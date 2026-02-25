@@ -161,9 +161,9 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             self.constants_computed_[name] = v
             return v
 
-        assert isinstance(
-            possible_value, onnx.TensorProto
-        ), f"Unexpected type {type(possible_value)} for a constant{self.get_debug_msg()}"
+        assert isinstance(possible_value, onnx.NodeProto), (
+            f"Unexpected type {type(possible_value)} for a constant{self.get_debug_msg()}"
+        )
         res, _ = self.compute_constant(name, exc=exc)
         if res is None:
             # The constant is too big to be computed.
