@@ -3,7 +3,6 @@ The module contains the main class ``ExtTestCase`` which adds
 specific functionalities to this project.
 """
 
-import copy
 import glob
 import itertools
 import logging
@@ -924,6 +923,23 @@ class ExtTestCase(unittest.TestCase):
         for a, b in zip(expected, value):
             self.assertEqualArray(a, b, atol=atol, rtol=rtol)
 
+    def to_numpy(tensor):
+        """Converts a :class:`torch.Tensor` to :class:`numpy.ndarray`."""
+        try:
+            return tensor.detach().cpu().numpy()
+        except TypeError:
+            # We try with ml_dtypes
+            pass
+
+        import ml_dtypes
+        import torch
+
+        conv = {torch.bfloat16: ml_dtypes.bfloat16}
+        assert tensor.dtype in conv, f"Unsupported type {tensor.dtype}, not in {conv}"
+        return (
+            tensor.detach().to(torch.float32).cpu().numpy().astype(conv[tensor.dtype])
+        )
+
     def assertEqualArray(
         self,
         expected: Any,
@@ -962,12 +978,10 @@ class ExtTestCase(unittest.TestCase):
                 raise AssertionError("\n".join(rows))  # noqa: B904
             return
 
-        from .helpers.torch_helper import to_numpy
-
         if hasattr(expected, "detach"):
-            expected = to_numpy(expected.detach().cpu())
+            expected = self.to_numpy(expected.detach().cpu())
         if hasattr(value, "detach"):
-            value = to_numpy(value.detach().cpu())
+            value = self.to_numpy(value.detach().cpu())
         if msg:
             try:
                 self.assertEqual(expected.dtype, value.dtype)
@@ -986,13 +1000,13 @@ class ExtTestCase(unittest.TestCase):
         except AssertionError as e:
             expected_max = numpy.abs(expected).max()
             expected_value = numpy.abs(value).max()
-            te = expected.astype(int) if expected.dtype == numpy.bool_ else expected
-            tv = value.astype(int) if value.dtype == numpy.bool_ else value
+            tte = expected.astype(int) if expected.dtype == numpy.bool_ else expected
+            ttv = value.astype(int) if value.dtype == numpy.bool_ else value
             rows = [
                 f"{msg}\n{e}" if msg else str(e),
                 f"expected max value={expected_max}",
                 f"expected computed value={expected_value}\n",
-                f"ratio={te / tv}\ndiff={te - tv}",
+                f"ratio={tte / ttv}\ndiff={tte - ttv}",
             ]
             raise AssertionError("\n".join(rows))  # noqa: B904
 
@@ -1025,81 +1039,7 @@ class ExtTestCase(unittest.TestCase):
     def assertEqualAny(
         self, expected: Any, value: Any, atol: float = 0, rtol: float = 0, msg: str = ""
     ):
-        if expected.__class__.__name__ == "BaseModelOutput":
-            self.assertEqual(type(expected), type(value), msg=msg)
-            self.assertEqual(len(expected), len(value), msg=msg)
-            self.assertEqual(list(expected), list(value), msg=msg)  # checks the order
-            self.assertEqualAny(
-                {k: v for k, v in expected.items()},  # noqa: C416
-                {k: v for k, v in value.items()},  # noqa: C416
-                atol=atol,
-                rtol=rtol,
-                msg=msg,
-            )
-        elif expected.__class__.__name__ == "BaseModelOutputWithPooling":
-            if expected.__class__.__name__ == value.__class__.__name__:
-                self.assertEqual(len(expected), len(value), msg=msg)
-                self.assertEqual(
-                    list(expected), list(value), msg=msg
-                )  # checks the order
-                self.assertEqualAny(
-                    {k: v for k, v in expected.items()},  # noqa: C416
-                    {k: v for k, v in value.items()},  # noqa: C416
-                    atol=atol,
-                    rtol=rtol,
-                    msg=msg,
-                )
-            else:
-                self.assertEqualArray(expected.last_hidden_state, value)
-        elif isinstance(expected, (tuple, list, dict)):
-            self.assertIsInstance(value, type(expected), msg=msg)
-            self.assertEqual(len(expected), len(value), msg=msg)
-            if isinstance(expected, dict):
-                for k in expected:
-                    self.assertIn(k, value, msg=msg)
-                    self.assertEqualAny(
-                        expected[k], value[k], msg=msg, atol=atol, rtol=rtol
-                    )
-            else:
-                for e, g in zip(expected, value):
-                    self.assertEqualAny(e, g, msg=msg, atol=atol, rtol=rtol)
-        elif expected.__class__.__name__ in (
-            "DynamicCache",
-            "SlidingWindowCache",
-            "HybridCache",
-        ):
-            from .helpers.cache_helper import CacheKeyValue
-
-            self.assertEqual(type(expected), type(value), msg=msg)
-            self.assertEqualAny(CacheKeyValue(expected), CacheKeyValue(value))
-        elif expected.__class__.__name__ == "StaticCache":
-            from .helpers.cache_helper import CacheKeyValue
-
-            self.assertEqual(type(expected), type(value), msg=msg)
-            self.assertEqual(expected.max_cache_len, value.max_cache_len)
-            self.assertEqualAny(CacheKeyValue(expected), CacheKeyValue(value))
-        elif expected.__class__.__name__ == "CacheKeyValue":
-            self.assertEqual(type(expected), type(value), msg=msg)
-            if expected.cls_layers is None:
-                self.assertEqual(expected.cls_layers, value.cls_layers)
-            else:
-                self.assertEqualAny(
-                    [cls.__name__ for cls in expected.cls_layers],
-                    [cls.__name__ for cls in value.cls_layers],
-                    msg=msg,
-                )
-            self.assertEqualAny(expected.key_cache, value.key_cache, msg=msg)
-            self.assertEqualAny(expected.value_cache, value.value_cache, msg=msg)
-        elif expected.__class__.__name__ == "EncoderDecoderCache":
-            self.assertEqual(type(expected), type(value), msg=msg)
-            atts = ["self_attention_cache", "cross_attention_cache"]
-            self.assertEqualAny(
-                {k: expected.__dict__.get(k, None) for k in atts},
-                {k: value.__dict__.get(k, None) for k in atts},
-                atol=atol,
-                rtol=rtol,
-            )
-        elif isinstance(expected, (int, float, str)):
+        if isinstance(expected, (int, float, str)):
             self.assertEqual(expected, value, msg=msg)
         elif hasattr(expected, "shape"):
             self.assertEqual(type(expected), type(value), msg=msg)
@@ -1262,211 +1202,9 @@ class ExtTestCase(unittest.TestCase):
                 raise
             raise AssertionError(msg) from e
 
-    def assert_onnx_disc(
-        self,
-        test_name: str,
-        proto: Union[str, "onnx.ModelProto"],  # noqa: F821
-        model: "torch.nn.Module",  # noqa: F821
-        inputs: Union[Tuple[Any], Dict[str, Any], List[Any]],
-        verbose: int = 0,
-        atol: float = 1e-5,
-        rtol: float = 1e-3,
-        copy_inputs: bool = True,
-        expected: Optional[Any] = None,
-        use_ort: bool = False,
-        ort_optimized_graph: bool = False,
-        ep: Optional[Union["torch.export.ExportedProgram", str]] = None,  # noqa: F821
-        **kwargs,
-    ):
-        """
-        Checks for discrepancies.
-        Runs the onnx models, computes expected outputs, in that order.
-        The inputs may be modified by this functions if the torch model
-        modifies them inplace.
-
-        :param test_name: test name, dumps the model if not empty
-        :param proto: onnx model
-        :param model: torch model
-        :param inputs: inputs
-        :param verbose: verbosity
-        :param atol: absolute tolerance
-        :param rtol: relative tolerance
-        :param expected: expected values
-        :param copy_inputs: to copy the inputs
-        :param use_ort: use :class:`onnxruntime.InferenceSession`
-        :param ort_optimized_graph: dumps the optimized onnxruntime graph
-        :param ep: exported program (or saved exported program)
-        :param kwargs: arguments sent to
-            :class:`yobx.helpers.ort_session.InferenceSessionForTorch`
-        """
-        from .helpers import string_type, string_diff, max_diff
-        from .helpers.torch_helper import torch_deepcopy
-        from .helpers.rt_helper import make_feeds
-        from .helpers.ort_session import InferenceSessionForTorch
-
-        kws = dict(with_shape=True, with_min_max=verbose > 1)
-        vname = test_name or "assert_onnx_disc"
-        if test_name:
-            import onnx
-
-            name = f"{test_name}.onnx"
-            if verbose:
-                print(f"[{vname}] save the onnx model into {name!r}")
-            model_file = None
-            if isinstance(proto, str):
-                model_file = proto
-                name = proto
-                proto = onnx.load(name)
-            elif hasattr(proto, "save"):
-                name = f"{test_name}.onnx"
-                proto.save(name)
-                proto = onnx.load(name)
-            elif hasattr(proto, "model_proto"):
-                proto = proto.model_proto
-            elif not self.unit_test_going():
-                assert isinstance(
-                    proto, onnx.ModelProto
-                ), f"Unexpected type {type(proto)} for proto"
-                name = self.dump_onnx(name, proto)
-            if verbose and not self.unit_test_going():
-                print(f"[{vname}] file size {os.stat(name).st_size // 2**10:1.3f} kb")
-        if verbose:
-            print(f"[{vname}] make feeds {string_type(inputs, **kws)}")
-
-        if not isinstance(inputs, list):
-            inputs = [inputs]
-            if expected is not None:
-                expected = [expected]
-
-        gots = []
-        if use_ort:
-            assert isinstance(
-                proto, onnx.ModelProto
-            ), f"Unexpected type {type(proto)} for proto"
-            import onnxruntime
-
-            options = onnxruntime.SessionOptions()
-            if ort_optimized_graph:
-                options.optimized_model_filepath = f"{name}.optort.onnx"
-            if "log_severity_level" in kwargs:
-                options.log_severity_level = kwargs["log_severity_level"]
-            if "log_verbosity_level" in kwargs:
-                options.log_verbosity_level = kwargs["log_verbosity_level"]
-            providers = kwargs.get("providers", ["CPUExecutionProvider"])
-            if verbose:
-                print(f"[{vname}] create onnxruntime.InferenceSession with {providers}")
-            sess = onnxruntime.InferenceSession(
-                model_file or proto.SerializeToString(), options, providers=providers
-            )
-            for inp in inputs:
-                feeds = make_feeds(proto, inp, use_numpy=True, copy=True)
-                if verbose:
-                    print(f"[{vname}] run ort feeds {string_type(feeds, **kws)}")
-                got = sess.run(None, feeds)
-                gots.append(got)
-        else:
-            if verbose:
-                print(f"[{vname}] create InferenceSessionForTorch")
-            sess = InferenceSessionForTorch(proto, **kwargs)
-            for inp in inputs:
-                feeds = make_feeds(proto, inp, copy=True)
-                if verbose:
-                    print(f"[{vname}] run orttorch feeds {string_type(feeds, **kws)}")
-                got = sess.run(None, feeds)
-                gots.append(got)
-        if verbose:
-            print(f"[{vname}] compute expected values")
-
-        if expected is None:
-            if copy_inputs:
-                expected = [
-                    (
-                        model(*torch_deepcopy(inp))
-                        if isinstance(inp, tuple)
-                        else model(**torch_deepcopy(inp))
-                    )
-                    for inp in inputs
-                ]
-            else:
-                expected = [
-                    model(*inp) if isinstance(inp, tuple) else model(**inp)
-                    for inp in inputs
-                ]
-
-        if verbose:
-            print(f"[{vname}] expected {string_type(expected, **kws)}")
-            print(f"[{vname}] obtained {string_type(got, **kws)}")
-
-        if ep:
-            if isinstance(ep, str):
-                if verbose:
-                    print(f"[{vname}] load exported program {ep!r}")
-                import torch
-
-                ep = torch.export.load(ep)
-
-            ep_model = ep.module()  # type: ignore[union-attr]
-            for expe, inp, got in zip(expected, inputs, gots):
-                ep_inputs = copy.deepcopy(inp) if copy_inputs else inp
-                ep_expected = (
-                    ep_model(*copy.deepcopy(ep_inputs))
-                    if isinstance(ep_inputs, tuple)
-                    else ep_model(**copy.deepcopy(ep_inputs))
-                )
-                if verbose:
-                    print(f"[{vname}] ep_expected {string_type(ep_expected, **kws)}")
-                ep_diff = max_diff(expe, ep_expected, hist=[0.1, 0.01])
-                if verbose:
-                    print(f"[{vname}] ep_diff {string_diff(ep_diff)}")
-                assert (
-                    isinstance(ep_diff["abs"], float)
-                    and isinstance(ep_diff["rel"], float)
-                    and not numpy.isnan(ep_diff["abs"])
-                    and ep_diff["abs"] <= atol
-                    and not numpy.isnan(ep_diff["rel"])
-                    and ep_diff["rel"] <= rtol
-                ), (
-                    f"discrepancies in {test_name!r} between the exported program "
-                    f"and the exported model diff={string_diff(ep_diff)}"
-                )
-                ep_nx_diff = max_diff(ep_expected, got, flatten=True, hist=[0.1, 0.01])
-                if verbose:
-                    print(f"[{vname}] ep_nx_diff {string_diff(ep_nx_diff)}")
-
-        for expe, got in zip(expected, gots):
-            diff = max_diff(expe, got, flatten=True, hist=[0.1, 0.01])
-            if verbose:
-                print(f"[{vname}] diff {string_diff(diff)}")
-            assert (
-                isinstance(diff["abs"], float)
-                and isinstance(diff["rel"], float)
-                and not numpy.isnan(diff["abs"])
-                and diff["abs"] <= atol
-                and not numpy.isnan(diff["rel"])
-                and diff["rel"] <= rtol
-            ), (
-                f"discrepancies in {test_name!r} between the model and "
-                f"the onnx model diff={string_diff(diff)}"
-            )
-
     def _debug(self):
         "Tells if DEBUG=1 is set up."
         return os.environ.get("DEBUG") in BOOLEAN_VALUES
-
-    def string_type(self, *args, **kwargs):
-        from .helpers import string_type
-
-        return string_type(*args, **kwargs)
-
-    def max_diff(self, *args, **kwargs):
-        from .helpers import max_diff
-
-        return max_diff(*args, **kwargs)
-
-    def use_dyn_not_str(self, *args, **kwargs):
-        from yobx.torch_export_patches.patch_inputs import use_dyn_not_str
-
-        return use_dyn_not_str(*args, *kwargs)
 
     def subloop(self, *args, verbose: int = 0):
         "Loops over elements and calls :meth:`unittests.TestCase.subTest`."

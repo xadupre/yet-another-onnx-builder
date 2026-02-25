@@ -18,6 +18,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install -e ".[docs]"
+        run: pip install -e ".[docs,torch]"
       - name: Build documentation
         run: sphinx-build -b html docs docs/_build/html -W
