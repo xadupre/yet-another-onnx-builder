@@ -462,6 +462,7 @@ class TestStringType(ExtTestCase):
     def test_with_min_max_bool_false(self):
         s = string_type(False, with_min_max=True)
         self.assertIn("bool=", s)
+
     def test_string_tensor_no_shape(self):
         import torch
         from yobx.helpers.helper import _string_tensor
