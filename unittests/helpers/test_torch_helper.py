@@ -1,4 +1,5 @@
 import unittest
+import numpy as np
 import onnx
 from yobx.ext_test_case import ExtTestCase, requires_torch
 
@@ -95,6 +96,79 @@ class TestTorchDtypeToOnnxDtype(ExtTestCase):
     def test_unknown_raises(self):
         with self.assertRaises(NotImplementedError):
             self.convert(_FakeSymbolicTensor("UNKNOWN"))
+
+
+@requires_torch("2.9")
+class TestToNumpy(ExtTestCase):
+    @classmethod
+    def setUpClass(cls):
+        import torch
+
+        cls.torch = torch
+
+    def setUp(self):
+        from yobx.helpers.torch_helper import to_numpy
+
+        self.to_numpy = to_numpy
+
+    def test_float32(self):
+        t = self.torch.tensor([1.0, 2.0, 3.0], dtype=self.torch.float32)
+        result = self.to_numpy(t)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.dtype, np.float32)
+        self.assertEqualArray(result, np.array([1.0, 2.0, 3.0], dtype=np.float32))
+
+    def test_float64(self):
+        t = self.torch.tensor([1.0, 2.0, 3.0], dtype=self.torch.float64)
+        result = self.to_numpy(t)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.dtype, np.float64)
+        self.assertEqualArray(result, np.array([1.0, 2.0, 3.0], dtype=np.float64))
+
+    def test_float16(self):
+        t = self.torch.tensor([1.0, 2.0, 3.0], dtype=self.torch.float16)
+        result = self.to_numpy(t)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.dtype, np.float16)
+        self.assertEqualArray(result, np.array([1.0, 2.0, 3.0], dtype=np.float16))
+
+    def test_int64(self):
+        t = self.torch.tensor([1, 2, 3], dtype=self.torch.int64)
+        result = self.to_numpy(t)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.dtype, np.int64)
+        self.assertEqualArray(result, np.array([1, 2, 3], dtype=np.int64))
+
+    def test_int32(self):
+        t = self.torch.tensor([1, 2, 3], dtype=self.torch.int32)
+        result = self.to_numpy(t)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.dtype, np.int32)
+        self.assertEqualArray(result, np.array([1, 2, 3], dtype=np.int32))
+
+    def test_bool(self):
+        t = self.torch.tensor([True, False, True], dtype=self.torch.bool)
+        result = self.to_numpy(t)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.dtype, np.bool_)
+        self.assertEqualArray(result, np.array([True, False, True], dtype=np.bool_))
+
+    def test_bfloat16(self):
+        try:
+            import ml_dtypes
+        except ImportError:
+            self.skipTest("ml_dtypes not available")
+        t = self.torch.tensor([1.0, 2.0, 3.0], dtype=self.torch.bfloat16)
+        result = self.to_numpy(t)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.dtype, ml_dtypes.bfloat16)
+
+    def test_2d_tensor(self):
+        t = self.torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=self.torch.float32)
+        result = self.to_numpy(t)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape, (2, 2))
+        self.assertEqualArray(result, np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32))
 
 
 if __name__ == "__main__":
