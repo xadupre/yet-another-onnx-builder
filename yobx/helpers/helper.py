@@ -1,7 +1,7 @@
 import enum
 import inspect
 from dataclasses import is_dataclass, fields
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Union
 import numpy as np
 
 
@@ -246,7 +246,7 @@ def string_type(
             limit=limit,
             verbose=verbose,
         )
-        s = ",".join(f"{kv[0]}:{string_type(kv[1],**kws)}" for kv in obj.items())
+        s = ",".join(f"{kv[0]}:{string_type(kv[1],**kws)}" for kv in obj.items())  # type: ignore[arg-type]
         if all(isinstance(k, int) for k in obj):
             if verbose:
                 print(f"[string_type] N:{type(obj)}")

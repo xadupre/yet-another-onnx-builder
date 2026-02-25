@@ -96,8 +96,8 @@ def rename_dynamic_dimensions(
             common = v & original
             if not common:
                 continue
-            common = sorted(common)
-            by = common[0]
+            common_sorted = sorted(common)
+            by = common_sorted[0]
             if ban_prefix and by.startswith(ban_prefix):
                 continue
             replacements[k] = by

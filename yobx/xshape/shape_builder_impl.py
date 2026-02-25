@@ -200,7 +200,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         ), f"Unable to compute value {name!r}{self.get_debug_msg()}"
         return value
 
-    def set_constant(self, name: str, value: Union[onnx.TensorProto, onnx.NodeProto]) -> bool:
+    def set_constant(self, name: str, value: Union[onnx.TensorProto, onnx.NodeProto]) -> None:
         """Tells if a result is a constant."""
         assert (
             name not in self.constants_
