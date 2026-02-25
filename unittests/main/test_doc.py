@@ -3,21 +3,20 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import numpy as np
-from yobx.ext_test_case import ExtTestCase
-
-try:
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    HAS_MATPLOTLIB = True
-except ImportError:
-    HAS_MATPLOTLIB = False
+from yobx.ext_test_case import ExtTestCase, requires_matplotlib
 
 
-@unittest.skipUnless(HAS_MATPLOTLIB, "matplotlib not installed")
+@requires_matplotlib()
 class TestDocMatplotlib(ExtTestCase):
+    @classmethod
+    def setUp(cls):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        cls.plt = plt
+
     def test_plot_legend_returns_axes(self):
         from yobx.doc import plot_legend
 
@@ -25,7 +24,7 @@ class TestDocMatplotlib(ExtTestCase):
         import matplotlib.axes
 
         self.assertIsInstance(ax, matplotlib.axes.Axes)
-        plt.close("all")
+        self.plt.close("all")
 
     def test_plot_legend_with_text_bottom(self):
         from yobx.doc import plot_legend
@@ -34,33 +33,33 @@ class TestDocMatplotlib(ExtTestCase):
         import matplotlib.axes
 
         self.assertIsInstance(ax, matplotlib.axes.Axes)
-        plt.close("all")
+        self.plt.close("all")
 
     def test_rotate_align_returns_axes(self):
         from yobx.doc import rotate_align
 
-        _fig, ax = plt.subplots()
+        _fig, ax = self.plt.subplots()
         ax.bar(["a", "b", "c"], [1, 2, 3])
         result = rotate_align(ax)
         self.assertIs(result, ax)
-        plt.close("all")
+        self.plt.close("all")
 
     def test_rotate_align_custom_angle_and_align(self):
         from yobx.doc import rotate_align
 
-        _fig, ax = plt.subplots()
+        _fig, ax = self.plt.subplots()
         ax.bar(["x", "y"], [1, 2])
         result = rotate_align(ax, angle=30, align="left")
         self.assertIs(result, ax)
         for label in ax.get_xticklabels():
             self.assertEqual(label.get_rotation(), 30)
             self.assertEqual(label.get_ha(), "left")
-        plt.close("all")
+        self.plt.close("all")
 
     def test_save_fig_creates_file(self):
         from yobx.doc import save_fig
 
-        _fig, ax = plt.subplots()
+        _fig, ax = self.plt.subplots()
         ax.plot([1, 2, 3])
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             fname = f.name
@@ -71,16 +70,16 @@ class TestDocMatplotlib(ExtTestCase):
             self.assertGreater(os.path.getsize(fname), 0)
         finally:
             os.unlink(fname)
-        plt.close("all")
+        self.plt.close("all")
 
     def test_title_sets_title(self):
         from yobx.doc import title
 
-        _fig, ax = plt.subplots()
+        _fig, ax = self.plt.subplots()
         result = title(ax, "My Title")
         self.assertIs(result, ax)
         self.assertEqual(ax.get_title(), "My Title")
-        plt.close("all")
+        self.plt.close("all")
 
     def test_plot_histogram_returns_axes(self):
         from yobx.doc import plot_histogram
@@ -90,16 +89,16 @@ class TestDocMatplotlib(ExtTestCase):
         import matplotlib.axes
 
         self.assertIsInstance(ax, matplotlib.axes.Axes)
-        plt.close("all")
+        self.plt.close("all")
 
     def test_plot_histogram_with_axes(self):
         from yobx.doc import plot_histogram
 
         data = np.random.default_rng(0).standard_normal(50)
-        _fig, ax = plt.subplots()
+        _fig, ax = self.plt.subplots()
         result = plot_histogram(data, ax=ax, bins=20, color="blue", alpha=0.5)
         self.assertIs(result, ax)
-        plt.close("all")
+        self.plt.close("all")
 
 
 class TestDocVersionHelpers(ExtTestCase):

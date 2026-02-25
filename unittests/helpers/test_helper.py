@@ -1,21 +1,7 @@
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
 from yobx.helpers import string_type
-
-try:
-    import torch as _torch  # noqa: F401
-
-    HAS_TORCH = True
-except ImportError:
-    HAS_TORCH = False
-
-try:
-    import transformers as _transformers  # noqa: F401
-
-    HAS_TRANSFORMERS = HAS_TORCH
-except ImportError:
-    HAS_TRANSFORMERS = False
 
 
 class TestStringType(ExtTestCase):
@@ -94,41 +80,41 @@ class TestStringType(ExtTestCase):
         s = string_type(arr, with_shape=True, with_min_max=True)
         self.assertIn("N2nans", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_bool(self):
         self.assertEqual(string_type(True), "bool")
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_bool_with_min_max(self):
         s = string_type(True, with_min_max=True)
         self.assertIn("bool=", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_int(self):
         self.assertEqual(string_type(1), "int")
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_int_with_min_max(self):
         self.assertEqual(string_type(5, with_min_max=True), "int=5")
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_float(self):
         self.assertEqual(string_type(1.0), "float")
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_float_with_min_max(self):
         s = string_type(3.14, with_min_max=True)
         self.assertIn("float=", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_str(self):
         self.assertEqual(string_type("hello"), "str")
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_slice(self):
         self.assertEqual(string_type(slice(1, 5)), "slice")
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_torch_tensor(self):
         import torch
 
@@ -137,7 +123,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("T", s)
         self.assertIn("r2", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_torch_tensor_with_shape(self):
         import torch
 
@@ -145,7 +131,7 @@ class TestStringType(ExtTestCase):
         s = string_type(t, with_shape=True)
         self.assertIn("s3x4", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_torch_tensor_with_min_max(self):
         import torch
 
@@ -154,7 +140,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("1.0", s)
         self.assertIn("3.0", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_dict_with_tensors(self):
         import torch
 
@@ -163,33 +149,33 @@ class TestStringType(ExtTestCase):
         self.assertIn("x:", s)
         self.assertIn("s2x3", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_tuple_with_min_max_ints(self):
         large = tuple(range(25))
         s = string_type(large, with_min_max=True)
         self.assertIn("#25(", s)
         self.assertIn("[0,24", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_list_with_min_max_ints(self):
         large = list(range(25))
         s = string_type(large, with_min_max=True)
         self.assertIn("#25[", s)
         self.assertIn("[0,24", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_set_small(self):
         s = string_type({1, 2, 3})
         self.assertIn("{", s)
         self.assertIn("}", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_set_large_with_min_max(self):
         large_set = set(range(15))
         s = string_type(large_set, with_min_max=True)
         self.assertIn("#15", s)
 
-    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    @requires_transformers("4.50")
     def test_dynamic_cache(self):
         import torch
         from transformers.cache_utils import DynamicCache
@@ -203,7 +189,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("key_cache=", s)
         self.assertIn("value_cache=", s)
 
-    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    @requires_transformers("4.50")
     def test_dynamic_cache_with_shape(self):
         import torch
         from transformers.cache_utils import DynamicCache
@@ -216,7 +202,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("DynamicCache", s)
         self.assertIn("1x4x2x8", s)
 
-    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    @requires_transformers("4.50")
     def test_dynamic_layer(self):
         import torch
         from transformers.cache_utils import DynamicCache
@@ -231,7 +217,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("keys=", s)
         self.assertIn("values=", s)
 
-    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    @requires_transformers("4.50")
     def test_dynamic_layer_with_shape(self):
         import torch
         from transformers.cache_utils import DynamicCache
@@ -245,7 +231,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("DynamicLayer", s)
         self.assertIn("1x4x2x8", s)
 
-    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    @requires_transformers("4.50")
     def test_static_cache(self):
         import torch
         from transformers import GPT2Config
@@ -261,7 +247,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("key_cache=", s)
         self.assertIn("value_cache=", s)
 
-    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    @requires_transformers("4.50")
     def test_static_cache_with_shape(self):
         import torch
         from transformers import GPT2Config
@@ -278,7 +264,7 @@ class TestStringType(ExtTestCase):
         # StaticCache pre-allocates to max_cache_len, so seq dim is 16 not 2
         self.assertIn("1x4x16x8", s)
 
-    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    @requires_transformers("4.50")
     def test_static_layer(self):
         import torch
         from transformers import GPT2Config
@@ -295,7 +281,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("keys=", s)
         self.assertIn("values=", s)
 
-    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    @requires_transformers("4.50")
     def test_static_layer_with_shape(self):
         import torch
         from transformers import GPT2Config
@@ -313,7 +299,7 @@ class TestStringType(ExtTestCase):
         # list() iterates over batch dim, exposing [heads, max_cache_len, head_dim]
         self.assertIn("4x16x8", s)
 
-    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    @requires_transformers("4.50")
     def test_encoder_decoder_cache(self):
         import torch
         from transformers.cache_utils import DynamicCache, EncoderDecoderCache
@@ -330,7 +316,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("self_attention_cache=", s)
         self.assertIn("cross_attention_cache=", s)
 
-    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    @requires_transformers("4.50")
     def test_encoder_decoder_cache_with_shape(self):
         import torch
         from transformers.cache_utils import DynamicCache, EncoderDecoderCache
@@ -348,7 +334,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("1x4x2x8", s)
         self.assertIn("1x4x3x8", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_dim(self):
         import torch
 
@@ -356,7 +342,7 @@ class TestStringType(ExtTestCase):
         s = string_type(d)
         self.assertEqual(s, "Dim(batch)")
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_derived_dim(self):
         import torch
 
@@ -365,21 +351,21 @@ class TestStringType(ExtTestCase):
         s = string_type(dd)
         self.assertEqual(s, "DerivedDim")
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_dim_hint_dynamic(self):
         import torch
 
         s = string_type(torch.export.Dim.DYNAMIC)
         self.assertEqual(s, "DYNAMIC")
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_dim_hint_auto(self):
         import torch
 
         s = string_type(torch.export.Dim.AUTO)
         self.assertEqual(s, "AUTO")
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_dataclass(self):
         from dataclasses import dataclass
 
@@ -394,7 +380,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("x:int", s)
         self.assertIn("y:float", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_dataclass_with_tensor(self):
         import torch
         from dataclasses import dataclass
@@ -408,7 +394,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("TensorData", s)
         self.assertIn("s2x3", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_torch_tensor_scalar_with_min_max(self):
         import torch
 
@@ -416,7 +402,7 @@ class TestStringType(ExtTestCase):
         s = string_type(t, with_min_max=True)
         self.assertIn("=", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_torch_tensor_empty_with_min_max(self):
         import torch
 
@@ -424,7 +410,7 @@ class TestStringType(ExtTestCase):
         s = string_type(t, with_shape=True, with_min_max=True)
         self.assertIn("[empty]", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_torch_tensor_with_nans_with_min_max(self):
         import torch
 
@@ -432,7 +418,7 @@ class TestStringType(ExtTestCase):
         s = string_type(t, with_shape=True, with_min_max=True)
         self.assertIn("N1nans", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_torch_tensor_float16(self):
         import torch
 
@@ -440,7 +426,7 @@ class TestStringType(ExtTestCase):
         s = string_type(t, with_shape=True)
         self.assertIn("s2x4", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_torch_tensor_int64(self):
         import torch
 
@@ -448,17 +434,17 @@ class TestStringType(ExtTestCase):
         s = string_type(t, with_shape=True)
         self.assertIn("T7s2x3", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_with_min_max_int(self):
         s = string_type(42, with_min_max=True)
         self.assertEqual(s, "int=42")
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_with_min_max_float(self):
         s = string_type(1.5, with_min_max=True)
         self.assertEqual(s, "float=1.5")
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_with_min_max_bool_false(self):
         s = string_type(False, with_min_max=True)
         self.assertIn("bool=", s)
@@ -472,7 +458,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("T", s)
         self.assertIn("r2", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_string_tensor_with_shape(self):
         import torch
         from yobx.helpers.helper import _string_tensor
@@ -482,7 +468,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("T", s)
         self.assertIn("s3x4", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_string_tensor_with_device_cpu(self):
         import torch
         from yobx.helpers.helper import _string_tensor
@@ -492,7 +478,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("C", s)
         self.assertIn("r2", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_string_tensor_custom_cls(self):
         import torch
         from yobx.helpers.helper import _string_tensor
@@ -502,7 +488,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("F", s)
         self.assertIn("s2x5", s)
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.9")
     def test_string_tensor_verbose(self):
         import torch
         from yobx.helpers.helper import _string_tensor
