@@ -332,3 +332,120 @@ def finalize_cache(cache: transformers.cache_utils.Cache) -> transformers.cache_
         f"first value={cache.layers[0].values}"  # type: ignore[attr-defined]
     )
     return cache
+
+
+def make_static_cache(
+    key_value_pairs: Union[List[torch.Tensor], List[Tuple[torch.Tensor, torch.Tensor]]],
+    max_cache_len: Optional[int] = None,
+    cls_layers: Optional[Union[str, List[type]]] = None,
+) -> transformers.cache_utils.DynamicCache:
+    """
+    Creates an instance of :class:`transformers.cache_utils.StaticCache`.
+    :param key_value_pairs: list of pairs of (key, values)
+    :param max_cache_len: max_cache_length or something inferred from the vector
+    :return: :class:`transformers.cache_utils.StaticCache`
+
+    Example:
+
+    .. runpython::
+        :showcode:
+
+        import torch
+        from onnx_diagnostic.helpers import string_type
+        from onnx_diagnostic.helpers.cache_helper import make_static_cache
+
+        n_layers = 2
+        bsize, nheads, slen, dim = 2, 4, 3, 7
+
+        past_key_values = make_static_cache(
+            [
+                (
+                    torch.randn(bsize, nheads, slen, dim),
+                    torch.randn(bsize, nheads, slen, dim),
+                )
+                for i in range(n_layers)
+            ],
+            max_cache_len=10,
+        )
+        print(string_type(past_key_values, with_shape=True))
+    """
+    assert not cls_layers or set(cls_layers) == {
+        transformers.cache_utils.StaticLayer
+    }, f"Not implemented when cls_layers={cls_layers!r}"
+    key_value_pairs = _preprocess_key_value_pairs(key_value_pairs)
+
+    class _config:
+        def __init__(self):
+            self.head_dim = key_value_pairs[0][0].shape[-1]
+            self.num_attention_heads = key_value_pairs[0][0].shape[1]
+            self.num_hidden_layers = len(key_value_pairs)
+
+        def get_text_config(self, *args, **kwargs):
+            return self
+
+    assert max_cache_len is not None, (
+        f"max_cache_len={max_cache_len} cannot be setup "
+        f"automatically yet from shape {key_value_pairs[0][0].shape}"
+    )
+    torch._check(
+        max_cache_len >= key_value_pairs[0][0].shape[2],
+        (
+            f"max_cache_len={max_cache_len} cannot be smaller "
+            f"shape[2]={key_value_pairs[0][0].shape[2]} in shape "
+            f"{key_value_pairs[0][0].shape}"
+        ),
+    )
+    cache = transformers.cache_utils.StaticCache(
+        config=_config(),
+        max_batch_size=key_value_pairs[0][0].shape[0],
+        device=key_value_pairs[0][0].device,
+        dtype=key_value_pairs[0][0].dtype,
+        max_cache_len=max_cache_len,
+    )
+    ca = CacheKeyValue(cache)
+    if hasattr(cache, "layers") and len(ca.key_cache) == 0:
+        # transformers>= 4.55.2, layers are empty
+        for i, (key, value) in enumerate(key_value_pairs):
+            cache.update(key, value, i)
+        return cache
+
+    torch._check(
+        not hasattr(cache, "layers") or len(key_value_pairs) == len(cache.layers),
+        lambda: (
+            f"Length mismatch len(key_value_pairs)={len(key_value_pairs)}, "
+            f"len(cache.layers)={len(cache.layers)}"
+        ),
+    )
+    torch._check(
+        len(key_value_pairs) == len(ca.key_cache),
+        lambda: (
+            f"Length mismatch len(key_value_pairs)={len(key_value_pairs)}, "
+            f"len(ca.key_cache)={len(ca.key_cache)}"
+        ),
+    )
+    torch._check(
+        len(key_value_pairs) == len(ca.value_cache),
+        lambda: (
+            f"Length mismatch len(key_value_pairs)={len(key_value_pairs)}, "
+            f"len(ca.value_cache)={len(ca.value_cache)}"
+        ),
+    )
+    for i in range(len(key_value_pairs)):
+        assert (
+            key_value_pairs[i][0].shape == key_value_pairs[i][1].shape
+        ), f"Shape mismatch {key_value_pairs[i][0].shape} != {key_value_pairs[i][1].shape}"
+        d = key_value_pairs[i][1].shape[2]
+        ca.key_cache[i][:, :, :d, :] = key_value_pairs[i][0]
+        ca.value_cache[i][:, :, :d, :] = key_value_pairs[i][1]
+    if hasattr(cache, "layers") and len(key_value_pairs) < len(cache.layers):
+        # The cache constructor contains the two following lines
+        # (in cache_utils.py) which append empty layers when the cache is
+        # initialized. We need to remove them.
+        # self.num_hidden_layers = getattr(config, "num_hidden_layers", 1)
+        # self.append_new_layers(self.num_hidden_layers - 1)
+        cache.layers[:] = cache.layers[-len(key_value_pairs) :]
+    assert not hasattr(cache, "layers") or len(key_value_pairs) == len(cache.layers), (
+        f"Unexpected number of layers in the cache ({len(cache.layers)}), "
+        f"{len(key_value_pairs)} expected."
+    )
+    return finalize_cache(cache)
