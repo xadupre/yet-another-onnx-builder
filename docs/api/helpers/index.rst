@@ -6,6 +6,7 @@
     :caption: modules
 
     helper
+    onnx_helper
     torch_helper
 
 Other functions

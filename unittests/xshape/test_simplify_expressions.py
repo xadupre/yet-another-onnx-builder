@@ -1,6 +1,8 @@
+import ast
 import unittest
 from yobx.ext_test_case import ExtTestCase
 from yobx.xshape.simplify_expressions import (
+    SimpleSimpliflyTransformer,
     simplify_expression,
     simplify_two_expressions,
 )
@@ -55,6 +57,20 @@ class TestSimplifyExpressions(ExtTestCase):
         self.assertEqual("a+b+c", simplify_expression("c+b+a"))
         self.assertEqual("a+b+c", simplify_expression("b+c+a"))
         self.assertEqual("a+b+c", simplify_expression("a+c+b"))
+
+    def test_simple_simplify_add(self):
+        tr = SimpleSimpliflyTransformer()
+        for expr, expected in [("x + 0", "x"), ("0 + x", "x")]:
+            tree = ast.parse(expr, mode="eval")
+            new_tree = tr.visit(tree)
+            self.assertEqual(ast.unparse(new_tree), expected)
+
+    def test_simple_simplify_mult(self):
+        tr = SimpleSimpliflyTransformer()
+        for expr, expected in [("x * 1", "x"), ("1 * x", "x")]:
+            tree = ast.parse(expr, mode="eval")
+            new_tree = tr.visit(tree)
+            self.assertEqual(ast.unparse(new_tree), expected)
 
     def test_simplify_function_floordiv_int(self):
         self.assertEqual("512*a", simplify_expression("1024*a//2"))

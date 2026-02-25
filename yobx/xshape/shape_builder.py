@@ -122,6 +122,8 @@ class ShapeBuilder:
                     return list(att.floats)
                 if att.type == onnx.AttributeProto.STRING:
                     return att.s
+                if att.type == onnx.AttributeProto.STRINGS:
+                    return list(att.strings)
                 raise TypeError(
                     f"Not implemented for attribute name {att.name!r}, attribute={att}"
                 )
@@ -150,6 +152,8 @@ class ShapeBuilder:
                     res[att.name] = list(att.floats)
                 elif att.type == onnx.AttributeProto.STRING:
                     res[att.name] = att.s
+                elif att.type == onnx.AttributeProto.STRINGS:
+                    res[att.name] = list(att.strings)
                 else:
                     raise TypeError(
                         f"Not implemented for attribute name {att.name!r}, attribute={att}"
