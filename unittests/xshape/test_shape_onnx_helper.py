@@ -16,7 +16,7 @@ TINT64 = onnx.TensorProto.INT64
 _mkv_ = oh.make_tensor_value_info
 
 
-class TestOnnxHelper(ExtTestCase):
+class TestShapeOnnxHelper(ExtTestCase):
     def test_element_wise_binary_op_types(self):
         types = element_wise_binary_op_types()
         self.assertIsInstance(types, set)
