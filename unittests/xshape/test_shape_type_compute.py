@@ -4,6 +4,7 @@ import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
+from yobx.xshape.shape_builder import ShapeBuilder
 from yobx.xshape.shape_builder_impl import BasicShapeBuilder
 from yobx.xshape.shape_type_compute import (
     broadcast_shape,
@@ -26,6 +27,7 @@ from yobx.xshape.shape_type_compute import (
     set_type_shape_unary_op_abs,
     set_shape_type_custom,
     _set_shape_type_op_any_sequence_empty,
+    _set_shape_type_op_any_known,
 )
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -35,6 +37,7 @@ TINT64 = onnx.TensorProto.INT64
 TBOOL = onnx.TensorProto.BOOL
 TCOMPLEX64 = onnx.TensorProto.COMPLEX64
 TCOMPLEX128 = onnx.TensorProto.COMPLEX128
+
 _mkv_ = oh.make_tensor_value_info
 
 
@@ -62,14 +65,12 @@ class _TestShapeBuilder(BasicShapeBuilder):
     ) -> bool:
         if input_index < len(node.input) and node.input[input_index]:
             return self.is_constant(node.input[input_index])
-        for att in node.attribute:
+        for att in node.attribute:  # noqa: SIM110
             if att.name == attr_name:
                 return True
         return False
 
-    def get_constant_or_attribute(
-        self, node: onnx.NodeProto, input_index: int, attr_name: str
-    ):
+    def get_constant_or_attribute(self, node: onnx.NodeProto, input_index: int, attr_name: str):
         if input_index < len(node.input) and node.input[input_index]:
             if self.is_constant(node.input[input_index]):
                 return self.get_constant(node.input[input_index], computed_value=True)
@@ -87,6 +88,67 @@ def _make_model(nodes, inputs, outputs, initializers=None, opset=18):
         opset_imports=[oh.make_opsetid("", opset)],
         ir_version=10,
     )
+
+
+class _MockShapeBuilder(ShapeBuilder):
+    """Minimal ShapeBuilder for unit-testing shape functions without torch."""
+
+    def __init__(self):
+        self._types = {}
+        self._shapes = {}
+        self._ranks = {}
+        self._devices = {}
+        self._debug_shape_missing = False
+
+    def get_type(self, name):
+        return self._types[name]
+
+    def set_type(self, name, t):
+        self._types[name] = t
+
+    def has_type(self, name):
+        return name in self._types
+
+    def get_shape(self, name):
+        return self._shapes[name]
+
+    def set_shape(self, name, shape, allow_zero=False):
+        self._shapes[name] = shape
+
+    def has_shape(self, name):
+        return name in self._shapes
+
+    def get_rank(self, name):
+        return self._ranks.get(name, len(self._shapes[name]) if name in self._shapes else None)
+
+    def set_rank(self, name, rank):
+        self._ranks[name] = rank
+
+    def has_rank(self, name):
+        return name in self._ranks or name in self._shapes
+
+    def has_device(self, name):
+        return name in self._devices
+
+    def get_device(self, name):
+        return self._devices[name]
+
+    def set_device(self, name, d):
+        self._devices[name] = d
+
+    def get_debug_msg(self):
+        return ""
+
+    def register_constraint_dimension(self, d, v):
+        pass
+
+    @property
+    def input_names(self):
+        return []
+
+    @property
+    def output_names(self):
+        return []
 
 
 class TestShapeTypeCompute(ExtTestCase):
@@ -300,7 +362,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b.set_shape("X", (2, 3, 4))
         b.set_type("Y", TFLOAT)
         b.set_shape("Y", (2, 4, 5))
-        result = set_type_shape_matmul(b, "Z", "X", "Y")
+        set_type_shape_matmul(b, "Z", "X", "Y")
         self.assertEqual(b.get_shape("Z"), (2, 3, 5))
 
     def test_set_type_shape_matmul_1d(self):
@@ -331,7 +393,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b.set_shape("X", (3, 4))
         b.set_type("Y", TFLOAT)
         b.set_shape("Y", (4, 5))
-        result = set_type_shape_gemm(b, "Z", "X", "Y", transA=0, transB=0)
+        set_type_shape_gemm(b, "Z", "X", "Y", transA=0, transB=0)
         self.assertEqual(b.get_shape("Z"), (3, 5))
 
     def test_set_type_shape_gemm_transA(self):
@@ -340,7 +402,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b.set_shape("X", (4, 3))
         b.set_type("Y", TFLOAT)
         b.set_shape("Y", (4, 5))
-        result = set_type_shape_gemm(b, "Z", "X", "Y", transA=1, transB=0)
+        set_type_shape_gemm(b, "Z", "X", "Y", transA=1, transB=0)
         self.assertEqual(b.get_shape("Z"), (3, 5))
 
     def test_set_type_shape_gemm_transB(self):
@@ -349,7 +411,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b.set_shape("X", (3, 4))
         b.set_type("Y", TFLOAT)
         b.set_shape("Y", (5, 4))
-        result = set_type_shape_gemm(b, "Z", "X", "Y", transA=0, transB=1)
+        set_type_shape_gemm(b, "Z", "X", "Y", transA=0, transB=1)
         self.assertEqual(b.get_shape("Z"), (3, 5))
 
     # ------------------------------------------------------------------
@@ -360,7 +422,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b = BasicShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4, 5))
-        result = set_type_shape_reduce_op(b, "Y", "X", keepdim=1, axes=(1,))
+        set_type_shape_reduce_op(b, "Y", "X", keepdim=1, axes=(1,))
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 1, 5))
 
@@ -368,14 +430,14 @@ class TestShapeTypeCompute(ExtTestCase):
         b = BasicShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4, 5))
-        result = set_type_shape_reduce_op(b, "Y", "X", keepdim=0, axes=(1,))
+        set_type_shape_reduce_op(b, "Y", "X", keepdim=0, axes=(1,))
         self.assertEqual(b.get_shape("Y"), (3, 5))
 
     def test_set_type_shape_reduce_op_no_axes(self):
         b = BasicShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4, 5))
-        result = set_type_shape_reduce_op(b, "Y", "X", keepdim=1, axes=None)
+        set_type_shape_reduce_op(b, "Y", "X", keepdim=1, axes=None)
         self.assertEqual(b.get_shape("Y"), (1, 1, 1))
 
     def test_set_type_shape_reduce_op_rank_only(self):
@@ -634,11 +696,7 @@ class TestShapeTypeCompute(ExtTestCase):
 
     def test_op_slice(self):
         model = _make_model(
-            [
-                oh.make_node(
-                    "Slice", ["X", "starts", "ends", "axes"], ["Y"]
-                )
-            ],
+            [oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])],
             [_mkv_("X", TFLOAT, [5, 6])],
             [_mkv_("Y", TFLOAT, [None, None])],
             [
@@ -874,7 +932,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b.set_type("Y", TFLOAT)
         b.set_shape("Y", (4, 5))
         node = oh.make_node("FusedMatMul", ["X", "Y"], ["Z"], domain="com.microsoft")
-        result = set_type_shape_fused_matmul(b, node)
+        set_type_shape_fused_matmul(b, node)
         self.assertEqual(b.get_shape("Z"), (3, 5))
 
     def test_set_type_shape_fused_matmul_transA(self):
@@ -883,10 +941,8 @@ class TestShapeTypeCompute(ExtTestCase):
         b.set_shape("X", (4, 3))
         b.set_type("Y", TFLOAT)
         b.set_shape("Y", (4, 5))
-        node = oh.make_node(
-            "FusedMatMul", ["X", "Y"], ["Z"], domain="com.microsoft", transA=1
-        )
-        result = set_type_shape_fused_matmul(b, node)
+        node = oh.make_node("FusedMatMul", ["X", "Y"], ["Z"], domain="com.microsoft", transA=1)
+        set_type_shape_fused_matmul(b, node)
         self.assertEqual(b.get_shape("Z"), (3, 5))
 
     def test_set_type_shape_fused_matmul_rank_only(self):
@@ -928,7 +984,7 @@ class TestShapeTypeCompute(ExtTestCase):
             target_treeids=[0],
             target_weights=[1.0],
         )
-        result = set_type_shape_tree_ensemble(b, node)
+        set_type_shape_tree_ensemble(b, node)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (10, 3))
 
@@ -969,7 +1025,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4, 2))
         node = oh.make_node("ToComplex", ["X"], ["Y"], domain="com.microsoft")
-        result = set_type_shape_to_complex(b, node)
+        set_type_shape_to_complex(b, node)
         self.assertEqual(b.get_type("Y"), TCOMPLEX64)
         self.assertEqual(b.get_shape("Y"), (3, 4))
 
@@ -978,7 +1034,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b.set_type("X", TDOUBLE)
         b.set_shape("X", (3, 4, 2))
         node = oh.make_node("ToComplex", ["X"], ["Y"], domain="com.microsoft")
-        result = set_type_shape_to_complex(b, node)
+        set_type_shape_to_complex(b, node)
         self.assertEqual(b.get_type("Y"), TCOMPLEX128)
 
     def test_set_type_shape_complex_module(self):
@@ -1029,7 +1085,7 @@ class TestShapeTypeCompute(ExtTestCase):
             ["Y"],
             domain="com.microsoft",
         )
-        result = set_type_shape_scatter_nd_of_shape(b, node)
+        set_type_shape_scatter_nd_of_shape(b, node)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (2, 3, 4))
 
@@ -1046,10 +1102,8 @@ class TestShapeTypeCompute(ExtTestCase):
         b._known_value_shape["shape"] = (4, 4)
         b.set_type("val", TFLOAT)
         b.set_shape("val", ())
-        node = oh.make_node(
-            "TriMatrix", ["shape", "val"], ["Y"], domain="com.microsoft"
-        )
-        result = set_type_shape_tri_matrix(b, node)
+        node = oh.make_node("TriMatrix", ["shape", "val"], ["Y"], domain="com.microsoft")
+        set_type_shape_tri_matrix(b, node)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (4, 4))
 
@@ -1061,10 +1115,8 @@ class TestShapeTypeCompute(ExtTestCase):
         b = BasicShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
-        node = oh.make_node(
-            "Transpose2DCastFP16", ["X"], ["Y"], domain="com.microsoft"
-        )
-        result = set_type_shape_transpose_2d_cast_fp16(b, node)
+        node = oh.make_node("Transpose2DCastFP16", ["X"], ["Y"], domain="com.microsoft")
+        set_type_shape_transpose_2d_cast_fp16(b, node)
         self.assertEqual(b.get_type("Y"), TFLOAT16)
         self.assertEqual(b.get_shape("Y"), (4, 3))
 
@@ -1072,10 +1124,8 @@ class TestShapeTypeCompute(ExtTestCase):
         b = BasicShapeBuilder()
         b.set_type("X", TFLOAT16)
         b.set_shape("X", (3, 4))
-        node = oh.make_node(
-            "Transpose2DCastFP32", ["X"], ["Y"], domain="com.microsoft"
-        )
-        result = set_type_shape_transpose_2d_cast_fp32(b, node)
+        node = oh.make_node("Transpose2DCastFP32", ["X"], ["Y"], domain="com.microsoft")
+        set_type_shape_transpose_2d_cast_fp32(b, node)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (4, 3))
 
@@ -1123,7 +1173,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         node = oh.make_node("ReplaceZero", ["X"], ["Y"], domain="com.microsoft")
-        result = set_shape_type_custom(b, node)
+        set_shape_type_custom(b, node)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4))
 
@@ -1134,7 +1184,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b.set_type("Y", TFLOAT)
         b.set_shape("Y", (4, 5))
         node = oh.make_node("FusedMatMul", ["X", "Y"], ["Z"], domain="com.microsoft")
-        result = set_shape_type_custom(b, node)
+        set_shape_type_custom(b, node)
         self.assertEqual(b.get_shape("Z"), (3, 5))
 
     def test_set_shape_type_custom_tree_ensemble(self):
@@ -1162,8 +1212,96 @@ class TestShapeTypeCompute(ExtTestCase):
             target_treeids=[0],
             target_weights=[1.0],
         )
-        result = set_shape_type_custom(b, node)
+        set_shape_type_custom(b, node)
         self.assertEqual(b.get_shape("Y"), (5, 2))
+
+    def test_argmax_keepdims(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 3, 4)
+        node = oh.make_node("ArgMax", ["X"], ["Y"], axis=1, keepdims=1)
+        _set_shape_type_op_any_known["ArgMax"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (2, 1, 4))
+        self.assertEqual(g._types.get("Y"), TINT64)
+
+    def test_argmin_no_keepdims(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 3, 4)
+        node = oh.make_node("ArgMin", ["X"], ["Y"], axis=2, keepdims=0)
+        _set_shape_type_op_any_known["ArgMin"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (2, 3))
+        self.assertEqual(g._types.get("Y"), TINT64)
+
+    def test_global_average_pool(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 8, 4, 4)
+        node = oh.make_node("GlobalAveragePool", ["X"], ["Y"])
+        _set_shape_type_op_any_known["GlobalAveragePool"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (2, 8, 1, 1))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_global_max_pool(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (1, 16, 6, 6)
+        node = oh.make_node("GlobalMaxPool", ["X"], ["Y"])
+        _set_shape_type_op_any_known["GlobalMaxPool"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (1, 16, 1, 1))
+
+    def test_flatten_static(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 3, 4)
+        node = oh.make_node("Flatten", ["X"], ["Y"], axis=1)
+        _set_shape_type_op_any_known["Flatten"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (2, 12))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_flatten_dynamic(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = ("batch", 3, 4)
+        node = oh.make_node("Flatten", ["X"], ["Y"], axis=1)
+        _set_shape_type_op_any_known["Flatten"](g, node)
+        self.assertEqual(g._shapes.get("Y"), ("batch", 12))
+
+    def test_eyelike_same_type(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (3, 3)
+        node = oh.make_node("EyeLike", ["X"], ["Y"])
+        _set_shape_type_op_any_known["EyeLike"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (3, 3))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_eyelike_with_dtype(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (4, 4)
+        node = oh.make_node("EyeLike", ["X"], ["Y"], dtype=TINT64)
+        _set_shape_type_op_any_known["EyeLike"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (4, 4))
+        self.assertEqual(g._types.get("Y"), TINT64)
+
+    def test_depth_to_space(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (1, 8, 2, 3)
+        node = oh.make_node("DepthToSpace", ["X"], ["Y"], blocksize=2)
+        _set_shape_type_op_any_known["DepthToSpace"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (1, 2, 4, 6))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_space_to_depth(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (1, 2, 4, 6)
+        node = oh.make_node("SpaceToDepth", ["X"], ["Y"], blocksize=2)
+        _set_shape_type_op_any_known["SpaceToDepth"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (1, 8, 2, 3))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
 
 
 if __name__ == "__main__":

@@ -1439,18 +1439,171 @@ def _set_shape_type_op_any_unary(
     return set_type_shape_unary_op(self, node.output[0], node.input[0], itype=itype)
 
 
+def _set_shape_type_op_any_arg_max_min(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for ArgMax and ArgMin."
+    self.set_type(node.output[0], TensorProto.INT64)
+    axis_att = self.get_attribute(node, "axis", exc=False)
+    axis = 0 if axis_att is None else axis_att.i
+    keepdim_att = self.get_attribute(node, "keepdims", exc=False)
+    keepdim = 1 if keepdim_att is None else keepdim_att.i
+    if self.has_shape(node.input[0]):
+        shape = list(self.get_shape(node.input[0]))
+        if keepdim:
+            shape[axis] = 1
+        else:
+            del shape[axis]
+        new_shape = tuple(shape)
+        self.set_shape(node.output[0], new_shape)
+        return new_shape
+    if self.has_rank(node.input[0]):
+        rk = self.get_rank(node.input[0])
+        self.set_rank(node.output[0], rk if keepdim else rk - 1)
+        return True
+    assert not self._debug_shape_missing, (
+        f"Unable to compute shape for node: "
+        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+    )
+
+
+def _set_shape_type_op_any_global_pool(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for GlobalAveragePool and GlobalMaxPool."
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    if self.has_shape(node.input[0]):
+        shape = self.get_shape(node.input[0])
+        new_shape = shape[:2] + (1,) * (len(shape) - 2)
+        self.set_shape(node.output[0], new_shape)
+        return new_shape
+    if self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+        return True
+    assert not self._debug_shape_missing, (
+        f"Unable to compute shape for node: "
+        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+    )
+
+
+def _set_shape_type_op_any_flatten(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for Flatten."
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    axis_att = self.get_attribute(node, "axis", exc=False)
+    axis = 1 if axis_att is None else axis_att.i
+    if self.has_shape(node.input[0]):
+        shape = self.get_shape(node.input[0])
+        if axis < 0:
+            axis = len(shape) + axis
+        dims_before = shape[:axis]
+        dims_after = shape[axis:]
+        if all_int(dims_before):
+            d1 = 1
+            for d in dims_before:
+                d1 *= d
+        else:
+            d1 = "*".join(map(str, dims_before)) if dims_before else "1"
+        if all_int(dims_after):
+            d2 = 1
+            for d in dims_after:
+                d2 *= d
+        else:
+            d2 = "*".join(map(str, dims_after)) if dims_after else "1"
+        new_shape = (d1, d2)
+        self.set_shape(node.output[0], new_shape)
+        return new_shape
+    self.set_rank(node.output[0], 2)
+    return True
+
+
+def _set_shape_type_op_any_eyelike(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for EyeLike."
+    dtype_att = self.get_attribute(node, "dtype", exc=False)
+    if dtype_att is not None:
+        self.set_type(node.output[0], dtype_att.i)
+    elif self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    if self.has_shape(node.input[0]):
+        self.set_shape(node.output[0], self.get_shape(node.input[0]))
+        return self.get_shape(node.input[0])
+    if self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+        return True
+    assert not self._debug_shape_missing, (
+        f"Unable to compute shape for node: "
+        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+    )
+
+
+def _set_shape_type_op_any_depth_to_space(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for DepthToSpace."
+    blocksize = self.get_attribute(node, "blocksize").i
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    if self.has_shape(node.input[0]):
+        shape = self.get_shape(node.input[0])
+        n, c = shape[0], shape[1]
+        spatial = shape[2:]
+        b_pow = blocksize ** len(spatial)
+        new_c = (c // b_pow) if isinstance(c, int) else f"{c}//{b_pow}"
+        new_spatial = tuple(
+            (s * blocksize if isinstance(s, int) else f"{s}*{blocksize}") for s in spatial
+        )
+        new_shape = (n, new_c, *new_spatial)
+        self.set_shape(node.output[0], new_shape)
+        return new_shape
+    if self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+        return True
+    assert not self._debug_shape_missing, (
+        f"Unable to compute shape for node: "
+        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+    )
+
+
+def _set_shape_type_op_any_space_to_depth(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for SpaceToDepth."
+    blocksize = self.get_attribute(node, "blocksize").i
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    if self.has_shape(node.input[0]):
+        shape = self.get_shape(node.input[0])
+        n, c = shape[0], shape[1]
+        spatial = shape[2:]
+        b_pow = blocksize ** len(spatial)
+        new_c = (c * b_pow) if isinstance(c, int) else f"{c}*{b_pow}"
+        new_spatial = tuple(
+            (s // blocksize if isinstance(s, int) else f"{s}//{blocksize}") for s in spatial
+        )
+        new_shape = (n, new_c, *new_spatial)
+        self.set_shape(node.output[0], new_shape)
+        return new_shape
+    if self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+        return True
+    assert not self._debug_shape_missing, (
+        f"Unable to compute shape for node: "
+        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+    )
+
+
 _set_shape_type_op_any_known = {
+    "ArgMax": _set_shape_type_op_any_arg_max_min,
+    "ArgMin": _set_shape_type_op_any_arg_max_min,
     "Attention": _set_shape_type_op_any_attention,
     "BatchNormalization": _set_shape_type_op_any_batch_normalization,
     "Cast": _set_shape_type_op_any_cast,
     "Compress": _set_shape_type_op_any_compress,
     "Concat": _set_shape_type_op_any_concat,
     "Conv": _set_shape_type_op_any_conv_max_pool,
+    "DepthToSpace": _set_shape_type_op_any_depth_to_space,
+    "EyeLike": _set_shape_type_op_any_eyelike,
     "Expand": _set_shape_type_op_any_expand,
+    "Flatten": _set_shape_type_op_any_flatten,
     "Gather": _set_shape_type_op_any_gather,
     "GatherElements": _set_shape_type_op_any_gather_elements,
     "Gelu": _set_shape_type_op_any_unary,
     "Gemm": _set_shape_type_op_any_gemm,
+    "GlobalAveragePool": _set_shape_type_op_any_global_pool,
+    "GlobalMaxPool": _set_shape_type_op_any_global_pool,
     "IsInf": lambda *args: _set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
     "IsNaN": lambda *args: _set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
     "LayerNormalization": _set_shape_type_op_any_layer_normalization,
@@ -1466,6 +1619,7 @@ _set_shape_type_op_any_known = {
     "SequenceEmpty": _set_shape_type_op_any_sequence_empty,
     "Sign": _set_shape_type_op_any_sign,
     "Slice": _set_shape_type_op_any_slice,
+    "SpaceToDepth": _set_shape_type_op_any_space_to_depth,
     "Split": _set_shape_type_op_any_split,
     "Squeeze": _set_shape_type_op_any_squeeze,
     "Tile": _set_shape_type_op_any_tile,

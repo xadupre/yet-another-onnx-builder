@@ -370,6 +370,60 @@ class TestShapeBuilder(ExtTestCase):
         }
         self.assertEqual(values, {"S1": (3, 5), "S2": (3, 5), "xy": (3, 10), "zs": (3, 10)})
 
+    def test_pretty_node_none(self):
+        b = BasicShapeBuilder()
+        self.assertEqual(b.pretty_node(None), "None")
+
+    def test_pretty_node_simple(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Add", ["X", "Y"], ["Z"])
+        result = b.pretty_node(node)
+        self.assertEqual(result, "Add: X, Y -> Z")
+
+    def test_pretty_node_with_domain(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("CustomOp", ["X"], ["Y"], domain="custom.domain")
+        result = b.pretty_node(node)
+        self.assertEqual(result, "CustomOp[custom.domain]: X -> Y")
+
+    def test_pretty_node_with_shape(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Add", ["X", "Y"], ["Z"])
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (2, 3))
+        b.set_type("Y", TFLOAT)
+        b.set_shape("Y", (2, 3))
+        b.set_type("Z", TFLOAT)
+        b.set_shape("Z", (2, 3))
+        result = b.pretty_node(node, shape=True)
+        self.assertIn("X:1|2x3", result)
+        self.assertIn("Y:1|2x3", result)
+        self.assertIn("Z:1|2x3", result)
+        self.assertIn("->", result)
+
+    def test_pretty_node_with_shape_missing_info(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Relu", ["X"], ["Y"])
+        result = b.pretty_node(node, shape=True)
+        self.assertIn("X:-|?", result)
+        self.assertIn("Y:-|?", result)
+
+    def test_pretty_node_short_false(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Relu", ["X"], ["Y"])
+        b.set_type("Y", TFLOAT)
+        b.set_shape("Y", (4, 5))
+        result = b.pretty_node(node, short=False)
+        self.assertIn("Relu: X -> Y", result)
+        self.assertIn("T1", result)
+        self.assertIn("4 x 5", result)
+
+    def test_pretty_node_short_false_with_name(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Relu", ["X"], ["Y"], name="relu_node")
+        result = b.pretty_node(node, short=False)
+        self.assertIn("relu_node", result)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

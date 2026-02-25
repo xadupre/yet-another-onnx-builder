@@ -24,7 +24,21 @@ class ShapeBuilderBackendRep(onnx.backend.base.BackendRep):
             model,
             n_in=(
                 1
-                if op_type in {"Expand", "Reshape", "Squeeze", "Unsqueeze"}
+                if op_type
+                in {
+                    "ArgMax",
+                    "ArgMin",
+                    "CumSum",
+                    "DepthToSpace",
+                    "Expand",
+                    "Flatten",
+                    "GlobalAveragePool",
+                    "GlobalMaxPool",
+                    "Reshape",
+                    "SpaceToDepth",
+                    "Squeeze",
+                    "Unsqueeze",
+                }
                 or op_type.startswith("Reduce")
                 else None
             ),
@@ -98,18 +112,18 @@ backend_test.exclude(
 # Not implemented yet.
 backend_test.exclude(
     "(affine_grid|array_feature_extractor|binarizer|label_encoder|attention"
-    "|argmax|argmin|bitwise|averagepool|blackmanwindow"
-    "|center_crop|col2im|compress|conv|cumsum"
-    "|depthtospace|det|dft|dropout|einsum|eyelike|fft|flatten|floor|gather|gelu"
-    "|globalmaxpool|gridsample|group_normalization|gru|hamming|hann"
-    "|hardmax|hardsigmoid|hardswish|instancenorm|l1normalization"
-    "|l2normalization|layer_normalization|leakyrelu|logsoftmax"
-    "|lpnormalization|lppool|lrn|lstm|matmulinteger|maxunpool"
-    "|mvn|nllloss|nonzero|optional|pad|quantize|range|rms"
+    "|bitwise|averagepool|blackmanwindow"
+    "|center_crop|col2im|compress|conv"
+    "|det|dft|dropout|einsum|fft|floor|gather|gelu"
+    "|gridsample|group_normalization|gru|hamming|hann"
+    "|hardmax|instancenorm|l1normalization"
+    "|l2normalization|layer_normalization|logsoftmax"
+    "|lppool|lstm|matmulinteger|maxunpool"
+    "|nllloss|nonzero|optional|pad|quantize|range|rms"
     "|resize|roialign|sce|sequence|shape_clip|softmax|squeeze|unsqueeze"
     "|test_max_|test_min_|test_maxpool_|shape_start_greater"
-    "|shrink|simple_rnn|spacetodepth|stft|string|strnorm"
-    "|tensorscatter|tfidfvectorizer|top_k|tril|triu"
+    "|simple_rnn|stft|string|strnorm"
+    "|tensorscatter|tfidfvectorizer|top_k"
     "|thresholdrelu"
     "|unique|AvgPool|BatchNorm|Conv|Embedding|GLU|LeakyReLU|Linear"
     "|MaxPool|PReLU|ConstantPad"
