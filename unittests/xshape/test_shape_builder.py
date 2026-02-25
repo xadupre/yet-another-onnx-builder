@@ -404,9 +404,7 @@ class TestShapeBuilder(ExtTestCase):
     def test_get_attribute_with_default_strings(self):
         b = BasicShapeBuilder()
         node = self._make_node_with_attrs(keys=[b"hello", b"world"])
-        self.assertEqual(
-            b.get_attribute_with_default(node, "keys", []), [b"hello", b"world"]
-        )
+        self.assertEqual(b.get_attribute_with_default(node, "keys", []), [b"hello", b"world"])
 
     def test_get_attribute_with_default_missing(self):
         b = BasicShapeBuilder()
@@ -425,9 +423,7 @@ class TestShapeBuilder(ExtTestCase):
         att.type = onnx.AttributeProto.TENSOR
         att.t.CopyFrom(tensor)
         node.attribute.append(att)
-        self.assertRaise(
-            lambda: b.get_attribute_with_default(node, "value", None), TypeError
-        )
+        self.assertRaise(lambda: b.get_attribute_with_default(node, "value", None), TypeError)
 
     def test_get_attributes_with_default_int(self):
         b = BasicShapeBuilder()
@@ -448,16 +444,12 @@ class TestShapeBuilder(ExtTestCase):
     def test_get_attributes_with_default_floats(self):
         b = BasicShapeBuilder()
         node = self._make_node_with_attrs(scales=[1.5, 2.5])
-        self.assertEqual(
-            b.get_attributes_with_default(node, scales=[]), {"scales": [1.5, 2.5]}
-        )
+        self.assertEqual(b.get_attributes_with_default(node, scales=[]), {"scales": [1.5, 2.5]})
 
     def test_get_attributes_with_default_string(self):
         b = BasicShapeBuilder()
         node = self._make_node_with_attrs(mode=b"nearest")
-        self.assertEqual(
-            b.get_attributes_with_default(node, mode=b""), {"mode": b"nearest"}
-        )
+        self.assertEqual(b.get_attributes_with_default(node, mode=b""), {"mode": b"nearest"})
 
     def test_get_attributes_with_default_strings(self):
         b = BasicShapeBuilder()
@@ -488,9 +480,7 @@ class TestShapeBuilder(ExtTestCase):
         att.type = onnx.AttributeProto.TENSOR
         att.t.CopyFrom(tensor)
         node.attribute.append(att)
-        self.assertRaise(
-            lambda: b.get_attributes_with_default(node, value=None), TypeError
-        )
+        self.assertRaise(lambda: b.get_attributes_with_default(node, value=None), TypeError)
 
     def test_pretty_node_none(self):
         b = BasicShapeBuilder()
