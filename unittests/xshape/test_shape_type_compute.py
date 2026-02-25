@@ -28,6 +28,7 @@ from yobx.xshape.shape_type_compute import (
     set_shape_type_custom,
     _set_shape_type_op_any_sequence_empty,
     _set_shape_type_op_any_known,
+    _set_shape_type_op_any_attention,
 )
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -1322,6 +1323,89 @@ class TestShapeTypeCompute(ExtTestCase):
         _set_shape_type_op_any_known["SpaceToDepth"](g, node)
         self.assertEqual(g._shapes.get("Y"), (1, 8, 2, 3))
         self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    # ------------------------------------------------------------------
+    # _set_shape_type_op_any_attention
+    # ------------------------------------------------------------------
+
+    def test_set_shape_type_op_any_attention_4d(self):
+        # 4D input: (batch, head, seq, size)
+        g = _MockShapeBuilder()
+        for name, shape in [("Q", (2, 8, 10, 64)), ("K", (2, 8, 10, 64)), ("V", (2, 8, 10, 32))]:
+            g._types[name] = TFLOAT
+            g._shapes[name] = shape
+        node = oh.make_node("Attention", ["Q", "K", "V"], ["out"])
+        _set_shape_type_op_any_attention(g, node)
+        self.assertEqual(g._shapes.get("out"), (2, 8, 10, 32))
+        self.assertEqual(g._types.get("out"), TFLOAT)
+
+    def test_set_shape_type_op_any_attention_3d(self):
+        # 3D input: (batch, seq, hidden_size) with q/kv head attributes
+        g = _MockShapeBuilder()
+        for name, shape in [
+            ("Q", (2, 10, 512)),
+            ("K", (2, 10, 256)),
+            ("V", (2, 10, 256)),
+        ]:
+            g._types[name] = TFLOAT
+            g._shapes[name] = shape
+        node = oh.make_node(
+            "Attention", ["Q", "K", "V"], ["out"], q_num_heads=8, kv_num_heads=4
+        )
+        _set_shape_type_op_any_attention(g, node)
+        # v_size = 256 // 4 = 64; output shape = (batch, seq, q_head * v_size) = (2, 10, 512)
+        self.assertEqual(g._shapes.get("out"), (2, 10, 512))
+        self.assertEqual(g._types.get("out"), TFLOAT)
+
+    def test_set_shape_type_op_any_attention_3d_present_outputs(self):
+        # 3D with present key/value outputs (output[1] and output[2]), no past inputs
+        g = _MockShapeBuilder()
+        for name, shape in [
+            ("Q", (2, 10, 512)),
+            ("K", (2, 10, 512)),
+            ("V", (2, 10, 512)),
+        ]:
+            g._types[name] = TFLOAT
+            g._shapes[name] = shape
+        node = oh.make_node(
+            "Attention",
+            ["Q", "K", "V", "", ""],
+            ["out", "present_key", "present_value"],
+            q_num_heads=8,
+            kv_num_heads=8,
+        )
+        _set_shape_type_op_any_attention(g, node)
+        # q_head=8, k_head=v_head=8, k_size=v_size=64
+        # output[0]: (2, 10, 8*64) = (2, 10, 512)
+        self.assertEqual(g._shapes.get("out"), (2, 10, 512))
+        # No past inputs: past_seq=0, total_seq=10+0=10
+        # output[1]: (batch, k_head, total_seq, k_size) = (2, 8, 10, 64)
+        self.assertEqual(g._shapes.get("present_key"), (2, 8, 10, 64))
+        # output[2]: (batch, v_head, total_seq, v_size) = (2, 8, 10, 64)
+        self.assertEqual(g._shapes.get("present_value"), (2, 8, 10, 64))
+
+    def test_set_shape_type_op_any_attention_rank_only(self):
+        # Only rank information available; rank of output[0] = rank of input[0]
+        g = _MockShapeBuilder()
+        g._types["Q"] = TFLOAT
+        g._ranks["Q"] = 3
+        node = oh.make_node("Attention", ["Q", "K", "V"], ["out"])
+        _set_shape_type_op_any_attention(g, node)
+        self.assertEqual(g._ranks.get("out"), 3)
+
+    def test_set_shape_type_op_any_attention_type_propagation(self):
+        # Type from input[0] propagates to all outputs; output[2] uses input[2] type
+        g = _MockShapeBuilder()
+        g._types["Q"] = TFLOAT16
+        g._types["K"] = TFLOAT16
+        g._types["V"] = TFLOAT  # different type for v cache output
+        node = oh.make_node(
+            "Attention", ["Q", "K", "V"], ["out", "present_key", "present_value"]
+        )
+        _set_shape_type_op_any_attention(g, node)
+        self.assertEqual(g._types.get("out"), TFLOAT16)
+        self.assertEqual(g._types.get("present_key"), TFLOAT16)
+        self.assertEqual(g._types.get("present_value"), TFLOAT)
 
 
 if __name__ == "__main__":
