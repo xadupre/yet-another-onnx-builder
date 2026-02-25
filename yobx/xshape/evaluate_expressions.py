@@ -20,7 +20,7 @@ def _CeilToDiv(n: int, div: int) -> int:
 
 def _eval(node, variables, expr):
     if isinstance(node, ast.Expression):
-        return _eval(node.body)
+        return _eval(node.body, variables, expr)
     if isinstance(node, ast.Constant):
         if isinstance(node.value, int):
             return node.value
