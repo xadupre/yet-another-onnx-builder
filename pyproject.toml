@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yet-another-onnx-builder"
+version = "0.1.0"
+description = "Converts models to ONNX format and other things"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = [
+    "ml_dtypes",
+    "numpy>=2.1",
+    "onnx>=1.14",
+    "onnxruntime>=1.20",
+    "packaging",
+    "scikit-learn>=1.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "pytest>=7",
+    "py-cpuinfo",
+    "pytest-coverage",
+    "pytest-subtests",
+    "ruff",
+]
+docs = [
+    "black",
+    "furo",
+    "matplotlib",
+    "onnx-diagnostic",
+    "openpyxl",
+    "pandas",
+    "sphinx>=7",
+    "sphinx-gallery",
+    "sphinx-issues",
+    "sphinx-runpython",
+    "tabulate",
+    "tqdm",
+    "xlsxwriter",
+]
+torch = [
+    "accelerate",
+    "huggingface_hub",
+    "onnxscript>=0.1",
+    "sentencepiece",
+    "torch>=2.10",
+    "transformers>=4.55",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["yobx*"]
+
+[tool.pytest.ini_options]
+testpaths = ["unittests"]
