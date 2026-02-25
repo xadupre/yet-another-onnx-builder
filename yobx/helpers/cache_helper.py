@@ -39,7 +39,9 @@ class CacheKeyValue:
         capi.value_cache
     """
 
-    def __init__(self, cache=None, cls_layers=None):
+    def __init__(
+        self, cache: Optional[Any] = None, cls_layers: Optional[Union[str, List[type]]] = None
+    ):
         if hasattr(cache, "layers"):
             layers = [
                 layer

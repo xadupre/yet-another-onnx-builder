@@ -18,7 +18,6 @@ from yobx.ext_test_case import (
     requires_onnxruntime,
     requires_python,
     requires_sklearn,
-    requires_zoo,
     has_onnxruntime,
     has_onnxruntime_training,
     has_onnxruntime_genai,
@@ -181,16 +180,6 @@ class TestRequiresFunctions(ExtTestCase):
         self.assertTrue(callable(dec))
         sentinel = object()
         self.assertIs(dec(sentinel), sentinel)
-
-    def test_requires_zoo_skips_when_not_set(self):
-        # ZOO env var is not set, should return skip decorator
-        old = os.environ.pop("ZOO", None)
-        try:
-            dec = requires_zoo("msg")
-            self.assertTrue(callable(dec))
-        finally:
-            if old is not None:
-                os.environ["ZOO"] = old
 
     def test_has_onnxruntime_returns_bool(self):
         result = has_onnxruntime("1.0.0")
