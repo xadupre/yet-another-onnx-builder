@@ -1,5 +1,5 @@
-onnx-pipe documentation
-=======================
+yet-another-onnx-builder documentation
+======================================
 
 .. toctree::
    :maxdepth: 2
