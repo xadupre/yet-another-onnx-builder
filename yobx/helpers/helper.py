@@ -76,7 +76,7 @@ def string_type(
         :showcode:
 
         import torch
-        from tobx.helpers import string_type
+        from yobx.helpers import string_type
 
         inputs = (
             torch.rand((3, 4), dtype=torch.float16),
