@@ -92,7 +92,7 @@ def _infer_types_function(
     for node in proto.node:
         out = _infer_types_node(node, [current[i] for i in node.input], None, exc=exc)
         current.update(dict(zip(node.output, out)))
-    return [current[n] for n in proto.output]
+    return tuple(current[n] for n in proto.output)
 
 
 def _infer_types_node(
