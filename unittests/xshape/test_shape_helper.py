@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.xshape._shape_helper import (
     reshape_implementation_with_zero,
     all_int,
@@ -13,13 +13,6 @@ from yobx.xshape._shape_helper import (
     compatible_dimensions,
     _reshape_shape,
 )
-
-try:
-    import torch as _torch  # noqa: F401
-
-    HAS_TORCH = True
-except ImportError:
-    HAS_TORCH = False
 
 
 class TestShapeHelper(ExtTestCase):
@@ -57,7 +50,7 @@ class TestShapeHelper(ExtTestCase):
     def test_is_static_dimension_str(self):
         self.assertFalse(is_static_dimension("batch"))
 
-    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    @requires_torch("2.0")
     def test_is_static_dimension_dim(self):
         import torch
 
