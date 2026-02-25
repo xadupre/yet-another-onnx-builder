@@ -683,6 +683,19 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4))
 
+    def test_op_expand_with_one(self):
+        # value is not None and cst contains 1, so _apply_expand_to_shape is called
+        model = _make_model(
+            [oh.make_node("Expand", ["X", "shape"], ["Y"])],
+            [_mkv_("X", TFLOAT, [3, 1])],
+            [_mkv_("Y", TFLOAT, [3, 4])],
+            [onh.from_array(np.array([1, 4], dtype=np.int64), name="shape")],
+        )
+        b = _TestShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (3, 4))
+
     def test_op_sign(self):
         model = _make_model(
             [oh.make_node("Sign", ["X"], ["Y"])],
