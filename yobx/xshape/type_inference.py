@@ -125,7 +125,7 @@ def _infer_types_node(
             raise RuntimeError(
                 f"Unable to infer type for node type {node.op_type!r}, node is {node}."
             )
-        return 0
+        return tuple(0 for _ in node.output)
 
     if output_name:
         assert (
