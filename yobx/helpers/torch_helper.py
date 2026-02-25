@@ -101,9 +101,7 @@ def torch_dtype_to_onnx_dtype(to: torch.dtype) -> int:
     sto = str(to)
     if sto in _TYPENAME:
         return _TYPENAME[sto]
-    raise NotImplementedError(
-        f"Unable to convert torch dtype {onnx_dtype_name(to)} ({type(to)}) to onnx dtype."
-    )
+    raise NotImplementedError(f"Unable to convert torch dtype {to!r} ({type(to)}) to onnx dtype.")
 
 
 def to_numpy(tensor: torch.Tensor) -> np.ndarray:

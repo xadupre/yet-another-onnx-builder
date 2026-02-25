@@ -38,7 +38,7 @@ def np_dtype_to_tensor_dtype(dtype: np.dtype) -> int:
     return oh.np_dtype_to_tensor_dtype(dtype)
 
 
-def dtype_to_tensor_dtype(dt: Union[np.dtype, "torch.dtype"]) -> int:  # noqa: F821
+def dtype_to_tensor_dtype(dt: Union[np.dtype, "torch.dtype"]) -> int:  # type: ignore[name-defined] # noqa: F821
     """
     Converts a torch dtype or numpy dtype into a onnx element type.
 

@@ -18,10 +18,13 @@ class TestTorchDtypeToOnnxDtype(ExtTestCase):
     @classmethod
     def setUpClass(cls):
         import torch
+
+        cls.torch = torch
+
+    def setUp(self):
         from yobx.helpers.torch_helper import torch_dtype_to_onnx_dtype
 
-        cls.convert = torch_dtype_to_onnx_dtype
-        cls.torch = torch
+        self.convert = torch_dtype_to_onnx_dtype
 
     def test_float32(self):
         self.assertEqual(self.convert(self.torch.float32), onnx.TensorProto.FLOAT)

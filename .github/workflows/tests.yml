@@ -39,7 +39,7 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev,docs,torch]"
       - name: Run tests
-        run: pytest -v --cov=yobx --cov-report=xml --durations=10
+        run: pytest --cov=yobx --cov-report=xml --durations=10
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.13'
         uses: codecov/codecov-action@v5
