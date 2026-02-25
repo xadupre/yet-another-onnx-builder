@@ -1369,6 +1369,7 @@ class TestShapeTypeCompute(ExtTestCase):
         _set_shape_type_op_any_known["GatherElements"](g, node)
         self.assertEqual(g._types.get("Y"), TFLOAT)
         self.assertEqual(g._ranks.get("Y"), 3)
+
     # ------------------------------------------------------------------
     # _set_shape_type_op_any_attention
     # ------------------------------------------------------------------
@@ -1394,9 +1395,7 @@ class TestShapeTypeCompute(ExtTestCase):
         ]:
             g._types[name] = TFLOAT
             g._shapes[name] = shape
-        node = oh.make_node(
-            "Attention", ["Q", "K", "V"], ["out"], q_num_heads=8, kv_num_heads=4
-        )
+        node = oh.make_node("Attention", ["Q", "K", "V"], ["out"], q_num_heads=8, kv_num_heads=4)
         _set_shape_type_op_any_attention(g, node)
         # v_size = 256 // 4 = 64; output shape = (batch, seq, q_head * v_size) = (2, 10, 512)
         self.assertEqual(g._shapes.get("out"), (2, 10, 512))
@@ -1444,9 +1443,7 @@ class TestShapeTypeCompute(ExtTestCase):
         g._types["Q"] = TFLOAT16
         g._types["K"] = TFLOAT16
         g._types["V"] = TFLOAT  # different type for v cache output
-        node = oh.make_node(
-            "Attention", ["Q", "K", "V"], ["out", "present_key", "present_value"]
-        )
+        node = oh.make_node("Attention", ["Q", "K", "V"], ["out", "present_key", "present_value"])
         _set_shape_type_op_any_attention(g, node)
         self.assertEqual(g._types.get("out"), TFLOAT16)
         self.assertEqual(g._types.get("present_key"), TFLOAT16)
