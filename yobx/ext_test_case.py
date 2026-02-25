@@ -1226,3 +1226,13 @@ class ExtTestCase(unittest.TestCase):
             yield
         finally:
             os.environ[varname] = old_value or ""
+
+    def string_type(self, *args, **kwargs):
+        from .helpers import string_type
+
+        return string_type(*args, **kwargs)
+
+    def max_diff(self, *args, **kwargs):
+        from .helpers import max_diff
+
+        return max_diff(*args, **kwargs)
