@@ -7,8 +7,8 @@ import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 from onnx.external_data_helper import uses_external_data
-from onnx_diagnostic.helpers import string_type
 from onnx.reference import ReferenceEvaluator
+from ..helpers import string_type
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape
 from ._builder_runtime import _BuilderRuntime
 from ._shape_runtime import _ShapeRuntime
