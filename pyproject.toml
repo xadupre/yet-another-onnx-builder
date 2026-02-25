@@ -77,3 +77,6 @@ exclude = [
 ]
 
 line-length = 98
+
+[tool.ruff.lint]
+select = ["E", "F"]
