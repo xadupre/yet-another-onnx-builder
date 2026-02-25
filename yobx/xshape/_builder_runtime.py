@@ -381,7 +381,7 @@ class _BuilderRuntime:
             if node.op_type == "Exp":
                 return [np.exp(x).astype(ttype)]
             if node.op_type == "Reciprocal":
-                return [(np.array([1], dtype=x.dtype) / x).to(ttype)]
+                return [(np.array([1], dtype=x.dtype) / x).astype(ttype)]
             raise AssertionError(
                 f"Not implemented for op_type={node.op_type!r}, node={node}, feeds={feeds}"
             )
