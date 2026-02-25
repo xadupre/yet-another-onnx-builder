@@ -313,6 +313,41 @@ class TestStringType(ExtTestCase):
         # list() iterates over batch dim, exposing [heads, max_cache_len, head_dim]
         self.assertIn("4x16x8", s)
 
+    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    def test_encoder_decoder_cache(self):
+        import torch
+        from transformers.cache_utils import DynamicCache, EncoderDecoderCache
+
+        self_cache = DynamicCache()
+        cross_cache = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        self_cache.update(key, value, layer_idx=0)
+        cross_cache.update(torch.rand(1, 4, 3, 8), torch.rand(1, 4, 3, 8), layer_idx=0)
+        edc = EncoderDecoderCache(self_cache, cross_cache)
+        s = string_type(edc)
+        self.assertIn("EncoderDecoderCache", s)
+        self.assertIn("self_attention_cache=", s)
+        self.assertIn("cross_attention_cache=", s)
+
+    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    def test_encoder_decoder_cache_with_shape(self):
+        import torch
+        from transformers.cache_utils import DynamicCache, EncoderDecoderCache
+
+        self_cache = DynamicCache()
+        cross_cache = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        self_cache.update(key, value, layer_idx=0)
+        cross_cache.update(torch.rand(1, 4, 3, 8), torch.rand(1, 4, 3, 8), layer_idx=0)
+        edc = EncoderDecoderCache(self_cache, cross_cache)
+        s = string_type(edc, with_shape=True)
+        self.assertIn("EncoderDecoderCache", s)
+        # self-attention uses seq len 2, cross-attention uses seq len 3
+        self.assertIn("1x4x2x8", s)
+        self.assertIn("1x4x3x8", s)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
