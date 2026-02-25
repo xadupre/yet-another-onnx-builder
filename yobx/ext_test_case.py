@@ -486,6 +486,17 @@ def requires_torch(version: str, msg: str = "") -> Callable:
     return lambda x: x
 
 
+def requires_matplotlib(version: str, msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`pytorch` is not recent enough."""
+    import packaging.version as pv
+    import matplotlib
+
+    if pv.Version(matplotlib.__version__) < pv.Version(version):
+        msg = f"matplotlib version {matplotlib.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def requires_numpy(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`numpy` is not recent enough."""
     import packaging.version as pv
