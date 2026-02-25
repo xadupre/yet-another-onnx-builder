@@ -3,4 +3,4 @@ API Reference
 
 .. toctree::
 
-   tracing/index
+   xshape/index

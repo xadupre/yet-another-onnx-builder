@@ -10,9 +10,7 @@ def get_latest_pypi_version(package_name="yet-another-onnx-builder") -> str:
     url = f"https://pypi.org/pypi/{package_name}/json"
     response = requests.get(url)
 
-    assert (
-        response.status_code == 200
-    ), f"Unable to retrieve the version response={response}"
+    assert response.status_code == 200, f"Unable to retrieve the version response={response}"
     data = response.json()
     version = data["info"]["version"]
     return version

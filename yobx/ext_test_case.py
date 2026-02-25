@@ -229,9 +229,7 @@ def measure_time(
     *number* times the execution of the main statement.
     """
     if not callable(stmt) and not isinstance(stmt, str):
-        raise TypeError(
-            f"stmt is not callable or a string but is of type {type(stmt)!r}."
-        )
+        raise TypeError(f"stmt is not callable or a string but is of type {type(stmt)!r}.")
     if context is None:
         context = {}
 
@@ -247,9 +245,7 @@ def measure_time(
 
     if max_time is not None:
         if not div_by_number:
-            raise ValueError(
-                "div_by_number must be set to True of max_time is defined."
-            )
+            raise ValueError("div_by_number must be set to True of max_time is defined.")
         i = 1
         total_time = 0.0
         results = []
@@ -350,9 +346,7 @@ def statistics_on_folder(
         rows = []
         for fold in folder:
             last = fold.replace("\\", "/").split("/")[-1]
-            r = statistics_on_folder(
-                fold, pattern=pattern, aggregation=max(aggregation - 1, 0)
-            )
+            r = statistics_on_folder(fold, pattern=pattern, aggregation=max(aggregation - 1, 0))
             if aggregation == 0:
                 rows.extend(r)
                 continue
@@ -411,9 +405,7 @@ def requires_python(version: Tuple[int, ...], msg: str = ""):
     :param version: minimum version
     """
     if sys.version_info[: len(version)] < version:
-        return unittest.skip(
-            msg or f"python not recent enough {sys.version_info} < {version}"
-        )
+        return unittest.skip(msg or f"python not recent enough {sys.version_info} < {version}")
     return lambda x: x
 
 
@@ -435,9 +427,7 @@ def requires_cuda(msg: str = "", version: str = "", memory: int = 0):
 
         if pv.Version(torch.version.cuda) < pv.Version(version):
             msg = msg or f"CUDA older than {version}"
-        return unittest.skip(
-            msg or f"cuda not recent enough {torch.version.cuda} < {version}"
-        )
+        return unittest.skip(msg or f"cuda not recent enough {torch.version.cuda} < {version}")
 
     if memory:
         m = torch.cuda.get_device_properties(0).total_memory / 2**30
@@ -470,20 +460,17 @@ def requires_sklearn(version: str, msg: str = "") -> Callable:
 
 
 def requires_experimental(version: str = "0.0.0", msg: str = "") -> Callable:
-    """Skips a unit test if :epkg:`experimental-experiment` is not recent enough."""
+    """Skips a unit test if :epkg:`yet-another-onnx-builder` is not recent enough."""
     import packaging.version as pv
 
     try:
-        import experimental_experiment
+        import yobx
     except ImportError:
-        msg = f"experimental-experiment not installed: {msg}"
+        msg = f"yet-another-onnx-builder not installed: {msg}"
         return unittest.skip(msg)
 
-    if pv.Version(experimental_experiment.__version__) < pv.Version(version):
-        msg = (
-            f"experimental-experiment version "
-            f"{experimental_experiment.__version__} < {version}: {msg}"
-        )
+    if pv.Version(yobx.__version__) < pv.Version(version):
+        msg = f"yet-another-onnx-builder version " f"{yobx.__version__} < {version}: {msg}"
         return unittest.skip(msg)
     return lambda x: x
 
@@ -568,10 +555,7 @@ def requires_diffusers(
         msg = f"diffusers version {diffusers.__version__} < {version} {msg}"
         return unittest.skip(msg)
     if or_older_than and v > pv.Version(or_older_than):
-        msg = (
-            f"diffusers version {or_older_than} < "
-            f"{diffusers.__version__} < {version} {msg}"
-        )
+        msg = f"diffusers version {or_older_than} < " f"{diffusers.__version__} < {version} {msg}"
         return unittest.skip(msg)
     return lambda x: x
 
@@ -707,13 +691,13 @@ def requires_onnx(version: str, msg: str = "") -> Callable:
     return lambda x: x
 
 
-def requires_experimental_experiment(version: str, msg: str = "") -> Callable:
+def requires_yobx(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx-array-api` is not recent enough."""
     import packaging.version as pv
-    import experimental_experiment
+    import yobx
 
-    if pv.Version(experimental_experiment.__version__) < pv.Version(version):
-        msg = f"onnx-array-api version {experimental_experiment.__version__} < {version}: {msg}"
+    if pv.Version(yobx.__version__) < pv.Version(version):
+        msg = f"onnx-array-api version {yobx.__version__} < {version}: {msg}"
         return unittest.skip(msg)
     return lambda x: x
 
@@ -817,7 +801,7 @@ class ExtTestCase(unittest.TestCase):
 
     @classmethod
     def to_onnx(self, *args, **kwargs) -> "ModelProto":  # noqa: F821
-        from experimental_experiment.torch_interpreter import to_onnx
+        from yobx.torch_interpreter import to_onnx
 
         return to_onnx(*args, **kwargs)
 
@@ -879,9 +863,7 @@ class ExtTestCase(unittest.TestCase):
     def assertGreaterOrEqual(self, a, b, msg=None):
         """In the name"""
         if a < b:
-            return AssertionError(
-                f"{a} < {b}, a not greater or equal than b\n{msg or ''}"
-            )
+            return AssertionError(f"{a} < {b}, a not greater or equal than b\n{msg or ''}")
 
     def assertInOr(self, tofind: Tuple[str, ...], text: str, msg: str = ""):
         for tof in tofind:
@@ -899,9 +881,7 @@ class ExtTestCase(unittest.TestCase):
         )
 
     def assertHasAttr(self, obj: Any, name: str):
-        assert hasattr(
-            obj, name
-        ), f"Unable to find attribute {name!r} in object type {type(obj)}"
+        assert hasattr(obj, name), f"Unable to find attribute {name!r} in object type {type(obj)}"
 
     def assertSetContained(self, set1, set2):
         "Checks that ``set1`` is contained in ``set2``."
@@ -936,9 +916,7 @@ class ExtTestCase(unittest.TestCase):
 
         conv = {torch.bfloat16: ml_dtypes.bfloat16}
         assert tensor.dtype in conv, f"Unsupported type {tensor.dtype}, not in {conv}"
-        return (
-            tensor.detach().to(torch.float32).cpu().numpy().astype(conv[tensor.dtype])
-        )
+        return tensor.detach().to(torch.float32).cpu().numpy().astype(conv[tensor.dtype])
 
     def assertEqualArray(
         self,
@@ -1041,14 +1019,21 @@ class ExtTestCase(unittest.TestCase):
     ):
         if isinstance(expected, (int, float, str)):
             self.assertEqual(expected, value, msg=msg)
+        elif expected is None:
+            self.assertEqual(expected, value, msg=msg)
+        elif isinstance(expected, (tuple, list, dict)):
+            self.assertIsInstance(value, type(expected), msg=msg)
+            self.assertEqual(len(expected), len(value), msg=msg)
+            if isinstance(expected, dict):
+                for k in expected:
+                    self.assertIn(k, value, msg=msg)
+                    self.assertEqualAny(expected[k], value[k], msg=msg, atol=atol, rtol=rtol)
+            else:
+                for e, g in zip(expected, value):
+                    self.assertEqualAny(e, g, msg=msg, atol=atol, rtol=rtol)
         elif hasattr(expected, "shape"):
             self.assertEqual(type(expected), type(value), msg=msg)
             self.assertEqualArray(expected, value, msg=msg, atol=atol, rtol=rtol)
-        elif expected.__class__.__name__ in ("Dim", "_Dim", "_DimHintType"):
-            self.assertEqual(type(expected), type(value), msg=msg)
-            self.assertEqual(expected.__name__, value.__name__, msg=msg)
-        elif expected is None:
-            self.assertEqual(expected, value, msg=msg)
         else:
             raise AssertionError(
                 f"Comparison not implemented for types {type(expected)} and {type(value)}"
@@ -1063,9 +1048,7 @@ class ExtTestCase(unittest.TestCase):
             if isinstance(expected, dict):
                 for k in expected:
                     self.assertIn(k, value, msg=msg)
-                    self.assertEqualArrayAny(
-                        expected[k], value[k], msg=msg, atol=atol, rtol=rtol
-                    )
+                    self.assertEqualArrayAny(expected[k], value[k], msg=msg, atol=atol, rtol=rtol)
             else:
                 excs = []
                 for i, (e, g) in enumerate(zip(expected, value)):
@@ -1121,9 +1104,7 @@ class ExtTestCase(unittest.TestCase):
             providers=["CPUExecutionProvider"],
         )
 
-    def assertRaise(
-        self, fct: Callable, exc_type: type[Exception], msg: Optional[str] = None
-    ):
+    def assertRaise(self, fct: Callable, exc_type: type[Exception], msg: Optional[str] = None):
         """In the name"""
         try:
             fct()
@@ -1131,9 +1112,7 @@ class ExtTestCase(unittest.TestCase):
             if not isinstance(e, exc_type):
                 raise AssertionError(f"Unexpected exception {type(e)!r}.")  # noqa: B904
             if msg is not None and msg not in str(e):
-                raise AssertionError(
-                    f"Unexpected exception message {e!r}."
-                )  # noqa: B904
+                raise AssertionError(f"Unexpected exception message {e!r}.")  # noqa: B904
             return
         raise AssertionError("No exception was raised.")  # noqa: B904
 
