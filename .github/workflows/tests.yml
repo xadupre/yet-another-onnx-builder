@@ -8,6 +8,7 @@ on:
 
 jobs:
   tests:
+    name: tests (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
