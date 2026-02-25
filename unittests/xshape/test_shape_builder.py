@@ -370,6 +370,128 @@ class TestShapeBuilder(ExtTestCase):
         }
         self.assertEqual(values, {"S1": (3, 5), "S2": (3, 5), "xy": (3, 10), "zs": (3, 10)})
 
+    def _make_node_with_attrs(self, **attrs):
+        node = oh.make_node("SomeOp", ["X"], ["Y"])
+        for name, value in attrs.items():
+            node.attribute.append(oh.make_attribute(name, value))
+        return node
+
+    def test_get_attribute_with_default_int(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(axis=2)
+        self.assertEqual(b.get_attribute_with_default(node, "axis", 0), 2)
+
+    def test_get_attribute_with_default_ints(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(perm=[0, 2, 1])
+        self.assertEqual(b.get_attribute_with_default(node, "perm", []), [0, 2, 1])
+
+    def test_get_attribute_with_default_float(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(alpha=0.5)
+        self.assertAlmostEqual(b.get_attribute_with_default(node, "alpha", 1.0), 0.5)
+
+    def test_get_attribute_with_default_floats(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(scales=[1.0, 2.0, 3.0])
+        self.assertEqual(b.get_attribute_with_default(node, "scales", []), [1.0, 2.0, 3.0])
+
+    def test_get_attribute_with_default_string(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(mode=b"constant")
+        self.assertEqual(b.get_attribute_with_default(node, "mode", b""), b"constant")
+
+    def test_get_attribute_with_default_strings(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(keys=[b"hello", b"world"])
+        self.assertEqual(
+            b.get_attribute_with_default(node, "keys", []), [b"hello", b"world"]
+        )
+
+    def test_get_attribute_with_default_missing(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(axis=1)
+        self.assertEqual(b.get_attribute_with_default(node, "missing", 42), 42)
+
+    def test_get_attribute_with_default_unsupported_type(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("SomeOp", ["X"], ["Y"])
+        import onnx.numpy_helper as onh
+        import numpy as np
+
+        tensor = onh.from_array(np.array([1.0], dtype=np.float32))
+        att = onnx.AttributeProto()
+        att.name = "value"
+        att.type = onnx.AttributeProto.TENSOR
+        att.t.CopyFrom(tensor)
+        node.attribute.append(att)
+        self.assertRaise(
+            lambda: b.get_attribute_with_default(node, "value", None), TypeError
+        )
+
+    def test_get_attributes_with_default_int(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(axis=3)
+        self.assertEqual(b.get_attributes_with_default(node, axis=0), {"axis": 3})
+
+    def test_get_attributes_with_default_ints(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(perm=[1, 0, 2])
+        self.assertEqual(b.get_attributes_with_default(node, perm=[]), {"perm": [1, 0, 2]})
+
+    def test_get_attributes_with_default_float(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(alpha=0.25)
+        result = b.get_attributes_with_default(node, alpha=1.0)
+        self.assertAlmostEqual(result["alpha"], 0.25)
+
+    def test_get_attributes_with_default_floats(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(scales=[1.5, 2.5])
+        self.assertEqual(
+            b.get_attributes_with_default(node, scales=[]), {"scales": [1.5, 2.5]}
+        )
+
+    def test_get_attributes_with_default_string(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(mode=b"nearest")
+        self.assertEqual(
+            b.get_attributes_with_default(node, mode=b""), {"mode": b"nearest"}
+        )
+
+    def test_get_attributes_with_default_strings(self):
+        b = BasicShapeBuilder()
+        node = self._make_node_with_attrs(keys=[b"a", b"b", b"c"])
+        self.assertEqual(
+            b.get_attributes_with_default(node, keys=[]), {"keys": [b"a", b"b", b"c"]}
+        )
+
+    def test_get_attributes_with_default_uses_default(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("SomeOp", ["X"], ["Y"])
+        self.assertEqual(b.get_attributes_with_default(node, axis=5), {"axis": 5})
+
+    def test_get_attributes_with_default_none_default_excluded(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("SomeOp", ["X"], ["Y"])
+        self.assertEqual(b.get_attributes_with_default(node, axis=None), {})
+
+    def test_get_attributes_with_default_unsupported_type(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("SomeOp", ["X"], ["Y"])
+        import onnx.numpy_helper as onh
+        import numpy as np
+
+        tensor = onh.from_array(np.array([1.0], dtype=np.float32))
+        att = onnx.AttributeProto()
+        att.name = "value"
+        att.type = onnx.AttributeProto.TENSOR
+        att.t.CopyFrom(tensor)
+        node.attribute.append(att)
+        self.assertRaise(
+            lambda: b.get_attributes_with_default(node, value=None), TypeError
+        )
+
     def test_pretty_node_none(self):
         b = BasicShapeBuilder()
         self.assertEqual(b.pretty_node(None), "None")
