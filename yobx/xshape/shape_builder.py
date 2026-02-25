@@ -235,7 +235,7 @@ class ShapeBuilder:
         assert dtype == self.get_type(name), (
             f"Type mismatch for {name!r}, expecting "
             f"{self.get_type(name)}, got {dtype} in "
-            f"{string_type(tensor, with_shapes=True)}"
+            f"{string_type(tensor, with_shape=True)}"
         )
         res = {}
         shape = self.get_shape(name)
@@ -245,13 +245,13 @@ class ShapeBuilder:
                     assert res[dim] == value, (
                         f"Shape mismatch for {name!r} for dimension {i}, "
                         f"known dimensions are {shape}, got "
-                        f"{string_type(tensor, with_shapes=True)}"
+                        f"{string_type(tensor, with_shape=True)}"
                     )
                 res[dim] = value
             else:
                 assert dim == value, (
                     f"Shape mismatch for {name!r} for dimension {i}, "
-                    f"expecting {dim}, got {string_type(tensor, with_shapes=True)}"
+                    f"expecting {dim}, got {string_type(tensor, with_shape=True)}"
                 )
         return res
 
@@ -268,7 +268,7 @@ class ShapeBuilder:
         assert dtype == self.get_type(name), (
             f"Type mismatch for {name!r}, expecting "
             f"{self.get_type(name)}, got {dtype} in "
-            f"{string_type(tensor, with_shapes=True)}"
+            f"{string_type(tensor, with_shape=True)}"
         )
         computed = self.evaluate_shape(name, context=context)
         return tuple(zip(self.get_shape(name), tensor.shape, computed))

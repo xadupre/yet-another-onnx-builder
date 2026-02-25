@@ -74,6 +74,7 @@ class _ShapeRuntime:
             f"Unable to compute a shape for node {self.pretty_node(node)} "
             f"with values={values}{self.get_debug_msg()}"
         )
+        return False  # defensive return for static type checkers; assert above always raises
 
     def _update_value_shape_with_node_Abs(self, node: onnx.NodeProto) -> bool:
         return self._update_value_shape_with_node_Identity(node)
@@ -299,6 +300,7 @@ class _ShapeRuntime:
                 node.output[0], (node.input[0],) if values_0 is None else (values_0,)
             )
             return True
+        return False
 
     def _update_value_shape_with_values_Concat(
         self, node: onnx.NodeProto, values: List[Any]
@@ -440,6 +442,7 @@ class _ShapeRuntime:
             )
             self.set_value_shape(node.output[0], tuple(shape[i] for i in values[1]))
             return True
+        return False
 
     def _update_value_shape_with_values_Slice(
         self, node: onnx.NodeProto, values: List[Any]
@@ -480,3 +483,4 @@ class _ShapeRuntime:
             self.set_value_shape(node.output[0], res)
             node.doc_string += "#SV-Sl4"
             return True
+        return False

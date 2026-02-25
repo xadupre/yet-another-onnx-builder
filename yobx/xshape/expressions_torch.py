@@ -37,7 +37,7 @@ def parse_expression(
     """
     if hasattr(expr, "__sym_float__"):
         # torch.SymInt
-        return parse_expression(expr.node, context=context, exc=exc)
+        return parse_expression(expr.node, context=context, exc=exc)  # type: ignore[attr-defined]
     if hasattr(expr, "_expr"):
         # torch.fx.experimental.sym_node.SymNode
         return parse_expression(str(expr._expr), context=context, exc=exc)
@@ -48,7 +48,7 @@ def parse_expression(
     if context is None:
         context = {}
     simplified = simplify_expression(expr)
-    st = ast.parse(simplified, mode="eval")
+    st = ast.parse(simplified, mode="eval")  # type: ignore[arg-type]
     for node in ast.walk(st):
         if isinstance(node, ast.Name):
             if node.id in {"Max", "Min", "CeilToInt", "IntTrueDiv", "Mod"}:
@@ -71,4 +71,4 @@ def parse_expression(
                 f"Unable to find name {node.id!r} from expression {expr!r}, "
                 f"context is {sorted(context)}"
             )
-    return Expression(expr, parsed=st)
+    return Expression(expr, parsed=st)  # type: ignore[arg-type]

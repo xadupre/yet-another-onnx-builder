@@ -1,4 +1,4 @@
-from typing import Optional, Sequence, Tuple, Union
+from typing import List, NoReturn, Optional, Sequence, Tuple, Union
 from onnx import FunctionProto, NodeProto, TensorProto
 
 _i1_o1_node_types = {
@@ -54,7 +54,7 @@ def infer_types(
     input_types: Sequence[int],
     output_name: Optional[str] = None,
     exc: bool = True,
-) -> Union[int, Tuple[int, ...]]:
+) -> Union[int, Sequence[int]]:
     """
     Tries to infer the type of an output or all outputs.
 
@@ -91,7 +91,7 @@ def _infer_types_function(
     current = dict(zip(proto.input, input_types))
     for node in proto.node:
         out = _infer_types_node(node, [current[i] for i in node.input], None, exc=exc)
-        current.update(dict(zip(node.output, out)))
+        current.update(dict(zip(node.output, out)))  # type: ignore[arg-type]
     return tuple(current[n] for n in proto.output)
 
 
@@ -100,7 +100,7 @@ def _infer_types_node(
     input_types: Sequence[int],
     output_name: Optional[str],
     exc: bool = True,
-) -> Union[int, Tuple[int, ...]]:
+) -> Union[int, Sequence[int]]:
     """
     Tries to infer the type of an output or all outputs.
 
@@ -111,6 +111,7 @@ def _infer_types_node(
     :param exc: raise an exception if type cannot be inferred
     :return: tuple of types or output type
     """
+    all_types: Optional[Sequence[int]] = None
     if node.op_type in _i1_o1_node_types:
         all_types = _infer_type_i1_o1(node, input_types)
     elif node.op_type in _in_o1_node_types:
@@ -138,7 +139,7 @@ def _infer_types_node(
     return all_types
 
 
-def _raise_exc(node: NodeProto, input_types: Sequence[int]):
+def _raise_exc(node: NodeProto, input_types: Sequence[int]) -> NoReturn:
     raise RuntimeError(
         f"Unable to guess output type for node type {node.op_type!r}, "
         f"input_types={input_types}, node={node}"
@@ -207,7 +208,7 @@ def _infer_type_constant_of_shape(node: NodeProto, input_types: Sequence[int]) -
     if len(node.attribute) == 0:
         return (TensorProto.FLOAT,)
     value = node.attribute[0]
-    return (value.data_type,)
+    return (value.data_type,)  # type: ignore[attr-defined]
 
 
 def _infer_type_eye_like(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
@@ -236,7 +237,7 @@ def _infer_type_shape_or_size(node: NodeProto, input_types: Sequence[int]) -> Tu
     return (TensorProto.INT64,)
 
 
-def _infer_type_split(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
+def _infer_type_split(node: NodeProto, input_types: Sequence[int]) -> List[int]:
     """Returns the output type for a node Split."""
     return [input_types[0] for _ in node.output]
 

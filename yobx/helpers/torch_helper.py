@@ -1,3 +1,4 @@
+import numpy as np
 import onnx
 import torch
 
@@ -58,3 +59,18 @@ def torch_dtype_to_onnx_dtype(to: torch.dtype) -> int:
     if sto in _TYPENAME:
         return _TYPENAME[sto]
     raise NotImplementedError(f"Unable to convert torch dtype {to!r} ({type(to)}) to onnx dtype.")
+
+
+def to_numpy(tensor: torch.Tensor) -> np.ndarray:
+    """Converts a :class:`torch.Tensor` to :class:`numpy.ndarray`."""
+    try:
+        return tensor.detach().cpu().numpy()
+    except TypeError:
+        # We try with ml_dtypes
+        pass
+
+    import ml_dtypes
+
+    conv = {torch.bfloat16: ml_dtypes.bfloat16}
+    assert tensor.dtype in conv, f"Unsupported type {tensor.dtype}, not in {conv}"
+    return tensor.detach().to(torch.float32).cpu().numpy().astype(conv[tensor.dtype])
