@@ -182,6 +182,55 @@ class TestStringType(ExtTestCase):
         s = string_type(large_set, with_min_max=True)
         self.assertIn("#15", s)
 
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_string_tensor_no_shape(self):
+        import torch
+        from yobx.helpers.helper import _string_tensor
+
+        t = torch.rand(3, 4)
+        s = _string_tensor(t, "T", with_shape=False, with_device=False, verbose=0)
+        self.assertIn("T", s)
+        self.assertIn("r2", s)
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_string_tensor_with_shape(self):
+        import torch
+        from yobx.helpers.helper import _string_tensor
+
+        t = torch.rand(3, 4)
+        s = _string_tensor(t, "T", with_shape=True, with_device=False, verbose=0)
+        self.assertIn("T", s)
+        self.assertIn("s3x4", s)
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_string_tensor_with_device_cpu(self):
+        import torch
+        from yobx.helpers.helper import _string_tensor
+
+        t = torch.rand(3, 4)
+        s = _string_tensor(t, "T", with_shape=False, with_device=True, verbose=0)
+        self.assertIn("C", s)
+        self.assertIn("r2", s)
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_string_tensor_custom_cls(self):
+        import torch
+        from yobx.helpers.helper import _string_tensor
+
+        t = torch.rand(2, 5)
+        s = _string_tensor(t, "F", with_shape=True, with_device=False, verbose=0)
+        self.assertIn("F", s)
+        self.assertIn("s2x5", s)
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_string_tensor_verbose(self):
+        import torch
+        from yobx.helpers.helper import _string_tensor
+
+        t = torch.rand(3, 4)
+        s = _string_tensor(t, "T", with_shape=False, with_device=False, verbose=1)
+        self.assertIn("r2", s)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
