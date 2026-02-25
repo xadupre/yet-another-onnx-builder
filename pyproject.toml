@@ -129,6 +129,7 @@ module = [
     "yobx.xshape.shape_builder_impl",
     "yobx.ext_test_case",
     "yobx.doc",
+    "yobx.helpers.helper",
 ]
 ignore_errors = true
 
