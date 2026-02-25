@@ -1303,6 +1303,39 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(g._shapes.get("Y"), (1, 8, 2, 3))
         self.assertEqual(g._types.get("Y"), TFLOAT)
 
+    def test_gather_elements_axis0(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (3, 4)
+        g._types["idx"] = TINT64
+        g._shapes["idx"] = (2, 4)
+        node = oh.make_node("GatherElements", ["X", "idx"], ["Y"], axis=0)
+        _set_shape_type_op_any_known["GatherElements"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (2, 4))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gather_elements_axis1(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (3, 4)
+        g._types["idx"] = TINT64
+        g._shapes["idx"] = (3, 2)
+        node = oh.make_node("GatherElements", ["X", "idx"], ["Y"], axis=1)
+        _set_shape_type_op_any_known["GatherElements"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (3, 2))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gather_elements_rank_only(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._ranks["X"] = 3
+        g._types["idx"] = TINT64
+        g._ranks["idx"] = 3
+        node = oh.make_node("GatherElements", ["X", "idx"], ["Y"], axis=1)
+        _set_shape_type_op_any_known["GatherElements"](g, node)
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+        self.assertEqual(g._ranks.get("Y"), 3)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
