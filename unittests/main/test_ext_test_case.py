@@ -419,6 +419,34 @@ class TestExtTestCaseAssertions(ExtTestCase):
         with self.assertRaises(AssertionError):
             self.assertEqualArray(a, b)
 
+    def test_assertEqualArray_fail_shape(self):
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        with self.assertRaises(AssertionError):
+            self.assertEqualArray(a, b)
+
+    def test_assertEqualArray_fail_values(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = np.array([1.0, 2.0, 4.0])
+        with self.assertRaises(AssertionError):
+            self.assertEqualArray(a, b)
+
+    def test_assertEqualArray_with_rtol(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = np.array([1.01, 2.02, 3.03])
+        self.assertEqualArray(a, b, rtol=0.02)
+
+    def test_assertEqualArray_with_msg(self):
+        a = np.array([1.0], dtype=np.float32)
+        b = np.array([1.0], dtype=np.float64)
+        with self.assertRaises(AssertionError):
+            self.assertEqualArray(a, b, msg="custom error message")
+
+    def test_assertEqualArray_bool(self):
+        a = np.array([True, False, True])
+        b = np.array([True, False, True])
+        self.assertEqualArray(a, b)
+
     def test_assertEqualArrays_list(self):
         a = [np.array([1.0, 2.0]), np.array([3.0, 4.0])]
         b = [np.array([1.0, 2.0]), np.array([3.0, 4.0])]
