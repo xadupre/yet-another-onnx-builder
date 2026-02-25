@@ -370,7 +370,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         is equal to the existing one.
 
         :param name: name
-        :param dtype: element type (an integer, ONNX), 0 (unknonw is a possible value)
+        :param dtype: element type (an integer, ONNX), 0 (unknown is a possible value)
         :param exc: raises an exception
         :return: returns True if there is no type conflict
         """
@@ -552,10 +552,10 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
     def get_debug_msg(self, limit: int = 1000) -> str:
         """
         Returns a string providing as much information as possible
-        to help the developper understand why a conversion failed.
+        to help the developer understand why a conversion failed.
 
         :param limit: limit the string if the model is big
-        :return: many pieces of informations about the on going conversion
+        :return: many pieces of information about the on going conversion
         """
 
         def assert_sorted(inputs):

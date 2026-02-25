@@ -88,7 +88,9 @@ class MulDivCancellerTransformer(CommonTransformer):
         return [node], []
 
     @classmethod
-    def _rebuild_from_factors(cls, numer: List[ast.AST], denom: List[ast.AST]) -> ast.AST:
+    def _rebuild_from_factors(
+        cls, numerator: List[ast.AST], denominator: List[ast.AST]
+    ) -> ast.AST:
         def _product(factors: List[ast.AST]) -> ast.AST:
             if not factors:
                 return ast.Constant(value=1)
@@ -97,10 +99,10 @@ class MulDivCancellerTransformer(CommonTransformer):
                 node = ast.BinOp(left=node, op=ast.Mult(), right=f)
             return node
 
-        numer_node = _product(numer)
-        if not denom:
+        numer_node = _product(numerator)
+        if not denominator:
             return numer_node
-        denom_node = _product(denom)
+        denom_node = _product(denominator)
         return ast.BinOp(left=numer_node, op=ast.FloorDiv(), right=denom_node)
 
     def visit_BinOp(self, node: ast.BinOp) -> ast.AST:
@@ -109,10 +111,10 @@ class MulDivCancellerTransformer(CommonTransformer):
         if not (isinstance(node, ast.BinOp) and (isinstance(node.op, (ast.Mult, ast.FloorDiv)))):
             return node
 
-        numer, denom = self._flatten_mul_div(node)
+        numerator, denominator = self._flatten_mul_div(node)
 
-        numer_keys = [_dump_node(n) for n in numer]
-        denom_keys = [_dump_node(d) for d in denom]
+        numer_keys = [_dump_node(n) for n in numerator]
+        denom_keys = [_dump_node(d) for d in denominator]
 
         num_counter = Counter(numer_keys)
         den_counter = Counter(denom_keys)
@@ -125,14 +127,14 @@ class MulDivCancellerTransformer(CommonTransformer):
 
         remaining_numer = []
         needed_num = dict(num_counter)
-        for n, k in zip(numer, numer_keys):
+        for n, k in zip(numerator, numer_keys):
             if needed_num.get(k, 0) > 0:
                 remaining_numer.append(n)
                 needed_num[k] -= 1
 
         remaining_denom = []
         needed_den = dict(den_counter)
-        for d, k in zip(denom, denom_keys):
+        for d, k in zip(denominator, denom_keys):
             if needed_den.get(k, 0) > 0:
                 remaining_denom.append(d)
                 needed_den[k] -= 1
@@ -282,20 +284,20 @@ class ExactMulDivConstantFolderTransformer(CommonTransformer):
         if not isinstance(node.op, (ast.Mult, ast.FloorDiv)):
             return node
 
-        numer, denom = self._flatten_mul_div(node)
+        numerator, denominator = self._flatten_mul_div(node)
 
         num_const = 1
         den_const = 1
         num_other: List[ast.AST] = []
         den_other: List[ast.AST] = []
 
-        for n in numer:
+        for n in numerator:
             if isinstance(n, ast.Constant) and isinstance(n.value, int):
                 num_const *= n.value
             else:
                 num_other.append(n)
 
-        for d in denom:
+        for d in denominator:
             if isinstance(d, ast.Constant) and isinstance(d.value, int):
                 den_const *= d.value
             else:

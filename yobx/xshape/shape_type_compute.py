@@ -1270,7 +1270,7 @@ def _set_shape_type_op_any_unsqueeze(self: ShapeBuilder, node: NodeProto):
             assert self.is_constant(node.input[1]), (
                 f"axes {node.input[1]!r} from node {node.op_type}, "
                 f"name={node.name!r} is not a constant, "
-                f"the new shape cannot be infered{self.get_debug_msg()}"
+                f"the new shape cannot be inferred{self.get_debug_msg()}"
             )
             cst = self.get_constant(node.input[1])
             if isinstance(cst, NodeProto) and cst.op_type in (
@@ -1347,7 +1347,7 @@ def _set_shape_type_op_any_squeeze(self: ShapeBuilder, node: NodeProto):
             assert self.is_constant(node.input[1]), (
                 f"axes from node {node.op_type}, "
                 f"name={node.name!r} is not a constant, "
-                f"the new shape cannot be infered{self.get_debug_msg()}"
+                f"the new shape cannot be inferred{self.get_debug_msg()}"
             )
             cst = self.get_constant(node.input[1])
             if isinstance(cst, NodeProto) and cst.op_type in (

@@ -62,7 +62,7 @@ def infer_types(
     :param input_types: type of the elements of the input tensors
     :param output_name: type for the desired output or
         all types if all are needed
-    :param exc: raise an exception if type cannot be infered
+    :param exc: raise an exception if type cannot be inferred
     :return: tuple of types or output type
     """
     if isinstance(node, FunctionProto):
@@ -85,7 +85,7 @@ def _infer_types_function(
     :param input_types: type of the elements of the input tensors
     :param output_name: type for the desired output or
         all types if all are needed
-    :param exc: raise an exception if type cannot be infered
+    :param exc: raise an exception if type cannot be inferred
     :return: tuple of types or output type
     """
     current = dict(zip(proto.input, input_types))
@@ -108,7 +108,7 @@ def _infer_types_node(
     :param input_types: type of the elements of the input tensors
     :param output_name: type for the desired output or
         all types if all are needed
-    :param exc: raise an exception if type cannot be infered
+    :param exc: raise an exception if type cannot be inferred
     :return: tuple of types or output type
     """
     if node.op_type in _i1_o1_node_types:
