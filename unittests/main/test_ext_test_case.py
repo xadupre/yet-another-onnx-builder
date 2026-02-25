@@ -1,7 +1,5 @@
-"""
-Extended tests for yobx.ext_test_case module.
-"""
 import os
+import math
 import sys
 import tempfile
 import unittest
@@ -34,14 +32,11 @@ from yobx.ext_test_case import (
 
 
 class TestDecoratorFunctions(ExtTestCase):
-    """Tests for decorator helper functions."""
-
     def test_ignore_errors_skips_on_expected(self):
         @ignore_errors(ValueError)
         def method(self):
             raise ValueError("expected error")
 
-        # Should raise SkipTest, not ValueError
         with self.assertRaises(unittest.SkipTest):
             method(self)
 
@@ -78,7 +73,7 @@ class TestDecoratorFunctions(ExtTestCase):
             warnings.warn("test warning", UserWarning)
             collected.append("ran")
 
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
             method(self)
         # Warning should have been suppressed
@@ -224,8 +219,6 @@ class TestMeasureTime(ExtTestCase):
     """Extended tests for measure_time."""
 
     def test_measure_time_with_context_values(self):
-        import math
-
         values = [1, 2, 3, 4, 5]
         res = measure_time(lambda: math.cos(0.5), context={"values": values})
         self.assertIsInstance(res, dict)
@@ -233,8 +226,6 @@ class TestMeasureTime(ExtTestCase):
         self.assertEqual(res["size"], 5)
 
     def test_measure_time_with_array_values(self):
-        import math
-
         values = np.array([1.0, 2.0, 3.0])
         res = measure_time(lambda: math.cos(0.5), context={"values": values})
         self.assertIsInstance(res, dict)
@@ -250,8 +241,6 @@ class TestMeasureTime(ExtTestCase):
         self.assertRaise(lambda: measure_time(42), TypeError)
 
     def test_measure_time_max_time_requires_div_by_number(self):
-        import math
-
         self.assertRaise(
             lambda: measure_time(
                 lambda: math.cos(0.5), max_time=0.01, div_by_number=False
@@ -260,8 +249,6 @@ class TestMeasureTime(ExtTestCase):
         )
 
     def test_measure_time_no_warmup(self):
-        import math
-
         res = measure_time(lambda: math.cos(0.5), warmup=0, repeat=2, number=5)
         self.assertIsInstance(res, dict)
         self.assertEqual(res["warmup_time"], 0)
@@ -335,9 +322,7 @@ class TestExtTestCaseAssertions(ExtTestCase):
             self.assertRaise(lambda: int("not a number"), TypeError)
 
     def test_assertRaise_with_msg(self):
-        self.assertRaise(
-            lambda: int("not a number"), ValueError, msg="invalid literal"
-        )
+        self.assertRaise(lambda: int("not a number"), ValueError, msg="invalid literal")
 
     def test_assertEmpty_none(self):
         self.assertEmpty(None)
@@ -478,8 +463,6 @@ class TestExtTestCaseAssertions(ExtTestCase):
         self.assertIn("captured output", out)
 
     def test_capture_stderr(self):
-        import sys
-
         def fn():
             print("error output", file=sys.stderr)
             return 1
