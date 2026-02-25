@@ -29,6 +29,7 @@ from yobx.xshape.shape_type_compute import (
     _set_shape_type_op_any_sequence_empty,
     _set_shape_type_op_any_known,
     _set_shape_type_op_any_attention,
+    _set_shape_type_op_any_squeeze,
 )
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -950,6 +951,56 @@ class TestShapeTypeCompute(ExtTestCase):
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4))
+
+    def test_op_squeeze_no_axes(self):
+        # No axes input and no attribute – all size-1 dimensions are removed.
+        model = _make_model(
+            [oh.make_node("Squeeze", ["X"], ["Y"])],
+            [_mkv_("X", TFLOAT, [1, 3, 1, 4])],
+            [_mkv_("Y", TFLOAT, [3, 4])],
+        )
+        b = _TestShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (3, 4))
+
+    def test_op_squeeze_axes_attribute(self):
+        # Pre-opset-13 style: axes given as an attribute rather than an input.
+        model = _make_model(
+            [oh.make_node("Squeeze", ["X"], ["Y"], axes=[0])],
+            [_mkv_("X", TFLOAT, [1, 3, 4])],
+            [_mkv_("Y", TFLOAT, [3, 4])],
+            opset=12,
+        )
+        b = _TestShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (3, 4))
+
+    def test_op_squeeze_negative_axes(self):
+        # Negative axis value: axis -2 on shape [3, 1, 4] refers to dim 1.
+        model = _make_model(
+            [oh.make_node("Squeeze", ["X", "axes"], ["Y"])],
+            [_mkv_("X", TFLOAT, [3, 1, 4])],
+            [_mkv_("Y", TFLOAT, [3, 4])],
+            [onh.from_array(np.array([-2], dtype=np.int64), name="axes")],
+        )
+        b = _TestShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (3, 4))
+
+    def test_op_squeeze_rank_only(self):
+        # When only rank (not shape) is known the output rank is inferred.
+        b = _TestShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_rank("X", 4)
+        axes_cst = onh.from_array(np.array([0, 1], dtype=np.int64), name="axes")
+        b.set_constant("axes", axes_cst)
+        node = oh.make_node("Squeeze", ["X", "axes"], ["Y"])
+        _set_shape_type_op_any_squeeze(b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_rank("Y"), 2)
 
     def test_op_where(self):
         model = _make_model(
