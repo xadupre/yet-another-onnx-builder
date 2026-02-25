@@ -131,9 +131,9 @@ def _set_shape_type_op_any_attention(g: ShapeBuilder, node: NodeProto):
                 if isinstance(seq, str) or isinstance(past_seq, str)
                 else (seq + past_seq)
             )
-            g.set_shape(node.output[1], (batch, v_head, total_seq, v_size))
+            g.set_shape(node.output[2], (batch, v_head, total_seq, v_size))
         if len(node.output) > 3 and node.output[3]:
-            g.set_shape(node.output[1], (batch, q_head, seq, total_seq))
+            g.set_shape(node.output[3], (batch, q_head, seq, total_seq))
     if g.has_rank(node.input[0]):
         rk = g.get_rank(node.input[0])
         g.set_rank(node.output[0], rk)
