@@ -456,7 +456,7 @@ class TestExtTestCaseAssertions(ExtTestCase):
             print("captured output")
             return 42
 
-        result, out, err = self.capture(fn)
+        result, out, _err = self.capture(fn)
         self.assertEqual(result, 42)
         self.assertIn("captured output", out)
 
@@ -465,7 +465,7 @@ class TestExtTestCaseAssertions(ExtTestCase):
             print("error output", file=sys.stderr)
             return 1
 
-        result, out, err = self.capture(fn)
+        result, _out, err = self.capture(fn)
         self.assertEqual(result, 1)
         self.assertIn("error output", err)
 

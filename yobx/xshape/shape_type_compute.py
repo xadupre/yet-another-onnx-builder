@@ -920,15 +920,19 @@ def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
                 cst = self.get_constant(node.input[1])
                 if isinstance(cst, NodeProto) and self.is_constant(cst.output[0]):
                     cst = self.get_constant(node.input[1], computed_value=True)
-                assert isinstance(cst, (np.ndarray, self.torch.Tensor)), (
-                    f"Unexpected type {type(cst)} for {node.input[1]!r}, "
-                    f"unable to set type and shape for node {node.op_type} "
-                    f"with name={node.name!r}{self.get_debug_msg()}"
-                )
-                if isinstance(cst, self.torch.Tensor):
+                if isinstance(cst, np.ndarray):
+                    iaxes = (int(cst),) if len(cst.shape) == 0 else tuple(int(i) for i in cst)
+                else:
+                    import torch
+
+                    assert isinstance(cst, torch.Tensor), (
+                        f"Unexpected type {type(cst)} for {node.input[1]!r}, "
+                        f"unable to set type and shape for node {node.op_type} "
+                        f"with name={node.name!r}{self.get_debug_msg()}"
+                    )
                     with self.maybe_disable_fake_tensor_mode():
                         cst = cst.cpu()
-                iaxes = (int(cst),) if len(cst.shape) == 0 else tuple(int(i) for i in cst)
+                    iaxes = (int(cst),) if len(cst.shape) == 0 else tuple(int(i) for i in cst)
             elif keepdim is not None:
                 self.set_rank(node.output[0], self.get_rank(node.input[0]))
                 return True
