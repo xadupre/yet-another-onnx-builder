@@ -370,7 +370,6 @@ class TestShapeBuilder(ExtTestCase):
         }
         self.assertEqual(values, {"S1": (3, 5), "S2": (3, 5), "xy": (3, 10), "zs": (3, 10)})
 
-
     def test_pretty_node_none(self):
         b = BasicShapeBuilder()
         self.assertEqual(b.pretty_node(None), "None")

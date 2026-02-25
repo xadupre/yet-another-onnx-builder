@@ -41,9 +41,7 @@ class TestApplySliceToShape(ExtTestCase):
         self.assertEqual(result, (0, 4, 5))
 
     def test_multiple_slices(self):
-        result = self.b._apply_slice_to_shape(
-            (10, 8, 5), [slice(0, 4), slice(2, 6)], [0, 1], []
-        )
+        result = self.b._apply_slice_to_shape((10, 8, 5), [slice(0, 4), slice(2, 6)], [0, 1], [])
         self.assertEqual(result, (4, 4, 5))
 
     def test_integer_indices(self):

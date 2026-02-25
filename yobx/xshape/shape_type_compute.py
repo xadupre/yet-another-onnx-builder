@@ -1547,7 +1547,7 @@ def _set_shape_type_op_any_depth_to_space(self: ShapeBuilder, node: NodeProto):
         new_spatial = tuple(
             (s * blocksize if isinstance(s, int) else f"{s}*{blocksize}") for s in spatial
         )
-        new_shape = (n, new_c) + new_spatial
+        new_shape = (n, new_c, *new_spatial)
         self.set_shape(node.output[0], new_shape)
         return new_shape
     if self.has_rank(node.input[0]):
@@ -1573,7 +1573,7 @@ def _set_shape_type_op_any_space_to_depth(self: ShapeBuilder, node: NodeProto):
         new_spatial = tuple(
             (s // blocksize if isinstance(s, int) else f"{s}//{blocksize}") for s in spatial
         )
-        new_shape = (n, new_c) + new_spatial
+        new_shape = (n, new_c, *new_spatial)
         self.set_shape(node.output[0], new_shape)
         return new_shape
     if self.has_rank(node.input[0]):
