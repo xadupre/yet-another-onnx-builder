@@ -1,5 +1,5 @@
-.helper
-=======
+.helpers
+========
 
 .. toctree::
     :maxdepth: 1
@@ -11,6 +11,6 @@
 Other functions
 +++++++++++++++
 
-.. automodule:: yobx.xshape
+.. automodule:: yobx.helpers
     :members:
     :no-undoc-members:
