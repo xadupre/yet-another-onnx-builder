@@ -28,7 +28,6 @@ class ShapeBuilderBackendRep(onnx.backend.base.BackendRep):
                 in {
                     "ArgMax",
                     "ArgMin",
-                    "AveragePool",
                     "CumSum",
                     "DepthToSpace",
                     "Expand",
@@ -113,7 +112,7 @@ backend_test.exclude(
 # Not implemented yet.
 backend_test.exclude(
     "(affine_grid|array_feature_extractor|binarizer|label_encoder|attention"
-    "|bitwise|blackmanwindow"
+    "|bitwise|averagepool|blackmanwindow"
     "|center_crop|col2im|compress|conv"
     "|det|dft|dropout|einsum|fft|floor|gather|gelu"
     "|gridsample|group_normalization|gru|hamming|hann"

@@ -1589,7 +1589,6 @@ _set_shape_type_op_any_known = {
     "ArgMax": _set_shape_type_op_any_arg_max_min,
     "ArgMin": _set_shape_type_op_any_arg_max_min,
     "Attention": _set_shape_type_op_any_attention,
-    "AveragePool": _set_shape_type_op_any_conv_max_pool,
     "BatchNormalization": _set_shape_type_op_any_batch_normalization,
     "Cast": _set_shape_type_op_any_cast,
     "Compress": _set_shape_type_op_any_compress,
