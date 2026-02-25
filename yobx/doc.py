@@ -2,7 +2,7 @@ from typing import Optional
 import numpy as np
 
 
-def get_latest_pypi_version(package_name="yet-another-onnx-builder") -> str:
+def get_latest_pypi_version(package_name="yet-another-onnx-builder") -> str:  # pragma: no cover
     """Returns the latest published version."""
 
     import requests
@@ -24,7 +24,7 @@ def update_version_package(version: str, package_name="onnx-diagnostic") -> str:
     return version if shorten_r == shorten_v else f"{shorten_v}.dev"
 
 
-def reset_torch_transformers(gallery_conf, fname):
+def reset_torch_transformers(gallery_conf, fname):  # pragma: no cover
     "Resets torch dynamo for :epkg:`sphinx-gallery`."
     import matplotlib.pyplot as plt
     import torch

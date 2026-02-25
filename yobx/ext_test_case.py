@@ -101,7 +101,7 @@ def ignore_warnings(warns: List[Warning]) -> Callable:
 
         try:  # noqa: SIM105
             call_f.__name__ = fct.__name__
-        except AttributeError:
+        except AttributeError:  # pragma: no cover
             pass
         return call_f
 
@@ -129,7 +129,7 @@ def ignore_errors(errors: Union[Exception, Tuple[Exception]]) -> Callable:
 
         try:  # noqa: SIM105
             call_f.__name__ = fct.__name__
-        except AttributeError:
+        except AttributeError:  # pragma: no cover
             pass
         return call_f
 
@@ -155,7 +155,7 @@ def hide_stdout(f: Optional[Callable] = None) -> Callable:
                 warnings.simplefilter("ignore", (UserWarning, DeprecationWarning))
                 try:
                     fct(self)
-                except AssertionError as e:
+                except AssertionError as e:  # pragma: no cover
                     if "torch is not recent enough, file" in str(e):
                         raise unittest.SkipTest(str(e))  # noqa: B904
                     raise
@@ -165,7 +165,7 @@ def hide_stdout(f: Optional[Callable] = None) -> Callable:
 
         try:  # noqa: SIM105
             call_f.__name__ = fct.__name__
-        except AttributeError:
+        except AttributeError:  # pragma: no cover
             pass
         return call_f
 
@@ -459,22 +459,6 @@ def requires_sklearn(version: str, msg: str = "") -> Callable:
     return lambda x: x
 
 
-def requires_experimental(version: str = "0.0.0", msg: str = "") -> Callable:
-    """Skips a unit test if :epkg:`yet-another-onnx-builder` is not recent enough."""
-    import packaging.version as pv
-
-    try:
-        import yobx
-    except ImportError:
-        msg = f"yet-another-onnx-builder not installed: {msg}"
-        return unittest.skip(msg)
-
-    if pv.Version(yobx.__version__) < pv.Version(version):
-        msg = f"yet-another-onnx-builder version {yobx.__version__} < {version}: {msg}"
-        return unittest.skip(msg)
-    return lambda x: x
-
-
 def has_torch(version: str) -> bool:
     "Returns True if torch transformers is higher."
     import packaging.version as pv
@@ -674,7 +658,7 @@ def requires_onnxruntime_training(
     if ortmodule:
         try:
             import onnxruntime.training.ortmodule  # noqa: F401
-        except (AttributeError, ImportError):
+        except (AttributeError, ImportError):  # pragma: no cover
             msg = msg or "ortmodule is missing in onnxruntime-training"
             return unittest.skip(msg)
     return lambda x: x

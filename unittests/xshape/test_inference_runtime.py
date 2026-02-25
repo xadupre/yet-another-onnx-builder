@@ -228,9 +228,7 @@ class TestMakeNodeSetTypeShapeConstantConstantOfShape(ExtTestCase):
         cst = onh.from_array(np.array([2, 3], dtype=np.int64), name="sh")
         b.set_constant("sh", cst)
         value_tensor = oh.make_tensor("value", TINT64, [1], [0])
-        node = oh.make_node(
-            "ConstantOfShape", ["sh"], ["y"], value=value_tensor
-        )
+        node = oh.make_node("ConstantOfShape", ["sh"], ["y"], value=value_tensor)
         b._make_node_set_type_shape_constant(node, {})
         self.assertEqual(b.get_type("y"), TINT64)
 
