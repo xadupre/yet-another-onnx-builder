@@ -1,7 +1,35 @@
+import functools
 from typing import Dict, Union
 import numpy as np
 import onnx
 import onnx.helper as oh
+
+
+@functools.cache
+def onnx_dtype_name(itype: int, exc: bool = True) -> str:
+    """
+    Returns the ONNX name for a specific element type.
+
+    .. runpython::
+        :showcode:
+
+        import onnx
+        from yobx.helpers.onnx_helper import onnx_dtype_name
+
+        itype = onnx.TensorProto.BFLOAT16
+        print(onnx_dtype_name(itype))
+        print(onnx_dtype_name(7))
+    """
+    for k in dir(onnx.TensorProto):
+        if k.upper() == k and k not in {"DESCRIPTOR", "EXTERNAL", "DEFAULT"}:
+            v = getattr(onnx.TensorProto, k)
+            if v == itype:
+                return k
+    if exc:
+        raise ValueError(f"Unexpected value itype: {itype}")
+    if itype == 0:
+        return "UNDEFINED"
+    return "UNEXPECTED"
 
 
 def np_dtype_to_tensor_dtype(dtype: np.dtype) -> int:
