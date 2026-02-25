@@ -538,6 +538,45 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 1, 5, 5))
 
+    def test_op_conv_stride2(self):
+        model = _make_model(
+            [oh.make_node("Conv", ["X", "W"], ["Y"], strides=[2, 2])],
+            [_mkv_("X", TFLOAT, [1, 1, 8, 8])],
+            [_mkv_("Y", TFLOAT, [1, 1, 3, 3])],
+            [onh.from_array(np.ones((1, 1, 3, 3), dtype=np.float32), name="W")],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (1, 1, 3, 3))
+
+    def test_op_max_pool_stride2(self):
+        model = _make_model(
+            [oh.make_node("MaxPool", ["X"], ["Y"], kernel_shape=[2, 2], strides=[2, 2])],
+            [_mkv_("X", TFLOAT, [1, 1, 8, 8])],
+            [_mkv_("Y", TFLOAT, [1, 1, 4, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (1, 1, 4, 4))
+
+    def test_op_conv_stride2_auto_pad_same_upper(self):
+        model = _make_model(
+            [
+                oh.make_node(
+                    "Conv", ["X", "W"], ["Y"], strides=[2, 2], auto_pad="SAME_UPPER"
+                )
+            ],
+            [_mkv_("X", TFLOAT, [1, 1, 8, 8])],
+            [_mkv_("Y", TFLOAT, [1, 1, 4, 4])],
+            [onh.from_array(np.ones((1, 1, 3, 3), dtype=np.float32), name="W")],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (1, 1, 4, 4))
+
     def test_op_gather(self):
         model = _make_model(
             [oh.make_node("Gather", ["X", "idx"], ["Y"], axis=0)],
