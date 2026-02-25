@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
+from yobx.ext_test_case import ExtTestCase, hide_stdout, requires_torch, requires_transformers
 from yobx.helpers import string_type
 
 
@@ -488,6 +488,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("F", s)
         self.assertIn("s2x5", s)
 
+    @hide_stdout()
     @requires_torch("2.9")
     def test_string_tensor_verbose(self):
         import torch
@@ -496,6 +497,35 @@ class TestStringType(ExtTestCase):
         t = torch.rand(3, 4)
         s = _string_tensor(t, "T", with_shape=False, with_device=False, verbose=1)
         self.assertIn("r2", s)
+
+    @hide_stdout()
+    def test_string_type_verbose_none(self):
+        s = string_type(None, verbose=1)
+        self.assertEqual(s, "None")
+
+    @hide_stdout()
+    @requires_torch("2.9")
+    def test_string_type_verbose_tuple(self):
+        s = string_type((1, 2, 3), verbose=1)
+        self.assertIn("int", s)
+
+    @hide_stdout()
+    @requires_torch("2.9")
+    def test_string_type_verbose_list(self):
+        s = string_type([1, 2, 3], verbose=1)
+        self.assertIn("int", s)
+
+    @hide_stdout()
+    @requires_torch("2.9")
+    def test_string_type_verbose_dict(self):
+        s = string_type({"a": 1}, verbose=1)
+        self.assertIn("a:", s)
+
+    @hide_stdout()
+    def test_string_type_verbose_ndarray(self):
+        arr = np.array([1.0, 2.0, 3.0])
+        s = string_type(arr, with_shape=True, verbose=1)
+        self.assertIn("s3", s)
 
 
 if __name__ == "__main__":
