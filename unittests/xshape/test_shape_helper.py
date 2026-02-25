@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.xshape._shape_helper import (
     reshape_implementation_with_zero,
     all_int,
@@ -49,6 +49,13 @@ class TestShapeHelper(ExtTestCase):
 
     def test_is_static_dimension_str(self):
         self.assertFalse(is_static_dimension("batch"))
+
+    @requires_torch("2.0")
+    def test_is_static_dimension_dim(self):
+        import torch
+
+        d = torch.export.Dim("batch", min=2, max=10)
+        self.assertFalse(is_static_dimension(d))
 
     def test_compatible_shapes_same(self):
         self.assertTrue(compatible_shapes((1, 2), (1, 2)))
