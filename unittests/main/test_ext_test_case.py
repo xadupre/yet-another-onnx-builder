@@ -419,6 +419,34 @@ class TestExtTestCaseAssertions(ExtTestCase):
         with self.assertRaises(AssertionError):
             self.assertEqualArray(a, b)
 
+    def test_assertEqualArray_fail_shape(self):
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        with self.assertRaises(AssertionError):
+            self.assertEqualArray(a, b)
+
+    def test_assertEqualArray_fail_values(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = np.array([1.0, 2.0, 4.0])
+        with self.assertRaises(AssertionError):
+            self.assertEqualArray(a, b)
+
+    def test_assertEqualArray_with_rtol(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = np.array([1.01, 2.02, 3.03])
+        self.assertEqualArray(a, b, rtol=0.02)
+
+    def test_assertEqualArray_with_msg(self):
+        a = np.array([1.0], dtype=np.float32)
+        b = np.array([1.0], dtype=np.float64)
+        with self.assertRaises(AssertionError):
+            self.assertEqualArray(a, b, msg="custom error message")
+
+    def test_assertEqualArray_bool(self):
+        a = np.array([True, False, True])
+        b = np.array([True, False, True])
+        self.assertEqualArray(a, b)
+
     def test_assertEqualArrays_list(self):
         a = [np.array([1.0, 2.0]), np.array([3.0, 4.0])]
         b = [np.array([1.0, 2.0]), np.array([3.0, 4.0])]
@@ -524,6 +552,83 @@ class TestExtTestCaseAssertions(ExtTestCase):
             with open(path) as f:
                 content = f.read()
             self.assertEqual(content, "hello world")
+
+
+class TestEqualArrayAny(ExtTestCase):
+    """Tests for the assertEqualArrayAny method."""
+
+    def test_list_of_arrays_pass(self):
+        a = [np.array([1.0, 2.0]), np.array([3.0, 4.0])]
+        b = [np.array([1.0, 2.0]), np.array([3.0, 4.0])]
+        self.assertEqualArrayAny(a, b)
+
+    def test_tuple_of_arrays_pass(self):
+        a = (np.array([1.0, 2.0]), np.array([3.0, 4.0]))
+        b = (np.array([1.0, 2.0]), np.array([3.0, 4.0]))
+        self.assertEqualArrayAny(a, b)
+
+    def test_dict_of_arrays_pass(self):
+        a = {"x": np.array([1.0, 2.0]), "y": np.array([3.0, 4.0])}
+        b = {"x": np.array([1.0, 2.0]), "y": np.array([3.0, 4.0])}
+        self.assertEqualArrayAny(a, b)
+
+    def test_int_scalar_pass(self):
+        self.assertEqualArrayAny(42, 42)
+
+    def test_float_scalar_pass(self):
+        self.assertEqualArrayAny(3.14, 3.14)
+
+    def test_string_scalar_pass(self):
+        self.assertEqualArrayAny("hello", "hello")
+
+    def test_none_pass(self):
+        self.assertEqualArrayAny(None, None)
+
+    def test_numpy_array_pass(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = np.array([1.0, 2.0, 3.0])
+        self.assertEqualArrayAny(a, b)
+
+    def test_numpy_array_with_atol_pass(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = np.array([1.01, 2.01, 3.01])
+        self.assertEqualArrayAny(a, b, atol=0.02)
+
+    def test_list_type_mismatch_fail(self):
+        a = [np.array([1.0, 2.0])]
+        b = (np.array([1.0, 2.0]),)
+        with self.assertRaises(AssertionError):
+            self.assertEqualArrayAny(a, b)
+
+    def test_list_length_mismatch_fail(self):
+        a = [np.array([1.0, 2.0]), np.array([3.0, 4.0])]
+        b = [np.array([1.0, 2.0])]
+        with self.assertRaises(AssertionError):
+            self.assertEqualArrayAny(a, b)
+
+    def test_list_value_mismatch_fail(self):
+        a = [np.array([1.0, 2.0]), np.array([3.0, 4.0])]
+        b = [np.array([1.0, 2.0]), np.array([5.0, 6.0])]
+        with self.assertRaises(AssertionError):
+            self.assertEqualArrayAny(a, b)
+
+    def test_dict_missing_key_fail(self):
+        a = {"x": np.array([1.0])}
+        b = {"y": np.array([1.0])}
+        with self.assertRaises(AssertionError):
+            self.assertEqualArrayAny(a, b)
+
+    def test_scalar_value_mismatch_fail(self):
+        with self.assertRaises(AssertionError):
+            self.assertEqualArrayAny(1, 2)
+
+    def test_none_vs_value_fail(self):
+        with self.assertRaises(AssertionError):
+            self.assertEqualArrayAny(None, np.array([1.0]))
+
+    def test_unsupported_type_fail(self):
+        with self.assertRaises(AssertionError):
+            self.assertEqualArrayAny(object(), object())
 
 
 if __name__ == "__main__":

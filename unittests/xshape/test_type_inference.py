@@ -110,6 +110,46 @@ class TestTypeInference(ExtTestCase):
         result = infer_types(node, [TFLOAT])
         self.assertEqual(result, (TFLOAT,))
 
+    def test_infer_types_function_single_node(self):
+        node = oh.make_node("Relu", ["X"], ["Y"])
+        func = oh.make_function(
+            domain="test",
+            fname="MyRelu",
+            inputs=["X"],
+            outputs=["Y"],
+            nodes=[node],
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        result = infer_types(func, [TFLOAT])
+        self.assertEqual(result, (TFLOAT,))
+
+    def test_infer_types_function_multi_node(self):
+        relu_node = oh.make_node("Relu", ["X"], ["T"])
+        cast_node = oh.make_node("Cast", ["T"], ["Y"], to=TINT64)
+        func = oh.make_function(
+            domain="test",
+            fname="ReluCast",
+            inputs=["X"],
+            outputs=["Y"],
+            nodes=[relu_node, cast_node],
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        result = infer_types(func, [TFLOAT])
+        self.assertEqual(result, (TINT64,))
+
+    def test_infer_types_function_multiple_outputs(self):
+        split_node = oh.make_node("Split", ["X"], ["Y1", "Y2"])
+        func = oh.make_function(
+            domain="test",
+            fname="MySplit",
+            inputs=["X"],
+            outputs=["Y1", "Y2"],
+            nodes=[split_node],
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        result = infer_types(func, [TFLOAT])
+        self.assertEqual(result, (TFLOAT, TFLOAT))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
