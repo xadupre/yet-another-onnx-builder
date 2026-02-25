@@ -46,7 +46,9 @@ class ShapeBuilderBackendRep(onnx.backend.base.BackendRep):
         try:
             self._shape_builder.compare_with_true_inputs(feeds, outs, exc=True)
         except NameError as e:
-            self.skipTest(f"shape function was found but only the rank could be set: {e}")
+            raise unittest.SkipTest(  # noqa: B904
+                f"shape function was found but only the rank could be set: {e}"
+            )
         except Exception as e:
             raise AssertionError(
                 f"Unable to handle a model due to {str(e)}\n---\n"
