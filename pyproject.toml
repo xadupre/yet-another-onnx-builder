@@ -34,7 +34,7 @@ docs = [
     "onnx-diagnostic",
     "openpyxl",
     "pandas",
-    "sphinx>=9",
+    "sphinx>=7",
     "sphinx-gallery",
     "sphinx-issues",
     "sphinx-runpython",
