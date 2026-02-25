@@ -276,7 +276,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
                     and len(existing) == len(value) == 1
                     and isinstance(existing[0], str)
                 ):
-                    self.register_constraint_dimension("existing", value)
+                    self.register_constraint_dimension(existing[0], value[0])
                     return
             assert (
                 name not in self._known_value_shape or self._known_value_shape[name] == value
