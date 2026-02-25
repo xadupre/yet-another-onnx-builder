@@ -70,6 +70,84 @@ class TestOnnxHelper(ExtTestCase):
         self.assertEqual(len(graphs), 1)
         self.assertIs(graphs[0], model.graph)
 
+    def test_enumerate_subgraphs_if(self):
+        then_graph = oh.make_graph(
+            [oh.make_node("Add", ["X", "X"], ["Z"])],
+            "then_branch",
+            [],
+            [_mkv_("Z", TFLOAT, [3, 4])],
+        )
+        else_graph = oh.make_graph(
+            [oh.make_node("Mul", ["X", "X"], ["Z"])],
+            "else_branch",
+            [],
+            [_mkv_("Z", TFLOAT, [3, 4])],
+        )
+        if_node = oh.make_node(
+            "If",
+            inputs=["cond"],
+            outputs=["Z"],
+            then_branch=then_graph,
+            else_branch=else_graph,
+        )
+        model = oh.make_model(
+            oh.make_graph(
+                [if_node],
+                "test",
+                [
+                    _mkv_("X", TFLOAT, [3, 4]),
+                    oh.make_tensor_value_info("cond", onnx.TensorProto.BOOL, []),
+                ],
+                [_mkv_("Z", TFLOAT, [3, 4])],
+            )
+        )
+        graphs = list(enumerate_subgraphs(model.graph))
+        self.assertEqual(len(graphs), 3)
+        self.assertIs(graphs[0], model.graph)
+        names = {g.name for g in graphs}
+        self.assertIn("then_branch", names)
+        self.assertIn("else_branch", names)
+
+    def test_enumerate_subgraphs_loop(self):
+        loop_body = oh.make_graph(
+            [
+                oh.make_node("Add", ["v_in", "v_in"], ["v_out"]),
+                oh.make_node("Identity", ["cond_in"], ["cond_out"]),
+            ],
+            "loop_body",
+            [
+                _mkv_("iter", TINT64, []),
+                oh.make_tensor_value_info("cond_in", onnx.TensorProto.BOOL, []),
+                _mkv_("v_in", TFLOAT, [3, 4]),
+            ],
+            [
+                oh.make_tensor_value_info("cond_out", onnx.TensorProto.BOOL, []),
+                _mkv_("v_out", TFLOAT, [3, 4]),
+            ],
+        )
+        loop_node = oh.make_node(
+            "Loop",
+            inputs=["max_iter", "cond", "X"],
+            outputs=["Y"],
+            body=loop_body,
+        )
+        model = oh.make_model(
+            oh.make_graph(
+                [loop_node],
+                "test",
+                [
+                    _mkv_("X", TFLOAT, [3, 4]),
+                    oh.make_tensor_value_info("max_iter", TINT64, []),
+                    oh.make_tensor_value_info("cond", onnx.TensorProto.BOOL, []),
+                ],
+                [_mkv_("Y", TFLOAT, [3, 4])],
+            )
+        )
+        graphs = list(enumerate_subgraphs(model.graph))
+        self.assertEqual(len(graphs), 2)
+        self.assertIs(graphs[0], model.graph)
+        self.assertEqual(graphs[1].name, "loop_body")
+
     def test_overwrite_shape_in_model_proto(self):
         model = oh.make_model(
             oh.make_graph(
