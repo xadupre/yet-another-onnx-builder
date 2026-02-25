@@ -33,7 +33,7 @@ docs = [
     "matplotlib",
     "onnx-diagnostic",
     "openpyxl",
-    "pandas>=3",
+    "pandas",
     "sphinx>=9",
     "sphinx-gallery",
     "sphinx-issues",
