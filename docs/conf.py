@@ -1,6 +1,6 @@
 # Configuration file for the Sphinx documentation builder.
 
-import onnx_pipe
+import yobx
 
 project = "yet-another-onnx-builder"
 author = "yet-another-onnx-builder contributors"
