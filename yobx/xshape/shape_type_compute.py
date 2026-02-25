@@ -1600,11 +1600,11 @@ def set_type_shape_to_complex(self: ShapeBuilder, node: NodeProto):
         ), f"Unexpected type {dtype} for node {node.op_type}{self.get_debug_msg()}"
         self.set_type(node.output[0], mapping[dtype])
     if self.has_shape(node.input[0]):
-        new_shape = self.get_shape(node.input[0][:-1])
+        new_shape = self.get_shape(node.input[0])[:-1]
         self.set_shape(node.output[0], new_shape)
         return new_shape
     if self.has_rank(node.input[0]):
-        self.set_rank(node.output[0], self.get_rank(input[0]) - 1)
+        self.set_rank(node.output[0], self.get_rank(node.input[0]) - 1)
     return True
 
 
@@ -1622,7 +1622,7 @@ def set_type_shape_complex_module(self: ShapeBuilder, node: NodeProto):
     if self.has_shape(node.input[0]):
         self.set_shape(node.output[0], self.get_shape(node.input[0]))
     elif self.has_rank(node.input[0]):
-        self.set_rank(node.output[0], self.get_rank(input[0]))
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
     return True
 
 
