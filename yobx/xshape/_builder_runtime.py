@@ -342,11 +342,9 @@ class _BuilderRuntime:
         for att in node.attribute:
             if att.name == "to":
                 to = att.i
-                break
-            if att.name == "saturate":
+            elif att.name == "saturate":
                 saturate = att.i
-                break
-        assert to, f"to not here in node {node}"
+        assert to is not None, f"to not here in node {node}"
         assert to != 8 and to < 17, f"Cast not implemented for to={to}, {str_tensor_proto_type()}"
         del saturate
         if not hasattr(self, "torch"):
