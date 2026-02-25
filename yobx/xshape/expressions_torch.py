@@ -21,7 +21,7 @@ class Expression:
 
     def isidentifier(self):
         "Tells if this expression is a single dimension or an expression."
-        return self.expr.isidentifier
+        return self.expr.isidentifier()
 
 
 def parse_expression(
