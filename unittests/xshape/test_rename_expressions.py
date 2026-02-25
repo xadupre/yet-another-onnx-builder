@@ -1,6 +1,7 @@
 import unittest
 from yobx.ext_test_case import ExtTestCase
 from yobx.xshape.rename_expressions import (
+    parse_expression_tokens,
     rename_expression,
     rename_dynamic_dimensions,
     rename_dynamic_expression,
@@ -110,6 +111,18 @@ class TestRenameExpressions(ExtTestCase):
 
     def test_rename_expression(self):
         self.assertEqual("B+seq_length", rename_expression("s52+seq_length", {"s52": "B"}))
+
+    def test_parse_expression_tokens_syntax_error(self):
+        # An expression with a SyntaxError should return the expression itself in a set.
+        invalid_expr = "a +"
+        result = parse_expression_tokens(invalid_expr)
+        self.assertEqual({invalid_expr}, result)
+
+    def test_rename_dynamic_expression_syntax_error(self):
+        # An expression with a SyntaxError should be returned unchanged.
+        invalid_expr = "a +"
+        result = rename_dynamic_expression(invalid_expr, {"a": "b"})
+        self.assertEqual(invalid_expr, result)
 
 
 if __name__ == "__main__":
