@@ -26,9 +26,7 @@ class TestUnitTest(ExtTestCase):
         self.assertGreater(stat["chars"], stat["lines"])
 
     def test_statistics_on_folder(self):
-        stat = statistics_on_folder(
-            os.path.join(os.path.dirname(__file__), ".."), aggregation=1
-        )
+        stat = statistics_on_folder(os.path.join(os.path.dirname(__file__), ".."), aggregation=1)
         self.assertGreater(len(stat), 0)
 
         df = pandas.DataFrame(stat)
@@ -57,9 +55,7 @@ class TestUnitTest(ExtTestCase):
             & (gr["dir"] != "_doc/auto_recipes")
             & (gr["dir"] != "_doc/auto_technical")
         ]
-        total = (
-            gr[gr["dir"].str.contains("yobx/")].drop(["ext", "dir"], axis=1).sum(axis=0)
-        )
+        total = gr[gr["dir"].str.contains("yobx/")].drop(["ext", "dir"], axis=1).sum(axis=0)
         self.assertEqual(len(gr.columns), 4)
         self.assertEqual(total.shape, (2,))
 

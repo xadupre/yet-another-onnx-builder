@@ -242,9 +242,7 @@ class TestMeasureTime(ExtTestCase):
 
     def test_measure_time_max_time_requires_div_by_number(self):
         self.assertRaise(
-            lambda: measure_time(
-                lambda: math.cos(0.5), max_time=0.01, div_by_number=False
-            ),
+            lambda: measure_time(lambda: math.cos(0.5), max_time=0.01, div_by_number=False),
             ValueError,
         )
 
