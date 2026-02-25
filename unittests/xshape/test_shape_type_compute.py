@@ -151,6 +151,45 @@ class _MockShapeBuilder(ShapeBuilder):
         return []
 
 
+class _LocalFunctionShapeBuilder(BasicShapeBuilder):
+    """BasicShapeBuilder with local function support for testing set_shape_type_custom."""
+
+    def __init__(self):
+        super().__init__()
+        self._functions = {}  # (name, domain) -> FunctionProto
+        self._functions_builder = {}  # (name, domain) -> builder
+        self._func_nodes = []  # nodes executed during infer_shapes
+
+    @property
+    def functions_builder(self):
+        return self._functions_builder
+
+    def has_local_function(self, op_type, domain="", builder=False):
+        key = (op_type, domain)
+        return key in (self._functions_builder if builder else self._functions)
+
+    def get_local_function(self, op_type, domain="", builder=False):
+        key = (op_type, domain)
+        return (self._functions_builder if builder else self._functions).get(key)
+
+    def register_local_function(self, proto, func_builder):
+        """Register a FunctionProto together with its shape-inference builder."""
+        key = (proto.name, proto.domain)
+        self._functions[key] = proto
+        self._functions_builder[key] = func_builder
+
+    def reset_types_and_shapes(self):
+        """Clear cached shapes and types so they can be recomputed."""
+        self._known_shapes.clear()
+        self._known_types.clear()
+        self._known_ranks.clear()
+
+    def infer_shapes(self):
+        """Re-run shape inference over the stored function nodes."""
+        for node in self._func_nodes:
+            self.run_node(node)
+
+
 class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
     # broadcast_shape (already tested, kept for completeness)
@@ -1214,6 +1253,71 @@ class TestShapeTypeCompute(ExtTestCase):
         )
         set_shape_type_custom(b, node)
         self.assertEqual(b.get_shape("Y"), (5, 2))
+
+    def test_set_shape_type_custom_local_function(self):
+        # Local function: MyUnary(a) -> b where b = Relu(a), same shape as input.
+        domain = "local_domain"
+        op_type = "MyUnary"
+        func_proto = oh.make_function(
+            domain,
+            op_type,
+            inputs=["a"],
+            outputs=["b"],
+            nodes=[oh.make_node("Relu", ["a"], ["b"])],
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        # Pre-populate the function builder with the same input shapes.
+        func_builder = _LocalFunctionShapeBuilder()
+        func_builder.set_type("a", TFLOAT)
+        func_builder.set_shape("a", (3, 4))
+        func_builder.set_type("b", TFLOAT)
+        func_builder.set_shape("b", (3, 4))
+        func_builder._output_names = ["b"]
+
+        # Main builder with the same shapes so re-inference is not triggered.
+        b = _LocalFunctionShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (3, 4))
+        b.register_local_function(func_proto, func_builder)
+
+        node = oh.make_node(op_type, ["X"], ["Y"], domain=domain)
+        set_shape_type_custom(b, node)
+
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (3, 4))
+
+    def test_set_shape_type_custom_local_function_recompute(self):
+        # Same local function but with mismatched shapes to trigger re-inference.
+        domain = "local_domain"
+        op_type = "MyUnary"
+        func_proto = oh.make_function(
+            domain,
+            op_type,
+            inputs=["a"],
+            outputs=["b"],
+            nodes=[oh.make_node("Relu", ["a"], ["b"])],
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        # Function builder has different (stale) input shapes.
+        func_builder = _LocalFunctionShapeBuilder()
+        func_builder.set_type("a", TFLOAT)
+        func_builder.set_shape("a", (5, 6))
+        func_builder.set_type("b", TFLOAT)
+        func_builder.set_shape("b", (5, 6))
+        func_builder._output_names = ["b"]
+        func_builder._func_nodes = [oh.make_node("Relu", ["a"], ["b"])]
+
+        # Main builder uses shape (3, 4) — triggers reset + re-inference.
+        b = _LocalFunctionShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (3, 4))
+        b.register_local_function(func_proto, func_builder)
+
+        node = oh.make_node(op_type, ["X"], ["Y"], domain=domain)
+        set_shape_type_custom(b, node)
+
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (3, 4))
 
     def test_argmax_keepdims(self):
         g = _MockShapeBuilder()
