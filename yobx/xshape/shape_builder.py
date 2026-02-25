@@ -2,8 +2,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import onnx
 import onnx.helper as oh
-from onnx_diagnostic.helpers.onnx_helper import dtype_to_tensor_dtype
 from ..helpers import string_type
+from ..helpers.onnx_helper import dtype_to_tensor_dtype
 from ._shape_helper import DYNAMIC_SHAPE
 from .evaluate_expressions import evaluate_expression
 from ._onnx_helper import (
@@ -121,7 +121,9 @@ class ShapeBuilder:
                 if att.type == onnx.AttributeProto.FLOATS:
                     return list(att.floats)
                 if att.type == onnx.AttributeProto.STRING:
-                    return att.s.decode("utf-8")
+                    return att.s
+                if att.type == onnx.AttributeProto.STRINGS:
+                    return list(att.strings)
                 raise TypeError(
                     f"Not implemented for attribute name {att.name!r}, attribute={att}"
                 )
@@ -149,7 +151,9 @@ class ShapeBuilder:
                 elif att.type == onnx.AttributeProto.FLOATS:
                     res[att.name] = list(att.floats)
                 elif att.type == onnx.AttributeProto.STRING:
-                    res[att.name] = att.s.decode("utf-8")
+                    res[att.name] = att.s
+                elif att.type == onnx.AttributeProto.STRINGS:
+                    res[att.name] = list(att.strings)
                 else:
                     raise TypeError(
                         f"Not implemented for attribute name {att.name!r}, attribute={att}"

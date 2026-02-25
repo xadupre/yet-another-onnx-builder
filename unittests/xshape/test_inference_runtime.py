@@ -79,6 +79,13 @@ class TestUpdateNodeConstant(ExtTestCase):
     def test_update_node_constant_invalid_name_type(self):
         self.assertRaises(AssertionError, self.b.update_node_constant, 42, None)
 
+    def test_update_node_constant_with_constant_node(self):
+        value = oh.make_tensor("value", TFLOAT, [2], [1.0, 2.0])
+        node = oh.make_node("Constant", [], ["c"], value=value)
+        result = self.b.update_node_constant("c", node)
+        self.assertTrue(result)
+        self.assertIn("c", self.b.constants_)
+
     def test_update_node_constant_invalid_node_type(self):
         self.assertRaises(AssertionError, self.b.update_node_constant, "c", "not_a_node")
 

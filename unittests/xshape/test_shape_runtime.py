@@ -166,6 +166,15 @@ class TestShapeRuntime(ExtTestCase):
         self.assertTrue(result)
         self.assertEqual(b.value_as_shape("Y"), (3, 4))
 
+    def test_shape_with_start_attr_end_missing_unknown_shape(self):
+        # start is set, end is missing, input has no shape or rank known:
+        # the function should return False and store a string value shape.
+        b = _TestShapeBuilder()
+        node = oh.make_node("Shape", ["X"], ["Y"], start=2)
+        result = b._update_value_shape_with_node_Shape(node)
+        self.assertFalse(result)
+        self.assertEqual(b.value_as_shape("Y"), "X[2:]")
+
     # ------------------------------------------------------------------
     # _update_value_shape_with_node_Gather
     # ------------------------------------------------------------------
