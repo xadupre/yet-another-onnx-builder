@@ -39,7 +39,7 @@ class TestDocMatplotlib(ExtTestCase):
     def test_rotate_align_returns_axes(self):
         from yobx.doc import rotate_align
 
-        fig, ax = plt.subplots()
+        _fig, ax = plt.subplots()
         ax.bar(["a", "b", "c"], [1, 2, 3])
         result = rotate_align(ax)
         self.assertIs(result, ax)
@@ -48,7 +48,7 @@ class TestDocMatplotlib(ExtTestCase):
     def test_rotate_align_custom_angle_and_align(self):
         from yobx.doc import rotate_align
 
-        fig, ax = plt.subplots()
+        _fig, ax = plt.subplots()
         ax.bar(["x", "y"], [1, 2])
         result = rotate_align(ax, angle=30, align="left")
         self.assertIs(result, ax)
@@ -60,7 +60,7 @@ class TestDocMatplotlib(ExtTestCase):
     def test_save_fig_creates_file(self):
         from yobx.doc import save_fig
 
-        fig, ax = plt.subplots()
+        _fig, ax = plt.subplots()
         ax.plot([1, 2, 3])
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             fname = f.name
@@ -76,7 +76,7 @@ class TestDocMatplotlib(ExtTestCase):
     def test_title_sets_title(self):
         from yobx.doc import title
 
-        fig, ax = plt.subplots()
+        _fig, ax = plt.subplots()
         result = title(ax, "My Title")
         self.assertIs(result, ax)
         self.assertEqual(ax.get_title(), "My Title")
@@ -96,7 +96,7 @@ class TestDocMatplotlib(ExtTestCase):
         from yobx.doc import plot_histogram
 
         data = np.random.default_rng(0).standard_normal(50)
-        fig, ax = plt.subplots()
+        _fig, ax = plt.subplots()
         result = plot_histogram(data, ax=ax, bins=20, color="blue", alpha=0.5)
         self.assertIs(result, ax)
         plt.close("all")
