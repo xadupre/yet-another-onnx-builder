@@ -40,6 +40,16 @@ class TestOnnxHelper(ExtTestCase):
         self.assertIn("Cast", types)
         self.assertIn("Exp", types)
         self.assertIn("Sqrt", types)
+        self.assertIn("CumSum", types)
+        self.assertIn("HardSigmoid", types)
+        self.assertIn("HardSwish", types)
+        self.assertIn("LeakyRelu", types)
+        self.assertIn("LpNormalization", types)
+        self.assertIn("LRN", types)
+        self.assertIn("MeanVarianceNormalization", types)
+        self.assertIn("Mish", types)
+        self.assertIn("Shrink", types)
+        self.assertIn("Trilu", types)
 
     def test_str_tensor_proto_type(self):
         s = str_tensor_proto_type()
