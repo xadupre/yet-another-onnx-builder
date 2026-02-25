@@ -1,6 +1,18 @@
 import unittest
+import numpy as np
+import onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
 from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+
+
+class _TorchShapeBuilder(BasicShapeBuilder):
+    """BasicShapeBuilder extended with a ``torch`` property for runtime tests."""
+
+    @property
+    def torch(self):
+        import torch
+
+        return torch
 
 
 class TestApplySliceToShape(ExtTestCase):
@@ -69,6 +81,113 @@ class TestApplySliceToShape(ExtTestCase):
         # only axis 0 is sliced; axes 1 and 2 are copied from the original shape
         result = self.b._apply_slice_to_shape((6, 4, 5), [slice(1, 4)], [0], [])
         self.assertEqual(result, (3, 4, 5))
+
+
+class TestApplyTranspose(ExtTestCase):
+    def setUp(self):
+        self.b = _TorchShapeBuilder()
+
+    def test_transpose_2d(self):
+        node = oh.make_node("Transpose", ["x"], ["y"], perm=[1, 0])
+        x = np.arange(6, dtype=np.float32).reshape(2, 3)
+        result = self.b._apply_transpose(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (3, 2))
+
+    def test_transpose_3d(self):
+        node = oh.make_node("Transpose", ["x"], ["y"], perm=[2, 0, 1])
+        x = np.arange(24, dtype=np.float32).reshape(2, 3, 4)
+        result = self.b._apply_transpose(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (4, 2, 3))
+
+
+class TestApplyExpand(ExtTestCase):
+    def setUp(self):
+        self.b = _TorchShapeBuilder()
+
+    def test_expand_numpy(self):
+        node = oh.make_node("Expand", ["x", "shape"], ["y"])
+        x = np.ones((1, 3), dtype=np.float32)
+        new_shape = np.array([2, 3], dtype=np.int64)
+        result = self.b._apply_expand(node, {"x": x, "shape": new_shape})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].shape, (2, 3))
+
+    def test_expand_torch(self):
+        import torch
+
+        node = oh.make_node("Expand", ["x", "shape"], ["y"])
+        x = torch.ones(1, 3)
+        new_shape = np.array([2, 3], dtype=np.int64)
+        result = self.b._apply_expand(node, {"x": x, "shape": new_shape})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (2, 3))
+
+    def test_expand_broadcast(self):
+        node = oh.make_node("Expand", ["x", "shape"], ["y"])
+        x = np.array([[1.0], [2.0], [3.0]], dtype=np.float32)
+        new_shape = np.array([3, 4], dtype=np.int64)
+        result = self.b._apply_expand(node, {"x": x, "shape": new_shape})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].shape, (3, 4))
+
+
+class TestApplySqueeze(ExtTestCase):
+    def setUp(self):
+        self.b = BasicShapeBuilder()
+
+    def test_squeeze_with_axis_scalar(self):
+        node = oh.make_node("Squeeze", ["x", "axes"], ["y"])
+        x = np.ones((3, 1, 5), dtype=np.float32)
+        axes = np.array(1, dtype=np.int64)
+        result = self.b._apply_squeeze(node, {"x": x, "axes": axes})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].shape, (3, 5))
+
+    def test_squeeze_with_axis_array(self):
+        node = oh.make_node("Squeeze", ["x", "axes"], ["y"])
+        x = np.ones((1, 3, 1, 5), dtype=np.float32)
+        axes = np.array([0, 2], dtype=np.int64)
+        result = self.b._apply_squeeze(node, {"x": x, "axes": axes})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].shape, (3, 5))
+
+    def test_squeeze_no_axis(self):
+        node = oh.make_node("Squeeze", ["x"], ["y"])
+        x = np.ones((1, 3, 1, 5), dtype=np.float32)
+        result = self.b._apply_squeeze(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].shape, (3, 5))
+
+
+class TestApplyUnsqueeze(ExtTestCase):
+    def setUp(self):
+        self.b = BasicShapeBuilder()
+
+    def test_unsqueeze_scalar_axis(self):
+        node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
+        x = np.arange(6, dtype=np.float32).reshape(2, 3)
+        axes = np.array(0, dtype=np.int64)
+        result = self.b._apply_unsqueeze(node, {"x": x, "axes": axes})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].shape, (1, 2, 3))
+
+    def test_unsqueeze_array_axis_single(self):
+        node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
+        x = np.arange(6, dtype=np.float32).reshape(2, 3)
+        axes = np.array([1], dtype=np.int64)
+        result = self.b._apply_unsqueeze(node, {"x": x, "axes": axes})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].shape, (2, 1, 3))
+
+    def test_unsqueeze_multiple_axes(self):
+        node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
+        x = np.arange(6, dtype=np.float32).reshape(2, 3)
+        axes = np.array([0, 3], dtype=np.int64)
+        result = self.b._apply_unsqueeze(node, {"x": x, "axes": axes})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].shape, (1, 2, 3, 1))
 
 
 if __name__ == "__main__":
