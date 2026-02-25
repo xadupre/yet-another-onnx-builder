@@ -224,6 +224,26 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_rank("Y"), 3)
 
+    def test_set_type_shape_reshape_new_shape_string_with_known_shape(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (3, 4))
+        # new_shape is a string and its shape is known: shape=(3,) → rank set to 3
+        b.set_shape("shape_tensor", (3,))
+        set_type_shape_reshape(b, "Y", "X", "shape_tensor")
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_rank("Y"), 3)
+
+    def test_set_type_shape_reshape_new_shape_string_without_known_shape(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (3, 4))
+        # new_shape is a string but its shape is not registered → no rank/shape set
+        set_type_shape_reshape(b, "Y", "X", "unknown_shape_tensor")
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertFalse(b.has_shape("Y"))
+        self.assertFalse(b.has_rank("Y"))
+
     # ------------------------------------------------------------------
     # set_type_shape_unary_op
     # ------------------------------------------------------------------
