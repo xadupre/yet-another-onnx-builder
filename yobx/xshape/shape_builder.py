@@ -2,8 +2,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import onnx
 import onnx.helper as oh
-from onnx_diagnostic.helpers.onnx_helper import dtype_to_tensor_dtype
 from ..helpers import string_type
+from ..helpers.onnx_helper import dtype_to_tensor_dtype
 from ._shape_helper import DYNAMIC_SHAPE
 from .evaluate_expressions import evaluate_expression
 from ._onnx_helper import (
