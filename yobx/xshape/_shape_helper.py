@@ -3,7 +3,7 @@ from typing import Any, Sequence, Tuple, Union
 import numpy as np
 
 STATIC_SHAPE = Tuple[int, ...]
-DYNAMIC_SHAPE = Tuple[Union[int, "torch.SymInt", "torch.SymFloat", float, str], ...]  # noqa: F821
+DYNAMIC_SHAPE = Tuple[Union[int, "torch.SymInt", "torch.SymFloat", float, str], ...]  # type: ignore[name-defined]  # noqa: F821
 
 
 def reshape_implementation_with_zero(data: Any, shape: Sequence[int], allowzero: int = 0) -> Any:
@@ -48,7 +48,7 @@ def is_static_shape(shape: DYNAMIC_SHAPE) -> bool:
     return all(map(is_static_dimension, shape))
 
 
-def is_static_dimension(d: int) -> bool:
+def is_static_dimension(d: Any) -> bool:
     import torch
 
     if isinstance(d, torch.export.dynamic_shapes._Dim):

@@ -3,6 +3,7 @@ from typing import Dict, Union
 import numpy as np
 import onnx
 import onnx.helper as oh
+from onnx_diagnostic.helpers.onnx_helper import pretty_onnx  # noqa: F401
 
 
 @functools.cache

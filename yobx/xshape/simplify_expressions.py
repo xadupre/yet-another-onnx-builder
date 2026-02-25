@@ -96,17 +96,17 @@ class MulDivCancellerTransformer(CommonTransformer):
                 return ast.Constant(value=1)
             node = factors[0]
             for f in factors[1:]:
-                node = ast.BinOp(left=node, op=ast.Mult(), right=f)
+                node = ast.BinOp(left=node, op=ast.Mult(), right=f)  # type: ignore[arg-type]
             return node
 
         numer_node = _product(numerator)
         if not denominator:
             return numer_node
         denom_node = _product(denominator)
-        return ast.BinOp(left=numer_node, op=ast.FloorDiv(), right=denom_node)
+        return ast.BinOp(left=numer_node, op=ast.FloorDiv(), right=denom_node)  # type: ignore[arg-type]
 
     def visit_BinOp(self, node: ast.BinOp) -> ast.AST:
-        node = self.generic_visit(node)
+        node = self.generic_visit(node)  # type: ignore[assignment]
 
         if not (isinstance(node, ast.BinOp) and (isinstance(node.op, (ast.Mult, ast.FloorDiv)))):
             return node
@@ -176,7 +176,7 @@ class ExpressionSimplifierAddVisitor(CommonVisitor):
 
     def __init__(self, expr: Optional[str] = None):
         super().__init__(expr)
-        self.coeffs = {}
+        self.coeffs: Dict[str, int] = {}
         self.const = 0
 
     def visit_BinOp(self, node):
@@ -261,7 +261,7 @@ class ReorderCommutativeOpsTransformer(CommonTransformer):
         """Rebuilds a binary tree from sorted operands."""
         expr = operands[0]
         for operand in operands[1:]:
-            expr = ast.BinOp(left=expr, op=op, right=operand)
+            expr = ast.BinOp(left=expr, op=op, right=operand)  # type: ignore[arg-type]
         return expr
 
     def _expr_key(self, node: ast.AST) -> str:
@@ -277,7 +277,7 @@ class ExactMulDivConstantFolderTransformer(CommonTransformer):
     """
 
     def visit_BinOp(self, node: ast.BinOp):
-        node = self.generic_visit(node)
+        node = self.generic_visit(node)  # type: ignore[assignment]
 
         if not isinstance(node, ast.BinOp):
             return node
@@ -335,7 +335,7 @@ class ExactMulDivConstantFolderTransformer(CommonTransformer):
     def _build_product(self, factors: List[ast.AST]) -> ast.AST:
         out = factors[0]
         for f in factors[1:]:
-            out = ast.BinOp(left=out, op=ast.Mult(), right=f)
+            out = ast.BinOp(left=out, op=ast.Mult(), right=f)  # type: ignore[arg-type]
         return out
 
 
