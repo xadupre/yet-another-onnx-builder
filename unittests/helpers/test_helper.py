@@ -10,6 +10,13 @@ try:
 except ImportError:
     HAS_TORCH = False
 
+try:
+    import transformers as _transformers  # noqa: F401
+
+    HAS_TRANSFORMERS = HAS_TORCH
+except ImportError:
+    HAS_TRANSFORMERS = False
+
 
 class TestStringType(ExtTestCase):
     def test_none(self):
@@ -181,6 +188,130 @@ class TestStringType(ExtTestCase):
         large_set = set(range(15))
         s = string_type(large_set, with_min_max=True)
         self.assertIn("#15", s)
+
+    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    def test_dynamic_cache(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+
+        dc = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        dc.update(key, value, layer_idx=0)
+        s = string_type(dc)
+        self.assertIn("DynamicCache", s)
+        self.assertIn("key_cache=", s)
+        self.assertIn("value_cache=", s)
+
+    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    def test_dynamic_cache_with_shape(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+
+        dc = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        dc.update(key, value, layer_idx=0)
+        s = string_type(dc, with_shape=True)
+        self.assertIn("DynamicCache", s)
+        self.assertIn("1x4x2x8", s)
+
+    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    def test_dynamic_layer(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+
+        dc = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        dc.update(key, value, layer_idx=0)
+        dl = dc.layers[0]
+        s = string_type(dl)
+        self.assertIn("DynamicLayer", s)
+        self.assertIn("keys=", s)
+        self.assertIn("values=", s)
+
+    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    def test_dynamic_layer_with_shape(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+
+        dc = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        dc.update(key, value, layer_idx=0)
+        dl = dc.layers[0]
+        s = string_type(dl, with_shape=True)
+        self.assertIn("DynamicLayer", s)
+        self.assertIn("1x4x2x8", s)
+
+    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    def test_static_cache(self):
+        import torch
+        from transformers import GPT2Config
+        from transformers.cache_utils import StaticCache
+
+        cfg = GPT2Config(n_head=4, n_embd=32)
+        sc = StaticCache(config=cfg, max_cache_len=16)
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        sc.update(key, value, layer_idx=0)
+        s = string_type(sc)
+        self.assertIn("StaticCache", s)
+        self.assertIn("key_cache=", s)
+        self.assertIn("value_cache=", s)
+
+    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    def test_static_cache_with_shape(self):
+        import torch
+        from transformers import GPT2Config
+        from transformers.cache_utils import StaticCache
+
+        cfg = GPT2Config(n_head=4, n_embd=32)
+        # max_cache_len=16 pre-allocates tensors of length 16 regardless of input seq len
+        sc = StaticCache(config=cfg, max_cache_len=16)
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        sc.update(key, value, layer_idx=0)
+        s = string_type(sc, with_shape=True)
+        self.assertIn("StaticCache", s)
+        # StaticCache pre-allocates to max_cache_len, so seq dim is 16 not 2
+        self.assertIn("1x4x16x8", s)
+
+    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    def test_static_layer(self):
+        import torch
+        from transformers import GPT2Config
+        from transformers.cache_utils import StaticCache
+
+        cfg = GPT2Config(n_head=4, n_embd=32)
+        sc = StaticCache(config=cfg, max_cache_len=16)
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        sc.update(key, value, layer_idx=0)
+        sl = sc.layers[0]
+        s = string_type(sl)
+        self.assertIn("StaticLayer", s)
+        self.assertIn("keys=", s)
+        self.assertIn("values=", s)
+
+    @unittest.skipUnless(HAS_TRANSFORMERS, "transformers or torch not installed")
+    def test_static_layer_with_shape(self):
+        import torch
+        from transformers import GPT2Config
+        from transformers.cache_utils import StaticCache
+
+        cfg = GPT2Config(n_head=4, n_embd=32)
+        sc = StaticCache(config=cfg, max_cache_len=16)
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        sc.update(key, value, layer_idx=0)
+        sl = sc.layers[0]
+        s = string_type(sl, with_shape=True)
+        self.assertIn("StaticLayer", s)
+        # StaticLayer.keys has shape [batch, heads, max_cache_len, head_dim];
+        # list() iterates over batch dim, exposing [heads, max_cache_len, head_dim]
+        self.assertIn("4x16x8", s)
 
 
 if __name__ == "__main__":
