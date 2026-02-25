@@ -779,6 +779,54 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4))
 
+    def test_apply_expand_to_shape_no_ones(self):
+        # No 1s or -1s in new_shape: return new_shape as-is without entering the loop
+        b = _TestShapeBuilder()
+        result = b._apply_expand_to_shape((3, 4), (5, 6))
+        self.assertEqual(result, (5, 6))
+
+    def test_apply_expand_to_shape_one_copies_input_dim(self):
+        # s == 1 in new_shape: copy the corresponding dimension from input_shape
+        b = _TestShapeBuilder()
+        result = b._apply_expand_to_shape((3, 4), (1, 4))
+        self.assertEqual(result, (3, 4))
+
+    def test_apply_expand_to_shape_shorter_input_padded(self):
+        # input_shape shorter than new_shape: pad with 1s on the left before expanding
+        b = _TestShapeBuilder()
+        result = b._apply_expand_to_shape((5,), (3, 1))
+        self.assertEqual(result, (3, 5))
+
+    def test_apply_expand_to_shape_zero_dimension(self):
+        # s == 0 in new_shape: output 0 at that position (needs 1 elsewhere to enter loop)
+        b = _TestShapeBuilder()
+        result = b._apply_expand_to_shape((3, 4), (0, 1))
+        self.assertEqual(result, (0, 4))
+
+    def test_apply_expand_to_shape_string_dims_equal(self):
+        # new_shape dim is a string matching input_shape dim: keep the string
+        b = _TestShapeBuilder()
+        result = b._apply_expand_to_shape(("batch", 4), ("batch", 1))
+        self.assertEqual(result, ("batch", 4))
+
+    def test_apply_expand_to_shape_string_dims_different(self):
+        # new_shape dim is a string differing from input_shape dim string: return None
+        b = _TestShapeBuilder()
+        result = b._apply_expand_to_shape(("batch", 4), ("seq", 1))
+        self.assertIsNone(result)
+
+    def test_apply_expand_to_shape_new_str_input_int_one(self):
+        # new_shape dim is a string and input dim is 1: use the string from new_shape
+        b = _TestShapeBuilder()
+        result = b._apply_expand_to_shape((1, 4), ("batch", 1))
+        self.assertEqual(result, ("batch", 4))
+
+    def test_apply_expand_to_shape_new_str_input_int_not_one(self):
+        # new_shape dim is a string and input dim is an int != 1: return None
+        b = _TestShapeBuilder()
+        result = b._apply_expand_to_shape((3, 4), ("batch", 1))
+        self.assertIsNone(result)
+
     def test_op_sign(self):
         model = _make_model(
             [oh.make_node("Sign", ["X"], ["Y"])],
