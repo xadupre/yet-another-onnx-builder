@@ -182,6 +182,121 @@ class TestStringType(ExtTestCase):
         s = string_type(large_set, with_min_max=True)
         self.assertIn("#15", s)
 
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_dim(self):
+        import torch
+
+        d = torch.export.Dim("batch", min=2, max=10)
+        s = string_type(d)
+        self.assertEqual(s, "Dim(batch)")
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_derived_dim(self):
+        import torch
+
+        d = torch.export.Dim("batch", min=2, max=10)
+        dd = d * 2
+        s = string_type(dd)
+        self.assertEqual(s, "DerivedDim")
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_dim_hint_dynamic(self):
+        import torch
+
+        s = string_type(torch.export.Dim.DYNAMIC)
+        self.assertEqual(s, "DYNAMIC")
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_dim_hint_auto(self):
+        import torch
+
+        s = string_type(torch.export.Dim.AUTO)
+        self.assertEqual(s, "AUTO")
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_dataclass(self):
+        from dataclasses import dataclass
+
+        @dataclass
+        class MyData:
+            x: int
+            y: float
+
+        obj = MyData(x=1, y=2.0)
+        s = string_type(obj)
+        self.assertIn("MyData", s)
+        self.assertIn("x:int", s)
+        self.assertIn("y:float", s)
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_dataclass_with_tensor(self):
+        import torch
+        from dataclasses import dataclass
+
+        @dataclass
+        class TensorData:
+            t: object
+
+        obj = TensorData(t=torch.rand(2, 3))
+        s = string_type(obj, with_shape=True)
+        self.assertIn("TensorData", s)
+        self.assertIn("s2x3", s)
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_torch_tensor_scalar_with_min_max(self):
+        import torch
+
+        t = torch.tensor(3.14)
+        s = string_type(t, with_min_max=True)
+        self.assertIn("=", s)
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_torch_tensor_empty_with_min_max(self):
+        import torch
+
+        t = torch.empty(0, 3)
+        s = string_type(t, with_shape=True, with_min_max=True)
+        self.assertIn("[empty]", s)
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_torch_tensor_with_nans_with_min_max(self):
+        import torch
+
+        t = torch.tensor([1.0, float("nan"), 3.0])
+        s = string_type(t, with_shape=True, with_min_max=True)
+        self.assertIn("N1nans", s)
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_torch_tensor_float16(self):
+        import torch
+
+        t = torch.rand(2, 4, dtype=torch.float16)
+        s = string_type(t, with_shape=True)
+        self.assertIn("s2x4", s)
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_torch_tensor_int64(self):
+        import torch
+
+        t = torch.arange(6, dtype=torch.int64).reshape(2, 3)
+        s = string_type(t, with_shape=True)
+        self.assertIn("T7s2x3", s)
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_with_min_max_int(self):
+        s = string_type(42, with_min_max=True)
+        self.assertEqual(s, "int=42")
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_with_min_max_float(self):
+        s = string_type(1.5, with_min_max=True)
+        self.assertEqual(s, "float=1.5")
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_with_min_max_bool_false(self):
+        s = string_type(False, with_min_max=True)
+        self.assertIn("bool=", s)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -14,6 +14,13 @@ from yobx.xshape._shape_helper import (
     _reshape_shape,
 )
 
+try:
+    import torch as _torch  # noqa: F401
+
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
 
 class TestShapeHelper(ExtTestCase):
     def test_all_int(self):
@@ -49,6 +56,13 @@ class TestShapeHelper(ExtTestCase):
 
     def test_is_static_dimension_str(self):
         self.assertFalse(is_static_dimension("batch"))
+
+    @unittest.skipUnless(HAS_TORCH, "torch not installed")
+    def test_is_static_dimension_dim(self):
+        import torch
+
+        d = torch.export.Dim("batch", min=2, max=10)
+        self.assertFalse(is_static_dimension(d))
 
     def test_compatible_shapes_same(self):
         self.assertTrue(compatible_shapes((1, 2), (1, 2)))
