@@ -1547,9 +1547,9 @@ class CubeLogs:
                             _mkc(m, f"∅{n1}∧{n2}"): (sinan & ~sjnan).astype(int),
                             _mkc(m, f"{n1}∧∅{n2}"): (~sinan & sjnan).astype(int),
                             _mkc(m, f"{n1}∧{n2}"): (~sinan & ~sjnan).astype(int),
-                            _mkc(m, f"{n1}<{n2}"): (si < sj).astype(int),# type: ignore[missing-attribute]
-                            _mkc(m, f"{n1}=={n2}"): (si == sj).astype(int),# type: ignore[missing-attribute]
-                            _mkc(m, f"{n1}>{n2}"): (si > sj).astype(int),# type: ignore[missing-attribute]
+                            _mkc(m, f"{n1}<{n2}"): (si < sj).astype(int),  # type: ignore[missing-attribute]
+                            _mkc(m, f"{n1}=={n2}"): (si == sj).astype(int),  # type: ignore[missing-attribute]
+                            _mkc(m, f"{n1}>{n2}"): (si > sj).astype(int),  # type: ignore[missing-attribute]
                             _mkc(m, f"{n1}*({n1}∧{n2})"): si * (~sinan & ~sjnan).astype(float),
                             _mkc(m, f"{n2}*({n1}∧{n2})"): sj * (~sinan & ~sjnan).astype(float),
                         }
