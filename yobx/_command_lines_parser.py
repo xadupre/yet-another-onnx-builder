@@ -164,11 +164,13 @@ def _cmd_find(argv: List[Any]):
         print(f"post-shadowing names: {ps}")
     elif args.v2:
         onx = onnx.load(args.input, load_external_data=False)
-        res = list(enumerate_results(onx, name=set(args.names.split(",")), verbose=args.verbose))
+        names = set(args.names.split(",")) if args.names is not None else None
+        res = list(enumerate_results(onx, name=names, verbose=args.verbose))
         if not args.verbose:
             print("\n".join(map(str, res)))
     else:
-        onnx_find(args.input, verbose=args.verbose, watch=set(args.names.split(",")))
+        watch = set(args.names.split(",")) if args.names is not None else None
+        onnx_find(args.input, verbose=args.verbose, watch=watch)
 
 
 def get_parser_agg() -> ArgumentParser:
