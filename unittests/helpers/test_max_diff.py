@@ -399,6 +399,45 @@ class TestMaxDiffDynamicCache(ExtTestCase):
         res = max_diff(cache, cache)
         self.assertEqual(res["abs"], 0.0)
 
+    def test_cache_key_value_vs_cache_key_value(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+        from yobx.helpers.cache_helper import CacheKeyValue
+
+        cache = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        cache.update(key, value, layer_idx=0)
+        cv = CacheKeyValue(cache)
+        res = max_diff(cv, cv)
+        self.assertEqual(res["abs"], 0.0)
+
+    def test_cache_key_value_vs_tuple(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+        from yobx.helpers.cache_helper import CacheKeyValue
+
+        cache = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        cache.update(key, value, layer_idx=0)
+        cv = CacheKeyValue(cache)
+        res = max_diff(cv, ([key], [value]))
+        self.assertEqual(res["abs"], 0.0)
+
+    def test_cache_key_value_different(self):
+        import torch
+        from yobx.helpers.cache_helper import CacheKeyValue
+
+        key1 = torch.rand(1, 4, 2, 8)
+        value1 = torch.rand(1, 4, 2, 8)
+        key2 = key1 + 1.0
+        value2 = value1 + 1.0
+        cv1 = CacheKeyValue([key1, value1])
+        cv2 = CacheKeyValue([key2, value2])
+        res = max_diff(cv1, cv2)
+        self.assertGreater(res["abs"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

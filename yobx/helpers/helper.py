@@ -1513,6 +1513,34 @@ def max_diff(
             f"level={level}"
         )
 
+    if expected.__class__.__name__ == "CacheKeyValue":
+        from .cache_helper import CacheKeyValue
+
+        if got.__class__.__name__ == "CacheKeyValue":
+            if verbose >= 6:
+                print(
+                    f"[max_diff] CacheKeyValue: {string_type(expected)} ? {string_type(got)}"
+                )
+            return max_diff(
+                [expected.key_cache, expected.value_cache],
+                [got.key_cache, got.value_cache],
+                verbose=verbose,
+                hist=hist,
+            )
+        if isinstance(got, tuple) and len(got) == 2:
+            return max_diff(
+                [expected.key_cache, expected.value_cache],
+                [got[0], got[1]],
+                debug_info=_debug(expected.__class__.__name__),
+                **_dkws,
+            )
+        raise AssertionError(
+            f"CacheKeyValue not fully implemented with classes "
+            f"{expected.__class__.__name__!r} and {got.__class__.__name__!r}, "
+            f"and expected={string_type(expected)}, got={string_type(got)},\n"
+            f"level={level}"
+        )
+
     if expected.__class__.__name__ == "EncoderDecoderCache":
         if got.__class__.__name__ == "EncoderDecoderCache":
             if verbose >= 6:
