@@ -22,7 +22,7 @@ def _preprocess_key_value_pairs(
 ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
     if not key_value_pairs or isinstance(key_value_pairs[0], tuple):
         return key_value_pairs
-    return list(zip(key_value_pairs[::2], key_value_pairs[1::2]))
+    return list(zip(key_value_pairs[::2], key_value_pairs[1::2]))  # type: ignore[arg-type]
 
 
 class CacheKeyValue:
@@ -230,7 +230,7 @@ def make_dynamic_cache(
             key_value_pairs and key_value_pairs[0]
         ), f"not implemented for type(key_value_pairs[0])={type(key_value_pairs[0])}"
         for kv, clsy, kws in zip(key_value_pairs, cls_layers, cls_kwargs):
-            default_values = KWARGS_LAYER.get(clsy, lambda tensor: {})(kv[0])
+            default_values = KWARGS_LAYER.get(clsy, lambda tensor: {})(kv[0])  # type: ignore[call-overload]
             for k, v in default_values.items():
                 if k not in kws:
                     kws[k] = v  # type: ignore[index]
@@ -270,8 +270,8 @@ def make_dynamic_cache(
         )
         for i, layer in enumerate(cache.layers):
             k, v = key_value_pairs[i][0], key_value_pairs[i][1]
-            layer.dtype = k.dtype
-            layer.device = k.device
+            layer.dtype = k.dtype  # type: ignore[attr-defined]
+            layer.device = k.device  # type: ignore[attr-defined]
             layer.keys = k
             layer.values = v
             layer.is_initialized = True
@@ -279,7 +279,7 @@ def make_dynamic_cache(
             f"Unexpected number of layers in the cache ({len(cache.layers)}), "
             f"{len(key_value_pairs)} expected."
         )
-        return finalize_cache(cache)
+        return finalize_cache(cache)  # type: ignore[return-value]
 
     cache = transformers.cache_utils.DynamicCache()
     if hasattr(cache, "layers") and (
@@ -404,7 +404,7 @@ def make_static_cache(
         ),
     )
     cache = transformers.cache_utils.StaticCache(
-        config=_config(),
+        config=_config(),  # type: ignore[arg-type]
         max_batch_size=key_value_pairs[0][0].shape[0],
         device=key_value_pairs[0][0].device,
         dtype=key_value_pairs[0][0].dtype,
@@ -414,4 +414,4 @@ def make_static_cache(
     # transformers>= 4.55.2, layers are empty
     for i, (key, value) in enumerate(key_value_pairs):
         cache.update(key, value, i)
-    return finalize_cache(cache)
+    return finalize_cache(cache)  # type: ignore[return-value]

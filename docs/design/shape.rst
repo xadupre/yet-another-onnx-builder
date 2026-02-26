@@ -1,5 +1,4 @@
 
-.. _l-shape-builder-design:
 .. _l-design-shape:
 
 ============
