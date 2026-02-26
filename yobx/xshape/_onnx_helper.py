@@ -203,7 +203,7 @@ def replace_static_dimensions_by_strings(
     :param model: ModelProto
     :return: the modified model, a mapping ``{new_name: value}``
     """
-    mapping = {}
+    mapping: Dict[str, Union[str, int]] = {}
     new_inputs = []
     for i in model.graph.input:
         if not i.type.tensor_type:

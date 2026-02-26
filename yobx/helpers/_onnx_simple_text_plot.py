@@ -598,7 +598,7 @@ def onnx_simple_text_plot(
         ]
 
     if sub_graphs_names is None:
-        sub_graphs_names = {}  # type: ignore[assigment]
+        sub_graphs_names = {}  # type: ignore[assignment]
 
     def _get_subgraph_name(idg):
         if idg in sub_graphs_names:
