@@ -271,8 +271,8 @@ class TestOnnxHelper(ExtTestCase):
         res = list(enumerate_results(model, "xu1", verbose=2))
         ress = ";".join(str(r) for r in res)
         self.assertEqual(
-            "<< xu1 - (0:Unsqueeze:) :: Unsqueeze(X, zero) -> xu1;"
-            ">> xu1 - (1:Unsqueeze:) :: Unsqueeze(xu1, un) -> xu2",
+            ">> xu1 - (0:Unsqueeze:) :: Unsqueeze(X, zero) -> xu1;"
+            "<< xu1 - (1:Unsqueeze:) :: Unsqueeze(xu1, un) -> xu2",
             ress,
         )
         self.assertEqual(2, len(list(enumerate_results(model, "shape1", verbose=2))))
