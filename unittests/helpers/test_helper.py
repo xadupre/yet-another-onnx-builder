@@ -766,5 +766,32 @@ class TestFlattenObject(ExtTestCase):
         self.assertEqual(len(result), 4)
 
 
+class TestStringTypeSpecialObjects(ExtTestCase):
+    def test_inference_session(self):
+        class InferenceSession:
+            pass
+
+        obj = InferenceSession()
+        s = string_type(obj)
+        self.assertEqual(s, "InferenceSession(...)")
+
+    @requires_torch("2.9")
+    def test_fake_tensor_mode(self):
+        import torch
+
+        with torch._subclasses.fake_tensor.FakeTensorMode() as mode:
+            s = string_type(mode)
+            self.assertIn("FakeTensorMode", s)
+
+    @requires_torch("2.9")
+    def test_fake_tensor_context(self):
+        class FakeTensorContext:
+            pass
+
+        obj = FakeTensorContext()
+        s = string_type(obj)
+        self.assertEqual(s, "FakeTensorContext(...)")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

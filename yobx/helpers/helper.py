@@ -1562,3 +1562,16 @@ def max_diff(
         f"{string_type(expected)} ({type(expected)}), got={string_type(got)},\n"
         f"level={level}"
     )
+
+
+def string_diff(diff: Dict[str, Any]) -> str:
+    """
+    Displays the discrepancies returned by :func:`max_diff` in one string.
+
+    :param diff: dictionary returned by :func:`max_diff`
+    :return: str
+    """
+    return (
+        f"abs={diff['abs']:.3g} rel={diff['rel']:.3g} "
+        f"n={diff['n']} dnan={diff['dnan']}"
+    )

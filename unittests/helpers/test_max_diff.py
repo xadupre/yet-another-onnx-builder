@@ -2,7 +2,7 @@ import math
 import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
-from yobx.helpers import max_diff
+from yobx.helpers import max_diff, string_diff
 
 
 class TestMaxDiffNone(ExtTestCase):
@@ -398,6 +398,37 @@ class TestMaxDiffDynamicCache(ExtTestCase):
         cache.update(key, value, layer_idx=0)
         res = max_diff(cache, cache)
         self.assertEqual(res["abs"], 0.0)
+
+
+class TestStringDiff(ExtTestCase):
+    def test_zero_diff(self):
+        a = np.array([1.0, 2.0])
+        res = max_diff(a, a.copy())
+        s = string_diff(res)
+        self.assertIn("abs=0", s)
+        self.assertIn("rel=0", s)
+        self.assertIn("n=2", s)
+        self.assertIn("dnan=0", s)
+
+    def test_nonzero_diff(self):
+        a = np.array([1.0, 2.0])
+        b = np.array([1.0, 3.0])
+        res = max_diff(a, b)
+        s = string_diff(res)
+        self.assertIn("abs=1", s)
+        self.assertIn("dnan=0", s)
+
+    def test_nan_diff(self):
+        a = np.array([1.0, float("nan"), 3.0])
+        b = np.array([1.0, 2.0, 3.0])
+        res = max_diff(a, b)
+        s = string_diff(res)
+        self.assertIn("dnan=", s)
+
+    def test_returns_string(self):
+        res = max_diff(None, None)
+        s = string_diff(res)
+        self.assertIsInstance(s, str)
 
 
 if __name__ == "__main__":
