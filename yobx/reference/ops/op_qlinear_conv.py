@@ -14,8 +14,8 @@ def _switch_dims_nchw_nhwc(dims: Tuple[int, ...], from_nchw_to_nhwc: bool):
         return (dims[0], dims[-1], *dims[1:-1])
     if len(dims) == 3:
         if from_nchw_to_nhwc:
-            return (*dims[1:], dims[0])
-        return (dims[-1], *dims[:-1])
+            return (dims[0], *dims[2:], dims[1])
+        return (dims[0], dims[-1], *dims[1:-1])
     raise NotImplementedError(f"Unable to process shape={dims}")
 
 
