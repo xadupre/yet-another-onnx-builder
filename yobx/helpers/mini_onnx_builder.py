@@ -466,7 +466,7 @@ def create_onnx_model_from_input_tensors(
 
     .. code-block:: python
 
-        from onnx_diagnostic.helpers.mini_onnx_builder import (
+        from yobx.helpers.mini_onnx_builder import (
             create_onnx_model_from_input_tensors,
         )
         import onnx
@@ -626,7 +626,7 @@ def create_input_tensors_from_onnx_model(
     Deserializes tensors stored with function
     :func:`create_onnx_model_from_input_tensors`.
     It relies on :class:`ExtendedReferenceEvaluator
-    <onnx_diagnostic.reference.ExtendedReferenceEvaluator>`
+    <yobx.reference.ExtendedReferenceEvaluator>`
     to restore the tensors.
 
     :param proto: onnx.ModelProto or the file itself
@@ -640,10 +640,10 @@ def create_input_tensors_from_onnx_model(
     .. code-block:: python
 
         import os
-        from onnx_diagnostic.helpers.mini_onnx_builder import (
+        from yobx.helpers.mini_onnx_builder import (
             create_input_tensors_from_onnx_model,
         )
-        from onnx_diagnostic.helpers import string_type
+        from yobx.helpers import string_type
 
         restored = create_input_tensors_from_onnx_model("attention_inputs.onnx")
         for k, v in restored.items():

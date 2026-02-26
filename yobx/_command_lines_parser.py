@@ -185,13 +185,13 @@ def get_parser_agg() -> ArgumentParser:
         epilog=textwrap.dedent("""
             examples:
 
-                python -m onnx_diagnostic agg test_agg.xlsx raw/*.zip -v 1
-                python -m onnx_diagnostic agg agg.xlsx raw/*.zip raw/*.csv -v 1 \\
+                python -m yobx agg test_agg.xlsx raw/*.zip -v 1
+                python -m yobx agg agg.xlsx raw/*.zip raw/*.csv -v 1 \\
                     --no-raw  --keep-last-date --filter-out "exporter:test-exporter"
 
             Another to create timeseries:
 
-                python -m onnx_diagnostic agg history.xlsx raw/*.csv -v 1 --no-raw \\
+                python -m yobx agg history.xlsx raw/*.csv -v 1 --no-raw \\
                     --no-recent
             """),
         formatter_class=RawTextHelpFormatter,
@@ -382,7 +382,7 @@ def get_parser_partition() -> ArgumentParser:
 
             Example:
 
-                python -m onnx_diagnostic partition \\
+                python -m yobx partition \\
                         model.onnx +.part -v 1 -r "model.layers.0.s.*"
             """),
     )
@@ -505,11 +505,11 @@ def _cmd_print(argv: List[Any]):
 
 def get_main_parser() -> ArgumentParser:
     parser = ArgumentParser(
-        prog="onnx_diagnostic",
-        description="onnx_diagnostic main command line.\n",
+        prog="yobx",
+        description="yobx main command line.\n",
         formatter_class=RawTextHelpFormatter,
         epilog=textwrap.dedent("""
-            Type 'python -m onnx_diagnostic <cmd> --help'
+            Type 'python -m yobx <cmd> --help'
             to get help for a specific command.
 
             agg          - aggregates statistics from multiple files

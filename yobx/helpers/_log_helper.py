@@ -252,16 +252,12 @@ def open_dataframe(
     data: Union[str, Tuple[str, str, str, str], pandas.DataFrame],
 ) -> pandas.DataFrame:
     """
-        Opens a filename defined by function
-    <<<<<<< cube
-        :func:`yobx.helpers._log_helper.enumerate_csv_files`.
-    =======
-        :func:`onnx_diagnostic.helpers._log_helper.enumerate_csv_files`.
-    >>>>>>> main
+    Opens a filename defined by function
+    :func:`yobx.helpers._log_helper.enumerate_csv_files`.
 
-        :param data: a dataframe, a filename, a tuple indicating the file is coming
-            from a zip file
-        :return: a dataframe
+    :param data: a dataframe, a filename, a tuple indicating the file is coming
+        from a zip file
+    :return: a dataframe
     """
     if isinstance(data, pandas.DataFrame):
         return data
