@@ -24,6 +24,7 @@ def element_wise_binary_op_types() -> Set[str]:
         "Mod",
         "Or",
         "Sub",
+        "Sum",
         "Xor",
     }
 
