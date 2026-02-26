@@ -190,5 +190,80 @@ class TestApplyUnsqueeze(ExtTestCase):
         self.assertEqual(result[0].shape, (1, 2, 3, 1))
 
 
+class TestApplyUnaryFunction(ExtTestCase):
+    def setUp(self):
+        self.b = _TorchShapeBuilder()
+
+    # --- numpy path ---
+
+    def test_sqrt_numpy(self):
+        node = oh.make_node("Sqrt", ["x"], ["y"])
+        x = np.array([4.0, 9.0, 16.0], dtype=np.float32)
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(result[0], np.array([2.0, 3.0, 4.0], dtype=np.float32))
+
+    def test_exp_numpy(self):
+        node = oh.make_node("Exp", ["x"], ["y"])
+        x = np.array([0.0, 1.0], dtype=np.float32)
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(result[0], np.exp(x).astype(np.float32))
+
+    def test_reciprocal_numpy(self):
+        node = oh.make_node("Reciprocal", ["x"], ["y"])
+        x = np.array([2.0, 4.0], dtype=np.float32)
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(result[0], np.array([0.5, 0.25], dtype=np.float32))
+
+    def test_unknown_op_numpy_raises(self):
+        node = oh.make_node("Log", ["x"], ["y"])
+        x = np.array([1.0, 2.0], dtype=np.float32)
+        self.assertRaises(AssertionError, self.b._apply_unary_function, node, {"x": x})
+
+    # --- torch path ---
+
+    def test_sqrt_torch(self):
+        import torch
+
+        node = oh.make_node("Sqrt", ["x"], ["y"])
+        x = torch.tensor([4.0, 9.0, 16.0], dtype=torch.float32)
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(
+            result[0].numpy(), np.array([2.0, 3.0, 4.0], dtype=np.float32)
+        )
+
+    def test_exp_torch(self):
+        import torch
+
+        node = oh.make_node("Exp", ["x"], ["y"])
+        x = torch.tensor([0.0, 1.0], dtype=torch.float32)
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(
+            result[0].numpy(), np.exp(np.array([0.0, 1.0], dtype=np.float32)), atol=1e-6
+        )
+
+    def test_reciprocal_torch(self):
+        import torch
+
+        node = oh.make_node("Reciprocal", ["x"], ["y"])
+        x = torch.tensor([2.0, 4.0], dtype=torch.float32)
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(
+            result[0].numpy(), np.array([0.5, 0.25], dtype=np.float32)
+        )
+
+    def test_unknown_op_torch_raises(self):
+        import torch
+
+        node = oh.make_node("Log", ["x"], ["y"])
+        x = torch.tensor([1.0, 2.0], dtype=torch.float32)
+        self.assertRaises(AssertionError, self.b._apply_unary_function, node, {"x": x})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
