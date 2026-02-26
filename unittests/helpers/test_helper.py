@@ -523,6 +523,76 @@ class TestStringType(ExtTestCase):
         s = string_type(arr, with_shape=True)
         self.assertIn("s3", s)
 
+    @requires_torch("2.9")
+    def test_string_type_virtual_tensor(self):
+        class VirtualTensor:
+            def __init__(self, name, dtype, shape):
+                self.name = name
+                self.dtype = dtype
+                self.shape = shape
+
+        vt = VirtualTensor(name="x", dtype=1, shape=(2, 3))
+        s = string_type(vt)
+        self.assertIn("VirtualTensor", s)
+        self.assertIn("'x'", s)
+        self.assertIn("dtype=1", s)
+        self.assertIn("(2, 3)", s)
+
+    @requires_torch("2.9")
+    def test_string_type_virtual_tensor_string_shape(self):
+        class VirtualTensor:
+            def __init__(self, name, dtype, shape):
+                self.name = name
+                self.dtype = dtype
+                self.shape = shape
+
+        vt = VirtualTensor(name="y", dtype=7, shape=("batch", "seq"))
+        s = string_type(vt)
+        self.assertIn("VirtualTensor", s)
+        self.assertIn("'y'", s)
+        self.assertIn("('batch', 'seq')", s)
+
+    @requires_torch("2.9")
+    def test_string_type_ort_value(self):
+        from onnxruntime import OrtValue
+
+        arr = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        ov = OrtValue.ortvalue_from_numpy(arr)
+        s = string_type(ov)
+        self.assertIn("OV", s)
+
+    @requires_torch("2.9")
+    def test_string_type_ort_value_with_shape(self):
+        from onnxruntime import OrtValue
+
+        arr = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        ov = OrtValue.ortvalue_from_numpy(arr)
+        s = string_type(ov, with_shape=True)
+        self.assertIn("OV", s)
+        self.assertIn("2x2", s)
+
+    @requires_torch("2.9")
+    def test_string_type_ort_value_with_device(self):
+        from onnxruntime import OrtValue
+
+        arr = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        ov = OrtValue.ortvalue_from_numpy(arr)
+        s = string_type(ov, with_shape=True, with_device=True)
+        self.assertIn("OV", s)
+        self.assertIn("C", s)
+        self.assertIn("2x2", s)
+
+    @requires_torch("2.9")
+    def test_string_type_ort_value_with_min_max(self):
+        from onnxruntime import OrtValue
+
+        arr = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        ov = OrtValue.ortvalue_from_numpy(arr)
+        s = string_type(ov, with_shape=True, with_min_max=True)
+        self.assertIn("OV", s)
+        self.assertIn("1.0", s)
+        self.assertIn("4.0", s)
+
 
 class TestStringSignature(ExtTestCase):
     def test_simple_function(self):
