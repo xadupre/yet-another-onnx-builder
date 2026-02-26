@@ -751,11 +751,6 @@ class TestShapeTypeCompute(ExtTestCase):
 
     def test_op_einsum_rank_only(self):
         # When input shapes are unavailable, at least rank should be set.
-        model = _make_model(
-            [oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="ij,jk->ik")],
-            [_mkv_("X", TFLOAT, [3, 4])],
-            [_mkv_("Z", TFLOAT, [3, 5])],
-        )
         b = _TestShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_rank("X", 2)
@@ -1240,7 +1235,6 @@ class TestShapeTypeCompute(ExtTestCase):
         _set_shape_type_op_any_unsqueeze(b, node)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_rank("Y"), 3)
-
 
         model = _make_model(
             [oh.make_node("Where", ["cond", "X", "Y"], ["Z"])],
