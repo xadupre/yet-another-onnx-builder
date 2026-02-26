@@ -1,3 +1,4 @@
+from collections import Counter
 from typing import List, Optional, Sequence, Tuple
 import numpy as np
 from onnx import NodeProto, TensorProto
@@ -808,6 +809,91 @@ def _set_shape_type_op_any_matmul(self: ShapeBuilder, node: NodeProto):
         f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
     )
     return r
+
+
+def _set_shape_type_op_any_einsum(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for node type Einsum."
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+
+    equation_attr = self.get_attribute(node, "equation", exc=False)
+    if equation_attr is None:
+        return
+    equation = equation_attr.s.decode("utf-8").strip().replace(" ", "")
+
+    # Parse equation into input subscripts and output subscript.
+    if "->" in equation:
+        lhs, output_subscript = equation.split("->")
+    else:
+        # Implicit output: sorted unique labels that appear exactly once.
+        # If ellipsis is present in any input, it is prepended to the output.
+        lhs = equation
+        counts = Counter(ch for ch in lhs if ch.isalpha())
+        unique_labels = "".join(sorted(k for k, v in counts.items() if v == 1))
+        output_subscript = ("..." if "..." in lhs else "") + unique_labels
+
+    input_subscripts = lhs.split(",")
+
+    # Build a mapping from label character to its dimension size.
+    dim_map = {}
+    ellipsis_shape = None
+    for inp_name, subscript in zip(node.input, input_subscripts):
+        if not self.has_shape(inp_name):
+            continue
+        shape = self.get_shape(inp_name)
+        if "..." in subscript:
+            prefix, suffix = subscript.split("...")
+            prefix_len = len(prefix)
+            suffix_len = len(suffix)
+            ell_len = len(shape) - prefix_len - suffix_len
+            if ell_len < 0:
+                continue
+            for i, ch in enumerate(prefix):
+                dim_map[ch] = shape[i]
+            if ellipsis_shape is None:
+                ellipsis_shape = shape[prefix_len : prefix_len + ell_len]
+            for i, ch in enumerate(suffix):
+                dim_map[ch] = shape[prefix_len + ell_len + i]
+        else:
+            if len(subscript) == len(shape):
+                for i, ch in enumerate(subscript):
+                    dim_map[ch] = shape[i]
+
+    # Compute the output shape.
+    if "..." in output_subscript:
+        if ellipsis_shape is not None:
+            prefix, suffix = output_subscript.split("...")
+            output_shape = []
+            ok = True
+            for ch in prefix:
+                if ch not in dim_map:
+                    ok = False
+                    break
+                output_shape.append(dim_map[ch])
+            if ok:
+                output_shape.extend(ellipsis_shape)
+                for ch in suffix:
+                    if ch not in dim_map:
+                        ok = False
+                        break
+                    output_shape.append(dim_map[ch])
+            if ok:
+                self.set_shape(node.output[0], tuple(output_shape))
+                return tuple(output_shape)
+        # Cannot determine shape or rank when ellipsis length is unknown.
+    else:
+        if all(ch in dim_map for ch in output_subscript):
+            output_shape = tuple(dim_map[ch] for ch in output_subscript)
+            self.set_shape(node.output[0], output_shape)
+            return output_shape
+        # Rank is known from equation even when dimension sizes are not.
+        self.set_rank(node.output[0], len(output_subscript))
+        return True
+
+    assert not self._debug_shape_missing, (
+        f"Unable to compute shape for node: "
+        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+    )
 
 
 def _set_shape_type_op_any_non_zero(self: ShapeBuilder, node: NodeProto):
@@ -1660,6 +1746,7 @@ _set_shape_type_op_any_known = {
     "Concat": _set_shape_type_op_any_concat,
     "Conv": _set_shape_type_op_any_conv_max_pool,
     "DepthToSpace": _set_shape_type_op_any_depth_to_space,
+    "Einsum": _set_shape_type_op_any_einsum,
     "EyeLike": _set_shape_type_op_any_eyelike,
     "Expand": _set_shape_type_op_any_expand,
     "Flatten": _set_shape_type_op_any_flatten,
