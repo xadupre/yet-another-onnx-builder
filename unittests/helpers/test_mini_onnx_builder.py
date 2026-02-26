@@ -288,6 +288,23 @@ class TestMiniOnnxBuilder(ExtTestCase):
         self.assertEqual(list(data), list(restored))
         self.assertEqualAny(data, restored)
 
+    def test_mini_onnx_builder_engines(self):
+        data = [
+            np.array([1, 2], dtype=np.int64),
+            torch.tensor([4, 5], dtype=torch.float32),
+            (np.array([1, 2], dtype=np.int64), torch.tensor([4, 5], dtype=torch.float32)),
+            {
+                "t1": np.array([1, 2], dtype=np.int64),
+                "t2": torch.tensor([4, 5], dtype=torch.float32),
+            },
+        ]
+        for engine in ("ExtendedReferenceEvaluator", "yobx", "onnx", "onnxruntime"):
+            for inputs in data:
+                with self.subTest(engine=engine, types=string_type(inputs)):
+                    model = create_onnx_model_from_input_tensors(inputs)
+                    restored = create_input_tensors_from_onnx_model(model, engine=engine)
+                    self.assertEqualAny(inputs, restored)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
