@@ -1,5 +1,5 @@
 import functools
-from typing import Dict, Set, Optional, Union
+from typing import Set, Optional, Union
 import numpy as np
 import onnx
 import onnx.helper as oh
@@ -62,29 +62,6 @@ def tensor_dtype_to_np_dtype(tensor_dtype: int) -> np.dtype:
     :param tensor_dtype: onnx.TensorProto's data_type
     :return: numpy's data_type
     """
-    if tensor_dtype >= 16:
-        try:
-            import ml_dtypes  # noqa: F401
-        except ImportError as e:
-            raise ValueError(
-                f"Unsupported value for tensor_dtype, "
-                f"numpy does not support onnx type {tensor_dtype}. "
-                f"ml_dtypes can be used."
-            ) from e
-
-        # pyrefly: ignore[bad-assignment]
-        mapping: Dict[int, np.dtype] = {
-            onnx.onnx.TensorProto.BFLOAT16: ml_dtypes.bfloat16,
-            onnx.onnx.TensorProto.FLOAT8E4M3FN: ml_dtypes.float8_e4m3fn,
-            onnx.onnx.TensorProto.FLOAT8E4M3FNUZ: ml_dtypes.float8_e4m3fnuz,
-            onnx.onnx.TensorProto.FLOAT8E5M2: ml_dtypes.float8_e5m2,
-            onnx.onnx.TensorProto.FLOAT8E5M2FNUZ: ml_dtypes.float8_e5m2fnuz,
-        }
-        assert (
-            tensor_dtype in mapping
-        ), f"Unable to find tensor_dtype={tensor_dtype!r} in mapping={mapping}"
-        return mapping[tensor_dtype]
-
     return oh.tensor_dtype_to_np_dtype(tensor_dtype)
 
 
