@@ -780,7 +780,7 @@ class CubeLogs:
             data_red = data_to_process[[*keys_no_agg, *values]]
             assert set(key_index) <= set(data_red.columns), (
                 f"view_def.name={view_def.name!r}, "
-                f"nnable to find {set(key_index) - set(data_red.columns)}, "
+                f"unable to find {set(key_index) - set(data_red.columns)}, "
                 f"key_agg={key_agg}, keys_no_agg={keys_no_agg},\n--\n"
                 f"selected={pprint.pformat(sorted(data_red.columns))},\n--\n"
                 f"keys={pprint.pformat(sorted(self.keys_time))}"
