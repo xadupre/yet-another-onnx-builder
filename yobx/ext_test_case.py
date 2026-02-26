@@ -1048,6 +1048,19 @@ class ExtTestCase(unittest.TestCase):
         elif hasattr(expected, "shape"):
             self.assertEqual(type(expected), type(value), msg=msg)
             self.assertEqualArray(expected, value, msg=msg, atol=atol, rtol=rtol)
+        elif expected.__class__.__name__ == "DynamicCache":
+            import transformers
+
+            self.assertIsInstance(value, transformers.cache_utils.DynamicCache)
+            self.assertEqual(len(expected.layers), len(value.layers))
+            self.assertEqual(
+                [type(layer) for layer in expected.layers],
+                [type(layer) for layer in value.layers],
+            )
+            self.assertEqualAny(
+                [(layer.keys, layer.values) for layer in expected.layers],
+                [(layer.keys, layer.values) for layer in value.layers],
+            )
         else:
             raise AssertionError(
                 f"Comparison not implemented for types {type(expected)} and {type(value)}"
