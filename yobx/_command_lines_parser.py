@@ -95,9 +95,8 @@ def _cmd_dot(argv: List[Any]):
     else:
         print(dot)
     if args.run:
-        assert args.output, "Cannot run dot without an output file."
-        outname = process_outputname(outname, args.input)
-        cmds = ["dot", f"-T{args.run}", outname, "-o", f"{args.output}.{args.run}"]
+        assert outname, f"Cannot run dot without an output file but outname={outname!r}."
+        cmds = ["dot", f"-T{args.run}", outname, "-o", f"{outname}.{args.run}"]
         if args.verbose:
             print(f"-- run {' '.join(cmds)}")
         p = subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -164,7 +163,7 @@ def _cmd_find(argv: List[Any]):
         print(f"post-shadowing names: {ps}")
     elif args.v2:
         onx = onnx.load(args.input, load_external_data=False)
-        names = set(args.names.split(",")) if args.names is not None else None
+        names = set(args.names.split(",")) if args.names is not None else set()
         res = list(enumerate_results(onx, name=names, verbose=args.verbose))
         if not args.verbose:
             print("\n".join(map(str, res)))

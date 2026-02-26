@@ -59,8 +59,9 @@ class TestCommandLines(ExtTestCase):
             main(args)
         text = st.getvalue()
         if text:
-            # text is empty is dot is not installed
-            self.assertIn("converts into dot", text)
+            # text is empty is dot is not installed,
+            # dot may be missing
+            self.assertInOr(("converts into dot", "No such file or directory"), text)
 
     def test_f_parser_partition(self):
         output = self.get_dump_file("test_parser_partition.onnx")
