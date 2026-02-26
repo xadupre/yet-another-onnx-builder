@@ -1179,7 +1179,7 @@ class CubeLogs:
 
         :param output: output file to create
         :param views: sequence or dictionary of views to append
-        :param main: add a page with statitcs on all variables
+        :param main: add a page with statistics on all variables
         :param raw: add a page with the raw data
         :param csv: views to dump as csv files (same name as outputs + view naw)
         :param verbose: verbosity
