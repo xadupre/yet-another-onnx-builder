@@ -16,17 +16,108 @@ from .ops.op_skip_layer_normalization import SkipLayerNormalization
 
 class ExtendedReferenceEvaluator(ReferenceEvaluator):
     """
-    This class extends the python implementation with new kernels
-    for domains such as ``com.microsoft``.
-    The evaluator allows to test
-    scenarios outside what an onnx backend bound to the official onnx
-    operators definition could do such as optimization patterns
-    involving onnxruntime contrib operators.
+    Extends :class:`onnx.reference.ReferenceEvaluator` with additional operator
+    kernels for non-standard domains such as ``com.microsoft``.
 
-    ::
+    The evaluator allows testing scenarios outside what a standard ONNX backend
+    can handle, such as optimization patterns that rely on ONNX Runtime contrib
+    operators (e.g. :class:`FusedMatMul <yobx.reference.ops.op_fused_matmul.FusedMatMul>`,
+    :class:`QuickGelu <yobx.reference.ops.op_quick_gelu.QuickGelu>`).
 
+    **Basic usage** — run an ONNX model with standard operators:
+
+    .. runpython::
+        :showcode:
+
+        import numpy as np
+        import onnx.helper as oh
+        import onnx
         from yobx.reference import ExtendedReferenceEvaluator
-        ref = ExtendedReferenceEvaluator(...)
+
+        TFLOAT = onnx.TensorProto.FLOAT
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Add", ["X", "Y"], ["Z"])],
+                "add_graph",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [None, None]),
+                    oh.make_tensor_value_info("Y", TFLOAT, [None, None]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, [None, None])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        ref = ExtendedReferenceEvaluator(model)
+        x = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        (result,) = ref.run(None, {"X": x, "Y": x})
+        print(result)
+
+    **Using contrib operators** — run a ``com.microsoft`` operator:
+
+    .. runpython::
+        :showcode:
+
+        import numpy as np
+        import onnx.helper as oh
+        import onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        TFLOAT = onnx.TensorProto.FLOAT
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("FusedMatMul", ["X", "Y"], ["Z"], domain="com.microsoft")],
+                "fused_mm",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, None),
+                    oh.make_tensor_value_info("Y", TFLOAT, None),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, None)],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+        )
+        ref = ExtendedReferenceEvaluator(model)
+        a = np.arange(4, dtype=np.float32).reshape(2, 2)
+        (result,) = ref.run(None, {"X": a, "Y": a})
+        print(result)
+
+    **Adding custom operators** — pass extra :class:`OpRun
+    <onnx.reference.op_run.OpRun>` subclasses via ``new_ops``:
+
+    .. runpython::
+        :showcode:
+
+        import numpy as np
+        import onnx.helper as oh
+        import onnx
+        from onnx.reference.op_run import OpRun
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        TFLOAT = onnx.TensorProto.FLOAT
+
+        class MyCustomOp(OpRun):
+            op_domain = "my.domain"
+
+            def _run(self, X):
+                return (X * 2,)
+
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("MyCustomOp", ["X"], ["Z"], domain="my.domain")],
+                "custom_graph",
+                [oh.make_tensor_value_info("X", TFLOAT, [None])],
+                [oh.make_tensor_value_info("Z", TFLOAT, [None])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("my.domain", 1)],
+            ir_version=10,
+        )
+        ref = ExtendedReferenceEvaluator(model, new_ops=[MyCustomOp])
+        x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (result,) = ref.run(None, {"X": x})
+        print(result)
+
+    The ``new_ops`` list is *merged* with :attr:`default_ops`; you do not need
+    to re-list the built-in contrib operators.
 
     The class overloads or adds the following operators by default:
 
