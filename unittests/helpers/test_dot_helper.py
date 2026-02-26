@@ -100,7 +100,7 @@ class TestDotHelper(ExtTestCase):
                 I_1 -> LayerNormalization_3 [label="FLOAT16(d)"];
                 I_2 -> LayerNormalization_3 [label="FLOAT16(d)"];
                 LayerNormalization_3 -> Add_5 [label="FLOAT16(b,c,d)"];
-                Cast_4->Add_5[label="FLOAT16()"];
+                Cast_4->Add_5[label="FLOAT16(1)"];
                 O_6 [label="Z\\nFLOAT16(b,c,d)", fillcolor="#aaaaee"];
                 Add_5 -> O_6;
                 }
