@@ -10,7 +10,7 @@ from . import string_type
 
 
 def proto_from_array(
-    arr: "torch.Tensor",  # noqa: F821
+    arr: "torch.Tensor",  # type: ignore[name-defined] # noqa: F821
     name: Optional[str] = None,
     verbose: int = 0,
 ) -> onnx.TensorProto:
@@ -47,7 +47,7 @@ def proto_from_array(
         assert (
             arr_cpu.data_ptr() == 0 or arr_cpu.data_ptr() != copy.data_ptr()
         ), f"Pointers are not null and different {arr_cpu.data_ptr()} != {copy.data_ptr()}"
-        np_arr = np.from_dlpack(copy)
+        np_arr = np.from_dlpack(copy)  # type: ignore[assignment]
     else:
         np_arr = np.from_dlpack(arr_cpu.detach())
 
@@ -102,7 +102,7 @@ class MiniOnnxBuilder:
     def append_output_initializer(
         self,
         name: str,
-        tensor: Union[np.ndarray, "torch.Tensor"],  # noqa: F821
+        tensor: Union[np.ndarray, "torch.Tensor"],  # type: ignore[name-defined] # noqa: F821
         randomize: bool = False,
     ):
         """
@@ -137,7 +137,7 @@ class MiniOnnxBuilder:
                 shape = tuple(map(int, tensor.shape))
                 self.nodes.append(
                     # pyrefly: ignore[bad-argument-type]
-                    oh.make_node(op_type, [], [name], dtype=dtype, shape=shape, **kwargs)
+                    oh.make_node(op_type, [], [name], dtype=dtype, shape=shape, **kwargs)  # type: ignore[arg-type]
                 )
                 self.outputs.append(oh.make_tensor_value_info(name, dtype, shape))
                 return
@@ -154,7 +154,7 @@ class MiniOnnxBuilder:
         self.nodes.append(oh.make_node("Identity", [init_name], [name]))
 
     def append_output_sequence(
-        self, name: str, tensors: List[Union[np.ndarray, "torch.Tensor"]]  # noqa: F821
+        self, name: str, tensors: List[Union[np.ndarray, "torch.Tensor"]]  # type: ignore[name-defined] # noqa: F821
     ):
         """
         Adds a sequence of initializers as an output.
@@ -191,7 +191,7 @@ class MiniOnnxBuilder:
         self.outputs.append(output)
 
     def append_output_dict(
-        self, name: str, tensors: Dict[str, Union[np.ndarray, "torch.Tensor"]]  # noqa: F821
+        self, name: str, tensors: Dict[str, Union[np.ndarray, "torch.Tensor"]]  # type: ignore[name-defined] # noqa: F821
     ):
         """
         Adds two outputs, a string tensors for the keys and a sequence of tensors
@@ -624,7 +624,7 @@ def create_input_tensors_from_onnx_model(
             print(f"{k}: {string_type(v, with_shape=True, with_min_max=True)}")
 
     """
-    if engine == "ExtendedReferenceEvaluator":
+    if engine in ("ExtendedReferenceEvaluator", "yobx"):
         from ..reference import ExtendedReferenceEvaluator
 
         sess = ExtendedReferenceEvaluator(proto)
@@ -632,7 +632,7 @@ def create_input_tensors_from_onnx_model(
     elif engine == "onnx":
         from onnx.reference import ReferenceEvaluator
 
-        sess = ReferenceEvaluator(proto)
+        sess = ReferenceEvaluator(proto)  # type: ignore[arg-type]
         names = sess.output_names
     elif engine == "onnxruntime":
         from onnxruntime import InferenceSession
