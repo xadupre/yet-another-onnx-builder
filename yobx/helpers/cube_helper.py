@@ -108,7 +108,7 @@ class CubeViewDef:
         name: Optional[str] = None,
         no_index: bool = False,
         plots: bool = False,
-        fix_aggregation_change: Optional[List["str"]] = None,
+        fix_aggregation_change: Optional[List[str]] = None,
     ):
         self.key_index = key_index
         self.values = values
