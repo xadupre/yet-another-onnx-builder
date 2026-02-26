@@ -1,4 +1,5 @@
 import time
+from collections import namedtuple
 from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
 import onnx
@@ -14,6 +15,8 @@ from ._shape_helper import (
 )
 from .shape_type_compute import set_shape_type_op_any, set_shape_type_custom
 
+_ShapeConstant = namedtuple("ShapeConstant", ["name", "shape", "node"])
+
 
 class _OptimizationOptions:
     """Default optimization options for :class:`BasicShapeBuilder`."""
@@ -24,6 +27,7 @@ class _OptimizationOptions:
 class _InferenceRuntime:
     """Sets shape and type."""
 
+    ShapeConstant = _ShapeConstant
     def _get_tensor_shape(self, node: onnx.NodeProto) -> Tuple[int, ...]:
         """Returns the shape of the tensor produced by a Constant node."""
         if not node.attribute:
