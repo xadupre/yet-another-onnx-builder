@@ -118,14 +118,14 @@ def get_parser_find() -> ArgumentParser:
             Look into a model and search for a set of names,
             tells which node is consuming or producing it.
             """),
-        epilog="Enables Some quick validation.",
+        epilog="Enables some quick validation.",
     )
     parser.add_argument(
         "-i",
         "--input",
         type=str,
         required=True,
-        help="onnx model to unlighten",
+        help="onnx model to search",
     )
     parser.add_argument(
         "-n",
@@ -164,11 +164,13 @@ def _cmd_find(argv: List[Any]):
         print(f"post-shadowing names: {ps}")
     elif args.v2:
         onx = onnx.load(args.input, load_external_data=False)
-        res = list(enumerate_results(onx, name=set(args.names.split(",")), verbose=args.verbose))
+        names = set(args.names.split(",")) if args.names is not None else None
+        res = list(enumerate_results(onx, name=names, verbose=args.verbose))
         if not args.verbose:
             print("\n".join(map(str, res)))
     else:
-        onnx_find(args.input, verbose=args.verbose, watch=set(args.names.split(",")))
+        watch = set(args.names.split(",")) if args.names is not None else None
+        onnx_find(args.input, verbose=args.verbose, watch=watch)
 
 
 def get_parser_agg() -> ArgumentParser:
@@ -209,13 +211,13 @@ def get_parser_agg() -> ArgumentParser:
         "--recent",
         default=True,
         action=BooleanOptionalAction,
-        help="Keeps only the most recent experiment for the same of keys.",
+        help="Keeps only the most recent experiment for the same set of keys.",
     )
     parser.add_argument(
         "--keep-last-date",
         default=False,
         action=BooleanOptionalAction,
-        help="Rewrite all dates to the last one to simplifies the analysis, "
+        help="Rewrite all dates to the last one to simplify the analysis, "
         "this assume changing the date does not add ambiguity, if any, option "
         "--recent should be added.",
     )

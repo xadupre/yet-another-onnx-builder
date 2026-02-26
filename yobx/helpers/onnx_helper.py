@@ -55,7 +55,7 @@ class ResultFound:
         self.consumer = consumer
 
     def __str__(self) -> str:
-        "usuals"
+        "Human-readable representation of the result, including its producer or consumer."
         return (
             f"<< {self.name} - {self.consumer}"
             if self.producer is None
@@ -726,7 +726,7 @@ def make_subfunction(
     :param opset_imports: opset import
     :param output_names: desired outputs
     :param domain: function domain
-    :return: model proto
+    :return: function proto
     """
     return oh.make_function(
         domain,
@@ -784,12 +784,12 @@ def make_model_with_local_functions(
     ``'namespace'``. It is going to look into every value
     matching the regular expression and partition the nodes based
     on the unique values the regular expression finds.
-    Every set of nodes it replaced by a call to a local function.
+    Every set of nodes is replaced by a call to a local function.
 
     :param model: model proto
     :param regex: regular expression
     :param domain: function domain
-    :param metadata_keys: list of metadata keys to consider,
+    :param metadata_key_prefix: list of metadata keys to consider,
         every value is split into multiple ones.
     :param allow_extensions: allows the function to take nodes outside
         a partition if there are not already inside another partition
