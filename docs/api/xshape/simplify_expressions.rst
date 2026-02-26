@@ -1,6 +1,5 @@
-
-.xshape.simplify_expressions
-============================
+yobx.xshape.simplify_expressions
+================================
 
 .. automodule:: yobx.xshape.simplify_expressions
     :members:

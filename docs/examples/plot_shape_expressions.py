@@ -1,4 +1,6 @@
 """
+.. _plot-shape-expressions:
+
 Expressions in Shape Computation
 =================================
 

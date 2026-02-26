@@ -1,6 +1,5 @@
-
-.xshape.expressions_torch
-=========================
+yobx.xshape.expressions_torch
+=============================
 
 .. automodule:: yobx.xshape.expressions_torch
     :members:

@@ -1,6 +1,5 @@
-
-.xshape.type_inference
-======================
+yobx.xshape.type_inference
+==========================
 
 .. automodule:: yobx.xshape.type_inference
     :members:

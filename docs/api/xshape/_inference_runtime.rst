@@ -1,6 +1,6 @@
 
-.xshape._inference_runtime
-==========================
+yobx.xshape._inference_runtime
+==============================
 
 .. automodule:: yobx.xshape._inference_runtime
     :members:

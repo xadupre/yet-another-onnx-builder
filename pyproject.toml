@@ -114,6 +114,9 @@ select = [
     "SIM102", "SIM103", "SIM108", "SIM114", "SIM910",
     "UP006", "UP007", "UP015", "UP027", "UP031", "UP032", "UP034", "UP035", "UP045",
 ]
+"unittests/**" = [
+    "B904",
+]
 
 [tool.mypy]
 ignore_missing_imports = true

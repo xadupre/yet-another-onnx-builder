@@ -1,6 +1,6 @@
 
-.xshape.shape_builder
-=====================
+yobx.xshape.shape_builder
+=========================
 
 .. automodule:: yobx.xshape.shape_builder
     :members:

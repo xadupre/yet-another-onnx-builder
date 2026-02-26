@@ -1,5 +1,5 @@
-.xshape
-=======
+yobx.xshape
+===========
 
 .. toctree::
     :maxdepth: 1

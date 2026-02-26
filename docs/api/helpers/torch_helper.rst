@@ -1,5 +1,5 @@
-.helpers.torch_helper
-=====================
+yobx.helpers.torch_helper
+=========================
 
 .. automodule:: yobx.helpers.torch_helper
     :members:
