@@ -426,7 +426,7 @@ class _BuilderRuntime:
             ak = k.detach().cpu()
             iak = int(ak) if len(ak.shape) == 0 else int(ak[0])
             assert iak <= 1, f"Unexpected value for k={k}{self.get_debug_msg()}"
-            return [self.torch.triu(x, k == 0) if upper else self.torch.tril(x, k == 0)]
+            return [self.torch.triu(x, iak) if upper else self.torch.tril(x, iak)]
 
         assert isinstance(k, np.ndarray), (
             f"Expecting a tensor for {node.input[1]!r} but got "

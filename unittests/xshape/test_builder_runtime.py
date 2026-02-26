@@ -677,5 +677,79 @@ class TestApplyWhere(ExtTestCase):
         self.assertEqualArray(expected, result[0])
 
 
+class TestApplyTrilu(ExtTestCase):
+    def setUp(self):
+        self.b = _TorchShapeBuilder()
+
+    def test_numpy_upper_no_k(self):
+        # Single input: default upper triangular with k=0
+        node = oh.make_node("Trilu", ["x"], ["y"])
+        x = np.arange(9, dtype=np.float32).reshape(3, 3)
+        result = self.b._apply_trilu(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        np.testing.assert_array_equal(result[0], np.triu(x, 0))
+
+    def test_numpy_upper_with_k0(self):
+        # Two inputs: upper triangular with explicit k=0
+        node = oh.make_node("Trilu", ["x", "k"], ["y"])
+        x = np.arange(9, dtype=np.float32).reshape(3, 3)
+        k = np.array(0, dtype=np.int64)
+        result = self.b._apply_trilu(node, {"x": x, "k": k})
+        self.assertEqual(len(result), 1)
+        np.testing.assert_array_equal(result[0], np.triu(x, 0))
+
+    def test_numpy_upper_with_k1(self):
+        # Two inputs: upper triangular with k=1 (exclude main diagonal)
+        node = oh.make_node("Trilu", ["x", "k"], ["y"])
+        x = np.arange(9, dtype=np.float32).reshape(3, 3)
+        k = np.array(1, dtype=np.int64)
+        result = self.b._apply_trilu(node, {"x": x, "k": k})
+        self.assertEqual(len(result), 1)
+        np.testing.assert_array_equal(result[0], np.triu(x, 1))
+
+    def test_numpy_lower_no_k(self):
+        # Single input: lower triangular (upper=0) with default k=0
+        node = oh.make_node("Trilu", ["x"], ["y"], upper=0)
+        x = np.arange(9, dtype=np.float32).reshape(3, 3)
+        result = self.b._apply_trilu(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        np.testing.assert_array_equal(result[0], np.tril(x, 0))
+
+    def test_numpy_lower_with_k1(self):
+        # Two inputs: lower triangular with k=1
+        node = oh.make_node("Trilu", ["x", "k"], ["y"], upper=0)
+        x = np.arange(9, dtype=np.float32).reshape(3, 3)
+        k = np.array(1, dtype=np.int64)
+        result = self.b._apply_trilu(node, {"x": x, "k": k})
+        self.assertEqual(len(result), 1)
+        np.testing.assert_array_equal(result[0], np.tril(x, 1))
+
+    def test_torch_upper_with_k0(self):
+        import torch
+
+        # Torch upper triangular with k=tensor(0)
+        node = oh.make_node("Trilu", ["x", "k"], ["y"])
+        x = torch.arange(9, dtype=torch.float32).reshape(3, 3)
+        k = torch.tensor(0, dtype=torch.int64)
+        result = self.b._apply_trilu(node, {"x": x, "k": k})
+        self.assertEqual(len(result), 1)
+        expected = torch.triu(x, 0)
+        self.assertEqual(tuple(result[0].shape), (3, 3))
+        self.assertTrue(torch.equal(result[0], expected))
+
+    def test_torch_lower_with_k0(self):
+        import torch
+
+        # Torch lower triangular with k=tensor(0), upper=0
+        node = oh.make_node("Trilu", ["x", "k"], ["y"], upper=0)
+        x = torch.arange(9, dtype=torch.float32).reshape(3, 3)
+        k = torch.tensor(0, dtype=torch.int64)
+        result = self.b._apply_trilu(node, {"x": x, "k": k})
+        self.assertEqual(len(result), 1)
+        expected = torch.tril(x, 0)
+        self.assertEqual(tuple(result[0].shape), (3, 3))
+        self.assertTrue(torch.equal(result[0], expected))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
