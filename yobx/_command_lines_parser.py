@@ -209,7 +209,7 @@ def get_parser_agg() -> ArgumentParser:
         "--recent",
         default=True,
         action=BooleanOptionalAction,
-        help="Keeps only the most recent experiment for the same of keys.",
+        help="Keeps only the most recent experiment for the same set of keys.",
     )
     parser.add_argument(
         "--keep-last-date",
