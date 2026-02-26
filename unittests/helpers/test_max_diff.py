@@ -116,6 +116,38 @@ class TestMaxDiffNdarray(ExtTestCase):
         self.assertEqual(res["abs"], 1.0)
 
 
+class TestMaxDiffNdarrayListTuple(ExtTestCase):
+    def test_ndarray_vs_list_equal(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = [1.0, 2.0, 3.0]
+        res = max_diff(a, b)
+        self.assertEqual(res["abs"], 0.0)
+
+    def test_ndarray_vs_tuple_equal(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = (1.0, 2.0, 3.0)
+        res = max_diff(a, b)
+        self.assertEqual(res["abs"], 0.0)
+
+    def test_ndarray_vs_list_different(self):
+        a = np.array([1.0, 2.0])
+        b = [1.0, 3.0]
+        res = max_diff(a, b)
+        self.assertEqual(res["abs"], 1.0)
+
+    def test_ndarray_vs_list_shape_mismatch(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = [1.0, 2.0]
+        res = max_diff(a, b)
+        self.assertTrue(math.isinf(res["abs"]))
+
+    def test_ndarray_vs_tuple_shape_mismatch(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = (1.0, 2.0)
+        res = max_diff(a, b)
+        self.assertTrue(math.isinf(res["abs"]))
+
+
 class TestMaxDiffListTuple(ExtTestCase):
     def test_list_identical(self):
         a = [np.array([1.0, 2.0]), np.array([3.0])]
