@@ -10,7 +10,7 @@ def make_feeds(
     use_numpy: bool = False,
     copy: bool = False,
     is_modelbuilder: bool = False,
-) -> Dict[str, Union["torch.Tensor", np.ndarray]]:  # noqa: F821
+) -> Dict[str, Union["torch.Tensor", np.ndarray]]:  # type: ignore[name-defined] # noqa: F821
     """
     Serializes the inputs to produce feeds expected
     by :class:`onnxruntime.InferenceSession`.
