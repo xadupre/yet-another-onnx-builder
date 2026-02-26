@@ -344,25 +344,6 @@ def string_type(
     if obj.__class__.__name__ == "SymbolicTensor":
         return _string_tensor(obj, "ST", with_shape, with_device)
 
-    # others classes
-
-    if obj.__class__.__name__ == "MambaCache":
-        c = string_type(
-            obj.conv_states,
-            with_shape=with_shape,
-            with_min_max=with_min_max,
-            with_device=with_device,
-            limit=limit,
-        )
-        d = string_type(
-            obj.ssm_states,
-            with_shape=with_shape,
-            with_min_max=with_min_max,
-            with_device=with_device,
-            limit=limit,
-        )
-        return f"MambaCache(conv_states={c}, ssm_states={d})"
-
     if (
         obj.__class__.__name__ in {"DynamicCache"}
         and hasattr(obj, "layers")
@@ -716,11 +697,6 @@ def flatten_object(x: Any, drop_keys: bool = False) -> Any:
             *flatten_object(x.cross_attention_cache),
         ]
         return tuple(res)
-    if x.__class__.__name__ == "MambaCache":
-        if isinstance(x.conv_states, list):
-            res = [*flatten_object(x.conv_states), *flatten_object(x.ssm_states)]
-            return tuple(res)
-        return (x.conv_states, x.ssm_states)
     if hasattr(x, "to_tuple"):
         return flatten_object(x.to_tuple(), drop_keys=drop_keys)
     if hasattr(x, "shape"):

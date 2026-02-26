@@ -27,6 +27,8 @@ class _InferenceRuntime:
     class ShapeConstant:
         """Wraps a constant shape even if the input producing the shape is not."""
 
+        __slots__ = ("name", "node", "shape")
+
         def __init__(self, name: str, shape: Tuple[int, ...], node: onnx.NodeProto):
             self.name = name
             self.shape = shape
