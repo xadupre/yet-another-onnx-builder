@@ -439,6 +439,41 @@ class TestReferenceOps(ExtTestCase):
         expected = sess.run(None, feeds)
         self.assertEqualArrayAny(expected, got, atol=1)
 
+    def test_bias_softmax(self):
+        for axis, b_shape in [(0, (2, 3, 4)), (1, (3, 4)), (2, (4,))]:
+            model = oh.make_model(
+                oh.make_graph(
+                    [
+                        oh.make_node(
+                            "BiasSoftmax",
+                            ["X", "B"],
+                            ["Z"],
+                            domain="com.microsoft",
+                            axis=axis,
+                            is_inner_broadcast=0,
+                        )
+                    ],
+                    "name",
+                    [
+                        oh.make_tensor_value_info("X", TFLOAT, None),
+                        oh.make_tensor_value_info("B", TFLOAT, None),
+                    ],
+                    [oh.make_tensor_value_info("Z", TFLOAT, None)],
+                ),
+                opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+                ir_version=9,
+            )
+            x = self._range(2, 3, 4)
+            b = self._range(*b_shape)
+            feeds = {"X": x, "B": b}
+            ref = ExtendedReferenceEvaluator(model)
+            got = ref.run(None, feeds)
+            z = x + b
+            tmp = z - z.max(axis=axis, keepdims=True)
+            w = np.exp(tmp)
+            expected = (w / w.sum(axis=axis, keepdims=True)).astype(np.float32)
+            self.assertEqualArray(expected, got[0], atol=1e-5)
+
     def test_inline_1_function(self):
         new_domain = "custom"
 
