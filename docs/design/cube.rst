@@ -184,7 +184,7 @@ CubeViewDef options
 +---------------------------+------------------------------------------------------------+
 | ``key_agg``               | Keys to aggregate away before pivoting                     |
 +---------------------------+------------------------------------------------------------+
-| ``agg_args``              | Aggregation function(s) passed to ``groupby(...).agg()``  |
+| ``agg_args``              | Aggregation function(s) passed to ``groupby(...).agg()``   |
 |                           | (can be a callable ``column_name → agg_func``)             |
 +---------------------------+------------------------------------------------------------+
 | ``agg_multi``             | Extra aggregations over multiple columns simultaneously    |
@@ -193,7 +193,7 @@ CubeViewDef options
 +---------------------------+------------------------------------------------------------+
 | ``ignore_columns``        | Columns to exclude from the view                           |
 +---------------------------+------------------------------------------------------------+
-| ``keep_columns_in_index`` | Keep a column even if it has only one distinct value        |
+| ``keep_columns_in_index`` | Keep a column even if it has only one distinct value       |
 +---------------------------+------------------------------------------------------------+
 | ``transpose``             | Transpose rows and columns                                 |
 +---------------------------+------------------------------------------------------------+
