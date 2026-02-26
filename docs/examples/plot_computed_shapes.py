@@ -16,6 +16,10 @@ model contains dynamic (symbolic) dimensions it typically assigns ``None``
 (unknown) to most intermediate results.  :class:`BasicShapeBuilder` instead
 keeps the dimensions as symbolic arithmetic expressions so that output shapes
 are expressed in terms of the input dimension names.
+
+See :ref:`l-design-shape` for a detailed description of how
+:class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+works and a comparison table with :func:`onnx.shape_inference.infer_shapes`.
 """
 
 # %%
