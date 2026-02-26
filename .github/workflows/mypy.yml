@@ -18,6 +18,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install -e ".[dev]" mypy
+        run: pip install -e ".[dev,torch]" mypy
       - name: Run mypy
         run: mypy yobx
