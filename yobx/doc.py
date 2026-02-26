@@ -176,29 +176,32 @@ def _run_subprocess(args: List[str], cwd: Optional[str] = None):
         stderr=subprocess.PIPE,
     )
     raise_exception = False
-    output = ""
+    output_lines: List[str] = []
     while True:
-        output = p.stdout.readline().decode(errors="ignore")  # type: ignore[union-attr]
-        if output == "" and p.poll() is not None:
+        line = p.stdout.readline()  # type: ignore[union-attr]
+        if not line and p.poll() is not None:
             break
-        if output:
+        if line:
+            decoded = line.decode(errors="ignore")
+            output_lines.append(decoded)
             if (
-                "fatal error" in output
-                or "CMake Error" in output
-                or "gmake: ***" in output
-                or "): error C" in output
-                or ": error: " in output
+                "fatal error" in decoded
+                or "CMake Error" in decoded
+                or "gmake: ***" in decoded
+                or "): error C" in decoded
+                or ": error: " in decoded
             ):
                 raise_exception = True
     p.poll()
-    error = p.stderr.readline().decode(errors="ignore")  # type: ignore[union-attr]
+    stdout_output = "".join(output_lines)
+    error = p.stderr.read().decode(errors="ignore")  # type: ignore[union-attr]
     p.stdout.close()  # type: ignore[union-attr]
     p.stderr.close()  # type: ignore[union-attr]
     if error and raise_exception:
         raise RuntimeError(
-            f"An error was found in the output. The build is stopped.\n{output}\n---\n{error}"
+            f"An error was found in the output. The build is stopped.\n{stdout_output}\n---\n{error}"
         )
-    return output + "\n" + error
+    return stdout_output + "\n" + error
 
 
 def _run_graphviz(filename: str, image: str, engine: str = "dot") -> str:
