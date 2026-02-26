@@ -9,6 +9,9 @@ from yobx.reference import ExtendedReferenceEvaluator
 
 TFLOAT = onnx.TensorProto.FLOAT
 TINT64 = onnx.TensorProto.INT64
+TCOMPLEX64 = onnx.TensorProto.COMPLEX64
+TCOMPLEX128 = onnx.TensorProto.COMPLEX128
+TDOUBLE = onnx.TensorProto.DOUBLE
 
 
 class TestReferenceOps(ExtTestCase):
@@ -439,6 +442,41 @@ class TestReferenceOps(ExtTestCase):
         expected = sess.run(None, feeds)
         self.assertEqualArrayAny(expected, got, atol=1)
 
+    def test_bias_softmax(self):
+        for axis, b_shape in [(0, (2, 3, 4)), (1, (3, 4)), (2, (4,))]:
+            model = oh.make_model(
+                oh.make_graph(
+                    [
+                        oh.make_node(
+                            "BiasSoftmax",
+                            ["X", "B"],
+                            ["Z"],
+                            domain="com.microsoft",
+                            axis=axis,
+                            is_inner_broadcast=0,
+                        )
+                    ],
+                    "name",
+                    [
+                        oh.make_tensor_value_info("X", TFLOAT, None),
+                        oh.make_tensor_value_info("B", TFLOAT, None),
+                    ],
+                    [oh.make_tensor_value_info("Z", TFLOAT, None)],
+                ),
+                opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+                ir_version=9,
+            )
+            x = self._range(2, 3, 4)
+            b = self._range(*b_shape)
+            feeds = {"X": x, "B": b}
+            ref = ExtendedReferenceEvaluator(model)
+            got = ref.run(None, feeds)
+            z = x + b
+            tmp = z - z.max(axis=axis, keepdims=True)
+            w = np.exp(tmp)
+            expected = (w / w.sum(axis=axis, keepdims=True)).astype(np.float32)
+            self.assertEqualArray(expected, got[0], atol=1e-5)
+
     def test_inline_1_function(self):
         new_domain = "custom"
 
@@ -536,6 +574,99 @@ class TestReferenceOps(ExtTestCase):
             B=np.arange(9).reshape((3, 3)).astype(np.float32),
         )
         ref.run(None, feeds)[0]
+
+
+    def test_to_complex_2d(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "ToComplex",
+                        ["X"],
+                        ["Z"],
+                        domain="ai.onnx.complex",
+                    )
+                ],
+                "name",
+                [oh.make_tensor_value_info("X", TFLOAT, None)],
+                [oh.make_tensor_value_info("Z", TCOMPLEX64, None)],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("ai.onnx.complex", 1)],
+        )
+        ref = ExtendedReferenceEvaluator(model)
+        x = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        got = ref.run(None, {"X": x})
+        expected = x[:, 0] + 1j * x[:, 1]
+        self.assertEqualArray(expected, got[0])
+
+    def test_to_complex_1d(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "ToComplex",
+                        ["X"],
+                        ["Z"],
+                        domain="ai.onnx.complex",
+                    )
+                ],
+                "name",
+                [oh.make_tensor_value_info("X", TFLOAT, None)],
+                [oh.make_tensor_value_info("Z", TCOMPLEX64, None)],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("ai.onnx.complex", 1)],
+        )
+        ref = ExtendedReferenceEvaluator(model)
+        x = np.array([[1.0], [3.0]], dtype=np.float32)
+        got = ref.run(None, {"X": x})
+        expected = x[:, 0] + 0j
+        self.assertEqualArray(expected, got[0])
+
+    def test_complex_module(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "ComplexModule",
+                        ["X"],
+                        ["Z"],
+                        domain="ai.onnx.complex",
+                    )
+                ],
+                "name",
+                [oh.make_tensor_value_info("X", TCOMPLEX64, None)],
+                [oh.make_tensor_value_info("Z", TFLOAT, None)],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("ai.onnx.complex", 1)],
+        )
+        ref = ExtendedReferenceEvaluator(model)
+        x = np.array([1.0 + 2j, 3.0 + 4j], dtype=np.complex64)
+        got = ref.run(None, {"X": x})
+        expected = np.abs(x)
+        self.assertEqualArray(expected, got[0])
+
+    def test_complex_module_128(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "ComplexModule",
+                        ["X"],
+                        ["Z"],
+                        domain="ai.onnx.complex",
+                    )
+                ],
+                "name",
+                [oh.make_tensor_value_info("X", TCOMPLEX128, None)],
+                [oh.make_tensor_value_info("Z", TDOUBLE, None)],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("ai.onnx.complex", 1)],
+        )
+        ref = ExtendedReferenceEvaluator(model)
+        x = np.array([1.0 + 2j, 3.0 + 4j], dtype=np.complex128)
+        got = ref.run(None, {"X": x})
+        expected = np.abs(x)
+        self.assertEqualArray(expected, got[0])
 
 
 if __name__ == "__main__":

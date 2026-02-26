@@ -113,7 +113,7 @@ backend_test.exclude(
 # Not implemented yet.
 backend_test.exclude(
     "(affine_grid|array_feature_extractor|binarizer|label_encoder|attention"
-    "|bitwise|averagepool"
+    "|averagepool"
     "|center_crop|col2im|compress|conv"
     "|det|dft|fft"
     "|gridsample|group_normalization|gru"
@@ -121,7 +121,7 @@ backend_test.exclude(
     "|lppool|lstm|matmulinteger|maxunpool"
     "|nllloss|optional|pad|quantize|rms"
     "|resize|roialign|sce|sequence|shape_clip"
-    "|test_max_|test_min_|test_maxpool_|shape_start_greater"
+    "|test_maxpool_|shape_start_greater"
     "|simple_rnn|stft|string|strnorm"
     "|tensorscatter|tfidfvectorizer"
     "|unique|AvgPool|BatchNorm|Conv|Embedding|GLU|LeakyReLU|Linear"
