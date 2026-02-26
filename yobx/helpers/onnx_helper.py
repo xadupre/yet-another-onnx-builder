@@ -38,7 +38,7 @@ def np_dtype_to_tensor_dtype(dtype: np.dtype) -> int:
     return oh.np_dtype_to_tensor_dtype(dtype)
 
 
-def dtype_to_tensor_dtype(dt: Union[np.dtype, "torch.dtype"]) -> int:  # type: ignore[name-defined] # noqa: F821
+def dtype_to_tensor_dtype(dt: Union[np.dtype, "torch.dtype"]) -> int:  # type: ignore[arg-type,name-defined] # noqa: F821
     """
     Converts a torch dtype or numpy dtype into a onnx element type.
 
@@ -186,11 +186,11 @@ def pretty_onnx(
         return f"{text}  ---  {rows[0]}"
 
     if isinstance(onx, onnx.TensorProto):
-        shape = "x".join(map(str, onx.dims))
+        shape = "x".join(d.dim_param or str(d.dim_value) for d in onx.dims)
         return f"onnx.TensorProto:{onx.data_type}:{shape}:{onx.name}"
 
     assert not isinstance(
-        onx, onnx.Sparseonnx.TensorProto
+        onx, onnx.SparseTensorProto
     ), "Sparseonnx.TensorProto is not handled yet."
 
     from ._onnx_simple_text_plot import onnx_simple_text_plot

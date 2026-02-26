@@ -199,10 +199,10 @@ def _get_hidden_inputs(nodes):
 
 def reorder_nodes_for_display(nodes, verbose=False):
     """
-    Reorders the node with breadth first seach (BFS).
+    Reorders the node with breadth first search (BFS).
 
     :param nodes: list of ONNX nodes
-    :param verbose: dislay intermediate informations
+    :param verbose: display intermediate information
     :return: reordered list of nodes
     """
 
