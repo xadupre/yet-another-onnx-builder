@@ -14,6 +14,11 @@ class _TorchShapeBuilder(BasicShapeBuilder):
 
         return torch
 
+    def make_torch_tensor_from_np_array(self, x):
+        import torch
+
+        return torch.from_numpy(x)
+
 
 class TestApplySliceToShape(ExtTestCase):
     def setUp(self):
@@ -101,6 +106,15 @@ class TestApplyTranspose(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (4, 2, 3))
 
+    def test_transpose_torch(self):
+        import torch
+
+        node = oh.make_node("Transpose", ["x"], ["y"], perm=[1, 0])
+        x = torch.arange(6, dtype=torch.float32).reshape(2, 3)
+        result = self.b._apply_transpose(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (3, 2))
+
 
 class TestApplyExpand(ExtTestCase):
     def setUp(self):
@@ -160,6 +174,35 @@ class TestApplySqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].shape, (3, 5))
 
+    def test_squeeze_torch_no_axis(self):
+        import torch
+
+        node = oh.make_node("Squeeze", ["x"], ["y"])
+        x = torch.ones(1, 3, 1, 5, dtype=torch.float32)
+        result = self.b._apply_squeeze(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (3, 5))
+
+    def test_squeeze_torch_with_axis_scalar(self):
+        import torch
+
+        node = oh.make_node("Squeeze", ["x", "axes"], ["y"])
+        x = torch.ones(3, 1, 5, dtype=torch.float32)
+        axes = np.array(1, dtype=np.int64)
+        result = self.b._apply_squeeze(node, {"x": x, "axes": axes})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (3, 5))
+
+    def test_squeeze_torch_with_axis_array(self):
+        import torch
+
+        node = oh.make_node("Squeeze", ["x", "axes"], ["y"])
+        x = torch.ones(1, 3, 1, 5, dtype=torch.float32)
+        axes = np.array([0, 2], dtype=np.int64)
+        result = self.b._apply_squeeze(node, {"x": x, "axes": axes})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (3, 5))
+
 
 class TestApplyUnsqueeze(ExtTestCase):
     def setUp(self):
@@ -188,6 +231,99 @@ class TestApplyUnsqueeze(ExtTestCase):
         result = self.b._apply_unsqueeze(node, {"x": x, "axes": axes})
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].shape, (1, 2, 3, 1))
+
+    def test_unsqueeze_torch_scalar_axis(self):
+        import torch
+
+        node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
+        x = torch.arange(6, dtype=torch.float32).reshape(2, 3)
+        axes = np.array(0, dtype=np.int64)
+        result = self.b._apply_unsqueeze(node, {"x": x, "axes": axes})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (1, 2, 3))
+
+    def test_unsqueeze_torch_single_axis(self):
+        import torch
+
+        node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
+        x = torch.arange(6, dtype=torch.float32).reshape(2, 3)
+        axes = np.array([1], dtype=np.int64)
+        result = self.b._apply_unsqueeze(node, {"x": x, "axes": axes})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (2, 1, 3))
+
+    def test_unsqueeze_torch_multiple_axes(self):
+        import torch
+
+        node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
+        x = torch.arange(6, dtype=torch.float32).reshape(2, 3)
+        axes = np.array([0, 3], dtype=np.int64)
+        result = self.b._apply_unsqueeze(node, {"x": x, "axes": axes})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (1, 2, 3, 1))
+
+
+class TestApplyCast(ExtTestCase):
+    def setUp(self):
+        self.b = _TorchShapeBuilder()
+
+    def test_cast_numpy_to_float32(self):
+        node = oh.make_node("Cast", ["x"], ["y"], to=1)  # 1 = FLOAT
+        x = np.arange(6, dtype=np.int64).reshape(2, 3)
+        result = self.b._apply_cast(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (2, 3))
+
+    def test_cast_torch_to_float32(self):
+        import torch
+
+        node = oh.make_node("Cast", ["x"], ["y"], to=1)  # 1 = FLOAT
+        x = torch.arange(6, dtype=torch.int64).reshape(2, 3)
+        result = self.b._apply_cast(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].dtype, torch.float32)
+        self.assertEqual(tuple(result[0].shape), (2, 3))
+
+    def test_cast_torch_to_int64(self):
+        import torch
+
+        node = oh.make_node("Cast", ["x"], ["y"], to=7)  # 7 = INT64
+        x = torch.tensor([1.5, 2.7, 3.1], dtype=torch.float32)
+        result = self.b._apply_cast(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].dtype, torch.int64)
+
+
+class TestApplyUnaryFunction(ExtTestCase):
+    def setUp(self):
+        self.b = _TorchShapeBuilder()
+
+    def test_sqrt_numpy(self):
+        node = oh.make_node("Sqrt", ["x"], ["y"])
+        x = np.array([4.0, 9.0, 16.0], dtype=np.float32)
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(result[0], np.array([2.0, 3.0, 4.0], dtype=np.float32))
+
+    def test_sqrt_torch(self):
+        import torch
+
+        node = oh.make_node("Sqrt", ["x"], ["y"])
+        x = torch.tensor([4.0, 9.0, 16.0], dtype=torch.float32)
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(
+            result[0].numpy(), np.array([2.0, 3.0, 4.0], dtype=np.float32)
+        )
+
+    def test_exp_torch(self):
+        import torch
+
+        node = oh.make_node("Exp", ["x"], ["y"])
+        x = torch.zeros(3, dtype=torch.float32)
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(result[0].numpy(), np.ones(3, dtype=np.float32))
 
 
 class TestApplyUnaryFunction(ExtTestCase):
