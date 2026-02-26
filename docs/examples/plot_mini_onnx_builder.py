@@ -135,10 +135,6 @@ big = np.random.randn(128, 256).astype(np.float32)
 proto_rand = create_onnx_model_from_input_tensors(big, randomize=True)
 proto_exact = create_onnx_model_from_input_tensors(big)
 
-print(
-    f"randomized model size : {proto_rand.ByteSize():>8} bytes"
-)
-print(
-    f"exact      model size : {proto_exact.ByteSize():>8} bytes"
-)
+print(f"randomized model size : {proto_rand.ByteSize():>8} bytes")
+print(f"exact      model size : {proto_exact.ByteSize():>8} bytes")
 assert proto_rand.ByteSize() < proto_exact.ByteSize()
