@@ -106,9 +106,7 @@ class TestReferenceOps(ExtTestCase):
         }
         ref = ExtendedReferenceEvaluator(model)
         got = ref.run(None, feeds)
-        sess = InferenceSession(
-            model.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
         expected = sess.run(None, feeds)
         self.assertEqualArray(expected[0], got[0])
 
