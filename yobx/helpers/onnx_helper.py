@@ -262,7 +262,7 @@ def enumerate_results(
     if isinstance(proto, onnx.ModelProto):
         if verbose:
             print(f"[enumerate_results] {indent}searching for {name!r} into ModelProto...")
-        yield from enumerate_results(proto.graph, name, verbose=verbose)
+        yield from enumerate_results(proto.graph, name, verbose=verbose, coordinates=coordinates)
     elif isinstance(proto, onnx.FunctionProto):
         if verbose:
             print(f"[enumerate_results] {indent}searching for {name!r} into FunctionProto...")
@@ -276,7 +276,7 @@ def enumerate_results(
                 if verbose > 1:
                     print(f"[enumerate_results] {indent}-- {r}")
                 yield r
-        yield from enumerate_results(proto.node, name, verbose=verbose)
+        yield from enumerate_results(proto.node, name, verbose=verbose, coordinates=coordinates)
         for i in proto.output:
             if i in name:
                 r = ResultFound(
