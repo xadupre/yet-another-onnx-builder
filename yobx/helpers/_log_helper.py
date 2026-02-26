@@ -328,18 +328,14 @@ def apply_excel_style(
     verbose: int = 0,
 ):
     """
-        Applies styles on all sheets in a file unless the sheet is too big.
+    Applies styles on all sheets in a file unless the sheet is too big.
 
-        :param filename_or_writer: filename, modified inplace
-        :param f_highlight: color function to apply, one per sheet
-        :param time_mask_view: if specified, it contains dataframe with the same shape
-            and values in {-1, 0, +1} which indicates if a value is unexpectedly lower (-1)
-            or higher (+1), it changes the color of the background then.
-    <<<<<<< cube
-        :param verbose: progress loop
-    =======
-        :param verbosity: progress loop
-    >>>>>>> main
+    :param filename_or_writer: filename, modified inplace
+    :param f_highlight: color function to apply, one per sheet
+    :param time_mask_view: if specified, it contains dataframe with the same shape
+        and values in {-1, 0, +1} which indicates if a value is unexpectedly lower (-1)
+        or higher (+1), it changes the color of the background then.
+    :param verbose: progress loop
     """
     from openpyxl import load_workbook
     from openpyxl.styles import Alignment
