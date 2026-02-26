@@ -44,7 +44,7 @@ def mann_kendall(series: Sequence[float], threshold: float = 0.5):
     aseries = np.asarray(series)
     stat = 0
     n = len(aseries)
-    var = n * (n - 1) * (2 * n + 5)
+    var = n * (n - 1) * (2 * n + 5) / 18
     for i in range(n - 1):
         stat += np.sign(aseries[i + 1 :] - aseries[i]).sum()
     var = var**0.5
@@ -59,6 +59,8 @@ def breaking_last_point(series: Sequence[float], threshold: float = 1.2):
     is not an outlier.
 
     :param series: series
+    :param threshold: number of standard deviations beyond the mean required
+        for the last point to be considered a significant change (default 1.2)
     :return: significant change (-1, 0, +1), test value
     """
     signal = np.asarray(series)
@@ -169,7 +171,7 @@ def enumerate_csv_files(
     loops over csv candidates.
 
     :param data: dataframe with the raw data or a file or list of files
-    :param vrbose: verbosity
+    :param verbose: verbosity
     :param filtering: function to filter in or out files in zip files,
         must return true to keep the file, false to skip it.
     :return: a generator yielding tuples with the filename, date, full path and zip file
@@ -182,7 +184,7 @@ def enumerate_csv_files(
     """
     if not isinstance(data, list):
         data = [data]
-    for itn, filename in enumerate(data):
+    for itn, filename in enumerate(data):  # pyrefly: ignore[bad-argument-type]
         if isinstance(filename, pandas.DataFrame):
             if verbose:
                 print(f"[enumerate_csv_files] data[{itn}] is a dataframe")
@@ -250,12 +252,16 @@ def open_dataframe(
     data: Union[str, Tuple[str, str, str, str], pandas.DataFrame],
 ) -> pandas.DataFrame:
     """
-    Opens a filename defined by function
-    :func:`onnx_diagnostic.helpers._log_helper.enumerate_csv_files`.
+        Opens a filename defined by function
+    <<<<<<< cube
+        :func:`yobx.helpers._log_helper.enumerate_csv_files`.
+    =======
+        :func:`onnx_diagnostic.helpers._log_helper.enumerate_csv_files`.
+    >>>>>>> main
 
-    :param data: a dataframe, a filename, a tuple indicating the file is coming
-        from a zip file
-    :return: a dataframe
+        :param data: a dataframe, a filename, a tuple indicating the file is coming
+            from a zip file
+        :return: a dataframe
     """
     if isinstance(data, pandas.DataFrame):
         return data
@@ -315,20 +321,29 @@ def align_dataframe_with(
 def apply_excel_style(
     filename_or_writer: Any,
     f_highlights: Optional[  # type: ignore[name-defined]
-        Dict[str, Callable[[Any], "CubeViewDef.HighLightKind"]]  # noqa: F821
+        Dict[
+            str,
+            Callable[
+                [Any], "CubeViewDef.HighLightKind"  # pyrefly: ignore[unknown-name]]  # noqa: F821
+            ],
+        ]
     ] = None,
     time_mask_view: Optional[Dict[str, pandas.DataFrame]] = None,
     verbose: int = 0,
 ):
     """
-    Applies styles on all sheets in a file unless the sheet is too big.
+        Applies styles on all sheets in a file unless the sheet is too big.
 
-    :param filename_or_writer: filename, modified inplace
-    :param f_highlight: color function to apply, one per sheet
-    :param time_mask_view: if specified, it contains dataframe with the same shape
-        and values in {-1, 0, +1} which indicates if a value is unexpectedly lower (-1)
-        or higher (+1), it changes the color of the background then.
-    :param verbosity: progress loop
+        :param filename_or_writer: filename, modified inplace
+        :param f_highlight: color function to apply, one per sheet
+        :param time_mask_view: if specified, it contains dataframe with the same shape
+            and values in {-1, 0, +1} which indicates if a value is unexpectedly lower (-1)
+            or higher (+1), it changes the color of the background then.
+    <<<<<<< cube
+        :param verbose: progress loop
+    =======
+        :param verbosity: progress loop
+    >>>>>>> main
     """
     from openpyxl import load_workbook
     from openpyxl.styles import Alignment

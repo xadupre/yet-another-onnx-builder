@@ -414,11 +414,11 @@ class TestCubeHelper(ExtTestCase):
 
     def test_mann_kendall(self):
         test = mann_kendall(list(range(5)))
-        self.assertEqual((np.float64(1.0), np.float64(0.5196152422706631)), test)
+        self.assertEqual((np.float64(1.0), np.float64(2.2045407685048604)), test)
         test = mann_kendall(list(range(3)))
-        self.assertEqual((0, np.float64(0.24618298195866545)), test)
+        self.assertEqual((np.float64(1), np.float64(1.044465935734187)), test)
         test = mann_kendall(list(range(5, 0, -1)))
-        self.assertEqual((np.float64(-1.0), np.float64(-0.5196152422706631)), test)
+        self.assertEqual((np.float64(-1.0), np.float64(-2.2045407685048604)), test)
 
     def test_breaking_last_point(self):
         test = breaking_last_point([1, 1, 1, 2])

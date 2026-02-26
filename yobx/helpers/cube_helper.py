@@ -108,7 +108,7 @@ class CubeViewDef:
         name: Optional[str] = None,
         no_index: bool = False,
         plots: bool = False,
-        fix_aggregation_change: Optional[List["str"]] = None,
+        fix_aggregation_change: Optional[List[str]] = None,
     ):
         self.key_index = key_index
         self.values = values
@@ -249,7 +249,7 @@ class CubePlot:
         :param verbose: verbosity
         :param merge: returns all graphs in a single image (True)
             or an image for every graph (False)
-        :param title_suffix: prefix for the title of every graph
+        :param title_suffix: suffix for the title of every graph
         :return: list of binary images (format PNG)
         """
         if self.kind in ("barh", "bar"):
@@ -541,7 +541,7 @@ class CubeLogs:
         ), f"Columns {set(self.keys_no_time) & set(self.ignored)} cannot be keys and ignored"
         assert not (
             set(self.values) & set(self.ignored)
-        ), f"Columns {set(self.keys_no_time) & set(self.ignored)} cannot be values and ignored"
+        ), f"Columns {set(self.values) & set(self.ignored)} cannot be values and ignored"
         assert (
             self.time not in self.keys_no_time
             and self.time not in self.values
@@ -780,7 +780,7 @@ class CubeLogs:
             data_red = data_to_process[[*keys_no_agg, *values]]
             assert set(key_index) <= set(data_red.columns), (
                 f"view_def.name={view_def.name!r}, "
-                f"nnable to find {set(key_index) - set(data_red.columns)}, "
+                f"unable to find {set(key_index) - set(data_red.columns)}, "
                 f"key_agg={key_agg}, keys_no_agg={keys_no_agg},\n--\n"
                 f"selected={pprint.pformat(sorted(data_red.columns))},\n--\n"
                 f"keys={pprint.pformat(sorted(self.keys_time))}"
@@ -921,7 +921,7 @@ class CubeLogs:
             piv = data.pivot(index=key_index[::-1], columns=key_columns, values=values)
         else:
             # pivot does return the same rank with it is empty.
-            # Let's add arficially one
+            # Let's add artificially one
             data = data.copy()
             data["ALL"] = "ALL"
             piv = data.pivot(index=["ALL"], columns=key_columns, values=values)
@@ -1179,9 +1179,9 @@ class CubeLogs:
 
         :param output: output file to create
         :param views: sequence or dictionary of views to append
-        :param main: add a page with statitcs on all variables
+        :param main: add a page with statistics on all variables
         :param raw: add a page with the raw data
-        :param csv: views to dump as csv files (same name as outputs + view naw)
+        :param csv: views to dump as csv files (same name as outputs + view name)
         :param verbose: verbosity
         :param time_mask: color the background of the cells if one
             of the value for the last date is unexpected,
@@ -1201,7 +1201,7 @@ class CubeLogs:
         with pandas.ExcelWriter(output, engine="openpyxl") as writer:
             if main:
                 assert main not in views, f"{main!r} is duplicated in views {sorted(views)}"
-                df = self.describe().sort_values("name")
+                df = self.describe().sort_index()
                 if verbose:
                     print(f"[CubeLogs.to_excel] add sheet {main!r} with shape {df.shape}")
                 df.to_excel(writer, sheet_name=main, freeze_panes=(1, 1))
@@ -1220,7 +1220,7 @@ class CubeLogs:
                     if aligned is not None:
                         assert aligned.shape == df.shape, (
                             f"Shape mismatch between the view {df.shape} and the mask "
-                            f"{time_mask_view[name].shape}"
+                            f"{aligned.shape}"
                         )
                         time_mask_view[name] = aligned
                         if verbose:
@@ -1243,7 +1243,7 @@ class CubeLogs:
                     fr = df.columns.to_frame()
                     if is_datetime64_any_dtype(fr[self.time]):
                         dt = fr[self.time]
-                        has_time = (dt != dt.dt.normalize()).any()
+                        has_time = (dt != dt.dt.normalize()).any()  # type: ignore[missing-attribute]
                         sdt = dt.apply(
                             lambda t, has_time=has_time: t.strftime(
                                 "%Y-%m-%dT%H-%M-%S" if has_time else "%Y-%m-%d"
@@ -1289,7 +1289,7 @@ class CubeLogs:
                         )
             assert isinstance(df, pandas.DataFrame)  # type checking
             if raw:
-                assert main not in views, f"{main!r} is duplicated in views {sorted(views)}"
+                assert raw not in views, f"{raw!r} is duplicated in views {sorted(views)}"
                 # Too long.
                 # self._apply_excel_style(raw, writer, self.data)
                 if csv and "raw" in csv:
@@ -1468,9 +1468,12 @@ class CubeLogs:
 
         new_data = pandas.concat(data_list, axis=0)
         cube = self.clone(new_data, keys=[*self.keys_no_time, column_name])
-        key_index = set(self.keys_time) - {*columns_index, column_name}  # type: ignore[misc]
+        # Preserve the original ordering of self.keys_time while excluding
+        # the configuration columns and the added column_name
+        excluded_keys = set(columns_index) | {column_name}  # type: ignore[arg-type]
+        key_index = [k for k in self.keys_time if k not in excluded_keys]
         view = CubeViewDef(
-            key_index=set(key_index),  # type: ignore[arg-type]
+            key_index=key_index,
             name="sbs",
             values=cube.values,
             keep_columns_in_index=[self.time],
@@ -1544,9 +1547,9 @@ class CubeLogs:
                             _mkc(m, f"∅{n1}∧{n2}"): (sinan & ~sjnan).astype(int),
                             _mkc(m, f"{n1}∧∅{n2}"): (~sinan & sjnan).astype(int),
                             _mkc(m, f"{n1}∧{n2}"): (~sinan & ~sjnan).astype(int),
-                            _mkc(m, f"{n1}<{n2}"): (si < sj).astype(int),
-                            _mkc(m, f"{n1}=={n2}"): (si == sj).astype(int),
-                            _mkc(m, f"{n1}>{n2}"): (si > sj).astype(int),
+                            _mkc(m, f"{n1}<{n2}"): (si < sj).astype(int),# type: ignore[missing-attribute]
+                            _mkc(m, f"{n1}=={n2}"): (si == sj).astype(int),# type: ignore[missing-attribute]
+                            _mkc(m, f"{n1}>{n2}"): (si > sj).astype(int),# type: ignore[missing-attribute]
                             _mkc(m, f"{n1}*({n1}∧{n2})"): si * (~sinan & ~sjnan).astype(float),
                             _mkc(m, f"{n2}*({n1}∧{n2})"): sj * (~sinan & ~sjnan).astype(float),
                         }
