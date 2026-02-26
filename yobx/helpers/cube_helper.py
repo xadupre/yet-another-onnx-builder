@@ -286,7 +286,7 @@ class CubePlot:
         nn += int(df.shape[1] % n_cols != 0)
         ratio = float(os.environ.get("FIGSIZEH", "1"))
         figsize = (6 * n_cols, nn * (2.5 + df.shape[0] / 15) * ratio)
-        fig, axs = plt.subplots(nn, n_cols, figsize=figsize)
+        fig, axs = plt.subplots(nn, n_cols, figsize=figsize, squeeze=False)
         pos = 0
         imgs = []
         for c in self._make_loop(df.columns, verbose):
