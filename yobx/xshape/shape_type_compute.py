@@ -1619,6 +1619,7 @@ _set_shape_type_op_any_known = {
     "SequenceEmpty": _set_shape_type_op_any_sequence_empty,
     "Sign": _set_shape_type_op_any_sign,
     "Slice": _set_shape_type_op_any_slice,
+    "Softmax": _set_shape_type_op_any_unary,
     "SpaceToDepth": _set_shape_type_op_any_space_to_depth,
     "Split": _set_shape_type_op_any_split,
     "Squeeze": _set_shape_type_op_any_squeeze,

@@ -1675,6 +1675,24 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(g._types.get("present_key"), TFLOAT16)
         self.assertEqual(g._types.get("present_value"), TFLOAT)
 
+    def test_set_shape_type_op_any_softmax_with_shape(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 10)
+        node = oh.make_node("Softmax", ["X"], ["Y"])
+        _set_shape_type_op_any_known["Softmax"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (2, 10))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_set_shape_type_op_any_softmax_rank_only(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._ranks["X"] = 3
+        node = oh.make_node("Softmax", ["X"], ["Y"])
+        _set_shape_type_op_any_known["Softmax"](g, node)
+        self.assertEqual(g._ranks.get("Y"), 3)
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
