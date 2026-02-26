@@ -18,10 +18,47 @@ from .shape_type_compute import set_shape_type_op_any, set_shape_type_custom
 _ShapeConstant = namedtuple("ShapeConstant", ["name", "shape", "node"])
 
 
+class _OptimizationOptions:
+    """Default optimization options for :class:`BasicShapeBuilder`."""
+
+    constant_size: int = 2**24
+
+
 class _InferenceRuntime:
     """Sets shape and type."""
 
     ShapeConstant = _ShapeConstant
+    def _get_tensor_shape(self, node: onnx.NodeProto) -> Tuple[int, ...]:
+        """Returns the shape of the tensor produced by a Constant node."""
+        if not node.attribute:
+            return ()
+        attr = node.attribute[0]
+        if attr.name == "value":
+            return tuple(attr.t.dims)
+        if attr.name in ("value_float", "value_int", "value_string"):
+            return ()
+        if attr.name == "value_floats":
+            return (len(attr.floats),)
+        if attr.name == "value_ints":
+            return (len(attr.ints),)
+        if attr.name == "value_strings":
+            return (len(attr.strings),)
+        return ()
+
+    def _get_tensor_type(self, node: onnx.NodeProto) -> int:
+        """Returns the element type of the tensor produced by a Constant node."""
+        if not node.attribute:
+            return onnx.TensorProto.FLOAT
+        attr = node.attribute[0]
+        if attr.name == "value":
+            return attr.t.data_type
+        if attr.name in ("value_float", "value_floats"):
+            return onnx.TensorProto.FLOAT
+        if attr.name in ("value_int", "value_ints"):
+            return onnx.TensorProto.INT64
+        if attr.name in ("value_string", "value_strings"):
+            return onnx.TensorProto.STRING
+        return onnx.TensorProto.FLOAT
 
     def make_dimension_name_if_necessary(
         self, a: Union[int, str], b: Union[int, str], op: str
