@@ -125,7 +125,7 @@ def get_parser_find() -> ArgumentParser:
         "--input",
         type=str,
         required=True,
-        help="onnx model to unlighten",
+        help="onnx model to search",
     )
     parser.add_argument(
         "-n",
