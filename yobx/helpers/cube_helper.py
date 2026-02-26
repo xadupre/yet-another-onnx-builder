@@ -612,7 +612,7 @@ class CubeLogs:
         return self
 
     def _process_formula(
-        self, formula: Union[str, Callable[[pandas.DataFrame], pandas.Series]]
+        self, formula: Callable[[pandas.DataFrame], pandas.Series]
     ) -> Callable[[pandas.DataFrame], Optional[pandas.Series]]:
         assert callable(formula), f"formula={formula!r} is not supported."
         return formula
