@@ -96,7 +96,14 @@ def to_dot(model: onnx.ModelProto) -> str:
         _unique[id_obj] = i
         return i
 
-    model = onnx.shape_inference.infer_shapes(model)
+    builder = None
+    try:
+        from ..xshape import BasicShapeBuilder
+
+        builder = BasicShapeBuilder()
+        builder.run_model(model)
+    except Exception:
+        builder = None
 
     op_type_colors = {
         "Shape": "#d2a81f",
@@ -108,8 +115,25 @@ def to_dot(model: onnx.ModelProto) -> str:
     }
 
     edge_label = {}
-    for val in model.graph.value_info:
-        edge_label[val.name] = _make_edge_label(val, multi_line=True)
+    if builder is not None:
+        for node in model.graph.node:
+            for name in node.output:
+                if name and builder.has_type(name) and builder.has_shape(name):
+                    itype = builder.get_type(name)
+                    if itype == onnx.TensorProto.UNDEFINED:
+                        continue
+                    shape = builder.get_shape(name)
+                    res = [
+                        str(a)
+                        for a in [
+                            ("?" if isinstance(s, str) and s.startswith("unk") else s)
+                            for s in shape
+                        ]
+                    ]
+                    sshape = ",".join(res)
+                    if len(sshape) > 30:
+                        sshape = ",\\n".join(res)
+                    edge_label[name] = f"{onnx_dtype_name(itype)}({sshape})"
 
     rows = [
         "digraph {",
