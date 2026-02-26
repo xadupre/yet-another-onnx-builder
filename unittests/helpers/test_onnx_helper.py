@@ -7,6 +7,7 @@ import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.helpers._onnx_simple_text_plot import onnx_simple_text_plot
 from yobx.helpers.onnx_helper import (
+    get_hidden_inputs,
     make_model_with_local_functions,
     make_subfunction,
     enumerate_results,
@@ -206,6 +207,70 @@ class TestOnnxHelper(ExtTestCase):
         )
         text = pretty_onnx(graph)
         self.assertIn("Add", text)
+
+    def test_get_hidden_inputs_no_hidden(self):
+        # All inputs are declared; no hidden inputs expected
+        graph = oh.make_graph(
+            [oh.make_node("Add", ["X", "Y"], ["Z"])],
+            "test",
+            [
+                oh.make_tensor_value_info("X", TFLOAT, [3, 4]),
+                oh.make_tensor_value_info("Y", TFLOAT, [3, 4]),
+            ],
+            [oh.make_tensor_value_info("Z", TFLOAT, [3, 4])],
+        )
+        self.assertEqual(get_hidden_inputs(graph), set())
+
+    def test_get_hidden_inputs_with_hidden(self):
+        # A node references "outer_val" which is not declared as a graph input
+        graph = oh.make_graph(
+            [oh.make_node("Add", ["X", "outer_val"], ["Z"])],
+            "test",
+            [oh.make_tensor_value_info("X", TFLOAT, [3, 4])],
+            [oh.make_tensor_value_info("Z", TFLOAT, [3, 4])],
+        )
+        self.assertEqual(get_hidden_inputs(graph), {"outer_val"})
+
+    def test_get_hidden_inputs_empty_names_excluded(self):
+        # Empty string inputs (optional/absent inputs) must not appear in the result
+        graph = oh.make_graph(
+            [oh.make_node("Add", ["X", ""], ["Z"])],
+            "test",
+            [oh.make_tensor_value_info("X", TFLOAT, [3, 4])],
+            [oh.make_tensor_value_info("Z", TFLOAT, [3, 4])],
+        )
+        self.assertEqual(get_hidden_inputs(graph), set())
+
+    def test_get_hidden_inputs_subgraph(self):
+        # A subgraph (e.g., an If branch) may reference variables from the outer graph.
+        # get_hidden_inputs on the inner graph returns those outer variables.
+        # get_hidden_inputs on the outer graph filters them out when they are in scope.
+        inner_graph = oh.make_graph(
+            [oh.make_node("Identity", ["outer_val"], ["res"])],
+            "inner",
+            [],
+            [oh.make_tensor_value_info("res", TFLOAT, [3, 4])],
+        )
+        if_node = oh.make_node(
+            "If",
+            ["cond"],
+            ["result"],
+            then_branch=inner_graph,
+            else_branch=inner_graph,
+        )
+        outer_graph = oh.make_graph(
+            [if_node],
+            "outer",
+            [
+                oh.make_tensor_value_info("cond", onnx.TensorProto.BOOL, []),
+                oh.make_tensor_value_info("outer_val", TFLOAT, [3, 4]),
+            ],
+            [oh.make_tensor_value_info("result", TFLOAT, [3, 4])],
+        )
+        # "outer_val" is declared in the outer graph, so it is not hidden there
+        self.assertEqual(get_hidden_inputs(outer_graph), set())
+        # "outer_val" is NOT declared in the inner graph, so it is hidden there
+        self.assertEqual(get_hidden_inputs(inner_graph), {"outer_val"})
 
     def test_onnx_simple_text_plot_add_links(self):
         model = oh.make_model(
