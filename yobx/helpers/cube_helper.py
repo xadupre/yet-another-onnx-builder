@@ -1468,9 +1468,12 @@ class CubeLogs:
 
         new_data = pandas.concat(data_list, axis=0)
         cube = self.clone(new_data, keys=[*self.keys_no_time, column_name])
-        key_index = set(self.keys_time) - {*columns_index, column_name}  # type: ignore[misc]
+        # Preserve the original ordering of self.keys_time while excluding
+        # the configuration columns and the added column_name
+        excluded_keys = set(columns_index) | {column_name}
+        key_index = [k for k in self.keys_time if k not in excluded_keys]
         view = CubeViewDef(
-            key_index=set(key_index),  # type: ignore[arg-type]
+            key_index=key_index,
             name="sbs",
             values=cube.values,
             keep_columns_in_index=[self.time],
