@@ -72,6 +72,37 @@ dictionary:
         arr = v if isinstance(v, np.ndarray) else v.numpy()
         print(f"  {k}: shape={arr.shape}, dtype={arr.dtype}")
 
+The higher-level helpers also handle **deeply nested** structures.  The
+next snippet serializes a dict whose values include a flat tensor *and* a
+list of tensors (typical for past-key-value caches in transformer models):
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from yobx.helpers.mini_onnx_builder import (
+        create_onnx_model_from_input_tensors,
+        create_input_tensors_from_onnx_model,
+    )
+
+    inputs = {
+        "input_ids": np.array([[1, 2, 3]], dtype=np.int64),
+        "past_key_values": [
+            np.zeros((1, 4, 6, 8), dtype=np.float32),   # layer 0 keys
+            np.zeros((1, 4, 6, 8), dtype=np.float32),   # layer 0 values
+        ],
+    }
+
+    proto = create_onnx_model_from_input_tensors(inputs)
+    restored = create_input_tensors_from_onnx_model(proto)
+
+    print("top-level keys:", list(restored.keys()))
+    print("input_ids     :", restored["input_ids"].shape)
+    print("past_key_values is a", type(restored["past_key_values"]).__name__,
+          "of length", len(restored["past_key_values"]))
+    for i, arr in enumerate(restored["past_key_values"]):
+        print(f"  [{i}]: shape={arr.shape}")
+
 ONNX Graph Visualization
 ========================
 
