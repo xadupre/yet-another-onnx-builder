@@ -1,7 +1,8 @@
+import inspect
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
-from yobx.helpers import string_type
+from yobx.ext_test_case import ExtTestCase, hide_stdout, requires_torch, requires_transformers
+from yobx.helpers import string_type, string_sig, string_signature
 from yobx.helpers.helper import flatten_object
 
 
@@ -489,6 +490,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("F", s)
         self.assertIn("s2x5", s)
 
+    @hide_stdout()
     @requires_torch("2.9")
     def test_string_tensor_verbose(self):
         import torch
@@ -497,6 +499,136 @@ class TestStringType(ExtTestCase):
         t = torch.rand(3, 4)
         s = _string_tensor(t, "T", with_shape=False, with_device=False, verbose=1)
         self.assertIn("r2", s)
+
+    @hide_stdout()
+    def test_string_type_verbose_none(self):
+        s = string_type(None, verbose=1)
+        self.assertEqual(s, "None")
+
+    @hide_stdout()
+    @requires_torch("2.9")
+    def test_string_type_verbose_tuple(self):
+        s = string_type((1, 2, 3), verbose=1)
+        self.assertIn("int", s)
+
+    @hide_stdout()
+    @requires_torch("2.9")
+    def test_string_type_verbose_list(self):
+        s = string_type([1, 2, 3], verbose=1)
+        self.assertIn("int", s)
+
+    @hide_stdout()
+    @requires_torch("2.9")
+    def test_string_type_verbose_dict(self):
+        s = string_type({"a": 1}, verbose=1)
+        self.assertIn("a:", s)
+
+    @hide_stdout()
+    def test_string_type_verbose_ndarray(self):
+        arr = np.array([1.0, 2.0, 3.0])
+        s = string_type(arr, with_shape=True, verbose=1)
+        self.assertIn("s3", s)
+
+
+class TestStringSignature(ExtTestCase):
+    def test_simple_function(self):
+        def foo(a, b):
+            pass
+
+        sig = inspect.signature(foo)
+        s = string_signature(sig)
+        self.assertIn("__call__", s)
+        self.assertIn("a", s)
+        self.assertIn("b", s)
+
+    def test_function_with_annotation(self):
+        def foo(a: int, b: str) -> float:
+            pass
+
+        sig = inspect.signature(foo)
+        s = string_signature(sig)
+        self.assertIn("__call__", s)
+        self.assertIn("int", s)
+        self.assertIn("str", s)
+        self.assertIn("float", s)
+
+    def test_function_with_default(self):
+        def foo(a, b=5):
+            pass
+
+        sig = inspect.signature(foo)
+        s = string_signature(sig)
+        self.assertIn("b = 5", s)
+
+    def test_function_no_return_annotation(self):
+        def foo(x):
+            pass
+
+        sig = inspect.signature(foo)
+        s = string_signature(sig)
+        self.assertIn("__call__", s)
+        self.assertNotIn("->", s)
+
+    def test_function_with_return_annotation(self):
+        def foo(x) -> int:
+            pass
+
+        sig = inspect.signature(foo)
+        s = string_signature(sig)
+        self.assertIn("-> <class 'int'>", s)
+
+
+class TestStringSig(ExtTestCase):
+    def test_function_no_kwargs(self):
+        def foo(a, b=2):
+            pass
+
+        s = string_sig(foo, {})
+        self.assertEqual(s, "foo()")
+
+    def test_function_kwargs_differ_from_default(self):
+        def foo(a=1, b=2):
+            pass
+
+        s = string_sig(foo, {"b": 99})
+        self.assertIn("b=99", s)
+        self.assertNotIn("a=", s)
+
+    def test_function_kwargs_same_as_default(self):
+        def foo(a=1, b=2):
+            pass
+
+        s = string_sig(foo, {"a": 1, "b": 2})
+        self.assertEqual(s, "foo()")
+
+    def test_function_no_default_in_kwargs(self):
+        def foo(a, b=2):
+            pass
+
+        s = string_sig(foo, {"a": 10})
+        self.assertIn("a=10", s)
+
+    def test_object_with_init(self):
+        class MyObj:
+            def __init__(self, x=1, y=2):
+                self.x = x
+                self.y = y
+
+        obj = MyObj(x=1, y=99)
+        s = string_sig(obj)
+        self.assertIn("MyObj", s)
+        self.assertIn("y=99", s)
+        self.assertNotIn("x=", s)
+
+    def test_object_all_defaults(self):
+        class MyObj:
+            def __init__(self, x=1, y=2):
+                self.x = x
+                self.y = y
+
+        obj = MyObj()
+        s = string_sig(obj)
+        self.assertEqual(s, "MyObj()")
 
 
 class TestFlattenObject(ExtTestCase):
