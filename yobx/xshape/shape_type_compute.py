@@ -1667,6 +1667,7 @@ _set_shape_type_op_any_known = {
     "LayerNormalization": _set_shape_type_op_any_layer_normalization,
     "LpNormalization": _set_shape_type_op_any_lp_normalization,
     "Log": _set_shape_type_op_any_unary,
+    "LogSoftmax": _set_shape_type_op_any_unary,
     "MatMul": _set_shape_type_op_any_matmul,
     "MaxPool": _set_shape_type_op_any_conv_max_pool,
     "NonZero": _set_shape_type_op_any_non_zero,
