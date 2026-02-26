@@ -927,6 +927,35 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("idx"), TINT64)
         self.assertEqual(b.get_shape("idx"), (3, 5))
 
+    def test_op_topk_axis0(self):
+        # TopK with axis=0: reduces the first dimension to k.
+        model = _make_model(
+            [oh.make_node("TopK", ["X", "k"], ["vals", "idx"], axis=0)],
+            [_mkv_("X", TFLOAT, [10, 4])],
+            [_mkv_("vals", TFLOAT, [3, 4]), _mkv_("idx", TINT64, [3, 4])],
+            [onh.from_array(np.array([3], dtype=np.int64), name="k")],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_shape("vals"), (3, 4))
+        self.assertEqual(b.get_type("vals"), TFLOAT)
+        self.assertEqual(b.get_shape("idx"), (3, 4))
+        self.assertEqual(b.get_type("idx"), TINT64)
+
+    def test_op_topk_dynamic_k(self):
+        # When k is a model input (not a constant), only rank can be inferred.
+        model = _make_model(
+            [oh.make_node("TopK", ["X", "k"], ["vals", "idx"])],
+            [_mkv_("X", TFLOAT, [3, 10]), _mkv_("k", TINT64, [1])],
+            [_mkv_("vals", TFLOAT, [3, 5]), _mkv_("idx", TINT64, [3, 5])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("vals"), TFLOAT)
+        self.assertEqual(b.get_type("idx"), TINT64)
+        self.assertEqual(b.get_rank("vals"), 2)
+        self.assertEqual(b.get_rank("idx"), 2)
+
     def test_op_unsqueeze(self):
         model = _make_model(
             [oh.make_node("Unsqueeze", ["X", "axes"], ["Y"])],
