@@ -56,7 +56,7 @@ def to_dot(model: onnx.ModelProto) -> str:
         :script: DOT-SECTION
         :process:
 
-        from onnx_diagnostic.helpers.dot_helper import to_dot
+        from yobx.helpers.dot_helper import to_dot
         from onnx_diagnostic.export.api import to_onnx
         from onnx_diagnostic.torch_export_patches import torch_export_patches
         from onnx_diagnostic.torch_models.hghub import get_untrained_model_with_inputs
@@ -74,7 +74,7 @@ def to_dot(model: onnx.ModelProto) -> str:
         :script: DOT-SECTION
         :process:
 
-        from onnx_diagnostic.helpers.dot_helper import to_dot
+        from yobx.helpers.dot_helper import to_dot
         from onnx_diagnostic.export.api import to_onnx
         from onnx_diagnostic.torch_export_patches import torch_export_patches
         from onnx_diagnostic.torch_models.hghub import get_untrained_model_with_inputs
