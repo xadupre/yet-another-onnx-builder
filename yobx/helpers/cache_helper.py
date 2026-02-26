@@ -410,51 +410,8 @@ def make_static_cache(
         dtype=key_value_pairs[0][0].dtype,
         max_cache_len=max_cache_len,
     )
-    ca = CacheKeyValue(cache)
-    assert ca.key_cache is not None and ca.value_cache is not None
-    if hasattr(cache, "layers") and len(ca.key_cache) == 0:
-        # transformers>= 4.55.2, layers are empty
-        for i, (key, value) in enumerate(key_value_pairs):
-            cache.update(key, value, i)
-        return cache
-
-    torch._check(
-        not hasattr(cache, "layers") or len(key_value_pairs) == len(cache.layers),
-        lambda: (
-            f"Length mismatch len(key_value_pairs)={len(key_value_pairs)}, "
-            f"len(cache.layers)={len(cache.layers)}"
-        ),
-    )
-    torch._check(
-        len(key_value_pairs) == len(ca.key_cache),
-        lambda: (
-            f"Length mismatch len(key_value_pairs)={len(key_value_pairs)}, "
-            f"len(ca.key_cache)={len(ca.key_cache)}"
-        ),
-    )
-    torch._check(
-        len(key_value_pairs) == len(ca.value_cache),
-        lambda: (
-            f"Length mismatch len(key_value_pairs)={len(key_value_pairs)}, "
-            f"len(ca.value_cache)={len(ca.value_cache)}"
-        ),
-    )
-    for i in range(len(key_value_pairs)):
-        assert (
-            key_value_pairs[i][0].shape == key_value_pairs[i][1].shape
-        ), f"Shape mismatch {key_value_pairs[i][0].shape} != {key_value_pairs[i][1].shape}"
-        d = key_value_pairs[i][1].shape[2]
-        ca.key_cache[i][:, :, :d, :] = key_value_pairs[i][0]
-        ca.value_cache[i][:, :, :d, :] = key_value_pairs[i][1]
-    if hasattr(cache, "layers") and len(key_value_pairs) < len(cache.layers):
-        # The cache constructor contains the two following lines
-        # (in cache_utils.py) which append empty layers when the cache is
-        # initialized. We need to remove them.
-        # self.num_hidden_layers = getattr(config, "num_hidden_layers", 1)
-        # self.append_new_layers(self.num_hidden_layers - 1)
-        cache.layers[:] = cache.layers[-len(key_value_pairs) :]
-    assert not hasattr(cache, "layers") or len(key_value_pairs) == len(cache.layers), (
-        f"Unexpected number of layers in the cache ({len(cache.layers)}), "
-        f"{len(key_value_pairs)} expected."
-    )
+    assert hasattr(cache, "layers"), f"Missing attribute 'layers' for {cache!r}"
+    # transformers>= 4.55.2, layers are empty
+    for i, (key, value) in enumerate(key_value_pairs):
+        cache.update(key, value, i)
     return finalize_cache(cache)

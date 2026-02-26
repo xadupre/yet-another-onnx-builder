@@ -169,7 +169,8 @@ class TestToNumpy(ExtTestCase):
         self.assertIsInstance(result, np.ndarray)
         self.assertEqual(result.shape, (2, 2))
         self.assertEqualArray(result, np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32))
-        
+
+
 @requires_torch("2.9")
 class TestOnnxDtypeToTorchDtype(ExtTestCase):
     @classmethod
