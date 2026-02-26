@@ -543,7 +543,7 @@ def _validate_graph(
             found.append(node)
     out = {o.name for o in g.output}
     ins = out & existing
-    assert ins == out, f"One output is missing, out={node.input}, existing={ins}, path={path}"
+    assert ins == out, f"One output is missing, out={out}, existing={ins}, path={path}"
     return found
 
 
