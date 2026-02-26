@@ -118,7 +118,7 @@ def get_parser_find() -> ArgumentParser:
             Look into a model and search for a set of names,
             tells which node is consuming or producing it.
             """),
-        epilog="Enables Some quick validation.",
+        epilog="Enables some quick validation.",
     )
     parser.add_argument(
         "-i",
