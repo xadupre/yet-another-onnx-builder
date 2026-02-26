@@ -786,7 +786,7 @@ def make_model_with_local_functions(
     ``'namespace'``. It is going to look into every value
     matching the regular expression and partition the nodes based
     on the unique values the regular expression finds.
-    Every set of nodes it replaced by a call to a local function.
+    Every set of nodes is replaced by a call to a local function.
 
     :param model: model proto
     :param regex: regular expression
