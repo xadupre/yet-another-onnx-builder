@@ -151,7 +151,6 @@ The resulting DOT source can be rendered directly in the documentation with the
 
 .. gdot::
     :script: DOT-SECTION
-    :process:
 
     import numpy as np
     import onnx
