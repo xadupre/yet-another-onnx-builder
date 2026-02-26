@@ -6,6 +6,7 @@ yobx.helpers
     :caption: modules
 
     cache_helper
+    cube_helper
     helper
     onnx_helper
     torch_helper
