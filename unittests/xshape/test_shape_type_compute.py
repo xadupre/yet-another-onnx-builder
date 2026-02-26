@@ -544,6 +544,32 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (2, 3, 4))
 
+    def test_op_instance_normalization(self):
+        model = _make_model(
+            [oh.make_node("InstanceNormalization", ["X", "sc", "bi"], ["Y"])],
+            [_mkv_("X", TFLOAT, [2, 3, 4])],
+            [_mkv_("Y", TFLOAT, [2, 3, 4])],
+            [
+                onh.from_array(np.ones(3, dtype=np.float32), name="sc"),
+                onh.from_array(np.zeros(3, dtype=np.float32), name="bi"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (2, 3, 4))
+
+    def test_op_lp_normalization(self):
+        model = _make_model(
+            [oh.make_node("LpNormalization", ["X"], ["Y"])],
+            [_mkv_("X", TFLOAT, [2, 3, 4])],
+            [_mkv_("Y", TFLOAT, [2, 3, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (2, 3, 4))
+
     def test_op_cast(self):
         model = _make_model(
             [oh.make_node("Cast", ["X"], ["Y"], to=TINT64)],
