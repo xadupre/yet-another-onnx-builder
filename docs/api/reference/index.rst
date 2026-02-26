@@ -10,9 +10,6 @@ yobx.reference
 ExtendedReferenceEvaluator
 ++++++++++++++++++++++++++
 
-ExtendedReferenceEvaluator
-++++++++++++++++++++++++++
-
-.. automodule:: yobx.reference.ExtendedReferenceEvaluator
+.. autoclass:: yobx.reference.ExtendedReferenceEvaluator
     :members:
     :no-undoc-members:
