@@ -656,6 +656,69 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 5))
 
+    def test_op_einsum_matmul(self):
+        model = _make_model(
+            [oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="ij,jk->ik")],
+            [_mkv_("X", TFLOAT, [3, 4]), _mkv_("Y", TFLOAT, [4, 5])],
+            [_mkv_("Z", TFLOAT, [3, 5])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Z"), TFLOAT)
+        self.assertEqual(b.get_shape("Z"), (3, 5))
+
+    def test_op_einsum_outer_product(self):
+        model = _make_model(
+            [oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="i,j->ij")],
+            [_mkv_("X", TFLOAT, [3]), _mkv_("Y", TFLOAT, [4])],
+            [_mkv_("Z", TFLOAT, [3, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Z"), TFLOAT)
+        self.assertEqual(b.get_shape("Z"), (3, 4))
+
+    def test_op_einsum_reduce(self):
+        model = _make_model(
+            [oh.make_node("Einsum", ["X"], ["Z"], equation="ij->i")],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Z", TFLOAT, [3])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Z"), TFLOAT)
+        self.assertEqual(b.get_shape("Z"), (3,))
+
+    def test_op_einsum_batched_matmul(self):
+        model = _make_model(
+            [oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="...ij,...jk->...ik")],
+            [_mkv_("X", TFLOAT, [2, 3, 4]), _mkv_("Y", TFLOAT, [2, 4, 5])],
+            [_mkv_("Z", TFLOAT, [2, 3, 5])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Z"), TFLOAT)
+        self.assertEqual(b.get_shape("Z"), (2, 3, 5))
+
+    def test_op_einsum_rank_only(self):
+        # When input shapes are unavailable, at least rank should be set.
+        model = _make_model(
+            [oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="ij,jk->ik")],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Z", TFLOAT, [3, 5])],
+        )
+        b = _TestShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_rank("X", 2)
+        b.set_type("Y", TFLOAT)
+        b.set_rank("Y", 2)
+        node = oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="ij,jk->ik")
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_einsum
+
+        _set_shape_type_op_any_einsum(b, node)
+        self.assertEqual(b.get_type("Z"), TFLOAT)
+        self.assertEqual(b.get_rank("Z"), 2)
+
     def test_op_matmul(self):
         model = _make_model(
             [oh.make_node("MatMul", ["X", "Y"], ["Z"])],
