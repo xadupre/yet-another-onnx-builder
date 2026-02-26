@@ -1170,6 +1170,15 @@ def max_diff(
             return dict(abs=np.inf, rel=np.inf, sum=np.inf, n=np.inf, dnan=np.inf)
         return max_diff(list(expected.values()), got, debug_info=_debug("dict2"), **_dkws)
 
+    is_expected_ort = expected.__class__.__name__ == "OrtValue"
+    is_got_ort = got.__class__.__name__ == "OrtValue"
+    if is_expected_ort or is_got_ort:
+        if is_expected_ort:
+            expected = expected.numpy()
+        if is_got_ort:
+            got = got.numpy()
+        return max_diff(expected, got, debug_info=_debug("OrtValue"), **_dkws)
+
     import torch
 
     if isinstance(expected, np.ndarray) or isinstance(got, np.ndarray):
@@ -1561,4 +1570,49 @@ def max_diff(
         f"Not implemented with implemented with expected="
         f"{string_type(expected)} ({type(expected)}), got={string_type(got)},\n"
         f"level={level}"
+    )
+
+
+def string_diff(
+    expected: Any,
+    got: Any,
+    verbose: int = 0,
+    level: int = 0,
+    flatten: bool = False,
+    debug_info: Optional[List[str]] = None,
+    begin: int = 0,
+    end: int = -1,
+    hist: Optional[Union[bool, List[float]]] = None,
+    skip_none: bool = False,
+) -> str:
+    """
+    Computes :func:`max_diff` and returns the discrepancies as a single string.
+
+    :param expected: first tensor, array or structure
+    :param got: second tensor, array or structure
+    :param verbose: verbosity
+    :param level: recursion level
+    :param flatten: flatten outputs
+    :param debug_info: debug information
+    :param begin: first output to consider
+    :param end: last output to consider (-1 for the last one)
+    :param hist: compute a histogram of the discrepancies
+    :param skip_none: skips None values
+    :return: formatted string with discrepancies
+    """
+    res = max_diff(
+        expected,
+        got,
+        verbose=verbose,
+        level=level,
+        flatten=flatten,
+        debug_info=debug_info,
+        begin=begin,
+        end=end,
+        hist=hist,
+        skip_none=skip_none,
+    )
+    return (
+        f"abs={res['abs']:.3g} rel={res['rel']:.3g} "
+        f"sum={res['sum']:.3g} n={res['n']:.3g} dnan={res['dnan']:.3g}"
     )

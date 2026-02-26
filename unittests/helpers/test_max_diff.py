@@ -1,8 +1,13 @@
 import math
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
-from yobx.helpers import max_diff
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_onnxruntime,
+    requires_torch,
+    requires_transformers,
+)
+from yobx.helpers import max_diff, string_diff
 
 
 class TestMaxDiffNone(ExtTestCase):
@@ -398,6 +403,49 @@ class TestMaxDiffDynamicCache(ExtTestCase):
         cache.update(key, value, layer_idx=0)
         res = max_diff(cache, cache)
         self.assertEqual(res["abs"], 0.0)
+
+
+@requires_onnxruntime("1.18")
+class TestStringDiffOrtValue(ExtTestCase):
+    def test_identical_ortvalues(self):
+        import onnxruntime as ort
+
+        a = ort.OrtValue.ortvalue_from_numpy(np.array([1.0, 2.0, 3.0]))
+        s = string_diff(a, a)
+        self.assertIn("abs=0", s)
+        self.assertIn("rel=0", s)
+
+    def test_different_ortvalues(self):
+        import onnxruntime as ort
+
+        a = ort.OrtValue.ortvalue_from_numpy(np.array([1.0, 2.0, 3.0]))
+        b = ort.OrtValue.ortvalue_from_numpy(np.array([1.0, 2.0, 4.0]))
+        s = string_diff(a, b)
+        self.assertIn("abs=1", s)
+
+    def test_ortvalue_vs_numpy(self):
+        import onnxruntime as ort
+
+        a = ort.OrtValue.ortvalue_from_numpy(np.array([1.0, 2.0, 3.0]))
+        b = np.array([1.0, 2.0, 3.0])
+        s = string_diff(a, b)
+        self.assertIn("abs=0", s)
+
+    def test_ortvalue_max_diff_identical(self):
+        import onnxruntime as ort
+
+        a = ort.OrtValue.ortvalue_from_numpy(np.array([1.0, 2.0, 3.0]))
+        res = max_diff(a, a)
+        self.assertEqual(res["abs"], 0.0)
+        self.assertEqual(res["dnan"], 0.0)
+
+    def test_ortvalue_max_diff_different(self):
+        import onnxruntime as ort
+
+        a = ort.OrtValue.ortvalue_from_numpy(np.array([1.0, 2.0]))
+        b = ort.OrtValue.ortvalue_from_numpy(np.array([1.0, 5.0]))
+        res = max_diff(a, b)
+        self.assertEqual(res["abs"], 3.0)
 
 
 if __name__ == "__main__":
