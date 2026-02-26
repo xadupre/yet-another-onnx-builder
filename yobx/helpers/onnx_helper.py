@@ -149,7 +149,7 @@ def pretty_onnx(
         if att.type == onnx.AttributeProto.STRING:
             return f"{att.name}={att.s!r}"
         if att.type == onnx.AttributeProto.TENSOR:
-            v = onh.from_array(att.t)
+            v = onh.to_array(att.t)
             assert hasattr(v, "reshape"), f"not a tensor {type(v)}"
             assert hasattr(v, "shape"), f"not a tensor {type(v)}"
             vf = v.reshape((-1,))
