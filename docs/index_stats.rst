@@ -19,6 +19,7 @@ With the following versions:
     import onnx_ir
     import onnxruntime
     import onnxscript
+    import optree
     import torch
     import transformers
 

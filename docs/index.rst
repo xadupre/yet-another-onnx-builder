@@ -11,7 +11,7 @@ yet-another-onnx-builder documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption:
+   :caption: API
 
    api/index
    index_stats
