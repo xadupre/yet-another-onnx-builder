@@ -811,12 +811,14 @@ def _set_shape_type_op_any_matmul(self: ShapeBuilder, node: NodeProto):
 
 
 def _set_shape_type_op_any_non_zero(self: ShapeBuilder, node: NodeProto):
-    "Sets the output shape for node type NonZro."
+    "Sets the output shape for node type NonZero."
     self.set_type(node.output[0], TensorProto.INT64)
     if self.has_rank(node.input[0]):
         new_shape = (self.get_rank(node.input[0]), self.unique_dimension_name("NEWDIM_nonzero"))
         self.set_shape(node.output[0], new_shape)
         return new_shape
+    # Output is always 2D: (rank_of_input, num_nonzero_elements)
+    self.set_rank(node.output[0], 2)
     assert not self._debug_shape_missing, (
         f"Unable to compute shape for node: "
         f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
