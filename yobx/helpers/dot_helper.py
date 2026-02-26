@@ -54,36 +54,38 @@ def to_dot(model: onnx.ModelProto) -> str:
 
     .. gdot::
         :script: DOT-SECTION
-        :process:
 
+        import numpy as np
+        import onnx
+        import onnx.helper as oh
+        import onnx.numpy_helper as onh
         from yobx.helpers.dot_helper import to_dot
-        from onnx_diagnostic.export.api import to_onnx
-        from onnx_diagnostic.torch_export_patches import torch_export_patches
-        from onnx_diagnostic.torch_models.hghub import get_untrained_model_with_inputs
 
-        data = get_untrained_model_with_inputs("arnir0/Tiny-LLM")
-        model, inputs, ds = data["model"], data["inputs"], data["dynamic_shapes"]
-        with torch_export_patches(patch_transformers=True):
-            em = to_onnx(model, inputs, dynamic_shapes=ds, exporter="custom")
-        dot = to_dot(em.model_proto)
-        print("DOT-SECTION", dot)
-
-    Or this one obtained with :func:`torch.onnx.export`.
-
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
-
-        from yobx.helpers.dot_helper import to_dot
-        from onnx_diagnostic.export.api import to_onnx
-        from onnx_diagnostic.torch_export_patches import torch_export_patches
-        from onnx_diagnostic.torch_models.hghub import get_untrained_model_with_inputs
-
-        data = get_untrained_model_with_inputs("arnir0/Tiny-LLM")
-        model, inputs, ds = data["model"], data["inputs"], data["dynamic_shapes"]
-        with torch_export_patches(patch_transformers=True):
-            em = to_onnx(model, kwargs=inputs, dynamic_shapes=ds, exporter="onnx-dynamo")
-        dot = to_dot(em.model_proto)
+        TFLOAT = onnx.TensorProto.FLOAT
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Add", ["X", "Y"], ["added"]),
+                    oh.make_node("MatMul", ["added", "W"], ["mm"]),
+                    oh.make_node("Relu", ["mm"], ["Z"]),
+                ],
+                "add_matmul_relu",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq", 4]),
+                    oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq", 4]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, ["batch", "seq", 2])],
+                [
+                    onh.from_array(
+                        np.zeros((4, 2), dtype=np.float32),
+                        name="W",
+                    )
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        dot = to_dot(model)
         print("DOT-SECTION", dot)
     """
     _unique: Dict[int, int] = {}
