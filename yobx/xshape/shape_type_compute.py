@@ -461,6 +461,16 @@ def _set_shape_type_op_any_layer_normalization(self: ShapeBuilder, node: NodePro
     return None if set(res) == {None} else res
 
 
+def _set_shape_type_op_any_instance_normalization(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for node type InstanceNormalization."
+    return set_type_shape_unary_op(self, node.output[0], node.input[0])
+
+
+def _set_shape_type_op_any_lp_normalization(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for node type LpNormalization."
+    return set_type_shape_unary_op(self, node.output[0], node.input[0])
+
+
 def _set_shape_type_op_any_cast(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Cast."
     return set_type_shape_unary_op(
@@ -1651,9 +1661,11 @@ _set_shape_type_op_any_known = {
     "Gemm": _set_shape_type_op_any_gemm,
     "GlobalAveragePool": _set_shape_type_op_any_global_pool,
     "GlobalMaxPool": _set_shape_type_op_any_global_pool,
+    "InstanceNormalization": _set_shape_type_op_any_instance_normalization,
     "IsInf": lambda *args: _set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
     "IsNaN": lambda *args: _set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
     "LayerNormalization": _set_shape_type_op_any_layer_normalization,
+    "LpNormalization": _set_shape_type_op_any_lp_normalization,
     "Log": _set_shape_type_op_any_unary,
     "MatMul": _set_shape_type_op_any_matmul,
     "MaxPool": _set_shape_type_op_any_conv_max_pool,
