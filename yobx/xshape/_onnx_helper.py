@@ -215,7 +215,7 @@ def replace_static_dimensions_by_strings(
                 shape.append(f"DIM{d.dim_value}")
             else:
                 shape.append(d.dim_param or d.dim_value)
-            mapping[shape[-1]] = d.dim_param or d.dim_value
+            mapping[shape[-1]] = d.dim_param or d.dim_value  # type: ignore[index]
         new_inputs.append(oh.make_tensor_value_info(i.name, i.type.tensor_type.elem_type, shape))
     new_outputs = []
     for i in model.graph.output:
@@ -228,7 +228,7 @@ def replace_static_dimensions_by_strings(
                 shape.append(f"DIM{d.dim_value}")
             else:
                 shape.append(d.dim_param or d.dim_value)
-            mapping[shape[-1]] = d.dim_param or d.dim_value
+            mapping[shape[-1]] = d.dim_param or d.dim_value  # type: ignore[index]
         new_outputs.append(oh.make_tensor_value_info(i.name, i.type.tensor_type.elem_type, shape))
     model = oh.make_model(
         oh.make_graph(
@@ -237,7 +237,8 @@ def replace_static_dimensions_by_strings(
             new_inputs,
             new_outputs,
             model.graph.initializer,
-            model.graph.sparse_initializer,
+            sparse_initializer=model.graph.sparse_initializer,
+            doc_string=model.doc_string,
         ),
         opset_imports=model.opset_import,
         ir_version=model.ir_version,

@@ -139,7 +139,7 @@ module = [
 ignore_errors = true
 
 [tool.pyrefly]
-implicit-import = false
+ignore-implicit-import = ["*"]
 ignore-missing-imports = ["*"]
 project-includes = ["yobx/**/*.py"]
 project-excludes = [

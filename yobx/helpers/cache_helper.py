@@ -82,7 +82,7 @@ class CacheKeyValue:
         """Does the reverse operation."""
         assert self.key_cache is not None and self.value_cache is not None
         return make_dynamic_cache(
-            list(zip(self.key_cache, self.value_cache)),
+            list(zip(self.key_cache, self.value_cache)),  # pyrefly: ignore[no-matching-overload]
             cls_layers=self.cls_layers,  # pyrefly: ignore[no-matching-overload]
         )
 
@@ -127,7 +127,7 @@ def flatten_unflatten_for_dynamic_shapes(
     """
     if isinstance(obj, torch.Tensor):
         return change_function(obj) if change_function else obj
-    flat, spec = torch.utils._pytree.tree_flatten(obj)
+    flat, spec = torch.utils._pytree.tree_flatten(obj)  # pyrefly: ignore[implicit-import]
     start = 0
     end = 0
     subtrees = []
