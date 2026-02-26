@@ -97,5 +97,68 @@ class TestTorchDtypeToOnnxDtype(ExtTestCase):
             self.convert(_FakeSymbolicTensor("UNKNOWN"))
 
 
+@requires_torch("2.9")
+class TestOnnxDtypeToTorchDtype(ExtTestCase):
+    @classmethod
+    def setUpClass(cls):
+        import torch
+
+        cls.torch = torch
+
+    def setUp(self):
+        from yobx.helpers.torch_helper import onnx_dtype_to_torch_dtype
+
+        self.convert = onnx_dtype_to_torch_dtype
+
+    def test_float32(self):
+        self.assertEqual(self.convert(onnx.TensorProto.FLOAT), self.torch.float32)
+
+    def test_float16(self):
+        self.assertEqual(self.convert(onnx.TensorProto.FLOAT16), self.torch.float16)
+
+    def test_bfloat16(self):
+        self.assertEqual(self.convert(onnx.TensorProto.BFLOAT16), self.torch.bfloat16)
+
+    def test_float64(self):
+        self.assertEqual(self.convert(onnx.TensorProto.DOUBLE), self.torch.float64)
+
+    def test_int32(self):
+        self.assertEqual(self.convert(onnx.TensorProto.INT32), self.torch.int32)
+
+    def test_int64(self):
+        self.assertEqual(self.convert(onnx.TensorProto.INT64), self.torch.int64)
+
+    def test_uint32(self):
+        self.assertEqual(self.convert(onnx.TensorProto.UINT32), self.torch.uint32)
+
+    def test_uint64(self):
+        self.assertEqual(self.convert(onnx.TensorProto.UINT64), self.torch.uint64)
+
+    def test_bool(self):
+        self.assertEqual(self.convert(onnx.TensorProto.BOOL), self.torch.bool)
+
+    def test_int16(self):
+        self.assertEqual(self.convert(onnx.TensorProto.INT16), self.torch.int16)
+
+    def test_uint16(self):
+        self.assertEqual(self.convert(onnx.TensorProto.UINT16), self.torch.uint16)
+
+    def test_int8(self):
+        self.assertEqual(self.convert(onnx.TensorProto.INT8), self.torch.int8)
+
+    def test_uint8(self):
+        self.assertEqual(self.convert(onnx.TensorProto.UINT8), self.torch.uint8)
+
+    def test_complex64(self):
+        self.assertEqual(self.convert(onnx.TensorProto.COMPLEX64), self.torch.complex64)
+
+    def test_complex128(self):
+        self.assertEqual(self.convert(onnx.TensorProto.COMPLEX128), self.torch.complex128)
+
+    def test_unknown_raises(self):
+        with self.assertRaises(NotImplementedError):
+            self.convert(onnx.TensorProto.STRING)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

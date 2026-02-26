@@ -39,10 +39,15 @@ class CacheKeyValue:
         capi.value_cache
     """
 
+    key_cache: Optional[List[Any]]
+    value_cache: Optional[List[Any]]
+    cls_layers: Optional[Union[str, List[type]]]
+
     def __init__(
         self, cache: Optional[Any] = None, cls_layers: Optional[Union[str, List[type]]] = None
     ):
         if hasattr(cache, "layers"):
+            assert cache is not None
             layers = [
                 layer
                 for layer in cache.layers
@@ -75,6 +80,7 @@ class CacheKeyValue:
 
     def make_dynamic_cache(self):
         """Does the reverse operation."""
+        assert self.key_cache is not None and self.value_cache is not None
         return make_dynamic_cache(
             list(zip(self.key_cache, self.value_cache)), cls_layers=self.cls_layers
         )
@@ -86,11 +92,13 @@ class CacheKeyValue:
 
     def __len__(self) -> int:
         "Returns the number of tensors."
-        return len(self.key_cache) + len(self.value_cache)
+        return len(self.key_cache or []) + len(self.value_cache or [])
 
     def aslist(self) -> List[torch.Tensor]:
         "Returns tensors in a list."
-        res = []
+        res: List[torch.Tensor] = []
+        if self.key_cache is None or self.value_cache is None:
+            return res
         for i in range(self.n_layers):
             res.append(self.key_cache[i])
             res.append(self.value_cache[i])
@@ -403,6 +411,7 @@ def make_static_cache(
         max_cache_len=max_cache_len,
     )
     ca = CacheKeyValue(cache)
+    assert ca.key_cache is not None and ca.value_cache is not None
     if hasattr(cache, "layers") and len(ca.key_cache) == 0:
         # transformers>= 4.55.2, layers are empty
         for i, (key, value) in enumerate(key_value_pairs):

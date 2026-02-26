@@ -953,7 +953,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (3, 4))
 
     def test_op_squeeze_no_axes(self):
-        # No axes input and no attribute – all size-1 dimensions are removed.
+        # No axes input and no attribute - all size-1 dimensions are removed.
         model = _make_model(
             [oh.make_node("Squeeze", ["X"], ["Y"])],
             [_mkv_("X", TFLOAT, [1, 3, 1, 4])],
