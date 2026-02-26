@@ -576,7 +576,7 @@ def _validate_function(g: onnx.FunctionProto, verbose: int = 0, watch: Optional[
     ins = out & existing
     if ins != out:
         raise AssertionError(
-            f"One output is missing, out={node.input}, existing={ins}, path={g.name}"
+            f"One output is missing, out={out}, existing={ins}, path={g.name}"
         )
     return found
 
