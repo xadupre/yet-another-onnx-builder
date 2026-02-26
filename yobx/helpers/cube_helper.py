@@ -612,7 +612,7 @@ class CubeLogs:
         return self
 
     def _process_formula(
-        self, formula: Union[str, Callable[[pandas.DataFrame], pandas.Series]]
+        self, formula: Callable[[pandas.DataFrame], pandas.Series]
     ) -> Callable[[pandas.DataFrame], Optional[pandas.Series]]:
         assert callable(formula), f"formula={formula!r} is not supported."
         return formula
@@ -1201,7 +1201,7 @@ class CubeLogs:
         with pandas.ExcelWriter(output, engine="openpyxl") as writer:
             if main:
                 assert main not in views, f"{main!r} is duplicated in views {sorted(views)}"
-                df = self.describe().sort_values("name")
+                df = self.describe().sort_index()
                 if verbose:
                     print(f"[CubeLogs.to_excel] add sheet {main!r} with shape {df.shape}")
                 df.to_excel(writer, sheet_name=main, freeze_panes=(1, 1))
@@ -1220,7 +1220,7 @@ class CubeLogs:
                     if aligned is not None:
                         assert aligned.shape == df.shape, (
                             f"Shape mismatch between the view {df.shape} and the mask "
-                            f"{time_mask_view[name].shape}"
+                            f"{aligned.shape}"
                         )
                         time_mask_view[name] = aligned
                         if verbose:
@@ -1468,9 +1468,12 @@ class CubeLogs:
 
         new_data = pandas.concat(data_list, axis=0)
         cube = self.clone(new_data, keys=[*self.keys_no_time, column_name])
-        key_index = set(self.keys_time) - {*columns_index, column_name}  # type: ignore[misc]
+        # Preserve the original ordering of self.keys_time while excluding
+        # the configuration columns and the added column_name
+        excluded_keys = set(columns_index) | {column_name}
+        key_index = [k for k in self.keys_time if k not in excluded_keys]
         view = CubeViewDef(
-            key_index=set(key_index),  # type: ignore[arg-type]
+            key_index=key_index,
             name="sbs",
             values=cube.values,
             keep_columns_in_index=[self.time],
