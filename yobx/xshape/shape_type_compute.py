@@ -1380,9 +1380,7 @@ def _set_shape_type_op_any_unsqueeze(self: ShapeBuilder, node: NodeProto):
             if self.has_shape(node.input[1]):
                 n_axes = self.get_shape(node.input[1])
                 if n_axes and isinstance(n_axes[0], int):
-                    self.set_rank(
-                        node.output[0], self.get_rank(node.input[0]) + n_axes[0]
-                    )
+                    self.set_rank(node.output[0], self.get_rank(node.input[0]) + n_axes[0])
                     return True
             assert not self._debug_shape_missing, (
                 f"Unable to compute shape for node: "
@@ -1482,9 +1480,7 @@ def _set_shape_type_op_any_squeeze(self: ShapeBuilder, node: NodeProto):
             if self.has_shape(node.input[1]):
                 n_axes = self.get_shape(node.input[1])
                 if n_axes and isinstance(n_axes[0], int):
-                    self.set_rank(
-                        node.output[0], self.get_rank(node.input[0]) - n_axes[0]
-                    )
+                    self.set_rank(node.output[0], self.get_rank(node.input[0]) - n_axes[0])
                     return True
             assert not self._debug_shape_missing, (
                 f"Unable to compute shape for node: "
