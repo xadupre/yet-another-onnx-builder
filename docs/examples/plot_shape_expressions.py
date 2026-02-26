@@ -15,6 +15,38 @@ This example walks through several common patterns:
 * **Automatic simplification** — ``d + f - f`` → ``d``, ``2*x//2`` → ``x``
 * **Evaluation** — resolving symbolic shapes to concrete integers once the
   actual dimension values are known
+
+How it works
+------------
+
+:class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+walks every node of the ONNX graph in order.  For each node it calls an
+op-specific handler (defined in :mod:`yobx.xshape.shape_type_compute`) that
+derives the output shape from the input shapes.  When a dimension cannot be
+expressed as a plain integer it is stored as a Python-arithmetic string
+(e.g. ``"seq1+seq2"``, ``"c//2"``).  Before storing, the string is
+normalised by
+:func:`simplify_expression <yobx.xshape.simplify_expressions.simplify_expression>`,
+which uses Python's :mod:`ast` module to cancel identical sub-expressions
+(``d + f - f`` → ``d``) and fold constants (``2 * seq // 2`` → ``seq``).
+Once the actual input sizes are available at runtime, every symbolic
+dimension can be resolved to an integer by
+:func:`evaluate_expression <yobx.xshape.evaluate_expressions.evaluate_expression>`
+or the higher-level
+:meth:`evaluate_shape <yobx.xshape.ShapeBuilder.evaluate_shape>`.
+
+For a deeper description of the design, see the
+:ref:`ShapeBuilder design page <l-shape-builder-design>`.
+
+See also
+--------
+
+* :class:`yobx.xshape.shape_builder_impl.BasicShapeBuilder` — main implementation
+* :func:`yobx.xshape.simplify_expressions.simplify_expression` — expression
+  canonicalisation
+* :func:`yobx.xshape.evaluate_expressions.evaluate_expression` — expression
+  evaluation
+* :mod:`yobx.xshape.shape_type_compute` — per-operator shape handlers
 """
 
 # %%

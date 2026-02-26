@@ -1,4 +1,6 @@
 
+.. _l-shape-builder-design:
+
 ============
 ShapeBuilder
 ============
