@@ -1,5 +1,6 @@
 import enum
 import inspect
+import json
 from dataclasses import is_dataclass, fields
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
@@ -1562,3 +1563,77 @@ def max_diff(
         f"{string_type(expected)} ({type(expected)}), got={string_type(got)},\n"
         f"level={level}"
     )
+
+
+def string_diff(diff: Dict[str, Any], js: bool = False, ratio: bool = False, **kwargs) -> str:
+    """
+    Renders discrepancies returned by :func:`max_diff` into one string.
+
+    :param diff: differences returned by :func:`max_diff`
+    :param js: json format
+    :param ratio: display mismatch ratio (requires ``js=True``)
+    :param kwargs: additional values to add in the json format
+    :return: str
+
+    .. runpython::
+        :showcode:
+
+        import numpy as np
+        from yobx.helpers import max_diff, string_diff, string_type
+
+        # VirtualTensor is a lightweight placeholder used for dynamic shape tracing.
+        # string_type recognises it by class name so no torch import is needed here.
+        class VirtualTensor:
+            def __init__(self, name, dtype, shape):
+                self.name = name
+                self.dtype = dtype
+                self.shape = shape
+
+        vt = VirtualTensor("x", "float32", (2, 3))
+        print("string_type:", string_type(vt))
+
+        # Compare two numpy arrays and display the discrepancies as a string.
+        a = np.array([1.0, 2.0, 3.0])
+        b = np.array([1.0, 2.5, 3.0])
+        diff = max_diff(a, b)
+        print("string_diff:", string_diff(diff))
+    """
+    if js:
+        if "rep" in diff:
+            rep = diff["rep"]
+            diff = {**{k: v for k, v in diff.items() if k != "rep"}, **rep}
+            if ratio:
+                for k, v in rep.items():
+                    diff[f"%{k}"] = v / diff["n"]
+                diff["mean"] = diff["sum"] / diff["n"]
+            diff.update(kwargs)
+        return json.dumps(diff)
+
+    # dict(abs=, rel=, sum=, n=n_diff, dnan=)
+    if "dev" in diff:
+        ddiff = {k: v for k, v in diff.items() if k != "dev"}
+        return f"{string_diff(ddiff)}, dev={diff['dev']}"
+    suffix = ""
+    if "rep" in diff:
+        rows = []
+        for k, v in diff["rep"].items():
+            if v > 0:
+                rows.append(f"#{v}{k}")
+        suffix = "-".join(rows)
+        suffix = f"/{suffix}"
+    if "argm" in diff:
+        sa = (
+            ",".join(map(str, diff["argm"]))
+            if isinstance(diff["argm"], tuple)
+            else str(diff["argm"])
+        )
+        suffix += f",amax={sa}"
+    if diff.get("dnan", None):
+        if diff["abs"] == 0 or diff["rel"] == 0:
+            return f"abs={diff['abs']}, rel={diff['rel']}, dnan={diff['dnan']}{suffix}"
+        return (
+            f"abs={diff['abs']}, rel={diff['rel']}, n={diff['n']}, dnan={diff['dnan']}{suffix}"
+        )
+    if diff["abs"] == 0 or diff["rel"] == 0:
+        return f"abs={diff['abs']}, rel={diff['rel']}{suffix}"
+    return f"abs={diff['abs']}, rel={diff['rel']}, n={diff['n']}{suffix}"

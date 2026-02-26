@@ -2,7 +2,7 @@ import math
 import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
-from yobx.helpers import max_diff
+from yobx.helpers import max_diff, string_diff
 
 
 class TestMaxDiffNone(ExtTestCase):
@@ -398,6 +398,110 @@ class TestMaxDiffDynamicCache(ExtTestCase):
         cache.update(key, value, layer_idx=0)
         res = max_diff(cache, cache)
         self.assertEqual(res["abs"], 0.0)
+
+
+class TestStringDiff(ExtTestCase):
+    @requires_torch("2.9")
+    def test_identical_arrays(self):
+        a = np.array([1.0, 2.0, 3.0])
+        diff = max_diff(a, a.copy())
+        s = string_diff(diff)
+        self.assertIn("abs=0", s)
+        self.assertIn("rel=0", s)
+
+    @requires_torch("2.9")
+    def test_different_arrays(self):
+        a = np.array([1.0, 2.0])
+        b = np.array([1.0, 3.0])
+        diff = max_diff(a, b)
+        s = string_diff(diff)
+        self.assertIn("abs=", s)
+        self.assertIn("rel=", s)
+        self.assertIn("n=", s)
+
+    @requires_torch("2.9")
+    def test_with_nan(self):
+        a = np.array([1.0, float("nan"), 3.0])
+        b = np.array([1.0, 2.0, 3.0])
+        diff = max_diff(a, b)
+        s = string_diff(diff)
+        self.assertIn("dnan=", s)
+
+    @requires_torch("2.9")
+    def test_js_format(self):
+        import json
+
+        a = np.array([1.0, 2.0])
+        b = np.array([1.0, 3.0])
+        diff = max_diff(a, b)
+        s = string_diff(diff, js=True)
+        obj = json.loads(s)
+        self.assertIn("abs", obj)
+        self.assertIn("rel", obj)
+
+    @requires_torch("2.9")
+    def test_js_format_with_kwargs(self):
+        import json
+
+        a = np.array([1.0, 2.0])
+        b = np.array([1.0, 3.0])
+        diff = max_diff(a, b, hist=True)
+        s = string_diff(diff, js=True, tag="test")
+        obj = json.loads(s)
+        self.assertEqual(obj["tag"], "test")
+
+    @requires_torch("2.9")
+    def test_with_hist(self):
+        a = np.array([1.0, 2.0])
+        b = np.array([1.0, 2.1])
+        diff = max_diff(a, b, hist=True)
+        s = string_diff(diff)
+        self.assertIn("abs=", s)
+
+    @requires_torch("2.9")
+    def test_virtual_tensor_string_type(self):
+        from yobx.helpers import string_type
+
+        class VirtualTensor:
+            def __init__(self, name, dtype, shape):
+                self.name = name
+                self.dtype = dtype
+                self.shape = shape
+
+        vt = VirtualTensor("x", "float32", (2, 3))
+        s = string_type(vt)
+        self.assertIn("VirtualTensor", s)
+        self.assertIn("name='x'", s)
+        self.assertIn("float32", s)
+
+    @requires_torch("2.9")
+    def test_with_argm(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = np.array([1.0, 2.0, 5.0])
+        diff = max_diff(a, b)
+        s = string_diff(diff)
+        self.assertIn("amax=", s)
+
+    @requires_torch("2.9")
+    def test_with_dev_field(self):
+        import torch
+
+        a = torch.tensor([1.0, 2.0])
+        b = torch.tensor([1.0, 2.0])
+        diff = max_diff(a, b)
+        s = string_diff(diff)
+        self.assertIn("dev=", s)
+
+    @requires_torch("2.9")
+    def test_js_with_rep(self):
+        import json
+
+        a = np.array([1.0, 2.0])
+        b = np.array([1.0, 2.1])
+        diff = max_diff(a, b, hist=True)
+        s = string_diff(diff, js=True, ratio=True)
+        obj = json.loads(s)
+        self.assertIn("mean", obj)
 
 
 if __name__ == "__main__":
