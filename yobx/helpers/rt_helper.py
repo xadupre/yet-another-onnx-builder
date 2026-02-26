@@ -4,18 +4,11 @@ import onnx
 from .helper import flatten_object, string_type
 
 
-def _torch_tree_unflatten(value):
-    import torch
-
-    return torch.utils._pytree.tree_flatten(value)
-
-
 def make_feeds(
     proto: Union[onnx.ModelProto, Sequence[str]],
     inputs: Any,
     use_numpy: bool = False,
     copy: bool = False,
-    check_flatten: bool = True,
     is_modelbuilder: bool = False,
 ) -> Dict[str, Union["torch.Tensor", np.ndarray]]:  # noqa: F821
     """
@@ -27,8 +20,6 @@ def make_feeds(
     :param use_numpy: if True, converts torch tensors into numpy arrays
     :param copy: a copy is made, this should be the case if the inputs is ingested
         by ``OrtValue``
-    :param check_flatten: if True, checks the ``torch.utils._pytree.tree_flatten``
-        returns the same number of outputs
     :param is_modelbuilder: if True, the exporter is ModelBuilder, and we need to reorder
         the past_key_values inputs to match the expected order, and get rid of position_ids.
     :return: feeds dictionary
@@ -54,16 +45,6 @@ def make_feeds(
         inputs.pop("position_ids", None)  # Ensure 'position_ids' absent before removing.
 
     flat = flatten_object(inputs, drop_keys=True)
-    assert (
-        not check_flatten
-        or not all(isinstance(obj, torch.Tensor) for obj in flat)
-        # or not is_cache_dynamic_registered(fast=True)
-        or len(flat) == len(_torch_tree_unflatten(inputs)[0])
-    ), (
-        f"Unexpected number of flattened objects, "
-        f"{string_type(flat, with_shape=True)} != "
-        f"{string_type(_torch_tree_unflatten(inputs)[0], with_shape=True)}"
-    )
     if use_numpy:
         import torch
         from .torch_helper import to_numpy

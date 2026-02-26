@@ -115,10 +115,9 @@ backend_test.exclude(
     "(affine_grid|array_feature_extractor|binarizer|label_encoder|attention"
     "|bitwise|averagepool"
     "|center_crop|col2im|compress|conv"
-    "|det|dft|einsum|fft"
+    "|det|dft|fft"
     "|gridsample|group_normalization|gru"
-    "|hardmax|instancenorm|l1normalization"
-    "|l2normalization|layer_normalization"
+    "|hardmax|instancenorm"
     "|lppool|lstm|matmulinteger|maxunpool"
     "|nllloss|optional|pad|quantize|rms"
     "|resize|roialign|sce|sequence|shape_clip"
@@ -134,7 +133,15 @@ backend_test.exclude(
 backend_test.exclude("(expand_dim|_opt_|_if_|_scan|_loop|_image_|_scatter_)")
 
 # broken case
-backend_test.exclude("(test_transpose_default)")
+backend_test.exclude(
+    "(test_layer_normalization_2d_axis0"
+    "|test_layer_normalization_2d_axis1"
+    "|test_layer_normalization_2d_axis_negative_"
+    "|test_layer_normalization_3d"
+    "|test_layer_normalization_4d"
+    "|test_layer_normalization_default"
+    ")"
+)
 
 
 # import all test cases at global scope to make them visible to python.unittest

@@ -1281,7 +1281,14 @@ def _set_shape_type_op_any_transpose(self: ShapeBuilder, node: NodeProto):
     dtype = self.get_type(node.input[0])
     self.set_type(node.output[0], dtype)
     if self.has_shape(node.input[0]):
-        perm = list(self.get_attribute(node, "perm").ints)
+        att = self.get_attribute(node, "perm", exc=False)
+        if att is None:
+            assert self.has_rank(
+                node.input[0]
+            ), f"Missing rank for {node.input[0]!r}{self.get_debug_msg()}"
+            perm = list(range(self.get_rank(node.input[0]))[::-1])
+        else:
+            perm = list(att.ints)
         shape = self.get_shape(node.input[0])
         assert len(perm) == len(shape), (
             f"Mismatch between perm={perm} and shape={shape}, "
