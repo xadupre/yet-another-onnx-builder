@@ -1676,5 +1676,70 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(g._types.get("present_value"), TFLOAT)
 
 
+    def test_blackman_window_known_size(self):
+        """BlackmanWindow with constant size sets exact output shape."""
+        model = _make_model(
+            [oh.make_node("BlackmanWindow", ["size"], ["Y"])],
+            [],
+            [_mkv_("Y", TFLOAT, [None])],
+            [onh.from_array(np.array(16, dtype=np.int64), name="size")],
+        )
+        b = _TestShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (16,))
+
+    def test_blackman_window_with_dtype(self):
+        """BlackmanWindow with output_datatype attribute sets correct output type."""
+        model = _make_model(
+            [oh.make_node("BlackmanWindow", ["size"], ["Y"], output_datatype=TDOUBLE)],
+            [],
+            [_mkv_("Y", TDOUBLE, [None])],
+            [onh.from_array(np.array(8, dtype=np.int64), name="size")],
+        )
+        b = _TestShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TDOUBLE)
+        self.assertEqual(b.get_shape("Y"), (8,))
+
+    def test_hamming_window_known_size(self):
+        """HammingWindow with constant size sets exact output shape."""
+        model = _make_model(
+            [oh.make_node("HammingWindow", ["size"], ["Y"])],
+            [],
+            [_mkv_("Y", TFLOAT, [None])],
+            [onh.from_array(np.array(32, dtype=np.int64), name="size")],
+        )
+        b = _TestShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (32,))
+
+    def test_hann_window_known_size(self):
+        """HannWindow with constant size sets exact output shape."""
+        model = _make_model(
+            [oh.make_node("HannWindow", ["size"], ["Y"])],
+            [],
+            [_mkv_("Y", TFLOAT, [None])],
+            [onh.from_array(np.array(64, dtype=np.int64), name="size")],
+        )
+        b = _TestShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (64,))
+
+    def test_hann_window_dynamic_size(self):
+        """HannWindow with dynamic (non-constant) size sets rank=1."""
+        model = _make_model(
+            [oh.make_node("HannWindow", ["size"], ["Y"])],
+            [_mkv_("size", TINT64, [])],
+            [_mkv_("Y", TFLOAT, [None])],
+        )
+        b = _TestShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_rank("Y"), 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
