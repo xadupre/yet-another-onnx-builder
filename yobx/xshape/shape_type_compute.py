@@ -85,6 +85,10 @@ def broadcast_shape(
 
 def _set_shape_type_op_any_attention(g: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Attention."
+    if g.has_device(node.input[0]):
+        for o in node.output:
+            if o:
+                g.set_device(o, g.get_device(node.input[0]))
     if g.has_type(node.input[0]):
         itype = g.get_type(node.input[0])
         for i, o in enumerate(node.output):
@@ -813,6 +817,8 @@ def _set_shape_type_op_any_matmul(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_einsum(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Einsum."
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
 
@@ -898,6 +904,8 @@ def _set_shape_type_op_any_einsum(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_non_zero(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type NonZero."
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     self.set_type(node.output[0], TensorProto.INT64)
     if self.has_rank(node.input[0]):
         new_shape = (self.get_rank(node.input[0]), self.unique_dimension_name("NEWDIM_nonzero"))
@@ -962,6 +970,8 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_range(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for for node type Range."
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     types = [self.get_type(i) for i in node.input if self.has_type(i)]
     assert types and len(set(types)) == 1, (
         f"Mixed type for node {self.pretty_node(node)}, types={types}, "
@@ -1022,6 +1032,8 @@ def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
                         cst = cst.cpu()
                     iaxes = (int(cst),) if len(cst.shape) == 0 else tuple(int(i) for i in cst)
             elif keepdim is not None:
+                if self.has_device(node.input[0]):
+                    self.set_device(node.output[0], self.get_device(node.input[0]))
                 self.set_rank(node.output[0], self.get_rank(node.input[0]))
                 return True
             elif self.has_shape(node.input[1]) and self.has_rank(node.input[0]):
@@ -1030,6 +1042,8 @@ def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
                     len(shape) == 1
                 ), f"Wrong shape={shape!r} for axes={node.input[1]!r}{self.get_debug_msg()}"
                 if isinstance(shape[0], int):
+                    if self.has_device(node.input[0]):
+                        self.set_device(node.output[0], self.get_device(node.input[0]))
                     self.set_rank(node.output[0], self.get_rank(node.input[0]) - shape[0])
                     return True
             else:
@@ -1548,6 +1562,8 @@ def _set_shape_type_op_any_unary(
 
 def _set_shape_type_op_any_arg_max_min(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for ArgMax and ArgMin."
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     self.set_type(node.output[0], TensorProto.INT64)
     axis_att = self.get_attribute(node, "axis", exc=False)
     axis = 0 if axis_att is None else axis_att.i
@@ -1574,6 +1590,8 @@ def _set_shape_type_op_any_arg_max_min(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_global_pool(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for GlobalAveragePool and GlobalMaxPool."
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
     if self.has_shape(node.input[0]):
@@ -1592,6 +1610,8 @@ def _set_shape_type_op_any_global_pool(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_flatten(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for Flatten."
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
     axis_att = self.get_attribute(node, "axis", exc=False)
@@ -1623,6 +1643,8 @@ def _set_shape_type_op_any_flatten(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_eyelike(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for EyeLike."
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     dtype_att = self.get_attribute(node, "dtype", exc=False)
     if dtype_att is not None:
         self.set_type(node.output[0], dtype_att.i)
@@ -1643,6 +1665,8 @@ def _set_shape_type_op_any_eyelike(self: ShapeBuilder, node: NodeProto):
 def _set_shape_type_op_any_depth_to_space(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for DepthToSpace."
     blocksize = self.get_attribute(node, "blocksize").i
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
     if self.has_shape(node.input[0]):
@@ -1668,6 +1692,8 @@ def _set_shape_type_op_any_depth_to_space(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_gridsample(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for GridSample."
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
     if self.has_shape(node.input[0]) and self.has_shape(node.input[1]):
@@ -1689,6 +1715,8 @@ def _set_shape_type_op_any_gridsample(self: ShapeBuilder, node: NodeProto):
 def _set_shape_type_op_any_space_to_depth(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for SpaceToDepth."
     blocksize = self.get_attribute(node, "blocksize").i
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
     if self.has_shape(node.input[0]):
@@ -1901,6 +1929,10 @@ def set_type_shape_fused_matmul(self: ShapeBuilder, node: NodeProto):
     transB = transB.i if transB else 0
     if transA == 0 and transB == 0:
         return set_type_shape_matmul(self, name, x, y)
+    if self.has_device(x) and self.has_device(y) and self.get_device(x) == self.get_device(y):
+        self.set_device(name, self.get_device(x))
+    elif self.has_device(x):
+        self.set_device(name, self.get_device(x))
     if self.has_type(x):
         self.set_type(name, self.get_type(x))
     elif self.has_type(y):
@@ -1925,6 +1957,8 @@ def set_type_shape_fused_matmul(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_tree_ensemble(self: ShapeBuilder, node: NodeProto):
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     self.set_type(node.output[0], self.get_type(node.input[0]))
     n_targets = self.get_attribute(node, "n_targets", exc=False)
     assert n_targets is not None, (
@@ -1941,6 +1975,8 @@ def set_type_shape_tree_ensemble(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_to_complex(self: ShapeBuilder, node: NodeProto):
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
         dtype = self.get_type(node.input[0])
         mapping = {
@@ -1961,6 +1997,8 @@ def set_type_shape_to_complex(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_complex_module(self: ShapeBuilder, node: NodeProto):
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
         dtype = self.get_type(node.input[0])
         mapping = {
@@ -1986,6 +2024,8 @@ def set_type_shape_shared_input(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_scatter_nd_of_shape(self: ShapeBuilder, node: NodeProto):
+    if self.has_device(node.input[2]):
+        self.set_device(node.output[0], self.get_device(node.input[2]))
     if self.has_type(node.input[2]):
         self.set_type(node.output[0], self.get_type(node.input[2]))
     value = self.value_as_shape(node.input[0])
@@ -1995,6 +2035,8 @@ def set_type_shape_scatter_nd_of_shape(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_tri_matrix(self: ShapeBuilder, node: NodeProto):
+    if self.has_device(node.input[1]):
+        self.set_device(node.output[0], self.get_device(node.input[1]))
     if self.has_type(node.input[1]):
         self.set_type(node.output[0], self.get_type(node.input[1]))
     value = self.value_as_shape(node.input[0])
@@ -2005,6 +2047,8 @@ def set_type_shape_tri_matrix(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_transpose_2d_cast_fp16(self: ShapeBuilder, node: NodeProto):
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     self.set_type(node.output[0], TensorProto.FLOAT16)
     if self.has_shape(node.input[0]):
         shape = self.get_shape(node.input[0])
@@ -2013,6 +2057,8 @@ def set_type_shape_transpose_2d_cast_fp16(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_transpose_2d_cast_fp32(self: ShapeBuilder, node: NodeProto):
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
     self.set_type(node.output[0], TensorProto.FLOAT)
     if self.has_shape(node.input[0]):
         shape = self.get_shape(node.input[0])
@@ -2021,6 +2067,10 @@ def set_type_shape_transpose_2d_cast_fp32(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_multi_head_attention(self: ShapeBuilder, node: NodeProto):
+    if self.has_device(node.input[0]):
+        for o in node.output:
+            if o:
+                self.set_device(o, self.get_device(node.input[0]))
     itype = self.get_type(node.input[0])
     for o in node.output:
         self.set_type(o, itype)

@@ -2118,5 +2118,309 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_rank("Y"), 1)
 
 
+class TestDevicePropagation(ExtTestCase):
+    """Tests that device is propagated correctly through each operator."""
+
+    # ------------------------------------------------------------------
+    # Einsum
+    # ------------------------------------------------------------------
+
+    def test_einsum_device_propagation(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (3, 4)
+        g._devices["X"] = -1
+        g._types["Y"] = TFLOAT
+        g._shapes["Y"] = (4, 5)
+        node = oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="ij,jk->ik")
+        _set_shape_type_op_any_known["Einsum"](g, node)
+        self.assertEqual(g._devices.get("Z"), -1)
+
+    # ------------------------------------------------------------------
+    # NonZero
+    # ------------------------------------------------------------------
+
+    def test_non_zero_device_propagation(self):
+        g = _TestShapeBuilder()
+        g.set_type("X", TFLOAT)
+        g.set_shape("X", (3, 4))
+        g.set_device("X", -1)
+        node = oh.make_node("NonZero", ["X"], ["Y"])
+        _set_shape_type_op_any_known["NonZero"](g, node)
+        self.assertEqual(g.get_device("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # ArgMax / ArgMin
+    # ------------------------------------------------------------------
+
+    def test_argmax_device_propagation(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 3, 4)
+        g._devices["X"] = -1
+        node = oh.make_node("ArgMax", ["X"], ["Y"], axis=1, keepdims=1)
+        _set_shape_type_op_any_known["ArgMax"](g, node)
+        self.assertEqual(g._devices.get("Y"), -1)
+
+    def test_argmin_device_propagation(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 3, 4)
+        g._devices["X"] = -1
+        node = oh.make_node("ArgMin", ["X"], ["Y"], axis=0, keepdims=0)
+        _set_shape_type_op_any_known["ArgMin"](g, node)
+        self.assertEqual(g._devices.get("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # GlobalAveragePool / GlobalMaxPool
+    # ------------------------------------------------------------------
+
+    def test_global_average_pool_device_propagation(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 8, 4, 4)
+        g._devices["X"] = -1
+        node = oh.make_node("GlobalAveragePool", ["X"], ["Y"])
+        _set_shape_type_op_any_known["GlobalAveragePool"](g, node)
+        self.assertEqual(g._devices.get("Y"), -1)
+
+    def test_global_max_pool_device_propagation(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (1, 16, 6, 6)
+        g._devices["X"] = -1
+        node = oh.make_node("GlobalMaxPool", ["X"], ["Y"])
+        _set_shape_type_op_any_known["GlobalMaxPool"](g, node)
+        self.assertEqual(g._devices.get("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # Flatten
+    # ------------------------------------------------------------------
+
+    def test_flatten_device_propagation(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 3, 4)
+        g._devices["X"] = -1
+        node = oh.make_node("Flatten", ["X"], ["Y"], axis=1)
+        _set_shape_type_op_any_known["Flatten"](g, node)
+        self.assertEqual(g._devices.get("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # EyeLike
+    # ------------------------------------------------------------------
+
+    def test_eyelike_device_propagation(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (3, 3)
+        g._devices["X"] = -1
+        node = oh.make_node("EyeLike", ["X"], ["Y"])
+        _set_shape_type_op_any_known["EyeLike"](g, node)
+        self.assertEqual(g._devices.get("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # DepthToSpace
+    # ------------------------------------------------------------------
+
+    def test_depth_to_space_device_propagation(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (1, 8, 2, 3)
+        g._devices["X"] = -1
+        node = oh.make_node("DepthToSpace", ["X"], ["Y"], blocksize=2)
+        _set_shape_type_op_any_known["DepthToSpace"](g, node)
+        self.assertEqual(g._devices.get("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # GridSample
+    # ------------------------------------------------------------------
+
+    def test_gridsample_device_propagation(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (1, 3, 4, 4)
+        g._devices["X"] = -1
+        g._types["grid"] = TFLOAT
+        g._shapes["grid"] = (1, 2, 2, 2)
+        node = oh.make_node("GridSample", ["X", "grid"], ["Y"])
+        _set_shape_type_op_any_known["GridSample"](g, node)
+        self.assertEqual(g._devices.get("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # SpaceToDepth
+    # ------------------------------------------------------------------
+
+    def test_space_to_depth_device_propagation(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (1, 2, 4, 6)
+        g._devices["X"] = -1
+        node = oh.make_node("SpaceToDepth", ["X"], ["Y"], blocksize=2)
+        _set_shape_type_op_any_known["SpaceToDepth"](g, node)
+        self.assertEqual(g._devices.get("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # FusedMatMul (transA/transB != 0 case)
+    # ------------------------------------------------------------------
+
+    def test_fused_matmul_transA_device_propagation(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (4, 3))
+        b.set_device("X", -1)
+        b.set_type("Y", TFLOAT)
+        b.set_shape("Y", (4, 5))
+        node = oh.make_node("FusedMatMul", ["X", "Y"], ["Z"], domain="com.microsoft", transA=1)
+        set_type_shape_fused_matmul(b, node)
+        self.assertEqual(b.get_device("Z"), -1)
+
+    # ------------------------------------------------------------------
+    # TreeEnsemble
+    # ------------------------------------------------------------------
+
+    def test_tree_ensemble_device_propagation(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (4, 3))
+        b.set_device("X", -1)
+        node = oh.make_node(
+            "TreeEnsembleRegressor",
+            ["X"],
+            ["Y"],
+            n_targets=2,
+            domain="ai.onnx.ml",
+        )
+        set_type_shape_tree_ensemble(b, node)
+        self.assertEqual(b.get_device("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # ToComplex
+    # ------------------------------------------------------------------
+
+    def test_to_complex_device_propagation(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (3, 4, 2))
+        b.set_device("X", -1)
+        node = oh.make_node("ToComplex", ["X"], ["Y"], domain="com.microsoft")
+        set_type_shape_to_complex(b, node)
+        self.assertEqual(b.get_device("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # ComplexModule
+    # ------------------------------------------------------------------
+
+    def test_complex_module_device_propagation(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TCOMPLEX64)
+        b.set_shape("X", (3, 4))
+        b.set_device("X", -1)
+        node = oh.make_node("ComplexModule", ["X"], ["Y"], domain="com.microsoft")
+        set_type_shape_complex_module(b, node)
+        self.assertEqual(b.get_device("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # ScatterNDOfShape
+    # ------------------------------------------------------------------
+
+    def test_scatter_nd_of_shape_device_propagation(self):
+        b = BasicShapeBuilder()
+        b.set_type("updates", TFLOAT)
+        b.set_shape("updates", (2, 4))
+        b.set_device("updates", -1)
+        node = oh.make_node(
+            "ScatterNDOfShape",
+            ["shape", "indices", "updates"],
+            ["Y"],
+            domain="com.microsoft",
+        )
+        set_type_shape_scatter_nd_of_shape(b, node)
+        self.assertEqual(b.get_device("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # TriMatrix
+    # ------------------------------------------------------------------
+
+    def test_tri_matrix_device_propagation(self):
+        b = BasicShapeBuilder()
+        b.set_type("val", TFLOAT)
+        b.set_shape("val", ())
+        b.set_device("val", -1)
+        node = oh.make_node("TriMatrix", ["shape", "val"], ["Y"], domain="com.microsoft")
+        set_type_shape_tri_matrix(b, node)
+        self.assertEqual(b.get_device("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # Transpose2DCastFP16 / Transpose2DCastFP32
+    # ------------------------------------------------------------------
+
+    def test_transpose_2d_cast_fp16_device_propagation(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (3, 4))
+        b.set_device("X", -1)
+        node = oh.make_node(
+            "Transpose2DCastFP16", ["X"], ["Y"], domain="com.microsoft"
+        )
+        set_type_shape_transpose_2d_cast_fp16(b, node)
+        self.assertEqual(b.get_device("Y"), -1)
+
+    def test_transpose_2d_cast_fp32_device_propagation(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT16)
+        b.set_shape("X", (3, 4))
+        b.set_device("X", -1)
+        node = oh.make_node(
+            "Transpose2DCastFP32", ["X"], ["Y"], domain="com.microsoft"
+        )
+        set_type_shape_transpose_2d_cast_fp32(b, node)
+        self.assertEqual(b.get_device("Y"), -1)
+
+    # ------------------------------------------------------------------
+    # MultiHeadAttention
+    # ------------------------------------------------------------------
+
+    def test_multi_head_attention_device_propagation(self):
+        b = BasicShapeBuilder()
+        b.set_type("Q", TFLOAT)
+        b.set_rank("Q", 3)
+        b.set_device("Q", -1)
+        node = oh.make_node(
+            "MultiHeadAttention",
+            ["Q", "K", "V"],
+            ["out"],
+            domain="com.microsoft",
+        )
+        set_type_shape_multi_head_attention(b, node)
+        self.assertEqual(b.get_device("out"), -1)
+
+    # ------------------------------------------------------------------
+    # Reduce (early-return paths)
+    # ------------------------------------------------------------------
+
+    def test_reduce_sum_device_propagation_keepdim(self):
+        """Device is propagated on the keepdim early-return path."""
+        b = _TestShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (2, 3, 4))
+        b.set_device("X", -1)
+        # Use a model with a non-constant axes input so the keepdim early path is taken
+        model = _make_model(
+            [oh.make_node("ReduceSum", ["X", "axes"], ["Y"], keepdims=1)],
+            [_mkv_("X", TFLOAT, [2, 3, 4]), _mkv_("axes", TINT64, [1])],
+            [_mkv_("Y", TFLOAT, [2, 1, 4])],
+        )
+        b.run_model(model)
+        b.set_device("X", -1)
+        # Re-run just the node to test device propagation
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_reduce
+
+        node = oh.make_node("ReduceSum", ["X", "axes"], ["Y2"], keepdims=1)
+        b.set_type("Y2", TFLOAT)
+        _set_shape_type_op_any_reduce(b, node)
+        self.assertEqual(b.get_device("Y2"), -1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
