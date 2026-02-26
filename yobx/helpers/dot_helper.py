@@ -12,7 +12,7 @@ def _make_node_label(node: onnx.NodeProto, tiny_inits: Dict[str, str]) -> str:
     for att in node.attribute:
         if att.name == "to":
             ee.append(f"{att.name}={onnx_dtype_name(att.i)}")
-        elif att.name in {"to", "axis", "value_int", "stash_type", "start", "end"}:
+        elif att.name in {"axis", "value_int", "stash_type", "start", "end"}:
             ee.append(f"{att.name}={att.i}")
         elif att.name in {"value_float"}:
             ee.append(f"{att.name}={att.f}")
