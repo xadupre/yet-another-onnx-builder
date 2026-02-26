@@ -68,8 +68,8 @@ class TestReferenceOps(ExtTestCase):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node("MemcpyToHost", ["X"], ["Z"]),
-                    oh.make_node("MemcpyFromHost", ["X"], ["Z"]),
+                    oh.make_node("MemcpyToHost", ["X"], ["Z"], domain="com.microsoft"),
+                    oh.make_node("MemcpyFromHost", ["X"], ["Z"], domain="com.microsoft"),
                 ],
                 "name",
                 [oh.make_tensor_value_info("X", TFLOAT, None)],
