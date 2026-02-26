@@ -921,7 +921,7 @@ class CubeLogs:
             piv = data.pivot(index=key_index[::-1], columns=key_columns, values=values)
         else:
             # pivot does return the same rank with it is empty.
-            # Let's add arficially one
+            # Let's add artificially one
             data = data.copy()
             data["ALL"] = "ALL"
             piv = data.pivot(index=["ALL"], columns=key_columns, values=values)
