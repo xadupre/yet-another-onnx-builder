@@ -541,7 +541,7 @@ class CubeLogs:
         ), f"Columns {set(self.keys_no_time) & set(self.ignored)} cannot be keys and ignored"
         assert not (
             set(self.values) & set(self.ignored)
-        ), f"Columns {set(self.keys_no_time) & set(self.ignored)} cannot be values and ignored"
+        ), f"Columns {set(self.values) & set(self.ignored)} cannot be values and ignored"
         assert (
             self.time not in self.keys_no_time
             and self.time not in self.values
