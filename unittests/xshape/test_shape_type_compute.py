@@ -350,6 +350,28 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_rank("Y"), 3)
 
     # ------------------------------------------------------------------
+    # LogSoftmax shape compute
+    # ------------------------------------------------------------------
+
+    def test_logsoftmax_with_shape(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (2, 3, 4))
+        node = oh.make_node("LogSoftmax", inputs=["X"], outputs=["Y"], axis=1)
+        _set_shape_type_op_any_known["LogSoftmax"](b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (2, 3, 4))
+
+    def test_logsoftmax_with_rank_only(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_rank("X", 3)
+        node = oh.make_node("LogSoftmax", inputs=["X"], outputs=["Y"], axis=2)
+        _set_shape_type_op_any_known["LogSoftmax"](b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_rank("Y"), 3)
+
+    # ------------------------------------------------------------------
     # set_type_shape_binary_op
     # ------------------------------------------------------------------
 
