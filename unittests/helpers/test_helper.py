@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, hide_stdout, requires_torch, requires_transformers
 from yobx.helpers import string_type, string_sig, string_signature
+from yobx.helpers.helper import flatten_object
 
 
 class TestStringType(ExtTestCase):
@@ -628,6 +629,141 @@ class TestStringSig(ExtTestCase):
         obj = MyObj()
         s = string_sig(obj)
         self.assertEqual(s, "MyObj()")
+
+
+class TestFlattenObject(ExtTestCase):
+    def test_none(self):
+        self.assertIsNone(flatten_object(None))
+
+    def test_empty_list(self):
+        self.assertEqual(flatten_object([]), [])
+
+    def test_empty_tuple(self):
+        self.assertEqual(flatten_object(()), ())
+
+    def test_list_of_primitives(self):
+        self.assertEqual(flatten_object([1, 2.0, "a"]), [1, 2.0, "a"])
+
+    def test_tuple_of_primitives(self):
+        self.assertEqual(flatten_object((1, 2, 3)), (1, 2, 3))
+
+    def test_nested_list(self):
+        self.assertEqual(flatten_object([[1, 2], [3, 4]]), [1, 2, 3, 4])
+
+    def test_nested_tuple(self):
+        self.assertEqual(flatten_object(((1, 2), (3, 4))), (1, 2, 3, 4))
+
+    def test_list_with_none(self):
+        self.assertEqual(flatten_object([None, 1, None]), [None, 1, None])
+
+    def test_numpy_array_passthrough(self):
+        arr = np.array([1.0, 2.0, 3.0])
+        result = flatten_object(arr)
+        self.assertIs(result, arr)
+
+    def test_list_with_numpy_array(self):
+        arr = np.array([1.0, 2.0])
+        result = flatten_object([arr, 1])
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        self.assertIs(result[0], arr)
+        self.assertEqual(result[1], 1)
+
+    def test_dict_keep_keys(self):
+        arr1 = np.array([1.0])
+        arr2 = np.array([2.0])
+        result = flatten_object({"a": arr1, "b": arr2}, drop_keys=False)
+        # dict items are flattened as (key, value) pairs
+        self.assertIn("a", result)
+        self.assertIn("b", result)
+        self.assertIn(arr1, result)
+        self.assertIn(arr2, result)
+
+    def test_dict_drop_keys(self):
+        arr1 = np.array([1.0])
+        arr2 = np.array([2.0])
+        result = flatten_object({"a": arr1, "b": arr2}, drop_keys=True)
+        # only values are kept, no string keys
+        self.assertNotIn("a", result)
+        self.assertNotIn("b", result)
+        self.assertIn(arr1, result)
+        self.assertIn(arr2, result)
+
+    def test_object_with_to_tuple(self):
+        class MyObj:
+            def to_tuple(self):
+                return (1, 2.0, "x")
+
+        result = flatten_object(MyObj())
+        self.assertEqual(result, (1, 2.0, "x"))
+
+    def test_object_with_shape(self):
+        arr = np.zeros((2, 3))
+        result = flatten_object(arr)
+        self.assertIs(result, arr)
+
+    @requires_torch("2.9")
+    def test_unsupported_type_raises(self):
+        with self.assertRaises(TypeError):
+            flatten_object(object())
+
+    @requires_torch("2.9")
+    def test_torch_tensor_passthrough(self):
+        import torch
+
+        t = torch.rand(2, 3)
+        result = flatten_object(t)
+        self.assertIs(result, t)
+
+    @requires_torch("2.9")
+    def test_list_of_torch_tensors(self):
+        import torch
+
+        t1 = torch.rand(2, 3)
+        t2 = torch.rand(4, 5)
+        result = flatten_object([t1, t2])
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        self.assertIs(result[0], t1)
+        self.assertIs(result[1], t2)
+
+    @requires_torch("2.9")
+    def test_nested_list_of_torch_tensors(self):
+        import torch
+
+        t1 = torch.rand(2)
+        t2 = torch.rand(3)
+        result = flatten_object([[t1], [t2]])
+        self.assertEqual(len(result), 2)
+        self.assertIs(result[0], t1)
+        self.assertIs(result[1], t2)
+
+    @requires_transformers("4.50")
+    def test_dynamic_cache(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+
+        dc = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        dc.update(key, value, layer_idx=0)
+        result = flatten_object(dc)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+
+    @requires_transformers("4.50")
+    def test_encoder_decoder_cache(self):
+        import torch
+        from transformers.cache_utils import DynamicCache, EncoderDecoderCache
+
+        self_cache = DynamicCache()
+        cross_cache = DynamicCache()
+        self_cache.update(torch.rand(1, 4, 2, 8), torch.rand(1, 4, 2, 8), layer_idx=0)
+        cross_cache.update(torch.rand(1, 4, 3, 8), torch.rand(1, 4, 3, 8), layer_idx=0)
+        edc = EncoderDecoderCache(self_cache, cross_cache)
+        result = flatten_object(edc)
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 4)
 
 
 if __name__ == "__main__":
