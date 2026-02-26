@@ -791,6 +791,18 @@ class TestShapeTypeCompute(ExtTestCase):
         # NonZero output shape: (rank_of_input, num_nonzero)
         self.assertEqual(b.get_shape("Y")[0], 2)
 
+    def test_op_non_zero_no_rank(self):
+        # When input rank is unknown, output is still always 2D
+        model = _make_model(
+            [oh.make_node("NonZero", ["X"], ["Y"])],
+            [_mkv_("X", TFLOAT, None)],
+            [_mkv_("Y", TINT64, None)],
+        )
+        b = _TestShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TINT64)
+        self.assertEqual(b.get_rank("Y"), 2)
+
     def test_op_pad(self):
         model = _make_model(
             [oh.make_node("Pad", ["X", "pads"], ["Y"])],
