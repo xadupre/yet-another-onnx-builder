@@ -30,6 +30,9 @@ imgmath_image_format = "svg"
 templates_path = ["_templates"]
 exclude_patterns = ["_build"]
 html_theme = "furo"
+html_static_path = ["_static"]
+html_logo = "_static/logo.svg"
+html_favicon = "_static/logo.svg"
 
 
 def linkcode_resolve(domain, info):
