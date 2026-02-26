@@ -95,7 +95,8 @@ class MiniOnnxBuilder:
 
     Typical usage — save a plain numpy array and round-trip it through ONNX:
 
-    .. code-block:: python
+    .. runpython::
+        :showcode:
 
         import numpy as np
         from yobx.helpers.mini_onnx_builder import MiniOnnxBuilder
@@ -107,7 +108,7 @@ class MiniOnnxBuilder:
 
         ref = ExtendedReferenceEvaluator(model)
         (weights,) = ref.run(None, {})
-        # weights == np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        print(weights)  # np.array([1.0, 2.0, 3.0], dtype=np.float32)
 
     For serializing arbitrary nested Python structures (dicts, tuples, lists,
     torch tensors, ``DynamicCache`` …) prefer the higher-level helpers
