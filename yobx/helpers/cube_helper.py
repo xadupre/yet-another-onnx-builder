@@ -1181,7 +1181,7 @@ class CubeLogs:
         :param views: sequence or dictionary of views to append
         :param main: add a page with statistics on all variables
         :param raw: add a page with the raw data
-        :param csv: views to dump as csv files (same name as outputs + view naw)
+        :param csv: views to dump as csv files (same name as outputs + view name)
         :param verbose: verbosity
         :param time_mask: color the background of the cells if one
             of the value for the last date is unexpected,
