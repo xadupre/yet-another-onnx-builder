@@ -1,4 +1,5 @@
 
+.. _l-shape-builder-design:
 .. _l-design-shape:
 
 ============
@@ -116,6 +117,12 @@ to a whole shape at once.
     context = dict(batch=3, seq1=5, seq2=7)
     concrete = builder.evaluate_shape("Z", context)
     print("concrete shape :", concrete)
+
+.. seealso::
+
+    :ref:`sphx_glr_auto_examples_plot_shape_expressions_py` — sphinx-gallery
+    example demonstrating ``Concat``, ``Reshape``, and ``Split`` symbolic
+    expressions, automatic simplification, and evaluation with concrete values.
 
 Example
 =======
