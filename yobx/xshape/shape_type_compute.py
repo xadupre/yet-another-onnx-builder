@@ -1712,6 +1712,17 @@ def _set_shape_type_op_any_space_to_depth(self: ShapeBuilder, node: NodeProto):
     )
 
 
+def _set_shape_type_op_any_window(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for BlackmanWindow, HannWindow, HammingWindow."
+    dtype = self.get_attribute_with_default(node, "output_datatype", TensorProto.FLOAT)
+    self.set_type(node.output[0], dtype)
+    if self.is_constant(node.input[0]):
+        cst = self.get_constant(node.input[0], exc=False, computed_value=True)
+        if cst is not None:
+            size = int(cst.flat[0])
+            self.set_shape(node.output[0], (size,))
+            return
+    self.set_rank(node.output[0], 1)
 def _set_shape_type_op_any_resize(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Resize."
     if self.has_device(node.input[0]):
@@ -1763,6 +1774,7 @@ _set_shape_type_op_any_known = {
     "ArgMin": _set_shape_type_op_any_arg_max_min,
     "Attention": _set_shape_type_op_any_attention,
     "BatchNormalization": _set_shape_type_op_any_batch_normalization,
+    "BlackmanWindow": _set_shape_type_op_any_window,
     "Cast": _set_shape_type_op_any_cast,
     "Compress": _set_shape_type_op_any_compress,
     "Concat": _set_shape_type_op_any_concat,
@@ -1775,6 +1787,8 @@ _set_shape_type_op_any_known = {
     "Gather": _set_shape_type_op_any_gather,
     "GatherElements": _set_shape_type_op_any_gather_elements,
     "Gelu": _set_shape_type_op_any_unary,
+    "HammingWindow": _set_shape_type_op_any_window,
+    "HannWindow": _set_shape_type_op_any_window,
     "Gemm": _set_shape_type_op_any_gemm,
     "GlobalAveragePool": _set_shape_type_op_any_global_pool,
     "GlobalMaxPool": _set_shape_type_op_any_global_pool,
