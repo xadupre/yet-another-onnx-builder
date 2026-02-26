@@ -202,7 +202,7 @@ def to_dot(model: onnx.ModelProto) -> str:
             for i in unique:
                 if i in tiny_inits:
                     continue
-                edge = name_to_ids[i], _mkn(node)  # type: ignore[assignment]
+                edge = name_to_ids[i], f"{node.op_type}_{_mkn(node)}"
                 if edge in done:
                     continue
                 done.add(edge)

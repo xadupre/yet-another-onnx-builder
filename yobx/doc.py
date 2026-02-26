@@ -296,10 +296,10 @@ def plot_dot(
     Draws a dot graph into a matplotlib graph.
 
     :param dot: dot graph or ModelProto
-    :param image: output image, None, just returns the output
+    :param ax: output axis, None just returns the output
     :param engine: *dot* or *neato*
-    :param figsize: figsize of ax is None
-    :return: :epkg:`Graphviz` output or, the dot text if *image* is None
+    :param figsize: figsize if ax is None
+    :return: :epkg:`Graphviz` output or, the dot text if *ax* is None
 
     .. plot::
 
