@@ -598,7 +598,7 @@ def onnx_simple_text_plot(
         ]
 
     if sub_graphs_names is None:
-        sub_graphs_names = {}
+        sub_graphs_names = {}  # type: ignore[assignment]
 
     def _get_subgraph_name(idg):
         if idg in sub_graphs_names:
@@ -723,7 +723,7 @@ def onnx_simple_text_plot(
 
     # inputs
     line_name_new = {}
-    line_name_in = {}
+    line_name_in = {}  # type: ignore[var-annotated]
     if level == 0:
         rows.append("----- input ----")
     for inp in model.input:
@@ -805,7 +805,7 @@ def onnx_simple_text_plot(
                     print(f"[onnx_simple_text_plot] break1 {node.op_type}")
                 add_break = True
         elif previous_in is not None and set(node.input) == previous_in:
-            indent = previous_indent
+            indent = previous_indent  # type: ignore[assignment]
         else:
             inds = [indents.get(i, 0) for i in node.input if i not in init_names]
             if not inds:

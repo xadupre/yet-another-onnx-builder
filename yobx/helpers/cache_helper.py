@@ -21,7 +21,7 @@ def _preprocess_key_value_pairs(
     key_value_pairs: Union[List[torch.Tensor], List[Tuple[torch.Tensor, torch.Tensor]]],
 ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
     if not key_value_pairs or isinstance(key_value_pairs[0], tuple):
-        return key_value_pairs
+        return key_value_pairs  # type: ignore[return-value]
     return list(zip(key_value_pairs[::2], key_value_pairs[1::2]))  # type: ignore[arg-type]
 
 
@@ -82,7 +82,8 @@ class CacheKeyValue:
         """Does the reverse operation."""
         assert self.key_cache is not None and self.value_cache is not None
         return make_dynamic_cache(
-            list(zip(self.key_cache, self.value_cache)), cls_layers=self.cls_layers
+            list(zip(self.key_cache, self.value_cache)),  # pyrefly: ignore[no-matching-overload]
+            cls_layers=self.cls_layers,  # pyrefly: ignore[no-matching-overload]
         )
 
     @property
@@ -126,11 +127,11 @@ def flatten_unflatten_for_dynamic_shapes(
     """
     if isinstance(obj, torch.Tensor):
         return change_function(obj) if change_function else obj
-    flat, spec = torch.utils._pytree.tree_flatten(obj)
+    flat, spec = torch.utils._pytree.tree_flatten(obj)  # pyrefly: ignore[implicit-import]
     start = 0
     end = 0
     subtrees = []
-    for subspec in (spec.children() if hasattr(spec, "children") else spec.children_specs):
+    for subspec in spec.children():
         end += subspec.num_leaves
         value = subspec.unflatten(flat[start:end])
         value = flatten_unflatten_for_dynamic_shapes(
@@ -315,7 +316,7 @@ def make_dynamic_cache(
         f"Unexpected number of layers in the cache ({len(cache.layers)}), "
         f"{len(key_value_pairs)} expected."
     )
-    return finalize_cache(cache)
+    return finalize_cache(cache)  # type: ignore[return-value]
 
 
 def finalize_cache(cache: transformers.cache_utils.Cache) -> transformers.cache_utils.Cache:

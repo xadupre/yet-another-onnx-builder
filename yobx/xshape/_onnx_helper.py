@@ -1,6 +1,6 @@
 import onnx
 import onnx.helper as oh
-from typing import Dict, Iterator, Optional, Set, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Set, Tuple, Union
 
 
 def element_wise_binary_op_types() -> Set[str]:
@@ -203,19 +203,19 @@ def replace_static_dimensions_by_strings(
     :param model: ModelProto
     :return: the modified model, a mapping ``{new_name: value}``
     """
-    mapping = {}
+    mapping: Dict[str, Union[str, int]] = {}
     new_inputs = []
     for i in model.graph.input:
         if not i.type.tensor_type:
             continue
         dim = i.type.tensor_type.shape.dim
-        shape = []
+        shape: List[int | str] = []
         for d in dim:
             if not d.dim_param and d.dim_value:
                 shape.append(f"DIM{d.dim_value}")
             else:
                 shape.append(d.dim_param or d.dim_value)
-            mapping[shape[-1]] = d.dim_param or d.dim_value
+            mapping[shape[-1]] = d.dim_param or d.dim_value  # type: ignore[index]
         new_inputs.append(oh.make_tensor_value_info(i.name, i.type.tensor_type.elem_type, shape))
     new_outputs = []
     for i in model.graph.output:
@@ -228,7 +228,7 @@ def replace_static_dimensions_by_strings(
                 shape.append(f"DIM{d.dim_value}")
             else:
                 shape.append(d.dim_param or d.dim_value)
-            mapping[shape[-1]] = d.dim_param or d.dim_value
+            mapping[shape[-1]] = d.dim_param or d.dim_value  # type: ignore[index]
         new_outputs.append(oh.make_tensor_value_info(i.name, i.type.tensor_type.elem_type, shape))
     model = oh.make_model(
         oh.make_graph(
@@ -237,7 +237,8 @@ def replace_static_dimensions_by_strings(
             new_inputs,
             new_outputs,
             model.graph.initializer,
-            model.graph.sparse_initializer,
+            sparse_initializer=model.graph.sparse_initializer,
+            doc_string=model.doc_string,
         ),
         opset_imports=model.opset_import,
         ir_version=model.ir_version,

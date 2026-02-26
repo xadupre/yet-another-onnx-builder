@@ -107,9 +107,7 @@ class TestOnnxHelper(ExtTestCase):
         self.assertIn("mode=", text)
 
     def test_pretty_onnx_attribute_proto_tensor(self):
-        att = oh.make_attribute(
-            "value", onh.from_array(np.array([1.0, 2.0], dtype=np.float32))
-        )
+        att = oh.make_attribute("value", onh.from_array(np.array([1.0, 2.0], dtype=np.float32)))
         text = pretty_onnx(att)
         self.assertIn("value=", text)
         self.assertIn("tensor(", text)
@@ -169,6 +167,7 @@ class TestOnnxHelper(ExtTestCase):
         )
         text = pretty_onnx(graph)
         self.assertIn("Add", text)
+
     def test_onnx_simple_text_plot_add_links(self):
         model = oh.make_model(
             oh.make_graph(
