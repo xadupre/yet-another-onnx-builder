@@ -1380,9 +1380,7 @@ def _set_shape_type_op_any_unsqueeze(self: ShapeBuilder, node: NodeProto):
             if self.has_shape(node.input[1]):
                 n_axes = self.get_shape(node.input[1])
                 if n_axes and isinstance(n_axes[0], int):
-                    self.set_rank(
-                        node.output[0], self.get_rank(node.input[0]) + n_axes[0]
-                    )
+                    self.set_rank(node.output[0], self.get_rank(node.input[0]) + n_axes[0])
                     return True
             assert not self._debug_shape_missing, (
                 f"Unable to compute shape for node: "
@@ -1482,9 +1480,7 @@ def _set_shape_type_op_any_squeeze(self: ShapeBuilder, node: NodeProto):
             if self.has_shape(node.input[1]):
                 n_axes = self.get_shape(node.input[1])
                 if n_axes and isinstance(n_axes[0], int):
-                    self.set_rank(
-                        node.output[0], self.get_rank(node.input[0]) - n_axes[0]
-                    )
+                    self.set_rank(node.output[0], self.get_rank(node.input[0]) - n_axes[0])
                     return True
             assert not self._debug_shape_missing, (
                 f"Unable to compute shape for node: "
@@ -1710,7 +1706,7 @@ def _set_shape_type_op_any_gridsample(self: ShapeBuilder, node: NodeProto):
         x_shape = self.get_shape(node.input[0])
         grid_shape = self.get_shape(node.input[1])
         # Output: (N, C, *grid_spatial) where grid_spatial = grid[1:-1]
-        new_shape = (x_shape[0], x_shape[1]) + tuple(grid_shape[1:-1])
+        new_shape = (x_shape[0], x_shape[1], *grid_shape[1:-1])
         self.set_shape(node.output[0], new_shape)
         return new_shape
     if self.has_rank(node.input[0]):
@@ -1759,6 +1755,8 @@ def _set_shape_type_op_any_window(self: ShapeBuilder, node: NodeProto):
             self.set_shape(node.output[0], (size,))
             return
     self.set_rank(node.output[0], 1)
+
+
 def _set_shape_type_op_any_resize(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Resize."
     if self.has_device(node.input[0]):

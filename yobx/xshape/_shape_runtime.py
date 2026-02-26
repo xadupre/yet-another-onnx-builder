@@ -263,9 +263,7 @@ class _ShapeRuntime:
                 f"Not implemented when node Squeeze with inputs={node.input}, "
                 f"y={y!r}, i={i!r}{self.get_debug_msg()}"
             )
-        assert (
-            ii == 0
-        ), f"A shape should only have one axis i={i}, y={y}{self.get_debug_msg()}"
+        assert ii == 0, f"A shape should only have one axis i={i}, y={y}{self.get_debug_msg()}"
         if isinstance(y, str):
             node.doc_string += "#SV-Sq1"
             self.set_value_shape(node.output[0], f"squeeze({y})")
