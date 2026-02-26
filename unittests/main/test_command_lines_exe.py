@@ -56,7 +56,10 @@ class TestCommandLines(ExtTestCase):
 
         st = StringIO()
         with redirect_stdout(st):
-            main(args)
+            try:
+                main(args)
+            except FileNotFoundError:
+                self.skipTest("dot not available")
         text = st.getvalue()
         if text:
             # text is empty is dot is not installed,
