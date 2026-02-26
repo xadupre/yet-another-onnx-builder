@@ -29,6 +29,21 @@ class ShapeBuilder:
     and types based on the input shapes, using symbolic expressions when the
     exact integer values are not known.
 
+    **Symbolic expressions** — When a dimension cannot be determined as a plain
+    integer (e.g. because it depends on a dynamic input dimension), it is stored
+    as a Python-arithmetic string expression built from the input dimension names.
+    For instance, concatenating tensors of shapes ``("batch", "seq1")`` and
+    ``("batch", "seq2")`` along axis 1 yields output shape
+    ``("batch", "seq1+seq2")``.  The supported operators inside a symbolic
+    expression are ``+``, ``-``, ``*``, ``//``, ``%`` and ``^``
+    (where ``^`` means ``max``).  Expressions are automatically simplified
+    by :func:`simplify_expression
+    <yobx.xshape.simplify_expressions.simplify_expression>` before being stored,
+    so ``d + f - f`` becomes ``d`` and ``2*seq//2`` becomes ``seq``.
+    Once concrete values are available they can be resolved with
+    :meth:`evaluate_shape` or :func:`evaluate_expression
+    <yobx.xshape.evaluate_expressions.evaluate_expression>`.
+
     .. runpython::
         :showcode:
 
