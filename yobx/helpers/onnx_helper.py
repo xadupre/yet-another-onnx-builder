@@ -959,7 +959,7 @@ def make_model_with_local_functions(
             if verbose:
                 print(
                     f"[make_model_with_local_functions] add function {function_name}"
-                    f"({', '.join(lf.input)}) -> {', '.join(lf.input)}"
+                    f"({', '.join(lf.input)}) -> {', '.join(lf.output)}"
                 )
             functions.append(lf)
             maxi = max(node_indices)
