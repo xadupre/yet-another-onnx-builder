@@ -178,3 +178,27 @@ def pretty_onnx(
             f"{onnx_simple_text_plot(onx, recursive=True)}"  # pyrefly: ignore[bad-argument-type]
         )
     return onnx_simple_text_plot(onx, recursive=True)  # pyrefly: ignore[bad-argument-type]
+
+
+def get_hidden_inputs(graph: onnx.GraphProto) -> Set[str]:
+    """
+    Returns the hidden inputs (inputs coming from an upper context)
+    used by a subgraph. It excludes empty names.
+    """
+    hidden = set()
+    memo = (
+        {i.name for i in graph.initializer}
+        | {i.values.name for i in graph.sparse_initializer}
+        | {i.name for i in graph.input}
+    )
+    for node in graph.node:
+        for i in node.input:
+            if i and i not in memo:
+                hidden.add(i)
+        for att in node.attribute:
+            if att.type == onnx.AttributeProto.GRAPH and att.g:
+                hid = get_hidden_inputs(att.g)
+                less = set(h for h in hid if h not in memo)
+                hidden |= less
+        memo |= set(node.output)
+    return hidden
