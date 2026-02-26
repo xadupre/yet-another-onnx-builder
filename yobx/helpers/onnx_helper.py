@@ -791,7 +791,7 @@ def make_model_with_local_functions(
     :param model: model proto
     :param regex: regular expression
     :param domain: function domain
-    :param metadata_keys: list of metadata keys to consider,
+    :param metadata_key_prefix: list of metadata keys to consider,
         every value is split into multiple ones.
     :param allow_extensions: allows the function to take nodes outside
         a partition if there are not already inside another partition
