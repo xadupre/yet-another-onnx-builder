@@ -2,8 +2,12 @@ import unittest
 import ml_dtypes
 import numpy as np
 import onnx
+import onnx.helper as oh
+import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
-from yobx.helpers.onnx_helper import onnx_dtype_name, tensor_dtype_to_np_dtype
+from yobx.helpers.onnx_helper import onnx_dtype_name, tensor_dtype_to_np_dtype, pretty_onnx
+
+TFLOAT = onnx.TensorProto.FLOAT
 
 
 class TestOnnxHelper(ExtTestCase):
@@ -38,6 +42,30 @@ class TestOnnxHelper(ExtTestCase):
             tensor_dtype_to_np_dtype(onnx.TensorProto.FLOAT8E5M2FNUZ),
             ml_dtypes.float8_e5m2fnuz,
         )
+
+    def test_pretty_onnx(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Add", ["X", "Y"], ["added"]),
+                    oh.make_node("Concat", ["added", "X"], ["concat_out"], axis=2),
+                    oh.make_node("Reshape", ["concat_out", "reshape_shape"], ["Z"]),
+                ],
+                "add_concat_reshape",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq", "d_model"]),
+                    oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq", "d_model"]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, [None, None, None])],
+                [
+                    onh.from_array(np.array([0, 0, -1], dtype=np.int64), name="reshape_shape"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        text = pretty_onnx(model)
+        self.assertIn("Reshape(concat_out, reshape_shape) -> Z", text)
 
 
 if __name__ == "__main__":
