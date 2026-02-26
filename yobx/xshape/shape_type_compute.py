@@ -1585,6 +1585,52 @@ def _set_shape_type_op_any_space_to_depth(self: ShapeBuilder, node: NodeProto):
     )
 
 
+def _set_shape_type_op_any_resize(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for node type Resize."
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    else:
+        assert not self._debug_shape_missing, (
+            f"Unable to compute shape for node: "
+            f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+        )
+
+    # input[3] = sizes (takes priority over scales when non-empty)
+    if len(node.input) > 3 and node.input[3] and self.is_constant(node.input[3]):
+        sizes = self.get_constant(node.input[3], computed_value=True)
+        if sizes is not None and sizes.size > 0:
+            new_shape = tuple(int(d) for d in sizes.tolist())
+            self.set_shape(node.output[0], new_shape)
+            return new_shape
+
+    # input[2] = scales
+    if (
+        len(node.input) > 2
+        and node.input[2]
+        and self.is_constant(node.input[2])
+        and self.has_shape(node.input[0])
+    ):
+        scales = self.get_constant(node.input[2], computed_value=True)
+        if scales is not None and scales.size > 0:
+            shape = self.get_shape(node.input[0])
+            new_shape = tuple(
+                int(np.floor(d * s)) if isinstance(d, int) else f"int(floor({d}*{s}))"
+                for d, s in zip(shape, scales.tolist())
+            )
+            self.set_shape(node.output[0], new_shape)
+            return new_shape
+
+    if self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+        return True
+    assert not self._debug_shape_missing, (
+        f"Unable to compute shape for node: "
+        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+    )
+
+
 _set_shape_type_op_any_known = {
     "ArgMax": _set_shape_type_op_any_arg_max_min,
     "ArgMin": _set_shape_type_op_any_arg_max_min,
@@ -1614,6 +1660,7 @@ _set_shape_type_op_any_known = {
     "Pad": _set_shape_type_op_any_pad,
     "Range": _set_shape_type_op_any_range,
     "Reshape": _set_shape_type_op_any_reshape,
+    "Resize": _set_shape_type_op_any_resize,
     "RotaryEmbedding": _set_shape_type_op_any_rotary_embedding,
     "ScatterND": _set_shape_type_op_any_scatternd,
     "SequenceEmpty": _set_shape_type_op_any_sequence_empty,

@@ -828,6 +828,30 @@ class TestShapeTypeCompute(ExtTestCase):
         result = b._apply_expand_to_shape((3, 4), ("batch", 1))
         self.assertIsNone(result)
 
+    def test_op_resize_with_sizes(self):
+        model = _make_model(
+            [oh.make_node("Resize", ["X", "", "", "sizes"], ["Y"])],
+            [_mkv_("X", TFLOAT, [1, 3, 4, 5])],
+            [_mkv_("Y", TFLOAT, [1, 3, 8, 10])],
+            [onh.from_array(np.array([1, 3, 8, 10], dtype=np.int64), name="sizes")],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (1, 3, 8, 10))
+
+    def test_op_resize_with_scales(self):
+        model = _make_model(
+            [oh.make_node("Resize", ["X", "", "scales"], ["Y"])],
+            [_mkv_("X", TFLOAT, [1, 3, 4, 5])],
+            [_mkv_("Y", TFLOAT, [1, 3, 8, 10])],
+            [onh.from_array(np.array([1.0, 1.0, 2.0, 2.0], dtype=np.float32), name="scales")],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (1, 3, 8, 10))
+
     def test_op_sign(self):
         model = _make_model(
             [oh.make_node("Sign", ["X"], ["Y"])],
