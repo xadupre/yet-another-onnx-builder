@@ -482,6 +482,14 @@ def _set_shape_type_op_any_cast(self: ShapeBuilder, node: NodeProto):
     )
 
 
+def _set_shape_type_op_any_dropout(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for node type Dropout."
+    res = set_type_shape_unary_op(self, node.output[0], node.input[0])
+    if len(node.output) > 1 and node.output[1]:
+        set_type_shape_unary_op(self, node.output[1], node.input[0], itype=TensorProto.BOOL)
+    return res
+
+
 def _set_shape_type_op_any_rotary_embedding(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Cast."
     return set_type_shape_unary_op(self, node.output[0], node.input[0])
@@ -1359,12 +1367,7 @@ def _set_shape_type_op_any_unsqueeze(self: ShapeBuilder, node: NodeProto):
         if len(node.input) == 1:
             c = self.get_attribute(node, "axes")
             cst = np.array(c.ints, dtype=np.int64)
-        else:
-            assert self.is_constant(node.input[1]), (
-                f"axes {node.input[1]!r} from node {node.op_type}, "
-                f"name={node.name!r} is not a constant, "
-                f"the new shape cannot be inferred{self.get_debug_msg()}"
-            )
+        elif self.is_constant(node.input[1]):
             cst = self.get_constant(node.input[1])
             if isinstance(cst, NodeProto) and cst.op_type in (
                 "Constant",
@@ -1372,6 +1375,18 @@ def _set_shape_type_op_any_unsqueeze(self: ShapeBuilder, node: NodeProto):
                 "ConstantOfShape",
             ):
                 cst = self.get_constant(node.input[1], computed_value=True)
+        else:
+            # axes is not a constant but its shape may be known
+            if self.has_shape(node.input[1]):
+                n_axes = self.get_shape(node.input[1])
+                if n_axes and isinstance(n_axes[0], int):
+                    self.set_rank(node.output[0], self.get_rank(node.input[0]) + n_axes[0])
+                    return True
+            assert not self._debug_shape_missing, (
+                f"Unable to compute shape for node: "
+                f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+            )
+            return
 
         if isinstance(cst, np.ndarray):
             iaxes = (int(cst),) if len(cst.shape) == 0 else tuple(int(i) for i in cst)
@@ -1414,6 +1429,11 @@ def _set_shape_type_op_any_unsqueeze(self: ShapeBuilder, node: NodeProto):
             return
         self.set_rank(node.output[0], self.get_rank(node.input[0]) + n_axes)
         return True
+    elif self.has_rank(node.input[0]) and len(node.input) > 1 and self.has_shape(node.input[1]):
+        n_axes = self.get_shape(node.input[1])
+        if n_axes and isinstance(n_axes[0], int):
+            self.set_rank(node.output[0], self.get_rank(node.input[0]) + n_axes[0])
+            return True
     else:
         assert not self._debug_shape_missing, (
             f"Unable to compute shape for node: "
@@ -1447,12 +1467,7 @@ def _set_shape_type_op_any_squeeze(self: ShapeBuilder, node: NodeProto):
         if len(node.input) == 1:
             c = self.get_attribute(node, "axes")
             cst = np.array(c.ints, dtype=np.int64)
-        else:
-            assert self.is_constant(node.input[1]), (
-                f"axes from node {node.op_type}, "
-                f"name={node.name!r} is not a constant, "
-                f"the new shape cannot be inferred{self.get_debug_msg()}"
-            )
+        elif self.is_constant(node.input[1]):
             cst = self.get_constant(node.input[1])
             if isinstance(cst, NodeProto) and cst.op_type in (
                 "Constant",
@@ -1460,6 +1475,18 @@ def _set_shape_type_op_any_squeeze(self: ShapeBuilder, node: NodeProto):
                 "ConstantOfShape",
             ):
                 cst = self.get_constant(node.input[1], computed_value=True)
+        else:
+            # axes is not a constant but its shape may be known
+            if self.has_shape(node.input[1]):
+                n_axes = self.get_shape(node.input[1])
+                if n_axes and isinstance(n_axes[0], int):
+                    self.set_rank(node.output[0], self.get_rank(node.input[0]) - n_axes[0])
+                    return True
+            assert not self._debug_shape_missing, (
+                f"Unable to compute shape for node: "
+                f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+            )
+            return
         if isinstance(cst, np.ndarray):
             iaxes = set((int(cst),) if len(cst.shape) == 0 else tuple(int(i) for i in cst))
             shape = list(self.get_shape(node.input[0]))
@@ -1496,6 +1523,11 @@ def _set_shape_type_op_any_squeeze(self: ShapeBuilder, node: NodeProto):
             return
         self.set_rank(node.output[0], self.get_rank(node.input[0]) - n_axes)
         return True
+    elif self.has_rank(node.input[0]) and len(node.input) > 1 and self.has_shape(node.input[1]):
+        n_axes = self.get_shape(node.input[1])
+        if n_axes and isinstance(n_axes[0], int):
+            self.set_rank(node.output[0], self.get_rank(node.input[0]) - n_axes[0])
+            return True
     else:
         assert not self._debug_shape_missing, (
             f"Unable to compute shape for node: "
@@ -1674,7 +1706,7 @@ def _set_shape_type_op_any_gridsample(self: ShapeBuilder, node: NodeProto):
         x_shape = self.get_shape(node.input[0])
         grid_shape = self.get_shape(node.input[1])
         # Output: (N, C, *grid_spatial) where grid_spatial = grid[1:-1]
-        new_shape = (x_shape[0], x_shape[1]) + tuple(grid_shape[1:-1])
+        new_shape = (x_shape[0], x_shape[1], *grid_shape[1:-1])
         self.set_shape(node.output[0], new_shape)
         return new_shape
     if self.has_rank(node.input[0]):
@@ -1723,6 +1755,8 @@ def _set_shape_type_op_any_window(self: ShapeBuilder, node: NodeProto):
             self.set_shape(node.output[0], (size,))
             return
     self.set_rank(node.output[0], 1)
+
+
 def _set_shape_type_op_any_resize(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Resize."
     if self.has_device(node.input[0]):
@@ -1780,6 +1814,7 @@ _set_shape_type_op_any_known = {
     "Concat": _set_shape_type_op_any_concat,
     "Conv": _set_shape_type_op_any_conv_max_pool,
     "DepthToSpace": _set_shape_type_op_any_depth_to_space,
+    "Dropout": _set_shape_type_op_any_dropout,
     "Einsum": _set_shape_type_op_any_einsum,
     "EyeLike": _set_shape_type_op_any_eyelike,
     "Expand": _set_shape_type_op_any_expand,

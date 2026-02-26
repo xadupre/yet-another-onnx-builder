@@ -751,11 +751,6 @@ class TestShapeTypeCompute(ExtTestCase):
 
     def test_op_einsum_rank_only(self):
         # When input shapes are unavailable, at least rank should be set.
-        model = _make_model(
-            [oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="ij,jk->ik")],
-            [_mkv_("X", TFLOAT, [3, 4])],
-            [_mkv_("Z", TFLOAT, [3, 5])],
-        )
         b = _TestShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_rank("X", 2)
@@ -1252,7 +1247,6 @@ class TestShapeTypeCompute(ExtTestCase):
         _set_shape_type_op_any_unsqueeze(b, node)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_rank("Y"), 3)
-
 
         model = _make_model(
             [oh.make_node("Where", ["cond", "X", "Y"], ["Z"])],
@@ -2014,7 +2008,6 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(g._ranks.get("Y"), 3)
         self.assertEqual(g._types.get("Y"), TFLOAT)
 
-
     def test_gridsample_4d_static(self):
         g = _MockShapeBuilder()
         g._types["X"] = TFLOAT
@@ -2051,7 +2044,6 @@ class TestShapeTypeCompute(ExtTestCase):
         node = oh.make_node("GridSample", ["X", "grid"], ["Y"])
         _set_shape_type_op_any_known["GridSample"](g, node)
         self.assertEqual(g._ranks.get("Y"), 4)
-
 
     def test_blackman_window_known_size(self):
         """BlackmanWindow with constant size sets exact output shape."""

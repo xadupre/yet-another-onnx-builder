@@ -231,45 +231,53 @@ class _ShapeRuntime:
         return True
 
     def _update_value_shape_with_node_Squeeze(self, node: onnx.NodeProto) -> bool:
-        if self.is_constant_or_attribute(node, 1, "axes"):
-            y = self.value_as_shape(node.input[0])
-            if y is None:
-                node.doc_string += "#SV-Sq/3"
+        # Check if axes is available as a constant input or as an attribute
+        if len(node.input) > 1 and node.input[1]:
+            if not self.is_constant(node.input[1]):
+                node.doc_string += "#SV-Sq/2"
                 return False
-            i = self.get_constant_or_attribute(node, 1, "axes")
-            if isinstance(i, int):
-                ii = i
-            elif isinstance(i, np.ndarray) and i.dtype == np.int64 and i.shape in ((1,), tuple()):
-                ii = int(i[0]) if i.shape == (1,) else int(i)
-            elif i is None and isinstance(y, tuple) and len(y) == 1:
-                # A dimension a tensor of 1 element turned into a scalar
-                node.doc_string += "#SV-SqDim"
-                self.set_value_shape(node.output[0], y[0])
-                return True
-            else:
-                raise RuntimeError(
-                    f"Not implemented when node Squeeze with inputs={node.input}, "
-                    f"y={y!r}, i={i!r}{self.get_debug_msg()}"
-                )
-            assert (
-                ii == 0
-            ), f"A shape should only have one axis i={i}, y={y}{self.get_debug_msg()}"
-            if isinstance(y, str):
-                node.doc_string += "#SV-Sq1"
-                self.set_value_shape(node.output[0], f"squeeze({y})")
-                return True
-            if isinstance(y, int):
-                node.doc_string += "#SV-Sq2"
-                self.set_value_shape(node.output[0], y)
-                return True
-            assert isinstance(
-                y, tuple
-            ), f"Unexpected type {type(y)} for y={y} and i={i}{self.get_debug_msg()}"
-            node.doc_string += "#SV-Sq3"
+            i = self.get_constant(node.input[1], exc=False, computed_value=True)
+        elif node.attribute:
+            axes_attr = self.get_attribute(node, "axes", exc=False)
+            if axes_attr is None:
+                node.doc_string += "#SV-Sq/2"
+                return False
+            i = np.array(list(axes_attr.ints), dtype=np.int64)
+        else:
+            i = None
+        y = self.value_as_shape(node.input[0])
+        if y is None:
+            node.doc_string += "#SV-Sq/3"
+            return False
+        if isinstance(i, int):
+            ii = i
+        elif isinstance(i, np.ndarray) and i.dtype == np.int64 and i.shape in ((1,), tuple()):
+            ii = int(i[0]) if i.shape == (1,) else int(i)
+        elif i is None and isinstance(y, tuple) and len(y) == 1:
+            # A dimension a tensor of 1 element turned into a scalar
+            node.doc_string += "#SV-SqDim"
             self.set_value_shape(node.output[0], y[0])
             return True
-        node.doc_string += "#SV-Sq/2"
-        return False
+        else:
+            raise RuntimeError(
+                f"Not implemented when node Squeeze with inputs={node.input}, "
+                f"y={y!r}, i={i!r}{self.get_debug_msg()}"
+            )
+        assert ii == 0, f"A shape should only have one axis i={i}, y={y}{self.get_debug_msg()}"
+        if isinstance(y, str):
+            node.doc_string += "#SV-Sq1"
+            self.set_value_shape(node.output[0], f"squeeze({y})")
+            return True
+        if isinstance(y, int):
+            node.doc_string += "#SV-Sq2"
+            self.set_value_shape(node.output[0], y)
+            return True
+        assert isinstance(
+            y, tuple
+        ), f"Unexpected type {type(y)} for y={y} and i={i}{self.get_debug_msg()}"
+        node.doc_string += "#SV-Sq3"
+        self.set_value_shape(node.output[0], y[0])
+        return True
 
     def _update_value_shape_with_node_Unsqueeze(self, node: onnx.NodeProto) -> bool:
         values_0 = self.value_as_shape(node.input[0])
