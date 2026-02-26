@@ -670,6 +670,96 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 1, 4, 4))
 
+    def test_op_conv_auto_pad_same_upper(self):
+        model = _make_model(
+            [oh.make_node("Conv", ["X", "W"], ["Y"], strides=[2, 2], auto_pad="SAME_UPPER")],
+            [_mkv_("X", TFLOAT, [1, 1, 8, 8])],
+            [_mkv_("Y", TFLOAT, [1, 1, 4, 4])],
+            [onh.from_array(np.ones((1, 1, 3, 3), dtype=np.float32), name="W")],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (1, 1, 4, 4))
+
+    def test_op_conv_auto_pad_same_lower(self):
+        model = _make_model(
+            [oh.make_node("Conv", ["X", "W"], ["Y"], strides=[2, 2], auto_pad="SAME_LOWER")],
+            [_mkv_("X", TFLOAT, [1, 1, 8, 8])],
+            [_mkv_("Y", TFLOAT, [1, 1, 4, 4])],
+            [onh.from_array(np.ones((1, 1, 3, 3), dtype=np.float32), name="W")],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (1, 1, 4, 4))
+
+    def test_op_max_pool_ceil_mode(self):
+        model = _make_model(
+            [oh.make_node(
+                "MaxPool", ["X"], ["Y"], kernel_shape=[2, 2], strides=[2, 2], ceil_mode=1
+            )],
+            [_mkv_("X", TFLOAT, [1, 1, 7, 7])],
+            [_mkv_("Y", TFLOAT, [1, 1, 4, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (1, 1, 4, 4))
+
+    def test_op_max_pool_two_outputs(self):
+        model = _make_model(
+            [oh.make_node("MaxPool", ["X"], ["Y", "I"], kernel_shape=[2, 2], strides=[2, 2])],
+            [_mkv_("X", TFLOAT, [1, 1, 6, 6])],
+            [
+                _mkv_("Y", TFLOAT, [1, 1, 3, 3]),
+                _mkv_("I", TINT64, [1, 1, 3, 3]),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (1, 1, 3, 3))
+        self.assertEqual(b.get_type("I"), TINT64)
+        self.assertEqual(b.get_shape("I"), (1, 1, 3, 3))
+
+    def test_op_conv_dynamic_auto_pad(self):
+        # Dynamic input dimension with auto_pad triggers symbolic (conv_f3) output
+        model = _make_model(
+            [oh.make_node("Conv", ["X", "W"], ["Y"], strides=[2, 2], auto_pad="SAME_UPPER")],
+            [_mkv_("X", TFLOAT, [1, 1, "N", 8])],
+            [_mkv_("Y", TFLOAT, None)],
+            [onh.from_array(np.ones((1, 1, 3, 3), dtype=np.float32), name="W")],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (1, 1, "conv_f3_0(N,3,2)", 4))
+
+    def test_op_max_pool_kernel_1_dynamic(self):
+        # kernel_shape=1 with dynamic spatial dims triggers simplified formula branch
+        model = _make_model(
+            [oh.make_node("MaxPool", ["X"], ["Y"], kernel_shape=[1, 1])],
+            [_mkv_("X", TFLOAT, ["N", 1, "H", 8])],
+            [_mkv_("Y", TFLOAT, None)],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), ("N", 1, "H", 8))
+
+    def test_op_max_pool_rank_only(self):
+        # Input has rank but no shape: output rank is propagated
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_conv_max_pool
+
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_rank("X", 4)
+        node = oh.make_node("MaxPool", ["X"], ["Y"], kernel_shape=[2, 2])
+        _set_shape_type_op_any_conv_max_pool(b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_rank("Y"), 4)
+
     def test_op_gather(self):
         model = _make_model(
             [oh.make_node("Gather", ["X", "idx"], ["Y"], axis=0)],

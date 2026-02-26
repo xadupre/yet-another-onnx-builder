@@ -633,7 +633,9 @@ def _set_shape_type_op_any_conv_max_pool(self: ShapeBuilder, node: NodeProto):
     _ = lambda v: v if isinstance(v, int) or "," not in v else f"({v})"  # noqa: E731
 
     auto_pad_attr = self.get_attribute_with_default(node, "auto_pad", "NOTSET")
-    if auto_pad_attr and auto_pad_attr != "VALID":
+    if isinstance(auto_pad_attr, bytes):
+        auto_pad_attr = auto_pad_attr.decode("utf-8")
+    if auto_pad_attr and auto_pad_attr != "VALID" and auto_pad_attr != "NOTSET":
         for i in range(n_input_dims):
             stride = strides[i]
             if stride > 1:
