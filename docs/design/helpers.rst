@@ -7,7 +7,9 @@ Interesting Helpers
 ONNX Serialization of Nested Structured with Tensors
 ====================================================
 
-This relies on :class:`MiniOnnxBuilder <yobx.helpers.mini_onnx_builder.MiniOnnxBuilder>`.
+The main goal is to serialize any Python structure into ONNX
+format. This relies on :class:`MiniOnnxBuilder <yobx.helpers.mini_onnx_builder.MiniOnnxBuilder>`.
+Example :ref:`l-plot-mini-onnx-builder` shows an example.
 
 ONNX Graph Visualization
 ========================
