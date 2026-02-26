@@ -133,6 +133,39 @@ class TestCacheHelpers(ExtTestCase):
         self.assertIsInstance(rebuilt, transformers.cache_utils.DynamicCache)
         self.assertEqual(0, max_diff(cache, rebuilt)["abs"])
 
+    def test_cache_key_value_cls_layers(self):
+        bsize, nheads, slen, dim = 2, 4, 3, 7
+        t1 = torch.randn(bsize, nheads, slen, dim)
+        t2 = torch.randn(bsize, nheads, slen, dim)
+        t3 = torch.randn(bsize, nheads, slen, dim)
+        t4 = torch.randn(bsize, nheads, slen, dim)
+        cache = make_dynamic_cache([(t1, t2), (t3, t4)])
+        cv = CacheKeyValue(cache)
+        # cls_layers is set when constructed from a cache with layers attribute,
+        # or is None/passed-in when constructed from key_cache attribute
+        if hasattr(cache, "layers"):
+            self.assertIsInstance(cv.cls_layers, list)
+            self.assertEqual(2, len(cv.cls_layers))
+        self.assertEqual(2, cv.n_layers)
+        self.assertEqual(4, len(cv))
+
+    def test_max_diff_with_cache_key_value(self):
+        bsize, nheads, slen, dim = 2, 4, 3, 7
+        t1 = torch.randn(bsize, nheads, slen, dim)
+        t2 = torch.randn(bsize, nheads, slen, dim)
+        cache = make_dynamic_cache([(t1, t2)])
+        cv = CacheKeyValue(cache)
+        self.assertEqual(0, max_diff(cv, cv)["abs"])
+
+    def test_max_diff_cache_key_value_vs_tuple(self):
+        bsize, nheads, slen, dim = 2, 4, 3, 7
+        t1 = torch.randn(bsize, nheads, slen, dim)
+        t2 = torch.randn(bsize, nheads, slen, dim)
+        cache = make_dynamic_cache([(t1, t2)])
+        cv = CacheKeyValue(cache)
+        res = max_diff(cv, ([t1], [t2]))
+        self.assertEqual(0, res["abs"])
+
     @requires_transformers("4.57")
     def test_make_dynamic_cache_2_types(self):
         cache = make_dynamic_cache(
