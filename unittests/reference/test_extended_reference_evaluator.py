@@ -575,7 +575,6 @@ class TestReferenceOps(ExtTestCase):
         )
         ref.run(None, feeds)[0]
 
-
     def test_to_complex_2d(self):
         model = oh.make_model(
             oh.make_graph(
