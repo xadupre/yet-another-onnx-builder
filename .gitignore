@@ -208,3 +208,6 @@ __marimo__/
 
 # docs
 docs/sg_execution_times.rst
+
+# tests
+dump_test*
