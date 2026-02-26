@@ -463,6 +463,13 @@ class _BuilderRuntime:
                 f"node.name={node.name!r}, inputs={node.input}, outputs={node.output}"
             ) from e
 
+    def make_torch_tensor_from_np_array(
+        self,
+        arr: np.ndarray,
+    ) -> "torch.Tensor":  # noqa: F821
+        """Converts a numpy array to a torch tensor."""
+        return self.torch.from_numpy(arr)
+
     def _apply_where(
         self,
         node: NodeProto,
@@ -472,7 +479,7 @@ class _BuilderRuntime:
         for k, v in feeds.items():
             if not hasattr(self, "torch"):
                 new_feeds[k] = v
-            if isinstance(v, np.ndarray):
+            elif isinstance(v, np.ndarray):
                 # Type conversion between numpy and torch is not robust.
                 itype = dtype_to_tensor_dtype(v.dtype)
                 ttype = onnx_dtype_to_torch_dtype(itype)

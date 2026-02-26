@@ -190,5 +190,56 @@ class TestApplyUnsqueeze(ExtTestCase):
         self.assertEqual(result[0].shape, (1, 2, 3, 1))
 
 
+class TestApplyWhere(ExtTestCase):
+    def setUp(self):
+        self.b_numpy = BasicShapeBuilder()
+        self.b_torch = _TorchShapeBuilder()
+
+    def test_where_numpy_1d(self):
+        node = oh.make_node("Where", ["cond", "x", "y"], ["z"])
+        cond = np.array([True, False, True])
+        x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        y = np.array([10.0, 20.0, 30.0], dtype=np.float32)
+        result = self.b_numpy._apply_where(node, {"cond": cond, "x": x, "y": y})
+        self.assertEqual(len(result), 1)
+        expected = np.array([1.0, 20.0, 3.0], dtype=np.float32)
+        self.assertEqualArray(expected, result[0])
+
+    def test_where_numpy_2d(self):
+        node = oh.make_node("Where", ["cond", "x", "y"], ["z"])
+        cond = np.array([[True, False], [False, True]])
+        x = np.ones((2, 2), dtype=np.float32)
+        y = np.zeros((2, 2), dtype=np.float32)
+        result = self.b_numpy._apply_where(node, {"cond": cond, "x": x, "y": y})
+        self.assertEqual(len(result), 1)
+        expected = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+        self.assertEqualArray(expected, result[0])
+
+    def test_where_torch_tensors(self):
+        import torch
+
+        node = oh.make_node("Where", ["cond", "x", "y"], ["z"])
+        cond = torch.tensor([True, False, True])
+        x = torch.tensor([1.0, 2.0, 3.0])
+        y = torch.tensor([10.0, 20.0, 30.0])
+        result = self.b_torch._apply_where(node, {"cond": cond, "x": x, "y": y})
+        self.assertEqual(len(result), 1)
+        expected = torch.tensor([1.0, 20.0, 3.0])
+        self.assertEqualArray(expected, result[0])
+
+    def test_where_numpy_inputs_with_torch(self):
+        import torch
+
+        node = oh.make_node("Where", ["cond", "x", "y"], ["z"])
+        cond = np.array([True, False, True])
+        x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        y = np.array([10.0, 20.0, 30.0], dtype=np.float32)
+        result = self.b_torch._apply_where(node, {"cond": cond, "x": x, "y": y})
+        self.assertEqual(len(result), 1)
+        self.assertIsInstance(result[0], torch.Tensor)
+        expected = torch.tensor([1.0, 20.0, 3.0])
+        self.assertEqualArray(expected, result[0])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
