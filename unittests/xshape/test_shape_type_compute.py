@@ -705,6 +705,69 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 5))
 
+    def test_op_einsum_matmul(self):
+        model = _make_model(
+            [oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="ij,jk->ik")],
+            [_mkv_("X", TFLOAT, [3, 4]), _mkv_("Y", TFLOAT, [4, 5])],
+            [_mkv_("Z", TFLOAT, [3, 5])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Z"), TFLOAT)
+        self.assertEqual(b.get_shape("Z"), (3, 5))
+
+    def test_op_einsum_outer_product(self):
+        model = _make_model(
+            [oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="i,j->ij")],
+            [_mkv_("X", TFLOAT, [3]), _mkv_("Y", TFLOAT, [4])],
+            [_mkv_("Z", TFLOAT, [3, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Z"), TFLOAT)
+        self.assertEqual(b.get_shape("Z"), (3, 4))
+
+    def test_op_einsum_reduce(self):
+        model = _make_model(
+            [oh.make_node("Einsum", ["X"], ["Z"], equation="ij->i")],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Z", TFLOAT, [3])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Z"), TFLOAT)
+        self.assertEqual(b.get_shape("Z"), (3,))
+
+    def test_op_einsum_batched_matmul(self):
+        model = _make_model(
+            [oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="...ij,...jk->...ik")],
+            [_mkv_("X", TFLOAT, [2, 3, 4]), _mkv_("Y", TFLOAT, [2, 4, 5])],
+            [_mkv_("Z", TFLOAT, [2, 3, 5])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Z"), TFLOAT)
+        self.assertEqual(b.get_shape("Z"), (2, 3, 5))
+
+    def test_op_einsum_rank_only(self):
+        # When input shapes are unavailable, at least rank should be set.
+        model = _make_model(
+            [oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="ij,jk->ik")],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Z", TFLOAT, [3, 5])],
+        )
+        b = _TestShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_rank("X", 2)
+        b.set_type("Y", TFLOAT)
+        b.set_rank("Y", 2)
+        node = oh.make_node("Einsum", ["X", "Y"], ["Z"], equation="ij,jk->ik")
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_einsum
+
+        _set_shape_type_op_any_einsum(b, node)
+        self.assertEqual(b.get_type("Z"), TFLOAT)
+        self.assertEqual(b.get_rank("Z"), 2)
+
     def test_op_matmul(self):
         model = _make_model(
             [oh.make_node("MatMul", ["X", "Y"], ["Z"])],
@@ -1771,6 +1834,65 @@ class TestShapeTypeCompute(ExtTestCase):
         _set_shape_type_op_any_known["GatherElements"](g, node)
         self.assertEqual(g._types.get("Y"), TFLOAT)
         self.assertEqual(g._ranks.get("Y"), 3)
+
+    # ------------------------------------------------------------------
+    # _set_shape_type_op_any_gather
+    # ------------------------------------------------------------------
+
+    def test_gather_axis0(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (5, 4)
+        g._types["idx"] = TINT64
+        g._shapes["idx"] = (3,)
+        node = oh.make_node("Gather", ["X", "idx"], ["Y"], axis=0)
+        _set_shape_type_op_any_known["Gather"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (3, 4))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gather_axis1(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (3, 5)
+        g._types["idx"] = TINT64
+        g._shapes["idx"] = (2,)
+        node = oh.make_node("Gather", ["X", "idx"], ["Y"], axis=1)
+        _set_shape_type_op_any_known["Gather"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (3, 2))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gather_scalar_indices(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (5, 4)
+        g._types["idx"] = TINT64
+        g._shapes["idx"] = ()
+        node = oh.make_node("Gather", ["X", "idx"], ["Y"], axis=0)
+        _set_shape_type_op_any_known["Gather"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (4,))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gather_nd_general(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 3, 4)
+        g._types["idx"] = TINT64
+        g._shapes["idx"] = (5, 6)
+        node = oh.make_node("Gather", ["X", "idx"], ["Y"], axis=1)
+        _set_shape_type_op_any_known["Gather"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (2, 5, 6, 4))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gather_rank_only(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._ranks["X"] = 3
+        g._types["idx"] = TINT64
+        g._ranks["idx"] = 2
+        node = oh.make_node("Gather", ["X", "idx"], ["Y"], axis=0)
+        _set_shape_type_op_any_known["Gather"](g, node)
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+        self.assertEqual(g._ranks.get("Y"), 4)
 
     # ------------------------------------------------------------------
     # _set_shape_type_op_any_attention
