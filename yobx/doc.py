@@ -293,13 +293,13 @@ def plot_dot(
     figsize: Optional[Tuple[int, int]] = None,
 ) -> "matplotlib.axis.Axis":  # noqa: F821
     """
-    Draws a dot graph into a matplotlib graph.
+    Draws a dot graph into a matplotlib axis.
 
     :param dot: dot graph or ModelProto
-    :param image: output image, None, just returns the output
+    :param ax: optional matplotlib axis; if None, a new figure and axis are created
     :param engine: *dot* or *neato*
-    :param figsize: figsize of ax is None
-    :return: :epkg:`Graphviz` output or, the dot text if *image* is None
+    :param figsize: size of the figure if *ax* is None
+    :return: matplotlib axis containing the rendered graph image
 
     .. plot::
 
