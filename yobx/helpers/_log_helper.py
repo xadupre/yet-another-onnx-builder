@@ -182,7 +182,7 @@ def enumerate_csv_files(
     """
     if not isinstance(data, list):
         data = [data]
-    for itn, filename in enumerate(data):
+    for itn, filename in enumerate(data):  # pyrefly: ignore[bad-argument-type]
         if isinstance(filename, pandas.DataFrame):
             if verbose:
                 print(f"[enumerate_csv_files] data[{itn}] is a dataframe")
@@ -315,7 +315,12 @@ def align_dataframe_with(
 def apply_excel_style(
     filename_or_writer: Any,
     f_highlights: Optional[  # type: ignore[name-defined]
-        Dict[str, Callable[[Any], "CubeViewDef.HighLightKind"]]  # noqa: F821
+        Dict[
+            str,
+            Callable[
+                [Any], "CubeViewDef.HighLightKind"  # pyrefly: ignore[unknown-name]]  # noqa: F821
+            ],
+        ]
     ] = None,
     time_mask_view: Optional[Dict[str, pandas.DataFrame]] = None,
     verbose: int = 0,
