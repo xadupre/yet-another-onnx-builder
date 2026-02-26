@@ -37,12 +37,13 @@ Pass any of the following to the constructor, then call
 .. runpython::
     :showcode:
 
+    import io
     import textwrap
     import pandas
     from yobx.helpers.cube_helper import CubeLogs
 
     raw = pandas.read_csv(
-        __import__("io").StringIO(
+        io.StringIO(
             textwrap.dedent(
                 """
                 date,version_python,model_name,model_exporter,time_latency,time_baseline
@@ -92,12 +93,13 @@ must return a :class:`~pandas.Series`.  Computed columns are appended to the
 .. runpython::
     :showcode:
 
+    import io
     import textwrap
     import pandas
     from yobx.helpers.cube_helper import CubeLogs
 
     raw = pandas.read_csv(
-        __import__("io").StringIO(
+        io.StringIO(
             textwrap.dedent(
                 """
                 date,version_python,model_name,model_exporter,time_latency,time_baseline
@@ -130,12 +132,13 @@ pivot table from the cube.  Rows and columns of the pivot are controlled by a
 .. runpython::
     :showcode:
 
+    import io
     import textwrap
     import pandas
     from yobx.helpers.cube_helper import CubeLogs, CubeViewDef
 
     raw = pandas.read_csv(
-        __import__("io").StringIO(
+        io.StringIO(
             textwrap.dedent(
                 """
                 date,version_python,model_name,model_exporter,time_latency,time_baseline
@@ -228,12 +231,13 @@ statistics:
 .. runpython::
     :showcode:
 
+    import io
     import textwrap
     import pandas
     from yobx.helpers.cube_helper import CubeLogs
 
     raw = pandas.read_csv(
-        __import__("io").StringIO(
+        io.StringIO(
             textwrap.dedent(
                 """
                 date,version_python,model_name,model_exporter,time_latency,time_baseline
