@@ -776,7 +776,7 @@ def string_type(
 
     if verbose:
         print(f"[string_type] END:{type(obj)}")
-    raise AssertionError(f"Unsupported type {type(obj).__name__!r} - {type(obj)}")
+    raise TypeError(f"Unsupported type {type(obj).__name__!r} - {type(obj)}")
 
 
 def string_signature(sig: Any) -> str:

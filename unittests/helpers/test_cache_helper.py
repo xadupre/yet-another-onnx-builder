@@ -3,7 +3,7 @@ import torch
 import transformers
 from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.helpers import string_type, max_diff
-from yobx.helpers.cache_helper import make_dynamic_cache, make_static_cache
+from yobx.helpers.cache_helper import CacheKeyValue, make_dynamic_cache, make_static_cache
 
 
 class TestCacheHelpers(ExtTestCase):
@@ -79,6 +79,59 @@ class TestCacheHelpers(ExtTestCase):
             dynamic_shapes=({0: DYN, 1: DYN}, sh, sh),
         )
         self.assertNotEmpty(ep)
+
+    def test_cache_key_value_none(self):
+        cv = CacheKeyValue(None)
+        self.assertIsNone(cv.key_cache)
+        self.assertIsNone(cv.value_cache)
+        self.assertEqual(0, cv.n_layers)
+        self.assertEqual(0, len(cv))
+        self.assertEqual([], cv.aslist())
+
+    def test_cache_key_value_from_list(self):
+        bsize, nheads, slen, dim = 2, 4, 3, 7
+        t1 = torch.randn(bsize, nheads, slen, dim)
+        t2 = torch.randn(bsize, nheads, slen, dim)
+        t3 = torch.randn(bsize, nheads, slen, dim)
+        t4 = torch.randn(bsize, nheads, slen, dim)
+        cv = CacheKeyValue([t1, t2, t3, t4])
+        self.assertEqual(2, cv.n_layers)
+        self.assertEqual(4, len(cv))
+        lst = cv.aslist()
+        self.assertEqual(4, len(lst))
+        self.assertEqualArray(t1, lst[0])
+        self.assertEqualArray(t2, lst[1])
+        self.assertEqualArray(t3, lst[2])
+        self.assertEqualArray(t4, lst[3])
+
+    def test_cache_key_value_from_dynamic_cache(self):
+        bsize, nheads, slen, dim = 2, 4, 3, 7
+        t1 = torch.randn(bsize, nheads, slen, dim)
+        t2 = torch.randn(bsize, nheads, slen, dim)
+        t3 = torch.randn(bsize, nheads, slen, dim)
+        t4 = torch.randn(bsize, nheads, slen, dim)
+        cache = make_dynamic_cache([(t1, t2), (t3, t4)])
+        cv = CacheKeyValue(cache)
+        self.assertEqual(2, cv.n_layers)
+        self.assertEqual(4, len(cv))
+        lst = cv.aslist()
+        self.assertEqual(4, len(lst))
+        self.assertEqualArray(t1, lst[0])
+        self.assertEqualArray(t2, lst[1])
+        self.assertEqualArray(t3, lst[2])
+        self.assertEqualArray(t4, lst[3])
+
+    def test_cache_key_value_make_dynamic_cache(self):
+        bsize, nheads, slen, dim = 2, 4, 3, 7
+        t1 = torch.randn(bsize, nheads, slen, dim)
+        t2 = torch.randn(bsize, nheads, slen, dim)
+        t3 = torch.randn(bsize, nheads, slen, dim)
+        t4 = torch.randn(bsize, nheads, slen, dim)
+        cache = make_dynamic_cache([(t1, t2), (t3, t4)])
+        cv = CacheKeyValue(cache)
+        rebuilt = cv.make_dynamic_cache()
+        self.assertIsInstance(rebuilt, transformers.cache_utils.DynamicCache)
+        self.assertEqual(0, max_diff(cache, rebuilt)["abs"])
 
     @requires_transformers("4.57")
     def test_make_dynamic_cache_2_types(self):
