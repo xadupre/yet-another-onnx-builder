@@ -1723,6 +1723,8 @@ def _set_shape_type_op_any_window(self: ShapeBuilder, node: NodeProto):
             self.set_shape(node.output[0], (size,))
             return
     self.set_rank(node.output[0], 1)
+
+
 def _set_shape_type_op_any_resize(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Resize."
     if self.has_device(node.input[0]):

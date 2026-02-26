@@ -2045,7 +2045,6 @@ class TestShapeTypeCompute(ExtTestCase):
         _set_shape_type_op_any_known["GridSample"](g, node)
         self.assertEqual(g._ranks.get("Y"), 4)
 
-
     def test_blackman_window_known_size(self):
         """BlackmanWindow with constant size sets exact output shape."""
         model = _make_model(
