@@ -9,6 +9,7 @@ from yobx.reference import ExtendedReferenceEvaluator
 
 TFLOAT = onnx.TensorProto.FLOAT
 TINT64 = onnx.TensorProto.INT64
+TUINT8 = onnx.TensorProto.UINT8
 TCOMPLEX64 = onnx.TensorProto.COMPLEX64
 TCOMPLEX128 = onnx.TensorProto.COMPLEX128
 TDOUBLE = onnx.TensorProto.DOUBLE
@@ -66,6 +67,50 @@ class TestReferenceOps(ExtTestCase):
         a = np.arange(4).reshape(-1, 2)
         got = ref.run(None, {"X": a, "Y": a})
         self.assertEqualArray(a.T @ a.T, got[0])
+
+    def test_qlinear_average_pool(self):
+        from onnxruntime import InferenceSession
+
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "QLinearAveragePool",
+                        ["x", "x_scale", "x_zero_point", "y_scale", "y_zero_point"],
+                        ["y"],
+                        domain="com.microsoft",
+                        kernel_shape=[2, 2],
+                        strides=[1, 1],
+                        channels_last=0,
+                    )
+                ],
+                "name",
+                [
+                    oh.make_tensor_value_info("x", TUINT8, None),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                ],
+                [oh.make_tensor_value_info("y", TUINT8, None)],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        feeds = {
+            "x": np.arange(1, 17, dtype=np.uint8).reshape(1, 1, 4, 4),
+            "x_scale": np.array(0.1, dtype=np.float32),
+            "x_zero_point": np.array(0, dtype=np.uint8),
+            "y_scale": np.array(0.1, dtype=np.float32),
+            "y_zero_point": np.array(0, dtype=np.uint8),
+        }
+        ref = ExtendedReferenceEvaluator(model)
+        got = ref.run(None, feeds)
+        sess = InferenceSession(
+            model.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        expected = sess.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0])
 
     def test_memcpy(self):
         model = oh.make_model(
