@@ -466,7 +466,6 @@ def get_parser_print() -> ArgumentParser:
             printer - onnx.printer.to_text(...)
             raw     - just prints the model with print(...)
             shape   - prints every node node with input and output shapes
-            text    - uses GraphRendering
 
             """.strip("\n")),
     )
