@@ -30,6 +30,7 @@ from yobx.xshape.shape_type_compute import (
     _set_shape_type_op_any_known,
     _set_shape_type_op_any_attention,
     _set_shape_type_op_any_squeeze,
+    _set_shape_type_op_any_unsqueeze,
 )
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -1119,7 +1120,65 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_rank("Y"), 2)
 
-    def test_op_where(self):
+    def test_op_squeeze_rank_only_axes_attribute(self):
+        # Pre-opset-13 style: axes as attribute, rank-only input.
+        b = _TestShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_rank("X", 3)
+        node = oh.make_node("Squeeze", ["X"], ["Y"], axes=[0])
+        _set_shape_type_op_any_squeeze(b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_rank("Y"), 2)
+
+    def test_op_unsqueeze_negative_axes(self):
+        # Negative axis: axis -1 on shape [3, 4] inserts dim at the end -> [3, 4, 1].
+        model = _make_model(
+            [oh.make_node("Unsqueeze", ["X", "axes"], ["Y"])],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Y", TFLOAT, [3, 4, 1])],
+            [onh.from_array(np.array([-1], dtype=np.int64), name="axes")],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (3, 4, 1))
+
+    def test_op_unsqueeze_axes_attribute(self):
+        # Pre-opset-13 style: axes given as an attribute rather than an input.
+        model = _make_model(
+            [oh.make_node("Unsqueeze", ["X"], ["Y"], axes=[0])],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Y", TFLOAT, [1, 3, 4])],
+            opset=12,
+        )
+        b = _TestShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (1, 3, 4))
+
+    def test_op_unsqueeze_rank_only(self):
+        # When only rank (not shape) is known the output rank is inferred.
+        b = _TestShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_rank("X", 2)
+        axes_cst = onh.from_array(np.array([0], dtype=np.int64), name="axes")
+        b.set_constant("axes", axes_cst)
+        node = oh.make_node("Unsqueeze", ["X", "axes"], ["Y"])
+        _set_shape_type_op_any_unsqueeze(b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_rank("Y"), 3)
+
+    def test_op_unsqueeze_rank_only_axes_attribute(self):
+        # Pre-opset-13 style: axes as attribute, rank-only input.
+        b = _TestShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_rank("X", 2)
+        node = oh.make_node("Unsqueeze", ["X"], ["Y"], axes=[0])
+        _set_shape_type_op_any_unsqueeze(b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_rank("Y"), 3)
+
+
         model = _make_model(
             [oh.make_node("Where", ["cond", "X", "Y"], ["Z"])],
             [
@@ -1714,6 +1773,65 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(g._ranks.get("Y"), 3)
 
     # ------------------------------------------------------------------
+    # _set_shape_type_op_any_gather
+    # ------------------------------------------------------------------
+
+    def test_gather_axis0(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (5, 4)
+        g._types["idx"] = TINT64
+        g._shapes["idx"] = (3,)
+        node = oh.make_node("Gather", ["X", "idx"], ["Y"], axis=0)
+        _set_shape_type_op_any_known["Gather"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (3, 4))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gather_axis1(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (3, 5)
+        g._types["idx"] = TINT64
+        g._shapes["idx"] = (2,)
+        node = oh.make_node("Gather", ["X", "idx"], ["Y"], axis=1)
+        _set_shape_type_op_any_known["Gather"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (3, 2))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gather_scalar_indices(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (5, 4)
+        g._types["idx"] = TINT64
+        g._shapes["idx"] = ()
+        node = oh.make_node("Gather", ["X", "idx"], ["Y"], axis=0)
+        _set_shape_type_op_any_known["Gather"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (4,))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gather_nd_general(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 3, 4)
+        g._types["idx"] = TINT64
+        g._shapes["idx"] = (5, 6)
+        node = oh.make_node("Gather", ["X", "idx"], ["Y"], axis=1)
+        _set_shape_type_op_any_known["Gather"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (2, 5, 6, 4))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gather_rank_only(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._ranks["X"] = 3
+        g._types["idx"] = TINT64
+        g._ranks["idx"] = 2
+        node = oh.make_node("Gather", ["X", "idx"], ["Y"], axis=0)
+        _set_shape_type_op_any_known["Gather"](g, node)
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+        self.assertEqual(g._ranks.get("Y"), 4)
+
+    # ------------------------------------------------------------------
     # _set_shape_type_op_any_attention
     # ------------------------------------------------------------------
 
@@ -1791,6 +1909,24 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(g._types.get("out"), TFLOAT16)
         self.assertEqual(g._types.get("present_key"), TFLOAT16)
         self.assertEqual(g._types.get("present_value"), TFLOAT)
+
+    def test_set_shape_type_op_any_softmax_with_shape(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 10)
+        node = oh.make_node("Softmax", ["X"], ["Y"])
+        _set_shape_type_op_any_known["Softmax"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (2, 10))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_set_shape_type_op_any_softmax_rank_only(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._ranks["X"] = 3
+        node = oh.make_node("Softmax", ["X"], ["Y"])
+        _set_shape_type_op_any_known["Softmax"](g, node)
+        self.assertEqual(g._ranks.get("Y"), 3)
+        self.assertEqual(g._types.get("Y"), TFLOAT)
 
 
 if __name__ == "__main__":

@@ -746,19 +746,9 @@ def _set_shape_type_op_any_gather(self: ShapeBuilder, node: NodeProto):
         sh2 = self.get_shape(node.input[1])
         att = self.get_attribute(node, "axis", exc=False)
         axis = 0 if att is None else att.i
-        if len(sh2) == 0:
-            new_shape = tuple(s for i, s in enumerate(sh1) if i != axis)
-            self.set_shape(node.output[0], new_shape, allow_zero=True)
-            return new_shape
-        if len(sh1) == len(sh2) == 2 and axis == 0:
-            new_shape = (*sh2, sh1[-1])
-            self.set_shape(node.output[0], new_shape)
-            return new_shape
-        if len(sh1) == len(sh2) == 1:
-            self.set_shape(node.output[0], sh2)
-            return sh2
-        self.set_rank(node.output[0], len(sh1) + len(sh2) - 1)
-        return True
+        new_shape = sh1[:axis] + sh2 + sh1[axis + 1 :]
+        self.set_shape(node.output[0], new_shape, allow_zero=len(sh2) == 0)
+        return new_shape
     if self.has_rank(node.input[0]) and self.has_rank(node.input[1]):
         rk1 = self.get_rank(node.input[0])
         rk2 = self.get_rank(node.input[1])
@@ -1317,13 +1307,24 @@ def _set_shape_type_op_any_unsqueeze(self: ShapeBuilder, node: NodeProto):
                 f"unable to set type and shape for node {node.op_type} "
                 f"with name={node.name!r}{self.get_debug_msg()}"
             )
-    elif self.has_rank(node.input[0]) and self.is_constant(node.input[1]):
-        cst = self.get_constant(node.input[1], computed_value=True)
-        assert cst is not None, (
-            f"unable to extract constant {node.input[1]!r} in node "
-            f"{self.pretty_node(node)}{self.get_debug_msg()}"
-        )
-        self.set_rank(node.output[0], self.get_rank(node.input[0]) + cst.size)
+    elif self.has_rank(node.input[0]):
+        if len(node.input) == 1:
+            c = self.get_attribute(node, "axes")
+            n_axes = len(c.ints)
+        elif self.is_constant(node.input[1]):
+            cst = self.get_constant(node.input[1], computed_value=True)
+            assert cst is not None, (
+                f"unable to extract constant {node.input[1]!r} in node "
+                f"{self.pretty_node(node)}{self.get_debug_msg()}"
+            )
+            n_axes = cst.size
+        else:
+            assert not self._debug_shape_missing, (
+                f"Unable to compute shape for node: "
+                f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+            )
+            return
+        self.set_rank(node.output[0], self.get_rank(node.input[0]) + n_axes)
         return True
     else:
         assert not self._debug_shape_missing, (
@@ -1392,13 +1393,20 @@ def _set_shape_type_op_any_squeeze(self: ShapeBuilder, node: NodeProto):
                 f"unable to set type and shape for node {node.op_type} "
                 f"with name={node.name!r}{self.get_debug_msg()}"
             )
-    elif self.has_rank(node.input[0]) and self.is_constant(node.input[1]):
-        cst = self.get_constant(node.input[1], computed_value=True)
-        self.set_rank(
-            node.output[0],
-            self.get_rank(node.input[0])
-            - int(cst.numel() if hasattr(cst, "numel") else cst.size),
-        )
+    elif self.has_rank(node.input[0]):
+        if len(node.input) == 1 and node.attribute:
+            c = self.get_attribute(node, "axes")
+            n_axes = len(c.ints)
+        elif len(node.input) > 1 and self.is_constant(node.input[1]):
+            cst = self.get_constant(node.input[1], computed_value=True)
+            n_axes = int(cst.numel() if hasattr(cst, "numel") else cst.size)
+        else:
+            assert not self._debug_shape_missing, (
+                f"Unable to compute shape for node: "
+                f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+            )
+            return
+        self.set_rank(node.output[0], self.get_rank(node.input[0]) - n_axes)
         return True
     else:
         assert not self._debug_shape_missing, (
@@ -1680,6 +1688,7 @@ _set_shape_type_op_any_known = {
     "SequenceEmpty": _set_shape_type_op_any_sequence_empty,
     "Sign": _set_shape_type_op_any_sign,
     "Slice": _set_shape_type_op_any_slice,
+    "Softmax": _set_shape_type_op_any_unary,
     "SpaceToDepth": _set_shape_type_op_any_space_to_depth,
     "Split": _set_shape_type_op_any_split,
     "Squeeze": _set_shape_type_op_any_squeeze,
