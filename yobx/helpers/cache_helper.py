@@ -21,7 +21,7 @@ def _preprocess_key_value_pairs(
     key_value_pairs: Union[List[torch.Tensor], List[Tuple[torch.Tensor, torch.Tensor]]],
 ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
     if not key_value_pairs or isinstance(key_value_pairs[0], tuple):
-        return key_value_pairs
+        return key_value_pairs  # type: ignore[return-value]
     return list(zip(key_value_pairs[::2], key_value_pairs[1::2]))  # type: ignore[arg-type]
 
 
@@ -315,7 +315,7 @@ def make_dynamic_cache(
         f"Unexpected number of layers in the cache ({len(cache.layers)}), "
         f"{len(key_value_pairs)} expected."
     )
-    return finalize_cache(cache)
+    return finalize_cache(cache)  # type: ignore[return-value]
 
 
 def finalize_cache(cache: transformers.cache_utils.Cache) -> transformers.cache_utils.Cache:

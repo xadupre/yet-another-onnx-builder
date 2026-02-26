@@ -51,7 +51,7 @@ def dtype_to_tensor_dtype(dt: Union[np.dtype, "torch.dtype"]) -> int:  # type: i
         pass
     from .torch_helper import torch_dtype_to_onnx_dtype
 
-    return torch_dtype_to_onnx_dtype(dt)
+    return torch_dtype_to_onnx_dtype(dt)  # type: ignore[arg-type]
 
 
 def tensor_dtype_to_np_dtype(tensor_dtype: int) -> np.dtype:
@@ -163,7 +163,7 @@ def pretty_onnx(
         return f"{text}  ---  {rows[0]}"
 
     if isinstance(onx, onnx.TensorProto):
-        shape = "x".join(d.dim_param or str(d.dim_value) for d in onx.dims)
+        shape = "x".join(d.dim_param or str(d.dim_value) for d in onx.dims)  # type: ignore[assignment]
         return f"onnx.TensorProto:{onx.data_type}:{shape}:{onx.name}"
 
     assert not isinstance(
