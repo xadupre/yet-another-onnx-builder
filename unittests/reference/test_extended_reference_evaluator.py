@@ -225,6 +225,121 @@ class TestReferenceOps(ExtTestCase):
         expected = sess.run(None, feeds)
         self.assertEqualArray(expected[0], got[0])
 
+    def test_qlinear_conv_3d(self):
+        from onnxruntime import InferenceSession
+
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "QLinearConv",
+                        [
+                            "x",
+                            "x_scale",
+                            "x_zero_point",
+                            "w",
+                            "w_scale",
+                            "w_zero_point",
+                            "y_scale",
+                            "y_zero_point",
+                        ],
+                        ["y"],
+                        domain="com.microsoft",
+                        kernel_shape=[3],
+                        strides=[1],
+                        channels_last=0,
+                    )
+                ],
+                "name",
+                [
+                    oh.make_tensor_value_info("x", TUINT8, None),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("w", TUINT8, None),
+                    oh.make_tensor_value_info("w_scale", TFLOAT, None),
+                    oh.make_tensor_value_info("w_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                ],
+                [oh.make_tensor_value_info("y", TUINT8, None)],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        feeds = {
+            "x": np.arange(1, 9, dtype=np.uint8).reshape(1, 1, 8),
+            "x_scale": np.array(0.1, dtype=np.float32),
+            "x_zero_point": np.array(0, dtype=np.uint8),
+            "w": np.ones((1, 1, 3), dtype=np.uint8),
+            "w_scale": np.array(0.1, dtype=np.float32),
+            "w_zero_point": np.array(0, dtype=np.uint8),
+            "y_scale": np.array(0.1, dtype=np.float32),
+            "y_zero_point": np.array(0, dtype=np.uint8),
+        }
+        ref = ExtendedReferenceEvaluator(model)
+        got = ref.run(None, feeds)
+        sess = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = sess.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0])
+
+    def test_qlinear_conv_channels_last_3d(self):
+        from onnxruntime import InferenceSession
+
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "QLinearConv",
+                        [
+                            "x",
+                            "x_scale",
+                            "x_zero_point",
+                            "w",
+                            "w_scale",
+                            "w_zero_point",
+                            "y_scale",
+                            "y_zero_point",
+                        ],
+                        ["y"],
+                        domain="com.microsoft",
+                        kernel_shape=[3],
+                        strides=[1],
+                        channels_last=1,
+                    )
+                ],
+                "name",
+                [
+                    oh.make_tensor_value_info("x", TUINT8, None),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("w", TUINT8, None),
+                    oh.make_tensor_value_info("w_scale", TFLOAT, None),
+                    oh.make_tensor_value_info("w_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                ],
+                [oh.make_tensor_value_info("y", TUINT8, None)],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        # x is in NLC format: (N, L, C); w is in NCK format: (M, C/group, kL)
+        feeds = {
+            "x": np.arange(1, 9, dtype=np.uint8).reshape(1, 8, 1),
+            "x_scale": np.array(0.1, dtype=np.float32),
+            "x_zero_point": np.array(0, dtype=np.uint8),
+            "w": np.ones((1, 1, 3), dtype=np.uint8),
+            "w_scale": np.array(0.1, dtype=np.float32),
+            "w_zero_point": np.array(0, dtype=np.uint8),
+            "y_scale": np.array(0.1, dtype=np.float32),
+            "y_zero_point": np.array(0, dtype=np.uint8),
+        }
+        ref = ExtendedReferenceEvaluator(model)
+        got = ref.run(None, feeds)
+        sess = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = sess.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0])
+
     def test_memcpy(self):
         model = oh.make_model(
             oh.make_graph(
