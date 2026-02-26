@@ -1,4 +1,7 @@
 
+.. _l-shape-builder-design:
+.. _l-design-shape:
+
 ============
 ShapeBuilder
 ============
@@ -115,6 +118,12 @@ to a whole shape at once.
     concrete = builder.evaluate_shape("Z", context)
     print("concrete shape :", concrete)
 
+.. seealso::
+
+    :ref:`sphx_glr_auto_examples_plot_shape_expressions_py` — sphinx-gallery
+    example demonstrating ``Concat``, ``Reshape``, and ``Split`` symbolic
+    expressions, automatic simplification, and evaluation with concrete values.
+
 Example
 =======
 
@@ -160,3 +169,46 @@ on it, and prints the inferred shapes and types.
             f"{name:5s}  type={builder.get_type(name)}"
             f"  shape={builder.get_shape(name)}"
         )
+
+Comparison with ONNX shape inference
+=====================================
+
+:func:`onnx.shape_inference.infer_shapes` is ONNX's built-in shape
+propagation pass.  It works well for models with fully static dimensions but
+loses symbolic relationships when dimensions are dynamic: intermediate results
+receive freshly generated, unrelated symbols (e.g. ``unk__0``, ``unk__1``)
+instead of expressions derived from the input dimensions.
+
+:class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+does better in this case because it:
+
+1. **Carries symbolic names** — every dynamic dimension keeps the name given in
+   the input ``value_info`` (e.g. ``batch``, ``seq``, ``d_model``).
+2. **Builds arithmetic expressions** — when an operator changes a dimension
+   (e.g. ``Concat`` along an axis doubles ``d_model``) the result is stored as
+   the string expression ``"2*d_model"`` rather than a new opaque symbol.
+3. **Folds constants** — initializer tensors that appear as shape arguments
+   (e.g. the ``[0, 0, -1]`` passed to ``Reshape``) are evaluated at
+   inference-time, which lets the builder resolve the ``-1`` placeholder to
+   the correct symbolic formula.
+4. **Simplifies** — the resulting expression is reduced to its simplest form
+   by :func:`simplify_expression <yobx.xshape.simplify_expressions.simplify_expression>`
+   before being stored (``2*d_model//2`` → ``d_model``, etc.).
+
+The table below summarises the difference for a model that applies
+``Add → Concat(axis=2) → Reshape([0,0,-1])`` to inputs of shape
+``(batch, seq, d_model)``:
+
++---------------------+--------------------------------------+------------------------+
+| result              | ``infer_shapes``                     | ``BasicShapeBuilder``  |
++=====================+======================================+========================+
+| ``added``           | ``(batch, seq, d_model)``            | ``(batch, seq, d_model)`` |
++---------------------+--------------------------------------+------------------------+
+| ``concat_out``      | ``(batch, seq, unk__0)``             | ``(batch, seq, 2*d_model)`` |
++---------------------+--------------------------------------+------------------------+
+| ``Z``               | ``(batch, seq, unk__1)``             | ``(batch, seq, 2*d_model)`` |
++---------------------+--------------------------------------+------------------------+
+
+See :ref:`l-plot-computed-shapes` for a runnable example that demonstrates
+this comparison step by step.
+

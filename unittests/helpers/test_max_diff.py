@@ -116,6 +116,38 @@ class TestMaxDiffNdarray(ExtTestCase):
         self.assertEqual(res["abs"], 1.0)
 
 
+class TestMaxDiffNdarrayListTuple(ExtTestCase):
+    def test_ndarray_vs_list_equal(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = [1.0, 2.0, 3.0]
+        res = max_diff(a, b)
+        self.assertEqual(res["abs"], 0.0)
+
+    def test_ndarray_vs_tuple_equal(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = (1.0, 2.0, 3.0)
+        res = max_diff(a, b)
+        self.assertEqual(res["abs"], 0.0)
+
+    def test_ndarray_vs_list_different(self):
+        a = np.array([1.0, 2.0])
+        b = [1.0, 3.0]
+        res = max_diff(a, b)
+        self.assertEqual(res["abs"], 1.0)
+
+    def test_ndarray_vs_list_shape_mismatch(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = [1.0, 2.0]
+        res = max_diff(a, b)
+        self.assertTrue(math.isinf(res["abs"]))
+
+    def test_ndarray_vs_tuple_shape_mismatch(self):
+        a = np.array([1.0, 2.0, 3.0])
+        b = (1.0, 2.0)
+        res = max_diff(a, b)
+        self.assertTrue(math.isinf(res["abs"]))
+
+
 class TestMaxDiffListTuple(ExtTestCase):
     def test_list_identical(self):
         a = [np.array([1.0, 2.0]), np.array([3.0])]
@@ -363,6 +395,55 @@ class TestMaxDiffTorch(ExtTestCase):
 
 
 @requires_transformers("4.50")
+class TestMaxDiffCausalLMOutputWithPast(ExtTestCase):
+    def test_causal_lm_output_vs_causal_lm_output_identical(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+        from transformers.modeling_outputs import CausalLMOutputWithPast
+
+        logits = torch.rand(1, 5, 100)
+        cache = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        cache.update(key, value, layer_idx=0)
+        out = CausalLMOutputWithPast(logits=logits, past_key_values=cache)
+        res = max_diff(out, out)
+        self.assertEqual(res["abs"], 0.0)
+
+    def test_causal_lm_output_vs_causal_lm_output_different(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+        from transformers.modeling_outputs import CausalLMOutputWithPast
+
+        logits1 = torch.rand(1, 5, 100)
+        logits2 = logits1 + 1.0
+        cache = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        cache.update(key, value, layer_idx=0)
+        out1 = CausalLMOutputWithPast(logits=logits1, past_key_values=cache)
+        out2 = CausalLMOutputWithPast(logits=logits2, past_key_values=cache)
+        res = max_diff(out1, out2)
+        self.assertGreater(res["abs"], 0.0)
+
+    def test_causal_lm_output_vs_list(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+        from transformers.modeling_outputs import CausalLMOutputWithPast
+        from yobx.helpers.helper import flatten_object
+
+        logits = torch.rand(1, 5, 100)
+        cache = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        cache.update(key, value, layer_idx=0)
+        out = CausalLMOutputWithPast(logits=logits, past_key_values=cache)
+        flat = [logits, *flatten_object(cache)]
+        res = max_diff(out, flat)
+        self.assertEqual(res["abs"], 0.0)
+
+
+@requires_transformers("4.50")
 class TestMaxDiffDynamicCache(ExtTestCase):
     def test_dynamic_cache_vs_dynamic_cache(self):
         import torch
@@ -398,6 +479,45 @@ class TestMaxDiffDynamicCache(ExtTestCase):
         cache.update(key, value, layer_idx=0)
         res = max_diff(cache, cache)
         self.assertEqual(res["abs"], 0.0)
+
+    def test_cache_key_value_vs_cache_key_value(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+        from yobx.helpers.cache_helper import CacheKeyValue
+
+        cache = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        cache.update(key, value, layer_idx=0)
+        cv = CacheKeyValue(cache)
+        res = max_diff(cv, cv)
+        self.assertEqual(res["abs"], 0.0)
+
+    def test_cache_key_value_vs_tuple(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+        from yobx.helpers.cache_helper import CacheKeyValue
+
+        cache = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        cache.update(key, value, layer_idx=0)
+        cv = CacheKeyValue(cache)
+        res = max_diff(cv, ([key], [value]))
+        self.assertEqual(res["abs"], 0.0)
+
+    def test_cache_key_value_different(self):
+        import torch
+        from yobx.helpers.cache_helper import CacheKeyValue
+
+        key1 = torch.rand(1, 4, 2, 8)
+        value1 = torch.rand(1, 4, 2, 8)
+        key2 = key1 + 1.0
+        value2 = value1 + 1.0
+        cv1 = CacheKeyValue([key1, value1])
+        cv2 = CacheKeyValue([key2, value2])
+        res = max_diff(cv1, cv2)
+        self.assertGreater(res["abs"], 0.0)
 
 
 if __name__ == "__main__":
