@@ -9,9 +9,9 @@ from yobx.helpers.cache_helper import CacheKeyValue, make_dynamic_cache, make_st
 class TestCacheHelpers(ExtTestCase):
     def test_string_type(self):
         DYN = torch.export.Dim.DYNAMIC
-        self.assertEqual("DYNAMIC", string_type(DYN, verbose=0))
+        self.assertEqual("DYNAMIC", string_type(DYN))
         AUTO = torch.export.Dim.AUTO
-        self.assertEqual("AUTO", string_type(AUTO, verbose=0))
+        self.assertEqual("AUTO", string_type(AUTO))
         self.assertEqual("#1[DYNAMIC]", string_type([DYN]))
 
         batch = torch.export.Dim("batch")
