@@ -20,7 +20,47 @@ def make_hash(obj: Any) -> str:
 
 
 class ShapeBuilder:
-    """API for a class computing shapes in an ONNX model."""
+    """
+    API for a class computing shapes in an ONNX model.
+
+    The main implementation is :class:`BasicShapeBuilder
+    <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`.
+    It walks through all the nodes of an ONNX model and infers output shapes
+    and types based on the input shapes, using symbolic expressions when the
+    exact integer values are not known.
+
+    .. runpython::
+        :showcode:
+
+        import onnx
+        import onnx.helper as oh
+        from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+
+        TFLOAT = onnx.TensorProto.FLOAT
+
+        # Build a small model: Z = Concat(X, Y, axis=1)
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Concat", ["X", "Y"], ["Z"], axis=1)],
+                "graph",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq1"]),
+                    oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq2"]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, [None, None])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+
+        builder = BasicShapeBuilder()
+        builder.run_model(model)
+
+        print("input names :", builder.input_names)
+        print("output names:", builder.output_names)
+        print("shape of Z  :", builder.get_shape("Z"))
+        print("type of Z   :", builder.get_type("Z"))
+    """
 
     _op_type_element_wise_types = element_wise_binary_op_types()
     _op_type_element_wise_cmp_types = element_wise_op_cmp_types()
@@ -28,31 +68,78 @@ class ShapeBuilder:
 
     @property
     def input_names(self) -> List[str]:
+        """Returns the list of input names of the model."""
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
     @property
     def output_names(self) -> List[str]:
+        """Returns the list of output names of the model."""
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
     def get_shape(self, name: str) -> DYNAMIC_SHAPE:
+        """
+        Returns the shape of result *name* as a tuple.
+        Each dimension is either an integer or a string (symbolic dimension).
+
+        :param name: result name
+        :return: shape as a tuple of integers and/or strings
+        """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
     def set_shape(self, name: str, shape: DYNAMIC_SHAPE):
+        """
+        Sets the shape for result *name*.
+
+        :param name: result name
+        :param shape: tuple of integers and/or strings (symbolic dimensions)
+        """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
     def get_type(self, name: str) -> int:
+        """
+        Returns the element type of result *name* as an ONNX integer
+        (e.g. ``onnx.TensorProto.FLOAT == 1``).
+
+        :param name: result name
+        :return: element type as an integer
+        """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
     def set_type(self, name: str, itype: int):
+        """
+        Sets the element type for result *name*.
+
+        :param name: result name
+        :param itype: element type as an ONNX integer
+                      (e.g. ``onnx.TensorProto.FLOAT == 1``)
+        """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
     def get_rank(self, name: str) -> int:
+        """
+        Returns the rank (number of dimensions) of result *name*.
+
+        :param name: result name
+        :return: rank as an integer
+        """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
     def set_rank(self, name: str, rank: int):
+        """
+        Sets the rank (number of dimensions) for result *name*.
+
+        :param name: result name
+        :param rank: rank as an integer
+        """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
     def register_constraint_dimension(self, dim_name: str, value: Any):
+        """
+        Registers a constraint associating a symbolic dimension name with a value.
+
+        :param dim_name: symbolic dimension name (e.g. ``"batch"``)
+        :param value: the value or set of values to associate with that dimension
+        """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
     def _hash(self) -> str:
