@@ -1220,7 +1220,7 @@ class CubeLogs:
                     if aligned is not None:
                         assert aligned.shape == df.shape, (
                             f"Shape mismatch between the view {df.shape} and the mask "
-                            f"{time_mask_view[name].shape}"
+                            f"{aligned.shape}"
                         )
                         time_mask_view[name] = aligned
                         if verbose:
