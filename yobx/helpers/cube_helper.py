@@ -1289,7 +1289,7 @@ class CubeLogs:
                         )
             assert isinstance(df, pandas.DataFrame)  # type checking
             if raw:
-                assert main not in views, f"{main!r} is duplicated in views {sorted(views)}"
+                assert raw not in views, f"{raw!r} is duplicated in views {sorted(views)}"
                 # Too long.
                 # self._apply_excel_style(raw, writer, self.data)
                 if csv and "raw" in csv:
