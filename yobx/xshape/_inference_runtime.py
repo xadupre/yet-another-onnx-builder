@@ -24,6 +24,20 @@ class _OptimizationOptions:
 class _InferenceRuntime:
     """Sets shape and type."""
 
+    class ShapeConstant:
+        """Wraps a constant shape even if the input producing the shape is not."""
+
+        def __init__(self, name: str, shape: Tuple[int, ...], node: onnx.NodeProto):
+            self.name = name
+            self.shape = shape
+            self.node = node
+
+        def __repr__(self) -> str:
+            return (
+                f"{self.__class__.__name__}({self.name!r}, shape={self.shape!r}, "
+                f"node=<{self.node.op_type})"
+            )
+
     def _get_tensor_shape(self, node: onnx.NodeProto) -> Tuple[int, ...]:
         """Returns the shape of the tensor produced by a Constant node."""
         if not node.attribute:
