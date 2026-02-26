@@ -625,8 +625,8 @@ def check_for_non_recursivity(
     :return: list of nodes to add to make the list of node consistence
         with the list of inputs and outputs (they should be recomputed)
     """
-    orginal_set_inputs = inputs if isinstance(inputs, set) else set(inputs)
-    set_inputs = orginal_set_inputs.copy()
+    original_set_inputs = inputs if isinstance(inputs, set) else set(inputs)
+    set_inputs = original_set_inputs.copy()
     original_set_outputs = outputs if isinstance(outputs, set) else set(outputs)
     subset = set(node_indices)
     before_inputs = set()
@@ -653,7 +653,7 @@ def check_for_non_recursivity(
                 )
         else:
             # Not part of the function. Let's check
-            if s_outputs & orginal_set_inputs:
+            if s_outputs & original_set_inputs:
                 before_inputs |= set(i for i in node.input if i)
                 if node.op_type in {"Scan", "If", "Loop"}:
                     # there are hidden inputs
