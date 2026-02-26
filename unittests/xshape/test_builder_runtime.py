@@ -326,6 +326,75 @@ class TestApplyUnaryFunction(ExtTestCase):
         self.assertEqualArray(result[0].numpy(), np.ones(3, dtype=np.float32))
 
 
+class TestApplyShapeOnShape(ExtTestCase):
+    def setUp(self):
+        self.b = _TorchShapeBuilder()
+
+    def test_no_attributes_returns_full_shape(self):
+        node = oh.make_node("Shape", ["x"], ["s"])
+        result = self.b._apply_shape_on_shape(node, (2, 3, 4))
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].tolist()), (2, 3, 4))
+
+    def test_start_attribute_slices_from_start(self):
+        node = oh.make_node("Shape", ["x"], ["s"], start=1)
+        result = self.b._apply_shape_on_shape(node, (2, 3, 4))
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].tolist()), (3, 4))
+
+    def test_end_attribute_slices_to_end(self):
+        node = oh.make_node("Shape", ["x"], ["s"], end=2)
+        result = self.b._apply_shape_on_shape(node, (2, 3, 4))
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].tolist()), (2, 3))
+
+    def test_start_and_end_attributes(self):
+        node = oh.make_node("Shape", ["x"], ["s"], start=1, end=3)
+        result = self.b._apply_shape_on_shape(node, (2, 3, 4, 5))
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].tolist()), (3, 4))
+
+    def test_result_dtype_is_int64(self):
+        import torch
+
+        node = oh.make_node("Shape", ["x"], ["s"])
+        result = self.b._apply_shape_on_shape(node, (2, 3))
+        self.assertEqual(result[0].dtype, torch.int64)
+
+
+class TestApplyShape(ExtTestCase):
+    def setUp(self):
+        self.b = _TorchShapeBuilder()
+
+    def test_shape_of_numpy_array(self):
+        node = oh.make_node("Shape", ["x"], ["s"])
+        x = np.zeros((2, 3, 4), dtype=np.float32)
+        result = self.b._apply_shape(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].tolist()), (2, 3, 4))
+
+    def test_shape_of_torch_tensor(self):
+        import torch
+
+        node = oh.make_node("Shape", ["x"], ["s"])
+        x = torch.zeros(5, 6)
+        result = self.b._apply_shape(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].tolist()), (5, 6))
+
+    def test_shape_with_start_attribute(self):
+        node = oh.make_node("Shape", ["x"], ["s"], start=1)
+        x = np.zeros((2, 3, 4), dtype=np.float32)
+        result = self.b._apply_shape(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].tolist()), (3, 4))
+
+    def test_shape_with_start_end_attributes(self):
+        node = oh.make_node("Shape", ["x"], ["s"], start=1, end=3)
+        x = np.zeros((2, 3, 4, 5), dtype=np.float32)
+        result = self.b._apply_shape(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].tolist()), (3, 4))
 class TestApplyUnaryFunction(ExtTestCase):
     def setUp(self):
         self.b = _TorchShapeBuilder()
