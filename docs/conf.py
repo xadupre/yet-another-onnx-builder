@@ -141,6 +141,7 @@ epkg_dictionary = {
     "scipy": "https://scipy.org/",
     "sklearn-onnx": "https://onnx.ai/sklearn-onnx/",
     "sphinx-gallery": "https://github.com/sphinx-gallery/sphinx-gallery",
+    "sphinx-runpython": "https://github.com/sdpython/sphinx-runpython",
     "Supported Operators and Data Types": "https://github.com/microsoft/onnxruntime/blob/main/docs/OperatorKernels.md",
     "sympy": "https://www.sympy.org/en/index.html",
     "timm": "https://github.com/huggingface/pytorch-image-models",
