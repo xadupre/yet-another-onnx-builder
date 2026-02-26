@@ -1,6 +1,6 @@
 import onnx
 import onnx.helper as oh
-from typing import Iterator, Optional, Set
+from typing import Dict, Iterator, Optional, Set, Tuple, Union
 
 
 def element_wise_binary_op_types() -> Set[str]:
@@ -192,3 +192,55 @@ def overwrite_shape_in_model_proto(
         del subgraph.output[:]
         subgraph.output.extend(new_info)
     return model
+
+
+def replace_static_dimensions_by_strings(
+    model: onnx.ModelProto,
+) -> Tuple[onnx.ModelProto, Dict[str, Union[str, int]]]:
+    """
+    Replaces static dimensions by dynamic dimensions in a model.
+
+    :param model: ModelProto
+    :return: the modified model, a mapping ``{new_name: value}``
+    """
+    mapping = {}
+    new_inputs = []
+    for i in model.graph.input:
+        if not i.type.tensor_type:
+            continue
+        dim = i.type.tensor_type.shape.dim
+        shape = []
+        for d in dim:
+            if not d.dim_param and d.dim_value:
+                shape.append(f"DIM{d.dim_value}")
+            else:
+                shape.append(d.dim_param or d.dim_value)
+            mapping[shape[-1]] = d.dim_param or d.dim_value
+        new_inputs.append(oh.make_tensor_value_info(i.name, i.type.tensor_type.elem_type, shape))
+    new_outputs = []
+    for i in model.graph.output:
+        if not i.type.tensor_type:
+            continue
+        dim = i.type.tensor_type.shape.dim
+        shape = []
+        for d in dim:
+            if not d.dim_param and d.dim_value:
+                shape.append(f"DIM{d.dim_value}")
+            else:
+                shape.append(d.dim_param or d.dim_value)
+            mapping[shape[-1]] = d.dim_param or d.dim_value
+        new_outputs.append(oh.make_tensor_value_info(i.name, i.type.tensor_type.elem_type, shape))
+    model = oh.make_model(
+        oh.make_graph(
+            model.graph.node,
+            model.graph.name,
+            new_inputs,
+            new_outputs,
+            model.graph.initializer,
+            model.graph.sparse_initializer,
+        ),
+        opset_imports=model.opset_import,
+        ir_version=model.ir_version,
+        functions=model.functions,
+    )
+    return model, mapping
