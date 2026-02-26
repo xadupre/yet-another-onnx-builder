@@ -84,7 +84,6 @@ print(dot_src)
 #
 # .. gdot::
 #     :script: DOT-SECTION
-#     :process:
 #
 #     import numpy as np
 #     import onnx
