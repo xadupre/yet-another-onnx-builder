@@ -249,7 +249,7 @@ class CubePlot:
         :param verbose: verbosity
         :param merge: returns all graphs in a single image (True)
             or an image for every graph (False)
-        :param title_suffix: prefix for the title of every graph
+        :param title_suffix: suffix for the title of every graph
         :return: list of binary images (format PNG)
         """
         if self.kind in ("barh", "bar"):
