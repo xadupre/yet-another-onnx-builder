@@ -1172,21 +1172,18 @@ def max_diff(
 
     if isinstance(expected, np.ndarray) or isinstance(got, np.ndarray):
         dev = None
-        try:
-            import torch
+        import torch
 
-            if isinstance(expected, torch.Tensor):
-                from .torch_helper import to_numpy
+        if isinstance(expected, torch.Tensor):
+            from .torch_helper import to_numpy
 
-                dev = 0 if expected.device.type == "cpu" else 1
-                expected = to_numpy(expected)
-            if isinstance(got, torch.Tensor):
-                from .torch_helper import to_numpy
+            dev = 0 if expected.device.type == "cpu" else 1
+            expected = to_numpy(expected)
+        if isinstance(got, torch.Tensor):
+            from .torch_helper import to_numpy
 
-                dev = 0 if got.device.type == "cpu" else 1
-                got = to_numpy(got)
-        except ImportError:
-            pass
+            dev = 0 if got.device.type == "cpu" else 1
+            got = to_numpy(got)
         if isinstance(got, (list, tuple)):
             got = np.array(got)
         if isinstance(expected, (list, tuple)):
