@@ -181,7 +181,7 @@ def to_dot(model: onnx.ModelProto) -> str:
             # hide optional inputs
             continue
         shape = tuple(init.dims)
-        if len(shape) == 0 or (len(shape) == 1 and shape[0] < 10):
+        if len(shape) == 0 or (len(shape) == 1 and shape[0] < 10):  # type: ignore[operator]
             a = onh.to_array(init)
             tiny_inits[init.name] = (
                 str(a) if len(shape) == 0 else f"[{', '.join([str(i) for i in a])}]"

@@ -199,7 +199,8 @@ def _run_subprocess(args: List[str], cwd: Optional[str] = None):
     p.stderr.close()  # type: ignore[union-attr]
     if error and raise_exception:
         raise RuntimeError(
-            f"An error was found in the output. The build is stopped.\n{stdout_output}\n---\n{error}"
+            f"An error was found in the output. The build is stopped."
+            f"\n{stdout_output}\n---\n{error}"
         )
     return stdout_output + "\n" + error
 
