@@ -461,6 +461,16 @@ def _set_shape_type_op_any_layer_normalization(self: ShapeBuilder, node: NodePro
     return None if set(res) == {None} else res
 
 
+def _set_shape_type_op_any_instance_normalization(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for node type InstanceNormalization."
+    return set_type_shape_unary_op(self, node.output[0], node.input[0])
+
+
+def _set_shape_type_op_any_lp_normalization(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for node type LpNormalization."
+    return set_type_shape_unary_op(self, node.output[0], node.input[0])
+
+
 def _set_shape_type_op_any_cast(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Cast."
     return set_type_shape_unary_op(
@@ -845,9 +855,9 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
             return
         pads = pads.tolist()
         if len(node.input) > 3 and node.input[3]:
-            axes = self.compute_constant(node.input[1])[0]
+            axes = self.compute_constant(node.input[3])[0]
             assert axes is not None or not self._debug_shape_missing, (
-                f"Unable to evaluate axes={node.input[1]!r}: "
+                f"Unable to evaluate axes={node.input[3]!r}: "
                 f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
             )
             axes = axes.tolist()
@@ -864,7 +874,7 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
         self.set_shape(node.output[0], tuple(new_shape))
         return tuple(new_shape)
     if self.has_rank(node.input[0]):
-        self.set_rank(node.input[0], self.get_rank(node.input[0]))
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
         return True
     assert not self._debug_shape_missing, (
         f"Unable to compute shape for node: "
@@ -1225,7 +1235,8 @@ def _set_shape_type_op_any_topk(self: ShapeBuilder, node: NodeProto):
 
     ret_shapes = []
     if node.output[0]:
-        self.set_type(node.output[0], self.get_type(node.input[0]))
+        if self.has_type(node.input[0]):
+            self.set_type(node.output[0], self.get_type(node.input[0]))
         if shape is not None:
             self.set_shape(node.output[0], shape)
             ret_shapes.append(shape)
@@ -1596,6 +1607,50 @@ def _set_shape_type_op_any_window(self: ShapeBuilder, node: NodeProto):
             self.set_shape(node.output[0], (size,))
             return
     self.set_rank(node.output[0], 1)
+def _set_shape_type_op_any_resize(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for node type Resize."
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    else:
+        assert not self._debug_shape_missing, (
+            f"Unable to compute shape for node: "
+            f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+        )
+
+    # input[3] = sizes (takes priority over scales when non-empty)
+    if len(node.input) > 3 and node.input[3] and self.is_constant(node.input[3]):
+        sizes = self.get_constant(node.input[3], computed_value=True)
+        if sizes is not None and sizes.size > 0:
+            new_shape = tuple(int(d) for d in sizes.tolist())
+            self.set_shape(node.output[0], new_shape)
+            return new_shape
+
+    # input[2] = scales
+    if (
+        len(node.input) > 2
+        and node.input[2]
+        and self.is_constant(node.input[2])
+        and self.has_shape(node.input[0])
+    ):
+        scales = self.get_constant(node.input[2], computed_value=True)
+        if scales is not None and scales.size > 0:
+            shape = self.get_shape(node.input[0])
+            new_shape = tuple(
+                int(np.floor(d * s)) if isinstance(d, int) else f"int(floor({d}*{s}))"
+                for d, s in zip(shape, scales.tolist())
+            )
+            self.set_shape(node.output[0], new_shape)
+            return new_shape
+
+    if self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+        return True
+    assert not self._debug_shape_missing, (
+        f"Unable to compute shape for node: "
+        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+    )
 
 
 _set_shape_type_op_any_known = {
@@ -1620,9 +1675,11 @@ _set_shape_type_op_any_known = {
     "Gemm": _set_shape_type_op_any_gemm,
     "GlobalAveragePool": _set_shape_type_op_any_global_pool,
     "GlobalMaxPool": _set_shape_type_op_any_global_pool,
+    "InstanceNormalization": _set_shape_type_op_any_instance_normalization,
     "IsInf": lambda *args: _set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
     "IsNaN": lambda *args: _set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
     "LayerNormalization": _set_shape_type_op_any_layer_normalization,
+    "LpNormalization": _set_shape_type_op_any_lp_normalization,
     "Log": _set_shape_type_op_any_unary,
     "MatMul": _set_shape_type_op_any_matmul,
     "MaxPool": _set_shape_type_op_any_conv_max_pool,
@@ -1630,6 +1687,7 @@ _set_shape_type_op_any_known = {
     "Pad": _set_shape_type_op_any_pad,
     "Range": _set_shape_type_op_any_range,
     "Reshape": _set_shape_type_op_any_reshape,
+    "Resize": _set_shape_type_op_any_resize,
     "RotaryEmbedding": _set_shape_type_op_any_rotary_embedding,
     "ScatterND": _set_shape_type_op_any_scatternd,
     "SequenceEmpty": _set_shape_type_op_any_sequence_empty,
