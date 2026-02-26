@@ -22,9 +22,7 @@ class TestOnnxHelper(ExtTestCase):
         self.assertEqual(tensor_dtype_to_np_dtype(onnx.TensorProto.BOOL), np.bool_)
 
     def test_tensor_dtype_to_np_dtype_float8(self):
-        self.assertEqual(
-            tensor_dtype_to_np_dtype(onnx.TensorProto.BFLOAT16), ml_dtypes.bfloat16
-        )
+        self.assertEqual(tensor_dtype_to_np_dtype(onnx.TensorProto.BFLOAT16), ml_dtypes.bfloat16)
         self.assertEqual(
             tensor_dtype_to_np_dtype(onnx.TensorProto.FLOAT8E4M3FN),
             ml_dtypes.float8_e4m3fn,
