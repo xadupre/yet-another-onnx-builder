@@ -856,10 +856,7 @@ def max_diff(
                     flat_b,
                     debug_info=[
                         *(debug_info if debug_info else []),
-                        (
-                            f"{' ' * level}flatten["
-                            f"{string_type(expected)},{string_type(got)}]"
-                        ),
+                        (f"{' ' * level}flatten[{string_type(expected)},{string_type(got)}]"),
                     ],
                     **_dkwsf,
                 )

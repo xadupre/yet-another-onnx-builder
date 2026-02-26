@@ -1,7 +1,7 @@
 import inspect
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, hide_stdout, requires_torch, requires_transformers
+from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
 from yobx.helpers import make_hash, string_type, string_sig, string_signature
 from yobx.helpers.helper import flatten_object
 
