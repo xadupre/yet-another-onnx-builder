@@ -87,7 +87,7 @@ to a whole shape at once.
 
     import onnx
     import onnx.helper as oh
-    from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+    from yobx.xshape import BasicShapeBuilder
     from yobx.xshape.evaluate_expressions import evaluate_expression
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -120,7 +120,7 @@ to a whole shape at once.
 
 .. seealso::
 
-    :ref:`sphx_glr_auto_examples_plot_shape_expressions_py` — sphinx-gallery
+    :ref:`plot-shape-expressions` — sphinx-gallery
     example demonstrating ``Concat``, ``Reshape``, and ``Split`` symbolic
     expressions, automatic simplification, and evaluation with concrete values.
 
@@ -138,7 +138,7 @@ on it, and prints the inferred shapes and types.
     import onnx.helper as oh
     import onnx.numpy_helper as onh
     import numpy as np
-    from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+    from yobx.xshape import BasicShapeBuilder
 
     TFLOAT = onnx.TensorProto.FLOAT
 
@@ -199,16 +199,15 @@ The table below summarises the difference for a model that applies
 ``Add → Concat(axis=2) → Reshape([0,0,-1])`` to inputs of shape
 ``(batch, seq, d_model)``:
 
-+---------------------+--------------------------------------+------------------------+
-| result              | ``infer_shapes``                     | ``BasicShapeBuilder``  |
-+=====================+======================================+========================+
-| ``added``           | ``(batch, seq, d_model)``            | ``(batch, seq, d_model)`` |
-+---------------------+--------------------------------------+------------------------+
++---------------------+--------------------------------------+-----------------------------+
+| result              | ``infer_shapes``                     | ``BasicShapeBuilder``       |
++=====================+======================================+=============================+
+| ``added``           | ``(batch, seq, d_model)``            | ``(batch, seq, d_model)``   |
++---------------------+--------------------------------------+-----------------------------+
 | ``concat_out``      | ``(batch, seq, unk__0)``             | ``(batch, seq, 2*d_model)`` |
-+---------------------+--------------------------------------+------------------------+
++---------------------+--------------------------------------+-----------------------------+
 | ``Z``               | ``(batch, seq, unk__1)``             | ``(batch, seq, 2*d_model)`` |
-+---------------------+--------------------------------------+------------------------+
++---------------------+--------------------------------------+-----------------------------+
 
 See :ref:`l-plot-computed-shapes` for a runnable example that demonstrates
 this comparison step by step.
-

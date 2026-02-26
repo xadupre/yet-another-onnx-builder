@@ -1,5 +1,5 @@
-.helpers.helper
-===============
+yobx.helpers.helper
+===================
 
 .. automodule:: yobx.helpers.helper
     :members:

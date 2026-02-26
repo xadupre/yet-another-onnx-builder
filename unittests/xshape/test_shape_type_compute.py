@@ -4,8 +4,7 @@ import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape.shape_builder import ShapeBuilder
-from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+from yobx.xshape import ShapeBuilder, BasicShapeBuilder
 from yobx.xshape.shape_type_compute import (
     broadcast_shape,
     set_type_shape_binary_op,
@@ -2352,9 +2351,7 @@ class TestDevicePropagation(ExtTestCase):
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_device("X", -1)
-        node = oh.make_node(
-            "Transpose2DCastFP16", ["X"], ["Y"], domain="com.microsoft"
-        )
+        node = oh.make_node("Transpose2DCastFP16", ["X"], ["Y"], domain="com.microsoft")
         set_type_shape_transpose_2d_cast_fp16(b, node)
         self.assertEqual(b.get_device("Y"), -1)
 
@@ -2363,9 +2360,7 @@ class TestDevicePropagation(ExtTestCase):
         b.set_type("X", TFLOAT16)
         b.set_shape("X", (3, 4))
         b.set_device("X", -1)
-        node = oh.make_node(
-            "Transpose2DCastFP32", ["X"], ["Y"], domain="com.microsoft"
-        )
+        node = oh.make_node("Transpose2DCastFP32", ["X"], ["Y"], domain="com.microsoft")
         set_type_shape_transpose_2d_cast_fp32(b, node)
         self.assertEqual(b.get_device("Y"), -1)
 

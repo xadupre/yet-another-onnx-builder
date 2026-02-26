@@ -1,6 +1,5 @@
-
-.xshape.shape_type_compute
-===========================
+yobx.xshape.shape_type_compute
+==============================
 
 .. automodule:: yobx.xshape.shape_type_compute
     :members:

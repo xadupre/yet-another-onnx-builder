@@ -1,5 +1,5 @@
-.helpers.onnx_helper
-=====================
+yobx.helpers.onnx_helper
+========================
 
 .. automodule:: yobx.helpers.onnx_helper
     :members:

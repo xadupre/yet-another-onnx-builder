@@ -1,5 +1,5 @@
-.xshape
-=======
+yobx.xshape
+===========
 
 .. toctree::
     :maxdepth: 1
@@ -19,9 +19,16 @@
     shape_type_compute
     type_inference
 
-Other functions
-+++++++++++++++
+BasicShapeBuilder
++++++++++++++++++
 
-.. automodule:: yobx.xshape
+.. autoclass:: yobx.xshape.BasicShapeBuilder
+    :members:
+    :no-undoc-members:
+
+ShapeBuilder
+++++++++++++
+
+.. autoclass:: yobx.xshape.ShapeBuilder
     :members:
     :no-undoc-members:

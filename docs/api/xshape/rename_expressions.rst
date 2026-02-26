@@ -1,6 +1,5 @@
-
-.xshape.rename_expressions
-==========================
+yobx.xshape.rename_expressions
+==============================
 
 .. automodule:: yobx.xshape.rename_expressions
     :members:

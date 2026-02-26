@@ -114,6 +114,10 @@ select = [
     "SIM102", "SIM103", "SIM108", "SIM114", "SIM910",
     "UP006", "UP007", "UP015", "UP027", "UP031", "UP032", "UP034", "UP035", "UP045",
 ]
+"*/__init__.py" = ["F401"]
+"unittests/**" = [
+    "B904",
+]
 
 [tool.mypy]
 ignore_missing_imports = true
@@ -121,15 +125,16 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 # Mixin classes that intentionally call methods defined in the combined class
 module = [
+    "yobx.doc",
+    "yobx.ext_test_case",
+    "yobx.helpers.helper",
+    "yobx.reference.ops.*",
     "yobx.xshape._shape_runtime",
     "yobx.xshape._builder_runtime",
     "yobx.xshape._inference_runtime",
     "yobx.xshape.shape_type_compute",
     "yobx.xshape.shape_builder",
     "yobx.xshape.shape_builder_impl",
-    "yobx.ext_test_case",
-    "yobx.doc",
-    "yobx.helpers.helper",
 ]
 ignore_errors = true
 
@@ -137,16 +142,17 @@ ignore_errors = true
 ignore-missing-imports = ["*"]
 project-includes = ["yobx/**/*.py"]
 project-excludes = [
-    "yobx/xshape/shape_type_compute.py",
+    "yobx/doc.py",
+    "yobx/ext_test_case.py",
+    "yobx/helpers/helper.py",
+    "yobx/helpers/torch_helper.py",
+    "yobx/reference/ops/*",
     "yobx/xshape/_builder_runtime.py",
     "yobx/xshape/_inference_runtime.py",
     "yobx/xshape/_shape_runtime.py",
+    "yobx/xshape/evaluate_expressions.py",
     "yobx/xshape/shape_builder.py",
     "yobx/xshape/shape_builder_impl.py",
-    "yobx/xshape/evaluate_expressions.py",
+    "yobx/xshape/shape_type_compute.py",
     "yobx/xshape/simplify_expressions.py",
-    "yobx/ext_test_case.py",
-    "yobx/doc.py",
-    "yobx/helpers/helper.py",
-    "yobx/helpers/torch_helper.py",
 ]

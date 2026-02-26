@@ -1,5 +1,5 @@
-.helpers.cache_helper
-=====================
+yobx.helpers.cache_helper
+=========================
 
 .. automodule:: yobx.helpers.cache_helper
     :members:

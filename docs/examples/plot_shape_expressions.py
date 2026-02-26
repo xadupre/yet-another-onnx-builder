@@ -1,4 +1,6 @@
 """
+.. _plot-shape-expressions:
+
 Expressions in Shape Computation
 =================================
 
@@ -41,7 +43,7 @@ For a deeper description of the design, see the
 See also
 --------
 
-* :class:`yobx.xshape.shape_builder_impl.BasicShapeBuilder` — main implementation
+* :class:`yobx.xshape.BasicShapeBuilder` — main implementation
 * :func:`yobx.xshape.simplify_expressions.simplify_expression` — expression
   canonicalisation
 * :func:`yobx.xshape.evaluate_expressions.evaluate_expression` — expression
@@ -59,8 +61,11 @@ See also
 # is the symbolic expression ``"seq1+seq2"``.
 
 import onnx
+import numpy as np
 import onnx.helper as oh
-from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+import onnx.numpy_helper as onh
+from yobx.xshape import BasicShapeBuilder
+from yobx.xshape.simplify_expressions import simplify_expression
 
 TFLOAT = onnx.TensorProto.FLOAT
 
@@ -104,8 +109,6 @@ print("concrete shape of Z:", builder.evaluate_shape("Z", context))  # (2, 12)
 # symbolic expression ``"c//2"``.  The ``-1`` sentinel in the target
 # shape is resolved to the appropriate quotient expression.
 
-import numpy as np
-import onnx.numpy_helper as onh
 
 model_reshape = oh.make_model(
     oh.make_graph(
@@ -176,13 +179,12 @@ print("concrete shape of S2:", builder_split.evaluate_shape("S2", context_split)
 # :func:`simplify_expression <yobx.xshape.simplify_expressions.simplify_expression>`
 # reduces the expression to its simplest equivalent form.
 
-from yobx.xshape.simplify_expressions import simplify_expression
 
 examples = [
-    "d + f - f",        # cancellation → d
-    "2 * seq // 2",     # multiplication and floor-division cancel → seq
-    "1024 * a // 2",    # partial fold → 512*a
-    "b + a",            # terms are sorted → a+b
+    "d + f - f",  # cancellation → d
+    "2 * seq // 2",  # multiplication and floor-division cancel → seq
+    "1024 * a // 2",  # partial fold → 512*a
+    "b + a",  # terms are sorted → a+b
 ]
 
 for expr in examples:

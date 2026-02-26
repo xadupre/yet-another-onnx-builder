@@ -13,7 +13,7 @@ and compares the result with the standard
 The key difference is that ``onnx.shape_inference.infer_shapes`` can only
 propagate shapes when dimensions are statically known integers.  When the
 model contains dynamic (symbolic) dimensions it typically assigns ``None``
-(unknown) to most intermediate results.  :class:`BasicShapeBuilder` instead
+(unknown) to most intermediate results. :class:`BasicShapeBuilder` instead
 keeps the dimensions as symbolic arithmetic expressions so that output shapes
 are expressed in terms of the input dimension names.
 
@@ -21,6 +21,16 @@ See :ref:`l-design-shape` for a detailed description of how
 :class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
 works and a comparison table with :func:`onnx.shape_inference.infer_shapes`.
 """
+
+import numpy as np
+import onnx
+import onnx.helper as oh
+import onnx.numpy_helper as onh
+from yobx.reference import ExtendedReferenceEvaluator
+from yobx.xshape import BasicShapeBuilder
+
+TFLOAT = onnx.TensorProto.FLOAT
+
 
 # %%
 # Build a small model
@@ -35,13 +45,6 @@ works and a comparison table with :func:`onnx.shape_inference.infer_shapes`.
 # 3. ``Reshape(concat_out, shape)``  — flatten the last two dimensions using
 #    a fixed shape constant ``[0, 0, -1]``, which collapses
 #    ``(batch, seq, 2*d_model)`` back to ``(batch, seq, 2*d_model)``.
-
-import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-
-TFLOAT = onnx.TensorProto.FLOAT
 
 model = oh.make_model(
     oh.make_graph(
@@ -75,8 +78,8 @@ model = oh.make_model(
 inferred = onnx.shape_inference.infer_shapes(model)
 
 print("=== onnx.shape_inference.infer_shapes ===")
-for vi in list(inferred.graph.input) + list(inferred.graph.value_info) + list(
-    inferred.graph.output
+for vi in (
+    list(inferred.graph.input) + list(inferred.graph.value_info) + list(inferred.graph.output)
 ):
     t = vi.type.tensor_type
     if t.HasField("shape"):
@@ -97,7 +100,6 @@ for vi in list(inferred.graph.input) + list(inferred.graph.value_info) + list(
 # constant ``[0, 0, -1]``, the builder can evaluate the ``Reshape`` and express
 # the output shape as a function of the input dimensions.
 
-from yobx.xshape.shape_builder_impl import BasicShapeBuilder
 
 builder = BasicShapeBuilder()
 builder.run_model(model)
@@ -126,8 +128,6 @@ for name in ["X", "Y", "added", "concat_out", "Z"]:
 # Finally, run the model with concrete numpy arrays and confirm that the
 # shapes predicted by :class:`BasicShapeBuilder` match the actual output
 # shapes.
-
-from onnx_diagnostic.reference import ExtendedReferenceEvaluator
 
 feeds = {
     "X": np.random.rand(2, 5, 8).astype(np.float32),

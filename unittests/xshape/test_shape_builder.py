@@ -3,10 +3,9 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from onnx_diagnostic.reference import ExtendedReferenceEvaluator
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape.shape_builder import ShapeBuilder
-from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+from yobx.reference import ExtendedReferenceEvaluator
+from yobx.xshape import ShapeBuilder, BasicShapeBuilder
 
 TFLOAT = onnx.TensorProto.FLOAT
 TFLOAT16 = onnx.TensorProto.FLOAT16
@@ -412,15 +411,9 @@ class TestShapeBuilder(ExtTestCase):
         # BasicShapeBuilder tracks symbolic expressions
         builder = BasicShapeBuilder()
         builder.run_model(model)
-        self.assertEqual(
-            builder._known_shapes["added"], ("batch", "seq", "d_model")
-        )
-        self.assertEqual(
-            builder._known_shapes["concat_out"], ("batch", "seq", "2*d_model")
-        )
-        self.assertEqual(
-            builder._known_shapes["Z"], ("batch", "seq", "2*d_model")
-        )
+        self.assertEqual(builder._known_shapes["added"], ("batch", "seq", "d_model"))
+        self.assertEqual(builder._known_shapes["concat_out"], ("batch", "seq", "2*d_model"))
+        self.assertEqual(builder._known_shapes["Z"], ("batch", "seq", "2*d_model"))
 
         # Evaluate symbolic shapes with concrete values
         context = dict(batch=2, seq=5, d_model=8)

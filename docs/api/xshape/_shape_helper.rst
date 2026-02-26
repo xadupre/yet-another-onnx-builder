@@ -1,6 +1,5 @@
-
-.xshape._shape_helper
-=====================
+yobx.xshape._shape_helper
+=========================
 
 .. automodule:: yobx.xshape._shape_helper
     :members:

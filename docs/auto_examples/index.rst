@@ -11,11 +11,52 @@ Gallery of Examples
 
 .. thumbnail-parent-div-open
 
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example shows how yobx.xshape.shape_builder_impl.BasicShapeBuilder tracks symbolic dimension expressions through a sequence of Add, Concat, and Reshape nodes, and compares the result with the standard onnx.shape_inference.infer_shapes.">
+
+.. only:: html
+
+  .. image:: /auto_examples/images/thumb/sphx_glr_plot_computed_shapes_thumb.png
+    :alt:
+
+  :doc:`/auto_examples/plot_computed_shapes`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Computed Shapes: Add + Concat + Reshape</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="When an ONNX model contains dynamic (unknown) input dimensions, yobx.xshape.shape_builder_impl.BasicShapeBuilder represents every output dimension as either a plain integer or a symbolic string expression built from the names of the input dimensions.">
+
+.. only:: html
+
+  .. image:: /auto_examples/images/thumb/sphx_glr_plot_shape_expressions_thumb.png
+    :alt:
+
+  :doc:`/auto_examples/plot_shape_expressions`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Expressions in Shape Computation</div>
+    </div>
+
+
 .. thumbnail-parent-div-close
 
 .. raw:: html
 
     </div>
+
+
+.. toctree::
+   :hidden:
+
+   /auto_examples/plot_computed_shapes
+   /auto_examples/plot_shape_expressions
 
 
 .. only:: html
@@ -25,6 +66,10 @@ Gallery of Examples
     .. container:: sphx-glr-download sphx-glr-download-python
 
       :download:`Download all examples in Python source code: auto_examples_python.zip </auto_examples/auto_examples_python.zip>`
+
+    .. container:: sphx-glr-download sphx-glr-download-jupyter
+
+      :download:`Download all examples in Jupyter notebooks: auto_examples_jupyter.zip </auto_examples/auto_examples_jupyter.zip>`
 
 
 .. only:: html

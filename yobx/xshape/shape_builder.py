@@ -49,7 +49,7 @@ class ShapeBuilder:
 
         import onnx
         import onnx.helper as oh
-        from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+        from yobx.xshape import BasicShapeBuilder
 
         TFLOAT = onnx.TensorProto.FLOAT
 
