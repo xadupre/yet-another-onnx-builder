@@ -112,7 +112,7 @@ backend_test.exclude(
     "(affine_grid|array_feature_extractor|binarizer|label_encoder|attention"
     "|bitwise|averagepool|blackmanwindow"
     "|center_crop|col2im|compress|conv"
-    "|det|dft|dropout|einsum|fft|floor|gather|gelu"
+    "|det|dft|dropout|einsum|fft|floor|gather"
     "|gridsample|group_normalization|gru|hamming|hann"
     "|hardmax|instancenorm|l1normalization"
     "|l2normalization|layer_normalization|logsoftmax"
