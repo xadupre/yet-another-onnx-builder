@@ -1225,7 +1225,8 @@ def _set_shape_type_op_any_topk(self: ShapeBuilder, node: NodeProto):
 
     ret_shapes = []
     if node.output[0]:
-        self.set_type(node.output[0], self.get_type(node.input[0]))
+        if self.has_type(node.input[0]):
+            self.set_type(node.output[0], self.get_type(node.input[0]))
         if shape is not None:
             self.set_shape(node.output[0], shape)
             ret_shapes.append(shape)
