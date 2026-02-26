@@ -254,7 +254,7 @@ def reorder_nodes_for_display(nodes, verbose=False):
                     inputs = dnodes[next_name].input
                     if any((i not in known) for i in inputs):
                         break
-                    res.extend(next_name)
+                    res.append(next_name)
                 else:
                     break
             else:
@@ -646,7 +646,7 @@ def onnx_simple_text_plot(
                             "Unable to display tensor type %r.\n%s" % (att.type, str(att))
                         ) from e
                     if "\n" in val:
-                        val = val.split("\n", maxsplit=1) + "..."
+                        val = val.split("\n", maxsplit=1)[0] + "..."
                     if len(val) > 10:
                         val = val[:10] + "..."
                 elif att.type == onnx.AttributeProto.STRING:

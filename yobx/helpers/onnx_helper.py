@@ -105,7 +105,7 @@ def pretty_onnx(
     shape_inference: bool = False,
 ) -> str:
     """
-    Displays an onnx prot in a better way.
+    Displays an onnx proto in a better way.
 
     :param with_attributes: displays attributes as well, if only a node is printed
     :param highlight: to highlight some names
