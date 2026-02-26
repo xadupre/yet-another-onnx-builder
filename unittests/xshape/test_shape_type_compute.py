@@ -691,6 +691,22 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (5, 6))
 
+    def test_op_pad_with_axes(self):
+        # Pad only axis 1 with [2, 3] using the optional axes input.
+        model = _make_model(
+            [oh.make_node("Pad", ["X", "pads", "", "axes"], ["Y"])],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Y", TFLOAT, [3, 9])],
+            [
+                onh.from_array(np.array([2, 3], dtype=np.int64), name="pads"),
+                onh.from_array(np.array([1], dtype=np.int64), name="axes"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (3, 9))
+
     def test_op_range(self):
         model = _make_model(
             [oh.make_node("Range", ["start", "limit", "delta"], ["Y"])],
