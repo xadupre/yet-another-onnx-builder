@@ -113,6 +113,7 @@ def unary_like_op_types() -> Set[str]:
         "Sqrt",
         "Tan",
         "Tanh",
+        "ThresholdedRelu",
         "ThresholdRelu",
         "Trilu",
     }

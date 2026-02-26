@@ -1039,6 +1039,17 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4))
 
+    def test_op_thresholdedrelu(self):
+        model = _make_model(
+            [oh.make_node("ThresholdedRelu", ["X"], ["Y"], alpha=1.0)],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Y", TFLOAT, [3, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (3, 4))
+
     def test_op_add_element_wise(self):
         model = _make_model(
             [oh.make_node("Add", ["X", "Y"], ["Z"])],
