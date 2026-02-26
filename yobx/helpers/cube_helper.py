@@ -341,6 +341,7 @@ class CubePlot:
             figsize=figsize,
             sharex=True,
             sharey="row" if n_cols > 1 else False,
+            squeeze=False,
         )
         imgs = []
         row = 0
@@ -348,9 +349,9 @@ class CubePlot:
             dfc = df[[c]]
             dfc = dfc.unstack(self.timeseries).T.droplevel(0)
             if n_cols == 1:
-                dfc.plot(title=f"{c}{title_suffix}", ax=axs[row], linewidth=3)
-                axs[row].grid(True)
-                rotate_align(axs[row])
+                dfc.plot(title=f"{c}{title_suffix}", ax=axs[row, 0], linewidth=3)
+                axs[row, 0].grid(True)
+                rotate_align(axs[row, 0])
             else:
                 x = list(range(dfc.shape[0]))
                 ticks = list(dfc.index)
