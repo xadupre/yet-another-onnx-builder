@@ -55,7 +55,7 @@ class ResultFound:
         self.consumer = consumer
 
     def __str__(self) -> str:
-        "usuals"
+        "Human-readable representation of the result, including its producer or consumer."
         return (
             f"<< {self.name} - {self.consumer}"
             if self.producer is None
