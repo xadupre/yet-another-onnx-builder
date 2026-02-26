@@ -83,11 +83,37 @@ def proto_from_array(
 
 class MiniOnnxBuilder:
     """
-    Simplified builder to build very simple model.
+    Simplified builder to create very simple ONNX models that store
+    tensors (numpy arrays or torch tensors) as initializers and expose
+    them as model outputs.  The resulting model has **no inputs** — it
+    simply returns the stored values when executed.
 
-    :param target_opset: opset to specify
-    :param ir_verison: IR version to use
-    :param sep: separator to build output names
+    :param target_opset: default ONNX opset version (default: 18)
+    :param ir_version: ONNX IR version (default: 10)
+    :param sep: separator used to build composite output names
+        (default: ``"___"``)
+
+    Typical usage — save a plain numpy array and round-trip it through ONNX:
+
+    .. runpython::
+        :showcode:
+
+        import numpy as np
+        from yobx.helpers.mini_onnx_builder import MiniOnnxBuilder
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        builder = MiniOnnxBuilder()
+        builder.append_output_initializer("weights", np.array([1.0, 2.0, 3.0], dtype=np.float32))
+        model = builder.to_onnx()
+
+        ref = ExtendedReferenceEvaluator(model)
+        (weights,) = ref.run(None, {})
+        print(weights)  # np.array([1.0, 2.0, 3.0], dtype=np.float32)
+
+    For serializing arbitrary nested Python structures (dicts, tuples, lists,
+    torch tensors, ``DynamicCache`` …) prefer the higher-level helpers
+    :func:`create_onnx_model_from_input_tensors` and
+    :func:`create_input_tensors_from_onnx_model`.
     """
 
     def __init__(self, target_opset: int = 18, ir_version: int = 10, sep: str = "___"):
