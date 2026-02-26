@@ -1170,10 +1170,10 @@ def max_diff(
             return dict(abs=np.inf, rel=np.inf, sum=np.inf, n=np.inf, dnan=np.inf)
         return max_diff(list(expected.values()), got, debug_info=_debug("dict2"), **_dkws)
 
-    import torch
-
     if isinstance(expected, np.ndarray) or isinstance(got, np.ndarray):
         dev = None
+        import torch
+
         if isinstance(expected, torch.Tensor):
             from .torch_helper import to_numpy
 
@@ -1184,6 +1184,10 @@ def max_diff(
 
             dev = 0 if got.device.type == "cpu" else 1
             got = to_numpy(got)
+        if isinstance(got, (list, tuple)):
+            got = np.array(got)
+        if isinstance(expected, (list, tuple)):
+            expected = np.array(expected)
         if verbose >= 6:
             print(f"[max_diff] tensor: {string_type(expected)} ? {string_type(got)}")
 
@@ -1292,6 +1296,8 @@ def max_diff(
                 hist = np.array([0, 0.0001, 0.001, 0.01, 0.1, 1, 10, 100], dtype=diff.dtype)
             res["rep"] = {f">{h}": (diff > h).sum().item() for h in hist}
         return res  # type: ignore
+
+    import torch
 
     if isinstance(expected, torch.Tensor) and isinstance(got, torch.Tensor):
         if verbose >= 6:
