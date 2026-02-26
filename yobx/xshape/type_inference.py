@@ -13,6 +13,7 @@ _i1_o1_node_types = {
     "Exp",
     "Expand",
     "FastGelu",
+    "Floor",
     "Gather",
     "Gelu",
     "LogSoftmax",
@@ -32,6 +33,7 @@ _i1_o1_node_types = {
     "Tanh",
     "Tile",
     "Transpose",
+    "Trunc",
     "Unsqueeze",
 }
 
@@ -247,11 +249,20 @@ def _infer_type_where(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]
     return (max(input_types[1:]),)
 
 
+def _infer_type_dropout(node: NodeProto, input_types: Sequence[int]) -> List[int]:
+    """Returns the output types for a node Dropout."""
+    types = [input_types[0]]
+    if len(node.output) > 1 and node.output[1]:
+        types.append(TensorProto.BOOL)
+    return types
+
+
 _dict_type_inference = {
     "Cast": _infer_type_cast,
     "CastLike": _infer_type_cast_like,
     "Constant": _infer_type_constant,
     "ConstantOfShape": _infer_type_constant_of_shape,
+    "Dropout": _infer_type_dropout,
     "EyeLike": _infer_type_eye_like,
     "Pow": _infer_type_pow,
     "Range": _infer_type_range,
