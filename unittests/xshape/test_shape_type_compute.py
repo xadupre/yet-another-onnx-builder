@@ -791,6 +791,18 @@ class TestShapeTypeCompute(ExtTestCase):
         # NonZero output shape: (rank_of_input, num_nonzero)
         self.assertEqual(b.get_shape("Y")[0], 2)
 
+    def test_op_non_zero_no_rank(self):
+        # When input rank is unknown, output is still always 2D
+        model = _make_model(
+            [oh.make_node("NonZero", ["X"], ["Y"])],
+            [_mkv_("X", TFLOAT, None)],
+            [_mkv_("Y", TINT64, None)],
+        )
+        b = _TestShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TINT64)
+        self.assertEqual(b.get_rank("Y"), 2)
+
     def test_op_pad(self):
         model = _make_model(
             [oh.make_node("Pad", ["X", "pads"], ["Y"])],
@@ -1270,6 +1282,17 @@ class TestShapeTypeCompute(ExtTestCase):
     def test_op_log(self):
         model = _make_model(
             [oh.make_node("Log", ["X"], ["Y"])],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Y", TFLOAT, [3, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (3, 4))
+
+    def test_op_thresholdedrelu(self):
+        model = _make_model(
+            [oh.make_node("ThresholdedRelu", ["X"], ["Y"], alpha=1.0)],
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
@@ -1990,6 +2013,44 @@ class TestShapeTypeCompute(ExtTestCase):
         _set_shape_type_op_any_known["Softmax"](g, node)
         self.assertEqual(g._ranks.get("Y"), 3)
         self.assertEqual(g._types.get("Y"), TFLOAT)
+
+
+    def test_gridsample_4d_static(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 3, 8, 8)
+        g._shapes["grid"] = (2, 5, 6, 2)
+        node = oh.make_node("GridSample", ["X", "grid"], ["Y"])
+        _set_shape_type_op_any_known["GridSample"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (2, 3, 5, 6))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gridsample_5d_static(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (1, 4, 6, 6, 6)
+        g._shapes["grid"] = (1, 3, 4, 5, 3)
+        node = oh.make_node("GridSample", ["X", "grid"], ["Y"])
+        _set_shape_type_op_any_known["GridSample"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (1, 4, 3, 4, 5))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gridsample_4d_dynamic(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = ("batch", "channels", "H_in", "W_in")
+        g._shapes["grid"] = ("batch", "H_out", "W_out", 2)
+        node = oh.make_node("GridSample", ["X", "grid"], ["Y"])
+        _set_shape_type_op_any_known["GridSample"](g, node)
+        self.assertEqual(g._shapes.get("Y"), ("batch", "channels", "H_out", "W_out"))
+
+    def test_gridsample_rank_only(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._ranks["X"] = 4
+        node = oh.make_node("GridSample", ["X", "grid"], ["Y"])
+        _set_shape_type_op_any_known["GridSample"](g, node)
+        self.assertEqual(g._ranks.get("Y"), 4)
 
 
 if __name__ == "__main__":

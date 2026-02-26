@@ -24,6 +24,7 @@ def element_wise_binary_op_types() -> Set[str]:
         "Mod",
         "Or",
         "Sub",
+        "Sum",
         "Xor",
     }
 
@@ -114,6 +115,7 @@ def unary_like_op_types() -> Set[str]:
         "Sqrt",
         "Tan",
         "Tanh",
+        "ThresholdedRelu",
         "ThresholdRelu",
         "Trilu",
         "Trunc",

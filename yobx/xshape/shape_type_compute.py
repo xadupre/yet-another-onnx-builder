@@ -905,12 +905,14 @@ def _set_shape_type_op_any_einsum(self: ShapeBuilder, node: NodeProto):
 
 
 def _set_shape_type_op_any_non_zero(self: ShapeBuilder, node: NodeProto):
-    "Sets the output shape for node type NonZro."
+    "Sets the output shape for node type NonZero."
     self.set_type(node.output[0], TensorProto.INT64)
     if self.has_rank(node.input[0]):
         new_shape = (self.get_rank(node.input[0]), self.unique_dimension_name("NEWDIM_nonzero"))
         self.set_shape(node.output[0], new_shape)
         return new_shape
+    # Output is always 2D: (rank_of_input, num_nonzero_elements)
+    self.set_rank(node.output[0], 2)
     assert not self._debug_shape_missing, (
         f"Unable to compute shape for node: "
         f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
@@ -1700,6 +1702,26 @@ def _set_shape_type_op_any_depth_to_space(self: ShapeBuilder, node: NodeProto):
     )
 
 
+def _set_shape_type_op_any_gridsample(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for GridSample."
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    if self.has_shape(node.input[0]) and self.has_shape(node.input[1]):
+        x_shape = self.get_shape(node.input[0])
+        grid_shape = self.get_shape(node.input[1])
+        # Output: (N, C, *grid_spatial) where grid_spatial = grid[1:-1]
+        new_shape = (x_shape[0], x_shape[1]) + tuple(grid_shape[1:-1])
+        self.set_shape(node.output[0], new_shape)
+        return new_shape
+    if self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+        return True
+    assert not self._debug_shape_missing, (
+        f"Unable to compute shape for node: "
+        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+    )
+
+
 def _set_shape_type_op_any_space_to_depth(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for SpaceToDepth."
     blocksize = self.get_attribute(node, "blocksize").i
@@ -1793,6 +1815,7 @@ _set_shape_type_op_any_known = {
     "Gemm": _set_shape_type_op_any_gemm,
     "GlobalAveragePool": _set_shape_type_op_any_global_pool,
     "GlobalMaxPool": _set_shape_type_op_any_global_pool,
+    "GridSample": _set_shape_type_op_any_gridsample,
     "InstanceNormalization": _set_shape_type_op_any_instance_normalization,
     "IsInf": lambda *args: _set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
     "IsNaN": lambda *args: _set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),

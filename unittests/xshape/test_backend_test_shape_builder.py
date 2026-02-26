@@ -122,7 +122,6 @@ backend_test.exclude(
     "|test_max_|test_min_|test_maxpool_|shape_start_greater"
     "|simple_rnn|stft|string|strnorm"
     "|tensorscatter|tfidfvectorizer"
-    "|thresholdrelu"
     "|unique|AvgPool|BatchNorm|Conv|Embedding|GLU|LeakyReLU|Linear"
     "|MaxPool|PReLU|ConstantPad"
     "|Reflection|Replication|ZeroPad|test_operator)"
