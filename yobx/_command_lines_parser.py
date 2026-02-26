@@ -215,7 +215,7 @@ def get_parser_agg() -> ArgumentParser:
         "--keep-last-date",
         default=False,
         action=BooleanOptionalAction,
-        help="Rewrite all dates to the last one to simplifies the analysis, "
+        help="Rewrite all dates to the last one to simplify the analysis, "
         "this assume changing the date does not add ambiguity, if any, option "
         "--recent should be added.",
     )
