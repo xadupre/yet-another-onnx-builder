@@ -212,7 +212,7 @@ class TestMaxDiffSkipNone(ExtTestCase):
         self.assertEqual(res["n"], 1.0)
 
     def test_skip_none_false_raises(self):
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception):  # noqa: B017
             max_diff(None, np.array([1.0]))
 
 
