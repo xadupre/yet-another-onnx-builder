@@ -38,7 +38,7 @@ or the higher-level
 :meth:`evaluate_shape <yobx.xshape.ShapeBuilder.evaluate_shape>`.
 
 For a deeper description of the design, see the
-:ref:`ShapeBuilder design page <l-shape-builder-design>`.
+:ref:`ShapeBuilder design page <l-shape-design>`.
 
 See also
 --------
