@@ -1674,7 +1674,7 @@ def _set_shape_type_op_any_gridsample(self: ShapeBuilder, node: NodeProto):
         x_shape = self.get_shape(node.input[0])
         grid_shape = self.get_shape(node.input[1])
         # Output: (N, C, *grid_spatial) where grid_spatial = grid[1:-1]
-        new_shape = (x_shape[0], x_shape[1]) + tuple(grid_shape[1:-1])
+        new_shape = (x_shape[0], x_shape[1], *grid_shape[1:-1])
         self.set_shape(node.output[0], new_shape)
         return new_shape
     if self.has_rank(node.input[0]):

@@ -2008,7 +2008,6 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(g._ranks.get("Y"), 3)
         self.assertEqual(g._types.get("Y"), TFLOAT)
 
-
     def test_gridsample_4d_static(self):
         g = _MockShapeBuilder()
         g._types["X"] = TFLOAT
