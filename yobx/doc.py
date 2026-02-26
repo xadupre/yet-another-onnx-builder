@@ -253,12 +253,11 @@ def draw_graph_graphviz(dot: Union[str, onnx.ModelProto], image: str, engine: st
     Draws a graph using :epkg:`Graphviz`.
 
     :param dot: dot graph or ModelProto
-    :param image: output image, None, just returns the output
+    :param image: output image file path
     :param engine: *dot* or *neato*
-    :return: :epkg:`Graphviz` output or
-        the dot text if *image* is None
+    :return: :epkg:`Graphviz` output
 
-    The function creates a temporary file to store the dot file if *image* is not None.
+    The function creates a temporary file to store the dot file.
     """
     if isinstance(dot, onnx.ModelProto):
         sdot = to_dot(dot)
@@ -293,13 +292,13 @@ def plot_dot(
     figsize: Optional[Tuple[int, int]] = None,
 ) -> "matplotlib.axis.Axis":  # noqa: F821
     """
-    Draws a dot graph into a matplotlib graph.
+    Draws a dot graph into a matplotlib axis.
 
     :param dot: dot graph or ModelProto
-    :param ax: output axis, None just returns the output
+    :param ax: optional matplotlib axis; if None, a new figure and axis are created
     :param engine: *dot* or *neato*
-    :param figsize: figsize if ax is None
-    :return: :epkg:`Graphviz` output or, the dot text if *ax* is None
+    :param figsize: size of the figure if *ax* is None
+    :return: matplotlib axis containing the rendered graph image
 
     .. plot::
 
