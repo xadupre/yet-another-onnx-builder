@@ -90,11 +90,7 @@ assert np.allclose(z, a @ a)
 
 model_fmm_t = oh.make_model(
     oh.make_graph(
-        [
-            oh.make_node(
-                "FusedMatMul", ["X", "Y"], ["Z"], domain="com.microsoft", transA=1
-            )
-        ],
+        [oh.make_node("FusedMatMul", ["X", "Y"], ["Z"], domain="com.microsoft", transA=1)],
         "fused_matmul_transA_graph",
         [
             oh.make_tensor_value_info("X", TFLOAT, None),
