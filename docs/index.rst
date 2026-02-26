@@ -5,6 +5,7 @@ yet-another-onnx-builder documentation
    :maxdepth: 2
    :caption: Contents
 
+   cmds/index
    design/index
    auto_examples/index
 

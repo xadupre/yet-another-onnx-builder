@@ -4,19 +4,54 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.helpers._onnx_simple_text_plot import onnx_simple_text_plot
 from yobx.helpers.onnx_helper import (
     get_hidden_inputs,
+    make_model_with_local_functions,
+    make_subfunction,
+    enumerate_results,
+    onnx_find,
     onnx_dtype_name,
-    tensor_dtype_to_np_dtype,
     pretty_onnx,
+    shadowing_names,
+    tensor_dtype_to_np_dtype,
 )
 
 TFLOAT = onnx.TensorProto.FLOAT
+TINT64 = onnx.TensorProto.INT64
 
 
 class TestOnnxHelper(ExtTestCase):
+    def _get_model(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "zero"], ["xu1"]),
+                    oh.make_node("Unsqueeze", ["xu1", "un"], ["xu2"]),
+                    oh.make_node("Reshape", ["xu2", "shape1"], ["xm1"]),
+                    oh.make_node("Reshape", ["Y", "shape2"], ["xm2c"]),
+                    oh.make_node("Cast", ["xm2c"], ["xm2"], to=1),
+                    oh.make_node("MatMul", ["xm1", "xm2"], ["xm"]),
+                    oh.make_node("Reshape", ["xm", "shape3"], ["Z"]),
+                ],
+                "dummy",
+                [oh.make_tensor_value_info("X", TFLOAT, [320, 1280])],
+                [oh.make_tensor_value_info("Z", TFLOAT, [3, 5, 320, 640])],
+                [
+                    onh.from_array(np.random.rand(3, 5, 1280, 640).astype(np.float32), name="Y"),
+                    onh.from_array(np.array([0], dtype=np.int64), name="zero"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="un"),
+                    onh.from_array(np.array([1, 320, 1280], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([15, 1280, 640], dtype=np.int64), name="shape2"),
+                    onh.from_array(np.array([3, 5, 320, 640], dtype=np.int64), name="shape3"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        return model
+
     def test_onnx_dtype_name(self):
         for k in dir(onnx.TensorProto):
             if k.upper() == k and k not in {"DESCRIPTOR", "EXTERNAL", "DEFAULT"}:
@@ -262,6 +297,466 @@ class TestOnnxHelper(ExtTestCase):
         self.assertIn("Reshape(concat_out, reshape_shape) -> Z", text)
         # add_links=True renders ASCII art links; intermediate link lines end with '|'
         self.assertTrue(any(line.endswith("|") for line in text.splitlines()))
+
+    def test_onnx_find(self):
+        model = self._get_model()
+        res = onnx_find(model, watch={"xm2"})
+        self.assertEqual(len(res), 2)
+        self.assertIn("xm2", res[0].output)
+        self.assertIn("xm2", res[1].input)
+
+    @hide_stdout()
+    def test_enumerate_results(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "zero"], ["xu1"]),
+                    oh.make_node("Unsqueeze", ["xu1", "un"], ["xu2"]),
+                    oh.make_node("Reshape", ["xu2", "shape1"], ["xm1"]),
+                    oh.make_node("Reshape", ["Y", "shape2"], ["xm2c"]),
+                    oh.make_node("Cast", ["xm2c"], ["xm2"], to=1),
+                    oh.make_node("MatMul", ["xm1", "xm2"], ["xm"]),
+                    oh.make_node("Reshape", ["xm", "shape3"], ["Z"]),
+                ],
+                "dummy",
+                [oh.make_tensor_value_info("X", TFLOAT, [320, 1280])],
+                [oh.make_tensor_value_info("Z", TFLOAT, [3, 5, 320, 640])],
+                [
+                    onh.from_array(np.random.rand(3, 5, 1280, 640).astype(np.float32), name="Y"),
+                    onh.from_array(np.array([0], dtype=np.int64), name="zero"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="un"),
+                    onh.from_array(np.array([1, 320, 1280], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([15, 1280, 640], dtype=np.int64), name="shape2"),
+                    onh.from_array(np.array([3, 5, 320, 640], dtype=np.int64), name="shape3"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        res = list(enumerate_results(model, "xu1", verbose=2))
+        ress = ";".join(str(r) for r in res)
+        self.assertEqual(
+            ">> xu1 - (0:Unsqueeze:) :: Unsqueeze(X, zero) -> xu1;"
+            "<< xu1 - (1:Unsqueeze:) :: Unsqueeze(xu1, un) -> xu2",
+            ress,
+        )
+        self.assertEqual(2, len(list(enumerate_results(model, "shape1", verbose=2))))
+        self.assertEqual(2, len(list(enumerate_results(model, "X", verbose=2))))
+        self.assertEqual(2, len(list(enumerate_results(model, "Z", verbose=2))))
+
+    @hide_stdout()
+    def test_enumerate_results_loop(self):
+        x = np.array([1, 2, 3, 4, 5]).astype(np.float32)
+
+        model = oh.make_model(
+            graph=oh.make_graph(
+                name="loop_test",
+                inputs=[
+                    oh.make_tensor_value_info("trip_count", TINT64, ["a"]),
+                    oh.make_tensor_value_info("cond", onnx.TensorProto.BOOL, [1]),
+                ],
+                outputs=[oh.make_tensor_value_info("res", TFLOAT, [])],
+                nodes=[
+                    oh.make_node("SequenceEmpty", [], ["seq_empty"], dtype=TFLOAT),
+                    oh.make_node(
+                        "Loop",
+                        inputs=["trip_count", "cond", "seq_empty"],
+                        outputs=["seq_res"],
+                        body=oh.make_graph(
+                            [
+                                oh.make_node(
+                                    "Identity", inputs=["cond_in"], outputs=["cond_out"]
+                                ),
+                                oh.make_node(
+                                    "Constant",
+                                    inputs=[],
+                                    outputs=["x"],
+                                    value=oh.make_tensor(
+                                        name="const_tensor_x",
+                                        data_type=TFLOAT,
+                                        dims=x.shape,
+                                        vals=x.flatten().astype(float),
+                                    ),
+                                ),
+                                oh.make_node(
+                                    "Constant",
+                                    inputs=[],
+                                    outputs=["one"],
+                                    value=oh.make_tensor(
+                                        name="const_tensor_one",
+                                        data_type=TINT64,
+                                        dims=(),
+                                        vals=[1],
+                                    ),
+                                ),
+                                oh.make_node(
+                                    "Constant",
+                                    inputs=[],
+                                    outputs=["slice_start"],
+                                    value=oh.make_tensor(
+                                        name="const_tensor_zero",
+                                        data_type=TINT64,
+                                        dims=(1,),
+                                        vals=[0],
+                                    ),
+                                ),
+                                oh.make_node(
+                                    "Add", inputs=["iter_count", "one"], outputs=["end"]
+                                ),
+                                oh.make_node(
+                                    "Constant",
+                                    inputs=[],
+                                    outputs=["axes"],
+                                    value=oh.make_tensor(
+                                        name="const_tensor_axes",
+                                        data_type=TINT64,
+                                        dims=(1,),
+                                        vals=[0],
+                                    ),
+                                ),
+                                oh.make_node(
+                                    "Unsqueeze", inputs=["end", "axes"], outputs=["slice_end"]
+                                ),
+                                oh.make_node(
+                                    "Slice",
+                                    inputs=["x", "slice_start", "slice_end"],
+                                    outputs=["slice_out"],
+                                ),
+                                oh.make_node(
+                                    "SequenceInsert",
+                                    inputs=["seq_in", "slice_out"],
+                                    outputs=["seq_out"],
+                                ),
+                            ],
+                            "loop_body",
+                            [
+                                oh.make_tensor_value_info("iter_count", TINT64, []),
+                                oh.make_tensor_value_info("cond_in", onnx.TensorProto.BOOL, []),
+                                oh.make_tensor_sequence_value_info("seq_in", TFLOAT, None),
+                            ],
+                            [
+                                oh.make_tensor_value_info("cond_out", onnx.TensorProto.BOOL, []),
+                                oh.make_tensor_sequence_value_info("seq_out", TFLOAT, None),
+                            ],
+                        ),
+                    ),
+                    oh.make_node(
+                        "ConcatFromSequence",
+                        inputs=["seq_res"],
+                        outputs=["res"],
+                        axis=0,
+                        new_axis=0,
+                    ),
+                ],
+            ),
+            ir_version=10,
+            opset_imports=[oh.make_opsetid("", 22)],
+        )
+        res = list(enumerate_results(model, "slice_start", verbose=2))
+        self.assertEqual(len(res), 2)
+
+    def test_shadowing_names(self):
+        def _mkv_(name):
+            value_info_proto = onnx.ValueInfoProto()
+            value_info_proto.name = name
+            return value_info_proto
+
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("ReduceSum", ["X"], ["Xred"]),
+                    oh.make_node("Add", ["X", "two"], ["X0"]),
+                    oh.make_node("Add", ["X0", "zero"], ["X00"]),
+                    oh.make_node("CastLike", ["one", "Xred"], ["one_c"]),
+                    oh.make_node("Greater", ["Xred", "one_c"], ["cond"]),
+                    oh.make_node("Identity", ["two"], ["three"]),
+                    oh.make_node(
+                        "If",
+                        ["cond"],
+                        ["Z_c"],
+                        then_branch=oh.make_graph(
+                            [
+                                # shadowing
+                                oh.make_node("Constant", [], ["three"], value_floats=[2.1]),
+                                oh.make_node("Add", ["X00", "three"], ["Y"]),
+                            ],
+                            "then",
+                            [],
+                            [_mkv_("Y")],
+                        ),
+                        else_branch=oh.make_graph(
+                            [
+                                # not shadowing
+                                oh.make_node("Sub", ["X0", "three"], ["Y"]),
+                            ],
+                            "else",
+                            [],
+                            [_mkv_("Y")],
+                        ),
+                    ),
+                    oh.make_node("CastLike", ["Z_c", "X"], ["Z"]),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, ["N"]),
+                    oh.make_tensor_value_info("one", TFLOAT, ["N"]),
+                ],
+                [oh.make_tensor_value_info("Z", onnx.TensorProto.UNDEFINED, ["N"])],
+                [
+                    onh.from_array(np.array([0], dtype=np.float32), name="zero"),
+                    onh.from_array(np.array([2], dtype=np.float32), name="two"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        self.assertEqual(
+            (
+                {"three"},
+                set(),
+                {"cond", "Z", "X0", "Z_c", "three", "one_c", "Xred", "X00", "Y"},
+            ),
+            shadowing_names(model),
+        )
+
+    def test_make_model_with_local_functions(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "zero"], ["xu1"]),
+                    oh.make_node("Unsqueeze", ["xu1", "un"], ["xu2"]),
+                    oh.make_node("Reshape", ["xu2", "shape1"], ["xm1"]),
+                    oh.make_node("Reshape", ["Y", "shape2"], ["xm2c"]),
+                    oh.make_node("Cast", ["xm2c"], ["xm2"], to=1),
+                    oh.make_node("MatMul", ["xm1", "xm2"], ["xm"]),
+                    oh.make_node("Reshape", ["xm", "shape3"], ["Z"]),
+                ],
+                "dummy",
+                [oh.make_tensor_value_info("X", TFLOAT, [320, 1280])],
+                [oh.make_tensor_value_info("Z", TFLOAT, [3, 5, 320, 640])],
+                [
+                    onh.from_array(np.random.rand(3, 5, 1280, 640).astype(np.float32), name="Y"),
+                    onh.from_array(np.array([0], dtype=np.int64), name="zero"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="un"),
+                    onh.from_array(np.array([1, 320, 1280], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([15, 1280, 640], dtype=np.int64), name="shape2"),
+                    onh.from_array(np.array([3, 5, 320, 640], dtype=np.int64), name="shape3"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        for i_node in [0, 1, 2, 3]:
+            node = model.graph.node[i_node]
+            meta = node.metadata_props.add()
+            meta.key = "namespace"
+            meta.value = "LLL"
+        new_model = make_model_with_local_functions(model, "^LLL$")
+        onnx.checker.check_model(model)
+        self.assertEqual(len(new_model.functions), 1)
+        self.assertEqual(
+            ["X", "Y", "shape1", "shape2", "un", "zero"], new_model.functions[0].input
+        )
+        self.assertEqual(["xm1", "xm2c"], new_model.functions[0].output)
+        self.assertEqual("LLL", new_model.functions[0].name)
+        self.assertEqual("local_function", new_model.functions[0].domain)
+        self.assertIn("LLL[local_function]", pretty_onnx(new_model))
+        onnx.checker.check_model(new_model)
+
+    def test_make_model_with_local_functions_bug(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "zero"], ["xu1"]),
+                    oh.make_node("Unsqueeze", ["xu1", "un"], ["xu2"]),
+                    oh.make_node("Reshape", ["xu2", "shape1"], ["xm1"]),
+                    oh.make_node("Reshape", ["Y", "shape2"], ["xm2c"]),
+                    oh.make_node("Cast", ["xm2c"], ["xm2"], to=1),
+                    oh.make_node("MatMul", ["xm1", "xm2"], ["xm"]),
+                    oh.make_node("Reshape", ["xm", "shape3"], ["Z"]),
+                ],
+                "dummy",
+                [oh.make_tensor_value_info("X", TFLOAT, [320, 1280])],
+                [oh.make_tensor_value_info("Z", TFLOAT, [3, 5, 320, 640])],
+                [
+                    onh.from_array(np.random.rand(3, 5, 1280, 640).astype(np.float32), name="Y"),
+                    onh.from_array(np.array([0], dtype=np.int64), name="zero"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="un"),
+                    onh.from_array(np.array([1, 320, 1280], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([15, 1280, 640], dtype=np.int64), name="shape2"),
+                    onh.from_array(np.array([3, 5, 320, 640], dtype=np.int64), name="shape3"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        for i_node in [0, 2, 3, 4]:
+            node = model.graph.node[i_node]
+            meta = node.metadata_props.add()
+            meta.key = "namespace"
+            meta.value = "LLL"
+        self.assertRaise(
+            lambda: make_model_with_local_functions(model, "^LLL$", allow_extensions=False),
+            ValueError,
+        )
+        onnx.checker.check_model(model)
+
+    @hide_stdout()
+    def test_make_model_with_local_functions_2(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "zero"], ["xu1"]),
+                    oh.make_node("Unsqueeze", ["xu1", "un"], ["xu2"]),
+                    oh.make_node("Reshape", ["xu2", "shape1"], ["xm1"]),
+                    oh.make_node("Reshape", ["Y", "shape2"], ["xm2c"]),
+                    oh.make_node("Cast", ["xm2c"], ["xm2"], to=1),
+                    oh.make_node("MatMul", ["xm1", "xm2"], ["xm"]),
+                    oh.make_node("Reshape", ["xm", "shape3"], ["Z"]),
+                ],
+                "dummy",
+                [oh.make_tensor_value_info("X", TFLOAT, [320, 1280])],
+                [oh.make_tensor_value_info("Z", TFLOAT, [3, 5, 320, 640])],
+                [
+                    onh.from_array(np.random.rand(3, 5, 1280, 640).astype(np.float32), name="Y"),
+                    onh.from_array(np.array([0], dtype=np.int64), name="zero"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="un"),
+                    onh.from_array(np.array([1, 320, 1280], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([15, 1280, 640], dtype=np.int64), name="shape2"),
+                    onh.from_array(np.array([3, 5, 320, 640], dtype=np.int64), name="shape3"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        for i_node in [0, 1, 2, 3]:
+            node = model.graph.node[i_node]
+            meta = node.metadata_props.add()
+            meta.key = f"source[{i_node}]"
+            meta.value = f"LLL{i_node//3}"
+        new_model = make_model_with_local_functions(
+            model, "^LLL[01]$", metadata_key_prefix="source[", verbose=1
+        )
+        onnx.checker.check_model(model)
+        self.assertEqual(len(new_model.functions), 2)
+        p = pretty_onnx(new_model)
+        self.assertIn("LLL0[local_function]", p)
+        self.assertIn("LLL1[local_function]", p)
+
+        self.assertEqual(["X", "shape1", "un", "zero"], new_model.functions[0].input)
+        self.assertEqual(["xm1"], new_model.functions[0].output)
+        self.assertEqual("LLL0", new_model.functions[0].name)
+        self.assertEqual("local_function", new_model.functions[0].domain)
+        self.assertEqual(len(new_model.functions[0].node), 3)
+
+        self.assertEqual(["Y", "shape2"], new_model.functions[1].input)
+        self.assertEqual(["xm2c"], new_model.functions[1].output)
+        self.assertEqual("LLL1", new_model.functions[1].name)
+        self.assertEqual("local_function", new_model.functions[1].domain)
+        self.assertEqual(len(new_model.functions[1].node), 1)
+
+        onnx.checker.check_model(new_model)
+
+    @hide_stdout()
+    def test_make_model_with_local_functions_3(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "zero"], ["xu1"]),
+                    oh.make_node("Unsqueeze", ["xu1", "un"], ["xu2"]),
+                    oh.make_node("Reshape", ["xu2", "shape1"], ["xm1"]),
+                    oh.make_node("Reshape", ["Y", "shape2"], ["xm2c"]),
+                    oh.make_node("Cast", ["xm2c"], ["xm2"], to=1),
+                    oh.make_node("MatMul", ["xm1", "xm2"], ["xm"]),
+                    oh.make_node("Reshape", ["xm", "shape3"], ["Z"]),
+                ],
+                "dummy",
+                [oh.make_tensor_value_info("X", TFLOAT, [320, 1280])],
+                [oh.make_tensor_value_info("Z", TFLOAT, [3, 5, 320, 640])],
+                [
+                    onh.from_array(np.random.rand(3, 5, 1280, 640).astype(np.float32), name="Y"),
+                    onh.from_array(np.array([0], dtype=np.int64), name="zero"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="un"),
+                    onh.from_array(np.array([1, 320, 1280], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([15, 1280, 640], dtype=np.int64), name="shape2"),
+                    onh.from_array(np.array([3, 5, 320, 640], dtype=np.int64), name="shape3"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        onnx.checker.check_model(model)
+        for i_node in range(len(model.graph.node) - 1):
+            if i_node == 2:
+                continue
+            node = model.graph.node[i_node]
+            meta = node.metadata_props.add()
+            meta.key = f"source[{i_node}]"
+            meta.value = "LLL"
+        self.assertRaise(
+            lambda: make_model_with_local_functions(
+                model,
+                "^LLL$",
+                metadata_key_prefix="source[",
+                verbose=1,
+                allow_extensions=False,
+            ),
+            ValueError,
+        )
+        new_model = make_model_with_local_functions(
+            model, "^LLL$", metadata_key_prefix="source[", verbose=1
+        )
+        onnx.checker.check_model(new_model)
+        self.assertEqual(len(new_model.functions), 1)
+        p = pretty_onnx(new_model)
+        self.assertIn("LLL[local_function]", p)
+
+        self.assertEqual(
+            ["X", "Y", "shape1", "shape2", "un", "zero"], new_model.functions[0].input
+        )
+        self.assertEqual(["xm"], new_model.functions[0].output)
+        self.assertEqual("LLL", new_model.functions[0].name)
+        self.assertEqual("local_function", new_model.functions[0].domain)
+        self.assertEqual(len(new_model.functions[0].node), 6)
+        onnx.checker.check_model(new_model)
+
+    def test_make_subfunction(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "zero"], ["xu1"]),
+                    oh.make_node("Unsqueeze", ["xu1", "un"], ["xu2"]),
+                    oh.make_node("Reshape", ["xu2", "shape1"], ["xm1"]),
+                    oh.make_node("Reshape", ["Y", "shape2"], ["xm2c"]),
+                    oh.make_node("Cast", ["xm2c"], ["xm2"], to=1),
+                    oh.make_node("MatMul", ["xm1", "xm2"], ["xm"]),
+                    oh.make_node("Reshape", ["xm", "shape3"], ["Z"]),
+                ],
+                "dummy",
+                [oh.make_tensor_value_info("X", TFLOAT, [320, 1280])],
+                [oh.make_tensor_value_info("Z", TFLOAT, [3, 5, 320, 640])],
+                [
+                    onh.from_array(np.random.rand(3, 5, 1280, 640).astype(np.float32), name="Y"),
+                    onh.from_array(np.array([0], dtype=np.int64), name="zero"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="un"),
+                    onh.from_array(np.array([1, 320, 1280], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([15, 1280, 640], dtype=np.int64), name="shape2"),
+                    onh.from_array(np.array([3, 5, 320, 640], dtype=np.int64), name="shape3"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        new_function = make_subfunction(
+            "localf",
+            model.graph.node[:4],
+            opset_imports=model.opset_import,
+            output_names=["xm1", "xm2c"],
+        )
+        self.assertIsInstance(new_function, onnx.FunctionProto)
+        self.assertEqual(len(new_function.node), 4)
+        self.assertEqual(new_function.output, ["xm1", "xm2c"])
+        self.assertEqual(new_function.input, ["X", "Y", "shape1", "shape2", "un", "zero"])
 
 
 if __name__ == "__main__":
