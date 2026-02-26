@@ -1293,8 +1293,8 @@ class CubeLogs:
                 # Too long.
                 # self._apply_excel_style(raw, writer, self.data)
                 if csv and "raw" in csv:
-                    df.reset_index(drop=False).to_csv(f"{output}.raw.csv", index=False)
-                memory = df.memory_usage(deep=True).sum()
+                    self.data.reset_index(drop=False).to_csv(f"{output}.raw.csv", index=False)
+                memory = self.data.memory_usage(deep=True).sum()
                 if memory > 2**22:
                     msg = (
                         f"[CubeLogs.to_excel] skipping 'raw', "
