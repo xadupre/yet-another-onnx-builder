@@ -7,8 +7,8 @@ import onnx.backend.base
 import onnx.backend.test
 from onnx import ModelProto
 from onnx.backend.base import Device, DeviceType
-from onnx_diagnostic.helpers.onnx_helper import pretty_onnx
 from yobx.helpers import string_type
+from yobx.helpers.onnx_helper import pretty_onnx
 from yobx.helpers.rt_helper import make_feeds
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xshape import BasicShapeBuilder
