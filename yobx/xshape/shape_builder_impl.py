@@ -490,6 +490,15 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         ), f"Dynamic dimension {name!r}{self.get_debug_msg()}"
         self.dynamic_dimensions_[name] = {name}
 
+    def unique_dimension_name(self, base: str) -> str:
+        """Returns a unique dimension name based on *base*."""
+        i = 0
+        while f"{base}_{i}" in self.dynamic_dimensions_:
+            i += 1
+        name = f"{base}_{i}"
+        self.add_dynamic_dimension(name)
+        return name
+
     def set_shape(self, name: str, shape: DYNAMIC_SHAPE, exc: bool = False, **_kwargs):
         """
         Sets the shape for a result. It is exists, it checks the new shape
