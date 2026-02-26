@@ -321,6 +321,28 @@ class TestComputeConstant(ExtTestCase):
         self.assertIsNone(result)
         self.assertIsNone(feeds)
 
+    def test_compute_constant_shape_node_static_shape(self):
+        # When input has a fully static shape, Shape node returns it as int64 array
+        b = BasicShapeBuilder()
+        b.set_type("x", TFLOAT)
+        b.set_shape("x", (3, 4))
+        node = oh.make_node("Shape", ["x"], ["s"])
+        b.constants_["s"] = node
+        result, feeds = b.compute_constant("s")
+        self.assertEqualArray(result, np.array([3, 4], dtype=np.int64))
+        self.assertIn("x", feeds)
+
+    def test_compute_constant_shape_node_static_shape_with_start_end(self):
+        # Shape node with start/end attributes on a static shape
+        b = BasicShapeBuilder()
+        b.set_type("x", TFLOAT)
+        b.set_shape("x", (2, 3, 4, 5))
+        node = oh.make_node("Shape", ["x"], ["s"], start=1, end=3)
+        b.constants_["s"] = node
+        result, feeds = b.compute_constant("s")
+        self.assertEqualArray(result, np.array([3, 4], dtype=np.int64))
+        self.assertIn("x", feeds)
+
     def test_compute_constant_not_a_constant_raises(self):
         b = BasicShapeBuilder()
         self.assertRaises(AssertionError, b.compute_constant, "nonexistent")

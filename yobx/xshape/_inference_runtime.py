@@ -1,4 +1,5 @@
 import time
+from collections import namedtuple
 from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
 import onnx
@@ -14,9 +15,13 @@ from ._shape_helper import (
 )
 from .shape_type_compute import set_shape_type_op_any, set_shape_type_custom
 
+_ShapeConstant = namedtuple("ShapeConstant", ["name", "shape", "node"])
+
 
 class _InferenceRuntime:
     """Sets shape and type."""
+
+    ShapeConstant = _ShapeConstant
 
     def make_dimension_name_if_necessary(
         self, a: Union[int, str], b: Union[int, str], op: str
