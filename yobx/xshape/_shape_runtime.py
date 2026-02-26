@@ -36,20 +36,26 @@ class _ShapeRuntime:
 
         # Constant can be considered as possible shape.
         for i in node.input:
-            known = self.value_as_shape(i)
+            # pyrefly: ignore [missing-attribute]
+            known = self.value_as_shape(i)  # type: ignore[attr-defined]
             if known is not None:
                 continue
-            if not self.is_constant(i):
+            # pyrefly: ignore [missing-attribute]
+            if not self.is_constant(i):  # type: ignore[attr-defined]
                 continue
-            if not self.has_type(i) or self.get_type(i) != onnx.TensorProto.INT64:
+            # pyrefly: ignore [missing-attribute]
+            if not self.has_type(i) or self.get_type(i) != onnx.TensorProto.INT64:  # type: ignore[attr-defined]
                 # No chance for this to be used a shape computation.
                 continue
-            cst = self.get_constant(i, exc=False, computed_value=True)
+            # pyrefly: ignore [missing-attribute]
+            cst = self.get_constant(i, exc=False, computed_value=True)  # type: ignore[attr-defined]
             if cst is None or len(cst.shape) > 1:
                 continue
-            with self.maybe_disable_fake_tensor_mode():
+            # pyrefly: ignore [missing-attribute]
+            with self.maybe_disable_fake_tensor_mode():  # type: ignore[attr-defined]
                 tu = tuple(map(int, cst)) if len(cst.shape) > 0 else int(cst)
-            self.set_value_shape(i, tu)
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(i, tu)  # type: ignore[attr-defined]
 
         r = None
         meth_name = f"_update_value_shape_with_node_{node.op_type}"
@@ -59,7 +65,8 @@ class _ShapeRuntime:
                 return r
 
         # after this point, it is all about operators between shapes.
-        values = [self.value_as_shape(x) for x in node.input]
+        # pyrefly: ignore [missing-attribute]
+        values = [self.value_as_shape(x) for x in node.input]  # type: ignore[attr-defined]
         if any(x is None for x in values):
             # it is not a shape
             node.doc_string += "#SV-All/0"
@@ -71,8 +78,10 @@ class _ShapeRuntime:
             if r is not None:
                 return r
         assert r is not None, (
-            f"Unable to compute a shape for node {self.pretty_node(node)} "
-            f"with values={values}{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            f"Unable to compute a shape for node {self.pretty_node(node)} "  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            f"with values={values}{self.get_debug_msg()}"  # type: ignore[attr-defined]
         )
         return False  # defensive return for static type checkers; assert above always raises
 
@@ -80,23 +89,32 @@ class _ShapeRuntime:
         return self._update_value_shape_with_node_Identity(node)
 
     def _update_value_shape_with_node_Gather(self, node: onnx.NodeProto) -> bool:
-        if self.has_type(node.input[0]):
-            self.set_type(node.output[0], self.get_type(node.input[0]))
-        if self.has_device(node.input[0]):
-            self.set_device(node.output[0], self.get_device(node.input[0]))
-        if self.is_constant(node.input[1]):
-            y = self.value_as_shape(node.input[0])
+        # pyrefly: ignore [missing-attribute]
+        if self.has_type(node.input[0]):  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            self.set_type(node.output[0], self.get_type(node.input[0]))  # type: ignore[attr-defined]
+        # pyrefly: ignore [missing-attribute]
+        if self.has_device(node.input[0]):  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            self.set_device(node.output[0], self.get_device(node.input[0]))  # type: ignore[attr-defined]
+        # pyrefly: ignore [missing-attribute]
+        if self.is_constant(node.input[1]):  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            y = self.value_as_shape(node.input[0])  # type: ignore[attr-defined]
             if y is None:
                 node.doc_string += "#SV-Ga/2"
                 return False
-            i = self.get_constant(node.input[1], computed_value=True, exc=True)
+            # pyrefly: ignore [missing-attribute]
+            i = self.get_constant(node.input[1], computed_value=True, exc=True)  # type: ignore[attr-defined]
             if i is None:
                 node.doc_string += "#SV-Ga/3"
                 return False
             if isinstance(y, str) and isinstance(i, int):
-                self.set_value_shape(node.output[0], f"{y}[{i}]")
+                # pyrefly: ignore [missing-attribute]
+                self.set_value_shape(node.output[0], f"{y}[{i}]")  # type: ignore[attr-defined]
                 node.doc_string += "#SV-Ga3"
-                self.set_shape(node.output[0], tuple())
+                # pyrefly: ignore [missing-attribute]
+                self.set_shape(node.output[0], tuple())  # type: ignore[attr-defined]
                 return True
             if (
                 isinstance(y, str)
@@ -105,52 +123,67 @@ class _ShapeRuntime:
                 and i.shape in ((1,), tuple())
             ):
                 ii = int(i[0]) if i.shape == (1,) else int(i)
-                self.set_value_shape(node.output[0], f"{y}[{ii}]")
+                # pyrefly: ignore [missing-attribute]
+                self.set_value_shape(node.output[0], f"{y}[{ii}]")  # type: ignore[attr-defined]
                 node.doc_string += "#SV-Ga4"
-                self.set_shape(node.output[0], (1,) if i.shape == (1,) else tuple())
+                # pyrefly: ignore [missing-attribute]
+                self.set_shape(node.output[0], (1,) if i.shape == (1,) else tuple())  # type: ignore[attr-defined]
                 return True
             if isinstance(y, tuple) and isinstance(i, int):
-                self.set_value_shape(node.output[0], y[i])
+                # pyrefly: ignore [missing-attribute]
+                self.set_value_shape(node.output[0], y[i])  # type: ignore[attr-defined]
                 node.doc_string += "#SV-Ga5"
-                self.set_shape(node.output[0], tuple())
+                # pyrefly: ignore [missing-attribute]
+                self.set_shape(node.output[0], tuple())  # type: ignore[attr-defined]
                 return True
             if isinstance(y, tuple) and isinstance(i, tuple) and all_int(i):
-                self.set_value_shape(node.output[0], tuple(y[_] for _ in i))
-                self.set_shape(node.output[0], (len(i),))
+                # pyrefly: ignore [missing-attribute]
+                self.set_value_shape(node.output[0], tuple(y[_] for _ in i))  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.set_shape(node.output[0], (len(i),))  # type: ignore[attr-defined]
                 node.doc_string += "#SV-Ga6"
                 return True
             if (
                 isinstance(y, tuple)
-                and isinstance(i, (self.torch.Tensor, np.ndarray))
-                and i.dtype in (np.int64, self.torch.int64)
+                # pyrefly: ignore [missing-attribute]
+                and isinstance(i, (self.torch.Tensor, np.ndarray))  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                and i.dtype in (np.int64, self.torch.int64)  # type: ignore[attr-defined]
                 and tuple(i.shape) in ((1,), tuple())
             ):
                 ishape = tuple(i.shape)
                 ii = int(i[0]) if ishape == (1,) else int(i)
-                if self._debug_quiet and ii >= len(y):
+                # pyrefly: ignore [missing-attribute]
+                if self._debug_quiet and ii >= len(y):  # type: ignore[attr-defined]
                     node.doc_string += "#SV-Ga/77"
                     return False
                 assert ii < len(y), (
                     f"Unexpected value for y={y!r}, i={i!r} in node Gather "
-                    f"with inputs={node.input}{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"with inputs={node.input}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
-                self.set_value_shape(node.output[0], (y[ii],) if i.shape == (1,) else y[ii])
-                self.set_shape(node.output[0], (1,) if i.shape == (1,) else tuple())
+                # pyrefly: ignore [missing-attribute]
+                self.set_value_shape(node.output[0], (y[ii],) if i.shape == (1,) else y[ii])  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.set_shape(node.output[0], (1,) if i.shape == (1,) else tuple())  # type: ignore[attr-defined]
                 node.doc_string += "#SV-Ga7"
                 return True
             raise RuntimeError(
                 f"Not implemented when node Gather(x,i) with inputs={node.input}, "
                 f"shape(x)={y!r}, i={i!r}, i.dtype={i.dtype if i is not None else '?'}"
-                f"{self.get_debug_msg()}"
+                # pyrefly: ignore [missing-attribute]
+                f"{self.get_debug_msg()}"  # type: ignore[attr-defined]
             )
         node.doc_string += "#SV-Ga/7"
         return False
 
     def _update_value_shape_with_node_Identity(self, node: onnx.NodeProto) -> bool:
-        value = self.value_as_shape(node.input[0])
+        # pyrefly: ignore [missing-attribute]
+        value = self.value_as_shape(node.input[0])  # type: ignore[attr-defined]
         if value is not None:
             node.doc_string += "#SV-Id1"
-            self.set_value_shape(
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(  # type: ignore[attr-defined]
                 node.output[0],
                 (
                     np.abs(value)
@@ -165,78 +198,107 @@ class _ShapeRuntime:
 
     def _update_value_shape_with_node_Shape(self, node: onnx.NodeProto) -> bool:
         if len(node.attribute) == 0:
-            if self.has_shape(node.input[0]):
+            # pyrefly: ignore [missing-attribute]
+            if self.has_shape(node.input[0]):  # type: ignore[attr-defined]
                 node.doc_string += "#SV-Sh1"
-                shape = self.get_shape(node.input[0])
-                self.set_value_shape(node.output[0], shape)
+                # pyrefly: ignore [missing-attribute]
+                shape = self.get_shape(node.input[0])  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.set_value_shape(node.output[0], shape)  # type: ignore[attr-defined]
                 if all_int(shape):
-                    self.update_node_constant(node.output[0], node)
-                self.set_shape(node.output[0], (len(shape),))
+                    # pyrefly: ignore [missing-attribute]
+                    self.update_node_constant(node.output[0], node)  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.set_shape(node.output[0], (len(shape),))  # type: ignore[attr-defined]
                 return True
             node.doc_string += "#SV-Sh/1"
             return False
 
-        start = self.get_attribute(node, "start", exc=False)
-        end = self.get_attribute(node, "end", exc=False)
+        # pyrefly: ignore [missing-attribute]
+        start = self.get_attribute(node, "start", exc=False)  # type: ignore[attr-defined]
+        # pyrefly: ignore [missing-attribute]
+        end = self.get_attribute(node, "end", exc=False)  # type: ignore[attr-defined]
         assert end is None or start is None or end.i < 0 or start.i < end.i, (
-            f"Shape(..., end < start) is not implemented, node={self.pretty_node(node)}, "
-            f"start={start}, end={end}{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            f"Shape(..., end < start) is not implemented, node={self.pretty_node(node)}, "  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            f"start={start}, end={end}{self.get_debug_msg()}"  # type: ignore[attr-defined]
         )
         if end is None:
-            if self.has_rank(node.input[0]):
-                end = self.get_rank(node.input[0])
-        if self.has_shape(node.input[0]):
-            shape = self.get_shape(node.input[0])
+            # pyrefly: ignore [missing-attribute]
+            if self.has_rank(node.input[0]):  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                end = self.get_rank(node.input[0])  # type: ignore[attr-defined]
+        # pyrefly: ignore [missing-attribute]
+        if self.has_shape(node.input[0]):  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            shape = self.get_shape(node.input[0])  # type: ignore[attr-defined]
             assert start is None or start.i < len(shape), (
                 f"Shape mismatch, start={0 if start is None else start.i}, "
                 f"shape of {node.input[0]!r} "
-                f"is {shape}{self.get_debug_msg()}"
+                # pyrefly: ignore [missing-attribute]
+                f"is {shape}{self.get_debug_msg()}"  # type: ignore[attr-defined]
             )
             if end is None:
                 n_shape = shape[0 if start is None else start.i :]
-                self.set_value_shape(node.output[0], n_shape)
+                # pyrefly: ignore [missing-attribute]
+                self.set_value_shape(node.output[0], n_shape)  # type: ignore[attr-defined]
                 if all_int(shape):
-                    self.update_node_constant(node.output[0], node)
-                self.set_shape(node.output[0], (len(n_shape),))
+                    # pyrefly: ignore [missing-attribute]
+                    self.update_node_constant(node.output[0], node)  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.set_shape(node.output[0], (len(n_shape),))  # type: ignore[attr-defined]
                 node.doc_string += "#SV-Sh4"
                 return True
+            # pyrefly: ignore [unsupported-operation]
             assert getattr(end, "i", end) <= len(shape), (
                 f"Shape mismatch, end={getattr(end, 'i', end)}, "
                 f"shape of {node.input[0]!r} "
-                f"is {shape}{self.get_debug_msg()}"
+                # pyrefly: ignore [missing-attribute]
+                f"is {shape}{self.get_debug_msg()}"  # type: ignore[attr-defined]
             )
             n_shape = shape[0 if start is None else start.i : getattr(end, "i", end)]
             if all_int(shape):
-                self.update_node_constant(node.output[0], node)
-            self.set_value_shape(node.output[0], n_shape)
-            self.set_shape(node.output[0], (len(n_shape),))
+                # pyrefly: ignore [missing-attribute]
+                self.update_node_constant(node.output[0], node)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], n_shape)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            self.set_shape(node.output[0], (len(n_shape),))  # type: ignore[attr-defined]
             node.doc_string += "#SV-Sh6"
             return True
 
         if end is None:
-            self.set_value_shape(node.output[0], f"{node.input[0]}[{start.i}:]")
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], f"{node.input[0]}[{start.i}:]")  # type: ignore[attr-defined]
             node.doc_string += "#SV-Sh/6"
             return False
 
+        # pyrefly: ignore [missing-attribute]
         start = start.i
         end = getattr(end, "i", end)
         if isinstance(start, int) and isinstance(end, int):
-            self.set_value_shape(
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(  # type: ignore[attr-defined]
                 node.output[0], tuple(f"{node.input[0]}[{i}]" for i in range(start, end))
             )
             node.doc_string += "#SV-Sh7"
         else:
-            self.set_value_shape(node.output[0], f"{node.input[0]}[{start}:{end}]")
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], f"{node.input[0]}[{start}:{end}]")  # type: ignore[attr-defined]
             node.doc_string += "#SV-Sh7"
         return True
 
     def _update_value_shape_with_node_Squeeze(self, node: onnx.NodeProto) -> bool:
-        if self.is_constant_or_attribute(node, 1, "axes"):
-            y = self.value_as_shape(node.input[0])
+        # pyrefly: ignore [missing-attribute]
+        if self.is_constant_or_attribute(node, 1, "axes"):  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            y = self.value_as_shape(node.input[0])  # type: ignore[attr-defined]
             if y is None:
                 node.doc_string += "#SV-Sq/3"
                 return False
-            i = self.get_constant_or_attribute(node, 1, "axes")
+            # pyrefly: ignore [missing-attribute]
+            i = self.get_constant_or_attribute(node, 1, "axes")  # type: ignore[attr-defined]
             if isinstance(i, int):
                 ii = i
             elif isinstance(i, np.ndarray) and i.dtype == np.int64 and i.shape in ((1,), tuple()):
@@ -244,59 +306,76 @@ class _ShapeRuntime:
             elif i is None and isinstance(y, tuple) and len(y) == 1:
                 # A dimension a tensor of 1 element turned into a scalar
                 node.doc_string += "#SV-SqDim"
-                self.set_value_shape(node.output[0], y[0])
+                # pyrefly: ignore [missing-attribute]
+                self.set_value_shape(node.output[0], y[0])  # type: ignore[attr-defined]
                 return True
             else:
                 raise RuntimeError(
                     f"Not implemented when node Squeeze with inputs={node.input}, "
-                    f"y={y!r}, i={i!r}{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"y={y!r}, i={i!r}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
             assert (
                 ii == 0
-            ), f"A shape should only have one axis i={i}, y={y}{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            ), f"A shape should only have one axis i={i}, y={y}{self.get_debug_msg()}"  # type: ignore[attr-defined]
             if isinstance(y, str):
                 node.doc_string += "#SV-Sq1"
-                self.set_value_shape(node.output[0], f"squeeze({y})")
+                # pyrefly: ignore [missing-attribute]
+                self.set_value_shape(node.output[0], f"squeeze({y})")  # type: ignore[attr-defined]
                 return True
             if isinstance(y, int):
                 node.doc_string += "#SV-Sq2"
-                self.set_value_shape(node.output[0], y)
+                # pyrefly: ignore [missing-attribute]
+                self.set_value_shape(node.output[0], y)  # type: ignore[attr-defined]
                 return True
             assert isinstance(
                 y, tuple
-            ), f"Unexpected type {type(y)} for y={y} and i={i}{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            ), f"Unexpected type {type(y)} for y={y} and i={i}{self.get_debug_msg()}"  # type: ignore[attr-defined]
             node.doc_string += "#SV-Sq3"
-            self.set_value_shape(node.output[0], y[0])
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], y[0])  # type: ignore[attr-defined]
             return True
         node.doc_string += "#SV-Sq/2"
         return False
 
     def _update_value_shape_with_node_Unsqueeze(self, node: onnx.NodeProto) -> bool:
-        values_0 = self.value_as_shape(node.input[0])
+        # pyrefly: ignore [missing-attribute]
+        values_0 = self.value_as_shape(node.input[0])  # type: ignore[attr-defined]
         if isinstance(values_0, tuple) and len(values_0) > 1:
             # This cannot be a shape anymore after this operation
             node.doc_string += "#SV-Unsq/1"
             return False
-        if self.has_rank(node.input[0]) and self.get_rank(node.input[0]) > 0:
+        # pyrefly: ignore [missing-attribute]
+        if self.has_rank(node.input[0]) and self.get_rank(node.input[0]) > 0:  # type: ignore[attr-defined]
             # This cannot be a shape anymore.
             node.doc_string += "#SV-Unsq/2"
             return False
-        if not self.has_rank(node.input[0]) and values_0 is None:
+        # pyrefly: ignore [missing-attribute]
+        if not self.has_rank(node.input[0]) and values_0 is None:  # type: ignore[attr-defined]
             node.doc_string += "#SV-Unsq/3"
             return False
-        assert self.has_rank(node.input[0]), (
+        # pyrefly: ignore [missing-attribute]
+        assert self.has_rank(node.input[0]), (  # type: ignore[attr-defined]
             f"Rank of {node.input[0]!r} is unknown but "
-            f"its value is {values_0!r}{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            f"its value is {values_0!r}{self.get_debug_msg()}"  # type: ignore[attr-defined]
         )
         if len(node.input) > 1:
-            cst = self.get_constant(node.input[1], exc=False, computed_value=True)
+            # pyrefly: ignore [missing-attribute]
+            cst = self.get_constant(node.input[1], exc=False, computed_value=True)  # type: ignore[attr-defined]
             cst = tuple() if not cst.shape else tuple(cst)
         else:
-            cst = tuple(self.get_attribute(node, "axes").ints)
-            assert cst, f"Value={cst!r} is wrong for {node.input[0]}{self.get_debug_msg()}"
-        if cst is not None and len(cst) == 1 and self.get_rank(node.input[0]) == 0:
+            # pyrefly: ignore [missing-attribute]
+            cst = tuple(self.get_attribute(node, "axes").ints)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            assert cst, f"Value={cst!r} is wrong for {node.input[0]}{self.get_debug_msg()}"  # type: ignore[attr-defined]
+        # pyrefly: ignore [missing-attribute]
+        if cst is not None and len(cst) == 1 and self.get_rank(node.input[0]) == 0:  # type: ignore[attr-defined]
             node.doc_string += "#SV-Unsq4"
-            self.set_value_shape(
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(  # type: ignore[attr-defined]
                 node.output[0], (node.input[0],) if values_0 is None else (values_0,)
             )
             return True
@@ -306,17 +385,20 @@ class _ShapeRuntime:
         self, node: onnx.NodeProto, values: List[Any]
     ) -> bool:
         node.doc_string += "#SV-Co1"
-        concatenated = []
+        concatenated = []  # type: ignore[var-annotated]
         for v in values:
             concatenated.extend(v if isinstance(v, tuple) else (v,))
-        self.set_value_shape(node.output[0], tuple(concatenated))
+        # pyrefly: ignore [missing-attribute]
+        self.set_value_shape(node.output[0], tuple(concatenated))  # type: ignore[attr-defined]
         return True
 
     def _update_value_shape_with_values_Range(
         self, node: onnx.NodeProto, values: List[Any]
     ) -> bool:
-        if len(values) == 4 and self.is_constant(node.input[3]):
-            cst = self.get_constant(node.input[3], computed_value=True, exc=False)
+        # pyrefly: ignore [missing-attribute]
+        if len(values) == 4 and self.is_constant(node.input[3]):  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            cst = self.get_constant(node.input[3], computed_value=True, exc=False)  # type: ignore[attr-defined]
             if cst == 1:
                 values = values[:-1]
         if len(values) == 3:
@@ -337,7 +419,8 @@ class _ShapeRuntime:
             node.doc_string += "#SV-Ra/3"
             return False
         node.doc_string += "#SV-Ra"
-        self.set_value_shape(node.output[0], tuple(range(*args)))
+        # pyrefly: ignore [missing-attribute]
+        self.set_value_shape(node.output[0], tuple(range(*args)))  # type: ignore[attr-defined]
         return True
 
     def _update_value_shape_with_values_Add(
@@ -379,11 +462,13 @@ class _ShapeRuntime:
         m2 = values[1]
         if isinstance(m1, int) and isinstance(m2, int):
             node.doc_string += f"#SV-{node.op_type}1"
-            self.set_value_shape(node.output[0], fct(m1, m2))
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], fct(m1, m2))  # type: ignore[attr-defined]
             return True
         if isinstance(m1, (int, str)) and isinstance(m2, (int, str)):
             node.doc_string += f"#SV-{node.op_type}2"
-            self.set_value_shape(node.output[0], f"{m1}{symbol}{m2}")
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], f"{m1}{symbol}{m2}")  # type: ignore[attr-defined]
             return True
 
         # One of them is a tuple.
@@ -399,7 +484,8 @@ class _ShapeRuntime:
                     if isinstance(s1, int) and isinstance(s2, int)
                     else f"{s1}{symbol}{s2}"
                 )
-            self.set_value_shape(node.output[0], tuple(res))
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], tuple(res))  # type: ignore[attr-defined]
             node.doc_string += f"#SV-{node.op_type}3"
             return True
 
@@ -411,7 +497,8 @@ class _ShapeRuntime:
                     if isinstance(m1[0], int) and isinstance(s2, int)
                     else f"{m1[0]}{symbol}{s2}"
                 )
-            self.set_value_shape(node.output[0], tuple(res))
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], tuple(res))  # type: ignore[attr-defined]
             node.doc_string += f"#SV-{node.op_type}4"
             return True
         if len(m2) == 1:
@@ -422,7 +509,8 @@ class _ShapeRuntime:
                     if isinstance(s1, int) and isinstance(m2[0], int)
                     else f"{s1}{symbol}{m2[0]}"
                 )
-            self.set_value_shape(node.output[0], tuple(res))
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], tuple(res))  # type: ignore[attr-defined]
             node.doc_string += f"#SV-{node.op_type}4"
             return True
 
@@ -438,9 +526,11 @@ class _ShapeRuntime:
             node.doc_string += "#SV-Ga1"
             assert max(values[1]) < len(shape), (
                 f"Unable to compute new value shape when values={values}"
-                f"{self.get_debug_msg()}"
+                # pyrefly: ignore [missing-attribute]
+                f"{self.get_debug_msg()}"  # type: ignore[attr-defined]
             )
-            self.set_value_shape(node.output[0], tuple(shape[i] for i in values[1]))
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], tuple(shape[i] for i in values[1]))  # type: ignore[attr-defined]
             return True
         return False
 
@@ -449,7 +539,8 @@ class _ShapeRuntime:
     ) -> bool:
         if len(values) >= 3 and values[1] == (0,) and values[2] == (9223372036854775807,):
             node.doc_string += "#SV-Sl1"
-            self.set_value_shape(node.output[0], values[0])
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], values[0])  # type: ignore[attr-defined]
             return True
         if len(values) < 4 or values[3] != (0,):
             # Not a shape.
@@ -458,10 +549,12 @@ class _ShapeRuntime:
         if len(values) == 4 and all_int(values[1]) and all_int(values[2]):
             assert len(values[1]) == len(values[2]) == 1, (
                 f"Unexpected values {values} to compute a shape from node "
-                f"{self.pretty_node(node)}{self.get_debug_msg()}"
+                # pyrefly: ignore [missing-attribute]
+                f"{self.pretty_node(node)}{self.get_debug_msg()}"  # type: ignore[attr-defined]
             )
             node.doc_string += "#SV-Sl3"
-            self.set_value_shape(node.output[0], values[0][values[1][0] : values[2][0]])
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], values[0][values[1][0] : values[2][0]])  # type: ignore[attr-defined]
             return True
         if (
             len(values) == 4
@@ -480,7 +573,8 @@ class _ShapeRuntime:
                 (values[4][0] if len(values) > 4 else 1),
             )
             res = values[0][begin:end:step]
-            self.set_value_shape(node.output[0], res)
+            # pyrefly: ignore [missing-attribute]
+            self.set_value_shape(node.output[0], res)  # type: ignore[attr-defined]
             node.doc_string += "#SV-Sl4"
             return True
         return False

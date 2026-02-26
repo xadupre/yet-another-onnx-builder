@@ -25,7 +25,8 @@ class _InferenceRuntime:
         if op == "^":
             # very simple trick for the time being
             if a == b:
-                return a
+                # pyrefly: ignore [bad-return]
+                return a  # type: ignore[return-value]
             if isinstance(a, str) and a.endswith(f"^{b}"):
                 return a
             if isinstance(b, str) and b.startswith(f"{a}^"):
@@ -42,20 +43,26 @@ class _InferenceRuntime:
         if update is None:
             if node.domain == "":
                 node.doc_string += "#Io1"
-                update = set_shape_type_op_any(self, node, exc=exc)
+                # pyrefly: ignore [bad-argument-type]
+                update = set_shape_type_op_any(self, node, exc=exc)  # type: ignore[arg-type]
             else:
                 # Missing type means it is probably coming from an inlined function.
                 node.doc_string += (
-                    "#Io3" if node.input and not self.has_type(node.input[0]) else "#Io2"
+                    # pyrefly: ignore [missing-attribute]
+                    "#Io3" if node.input and not self.has_type(node.input[0]) else "#Io2"  # type: ignore[attr-defined]
                 )
-                update = set_shape_type_custom(self, node, exc=exc)
+                # pyrefly: ignore [bad-argument-type]
+                update = set_shape_type_custom(self, node, exc=exc)  # type: ignore[arg-type]
         if update:
-            self._calls.append(
+            # pyrefly: ignore [missing-attribute]
+            self._calls.append(  # type: ignore[attr-defined]
                 (node.name, node.domain, node.op_type, node.input, node.output, update)
             )
-        assert update is not None or not self._debug_shape_missing, (
+        # pyrefly: ignore [missing-attribute]
+        assert update is not None or not self._debug_shape_missing, (  # type: ignore[attr-defined]
             f"Shape missing for node type {node.op_type!r}, inputs={node.input}, "
-            f"outputs={node.output}\n----\n{node}\n{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            f"outputs={node.output}\n----\n{node}\n{self.get_debug_msg()}"  # type: ignore[attr-defined]
         )
         return update
 
@@ -67,21 +74,27 @@ class _InferenceRuntime:
         ), f"Unexpected type {type(node)} for name={name!r}"
         if node is not None and node.op_type.startswith("Random"):
             return False
-        if self.verbose > 2:
+        # pyrefly: ignore [missing-attribute]
+        if self.verbose > 2:  # type: ignore[attr-defined]
             print(
-                f"[GraphBuilder-{self._hash()}.update_node_constant] new constant "
+                # pyrefly: ignore [missing-attribute]
+                f"[GraphBuilder-{self._hash()}.update_node_constant] new constant "  # type: ignore[attr-defined]
                 f"{name!r}, node={None if node is None else node.op_type}"
             )
         assert (
             node is None
             or node.op_type == "Shape"
-            or all(self.is_constant(i) for i in node.input if i not in {"", None, "None"})
+            # pyrefly: ignore [missing-attribute]
+            or all(self.is_constant(i) for i in node.input if i not in {"", None, "None"})  # type: ignore[attr-defined]
         ), (
-            f"Output {name!r} is constant (node={self.pretty_node(node)}) "
+            # pyrefly: ignore [missing-attribute]
+            f"Output {name!r} is constant (node={self.pretty_node(node)}) "  # type: ignore[attr-defined]
             f"only if every input from {node.input} is constant "
-            f"but constants={[self.is_constant(i) for i in node.input]}{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            f"but constants={[self.is_constant(i) for i in node.input]}{self.get_debug_msg()}"  # type: ignore[attr-defined]
         )
-        self.constants_[name] = node
+        # pyrefly: ignore [missing-attribute]
+        self.constants_[name] = node  # type: ignore[attr-defined]
         return True
 
     def _make_node_set_type_shape_constant(
@@ -90,7 +103,8 @@ class _InferenceRuntime:
         if node.domain != "":
             return
 
-        if all(self.is_constant(i) for i in node.input):
+        # pyrefly: ignore [missing-attribute]
+        if all(self.is_constant(i) for i in node.input):  # type: ignore[attr-defined]
             for o in node.output:
                 self.update_node_constant(o, node)
 
@@ -104,113 +118,163 @@ class _InferenceRuntime:
                 size = np.prod(node.attribute[0].t.dims)
             else:
                 size = len(node.SerializeToString())
-            assert size < self.optimization_options.constant_size, (
+            # pyrefly: ignore [missing-attribute]
+            assert size < self.optimization_options.constant_size, (  # type: ignore[attr-defined]
                 f"A node Constant holds a tensor bigger than "
-                f"the constant: {size} >= {self.optimization_options.constant_size}."
+                # pyrefly: ignore [missing-attribute]
+                f"the constant: {size} >= {self.optimization_options.constant_size}."  # type: ignore[attr-defined]
             )
             k = node.output[0]
             self.update_node_constant(k, node)
             node.doc_string += ":constant-3:"
-            shape = self._get_tensor_shape(node)
-            dtype = self._get_tensor_type(node)
-            self.set_shape(k, shape)
-            self.set_type(k, dtype)
-            if self.verbose > 2 or np.prod(shape) > 100:
-                print(f"[GraphBuilder-{self._hash()}.5.make_node] {k}[{dtype}: {shape}]")
+            # pyrefly: ignore [missing-attribute]
+            shape = self._get_tensor_shape(node)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            dtype = self._get_tensor_type(node)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            self.set_shape(k, shape)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            self.set_type(k, dtype)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            if self.verbose > 2 or np.prod(shape) > 100:  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                print(f"[GraphBuilder-{self._hash()}.5.make_node] {k}[{dtype}: {shape}]")  # type: ignore[attr-defined]
             return shape
         elif node.op_type == "ConstantOfShape":
             if len(node.attribute) == 1 and node.attribute[0].name == "value":
                 itype = node.attribute[0].t.data_type
             else:
                 itype = onnx.TensorProto.FLOAT
-            self.set_type(node.output[0], itype)
-            if self.is_constant(node.input[0]):
-                value = self.get_constant(
+            # pyrefly: ignore [missing-attribute]
+            self.set_type(node.output[0], itype)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            if self.is_constant(node.input[0]):  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                value = self.get_constant(  # type: ignore[attr-defined]
                     node.input[0], computed_value=True, as_shape=True, exc=False
                 )
                 if value is not None:
                     # This is needed when concatenating caches.
-                    self.set_shape(node.output[0], value, allow_zero=True)
+                    # pyrefly: ignore [missing-attribute]
+                    self.set_shape(node.output[0], value, allow_zero=True)  # type: ignore[attr-defined]
                     node.doc_string += ":constant-9:"
                     return value
-            vs = self.value_as_shape(node.input[0])
+            # pyrefly: ignore [missing-attribute]
+            vs = self.value_as_shape(node.input[0])  # type: ignore[attr-defined]
             if vs is not None:
-                self.set_shape(node.output[0], vs, allow_zero=True)
+                # pyrefly: ignore [missing-attribute]
+                self.set_shape(node.output[0], vs, allow_zero=True)  # type: ignore[attr-defined]
                 return vs
-            if self.has_shape(node.input[0]):
-                shape = self.get_shape(node.input[0])
+            # pyrefly: ignore [missing-attribute]
+            if self.has_shape(node.input[0]):  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                shape = self.get_shape(node.input[0])  # type: ignore[attr-defined]
                 if is_static_shape(shape):
-                    self.set_rank(node.output[0], shape[0])
+                    # pyrefly: ignore [missing-attribute]
+                    self.set_rank(node.output[0], shape[0])  # type: ignore[attr-defined]
                     return True
         elif node.op_type == "Identity":
             shape = None
-            if self.has_shape(node.input[0]):
+            # pyrefly: ignore [missing-attribute]
+            if self.has_shape(node.input[0]):  # type: ignore[attr-defined]
                 # allow_zero is True but if it fails here, it means it did not fail
                 # before when it should be.
-                shape = self.get_shape(node.input[0])
-                self.set_shape(node.output[0], shape, allow_zero=True)
-            elif self.has_rank(node.input[0]):
-                self.set_rank(node.output[0], self.get_rank(node.input[0]))
-            if self.has_type(node.input[0]):
-                self.set_type(node.output[0], self.get_type(node.input[0]))
-            if self.has_device(node.input[0]) and not self.has_device(node.output[0]):
+                # pyrefly: ignore [missing-attribute]
+                shape = self.get_shape(node.input[0])  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.set_shape(node.output[0], shape, allow_zero=True)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            elif self.has_rank(node.input[0]):  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.set_rank(node.output[0], self.get_rank(node.input[0]))  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            if self.has_type(node.input[0]):  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.set_type(node.output[0], self.get_type(node.input[0]))  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            if self.has_device(node.input[0]) and not self.has_device(node.output[0]):  # type: ignore[attr-defined]
                 # Identity node are tricky. The onnx conversion usually ignores this.
                 # .to(device) becomes an identity node, therefore, a device could already be
                 # defined for the output (during optimization).
-                self.set_device(node.output[0], self.get_device(node.input[0]))
-            if self.is_constant(node.input[0]):
+                # pyrefly: ignore [missing-attribute]
+                self.set_device(node.output[0], self.get_device(node.input[0]))  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            if self.is_constant(node.input[0]):  # type: ignore[attr-defined]
                 self.update_node_constant(node.output[0], node)
                 node.doc_string += ":constant-4:"
             return shape
         elif node.op_type == "Expand":
-            if self.has_type(node.input[0]):
-                self.set_type(node.output[0], self.get_type(node.input[0]))
-            if self.has_device(node.input[0]):
-                self.set_device(node.output[0], self.get_device(node.input[0]))
+            # pyrefly: ignore [missing-attribute]
+            if self.has_type(node.input[0]):  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.set_type(node.output[0], self.get_type(node.input[0]))  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            if self.has_device(node.input[0]):  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.set_device(node.output[0], self.get_device(node.input[0]))  # type: ignore[attr-defined]
             if (
-                self.has_shape(node.input[0])
-                and is_static_shape(self.get_shape(node.input[0]))
-                and self.is_constant(node.input[1])
+                # pyrefly: ignore [missing-attribute]
+                self.has_shape(node.input[0])  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                and is_static_shape(self.get_shape(node.input[0]))  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                and self.is_constant(node.input[1])  # type: ignore[attr-defined]
             ):
                 cst, _ = self.compute_constant(node.input[1], exc=False, only_array=True)
                 if cst is not None:
-                    assert not isinstance(cst, self.torch._subclasses.fake_tensor.FakeTensor), (
+                    # pyrefly: ignore [missing-attribute]
+                    assert not isinstance(cst, self.torch._subclasses.fake_tensor.FakeTensor), (  # type: ignore[attr-defined]
                         f"self.compute_constant returns a FakeTensor for {node.input[1]!r}"
-                        f"\n{self.pretty_text()}"
+                        # pyrefly: ignore [missing-attribute]
+                        f"\n{self.pretty_text()}"  # type: ignore[attr-defined]
                     )
                     assert (
-                        not self.has_rank(node.input[1]) or self.get_rank(node.input[1]) == 1
+                        # pyrefly: ignore [missing-attribute]
+                        not self.has_rank(node.input[1]) or self.get_rank(node.input[1]) == 1  # type: ignore[attr-defined]
                     ), (
-                        f"Unexpected rank {self.get_rank(node.input[1])} for {node.input[1]!r}"
-                        f"{self.get_debug_msg()}"
+                        # pyrefly: ignore [missing-attribute]
+                        f"Unexpected rank {self.get_rank(node.input[1])} for {node.input[1]!r}"  # type: ignore[attr-defined]
+                        # pyrefly: ignore [missing-attribute]
+                        f"{self.get_debug_msg()}"  # type: ignore[attr-defined]
                     )
-                    with self.maybe_disable_fake_tensor_mode():
+                    # pyrefly: ignore [missing-attribute]
+                    with self.maybe_disable_fake_tensor_mode():  # type: ignore[attr-defined]
                         assert len(cst.shape) == 1 and cst[-1] > 0, (
                             f"Unexpected shape {cst.shape} "
                             f"for computed constant {node.input[1]!r}, "
-                            f"input={node.input}, cst={cst}{self.get_debug_msg()}"
+                            # pyrefly: ignore [missing-attribute]
+                            f"input={node.input}, cst={cst}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                         )
-                        shape = self.get_shape(node.input[0])
+                        # pyrefly: ignore [missing-attribute]
+                        shape = self.get_shape(node.input[0])  # type: ignore[attr-defined]
                         new_shape = tuple(int(i) for i in cst)
                     if len(shape) < len(new_shape):
                         shape = (1,) * (len(new_shape) - len(shape)) + shape
                     new_shape = tuple(max(i, j) for i, j in zip(shape, new_shape))
-                    self.set_shape(node.output[0], new_shape, allow_zero=0 in shape)
+                    # pyrefly: ignore [missing-attribute]
+                    self.set_shape(node.output[0], new_shape, allow_zero=0 in shape)  # type: ignore[attr-defined]
                     return new_shape
         elif node.op_type == "Reshape":
-            if self.has_type(node.input[0]):
-                self.set_type(node.output[0], self.get_type(node.input[0]))
-            if self.has_device(node.input[0]):
-                self.set_device(node.output[0], self.get_device(node.input[0]))
-            if self.is_constant(node.input[1]):
+            # pyrefly: ignore [missing-attribute]
+            if self.has_type(node.input[0]):  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.set_type(node.output[0], self.get_type(node.input[0]))  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            if self.has_device(node.input[0]):  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.set_device(node.output[0], self.get_device(node.input[0]))  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            if self.is_constant(node.input[1]):  # type: ignore[attr-defined]
                 cst, _ = self.compute_constant(
                     node.input[1], exc=False, only_array=True, allow_empty=True
                 )
                 if cst is not None:
                     shape_cst = tuple(int(i) for i in cst)
                     if 0 in shape_cst:
-                        if self.has_shape(node.input[0]):
-                            sh = self.get_shape(node.input[0])
+                        # pyrefly: ignore [missing-attribute]
+                        if self.has_shape(node.input[0]):  # type: ignore[attr-defined]
+                            # pyrefly: ignore [missing-attribute]
+                            sh = self.get_shape(node.input[0])  # type: ignore[attr-defined]
                             shape_cst_last_zero = shape_cst[
                                 : len(shape_cst) - 1 - shape_cst[::-1].index(0) + 1
                             ]
@@ -219,7 +283,8 @@ class _InferenceRuntime:
                                 f"node.name={node.name!r} "
                                 f"between sh={sh} and shape_cst={shape_cst}, "
                                 f"shape_cst_last_zero={shape_cst_last_zero}"
-                                f"\ncst={cst}{self.get_debug_msg()}"
+                                # pyrefly: ignore [missing-attribute]
+                                f"\ncst={cst}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                             )
                             shape_cst = tuple(
                                 [
@@ -228,79 +293,115 @@ class _InferenceRuntime:
                                 ]
                             )
                         else:
-                            shape_cst = None
+                            shape_cst = None  # type: ignore[assignment]
                     if shape_cst is not None:
                         if -1 in shape_cst:
-                            if self.has_shape(node.input[0]):
-                                sh = self.get_shape(node.input[0])
+                            # pyrefly: ignore [missing-attribute]
+                            if self.has_shape(node.input[0]):  # type: ignore[attr-defined]
+                                # pyrefly: ignore [missing-attribute]
+                                sh = self.get_shape(node.input[0])  # type: ignore[attr-defined]
                                 if is_static_shape(sh):
                                     new_shape = _reshape_shape(sh, shape_cst)
-                                    self.set_shape(node.output[0], new_shape, allow_zero=0 in sh)
+                                    # pyrefly: ignore [missing-attribute]
+                                    self.set_shape(node.output[0], new_shape, allow_zero=0 in sh)  # type: ignore[attr-defined]
                                     node.doc_string += ":constant-7a:"
                                     return new_shape
                         else:
-                            self.set_shape(node.output[0], shape_cst)
+                            # pyrefly: ignore [missing-attribute]
+                            self.set_shape(node.output[0], shape_cst)  # type: ignore[attr-defined]
                             node.doc_string += ":constant-7b:"
                             return shape_cst
         elif node.op_type == "Shape":
             ret_shape = None
-            self.set_type(node.output[0], onnx.TensorProto.INT64)
-            self.set_device(node.output[0], -1)
-            if self.has_rank(node.input[0]):
-                rk = self.get_rank(node.input[0])
+            # pyrefly: ignore [missing-attribute]
+            self.set_type(node.output[0], onnx.TensorProto.INT64)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            self.set_device(node.output[0], -1)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            if self.has_rank(node.input[0]):  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                rk = self.get_rank(node.input[0])  # type: ignore[attr-defined]
                 if len(node.attribute) == 0:
-                    self.set_shape(node.output[0], (rk,))
+                    # pyrefly: ignore [missing-attribute]
+                    self.set_shape(node.output[0], (rk,))  # type: ignore[attr-defined]
                 else:
-                    start = self.get_attribute_with_default(node, "start", 0)
+                    # pyrefly: ignore [missing-attribute]
+                    start = self.get_attribute_with_default(node, "start", 0)  # type: ignore[attr-defined]
                     if start < 0:
                         start += rk
-                    end = self.get_attribute_with_default(node, "end", rk)
+                    # pyrefly: ignore [missing-attribute]
+                    end = self.get_attribute_with_default(node, "end", rk)  # type: ignore[attr-defined]
                     if end < 0:
                         end += rk
-                    self.set_shape(node.output[0], (end - start,))
+                    # pyrefly: ignore [missing-attribute]
+                    self.set_shape(node.output[0], (end - start,))  # type: ignore[attr-defined]
                     ret_shape = (end - start,)
             elif node.attribute:
-                start = self.get_attribute_with_default(node, "start", 0)
-                end = self.get_attribute_with_default(node, "end", None)
+                # pyrefly: ignore [missing-attribute]
+                start = self.get_attribute_with_default(node, "start", 0)  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                end = self.get_attribute_with_default(node, "end", None)  # type: ignore[attr-defined]
                 if end is not None and end - start > 0:
-                    self.set_shape(node.output[0], (end - start,))
+                    # pyrefly: ignore [missing-attribute]
+                    self.set_shape(node.output[0], (end - start,))  # type: ignore[attr-defined]
                 else:
-                    self.set_rank(node.output[0], 1)
-                    assert not self._debug_shape_missing, (
+                    # pyrefly: ignore [missing-attribute]
+                    self.set_rank(node.output[0], 1)  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    assert not self._debug_shape_missing, (  # type: ignore[attr-defined]
                         f"Unable to compute the shape of this shape: "
-                        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+                        # pyrefly: ignore [missing-attribute]
+                        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                     )
             else:
-                self.set_rank(node.output[0], 1)
-                assert not self._debug_shape_missing, (
+                # pyrefly: ignore [missing-attribute]
+                self.set_rank(node.output[0], 1)  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                assert not self._debug_shape_missing, (  # type: ignore[attr-defined]
                     f"Unable to compute the shape of this shape: "
-                    f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
-            if self.is_constant(node.input[0]) or (
-                self.has_shape(node.input[0]) and all_int(self.get_shape(node.input[0]))
+            # pyrefly: ignore [missing-attribute]
+            if self.is_constant(node.input[0]) or (  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                self.has_shape(node.input[0]) and all_int(self.get_shape(node.input[0]))  # type: ignore[attr-defined]
             ):
                 self.update_node_constant(node.output[0], node)
                 node.doc_string += ":constant-2:"
             return ret_shape
         elif node.op_type == "Size":
-            self.set_type(node.output[0], onnx.TensorProto.INT64)
-            self.set_device(node.output[0], -1)
-            self.set_shape(node.output[0], tuple())
-            if self.is_constant(node.input[0]):
+            # pyrefly: ignore [missing-attribute]
+            self.set_type(node.output[0], onnx.TensorProto.INT64)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            self.set_device(node.output[0], -1)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            self.set_shape(node.output[0], tuple())  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            if self.is_constant(node.input[0]):  # type: ignore[attr-defined]
                 self.update_node_constant(node.output[0], node)
                 node.doc_string += ":constant-2s:"
             return tuple()
         elif not sts:
             if node.op_type == "GatherElements":
-                if self.has_type(node.input[0]):
-                    self.set_type(node.output[0], self.get_type(node.input[0]))
-                if self.has_device(node.input[0]):
-                    self.set_device(node.output[0], self.get_device(node.input[0]))
-                if self.has_shape(node.input[1]):
-                    self.set_shape(node.output[0], self.get_shape(node.input[1]))
-                    return self.get_shape(node.input[1])
-                elif self.has_rank(node.input[1]):
-                    self.set_rank(node.output[0], self.get_rank(node.input[1]))
+                # pyrefly: ignore [missing-attribute]
+                if self.has_type(node.input[0]):  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    self.set_type(node.output[0], self.get_type(node.input[0]))  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                if self.has_device(node.input[0]):  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    self.set_device(node.output[0], self.get_device(node.input[0]))  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                if self.has_shape(node.input[1]):  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    self.set_shape(node.output[0], self.get_shape(node.input[1]))  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    return self.get_shape(node.input[1])  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                elif self.has_rank(node.input[1]):  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    self.set_rank(node.output[0], self.get_rank(node.input[1]))  # type: ignore[attr-defined]
 
     def compute_constant(
         self, name: str, exc: bool = True, only_array: bool = False, allow_empty: bool = False
@@ -316,27 +417,36 @@ class _InferenceRuntime:
 
         If returns None if the constant is a FakeTensor.
         """
-        assert self.is_constant(name), f"Name {name!r} is not a constant"
-        v = self.constants_[name]
+        # pyrefly: ignore [missing-attribute]
+        assert self.is_constant(name), f"Name {name!r} is not a constant"  # type: ignore[attr-defined]
+        # pyrefly: ignore [missing-attribute]
+        v = self.constants_[name]  # type: ignore[attr-defined]
         # It should not be None but a node as it is not an initializer.
         if isinstance(v, onnx.TensorProto):
-            return self.get_constant(name, computed_value=True, exc=exc), None
+            # pyrefly: ignore [missing-attribute]
+            return self.get_constant(name, computed_value=True, exc=exc), None  # type: ignore[attr-defined]
 
         assert isinstance(
             v, onnx.NodeProto
         ), f"Unexpected type {type(v)} for constant name={name!r}"
-        if self._debug_get_constant:
-            print(f"[GraphBuilder-{self._hash()}.compute_constant] {self.pretty_node(v)}")
+        # pyrefly: ignore [missing-attribute]
+        if self._debug_get_constant:  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            print(f"[GraphBuilder-{self._hash()}.compute_constant] {self.pretty_node(v)}")  # type: ignore[attr-defined]
 
         if v.op_type == "Shape":
-            if not self.has_shape(v.input[0]):
+            # pyrefly: ignore [missing-attribute]
+            if not self.has_shape(v.input[0]):  # type: ignore[attr-defined]
                 # We stop.
-                assert not self._debug_constant_folding, (
+                # pyrefly: ignore [missing-attribute]
+                assert not self._debug_constant_folding, (  # type: ignore[attr-defined]
                     f"Unable to compute constant because {v.input[0]!r} has no shape"
-                    f"in node {self.pretty_node(v)}{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"in node {self.pretty_node(v)}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
                 return None, None
-            shape = self.get_shape(v.input[0])
+            # pyrefly: ignore [missing-attribute]
+            shape = self.get_shape(v.input[0])  # type: ignore[attr-defined]
             if is_static_shape(shape):
                 if v.attribute:
                     start = 0
@@ -347,67 +457,90 @@ class _InferenceRuntime:
                         elif att.name == "end":
                             end = att.i
                     shape = shape[start:] if end is None else shape[start:end]
-                    if self._debug_get_constant:
+                    if self._debug_get_constant:  # type: ignore[attr-defined]
                         print(
-                            f"[GraphBuilder-{self._hash()}.compute_constant]     - SHAPE "
+                            # pyrefly: ignore [missing-attribute]
+                            f"[GraphBuilder-{self._hash()}.compute_constant]     - SHAPE "  # type: ignore[attr-defined]
                             f"{name}: {shape}? start={start}, end={end}"
                         )
-                elif self._debug_get_constant:
+                elif self._debug_get_constant:  # type: ignore[attr-defined]
                     print(
-                        f"[GraphBuilder-{self._hash()}.compute_constant] "
+                        # pyrefly: ignore [missing-attribute]
+                        f"[GraphBuilder-{self._hash()}.compute_constant] "  # type: ignore[attr-defined]
                         f"    - SHAPE {name}: {shape}?"
                     )
                 return np.array(shape, dtype=np.int64), {
-                    v.input[0]: self.ShapeConstant(v.input[0], shape, v)
+                    # pyrefly: ignore [missing-attribute]
+                    v.input[0]: self.ShapeConstant(v.input[0], shape, v)  # type: ignore[attr-defined]
                 }
 
-            if not self.is_constant(v.input[0]):
+            # pyrefly: ignore [missing-attribute]
+            if not self.is_constant(v.input[0]):  # type: ignore[attr-defined]
                 # One exception here as the input maybe not
                 # be constant but the shape may be known.
                 assert all_int(shape), (
                     f"Shape must be static ({shape}) if shape is constant in {v} in "
-                    f"{self.pretty_node(v)}{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"{self.pretty_node(v)}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
-                with self.maybe_disable_fake_tensor_mode():
-                    output = self._apply_shape_on_shape(v, shape)
-                    if isinstance(output[0], self.torch.Tensor):
+                # pyrefly: ignore [missing-attribute]
+                with self.maybe_disable_fake_tensor_mode():  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    output = self._apply_shape_on_shape(v, shape)  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    if isinstance(output[0], self.torch.Tensor):  # type: ignore[attr-defined]
                         # We convert the tensor into numpy array,
                         # it is a small shape anyway so the FakeMode
                         # does not come up as an issue.
                         output = [output[0].detach().cpu().numpy()]
-                    if self._debug_get_constant:
+                    if self._debug_get_constant:  # type: ignore[attr-defined]
                         print(
-                            f"[GraphBuilder-{self._hash()}.compute_constant]     - A "
-                            f"{name}: {self.pretty_tensor(output[0])}"
+                            # pyrefly: ignore [missing-attribute]
+                            f"[GraphBuilder-{self._hash()}.compute_constant]     - A "  # type: ignore[attr-defined]
+                            # pyrefly: ignore [missing-attribute]
+                            f"{name}: {self.pretty_tensor(output[0])}"  # type: ignore[attr-defined]
                         )
-                    return output[0], {v.input[0]: self.ShapeConstant(v.input[0], shape, v)}
-            assert not self._debug_constant_folding, (
-                f"Unable to compute constant for node {self.pretty_node(v)}"
-                f"{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    return output[0], {v.input[0]: self.ShapeConstant(v.input[0], shape, v)}  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            assert not self._debug_constant_folding, (  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                f"Unable to compute constant for node {self.pretty_node(v)}"  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                f"{self.get_debug_msg()}"  # type: ignore[attr-defined]
             )
             return None, None
 
-        feeds = {i: self.get_constant(i, exc=exc, computed_value=True) for i in v.input}
+        # pyrefly: ignore [missing-attribute]
+        feeds = {i: self.get_constant(i, exc=exc, computed_value=True) for i in v.input}  # type: ignore[attr-defined]
         for kval, val in feeds.items():
             if not exc and "FakeTensor" in str(type(val)):
-                assert not self._debug_constant_folding, (
-                    f"Unable to compute constant for node {self.pretty_node(v)}"
-                    f"because a FakeTensor appeared{self.get_debug_msg()}"
+                # pyrefly: ignore [missing-attribute]
+                assert not self._debug_constant_folding, (  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    f"Unable to compute constant for node {self.pretty_node(v)}"  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    f"because a FakeTensor appeared{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
                 return None, None
             assert "FakeTensor" not in str(type(val)), (
                 f"FakeTensor {kval!r} cannot be an initializer {type(val)}, "
                 f"v.op_type={v.op_type!r}"
-                f"{self.get_debug_msg()}"
+                # pyrefly: ignore [missing-attribute]
+                f"{self.get_debug_msg()}"  # type: ignore[attr-defined]
             )
             if val is None:
-                assert not self._debug_constant_folding, (
-                    f"Unable to compute constant for node {self.pretty_node(v)}"
-                    f"because val=None{self.get_debug_msg()}"
+                # pyrefly: ignore [missing-attribute]
+                assert not self._debug_constant_folding, (  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    f"Unable to compute constant for node {self.pretty_node(v)}"  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    f"because val=None{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
                 return None, None
 
-        with self.maybe_disable_fake_tensor_mode():
+        # pyrefly: ignore [missing-attribute]
+        with self.maybe_disable_fake_tensor_mode():  # type: ignore[attr-defined]
             if v.op_type == "Identity":
                 # much faster this way
                 output = [feeds[v.input[0]]]
@@ -423,31 +556,44 @@ class _InferenceRuntime:
                 "Sub",
             }:
                 # bypassing onnx.numpy_helper.from_array, too slow
-                output = self._apply_binary_op(v, feeds)
+                # pyrefly: ignore [missing-attribute]
+                output = self._apply_binary_op(v, feeds)  # type: ignore[attr-defined]
             elif (
                 v.op_type == "Pow"
-                and self.has_type(v.input[0])
-                and self.has_type(v.input[1])
-                and self.get_type(v.input[0]) == self.get_type(v.input[1])
+                # pyrefly: ignore [missing-attribute]
+                and self.has_type(v.input[0])  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                and self.has_type(v.input[1])  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                and self.get_type(v.input[0]) == self.get_type(v.input[1])  # type: ignore[attr-defined]
             ):
-                output = self._apply_binary_op(v, feeds)
+                # pyrefly: ignore [missing-attribute]
+                output = self._apply_binary_op(v, feeds)  # type: ignore[attr-defined]
             elif v.op_type in {"Exp", "Log", "Reciprocal", "Sqrt"}:
                 # bypassing onnx.numpy_helper.from_array, too slow
-                output = self._apply_unary_function(v, feeds)
+                # pyrefly: ignore [missing-attribute]
+                output = self._apply_unary_function(v, feeds)  # type: ignore[attr-defined]
             elif hasattr(self, f"_apply_{v.op_type.lower()}"):
                 output = getattr(self, f"_apply_{v.op_type.lower()}")(v, feeds)
             elif all(isinstance(v, np.ndarray) for v in feeds.values()):
-                if v.op_type not in {"Constant", "ConstantOfShape"} and self.main_opset < 18:
+                # pyrefly: ignore [missing-attribute]
+                if v.op_type not in {"Constant", "ConstantOfShape"} and self.main_opset < 18:  # type: ignore[attr-defined]
                     # This functionality is not enabled before that opset.
-                    if self._debug_get_constant:
+                    if self._debug_get_constant:  # type: ignore[attr-defined]
                         print(
-                            f"[GraphBuilder-{self._hash()}.compute_constant] fails "
-                            f"because opset={self.main_opset} for name={name!r}, "
-                            f"node={self.pretty_node(v)}"
+                            # pyrefly: ignore [missing-attribute]
+                            f"[GraphBuilder-{self._hash()}.compute_constant] fails "  # type: ignore[attr-defined]
+                            # pyrefly: ignore [missing-attribute]
+                            f"because opset={self.main_opset} for name={name!r}, "  # type: ignore[attr-defined]
+                            # pyrefly: ignore [missing-attribute]
+                            f"node={self.pretty_node(v)}"  # type: ignore[attr-defined]
                         )
-                    assert not self._debug_constant_folding, (
-                        f"Unable to compute constant opset={self.main_opset}<18"
-                        f"for name={name!r}{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    assert not self._debug_constant_folding, (  # type: ignore[attr-defined]
+                        # pyrefly: ignore [missing-attribute]
+                        f"Unable to compute constant opset={self.main_opset}<18"  # type: ignore[attr-defined]
+                        # pyrefly: ignore [missing-attribute]
+                        f"for name={name!r}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                     )
                     return None, None
 
@@ -456,15 +602,20 @@ class _InferenceRuntime:
                 for _v in feeds.values():
                     max_dim = max(max_dim, np.prod(_v.shape))
                 if max_dim >= 2**22:
-                    if self.verbose > 1:
+                    # pyrefly: ignore [missing-attribute]
+                    if self.verbose > 1:  # type: ignore[attr-defined]
                         print(
-                            f"[GraphBuilder-{self._hash()}.compute_constant] stop computing a "
+                            # pyrefly: ignore [missing-attribute]
+                            f"[GraphBuilder-{self._hash()}.compute_constant] stop computing a "  # type: ignore[attr-defined]
                             f"constant as it may be too big, shapes are "
                             f"{[_.shape for _ in feeds.values()]}"
                         )
-                    assert not self._debug_constant_folding, (
-                        f"Unable to compute constant for node {self.pretty_node(v)}"
-                        f"because max_dim={max_dim} (shape={_v.shape}){self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    assert not self._debug_constant_folding, (  # type: ignore[attr-defined]
+                        # pyrefly: ignore [missing-attribute]
+                        f"Unable to compute constant for node {self.pretty_node(v)}"  # type: ignore[attr-defined]
+                        # pyrefly: ignore [missing-attribute]
+                        f"because max_dim={max_dim} (shape={_v.shape}){self.get_debug_msg()}"  # type: ignore[attr-defined]
                     )
                     return None, None
 
@@ -474,23 +625,34 @@ class _InferenceRuntime:
                     output = ref.run(None, feeds)
                 except (ValueError, TypeError) as e:
                     sf = ", ".join(f"{k}:{v.dtype}:{v.shape}" for k, v in feeds.items())
-                    if "warnings" not in self._debug_msg:
-                        self._debug_msg["warnings"] = []
+                    # pyrefly: ignore [missing-attribute]
+                    if "warnings" not in self._debug_msg:  # type: ignore[attr-defined]
+                        # pyrefly: ignore [missing-attribute]
+                        self._debug_msg["warnings"] = []  # type: ignore[attr-defined]
                     sv = str(v).replace("\n", " ")
-                    self._debug_msg["warnings"].append(f"Issue with v={sv}, feeds={sf}, e={e}")
-                    self.time_evaluation_constants_ += time.perf_counter() - begin
-                    assert not self._debug_constant_folding, (
-                        f"Unable to compute constant for node {self.pretty_node(v)}"
-                        f"due to {e}{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    self._debug_msg["warnings"].append(f"Issue with v={sv}, feeds={sf}, e={e}")  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    self.time_evaluation_constants_ += time.perf_counter() - begin  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    assert not self._debug_constant_folding, (  # type: ignore[attr-defined]
+                        # pyrefly: ignore [missing-attribute]
+                        f"Unable to compute constant for node {self.pretty_node(v)}"  # type: ignore[attr-defined]
+                        # pyrefly: ignore [missing-attribute]
+                        f"due to {e}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                     )
                     return None, None
 
-                self.time_evaluation_constants_ += time.perf_counter() - begin
+                # pyrefly: ignore [missing-attribute]
+                self.time_evaluation_constants_ += time.perf_counter() - begin  # type: ignore[attr-defined]
             else:
-                assert not self._debug_constant_folding, (
-                    f"Unable to compute constant for node {self.pretty_node(v)}, "
+                # pyrefly: ignore [missing-attribute]
+                assert not self._debug_constant_folding, (  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    f"Unable to compute constant for node {self.pretty_node(v)}, "  # type: ignore[attr-defined]
                     f"feeds={string_type(feeds, with_shape=True, with_min_max=True, limit=20)}"
-                    f"{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
                 return None, None
 
@@ -499,43 +661,57 @@ class _InferenceRuntime:
                 assert not isinstance(val, tuple), f"Unexpected type {type(val)} for n={n!r}"
                 assert "FakeTensor" not in str(type(val)), (
                     f"FakeTensor detected {type(val)} in constant {name!r}, "
-                    f"v.op_type={v.op_type!r}{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"v.op_type={v.op_type!r}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
-                if self.has_type(n):
+                # pyrefly: ignore [missing-attribute]
+                if self.has_type(n):  # type: ignore[attr-defined]
                     # numpy changes the expected type sometimes
                     # (like transpose(x: float36) --> float32)
-                    itype = self.get_type(n)
+                    # pyrefly: ignore [missing-attribute]
+                    itype = self.get_type(n)  # type: ignore[attr-defined]
                     if hasattr(val, "detach"):
                         val = val.to(onnx_dtype_to_torch_dtype(itype))
                     else:
                         val = val.astype(tensor_dtype_to_np_dtype(itype))
-                self.constants_computed_[n] = val
+                # pyrefly: ignore [missing-attribute]
+                self.constants_computed_[n] = val  # type: ignore[attr-defined]
                 if name == n:
                     cst = val
 
         assert (
-            len(cst.shape) == 0
-            or min(cst.shape) > 0
+            # pyrefly: ignore [missing-attribute]
+            len(cst.shape) == 0  # type: ignore[union-attr]
+            # pyrefly: ignore [no-matching-overload]
+            or min(cst.shape) > 0  # type: ignore[union-attr]
             or (v.op_type in {"ConstantOfShape", "Cast", "Identity", "Constant"})
         ), (
-            f"Output has empty shape {cst.shape}, name={name!r} "
-            f"v.op_type={v.op_type!r}, v.name={v.name!r}{self.get_debug_msg()}"
+            f"Output has empty shape {cst.shape}, name={name!r} "  # type: ignore[union-attr]
+            # pyrefly: ignore [missing-attribute]
+            f"v.op_type={v.op_type!r}, v.name={v.name!r}{self.get_debug_msg()}"  # type: ignore[attr-defined]
         )
         assert cst is not None, f"Constant {name!r} was not found in {v.output}"
         if hasattr(self, "torch") and isinstance(
             cst, self.torch._subclasses.fake_tensor.FakeTensor
         ):
-            assert not self._debug_constant_folding, (
-                f"Unable to compute constant for node {self.pretty_node(v)}"
-                f"because a FakeTensor appeared{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            assert not self._debug_constant_folding, (  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                f"Unable to compute constant for node {self.pretty_node(v)}"  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                f"because a FakeTensor appeared{self.get_debug_msg()}"  # type: ignore[attr-defined]
             )
             return None, None
-        if self._debug_get_constant:
+        if self._debug_get_constant:  # type: ignore[attr-defined]
             print(
-                f"[GraphBuilder-{self._hash()}.compute_constant] "
-                f"    - A {name}: {self.pretty_tensor(cst)}"
+                # pyrefly: ignore [missing-attribute]
+                f"[GraphBuilder-{self._hash()}.compute_constant] "  # type: ignore[attr-defined]
+                # pyrefly: ignore [missing-attribute]
+                f"    - A {name}: {self.pretty_tensor(cst)}"  # type: ignore[attr-defined]
             )
         assert (
-            not self._debug_constant_folding or cst is not None
-        ), f"Unable to compute constant for node {self.pretty_node(v)}{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            not self._debug_constant_folding or cst is not None  # type: ignore[attr-defined]
+        # pyrefly: ignore [missing-attribute]
+        ), f"Unable to compute constant for node {self.pretty_node(v)}{self.get_debug_msg()}"  # type: ignore[attr-defined]
         return cst, feeds

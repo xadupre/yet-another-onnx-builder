@@ -43,19 +43,19 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
 
     def __init__(self, verbose: int = 0, opset: Optional[int] = None):
         self.verbose = verbose
-        self._input_names = []
-        self._output_names = []
-        self._known_shapes = {}
-        self._known_ranks = {}
-        self._known_devices = {}
-        self._known_types = {}
-        self.constraints_ = {}
-        self.dynamic_dimensions_ = {}
-        self.constants_ = {}
+        self._input_names = []  # type: ignore[var-annotated]
+        self._output_names = []  # type: ignore[var-annotated]
+        self._known_shapes = {}  # type: ignore[var-annotated]
+        self._known_ranks = {}  # type: ignore[var-annotated]
+        self._known_devices = {}  # type: ignore[var-annotated]
+        self._known_types = {}  # type: ignore[var-annotated]
+        self.constraints_ = {}  # type: ignore[var-annotated]
+        self.dynamic_dimensions_ = {}  # type: ignore[var-annotated]
+        self.constants_ = {}  # type: ignore[var-annotated]
         #
-        self._known_value_shape = {}
-        self.constants_computed_ = {}
-        self._calls = []
+        self._known_value_shape = {}  # type: ignore[var-annotated]
+        self.constants_computed_ = {}  # type: ignore[var-annotated]
+        self._calls = []  # type: ignore[var-annotated]
         # self.dynamic_dimensions_source={}
         # self.dynamic_dimensions_source_flat={}
         # self._dynamic_examples={}
@@ -66,7 +66,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         self._debug_shape_missing = int(os.environ.get("ONNXSHAPECOMPUTE", "0"))
         self._debug_value_shape = os.environ.get("ONNXSTOPVALUESHAPE", "")
         self._debug_constant_folding = 0
-        self._debug_msg = {}
+        self._debug_msg = {}  # type: ignore[var-annotated]
         self.maybe_disable_fake_tensor_mode = _maybe_disable_fake_tensor_mode
         self.main_opset = opset or 18
         self.time_evaluation_constants_ = 0
@@ -123,6 +123,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             ), f"Multiple outputs is not allowed but type is {type(res)} for name={name!r}"
             new_res = []
             for i in res:
+                # pyrefly: ignore [bad-argument-type]
                 new_res.append(i if isinstance(i, str) else int(i))
             return tuple(new_res)
 
@@ -182,7 +183,9 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
 
         if len(res) == 1:
             assert multiple_outputs or not isinstance(
+                # pyrefly: ignore [unbound-name]
                 value, tuple
+            # pyrefly: ignore [unbound-name]
             ), f"Multiple output is not allowed but type is {type(value)} for name={name!r}"
             assert (
                 not exc or res[0] is not None
@@ -315,7 +318,8 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
                 self._known_value_shape[n] = new_value
 
     def set_device(
-        self, name: str, device: Union[int, "torch.dtype"], exc: bool = True  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        self, name: str, device: Union[int, "torch.dtype"], exc: bool = True  # type: ignore[name-defined]  # noqa: F821
     ):
         """
         Sets the shape for a result. It is exists, it checks the new shape
@@ -364,6 +368,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         )
         return self._known_types[name]
 
+    # pyrefly: ignore [bad-override]
     def set_type(self, name: str, dtype: int, exc: bool = True) -> bool:
         """
         Sets the shape for a result. It is exists, it checks the new shape
@@ -422,6 +427,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         )
         return self._known_ranks[name]
 
+    # pyrefly: ignore [bad-param-name-override]
     def set_rank(self, name: str, value: int) -> bool:
         """
         Sets the rank for a result.
@@ -490,6 +496,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         ), f"Dynamic dimension {name!r}{self.get_debug_msg()}"
         self.dynamic_dimensions_[name] = {name}
 
+    # pyrefly: ignore [bad-override]
     def set_shape(self, name: str, shape: DYNAMIC_SHAPE, exc: bool = False, **_kwargs):
         """
         Sets the shape for a result. It is exists, it checks the new shape
@@ -505,6 +512,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             not name or name != self._debug_stop_shape
         ), f"Requested stop, name={name!r}, shape={shape}{self.get_debug_msg()}"
         assert not shape or not isinstance(shape[0], tuple), f"Unexpected shape {shape}"
+        # pyrefly: ignore [bad-argument-type]
         shape = tuple(simplify_expression(s) for s in shape)
         for sdim in shape:
             if not isinstance(sdim, str):
@@ -539,15 +547,18 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         if name in self._known_value_shape:
             return self._known_value_shape[name]
         if not self.has_type(name) or self.get_type(name) != onnx.TensorProto.INT64:
-            return None
+            # pyrefly: ignore [bad-return]
+            return None  # type: ignore[return-value]
         if self.is_constant(name):
             # It is probably a shape because the user requested it as a shape.
             cst = self.get_constant(name, exc=False, computed_value=True)
             if cst is not None and len(cst.shape) == 1 and cst.dtype == np.int64:
                 value = tuple(map(int, cst))
                 self._known_value_shape[name] = value
-                return value
-        return None
+                # pyrefly: ignore [bad-return]
+                return value  # type: ignore[return-value]
+        # pyrefly: ignore [bad-return]
+        return None  # type: ignore[return-value]
 
     def get_debug_msg(self, limit: int = 1000) -> str:
         """
@@ -664,6 +675,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         for i in graph.output:
             self.run_value_info(i, False)
 
+    # pyrefly: ignore [bad-override]
     def register_constraint_dimension(self, dim_name: str, value: Any):
         """
         Registers a constraint on a dimension.

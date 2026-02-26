@@ -1004,24 +1004,28 @@ def max_diff(
                 [expected.logits, *flatten_object(expected.past_key_values)],
                 [got.logits, *flatten_object(got.past_key_values)],
                 debug_info=_debug(expected.__class__.__name__),
-                **_dkws,
+                # pyrefly: ignore [bad-argument-type]
+                **_dkws,  # type: ignore[arg-type]
             )
         return max_diff(
             [expected.logits, *flatten_object(expected.past_key_values)],
             got,
             debug_info=_debug(expected.__class__.__name__),
-            **_dkws,
+            # pyrefly: ignore [bad-argument-type]
+            **_dkws,  # type: ignore[arg-type]
         )
 
     if hasattr(expected, "to_tuple"):
         if verbose >= 6:
             print(f"[max_diff] to_tuple1: {string_type(expected)} ? {string_type(got)}")
-        return max_diff(expected.to_tuple(), got, debug_info=_debug("to_tuple1"), **_dkws)
+        # pyrefly: ignore [bad-argument-type]
+        return max_diff(expected.to_tuple(), got, debug_info=_debug("to_tuple1"), **_dkws)  # type: ignore[arg-type]
 
     if hasattr(got, "to_tuple"):
         if verbose >= 6:
             print(f"[max_diff] to_tuple2: {string_type(expected)} ? {string_type(got)}")
-        return max_diff(expected, got.to_tuple(), debug_info=_debug("to_tuple2"), **_dkws)
+        # pyrefly: ignore [bad-argument-type]
+        return max_diff(expected, got.to_tuple(), debug_info=_debug("to_tuple2"), **_dkws)  # type: ignore[arg-type]
 
     if isinstance(expected, (tuple, list)):
         if verbose >= 6:
@@ -1029,7 +1033,8 @@ def max_diff(
         if len(expected) == 1 and not isinstance(got, type(expected)):
             if verbose >= 6:
                 print(f"[max_diff] list,tuple,3: {string_type(expected)} ? {string_type(got)}")
-            return max_diff(expected[0], got, debug_info=_debug("lt2"), **_dkws)
+            # pyrefly: ignore [bad-argument-type]
+            return max_diff(expected[0], got, debug_info=_debug("lt2"), **_dkws)  # type: ignore[arg-type]
         if not isinstance(got, (tuple, list)):
             if verbose >= 6:
                 print(f"[max_diff] list,tuple,4: {string_type(expected)} ? {string_type(got)}")
@@ -1076,7 +1081,8 @@ def max_diff(
                         if verbose > 5
                         else None
                     ),
-                    **_dkwsf,
+                    # pyrefly: ignore [bad-argument-type]
+                    **_dkwsf,  # type: ignore[arg-type]
                 )
 
             if verbose > 2:
@@ -1099,6 +1105,7 @@ def max_diff(
         if verbose >= 6:
             print(f"[max_diff] list,tuple,6: {string_type(expected)} ? {string_type(got)}")
         am, rm, sm, n, dn, drep, dd = 0, 0, 0.0, 0.0, 0, None, None
+        # pyrefly: ignore [bad-assignment]
         for ip, (e, g) in enumerate(zip(expected, got)):
             d = max_diff(
                 e,
@@ -1120,16 +1127,21 @@ def max_diff(
                 hist=hist,
                 skip_none=skip_none,
             )
-            am = max(am, d["abs"])
-            dn = max(dn, d["dnan"])
-            rm = max(rm, d["rel"])
+            # pyrefly: ignore [no-matching-overload]
+            am = max(am, d["abs"])  # type: ignore[assignment]
+            # pyrefly: ignore [no-matching-overload]
+            dn = max(dn, d["dnan"])  # type: ignore[assignment]
+            # pyrefly: ignore [no-matching-overload]
+            rm = max(rm, d["rel"])  # type: ignore[assignment]
             sm += d["sum"]  # type: ignore
             n += d["n"]  # type: ignore
             if "rep" in d:
                 if drep is None:
-                    drep = d["rep"].copy()
+                    # pyrefly: ignore [missing-attribute]
+                    drep = d["rep"].copy()  # type: ignore[union-attr]
                 else:
-                    for k, v in d["rep"].items():
+                    # pyrefly: ignore [missing-attribute]
+                    for k, v in d["rep"].items():  # type: ignore[union-attr]
                         drep[k] += v
             if "dev" in d and d["dev"] is not None:
                 if dd is None:
@@ -1139,7 +1151,8 @@ def max_diff(
 
         res = dict(abs=am, rel=rm, sum=sm, n=n, dnan=dn)
         if dd is not None:
-            res["dev"] = dd
+            # pyrefly: ignore [unsupported-operation]
+            res["dev"] = dd  # type: ignore[assignment]
         if drep:
             res["rep"] = drep
         return res  # type: ignore
@@ -1161,14 +1174,16 @@ def max_diff(
                 [expected[k] for k in keys],
                 [got[k] for k in keys],
                 debug_info=_debug("dict1"),
-                **_dkws,
+                # pyrefly: ignore [bad-argument-type]
+                **_dkws,  # type: ignore[arg-type]
             )
 
         if not isinstance(got, (tuple, list)):
             return dict(abs=np.inf, rel=np.inf, sum=np.inf, n=np.inf, dnan=np.inf)
         if len(expected) != len(got):
             return dict(abs=np.inf, rel=np.inf, sum=np.inf, n=np.inf, dnan=np.inf)
-        return max_diff(list(expected.values()), got, debug_info=_debug("dict2"), **_dkws)
+        # pyrefly: ignore [bad-argument-type]
+        return max_diff(list(expected.values()), got, debug_info=_debug("dict2"), **_dkws)  # type: ignore[arg-type]
 
     import torch
 
@@ -1248,7 +1263,7 @@ def max_diff(
                 float(diff.max()),
                 float(rdiff.max()),
                 float(diff.sum()),
-                float(diff.size),
+                float(diff.size),  # type: ignore[assignment]
                 float(ndiff.sum()),
             )
             argm = tuple(map(int, np.unravel_index(diff.argmax(), diff.shape)))
@@ -1290,7 +1305,8 @@ def max_diff(
         if hist:
             if isinstance(hist, bool):
                 hist = np.array([0, 0.0001, 0.001, 0.01, 0.1, 1, 10, 100], dtype=diff.dtype)
-            res["rep"] = {f">{h}": (diff > h).sum().item() for h in hist}
+            # pyrefly: ignore [missing-attribute, unsupported-operation]
+            res["rep"] = {f">{h}": (diff > h).sum().item() for h in hist}  # type: ignore[assignment,union-attr]
         return res  # type: ignore
 
     if isinstance(expected, torch.Tensor) and isinstance(got, torch.Tensor):
@@ -1346,12 +1362,12 @@ def max_diff(
                 float(diff.max().detach()),
                 float(rdiff.max().detach()),
                 float(diff.sum().detach()),
-                float(diff.numel()),
+                float(diff.numel()),  # type: ignore[assignment]
                 float(ndiff.sum().detach()),
             )
             argm = tuple(map(int, torch.unravel_index(diff.argmax(), diff.shape)))
         elif got_cpu.numel() == exp_cpu.numel():
-            abs_diff, rel_diff, sum_diff, n_diff, nan_diff = (0.0, 0.0, 0.0, 0.0, 0.0)
+            abs_diff, rel_diff, sum_diff, n_diff, nan_diff = (0.0, 0.0, 0.0, 0.0, 0.0)  # type: ignore[assignment]
             argm = None
         else:
             abs_diff, rel_diff, sum_diff, n_diff, nan_diff = (
@@ -1405,7 +1421,8 @@ def max_diff(
         if hist:
             if isinstance(hist, bool):
                 hist = torch.tensor([0, 0.0001, 0.001, 0.01, 0.1, 1, 10, 100], dtype=diff.dtype)
-            res["rep"] = {f">{h}": (diff > h).sum().item() for h in hist}
+            # pyrefly: ignore [missing-attribute, unsupported-operation]
+            res["rep"] = {f">{h}": (diff > h).sum().item() for h in hist}  # type: ignore[assignment,union-attr]
         return res  # type: ignore
 
     if isinstance(expected, int) and isinstance(got, torch.Tensor):
@@ -1433,7 +1450,8 @@ def max_diff(
         if verbose >= 6:
             print(f"[max_diff] SquashedNormal: {string_type(expected)} ? {string_type(got)}")
         values = (expected.mean, expected.scale)
-        return max_diff(values, got, debug_info=_debug("SquashedNormal"), **_dkws)
+        # pyrefly: ignore [bad-argument-type]
+        return max_diff(values, got, debug_info=_debug("SquashedNormal"), **_dkws)  # type: ignore[arg-type]
 
     if expected.__class__ in torch.utils._pytree.SUPPORTED_NODES:
         if got.__class__ not in torch.utils._pytree.SUPPORTED_NODES:
@@ -1446,7 +1464,8 @@ def max_diff(
         expected_args, _spec = torch.utils._pytree.tree_flatten(expected)
         got_args, _spec = torch.utils._pytree.tree_flatten(got)
         return max_diff(
-            expected_args, got_args, debug_info=_debug(expected.__class__.__name__), **_dkws
+            # pyrefly: ignore [bad-argument-type]
+            expected_args, got_args, debug_info=_debug(expected.__class__.__name__), **_dkws  # type: ignore[arg-type]
         )
 
     # backup function in case pytorch does not know how to serialize.
@@ -1473,7 +1492,8 @@ def max_diff(
                 [expected.key_cache, expected.value_cache],
                 [got[0], got[1]],
                 debug_info=_debug(expected.__class__.__name__),
-                **_dkws,
+                # pyrefly: ignore [bad-argument-type]
+                **_dkws,  # type: ignore[arg-type]
             )
         raise AssertionError(
             f"DynamicCache not fully implemented with classes "
@@ -1504,7 +1524,8 @@ def max_diff(
                 [cae.key_cache, cae.value_cache],
                 [got[0], got[1]],
                 debug_info=_debug(expected.__class__.__name__),
-                **_dkws,
+                # pyrefly: ignore [bad-argument-type]
+                **_dkws,  # type: ignore[arg-type]
             )
         raise AssertionError(
             f"StaticCache not fully implemented with classes "
@@ -1531,7 +1552,8 @@ def max_diff(
                 [expected.self_attention_cache, expected.cross_attention_cache],
                 [got[0], got[1]],
                 debug_info=_debug(expected.__class__.__name__),
-                **_dkws,
+                # pyrefly: ignore [bad-argument-type]
+                **_dkws,  # type: ignore[arg-type]
             )
         raise AssertionError(
             f"EncoderDecoderCache not fully implemented with classes "
@@ -1551,7 +1573,8 @@ def max_diff(
             list(expected),
             list(got),
             debug_info=_debug(expected.__class__.__name__),
-            **_dkws,
+            # pyrefly: ignore [bad-argument-type]
+            **_dkws,  # type: ignore[arg-type]
         )
 
     if skip_none and (expected is None or got is None):

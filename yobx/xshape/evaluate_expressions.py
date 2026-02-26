@@ -33,6 +33,7 @@ def _eval(node, variables, expr):
         right = _eval(node.right, variables, expr)
         op_type = type(node.op)
         if op_type in operators:
+            # pyrefly: ignore [bad-argument-count, bad-index]
             return operators[op_type](left, right)
         raise TypeError(
             f"Unsupported operator: {op_type!r} "
@@ -42,6 +43,7 @@ def _eval(node, variables, expr):
         operand = _eval(node.operand, variables, expr)
         op_type = type(node.op)
         if op_type in operators:
+            # pyrefly: ignore [bad-argument-count, bad-index, missing-argument]
             return operators[op_type](operand)
         raise TypeError(
             f"Unsupported unary operator: {op_type!r} "
@@ -61,6 +63,7 @@ def _eval(node, variables, expr):
         )
     if isinstance(node, ast.Call):
         # Specific function
+        # pyrefly: ignore [missing-attribute]
         name = node.func.id
         assert name == "CeilToInt", f"Unable to evaluate function {name!r} in {expr!r}"
         values = [_eval(a, variables, expr) for a in node.args]
@@ -87,4 +90,5 @@ def evaluate_expression(expression: str, context: Dict[str, int]) -> int:
     if isinstance(expression, int):
         return expression
     parsed = ast.parse(expression, mode="eval")
+    # pyrefly: ignore [bad-return]
     return _eval(parsed.body, variables=context, expr=expression)

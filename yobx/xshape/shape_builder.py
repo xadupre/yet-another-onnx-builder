@@ -81,7 +81,8 @@ class ShapeBuilder:
                     ordered_include.append(o)
         infos = []
         for k in ordered_include:
-            if not self.has_shape(k):
+            # pyrefly: ignore [missing-attribute]
+            if not self.has_shape(k):  # type: ignore[attr-defined]
                 continue
             infos.append(oh.make_tensor_value_info(k, self.get_type(k), list(self.get_shape(k))))
         graph.value_info.extend(infos)
@@ -185,20 +186,26 @@ class ShapeBuilder:
         if shape:
             st = []
             for i in node.input:
-                dt = self.get_type(i) if self.has_type(i) else "-"
+                # pyrefly: ignore [missing-attribute]
+                dt = self.get_type(i) if self.has_type(i) else "-"  # type: ignore[attr-defined]
                 sh = (
                     "x".join(str(_).replace(" ", "") for _ in self.get_shape(i))
-                    if self.has_shape(i)
-                    else (f"rk={self.get_rank(i)}" if self.has_rank(i) else "?")
+                    # pyrefly: ignore [missing-attribute]
+                    if self.has_shape(i)  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    else (f"rk={self.get_rank(i)}" if self.has_rank(i) else "?")  # type: ignore[attr-defined]
                 )
                 st.append(f"{i}:{dt}|{sh}")
             st.append("->")
             for i in node.output:
-                dt = self.get_type(i) if self.has_type(i) else "-"
+                # pyrefly: ignore [missing-attribute]
+                dt = self.get_type(i) if self.has_type(i) else "-"  # type: ignore[attr-defined]
                 sh = (
                     "x".join(str(_).replace(" ", "") for _ in self.get_shape(i))
-                    if self.has_shape(i)
-                    else (f"rk={self.get_rank(i)}" if self.has_rank(i) else "?")
+                    # pyrefly: ignore [missing-attribute]
+                    if self.has_shape(i)  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    else (f"rk={self.get_rank(i)}" if self.has_rank(i) else "?")  # type: ignore[attr-defined]
                 )
                 st.append(f"{i}:{dt}|{sh}")
             shape_info = " ".join(st)
@@ -220,8 +227,10 @@ class ShapeBuilder:
         text += add
         info = []
         for o in node.output:
-            t = f"T{self.get_type(o)}" if self.has_type(o) else ""
-            s = " x ".join(map(str, self.get_shape(o))) if self.has_shape(o) else ""
+            # pyrefly: ignore [missing-attribute]
+            t = f"T{self.get_type(o)}" if self.has_type(o) else ""  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            s = " x ".join(map(str, self.get_shape(o))) if self.has_shape(o) else ""  # type: ignore[attr-defined]
             info.append(": ".join([t, s]))
         if node.name:
             s = f"{text}|{' '.join(info)}"
@@ -229,15 +238,17 @@ class ShapeBuilder:
         return f"{text}|{' '.join(info)}"
 
     def map_value_info_dimension_with_true_values(self, name: str, tensor: np.ndarray):
-        assert self.has_type(name), f"Missing type for {name!r}."
-        assert self.has_shape(name), f"Missing shape for {name!r}."
+        # pyrefly: ignore [missing-attribute]
+        assert self.has_type(name), f"Missing type for {name!r}."  # type: ignore[attr-defined]
+        # pyrefly: ignore [missing-attribute]
+        assert self.has_shape(name), f"Missing shape for {name!r}."  # type: ignore[attr-defined]
         dtype = dtype_to_tensor_dtype(tensor.dtype)
         assert dtype == self.get_type(name), (
             f"Type mismatch for {name!r}, expecting "
             f"{self.get_type(name)}, got {dtype} in "
             f"{string_type(tensor, with_shape=True)}"
         )
-        res = {}
+        res = {}  # type: ignore[var-annotated]
         shape = self.get_shape(name)
         for i, (value, dim) in enumerate(zip(tensor.shape, shape)):
             if isinstance(dim, str):
@@ -257,13 +268,16 @@ class ShapeBuilder:
 
     def evaluate_shape(self, name: str, context: Dict[str, int]) -> Tuple[int, ...]:
         shape = self.get_shape(name)
-        return tuple(evaluate_expression(s, context) for s in shape)
+        # pyrefly: ignore [bad-argument-type]
+        return tuple(evaluate_expression(s, context) for s in shape)  # type: ignore[arg-type]
 
     def compare_computed_shape_with_tensor(
         self, name: str, tensor: np.ndarray, context: Dict[str, int]
     ) -> Tuple[Tuple[str, int, int], ...]:
-        assert self.has_type(name), f"Missing type for {name!r}."
-        assert self.has_shape(name), f"Missing shape for {name!r}."
+        # pyrefly: ignore [missing-attribute]
+        assert self.has_type(name), f"Missing type for {name!r}."  # type: ignore[attr-defined]
+        # pyrefly: ignore [missing-attribute]
+        assert self.has_shape(name), f"Missing shape for {name!r}."  # type: ignore[attr-defined]
         dtype = dtype_to_tensor_dtype(tensor.dtype)
         assert dtype == self.get_type(name), (
             f"Type mismatch for {name!r}, expecting "
@@ -271,7 +285,8 @@ class ShapeBuilder:
             f"{string_type(tensor, with_shape=True)}"
         )
         computed = self.evaluate_shape(name, context=context)
-        return tuple(zip(self.get_shape(name), tensor.shape, computed))
+        # pyrefly: ignore [bad-argument-type]
+        return tuple(zip(self.get_shape(name), tensor.shape, computed))  # type: ignore[arg-type]
 
     def compare_with_true_inputs(
         self,

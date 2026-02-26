@@ -150,10 +150,13 @@ class MaxToXorTransformer(CommonTransformer):
         node = self.generic_visit(node)
 
         if (
+            # pyrefly: ignore [missing-attribute]
             isinstance(node.func, ast.Name)
             and node.func.id in ("max", "Max")
+            # pyrefly: ignore [missing-attribute]
             and len(node.args) == 2
         ):
+            # pyrefly: ignore [not-iterable]
             a, b = node.args
             return ast.BinOp(left=a, op=ast.BitXor(), right=b)
 
@@ -202,7 +205,9 @@ class ExpressionSimplifierAddVisitor(CommonVisitor):
                 for v, c in simp.coeffs.items():
                     if v not in self.coeffs:
                         self.coeffs[v] = 0
+                    # pyrefly: ignore [unsupported-operation]
                     self.coeffs[v] += value * c
+                # pyrefly: ignore [bad-assignment, unsupported-operation]
                 self.const += simp.const * value
             else:
                 self.generic_visit(node)

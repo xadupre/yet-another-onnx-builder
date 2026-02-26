@@ -47,7 +47,7 @@ class _BuilderRuntime:
         ), f"Mismatch lengths {len(indices)} != {len(axes)}"
 
         if all(isinstance(i, slice) for i in indices):
-            new_shape = []
+            new_shape = []  # type: ignore[var-annotated]
             for index, axis_ in zip(indices, axes):
                 axis = axis_ if axis_ >= 0 else (axis_ + len(shape)) % len(shape)
                 while len(new_shape) < axis:
@@ -58,7 +58,8 @@ class _BuilderRuntime:
                     new_shape.append(shape[len(new_shape)])
                 assert axis < len(shape), (
                     f"axis={axis} is out of order (shape={shape}, "
-                    f"indices={indices}, axes={axes}){self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"indices={indices}, axes={axes}){self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
                 n = shape[axis]
                 start = index.start or 0
@@ -112,6 +113,7 @@ class _BuilderRuntime:
                 new_new_shape.append(input_shape[i])
                 continue
             new_new_shape.append(sh)
+        # pyrefly: ignore [bad-argument-type]
         new_shape = tuple(new_new_shape)
 
         if -1 not in new_shape:
@@ -129,6 +131,7 @@ class _BuilderRuntime:
 
         mul, div = [], []
         muli, divi = 1, 1
+        # pyrefly: ignore [bad-assignment]
         for s, n in zip_longest(input_shape, new_shape):
             if s is None:
                 s = 1
@@ -150,7 +153,8 @@ class _BuilderRuntime:
         if not mul and not div:
             assert muli % divi == 0, (
                 f"Inconsistency between input_shape={input_shape} "
-                f"and new_shape={new_shape}{self.get_debug_msg()}"
+                # pyrefly: ignore [missing-attribute]
+                f"and new_shape={new_shape}{self.get_debug_msg()}"  # type: ignore[attr-defined]
             )
             rest = muli // divi
         else:
@@ -165,19 +169,19 @@ class _BuilderRuntime:
             if not mul:
                 mul = ["1"]
             if not div:
-                rest = mul[0] if len(mul) == 1 else f"{'*'.join(f'{_(s)}' for s in mul)}"
+                rest = mul[0] if len(mul) == 1 else f"{'*'.join(f'{_(s)}' for s in mul)}"  # type: ignore[assignment]
             elif not mul:
                 rest = (
-                    f"1//{_(div[0])}"
+                    f"1//{_(div[0])}"  # type: ignore[assignment]
                     if len(div) == 1
                     else f"1//({'*'.join(f'{_(s)}' for s in div)})"
                 )
             else:
                 rest = (
-                    f"(({'*'.join(f'{_(s)}' for s in mul)})"
+                    f"(({'*'.join(f'{_(s)}' for s in mul)})"  # type: ignore[assignment]
                     f"//({'*'.join(f'{_(s)}' for s in div)}))"
                 )
-            rest = simplify_expression(rest)
+            rest = simplify_expression(rest)  # type: ignore[assignment]
         return tuple(s if s != -1 else rest for s in new_shape)
 
     def _apply_expand_to_shape(
@@ -194,7 +198,8 @@ class _BuilderRuntime:
 
         assert len(new_shape) >= len(input_shape), (
             f"inconsistent behaviour, new_shape={new_shape}, "
-            f"input_shape={input_shape}{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            f"input_shape={input_shape}{self.get_debug_msg()}"  # type: ignore[attr-defined]
         )
         if len(input_shape) < len(new_shape):
             input_shape = (1,) * (len(new_shape) - len(input_shape)) + input_shape
@@ -203,7 +208,8 @@ class _BuilderRuntime:
             if s == 1:
                 assert i < len(input_shape), (
                     f"Unexpected scenario new_shape={new_shape}, "
-                    f"input_shape={input_shape}{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"input_shape={input_shape}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
                 nsh.append(input_shape[i])
                 continue
@@ -213,6 +219,7 @@ class _BuilderRuntime:
             if i < len(input_shape):
                 if isinstance(s, str) and isinstance(input_shape[i], str):
                     if s != input_shape[i]:
+                        # pyrefly: ignore [bad-return]
                         return None
                     nsh.append(s)
                     continue
@@ -222,10 +229,12 @@ class _BuilderRuntime:
                         continue
                     # (1, 1, 1024) with (1, 1, 'input_dim_13')
                     # The output is 1024 if input_dim_13 is not zero, which we don't know.
+                    # pyrefly: ignore [bad-return]
                     return None
             assert isinstance(s, int) or (i < len(input_shape) and input_shape[i] == 1), (
                 f"Unable to compute expanded shape at position {i} when trying "
-                f"to expand shape {input_shape} with {new_shape}{self.get_debug_msg()}"
+                # pyrefly: ignore [missing-attribute]
+                f"to expand shape {input_shape} with {new_shape}{self.get_debug_msg()}"  # type: ignore[attr-defined]
             )
             nsh.append(s)
         return tuple(nsh)
@@ -233,8 +242,10 @@ class _BuilderRuntime:
     def _apply_transpose(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        feeds: Dict[str, "torch.Tensor"],  # type: ignore[name-defined]  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         perm = None
         for att in node.attribute:
             if att.name == "perm":
@@ -244,23 +255,29 @@ class _BuilderRuntime:
         x = feeds[node.input[0]]
         assert len(x.shape) == len(perm), (
             f"Shape mismatch between x.shape={x.shape} and perm={perm!r}, "
-            f"node is {self.pretty_node(node)}{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            f"node is {self.pretty_node(node)}{self.get_debug_msg()}"  # type: ignore[attr-defined]
         )
         if isinstance(x, np.ndarray):
             # Type conversion between numpy and torch is not robust.
             itype = dtype_to_tensor_dtype(x.dtype)
             ttype = onnx_dtype_to_torch_dtype(itype)
-            x = self.torch.from_numpy(x.copy()).to(ttype)
-        return [self.torch.permute(x, perm).to(x.dtype)]
+            # pyrefly: ignore [missing-attribute]
+            x = self.torch.from_numpy(x.copy()).to(ttype)  # type: ignore[attr-defined]
+        # pyrefly: ignore [missing-attribute]
+        return [self.torch.permute(x, perm).to(x.dtype)]  # type: ignore[attr-defined]
 
     def _apply_expand(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        feeds: Dict[str, "torch.Tensor"],  # type: ignore[name-defined]  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         x = feeds[node.input[0]]
         new_shape = feeds[node.input[1]]
-        if isinstance(x, self.torch.Tensor):
+        # pyrefly: ignore [missing-attribute]
+        if isinstance(x, self.torch.Tensor):  # type: ignore[attr-defined]
             if len(x.shape) == 0:
                 if len(new_shape) == 0:
                     return x
@@ -277,7 +294,8 @@ class _BuilderRuntime:
             except RuntimeError as e:
                 raise RuntimeError(
                     f"Unable to compute the constant, new_shape={new_shape}, "
-                    f"x.shape={x.shape}, node={node}\n{self.pretty_text()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"x.shape={x.shape}, node={node}\n{self.pretty_text()}"  # type: ignore[attr-defined]
                 ) from e
         ones = np.ones(tuple(int(i) for i in new_shape), dtype=x.dtype)
         return [(x * ones).astype(x.dtype)]
@@ -285,8 +303,10 @@ class _BuilderRuntime:
     def _apply_squeeze(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        feeds: Dict[str, "torch.Tensor"],  # type: ignore[name-defined]  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         x = feeds[node.input[0]]
         if len(node.input) == 1:
             # No axis.
@@ -299,8 +319,10 @@ class _BuilderRuntime:
     def _apply_unsqueeze(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        feeds: Dict[str, "torch.Tensor"],  # type: ignore[name-defined]  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         x = feeds[node.input[0]]
         axis = feeds[node.input[1]]
         if isinstance(x, np.ndarray):
@@ -325,8 +347,10 @@ class _BuilderRuntime:
     def _apply_cast(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        feeds: Dict[str, "torch.Tensor"],  # type: ignore[name-defined]  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         x = feeds[node.input[0]]
         if not isinstance(x, np.ndarray) and (
             not hasattr(self, "torch") or not isinstance(x, self.torch.Tensor)
@@ -358,7 +382,8 @@ class _BuilderRuntime:
             assert "FakeTensor" not in str(type(x)), (
                 f"FakeTensor {node.output[0]!r} cannot be a constant {type(x)}, "
                 f"node.op_type={node.op_type!r}, type={self.torch.Tensor}"
-                f"{self.pretty_text()}"
+                # pyrefly: ignore [missing-attribute]
+                f"{self.pretty_text()}"  # type: ignore[attr-defined]
             )
         assert isinstance(x, self.torch.Tensor), (
             f"Unexpected type {type(x)} for x for node type {node.op_type}, "
@@ -370,8 +395,10 @@ class _BuilderRuntime:
     def _apply_unary_function(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        feeds: Dict[str, "torch.Tensor"],  # type: ignore[name-defined]  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         x = feeds[node.input[0]]
         itype = dtype_to_tensor_dtype(x.dtype)
         if isinstance(x, np.ndarray):
@@ -388,11 +415,14 @@ class _BuilderRuntime:
 
         ttype = onnx_dtype_to_torch_dtype(itype)
         if node.op_type == "Sqrt":
-            return [self.torch.sqrt(x).to(ttype)]
+            # pyrefly: ignore [missing-attribute]
+            return [self.torch.sqrt(x).to(ttype)]  # type: ignore[attr-defined]
         if node.op_type == "Exp":
-            return [self.torch.exp(x).to(ttype)]
+            # pyrefly: ignore [missing-attribute]
+            return [self.torch.exp(x).to(ttype)]  # type: ignore[attr-defined]
         if node.op_type == "Reciprocal":
-            return [(self.torch.tensor([1], dtype=x.dtype) / x).to(ttype)]
+            # pyrefly: ignore [missing-attribute]
+            return [(self.torch.tensor([1], dtype=x.dtype) / x).to(ttype)]  # type: ignore[attr-defined]
         raise AssertionError(
             f"Not implemented for op_type={node.op_type!r}, node={node}, "
             f"feeds={string_type(feeds, with_shape=True)}"
@@ -401,8 +431,10 @@ class _BuilderRuntime:
     def _apply_trilu(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        feeds: Dict[str, "torch.Tensor"],  # type: ignore[name-defined]  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         upper = True
         for att in node.attribute:
             if att.name == "upper":
@@ -410,27 +442,35 @@ class _BuilderRuntime:
                 break
         assert len(node.input) in (1, 2), (
             f"Unexpected number of inputs (inputs={node.input}) "
-            f"for Trilu{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            f"for Trilu{self.get_debug_msg()}"  # type: ignore[attr-defined]
         )
         x = feeds[node.input[0]]
         k = feeds[node.input[1]] if len(node.input) > 1 else np.array(0, dtype=np.int64)
         assert len(x.shape) > 0, (
             f"x cannot be empty but shape is {x.shape}, execution of Trilu "
-            f"failed{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            f"failed{self.get_debug_msg()}"  # type: ignore[attr-defined]
         )
-        if isinstance(x, self.torch.Tensor):
-            assert isinstance(k, self.torch.Tensor), (
+        # pyrefly: ignore [missing-attribute]
+        if isinstance(x, self.torch.Tensor):  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            assert isinstance(k, self.torch.Tensor), (  # type: ignore[attr-defined]
                 f"Expecting a tensor for {node.input[1]!r} but got "
-                f"{type(k)}{self.get_debug_msg()}"
+                # pyrefly: ignore [missing-attribute]
+                f"{type(k)}{self.get_debug_msg()}"  # type: ignore[attr-defined]
             )
             ak = k.detach().cpu()
             iak = int(ak) if len(ak.shape) == 0 else int(ak[0])
-            assert iak <= 1, f"Unexpected value for k={k}{self.get_debug_msg()}"
-            return [self.torch.triu(x, iak) if upper else self.torch.tril(x, iak)]
+            # pyrefly: ignore [missing-attribute]
+            assert iak <= 1, f"Unexpected value for k={k}{self.get_debug_msg()}"  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            return [self.torch.triu(x, iak) if upper else self.torch.tril(x, iak)]  # type: ignore[attr-defined]
 
         assert isinstance(k, np.ndarray), (
             f"Expecting a tensor for {node.input[1]!r} but got "
-            f"{type(k)}{self.get_debug_msg()}"
+            # pyrefly: ignore [missing-attribute]
+            f"{type(k)}{self.get_debug_msg()}"  # type: ignore[attr-defined]
         )
         iak = int(k) if len(k.shape) == 0 else int(k[0])
         return [np.triu(x, iak) if upper else np.tril(x, iak)]
@@ -438,12 +478,16 @@ class _BuilderRuntime:
     def _apply_binary_op(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        feeds: Dict[str, "torch.Tensor"],  # type: ignore[name-defined]  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         a, b = feeds[node.input[0]], feeds[node.input[1]]
         if a.dtype != b.dtype:
-            a = self._to_torch_tensor(a)
-            b = self._to_torch_tensor(b)
+            # pyrefly: ignore [missing-attribute]
+            a = self._to_torch_tensor(a)  # type: ignore[attr-defined]
+            # pyrefly: ignore [missing-attribute]
+            b = self._to_torch_tensor(b)  # type: ignore[attr-defined]
         try:
             if node.op_type == "Add":
                 return [a + b]
@@ -466,15 +510,19 @@ class _BuilderRuntime:
     def make_torch_tensor_from_np_array(
         self,
         arr: np.ndarray,
-    ) -> "torch.Tensor":  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         """Converts a numpy array to a torch tensor."""
-        return self.torch.from_numpy(arr)
+        # pyrefly: ignore [missing-attribute]
+        return self.torch.from_numpy(arr)  # type: ignore[attr-defined]
 
     def _apply_where(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        feeds: Dict[str, "torch.Tensor"],  # type: ignore[name-defined]  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         new_feeds = {}
         for k, v in feeds.items():
             if not hasattr(self, "torch"):
@@ -487,7 +535,8 @@ class _BuilderRuntime:
                 assert "FakeTensor" not in str(type(x)), (
                     f"FakeTensor {node.output[0]!r} cannot be a constant {type(x)}, "
                     f"node.op_type={node.op_type!r}, type={self.torch.Tensor}"
-                    f"{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
                 new_feeds[k] = x
             else:
@@ -501,31 +550,38 @@ class _BuilderRuntime:
     def _apply_slice(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        feeds: Dict[str, "torch.Tensor"],  # type: ignore[name-defined]  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         new_feeds = {}
         for k, v in feeds.items():
             if isinstance(v, np.ndarray):
                 # Type conversion between numpy and torch is not robust.
                 itype = dtype_to_tensor_dtype(v.dtype)
                 ttype = onnx_dtype_to_torch_dtype(itype)
-                x = self.torch.from_numpy(v)
+                # pyrefly: ignore [missing-attribute]
+                x = self.torch.from_numpy(v)  # type: ignore[attr-defined]
                 assert x.dtype == ttype, (
                     f"Unexpected conversion from numpy {v.dtype} to "
-                    f"{x.dtype} != {ttype}{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"{x.dtype} != {ttype}{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
 
                 assert "FakeTensor" not in str(type(x)), (
                     f"FakeTensor {node.output[0]!r} cannot be a constant {type(x)}, "
-                    f"node.op_type={node.op_type!r}, type={self.torch.Tensor}"
-                    f"{self.get_debug_msg()}"
+                    # pyrefly: ignore [missing-attribute]
+                    f"node.op_type={node.op_type!r}, type={self.torch.Tensor}"  # type: ignore[attr-defined]
+                    # pyrefly: ignore [missing-attribute]
+                    f"{self.get_debug_msg()}"  # type: ignore[attr-defined]
                 )
                 new_feeds[k] = x
             else:
                 new_feeds[k] = v
         assert len(node.input) >= 3, (
             f"Node {node.op_type} (name={node.name!r}) has not enough "
-            f"inputs {node.input}\n{self.pretty_text()}"
+            # pyrefly: ignore [missing-attribute]
+            f"inputs {node.input}\n{self.pretty_text()}"  # type: ignore[attr-defined]
         )
         data, starts, ends = [new_feeds[k] for k in node.input[:3]]
         axes = new_feeds[node.input[3]] if len(node.input) > 3 and node.input[3] else None
@@ -555,13 +611,15 @@ class _BuilderRuntime:
         assert len(res.shape) == len(data.shape), (
             f"Shape mismatch input shape is {data.shape}, output shape is {res.shape}, "
             f"axes={axes}, starts={starts}, ends={ends}, steps={steps}, "
-            f"node is {self.pretty_node(node)}{self.pretty_text()}"
+            # pyrefly: ignore [missing-attribute]
+            f"node is {self.pretty_node(node)}{self.pretty_text()}"  # type: ignore[attr-defined]
         )
         return [res]
 
     def _apply_shape_on_shape(
         self, node: NodeProto, shape: Tuple[int, ...]
-    ) -> "torch.Tensor":  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         if node.attribute:
             start = 0
             end = None
@@ -571,12 +629,15 @@ class _BuilderRuntime:
                 elif att.name == "end":
                     end = att.i
             shape = shape[start:] if end is None else shape[start:end]
-        return [self.torch.from_numpy(np.array(shape, dtype=np.int64))]
+        # pyrefly: ignore [missing-attribute]
+        return [self.torch.from_numpy(np.array(shape, dtype=np.int64))]  # type: ignore[attr-defined]
 
     def _apply_shape(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        feeds: Dict[str, "torch.Tensor"],  # type: ignore[name-defined]  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "torch.Tensor":  # type: ignore[name-defined]  # noqa: F821
         shape = tuple(map(int, feeds[node.input[0]].shape))
         return self._apply_shape_on_shape(node, shape)

@@ -79,6 +79,7 @@ def ignore_warnings(warns: List[Warning]) -> Callable:
     :param warns:   warnings to ignore
     """
     if not isinstance(warns, (tuple, list)):
+        # pyrefly: ignore [bad-assignment]
         warns = (warns,)
     new_list = []
     for w in warns:
@@ -88,7 +89,8 @@ def ignore_warnings(warns: List[Warning]) -> Callable:
             new_list.append(TracerWarning)
         else:
             new_list.append(w)
-    warns = tuple(new_list)
+    # pyrefly: ignore [bad-assignment]
+    warns = tuple(new_list)  # type: ignore[assignment]
 
     def wrapper(fct):
         if warns is None:
@@ -96,6 +98,7 @@ def ignore_warnings(warns: List[Warning]) -> Callable:
 
         def call_f(self):
             with warnings.catch_warnings():
+                # pyrefly: ignore [bad-argument-type]
                 warnings.simplefilter("ignore", warns)
                 return fct(self)
 
@@ -122,6 +125,7 @@ def ignore_errors(errors: Union[Exception, Tuple[Exception]]) -> Callable:
         def call_f(self):
             try:
                 return fct(self)
+            # pyrefly: ignore [not-a-type]
             except errors as e:
                 raise unittest.SkipTest(  # noqa: B904
                     f"expecting error {e.__class__.__name__}: {e}"
@@ -152,6 +156,7 @@ def hide_stdout(f: Optional[Callable] = None) -> Callable:
                 return
             st = StringIO()
             with redirect_stdout(st), warnings.catch_warnings():
+                # pyrefly: ignore [bad-argument-type]
                 warnings.simplefilter("ignore", (UserWarning, DeprecationWarning))
                 try:
                     fct(self)
@@ -303,7 +308,9 @@ def measure_time(
             mes["size"] = len(context["values"])
     else:
         mes["context_size"] = sys.getsizeof(context)
+    # pyrefly: ignore [unsupported-operation]
     mes["warmup_time"] = warmup_time
+    # pyrefly: ignore [bad-return]
     return mes
 
 
@@ -351,7 +358,8 @@ def statistics_on_folder(
                 rows.extend(r)
                 continue
             for line in r:
-                line["dir"] = os.path.join(last, line["dir"])
+                # pyrefly: ignore [no-matching-overload]
+                line["dir"] = os.path.join(last, line["dir"])  # type: ignore[arg-type]
             rows.extend(r)
         return rows
 
@@ -371,7 +379,7 @@ def statistics_on_folder(
             rows.append(stat)
             continue
         spl = os.path.dirname(name).replace("\\", "/").split("/")
-        level = "/".join(spl[:aggregation])
+        level = "/".join(spl[:aggregation])  # type: ignore[assignment]
         stat["dir"] = level
         rows.append(stat)
     return rows
@@ -604,15 +612,19 @@ def has_onnxscript(version: str) -> Callable:
     try:
         import onnxscript
     except ImportError:
-        return False
+        # pyrefly: ignore [bad-return]
+        return False  # type: ignore[return-value]
 
     if not hasattr(onnxscript, "__version__"):
         # development version
-        return True
+        # pyrefly: ignore [bad-return]
+        return True  # type: ignore[return-value]
 
     if pv.Version(onnxscript.__version__) < pv.Version(version):
-        return False
-    return True
+        # pyrefly: ignore [bad-return]
+        return False  # type: ignore[return-value]
+    # pyrefly: ignore [bad-return]
+    return True  # type: ignore[return-value]
 
 
 def requires_onnxruntime(version: str, msg: str = "") -> Callable:
@@ -633,12 +645,15 @@ def has_onnxruntime(version: str, msg: str = "") -> Callable:
 
     if not hasattr(onnxruntime, "__version__"):
         # development version
-        return True
+        # pyrefly: ignore [bad-return]
+        return True  # type: ignore[return-value]
 
     if pv.Version(onnxruntime.__version__) < pv.Version(version):
         msg = f"onnxruntime version {onnxruntime.__version__} < {version}: {msg}"
-        return False
-    return True
+        # pyrefly: ignore [bad-return]
+        return False  # type: ignore[return-value]
+    # pyrefly: ignore [bad-return]
+    return True  # type: ignore[return-value]
 
 
 def has_onnxruntime_training(push_back_batch: bool = False):
@@ -760,9 +775,11 @@ def statistics_on_file(filename: str) -> Dict[str, Union[int, float, str]]:
 
     stat = dict(lines=n_line, chars=n_ch, ext=ext)
     if ext != ".py":
-        return stat
+        # pyrefly: ignore [bad-return]
+        return stat  # type: ignore[return-value]
     # add statistics on python syntax?
-    return stat
+    # pyrefly: ignore [bad-return]
+    return stat  # type: ignore[return-value]
 
 
 class ExtTestCase(unittest.TestCase):
@@ -808,24 +825,28 @@ class ExtTestCase(unittest.TestCase):
         cls._todos.append((f, msg))
 
     @classmethod
-    def ort(cls) -> unittest.__class__:
+    # pyrefly: ignore [missing-attribute]
+    def ort(cls) -> unittest.__class__:  # type: ignore[name-defined]
         import onnxruntime
 
         return onnxruntime
 
     @classmethod
-    def to_onnx(self, *args, **kwargs) -> "ModelProto":  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    def to_onnx(self, *args, **kwargs) -> "ModelProto":  # type: ignore[name-defined]  # noqa: F821
         from yobx.torch_interpreter import to_onnx
 
         return to_onnx(*args, **kwargs)
 
-    def print_model(self, model: "ModelProto"):  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    def print_model(self, model: "ModelProto"):  # type: ignore[name-defined]  # noqa: F821
         "Prints a ModelProto"
         from yobx.helpers.onnx_helper import pretty_onnx
 
         print(pretty_onnx(model))
 
-    def print_onnx(self, model: "ModelProto"):  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    def print_onnx(self, model: "ModelProto"):  # type: ignore[name-defined]  # noqa: F821
         "Prints a ModelProto"
         from yobx.helpers.onnx_helper import pretty_onnx
 
@@ -887,7 +908,8 @@ class ExtTestCase(unittest.TestCase):
             msg or f"Unable to find one string in the list {tofind!r} in\n--\n{text}"
         )
 
-    def assertIn(self, tofind: str, text: str, msg: str = ""):
+    # pyrefly: ignore [bad-param-name-override]
+    def assertIn(self, tofind: str, text: str, msg: str = ""):  # type: ignore[override]
         if tofind in text:
             return
         raise AssertionError(
@@ -920,6 +942,7 @@ class ExtTestCase(unittest.TestCase):
     def to_numpy(tensor):
         """Converts a :class:`torch.Tensor` to :class:`numpy.ndarray`."""
         try:
+            # pyrefly: ignore [missing-attribute]
             return tensor.detach().cpu().numpy()
         except TypeError:
             # We try with ml_dtypes
@@ -929,7 +952,9 @@ class ExtTestCase(unittest.TestCase):
         import torch
 
         conv = {torch.bfloat16: ml_dtypes.bfloat16}
+        # pyrefly: ignore [missing-attribute]
         assert tensor.dtype in conv, f"Unsupported type {tensor.dtype}, not in {conv}"
+        # pyrefly: ignore [missing-attribute]
         return tensor.detach().to(torch.float32).cpu().numpy().astype(conv[tensor.dtype])
 
     def assertEqualArray(
@@ -971,9 +996,11 @@ class ExtTestCase(unittest.TestCase):
             return
 
         if hasattr(expected, "detach"):
-            expected = self.to_numpy(expected.detach().cpu())
+            # pyrefly: ignore [bad-argument-count]
+            expected = self.to_numpy(expected.detach().cpu())  # type: ignore[call-arg,misc]
         if hasattr(value, "detach"):
-            value = self.to_numpy(value.detach().cpu())
+            # pyrefly: ignore [bad-argument-count]
+            value = self.to_numpy(value.detach().cpu())  # type: ignore[call-arg,misc]
         if msg:
             try:
                 self.assertEqual(expected.dtype, value.dtype)
@@ -1016,6 +1043,7 @@ class ExtTestCase(unittest.TestCase):
             return
         raise AssertionError(msg or f"value is not True: {value!r}")
 
+    # pyrefly: ignore [bad-param-name-override]
     def assertEqual(self, expected: Any, value: Any, msg: str = ""):
         """Overwrites the error message to get a more explicit message about what is what."""
         if msg:
@@ -1040,6 +1068,7 @@ class ExtTestCase(unittest.TestCase):
             self.assertEqual(len(expected), len(value), msg=msg)
             if isinstance(expected, dict):
                 for k in expected:
+                    # pyrefly: ignore [bad-argument-type]
                     self.assertIn(k, value, msg=msg)
                     self.assertEqualAny(expected[k], value[k], msg=msg, atol=atol, rtol=rtol)
             else:
@@ -1061,6 +1090,7 @@ class ExtTestCase(unittest.TestCase):
             self.assertEqual(len(expected), len(value), msg=msg)
             if isinstance(expected, dict):
                 for k in expected:
+                    # pyrefly: ignore [bad-argument-type]
                     self.assertIn(k, value, msg=msg)
                     self.assertEqualArrayAny(expected[k], value[k], msg=msg, atol=atol, rtol=rtol)
             else:
@@ -1094,7 +1124,8 @@ class ExtTestCase(unittest.TestCase):
                 f"Comparison not implemented for types {type(expected)} and {type(value)}"
             )
 
-    def assertAlmostEqual(
+    # pyrefly: ignore [bad-override]
+    def assertAlmostEqual(  # type: ignore[override]
         self,
         expected: numpy.ndarray,
         value: numpy.ndarray,
@@ -1109,8 +1140,10 @@ class ExtTestCase(unittest.TestCase):
         self.assertEqualArray(expected, value, atol=atol, rtol=rtol)
 
     def check_ort(
-        self, onx: "onnx.ModelProto"  # noqa: F821
-    ) -> "onnxruntime.InferenceSession":  # noqa: F821
+        # pyrefly: ignore [unknown-name]
+        self, onx: "onnx.ModelProto"  # type: ignore[name-defined]  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ) -> "onnxruntime.InferenceSession":  # type: ignore[name-defined]  # noqa: F821
         from onnxruntime import InferenceSession
 
         return InferenceSession(

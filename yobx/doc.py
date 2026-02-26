@@ -5,7 +5,7 @@ import numpy as np
 def get_latest_pypi_version(package_name="yet-another-onnx-builder") -> str:  # pragma: no cover
     """Returns the latest published version."""
 
-    import requests
+    import requests  # type: ignore[import-untyped]
 
     url = f"https://pypi.org/pypi/{package_name}/json"
     response = requests.get(url)
@@ -35,7 +35,8 @@ def reset_torch_transformers(gallery_conf, fname):  # pragma: no cover
 
 def plot_legend(
     text: str, text_bottom: str = "", color: str = "green", fontsize: int = 15
-) -> "matplotlib.axes.Axes":  # noqa: F821
+# pyrefly: ignore [unknown-name]
+) -> "matplotlib.axes.Axes":  # type: ignore[name-defined]  # noqa: F821
     """
     Plots a graph with only text (for :epkg:`sphinx-gallery`).
 
@@ -75,14 +76,16 @@ def rotate_align(ax, angle=15, align="right"):
     return ax
 
 
-def save_fig(ax, name: str, **kwargs) -> "matplotlib.axis.Axis":  # noqa: F821
+# pyrefly: ignore [unknown-name]
+def save_fig(ax, name: str, **kwargs) -> "matplotlib.axis.Axis":  # type: ignore[name-defined]  # noqa: F821
     """Applies ``tight_layout`` and saves the figures. Returns ax."""
     fig = ax.get_figure()
     fig.savefig(name, **kwargs)
     return ax
 
 
-def title(ax: "plt.axes", title: str) -> "matplotlib.axis.Axis":  # noqa: F821
+# pyrefly: ignore [unknown-name]
+def title(ax: "plt.axes", title: str) -> "matplotlib.axis.Axis":  # type: ignore[name-defined]  # noqa: F821
     "Adds a title to axes and returns them."
     ax.set_title(title)
     return ax
@@ -90,11 +93,13 @@ def title(ax: "plt.axes", title: str) -> "matplotlib.axis.Axis":  # noqa: F821
 
 def plot_histogram(
     tensor: np.ndarray,
-    ax: Optional["plt.axes"] = None,  # noqa: F821
+    # pyrefly: ignore [unknown-name]
+    ax: Optional["plt.axes"] = None,  # type: ignore[name-defined]  # noqa: F821
     bins: int = 30,
     color: str = "orange",
     alpha: float = 0.7,
-) -> "matplotlib.axis.Axis":  # noqa: F821
+# pyrefly: ignore [unknown-name]
+) -> "matplotlib.axis.Axis":  # type: ignore[name-defined]  # noqa: F821
     "Computes the distribution for a tensor."
     if ax is None:
         import matplotlib.pyplot as plt
