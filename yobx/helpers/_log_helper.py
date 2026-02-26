@@ -333,7 +333,7 @@ def apply_excel_style(
     :param time_mask_view: if specified, it contains dataframe with the same shape
         and values in {-1, 0, +1} which indicates if a value is unexpectedly lower (-1)
         or higher (+1), it changes the color of the background then.
-    :param verbosity: progress loop
+    :param verbose: progress loop
     """
     from openpyxl import load_workbook
     from openpyxl.styles import Alignment
