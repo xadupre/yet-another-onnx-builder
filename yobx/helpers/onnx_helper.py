@@ -163,7 +163,7 @@ def pretty_onnx(
         return f"{text}  ---  {rows[0]}"
 
     if isinstance(onx, onnx.TensorProto):
-        shape = "x".join(d.dim_param or str(d.dim_value) for d in onx.dims)  # type: ignore[assignment]
+        shape = "x".join(str(d) for d in onx.dims)  # type: ignore[assignment]
         return f"onnx.TensorProto:{onx.data_type}:{shape}:{onx.name}"
 
     assert not isinstance(
