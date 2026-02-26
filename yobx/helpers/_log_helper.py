@@ -59,6 +59,8 @@ def breaking_last_point(series: Sequence[float], threshold: float = 1.2):
     is not an outlier.
 
     :param series: series
+    :param threshold: number of standard deviations beyond the mean required
+        for the last point to be considered a significant change (default 1.2)
     :return: significant change (-1, 0, +1), test value
     """
     signal = np.asarray(series)
