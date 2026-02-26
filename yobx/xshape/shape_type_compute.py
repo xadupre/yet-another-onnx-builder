@@ -1020,6 +1020,7 @@ def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
     keepdim = self.get_attribute(node, "keepdims", exc=False)
     axes = self.get_attribute(node, "axes", exc=False)
     keepdim = None if keepdim is None else keepdim.i
+    iaxes = None
     if axes is None:
         if len(node.input) == 2:
             if self.is_constant(node.input[1]):
@@ -1059,11 +1060,35 @@ def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
                     self._debug_shape_missing
                 ), f"Unable to determine shape for node {node}\n---\n{self.get_debug_msg()}"
                 return
-        else:
-            iaxes = None
     else:
         iaxes = tuple(axes.ints)
 
+    if iaxes is None:
+        if len(node.input) > 1:
+            if not self.is_constant(node.input[1]):
+                # No constant axis.
+                if self.has_device(node.input[0]):
+                    self.set_device(node.output[0], self.get_device(node.input[0]))
+                if self.has_shape(node.input[1]):
+                    self.set_rank(node.output[0], len(self.get_shape(node.input[1])))
+                if self.has_type(node.input[0]):
+                    self.set_type(node.output[0], self.get_type(node.input[0]))
+                return
+            assert iaxes is not None, (
+                f"iaxes=None when {axes=} (constant), "
+                f"node.input={node.input}{self.get_debug_msg()}"
+            )
+        # Full reduction
+        if self.has_device(node.input[0]):
+            self.set_device(node.output[0], self.get_device(node.input[0]))
+        self.set_shape(node.output[0], tuple())
+        if self.has_type(node.input[0]):
+            self.set_type(node.output[0], self.get_type(node.input[0]))
+        return
+
+    assert (
+        iaxes is not None
+    ), f"iaxes=None when {axes=}, node.input={node.input}{self.get_debug_msg()}"
     return set_type_shape_reduce_op(
         self,
         node.output[0],
@@ -1100,7 +1125,7 @@ def _set_shape_type_op_any_reshape(self: ShapeBuilder, node: NodeProto):
 
     if self.has_shape(node.input[1]):
         rk = self.get_shape(node.input[1])
-        self.set_rank(k, rk[0])
+        self.set_rank(k, len(rk))
         return True
     assert not self._debug_shape_missing, (
         f"Unable to compute shape for node: "

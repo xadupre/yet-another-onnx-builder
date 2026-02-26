@@ -106,9 +106,7 @@ class TestReferenceOps(ExtTestCase):
         }
         ref = ExtendedReferenceEvaluator(model)
         got = ref.run(None, feeds)
-        sess = InferenceSession(
-            model.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
         expected = sess.run(None, feeds)
         self.assertEqualArray(expected[0], got[0])
 
@@ -619,7 +617,6 @@ class TestReferenceOps(ExtTestCase):
             B=np.arange(9).reshape((3, 3)).astype(np.float32),
         )
         ref.run(None, feeds)[0]
-
 
     def test_to_complex_2d(self):
         model = oh.make_model(
