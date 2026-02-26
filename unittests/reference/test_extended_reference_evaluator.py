@@ -188,7 +188,7 @@ class TestReferenceOps(ExtTestCase):
                 [
                     oh.make_node(
                         "SkipLayerNormalization",
-                        ["x", "skip", "beta", "gamma"],
+                        ["x", "skip", "gamma", "beta"],
                         ["Z"],
                         epsilon=1.0e-5,
                         domain="com.microsoft",
@@ -229,7 +229,7 @@ class TestReferenceOps(ExtTestCase):
                 [
                     oh.make_node(
                         "SkipLayerNormalization",
-                        ["x", "skip", "beta", "gamma", "bias"],
+                        ["x", "skip", "gamma", "beta", "bias"],
                         ["Z"],
                         epsilon=1.0e-5,
                         domain="com.microsoft",

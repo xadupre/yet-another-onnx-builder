@@ -70,7 +70,6 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         self.maybe_disable_fake_tensor_mode = _maybe_disable_fake_tensor_mode
         self.main_opset = opset or 18
         self.time_evaluation_constants_ = 0
-        self._unique_dim_counter = 0
 
     @property
     def input_names(self) -> List[str]:
