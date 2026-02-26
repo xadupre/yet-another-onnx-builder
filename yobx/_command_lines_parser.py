@@ -487,9 +487,11 @@ def _cmd_print(argv: List[Any]):
     elif args.fmt == "printer":
         print(onnx.printer.to_text(onx))
     elif args.fmt == "shape":
-        from experimental_experiment.xbuilder import GraphBuilder
+        from .xshape import BasicShapeBuilder
 
-        print(GraphBuilder(onx).pretty_text())
+        bs = BasicShapeBuilder()
+        bs.run_model(onx)
+        print(bs.get_debug_msg())
     elif args.fmt == "dot":
         from .helpers.dot_helper import to_dot
 
