@@ -728,7 +728,7 @@ def make_subfunction(
     :param opset_imports: opset import
     :param output_names: desired outputs
     :param domain: function domain
-    :return: model proto
+    :return: function proto
     """
     return oh.make_function(
         domain,
