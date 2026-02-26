@@ -427,6 +427,115 @@ class TestShapeRuntime(ExtTestCase):
         self.assertTrue(result)
         self.assertEqual(b.value_as_shape("out"), (10, 15))
 
+    def test_slice_no_axes_non_full_range_returns_false(self):
+        # len(values)==3 but not a full-range identity → #SV-Sl/2
+        b = _TestShapeBuilder()
+        b.set_shape("out", (2,))
+        b.set_type("out", TINT64)
+        node = oh.make_node("Slice", ["data", "starts", "ends"], ["out"])
+        values = [(5, 10, 15), (1,), (3,)]
+        result = b._update_value_shape_with_values_Slice(node, values)
+        self.assertFalse(result)
+
+    def test_slice_non_zero_axis_returns_false(self):
+        # axes=(1,) (not axis 0) → #SV-Sl/2
+        b = _TestShapeBuilder()
+        b.set_shape("out", (2,))
+        b.set_type("out", TINT64)
+        node = oh.make_node("Slice", ["data", "starts", "ends", "axes"], ["out"])
+        values = [(5, 10, 15, 20), (1,), (3,), (1,)]
+        result = b._update_value_shape_with_values_Slice(node, values)
+        self.assertFalse(result)
+
+    def test_slice_dynamic_end_returns_false(self):
+        # axes=(0,), starts=(0,), ends=("dim",) (symbolic) → #SV-Sl/3
+        b = _TestShapeBuilder()
+        b.set_shape("out", (3,))
+        b.set_type("out", TINT64)
+        node = oh.make_node("Slice", ["data", "starts", "ends", "axes"], ["out"])
+        values = [("a", "b", "c"), (0,), ("dim",), (0,)]
+        result = b._update_value_shape_with_values_Slice(node, values)
+        self.assertFalse(result)
+
+    def test_slice_with_step(self):
+        # 5 inputs with axes=(0,), starts=(1,), ends=(5,), step=(2,) → #SV-Sl4
+        b = _TestShapeBuilder()
+        b.set_shape("out", (2,))
+        b.set_type("out", TINT64)
+        node = oh.make_node("Slice", ["data", "starts", "ends", "axes", "steps"], ["out"])
+        values = [(5, 10, 15, 20, 25), (1,), (5,), (0,), (2,)]
+        result = b._update_value_shape_with_values_Slice(node, values)
+        self.assertTrue(result)
+        self.assertEqual(b.value_as_shape("out"), (10, 20))
+
+    # ------------------------------------------------------------------
+    # _update_value_shape_with_node_Unsqueeze
+    # ------------------------------------------------------------------
+
+    def test_unsqueeze_multi_element_tuple_returns_false(self):
+        # values_0 is tuple with len > 1 → #SV-Unsq/1
+        b = _TestShapeBuilder()
+        b._known_value_shape["x"] = (2, 3)
+        b.set_shape("x", (2,))
+        b.set_type("x", TINT64)
+        node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
+        result = b._update_value_shape_with_node_Unsqueeze(node)
+        self.assertFalse(result)
+
+    def test_unsqueeze_rank_gt_zero_returns_false(self):
+        # rank > 0 and values_0 is None → #SV-Unsq/2
+        b = _TestShapeBuilder()
+        b.set_rank("x", 1)
+        node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
+        result = b._update_value_shape_with_node_Unsqueeze(node)
+        self.assertFalse(result)
+
+    def test_unsqueeze_no_rank_no_value_shape_returns_false(self):
+        # no rank and no value_shape → #SV-Unsq/3
+        b = _TestShapeBuilder()
+        node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
+        result = b._update_value_shape_with_node_Unsqueeze(node)
+        self.assertFalse(result)
+
+    def test_unsqueeze_scalar_axes_input_no_value_shape(self):
+        # rank=0, axes input=[0], values_0=None → #SV-Unsq4, output=("x",)
+        b = _TestShapeBuilder()
+        b.set_rank("x", 0)
+        b.set_constant("axes", _int64_cst("axes", [0]))
+        node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
+        result = b._update_value_shape_with_node_Unsqueeze(node)
+        self.assertTrue(result)
+        self.assertEqual(b.value_as_shape("y"), ("x",))
+
+    def test_unsqueeze_scalar_axes_input_with_value_shape(self):
+        # rank=0, axes input=[0], values_0=42 → #SV-Unsq4, output=(42,)
+        b = _TestShapeBuilder()
+        b.set_rank("x", 0)
+        b._known_value_shape["x"] = 42
+        b.set_constant("axes", _int64_cst("axes", [0]))
+        node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
+        result = b._update_value_shape_with_node_Unsqueeze(node)
+        self.assertTrue(result)
+        self.assertEqual(b.value_as_shape("y"), (42,))
+
+    def test_unsqueeze_scalar_axes_attribute(self):
+        # rank=0, axes attribute=[0], values_0=None → #SV-Unsq4, output=("x",)
+        b = _TestShapeBuilder()
+        b.set_rank("x", 0)
+        node = oh.make_node("Unsqueeze", ["x"], ["y"], axes=[0])
+        result = b._update_value_shape_with_node_Unsqueeze(node)
+        self.assertTrue(result)
+        self.assertEqual(b.value_as_shape("y"), ("x",))
+
+    def test_unsqueeze_scalar_0d_axes_returns_false(self):
+        # rank=0, axes input is 0-D scalar → cst=tuple(), len≠1 → return False
+        b = _TestShapeBuilder()
+        b.set_rank("x", 0)
+        b.set_constant("axes", _int64_cst("axes", 0))
+        node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
+        result = b._update_value_shape_with_node_Unsqueeze(node)
+        self.assertFalse(result)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
