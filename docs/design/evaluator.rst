@@ -166,6 +166,56 @@ not need to re-list the built-in contrib operators.
     (result,) = ref.run(None, {"X": x})
     print(result)  # [2. 4. 6.]
 
+Inspecting intermediate results
+================================
+
+Pass ``verbose=10`` to :class:`~yobx.reference.ExtendedReferenceEvaluator`
+to print every input, every intermediate result, and every output as the
+model executes.  This is useful for debugging incorrect outputs or
+understanding how values flow through the graph.
+
+The ``verbose`` parameter maps to the logging levels used internally by
+:class:`onnx.reference.ReferenceEvaluator`:
+
+* ``verbose=0`` (default) — silent
+* ``verbose=2`` — prints each node as it executes (``NodeOp(inputs) -> outputs``)
+* ``verbose=3`` or higher — also prints the value of every input, initializer
+  constant (``+C``), and intermediate/final result (``+``, ``+I``)
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    import onnx
+    import onnx.helper as oh
+    from yobx.reference import ExtendedReferenceEvaluator
+
+    TFLOAT = onnx.TensorProto.FLOAT
+    model = oh.make_model(
+        oh.make_graph(
+            [
+                oh.make_node("Add", ["X", "Y"], ["T"]),
+                oh.make_node("Relu", ["T"], ["Z"]),
+            ],
+            "add_relu",
+            [
+                oh.make_tensor_value_info("X", TFLOAT, [None, None]),
+                oh.make_tensor_value_info("Y", TFLOAT, [None, None]),
+            ],
+            [oh.make_tensor_value_info("Z", TFLOAT, [None, None])],
+        ),
+        opset_imports=[oh.make_opsetid("", 18)],
+        ir_version=10,
+    )
+    ref = ExtendedReferenceEvaluator(model, verbose=10)
+    x = np.array([[1.0, -2.0], [3.0, -4.0]], dtype=np.float32)
+    (result,) = ref.run(None, {"X": x, "Y": x})
+    print("result:", result)
+
+The lines prefixed with ``+I`` are model inputs; lines with ``+C`` are
+initializer constants; and lines with ``+`` (after a node execution line)
+are the intermediate or final outputs produced by that node.
+
 Operator versioning
 ===================
 
