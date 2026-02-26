@@ -1243,7 +1243,7 @@ class CubeLogs:
                     fr = df.columns.to_frame()
                     if is_datetime64_any_dtype(fr[self.time]):
                         dt = fr[self.time]
-                        has_time = (dt != dt.dt.normalize()).any()
+                        has_time = (dt != dt.dt.normalize()).any()  # type: ignore[missing-attribute]
                         sdt = dt.apply(
                             lambda t, has_time=has_time: t.strftime(
                                 "%Y-%m-%dT%H-%M-%S" if has_time else "%Y-%m-%d"
@@ -1470,7 +1470,7 @@ class CubeLogs:
         cube = self.clone(new_data, keys=[*self.keys_no_time, column_name])
         # Preserve the original ordering of self.keys_time while excluding
         # the configuration columns and the added column_name
-        excluded_keys = set(columns_index) | {column_name}
+        excluded_keys = set(columns_index) | {column_name}  # type: ignore[arg-type]
         key_index = [k for k in self.keys_time if k not in excluded_keys]
         view = CubeViewDef(
             key_index=key_index,
@@ -1547,9 +1547,9 @@ class CubeLogs:
                             _mkc(m, f"∅{n1}∧{n2}"): (sinan & ~sjnan).astype(int),
                             _mkc(m, f"{n1}∧∅{n2}"): (~sinan & sjnan).astype(int),
                             _mkc(m, f"{n1}∧{n2}"): (~sinan & ~sjnan).astype(int),
-                            _mkc(m, f"{n1}<{n2}"): (si < sj).astype(int),
-                            _mkc(m, f"{n1}=={n2}"): (si == sj).astype(int),
-                            _mkc(m, f"{n1}>{n2}"): (si > sj).astype(int),
+                            _mkc(m, f"{n1}<{n2}"): (si < sj).astype(int),# type: ignore[missing-attribute]
+                            _mkc(m, f"{n1}=={n2}"): (si == sj).astype(int),# type: ignore[missing-attribute]
+                            _mkc(m, f"{n1}>{n2}"): (si > sj).astype(int),# type: ignore[missing-attribute]
                             _mkc(m, f"{n1}*({n1}∧{n2})"): si * (~sinan & ~sjnan).astype(float),
                             _mkc(m, f"{n2}*({n1}∧{n2})"): sj * (~sinan & ~sjnan).astype(float),
                         }

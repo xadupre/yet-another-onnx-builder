@@ -25,6 +25,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: install graphviz
+        uses: ts-graphviz/setup-graphviz@v2
+      - name: Install pandoc
+        run: sudo apt-get install -y pandoc
       - name: Install dependencies
         run: pip install -e ".[docs,torch]"
       - name: Build documentation

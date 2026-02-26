@@ -49,7 +49,7 @@ def proto_from_array(
         ), f"Pointers are not null and different {arr_cpu.data_ptr()} != {copy.data_ptr()}"
         np_arr = np.from_dlpack(copy)  # type: ignore[assignment]
     else:
-        np_arr = np.from_dlpack(arr_cpu.detach())
+        np_arr = np.from_dlpack(arr_cpu.detach())  # type: ignore[assignment]
 
     tensor = onnx.TensorProto()
     tensor.dims.extend(arr_cpu.shape)
@@ -632,7 +632,7 @@ def create_input_tensors_from_onnx_model(
     elif engine == "onnx":
         from onnx.reference import ReferenceEvaluator
 
-        sess = ReferenceEvaluator(proto)  # type: ignore[arg-type]
+        sess = ReferenceEvaluator(proto)  # type: ignore[assignment,arg-type]
         names = sess.output_names
     elif engine == "onnxruntime":
         from onnxruntime import InferenceSession
