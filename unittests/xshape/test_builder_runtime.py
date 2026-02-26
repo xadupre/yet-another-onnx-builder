@@ -294,38 +294,6 @@ class TestApplyCast(ExtTestCase):
         self.assertEqual(result[0].dtype, torch.int64)
 
 
-class TestApplyUnaryFunction(ExtTestCase):
-    def setUp(self):
-        self.b = _TorchShapeBuilder()
-
-    def test_sqrt_numpy(self):
-        node = oh.make_node("Sqrt", ["x"], ["y"])
-        x = np.array([4.0, 9.0, 16.0], dtype=np.float32)
-        result = self.b._apply_unary_function(node, {"x": x})
-        self.assertEqual(len(result), 1)
-        self.assertEqualArray(result[0], np.array([2.0, 3.0, 4.0], dtype=np.float32))
-
-    def test_sqrt_torch(self):
-        import torch
-
-        node = oh.make_node("Sqrt", ["x"], ["y"])
-        x = torch.tensor([4.0, 9.0, 16.0], dtype=torch.float32)
-        result = self.b._apply_unary_function(node, {"x": x})
-        self.assertEqual(len(result), 1)
-        self.assertEqualArray(
-            result[0].numpy(), np.array([2.0, 3.0, 4.0], dtype=np.float32)
-        )
-
-    def test_exp_torch(self):
-        import torch
-
-        node = oh.make_node("Exp", ["x"], ["y"])
-        x = torch.zeros(3, dtype=torch.float32)
-        result = self.b._apply_unary_function(node, {"x": x})
-        self.assertEqual(len(result), 1)
-        self.assertEqualArray(result[0].numpy(), np.ones(3, dtype=np.float32))
-
-
 class TestApplyShapeOnShape(ExtTestCase):
     def setUp(self):
         self.b = _TorchShapeBuilder()
@@ -395,18 +363,13 @@ class TestApplyShape(ExtTestCase):
         result = self.b._apply_shape(node, {"x": x})
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].tolist()), (3, 4))
+
+
 class TestApplyUnaryFunction(ExtTestCase):
     def setUp(self):
         self.b = _TorchShapeBuilder()
 
     # --- numpy path ---
-
-    def test_sqrt_numpy(self):
-        node = oh.make_node("Sqrt", ["x"], ["y"])
-        x = np.array([4.0, 9.0, 16.0], dtype=np.float32)
-        result = self.b._apply_unary_function(node, {"x": x})
-        self.assertEqual(len(result), 1)
-        self.assertEqualArray(result[0], np.array([2.0, 3.0, 4.0], dtype=np.float32))
 
     def test_exp_numpy(self):
         node = oh.make_node("Exp", ["x"], ["y"])
@@ -429,28 +392,6 @@ class TestApplyUnaryFunction(ExtTestCase):
 
     # --- torch path ---
 
-    def test_sqrt_torch(self):
-        import torch
-
-        node = oh.make_node("Sqrt", ["x"], ["y"])
-        x = torch.tensor([4.0, 9.0, 16.0], dtype=torch.float32)
-        result = self.b._apply_unary_function(node, {"x": x})
-        self.assertEqual(len(result), 1)
-        self.assertEqualArray(
-            result[0].numpy(), np.array([2.0, 3.0, 4.0], dtype=np.float32)
-        )
-
-    def test_exp_torch(self):
-        import torch
-
-        node = oh.make_node("Exp", ["x"], ["y"])
-        x = torch.tensor([0.0, 1.0], dtype=torch.float32)
-        result = self.b._apply_unary_function(node, {"x": x})
-        self.assertEqual(len(result), 1)
-        self.assertEqualArray(
-            result[0].numpy(), np.exp(np.array([0.0, 1.0], dtype=np.float32)), atol=1e-6
-        )
-
     def test_reciprocal_torch(self):
         import torch
 
@@ -458,9 +399,7 @@ class TestApplyUnaryFunction(ExtTestCase):
         x = torch.tensor([2.0, 4.0], dtype=torch.float32)
         result = self.b._apply_unary_function(node, {"x": x})
         self.assertEqual(len(result), 1)
-        self.assertEqualArray(
-            result[0].numpy(), np.array([0.5, 0.25], dtype=np.float32)
-        )
+        self.assertEqualArray(result[0].numpy(), np.array([0.5, 0.25], dtype=np.float32))
 
     def test_unknown_op_torch_raises(self):
         import torch
@@ -468,6 +407,31 @@ class TestApplyUnaryFunction(ExtTestCase):
         node = oh.make_node("Log", ["x"], ["y"])
         x = torch.tensor([1.0, 2.0], dtype=torch.float32)
         self.assertRaises(AssertionError, self.b._apply_unary_function, node, {"x": x})
+
+    def test_sqrt_numpy(self):
+        node = oh.make_node("Sqrt", ["x"], ["y"])
+        x = np.array([4.0, 9.0, 16.0], dtype=np.float32)
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(result[0], np.array([2.0, 3.0, 4.0], dtype=np.float32))
+
+    def test_sqrt_torch(self):
+        import torch
+
+        node = oh.make_node("Sqrt", ["x"], ["y"])
+        x = torch.tensor([4.0, 9.0, 16.0], dtype=torch.float32)
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(result[0].numpy(), np.array([2.0, 3.0, 4.0], dtype=np.float32))
+
+    def test_exp_torch(self):
+        import torch
+
+        node = oh.make_node("Exp", ["x"], ["y"])
+        x = torch.zeros(3, dtype=torch.float32)
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(result[0].numpy(), np.ones(3, dtype=np.float32))
 
 
 class TestApplyBinaryOp(ExtTestCase):
