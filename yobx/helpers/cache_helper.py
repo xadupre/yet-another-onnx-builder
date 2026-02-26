@@ -184,8 +184,8 @@ def make_dynamic_cache(
         :showcode:
 
         import torch
-        from onnx_diagnostic.helpers import string_type
-        from onnx_diagnostic.helpers.cache_helper import make_dynamic_cache
+        from yobx.helpers import string_type
+        from yobx.helpers.cache_helper import make_dynamic_cache
 
         n_layers = 2
         bsize, nheads, slen, dim = 2, 4, 3, 7
@@ -359,8 +359,8 @@ def make_static_cache(
         :showcode:
 
         import torch
-        from onnx_diagnostic.helpers import string_type
-        from onnx_diagnostic.helpers.cache_helper import make_static_cache
+        from yobx.helpers import string_type
+        from yobx.helpers.cache_helper import make_static_cache
 
         n_layers = 2
         bsize, nheads, slen, dim = 2, 4, 3, 7
