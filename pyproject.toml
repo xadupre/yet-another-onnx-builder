@@ -116,9 +116,8 @@ select = [
     "UP006", "UP007", "UP015", "UP027", "UP031", "UP032", "UP034", "UP035", "UP045",
 ]
 "*/__init__.py" = ["F401"]
-"unittests/**" = [
-    "B904",
-]
+"unittests/**" = ["B904"]
+"unittests/helpers/test_dot_helper.py" = ["B904", "E501"]
 
 [tool.mypy]
 ignore_missing_imports = true
