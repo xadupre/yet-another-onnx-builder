@@ -5,6 +5,7 @@ yobx.helpers
     :maxdepth: 1
     :caption: modules
 
+    _log_helper
     cache_helper
     cube_helper
     dot_helper
