@@ -190,5 +190,114 @@ class TestApplyUnsqueeze(ExtTestCase):
         self.assertEqual(result[0].shape, (1, 2, 3, 1))
 
 
+class TestApplyBinaryOp(ExtTestCase):
+    @classmethod
+    def setUpClass(cls):
+        import torch
+
+        cls.torch = torch
+        cls.b = _TorchShapeBuilder()
+
+    def _make_node(self, op_type, input_names=("a", "b"), output_names=("c",)):
+        return oh.make_node(op_type, list(input_names), list(output_names))
+
+    # --- numpy tests ---
+
+    def test_add_numpy(self):
+        node = self._make_node("Add")
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        result = self.b._apply_binary_op(node, {"a": a, "b": b})
+        self.assertEqual(len(result), 1)
+        np.testing.assert_array_equal(result[0], np.array([4.0, 6.0], dtype=np.float32))
+
+    def test_mul_numpy(self):
+        node = self._make_node("Mul")
+        a = np.array([2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0], dtype=np.float32)
+        result = self.b._apply_binary_op(node, {"a": a, "b": b})
+        self.assertEqual(len(result), 1)
+        np.testing.assert_array_equal(result[0], np.array([8.0, 15.0], dtype=np.float32))
+
+    def test_sub_numpy(self):
+        node = self._make_node("Sub")
+        a = np.array([5.0, 7.0], dtype=np.float32)
+        b = np.array([3.0, 2.0], dtype=np.float32)
+        result = self.b._apply_binary_op(node, {"a": a, "b": b})
+        self.assertEqual(len(result), 1)
+        np.testing.assert_array_equal(result[0], np.array([2.0, 5.0], dtype=np.float32))
+
+    def test_div_numpy(self):
+        node = self._make_node("Div")
+        a = np.array([6.0, 9.0], dtype=np.float32)
+        b = np.array([2.0, 3.0], dtype=np.float32)
+        result = self.b._apply_binary_op(node, {"a": a, "b": b})
+        self.assertEqual(len(result), 1)
+        np.testing.assert_array_equal(result[0], np.array([3.0, 3.0], dtype=np.float32))
+
+    def test_pow_numpy(self):
+        node = self._make_node("Pow")
+        a = np.array([2.0, 3.0], dtype=np.float32)
+        b = np.array([3.0, 2.0], dtype=np.float32)
+        result = self.b._apply_binary_op(node, {"a": a, "b": b})
+        self.assertEqual(len(result), 1)
+        np.testing.assert_array_equal(result[0], np.array([8.0, 9.0], dtype=np.float32))
+
+    # --- torch tests ---
+
+    def test_add_torch(self):
+        node = self._make_node("Add")
+        a = self.torch.tensor([1.0, 2.0])
+        b = self.torch.tensor([3.0, 4.0])
+        result = self.b._apply_binary_op(node, {"a": a, "b": b})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(list(result[0].tolist()), [4.0, 6.0])
+
+    def test_mul_torch(self):
+        node = self._make_node("Mul")
+        a = self.torch.tensor([2.0, 3.0])
+        b = self.torch.tensor([4.0, 5.0])
+        result = self.b._apply_binary_op(node, {"a": a, "b": b})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(list(result[0].tolist()), [8.0, 15.0])
+
+    def test_sub_torch(self):
+        node = self._make_node("Sub")
+        a = self.torch.tensor([5.0, 7.0])
+        b = self.torch.tensor([3.0, 2.0])
+        result = self.b._apply_binary_op(node, {"a": a, "b": b})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(list(result[0].tolist()), [2.0, 5.0])
+
+    def test_div_torch(self):
+        node = self._make_node("Div")
+        a = self.torch.tensor([6.0, 9.0])
+        b = self.torch.tensor([2.0, 3.0])
+        result = self.b._apply_binary_op(node, {"a": a, "b": b})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(list(result[0].tolist()), [3.0, 3.0])
+
+    def test_pow_torch(self):
+        node = self._make_node("Pow")
+        a = self.torch.tensor([2.0, 3.0])
+        b = self.torch.tensor([3.0, 2.0])
+        result = self.b._apply_binary_op(node, {"a": a, "b": b})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(list(result[0].tolist()), [8.0, 9.0])
+
+    # --- error case ---
+
+    def test_unknown_op_raises(self):
+        node = self._make_node("Xor")
+        a = np.array([1.0], dtype=np.float32)
+        b = np.array([1.0], dtype=np.float32)
+        self.assertRaises(
+            AssertionError,
+            self.b._apply_binary_op,
+            node,
+            {"a": a, "b": b},
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
