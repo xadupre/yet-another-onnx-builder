@@ -169,7 +169,7 @@ def enumerate_csv_files(
     loops over csv candidates.
 
     :param data: dataframe with the raw data or a file or list of files
-    :param vrbose: verbosity
+    :param verbose: verbosity
     :param filtering: function to filter in or out files in zip files,
         must return true to keep the file, false to skip it.
     :return: a generator yielding tuples with the filename, date, full path and zip file
