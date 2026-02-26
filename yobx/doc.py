@@ -129,16 +129,16 @@ def _find_in_PATH(prog: str) -> Optional[str]:
     return None
 
 
-def _find_graphviz_dot(exc: bool = True) -> str:
+def _find_graphviz_dot(exc: bool = True) -> Optional[str]:
     """
     Determines the path to graphviz (on Windows),
     the function tests the existence of versions 34 to 45
     assuming it was installed in a standard folder:
     ``C:\\Program Files\\MiKTeX 2.9\\miktex\\bin\\x64``.
 
-    :param exc: raise exception of be silent
-    :return: path to dot
-    :raises FileNotFoundError: if graphviz not found
+    :param exc: raise exception or be silent
+    :return: path to dot, or None if not found and exc is False
+    :raises FileNotFoundError: if graphviz not found and exc is True
     """
     if sys.platform.startswith("win"):
         version = list(range(34, 60))
