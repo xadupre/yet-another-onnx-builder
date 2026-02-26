@@ -845,9 +845,9 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
             return
         pads = pads.tolist()
         if len(node.input) > 3 and node.input[3]:
-            axes = self.compute_constant(node.input[1])[0]
+            axes = self.compute_constant(node.input[3])[0]
             assert axes is not None or not self._debug_shape_missing, (
-                f"Unable to evaluate axes={node.input[1]!r}: "
+                f"Unable to evaluate axes={node.input[3]!r}: "
                 f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
             )
             axes = axes.tolist()
@@ -864,7 +864,7 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
         self.set_shape(node.output[0], tuple(new_shape))
         return tuple(new_shape)
     if self.has_rank(node.input[0]):
-        self.set_rank(node.input[0], self.get_rank(node.input[0]))
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
         return True
     assert not self._debug_shape_missing, (
         f"Unable to compute shape for node: "
