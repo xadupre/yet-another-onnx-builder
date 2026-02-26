@@ -3,8 +3,8 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from onnx_diagnostic.reference import ExtendedReferenceEvaluator
 from yobx.ext_test_case import ExtTestCase
+from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xshape.shape_builder import ShapeBuilder
 from yobx.xshape.shape_builder_impl import BasicShapeBuilder
 

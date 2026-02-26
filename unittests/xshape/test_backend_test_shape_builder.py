@@ -9,8 +9,8 @@ from onnx import ModelProto
 from onnx.backend.base import Device, DeviceType
 from onnx_diagnostic.helpers.rt_helper import make_feeds
 from onnx_diagnostic.helpers.onnx_helper import pretty_onnx
-from onnx_diagnostic.reference import ExtendedReferenceEvaluator
 from yobx.helpers import string_type
+from yobs.reference import ExtendedReferenceEvaluator
 from yobx.xshape.shape_builder_impl import BasicShapeBuilder
 from yobx.xshape._onnx_helper import overwrite_shape_in_model_proto
 

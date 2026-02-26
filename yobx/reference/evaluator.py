@@ -17,7 +17,8 @@ from .ops.op_skip_layer_normalization import SkipLayerNormalization
 
 class ExtendedReferenceEvaluator(ReferenceEvaluator):
     """
-    This class replaces the python implementation by custom implementation.
+    This class extends the python implementation with new kernels
+    for domains such as ``com.microsoft``.
     The evaluator allows to test
     scenarios outside what an onnx backend bound to the official onnx
     operators definition could do such as optimization patterns
@@ -25,7 +26,7 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
 
     ::
 
-        from onnx_diagnostic.reference import ExtendedReferenceEvaluator
+        from yobx.reference import ExtendedReferenceEvaluator
         ref = ExtendedReferenceEvaluator(...)
 
     The class overloads or adds the following operators by default:
@@ -34,7 +35,7 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         :showcode:
 
         import pprint
-        from onnx_diagnostic.reference import ExtendedReferenceEvaluator
+        from yobx.reference import ExtendedReferenceEvaluator
 
         pprint.pprint(ExtendedReferenceEvaluator.default_ops)
     """

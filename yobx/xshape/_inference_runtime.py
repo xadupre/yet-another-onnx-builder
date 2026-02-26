@@ -2,10 +2,10 @@ import time
 from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
 import onnx
-from onnx_diagnostic.reference import ExtendedReferenceEvaluator
 from ..helpers import string_type
 from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..helpers.torch_helper import onnx_dtype_to_torch_dtype
+from ..reference import ExtendedReferenceEvaluator
 from ._shape_helper import (
     all_int,
     _reshape_shape,
