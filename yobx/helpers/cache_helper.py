@@ -82,7 +82,8 @@ class CacheKeyValue:
         """Does the reverse operation."""
         assert self.key_cache is not None and self.value_cache is not None
         return make_dynamic_cache(
-            list(zip(self.key_cache, self.value_cache)), cls_layers=self.cls_layers
+            list(zip(self.key_cache, self.value_cache)),
+            cls_layers=self.cls_layers,  # pyrefly: ignore[no-matching-overload]
         )
 
     @property
@@ -130,7 +131,7 @@ def flatten_unflatten_for_dynamic_shapes(
     start = 0
     end = 0
     subtrees = []
-    for subspec in (spec.children() if hasattr(spec, "children") else spec.children_specs):
+    for subspec in spec.children():
         end += subspec.num_leaves
         value = subspec.unflatten(flat[start:end])
         value = flatten_unflatten_for_dynamic_shapes(

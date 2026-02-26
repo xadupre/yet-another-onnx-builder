@@ -1,6 +1,6 @@
 import onnx
 import onnx.helper as oh
-from typing import Dict, Iterator, Optional, Set, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Set, Tuple, Union
 
 
 def element_wise_binary_op_types() -> Set[str]:
@@ -209,7 +209,7 @@ def replace_static_dimensions_by_strings(
         if not i.type.tensor_type:
             continue
         dim = i.type.tensor_type.shape.dim
-        shape = []
+        shape: List[int | str] = []
         for d in dim:
             if not d.dim_param and d.dim_value:
                 shape.append(f"DIM{d.dim_value}")

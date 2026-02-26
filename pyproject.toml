@@ -139,11 +139,13 @@ module = [
 ignore_errors = true
 
 [tool.pyrefly]
+implicit-import = false
 ignore-missing-imports = ["*"]
 project-includes = ["yobx/**/*.py"]
 project-excludes = [
     "yobx/doc.py",
     "yobx/ext_test_case.py",
+    "yobx/helpers/_onnx_simple_text_plot.py",
     "yobx/helpers/helper.py",
     "yobx/helpers/torch_helper.py",
     "yobx/reference/ops/*",

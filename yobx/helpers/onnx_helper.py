@@ -175,6 +175,6 @@ def pretty_onnx(
     if isinstance(onx, onnx.FunctionProto):
         return (
             f"function: {onx.name}[{onx.domain}]\n"
-            f"{onnx_simple_text_plot(onx, recursive=True)}"
+            f"{onnx_simple_text_plot(onx, recursive=True)}"  # pyrefly: ignore[bad-argument-type]
         )
-    return onnx_simple_text_plot(onx, recursive=True)
+    return onnx_simple_text_plot(onx, recursive=True)  # pyrefly: ignore[bad-argument-type]
