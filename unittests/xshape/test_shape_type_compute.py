@@ -1676,5 +1676,43 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(g._types.get("present_value"), TFLOAT)
 
 
+    def test_gridsample_4d_static(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (2, 3, 8, 8)
+        g._shapes["grid"] = (2, 5, 6, 2)
+        node = oh.make_node("GridSample", ["X", "grid"], ["Y"])
+        _set_shape_type_op_any_known["GridSample"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (2, 3, 5, 6))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gridsample_5d_static(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = (1, 4, 6, 6, 6)
+        g._shapes["grid"] = (1, 3, 4, 5, 3)
+        node = oh.make_node("GridSample", ["X", "grid"], ["Y"])
+        _set_shape_type_op_any_known["GridSample"](g, node)
+        self.assertEqual(g._shapes.get("Y"), (1, 4, 3, 4, 5))
+        self.assertEqual(g._types.get("Y"), TFLOAT)
+
+    def test_gridsample_4d_dynamic(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._shapes["X"] = ("batch", "channels", "H_in", "W_in")
+        g._shapes["grid"] = ("batch", "H_out", "W_out", 2)
+        node = oh.make_node("GridSample", ["X", "grid"], ["Y"])
+        _set_shape_type_op_any_known["GridSample"](g, node)
+        self.assertEqual(g._shapes.get("Y"), ("batch", "channels", "H_out", "W_out"))
+
+    def test_gridsample_rank_only(self):
+        g = _MockShapeBuilder()
+        g._types["X"] = TFLOAT
+        g._ranks["X"] = 4
+        node = oh.make_node("GridSample", ["X", "grid"], ["Y"])
+        _set_shape_type_op_any_known["GridSample"](g, node)
+        self.assertEqual(g._ranks.get("Y"), 4)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
