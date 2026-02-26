@@ -344,13 +344,13 @@ def enumerate_results(
                     if n in name:
                         r = ResultFound(
                             n,
+                            None,
                             NodeCoordinates(
                                 node,
                                 tuple(  # noqa: C409
                                     [*coordinates, (node_i, node.op_type, node.name)]
                                 ),
                             ),
-                            None,
                         )
                         if verbose > 1:
                             print(f"[enumerate_results] {indent}-- {r}")
@@ -369,13 +369,13 @@ def enumerate_results(
                     if n in name:
                         r = ResultFound(
                             n,
-                            None,
                             NodeCoordinates(
                                 node,
                                 tuple(  # noqa: C409
                                     [*coordinates, (node_i, node.op_type, node.name)]
                                 ),
                             ),
+                            None,
                         )
                         if verbose > 1:
                             print(f"[enumerate_results] {indent}-- {r}")
