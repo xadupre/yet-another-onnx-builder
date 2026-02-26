@@ -370,6 +370,63 @@ class TestShapeBuilder(ExtTestCase):
         }
         self.assertEqual(values, {"S1": (3, 5), "S2": (3, 5), "xy": (3, 10), "zs": (3, 10)})
 
+    def test_add_concat_reshape_computed_shapes(self):
+        """Symbolic shapes through Add + Concat + Reshape; compare with onnx inference."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Add", ["X", "Y"], ["added"]),
+                    oh.make_node("Concat", ["added", "X"], ["concat_out"], axis=2),
+                    oh.make_node("Reshape", ["concat_out", "reshape_shape"], ["Z"]),
+                ],
+                "add_concat_reshape",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq", "d_model"]),
+                    oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq", "d_model"]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, [None, None, None])],
+                [
+                    onh.from_array(np.array([0, 0, -1], dtype=np.int64), name="reshape_shape"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+
+        # onnx shape inference loses the symbolic link for Concat and Reshape outputs
+        inferred = onnx.shape_inference.infer_shapes(model)
+        onnx_shapes = {}
+        for vi in list(inferred.graph.value_info) + list(inferred.graph.output):
+            t = vi.type.tensor_type
+            if t.HasField("shape"):
+                onnx_shapes[vi.name] = tuple(
+                    d.dim_param if d.dim_param else (d.dim_value if d.dim_value else None)
+                    for d in t.shape.dim
+                )
+        # concat_out and Z get new unknown symbols instead of "2*d_model"
+        self.assertTrue(
+            onnx_shapes.get("concat_out", (None,))[-1] != "2*d_model",
+            "onnx infer_shapes should not produce '2*d_model' for concat_out",
+        )
+
+        # BasicShapeBuilder tracks symbolic expressions
+        builder = BasicShapeBuilder()
+        builder.run_model(model)
+        self.assertEqual(
+            builder._known_shapes["added"], ("batch", "seq", "d_model")
+        )
+        self.assertEqual(
+            builder._known_shapes["concat_out"], ("batch", "seq", "2*d_model")
+        )
+        self.assertEqual(
+            builder._known_shapes["Z"], ("batch", "seq", "2*d_model")
+        )
+
+        # Evaluate symbolic shapes with concrete values
+        context = dict(batch=2, seq=5, d_model=8)
+        self.assertEqual(builder.evaluate_shape("concat_out", context), (2, 5, 16))
+        self.assertEqual(builder.evaluate_shape("Z", context), (2, 5, 16))
+
     def _make_node_with_attrs(self, **attrs):
         node = oh.make_node("SomeOp", ["X"], ["Y"])
         for name, value in attrs.items():

@@ -363,6 +363,55 @@ class TestMaxDiffTorch(ExtTestCase):
 
 
 @requires_transformers("4.50")
+class TestMaxDiffCausalLMOutputWithPast(ExtTestCase):
+    def test_causal_lm_output_vs_causal_lm_output_identical(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+        from transformers.modeling_outputs import CausalLMOutputWithPast
+
+        logits = torch.rand(1, 5, 100)
+        cache = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        cache.update(key, value, layer_idx=0)
+        out = CausalLMOutputWithPast(logits=logits, past_key_values=cache)
+        res = max_diff(out, out)
+        self.assertEqual(res["abs"], 0.0)
+
+    def test_causal_lm_output_vs_causal_lm_output_different(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+        from transformers.modeling_outputs import CausalLMOutputWithPast
+
+        logits1 = torch.rand(1, 5, 100)
+        logits2 = logits1 + 1.0
+        cache = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        cache.update(key, value, layer_idx=0)
+        out1 = CausalLMOutputWithPast(logits=logits1, past_key_values=cache)
+        out2 = CausalLMOutputWithPast(logits=logits2, past_key_values=cache)
+        res = max_diff(out1, out2)
+        self.assertGreater(res["abs"], 0.0)
+
+    def test_causal_lm_output_vs_list(self):
+        import torch
+        from transformers.cache_utils import DynamicCache
+        from transformers.modeling_outputs import CausalLMOutputWithPast
+        from yobx.helpers.helper import flatten_object
+
+        logits = torch.rand(1, 5, 100)
+        cache = DynamicCache()
+        key = torch.rand(1, 4, 2, 8)
+        value = torch.rand(1, 4, 2, 8)
+        cache.update(key, value, layer_idx=0)
+        out = CausalLMOutputWithPast(logits=logits, past_key_values=cache)
+        flat = [logits, *flatten_object(cache)]
+        res = max_diff(out, flat)
+        self.assertEqual(res["abs"], 0.0)
+
+
+@requires_transformers("4.50")
 class TestMaxDiffDynamicCache(ExtTestCase):
     def test_dynamic_cache_vs_dynamic_cache(self):
         import torch

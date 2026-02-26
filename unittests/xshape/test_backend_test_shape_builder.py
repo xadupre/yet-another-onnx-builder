@@ -26,12 +26,15 @@ class ShapeBuilderBackendRep(onnx.backend.base.BackendRep):
                 in {
                     "ArgMax",
                     "ArgMin",
+                    "BlackmanWindow",
                     "CumSum",
                     "DepthToSpace",
                     "Expand",
                     "Flatten",
                     "GlobalAveragePool",
                     "GlobalMaxPool",
+                    "HammingWindow",
+                    "HannWindow",
                     "Reshape",
                     "SpaceToDepth",
                     "Squeeze",
@@ -110,15 +113,15 @@ backend_test.exclude(
 # Not implemented yet.
 backend_test.exclude(
     "(affine_grid|array_feature_extractor|binarizer|label_encoder|attention"
-    "|bitwise|averagepool|blackmanwindow"
+    "|bitwise|averagepool"
     "|center_crop|col2im|compress|conv"
-    "|det|dft|dropout|einsum|fft|floor|gather"
-    "|gridsample|group_normalization|gru|hamming|hann"
+    "|det|dft|einsum|fft"
+    "|gridsample|group_normalization|gru"
     "|hardmax|instancenorm|l1normalization"
-    "|l2normalization|layer_normalization|logsoftmax"
+    "|l2normalization|layer_normalization"
     "|lppool|lstm|matmulinteger|maxunpool"
-    "|nllloss|nonzero|optional|pad|quantize|range|rms"
-    "|resize|roialign|sce|sequence|shape_clip|softmax|squeeze|unsqueeze"
+    "|nllloss|optional|pad|quantize|rms"
+    "|resize|roialign|sce|sequence|shape_clip"
     "|test_max_|test_min_|test_maxpool_|shape_start_greater"
     "|simple_rnn|stft|string|strnorm"
     "|tensorscatter|tfidfvectorizer"

@@ -70,6 +70,12 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         self.maybe_disable_fake_tensor_mode = _maybe_disable_fake_tensor_mode
         self.main_opset = opset or 18
         self.time_evaluation_constants_ = 0
+        self._unique_dim_counter = 0
+
+    def unique_dimension_name(self, prefix: str) -> str:
+        """Generates a unique dynamic dimension name."""
+        self._unique_dim_counter += 1
+        return f"{prefix}_{self._unique_dim_counter}"
 
     @property
     def input_names(self) -> List[str]:
@@ -489,6 +495,15 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             name not in self.dynamic_dimensions_
         ), f"Dynamic dimension {name!r}{self.get_debug_msg()}"
         self.dynamic_dimensions_[name] = {name}
+
+    def unique_dimension_name(self, base: str) -> str:
+        """Returns a unique dimension name based on *base*."""
+        i = 0
+        while f"{base}_{i}" in self.dynamic_dimensions_:
+            i += 1
+        name = f"{base}_{i}"
+        self.add_dynamic_dimension(name)
+        return name
 
     def set_shape(self, name: str, shape: DYNAMIC_SHAPE, exc: bool = False, **_kwargs):
         """

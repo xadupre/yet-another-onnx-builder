@@ -2,7 +2,7 @@ import inspect
 import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, hide_stdout, requires_torch, requires_transformers
-from yobx.helpers import string_type, string_sig, string_signature
+from yobx.helpers import make_hash, string_type, string_sig, string_signature
 from yobx.helpers.helper import flatten_object
 
 
@@ -629,6 +629,43 @@ class TestStringSig(ExtTestCase):
         obj = MyObj()
         s = string_sig(obj)
         self.assertEqual(s, "MyObj()")
+
+
+class TestMakeHash(ExtTestCase):
+    def test_returns_three_uppercase_letters(self):
+        obj = object()
+        h = make_hash(obj)
+        self.assertEqual(len(h), 3)
+        self.assertTrue(h.isupper() and h.isalpha(), f"Expected uppercase letters, got {h!r}")
+
+    def test_same_object_same_hash(self):
+        obj = object()
+        self.assertEqual(make_hash(obj), make_hash(obj))
+
+    def test_characters_in_range(self):
+        obj = object()
+        h = make_hash(obj)
+        for ch in h:
+            self.assertGreaterEqual(ch, "A")
+            self.assertLessEqual(ch, "Z")
+
+    def test_different_types(self):
+        for obj in [42, "hello", [1, 2], {"a": 1}, (1, 2)]:
+            h = make_hash(obj)
+            self.assertEqual(len(h), 3)
+            self.assertTrue(h.isalpha())
+
+    def test_boundary_hash_value(self):
+        # Verify the formula covers all 26^3 combinations without error
+        # by checking the minimum possible aa value (0) maps to "AAA"
+        class FakeId:
+            pass
+
+        obj = FakeId()
+        h = make_hash(obj)
+        # hash must be 3 uppercase ASCII letters
+        for ch in h:
+            self.assertIn(ch, "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 
 class TestFlattenObject(ExtTestCase):

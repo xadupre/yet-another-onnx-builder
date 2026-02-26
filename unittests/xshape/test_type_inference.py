@@ -150,6 +150,26 @@ class TestTypeInference(ExtTestCase):
         result = infer_types(func, [TFLOAT])
         self.assertEqual(result, (TFLOAT, TFLOAT))
 
+    def test_infer_types_floor(self):
+        node = oh.make_node("Floor", ["X"], ["Y"])
+        result = infer_types(node, [TFLOAT])
+        self.assertEqual(result, (TFLOAT,))
+
+    def test_infer_types_trunc(self):
+        node = oh.make_node("Trunc", ["X"], ["Y"])
+        result = infer_types(node, [TFLOAT])
+        self.assertEqual(result, (TFLOAT,))
+
+    def test_infer_types_dropout_single_output(self):
+        node = oh.make_node("Dropout", ["X"], ["Y"])
+        result = infer_types(node, [TFLOAT])
+        self.assertEqual(result, [TFLOAT])
+
+    def test_infer_types_dropout_with_mask(self):
+        node = oh.make_node("Dropout", ["X"], ["Y", "mask"])
+        result = infer_types(node, [TFLOAT])
+        self.assertEqual(result, [TFLOAT, TBOOL])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
