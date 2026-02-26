@@ -1,1 +1,1 @@
-from .evaluator import ExtendedReferenceEvaluator  # noqa: F401
+from .evaluator import ExtendedReferenceEvaluator

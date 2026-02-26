@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+from yobx.xshape import BasicShapeBuilder
 
 
 class _TorchShapeBuilder(BasicShapeBuilder):

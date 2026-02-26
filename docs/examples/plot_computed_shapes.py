@@ -13,7 +13,7 @@ and compares the result with the standard
 The key difference is that ``onnx.shape_inference.infer_shapes`` can only
 propagate shapes when dimensions are statically known integers.  When the
 model contains dynamic (symbolic) dimensions it typically assigns ``None``
-(unknown) to most intermediate results.  :class:`BasicShapeBuilder` instead
+(unknown) to most intermediate results. :class:`BasicShapeBuilder` instead
 keeps the dimensions as symbolic arithmetic expressions so that output shapes
 are expressed in terms of the input dimension names.
 
@@ -27,7 +27,7 @@ import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+from yobx.xshape import BasicShapeBuilder
 
 TFLOAT = onnx.TensorProto.FLOAT
 

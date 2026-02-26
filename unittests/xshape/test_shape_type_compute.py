@@ -4,8 +4,7 @@ import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape.shape_builder import ShapeBuilder
-from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+from yobx.xshape import ShapeBuilder, BasicShapeBuilder
 from yobx.xshape.shape_type_compute import (
     broadcast_shape,
     set_type_shape_binary_op,

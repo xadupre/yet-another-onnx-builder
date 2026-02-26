@@ -6,7 +6,7 @@
 
 Computation times
 =================
-**00:00.305** total execution time for 2 files **from auto_examples**:
+**00:00.541** total execution time for 2 files **from auto_examples**:
 
 .. container::
 
@@ -32,9 +32,9 @@ Computation times
    * - Example
      - Time
      - Mem (MB)
-   * - :ref:`sphx_glr_auto_examples_plot_shape_expressions.py` (``plot_shape_expressions.py``)
-     - 00:00.305
-     - 0.0
    * - :ref:`sphx_glr_auto_examples_plot_computed_shapes.py` (``plot_computed_shapes.py``)
-     - 00:00.000
+     - 00:00.525
+     - 0.0
+   * - :ref:`sphx_glr_auto_examples_plot_shape_expressions.py` (``plot_shape_expressions.py``)
+     - 00:00.016
      - 0.0

@@ -5,8 +5,7 @@ import onnx.helper as oh
 import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.xshape.shape_builder import ShapeBuilder
-from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+from yobx.xshape import ShapeBuilder, BasicShapeBuilder
 
 TFLOAT = onnx.TensorProto.FLOAT
 TFLOAT16 = onnx.TensorProto.FLOAT16

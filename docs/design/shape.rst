@@ -87,7 +87,7 @@ to a whole shape at once.
 
     import onnx
     import onnx.helper as oh
-    from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+    from yobx.xshape import BasicShapeBuilder
     from yobx.xshape.evaluate_expressions import evaluate_expression
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -138,7 +138,7 @@ on it, and prints the inferred shapes and types.
     import onnx.helper as oh
     import onnx.numpy_helper as onh
     import numpy as np
-    from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+    from yobx.xshape import BasicShapeBuilder
 
     TFLOAT = onnx.TensorProto.FLOAT
 

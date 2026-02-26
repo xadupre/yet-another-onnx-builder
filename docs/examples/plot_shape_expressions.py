@@ -43,7 +43,7 @@ For a deeper description of the design, see the
 See also
 --------
 
-* :class:`yobx.xshape.shape_builder_impl.BasicShapeBuilder` — main implementation
+* :class:`yobx.xshape.BasicShapeBuilder` — main implementation
 * :func:`yobx.xshape.simplify_expressions.simplify_expression` — expression
   canonicalisation
 * :func:`yobx.xshape.evaluate_expressions.evaluate_expression` — expression
@@ -64,7 +64,7 @@ import onnx
 import numpy as np
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from yobx.xshape.shape_builder_impl import BasicShapeBuilder
+from yobx.xshape import BasicShapeBuilder
 from yobx.xshape.simplify_expressions import simplify_expression
 
 TFLOAT = onnx.TensorProto.FLOAT

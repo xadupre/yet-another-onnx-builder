@@ -1,4 +1,4 @@
-from .helper import (  # noqa: F401
+from .helper import (
     make_hash,
     max_diff,
     string_type,
