@@ -108,7 +108,11 @@ class CubeViewDef:
         name: Optional[str] = None,
         no_index: bool = False,
         plots: bool = False,
+<<<<<<< cube
         fix_aggregation_change: Optional[List[str]] = None,
+=======
+        fix_aggregation_change: Optional[List["str"]] = None,
+>>>>>>> main
     ):
         self.key_index = key_index
         self.values = values
@@ -249,7 +253,11 @@ class CubePlot:
         :param verbose: verbosity
         :param merge: returns all graphs in a single image (True)
             or an image for every graph (False)
+<<<<<<< cube
         :param title_suffix: suffix for the title of every graph
+=======
+        :param title_suffix: prefix for the title of every graph
+>>>>>>> main
         :return: list of binary images (format PNG)
         """
         if self.kind in ("barh", "bar"):
@@ -541,7 +549,11 @@ class CubeLogs:
         ), f"Columns {set(self.keys_no_time) & set(self.ignored)} cannot be keys and ignored"
         assert not (
             set(self.values) & set(self.ignored)
+<<<<<<< cube
         ), f"Columns {set(self.values) & set(self.ignored)} cannot be values and ignored"
+=======
+        ), f"Columns {set(self.keys_no_time) & set(self.ignored)} cannot be values and ignored"
+>>>>>>> main
         assert (
             self.time not in self.keys_no_time
             and self.time not in self.values
@@ -612,7 +624,11 @@ class CubeLogs:
         return self
 
     def _process_formula(
+<<<<<<< cube
         self, formula: Callable[[pandas.DataFrame], pandas.Series]
+=======
+        self, formula: Union[str, Callable[[pandas.DataFrame], pandas.Series]]
+>>>>>>> main
     ) -> Callable[[pandas.DataFrame], Optional[pandas.Series]]:
         assert callable(formula), f"formula={formula!r} is not supported."
         return formula
@@ -780,7 +796,11 @@ class CubeLogs:
             data_red = data_to_process[[*keys_no_agg, *values]]
             assert set(key_index) <= set(data_red.columns), (
                 f"view_def.name={view_def.name!r}, "
+<<<<<<< cube
                 f"unable to find {set(key_index) - set(data_red.columns)}, "
+=======
+                f"nnable to find {set(key_index) - set(data_red.columns)}, "
+>>>>>>> main
                 f"key_agg={key_agg}, keys_no_agg={keys_no_agg},\n--\n"
                 f"selected={pprint.pformat(sorted(data_red.columns))},\n--\n"
                 f"keys={pprint.pformat(sorted(self.keys_time))}"
@@ -921,7 +941,11 @@ class CubeLogs:
             piv = data.pivot(index=key_index[::-1], columns=key_columns, values=values)
         else:
             # pivot does return the same rank with it is empty.
+<<<<<<< cube
             # Let's add artificially one
+=======
+            # Let's add arficially one
+>>>>>>> main
             data = data.copy()
             data["ALL"] = "ALL"
             piv = data.pivot(index=["ALL"], columns=key_columns, values=values)
@@ -1179,9 +1203,15 @@ class CubeLogs:
 
         :param output: output file to create
         :param views: sequence or dictionary of views to append
+<<<<<<< cube
         :param main: add a page with statistics on all variables
         :param raw: add a page with the raw data
         :param csv: views to dump as csv files (same name as outputs + view name)
+=======
+        :param main: add a page with statitcs on all variables
+        :param raw: add a page with the raw data
+        :param csv: views to dump as csv files (same name as outputs + view naw)
+>>>>>>> main
         :param verbose: verbosity
         :param time_mask: color the background of the cells if one
             of the value for the last date is unexpected,
@@ -1201,7 +1231,11 @@ class CubeLogs:
         with pandas.ExcelWriter(output, engine="openpyxl") as writer:
             if main:
                 assert main not in views, f"{main!r} is duplicated in views {sorted(views)}"
+<<<<<<< cube
                 df = self.describe().sort_index()
+=======
+                df = self.describe().sort_values("name")
+>>>>>>> main
                 if verbose:
                     print(f"[CubeLogs.to_excel] add sheet {main!r} with shape {df.shape}")
                 df.to_excel(writer, sheet_name=main, freeze_panes=(1, 1))
@@ -1220,7 +1254,11 @@ class CubeLogs:
                     if aligned is not None:
                         assert aligned.shape == df.shape, (
                             f"Shape mismatch between the view {df.shape} and the mask "
+<<<<<<< cube
                             f"{aligned.shape}"
+=======
+                            f"{time_mask_view[name].shape}"
+>>>>>>> main
                         )
                         time_mask_view[name] = aligned
                         if verbose:
@@ -1289,7 +1327,11 @@ class CubeLogs:
                         )
             assert isinstance(df, pandas.DataFrame)  # type checking
             if raw:
+<<<<<<< cube
                 assert raw not in views, f"{raw!r} is duplicated in views {sorted(views)}"
+=======
+                assert main not in views, f"{main!r} is duplicated in views {sorted(views)}"
+>>>>>>> main
                 # Too long.
                 # self._apply_excel_style(raw, writer, self.data)
                 if csv and "raw" in csv:
@@ -1468,12 +1510,18 @@ class CubeLogs:
 
         new_data = pandas.concat(data_list, axis=0)
         cube = self.clone(new_data, keys=[*self.keys_no_time, column_name])
+<<<<<<< cube
         # Preserve the original ordering of self.keys_time while excluding
         # the configuration columns and the added column_name
         excluded_keys = set(columns_index) | {column_name}
         key_index = [k for k in self.keys_time if k not in excluded_keys]
         view = CubeViewDef(
             key_index=key_index,
+=======
+        key_index = set(self.keys_time) - {*columns_index, column_name}  # type: ignore[misc]
+        view = CubeViewDef(
+            key_index=set(key_index),  # type: ignore[arg-type]
+>>>>>>> main
             name="sbs",
             values=cube.values,
             keep_columns_in_index=[self.time],
