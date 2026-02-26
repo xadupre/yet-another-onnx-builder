@@ -1201,7 +1201,7 @@ class CubeLogs:
         with pandas.ExcelWriter(output, engine="openpyxl") as writer:
             if main:
                 assert main not in views, f"{main!r} is duplicated in views {sorted(views)}"
-                df = self.describe().sort_values("name")
+                df = self.describe().sort_index()
                 if verbose:
                     print(f"[CubeLogs.to_excel] add sheet {main!r} with shape {df.shape}")
                 df.to_excel(writer, sheet_name=main, freeze_panes=(1, 1))
