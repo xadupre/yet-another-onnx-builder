@@ -129,41 +129,6 @@ def _find_in_PATH(prog: str) -> Optional[str]:
     return None
 
 
-def _find_graphviz_dot(exc: bool = True) -> Optional[str]:
-    """
-    Determines the path to graphviz (on Windows),
-    the function tests the existence of versions 34 to 45
-    assuming it was installed in a standard folder:
-    ``C:\\Program Files\\MiKTeX 2.9\\miktex\\bin\\x64``.
-
-    :param exc: raise exception or be silent
-    :return: path to dot, or None if not found and exc is False
-    :raises FileNotFoundError: if graphviz not found and exc is True
-    """
-    if sys.platform.startswith("win"):
-        version = list(range(34, 60))
-        version.extend([f"{v}.1" for v in version])
-        for v in version:
-            graphviz_dot = f"C:\\Program Files (x86)\\Graphviz2.{v}\\bin\\dot.exe"
-            if os.path.exists(graphviz_dot):
-                return graphviz_dot
-        extra = ["build/update_modules/Graphviz/bin"]
-        for ext in extra:
-            graphviz_dot = os.path.join(ext, "dot.exe")
-            if os.path.exists(graphviz_dot):
-                return graphviz_dot
-        p = _find_in_PATH("dot.exe")
-        if p is None:
-            if exc:
-                raise FileNotFoundError(
-                    f"Unable to find graphviz, look into paths such as {graphviz_dot}."
-                )
-            return None
-        return os.path.join(p, "dot.exe")
-    # linux
-    return "dot"
-
-
 def _run_subprocess(args: List[str], cwd: Optional[str] = None):
     assert not isinstance(args, str), "args should be a sequence of strings, not a string."
 
@@ -231,13 +196,8 @@ def _run_graphviz(filename: str, image: str, engine: str = "dot") -> str:
         ".tiff",
         ".wbmp",
     }, f"Unexpected extension {ext!r} for {image!r}."
-    if sys.platform.startswith("win"):
-        bin_ = os.path.dirname(_find_graphviz_dot())
-        # if bin not in os.environ["PATH"]:
-        #    os.environ["PATH"] = os.environ["PATH"] + ";" + bin
-        exe = os.path.join(bin_, engine)
-    else:
-        exe = engine
+    assert not sys.platform.startswith("win"), "this is not working on Windows"
+    exe = engine
     if os.path.exists(image):
         os.remove(image)
     cmd = [exe, f"-T{ext[1:]}", filename, "-o", image]
