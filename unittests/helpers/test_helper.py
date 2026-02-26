@@ -451,6 +451,7 @@ class TestStringType(ExtTestCase):
         s = string_type(False, with_min_max=True)
         self.assertIn("bool=", s)
 
+    @requires_torch("2.9")
     def test_string_tensor_no_shape(self):
         import torch
         from yobx.helpers.helper import _string_tensor

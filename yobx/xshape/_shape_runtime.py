@@ -119,10 +119,19 @@ class _ShapeRuntime:
                 self.set_shape(node.output[0], (len(i),))
                 node.doc_string += "#SV-Ga6"
                 return True
+            try:
+                _torch_tensor = self.torch.Tensor
+                _torch_int64 = self.torch.int64
+                _check_types = (_torch_tensor, np.ndarray)
+                _check_dtypes = (np.int64, _torch_int64)
+            except (AttributeError, ImportError):
+                _torch_tensor = None
+                _check_types = (np.ndarray,)
+                _check_dtypes = (np.int64,)
             if (
                 isinstance(y, tuple)
-                and isinstance(i, (self.torch.Tensor, np.ndarray))
-                and i.dtype in (np.int64, self.torch.int64)
+                and isinstance(i, _check_types)
+                and i.dtype in _check_dtypes
                 and tuple(i.shape) in ((1,), tuple())
             ):
                 ishape = tuple(i.shape)

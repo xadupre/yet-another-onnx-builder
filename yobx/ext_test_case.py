@@ -392,8 +392,10 @@ def get_figure(ax):
 
 def has_cuda() -> bool:
     """Returns ``torch.cuda.device_count() > 0``."""
-    import torch
-
+    try:
+        import torch
+    except ImportError:
+        return False
     return torch.cuda.device_count() > 0
 
 

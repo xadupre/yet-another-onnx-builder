@@ -49,19 +49,27 @@ def is_static_shape(shape: DYNAMIC_SHAPE) -> bool:
 
 
 def is_static_dimension(d: Any) -> bool:
-    import torch
-
-    if isinstance(d, torch.export.dynamic_shapes._Dim):
-        return False
     if isinstance(d, int):
-        assert not isinstance(
-            d, (torch.SymInt, torch.SymFloat)
-        ), f"Unexpected type {type(d)} for a dimension {d!r}"
+        try:
+            import torch
+
+            assert not isinstance(
+                d, (torch.SymInt, torch.SymFloat)
+            ), f"Unexpected type {type(d)} for a dimension {d!r}"
+        except ImportError:
+            pass
         return True
 
-    assert isinstance(
-        d, (str, torch.SymInt, torch.SymFloat)
-    ), f"Unexpected type {type(d)} for a dimension {d!r}"
+    try:
+        import torch
+
+        if isinstance(d, torch.export.dynamic_shapes._Dim):
+            return False
+        assert isinstance(
+            d, (str, torch.SymInt, torch.SymFloat)
+        ), f"Unexpected type {type(d)} for a dimension {d!r}"
+    except ImportError:
+        assert isinstance(d, str), f"Unexpected type {type(d)} for a dimension {d!r}"
     return False
 
 

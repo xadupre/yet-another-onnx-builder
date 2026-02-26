@@ -228,10 +228,15 @@ class _InferenceRuntime:
             ):
                 cst, _ = self.compute_constant(node.input[1], exc=False, only_array=True)
                 if cst is not None:
-                    assert not isinstance(cst, self.torch._subclasses.fake_tensor.FakeTensor), (
-                        f"self.compute_constant returns a FakeTensor for {node.input[1]!r}"
-                        f"\n{self.pretty_text()}"
-                    )
+                    try:
+                        assert not isinstance(
+                            cst, self.torch._subclasses.fake_tensor.FakeTensor
+                        ), (
+                            f"self.compute_constant returns a FakeTensor for {node.input[1]!r}"
+                            f"\n{self.pretty_text()}"
+                        )
+                    except (AttributeError, ImportError):
+                        pass
                     assert (
                         not self.has_rank(node.input[1]) or self.get_rank(node.input[1]) == 1
                     ), (
@@ -424,11 +429,14 @@ class _InferenceRuntime:
                 )
                 with self.maybe_disable_fake_tensor_mode():
                     output = self._apply_shape_on_shape(v, shape)
-                    if isinstance(output[0], self.torch.Tensor):
-                        # We convert the tensor into numpy array,
-                        # it is a small shape anyway so the FakeMode
-                        # does not come up as an issue.
-                        output = [output[0].detach().cpu().numpy()]
+                    try:
+                        if isinstance(output[0], self.torch.Tensor):
+                            # We convert the tensor into numpy array,
+                            # it is a small shape anyway so the FakeMode
+                            # does not come up as an issue.
+                            output = [output[0].detach().cpu().numpy()]
+                    except (AttributeError, ImportError):
+                        pass
                     if self._debug_get_constant:
                         print(
                             f"[GraphBuilder-{self._hash()}.compute_constant]     - A "
@@ -576,9 +584,13 @@ class _InferenceRuntime:
             f"v.op_type={v.op_type!r}, v.name={v.name!r}{self.get_debug_msg()}"
         )
         assert cst is not None, f"Constant {name!r} was not found in {v.output}"
-        if hasattr(self, "torch") and isinstance(
-            cst, self.torch._subclasses.fake_tensor.FakeTensor
-        ):
+        try:
+            _is_fake = hasattr(self, "torch") and isinstance(
+                cst, self.torch._subclasses.fake_tensor.FakeTensor
+            )
+        except (AttributeError, ImportError):
+            _is_fake = False
+        if _is_fake:
             assert not self._debug_constant_folding, (
                 f"Unable to compute constant for node {self.pretty_node(v)}"
                 f"because a FakeTensor appeared{self.get_debug_msg()}"

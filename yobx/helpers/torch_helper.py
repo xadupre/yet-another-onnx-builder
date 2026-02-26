@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import numpy as np
 import onnx
-import torch
 from .onnx_helper import onnx_dtype_name
 
 _TYPENAME = dict(
@@ -19,6 +20,8 @@ def onnx_dtype_to_torch_dtype(itype: int) -> torch.dtype:
     :param to: onnx dtype
     :return: torch dtype
     """
+    import torch
+
     if itype == onnx.TensorProto.FLOAT:
         return torch.float32
     if itype == onnx.TensorProto.FLOAT16:
@@ -112,6 +115,7 @@ def to_numpy(tensor: torch.Tensor) -> np.ndarray:
         # We try with ml_dtypes
         pass
 
+    import torch
     import ml_dtypes
 
     conv = {torch.bfloat16: ml_dtypes.bfloat16}
