@@ -846,6 +846,32 @@ def make_hash(obj: Any) -> str:
     return f"{chr(65 + aa // 26 ** 2)}{chr(65 + (aa // 26) % 26)}{chr(65 + aa % 26)}"
 
 
+def string_diff(diff: Dict[str, Any]) -> str:
+    """
+    Formats the result of :func:`max_diff` as a readable string.
+
+    :param diff: dictionary returned by :func:`max_diff`
+    :return: a compact string representation of the discrepancies
+
+    Example::
+
+        res = max_diff(expected, got)
+        print(string_diff(res))
+        # abs=0.001,rel=0.002,n=10,dnan=0
+    """
+    parts = []
+    for key in ("abs", "rel", "sum", "n", "dnan"):
+        if key in diff:
+            parts.append(f"{key}={diff[key]}")
+    if "argm" in diff and diff["argm"] is not None:
+        parts.append(f"argm={diff['argm']}")
+    if "dev" in diff:
+        parts.append(f"dev={diff['dev']}")
+    if "rep" in diff:
+        parts.append(f"rep={diff['rep']}")
+    return ",".join(parts)
+
+
 def flatten_object(x: Any, drop_keys: bool = False) -> Any:
     """
     Flattens the object.

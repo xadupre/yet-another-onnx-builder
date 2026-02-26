@@ -2,7 +2,7 @@ import inspect
 import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, hide_stdout, requires_torch, requires_transformers
-from yobx.helpers import string_type, string_sig, string_signature
+from yobx.helpers import string_type, string_sig, string_signature, string_diff
 from yobx.helpers.helper import flatten_object
 
 
@@ -529,8 +529,87 @@ class TestStringType(ExtTestCase):
         s = string_type(arr, with_shape=True, verbose=1)
         self.assertIn("s3", s)
 
+    @requires_torch("2.9")
+    def test_string_type_torch_nn_module(self):
+        import torch
 
-class TestStringSignature(ExtTestCase):
+        model = torch.nn.Linear(4, 2)
+        s = string_type(model)
+        self.assertIn("Linear", s)
+        self.assertIn("...", s)
+
+    @requires_torch("2.9")
+    def test_string_type_torch_dtype(self):
+        import torch
+
+        s = string_type(torch.float32)
+        self.assertIn("dtype", s)
+        self.assertIn("float32", s)
+
+    @requires_torch("2.9")
+    def test_string_type_torch_layout(self):
+        import torch
+
+        s = string_type(torch.strided)
+        self.assertIn("layout", s)
+        self.assertIn("strided", s)
+
+    @requires_torch("2.9")
+    def test_string_type_torch_memory_format(self):
+        import torch
+
+        s = string_type(torch.contiguous_format)
+        self.assertIn("memory_format", s)
+        self.assertIn("contiguous_format", s)
+
+
+class TestStringDiff(ExtTestCase):
+    @requires_torch("2.9")
+    def test_string_diff_identical(self):
+        import torch
+        from yobx.helpers import max_diff
+
+        a = torch.tensor([1.0, 2.0, 3.0])
+        res = max_diff(a, a.clone())
+        s = string_diff(res)
+        self.assertIn("abs=0", s)
+        self.assertIn("rel=0", s)
+        self.assertIn("n=", s)
+        self.assertIn("dnan=0", s)
+
+    @requires_torch("2.9")
+    def test_string_diff_different(self):
+        import torch
+        from yobx.helpers import max_diff
+
+        a = torch.tensor([1.0, 2.0, 3.0])
+        b = torch.tensor([1.0, 2.0, 4.0])
+        res = max_diff(a, b)
+        s = string_diff(res)
+        self.assertIn("abs=", s)
+        self.assertIn("rel=", s)
+
+    def test_string_diff_keys_present(self):
+        diff = {"abs": 0.5, "rel": 0.1, "sum": 1.5, "n": 10, "dnan": 0}
+        s = string_diff(diff)
+        self.assertIn("abs=0.5", s)
+        self.assertIn("rel=0.1", s)
+        self.assertIn("sum=1.5", s)
+        self.assertIn("n=10", s)
+        self.assertIn("dnan=0", s)
+
+    def test_string_diff_with_argm(self):
+        diff = {"abs": 1.0, "rel": 0.5, "sum": 2.0, "n": 4, "dnan": 0, "argm": (1, 2)}
+        s = string_diff(diff)
+        self.assertIn("argm=(1, 2)", s)
+
+    def test_string_diff_without_argm(self):
+        diff = {"abs": 0.0, "rel": 0.0, "sum": 0.0, "n": 3, "dnan": 0}
+        s = string_diff(diff)
+        self.assertNotIn("argm", s)
+
+
+
     def test_simple_function(self):
         def foo(a, b):
             pass
