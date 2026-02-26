@@ -905,7 +905,7 @@ def make_model_with_local_functions(
             outputs = _find_used_names(new_nodes, node_indices)
             # pyrefly: ignore[bad-assignment]
             function_nodes: List[onnx.NodeProto] = [
-                new_nodes[i] for i in node_indices if new_nodes[i]
+                new_nodes[i] for i in node_indices if new_nodes[i]  # type: ignore[misc]
             ]
 
             function_inputs = unknown_names_within_nodes(function_nodes)

@@ -93,6 +93,7 @@ def _cmd_dot(argv: List[Any]):
         with open(outname, "w") as f:
             f.write(dot)
     else:
+        outname = None
         print(dot)
     if args.run:
         assert outname, f"Cannot run dot without an output file but outname={outname!r}."
