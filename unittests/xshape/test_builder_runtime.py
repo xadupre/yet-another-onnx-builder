@@ -510,5 +510,121 @@ class TestApplyBinaryOp(ExtTestCase):
         )
 
 
+class TestApplySlice(ExtTestCase):
+    def setUp(self):
+        self.b = _TorchShapeBuilder()
+
+    def test_slice_no_axes(self):
+        # Without axes: starts/ends apply to each dimension in order
+        node = oh.make_node("Slice", ["data", "starts", "ends"], ["y"])
+        data = np.arange(20, dtype=np.float32).reshape(4, 5)
+        starts = np.array([1, 0], dtype=np.int64)
+        ends = np.array([3, 4], dtype=np.int64)
+        result = self.b._apply_slice(node, {"data": data, "starts": starts, "ends": ends})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (2, 4))
+
+    def test_slice_with_axes(self):
+        # axes=[0]: slice only the first dimension
+        node = oh.make_node("Slice", ["data", "starts", "ends", "axes"], ["y"])
+        data = np.arange(30, dtype=np.float32).reshape(6, 5)
+        starts = np.array([1], dtype=np.int64)
+        ends = np.array([4], dtype=np.int64)
+        axes = np.array([0], dtype=np.int64)
+        result = self.b._apply_slice(
+            node, {"data": data, "starts": starts, "ends": ends, "axes": axes}
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (3, 5))
+
+    def test_slice_with_axes_and_steps(self):
+        # axes=[0], steps=[2]: every other row
+        node = oh.make_node("Slice", ["data", "starts", "ends", "axes", "steps"], ["y"])
+        data = np.arange(30, dtype=np.float32).reshape(6, 5)
+        starts = np.array([0], dtype=np.int64)
+        ends = np.array([6], dtype=np.int64)
+        axes = np.array([0], dtype=np.int64)
+        steps = np.array([2], dtype=np.int64)
+        result = self.b._apply_slice(
+            node,
+            {
+                "data": data,
+                "starts": starts,
+                "ends": ends,
+                "axes": axes,
+                "steps": steps,
+            },
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (3, 5))
+
+    def test_slice_no_axes_with_steps(self):
+        # Without axes but with steps
+        node = oh.make_node("Slice", ["data", "starts", "ends", "", "steps"], ["y"])
+        data = np.arange(20, dtype=np.float32).reshape(4, 5)
+        starts = np.array([0, 0], dtype=np.int64)
+        ends = np.array([4, 5], dtype=np.int64)
+        steps = np.array([2, 2], dtype=np.int64)
+        result = self.b._apply_slice(
+            node, {"data": data, "starts": starts, "ends": ends, "steps": steps}
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (2, 3))
+
+    def test_slice_multiple_axes(self):
+        # Slice on two different axes simultaneously
+        node = oh.make_node("Slice", ["data", "starts", "ends", "axes"], ["y"])
+        data = np.arange(60, dtype=np.float32).reshape(6, 5, 2)
+        starts = np.array([1, 2], dtype=np.int64)
+        ends = np.array([4, 5], dtype=np.int64)
+        axes = np.array([0, 1], dtype=np.int64)
+        result = self.b._apply_slice(
+            node, {"data": data, "starts": starts, "ends": ends, "axes": axes}
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (3, 3, 2))
+
+    def test_slice_negative_axis(self):
+        # axes=[-1]: slice last dimension
+        node = oh.make_node("Slice", ["data", "starts", "ends", "axes"], ["y"])
+        data = np.arange(30, dtype=np.float32).reshape(3, 10)
+        starts = np.array([2], dtype=np.int64)
+        ends = np.array([7], dtype=np.int64)
+        axes = np.array([-1], dtype=np.int64)
+        result = self.b._apply_slice(
+            node, {"data": data, "starts": starts, "ends": ends, "axes": axes}
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (3, 5))
+
+    def test_slice_torch_tensor_input(self):
+        import torch
+
+        # Torch tensors pass through without numpy conversion
+        node = oh.make_node("Slice", ["data", "starts", "ends", "axes"], ["y"])
+        data = torch.arange(20, dtype=torch.float32).reshape(4, 5)
+        starts = torch.tensor([0], dtype=torch.int64)
+        ends = torch.tensor([2], dtype=torch.int64)
+        axes = torch.tensor([0], dtype=torch.int64)
+        result = self.b._apply_slice(
+            node, {"data": data, "starts": starts, "ends": ends, "axes": axes}
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (2, 5))
+
+    def test_slice_3d_axis1(self):
+        # Slice the middle axis of a 3-D array
+        node = oh.make_node("Slice", ["data", "starts", "ends", "axes"], ["y"])
+        data = np.zeros((3, 10, 4), dtype=np.float32)
+        starts = np.array([3], dtype=np.int64)
+        ends = np.array([8], dtype=np.int64)
+        axes = np.array([1], dtype=np.int64)
+        result = self.b._apply_slice(
+            node, {"data": data, "starts": starts, "ends": ends, "axes": axes}
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(tuple(result[0].shape), (3, 5, 4))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
