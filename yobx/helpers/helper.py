@@ -325,12 +325,9 @@ def string_type(
         if not obj.is_tensor():
             return "OV(NOTENSOR)"
         if with_min_max:
-            from .torch_helper import to_numpy
-
             try:
-                t = to_numpy(obj)
+                t = obj.numpy()
             except Exception:
-                # pass unable to convert into numpy (bfloat16, ...)
                 return "OV(NO-NUMPY:FIXIT)"
             dev = ("G" if obj.device_name() == "Cuda" else "C") if with_device else ""
             return f"{dev}OV({string_type(t, with_shape=with_shape, with_min_max=with_min_max)})"
