@@ -1524,9 +1524,7 @@ def max_diff(
 
         if got.__class__.__name__ == "CacheKeyValue":
             if verbose >= 6:
-                print(
-                    f"[max_diff] CacheKeyValue: {string_type(expected)} ? {string_type(got)}"
-                )
+                print(f"[max_diff] CacheKeyValue: {string_type(expected)} ? {string_type(got)}")
             return max_diff(
                 [expected.key_cache, expected.value_cache],
                 [got.key_cache, got.value_cache],

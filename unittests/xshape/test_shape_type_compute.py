@@ -2352,9 +2352,7 @@ class TestDevicePropagation(ExtTestCase):
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_device("X", -1)
-        node = oh.make_node(
-            "Transpose2DCastFP16", ["X"], ["Y"], domain="com.microsoft"
-        )
+        node = oh.make_node("Transpose2DCastFP16", ["X"], ["Y"], domain="com.microsoft")
         set_type_shape_transpose_2d_cast_fp16(b, node)
         self.assertEqual(b.get_device("Y"), -1)
 
@@ -2363,9 +2361,7 @@ class TestDevicePropagation(ExtTestCase):
         b.set_type("X", TFLOAT16)
         b.set_shape("X", (3, 4))
         b.set_device("X", -1)
-        node = oh.make_node(
-            "Transpose2DCastFP32", ["X"], ["Y"], domain="com.microsoft"
-        )
+        node = oh.make_node("Transpose2DCastFP32", ["X"], ["Y"], domain="com.microsoft")
         set_type_shape_transpose_2d_cast_fp32(b, node)
         self.assertEqual(b.get_device("Y"), -1)
 

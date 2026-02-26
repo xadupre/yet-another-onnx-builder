@@ -72,11 +72,6 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         self.time_evaluation_constants_ = 0
         self._unique_dim_counter = 0
 
-    def unique_dimension_name(self, prefix: str) -> str:
-        """Generates a unique dynamic dimension name."""
-        self._unique_dim_counter += 1
-        return f"{prefix}_{self._unique_dim_counter}"
-
     @property
     def input_names(self) -> List[str]:
         return self._input_names
