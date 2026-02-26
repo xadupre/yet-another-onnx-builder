@@ -1,4 +1,5 @@
 import pprint
+from typing import Optional, Sequence
 import numpy as np
 import onnx
 import onnx.numpy_helper as onh
@@ -406,17 +407,17 @@ def reorder_nodes_for_display(nodes, verbose=False):
 
 
 def onnx_simple_text_plot(
-    model,
-    verbose=False,
-    att_display=None,
-    add_links=False,
-    recursive=False,
-    functions=True,
-    raise_exc=True,
-    sub_graphs_names=None,
-    level=1,
-    indent=True,
-):
+    model: onnx.ModelProto,
+    verbose: bool = False,
+    att_display: Optional[Sequence[str]] = None,
+    add_links: bool = False,
+    recursive: bool = False,
+    functions: bool = True,
+    raise_exc: bool = True,
+    sub_graphs_names: Optional[Sequence[str]] = None,
+    level: int = 1,
+    indent: int = True,
+) -> str:
     """
     Displays an ONNX graph into text.
 
