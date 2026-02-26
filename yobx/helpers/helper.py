@@ -1465,6 +1465,10 @@ def max_diff(
                 hist=hist,
             )
         if isinstance(got, tuple) and len(got) == 2:
+            from .cache_helper import CacheKeyValue
+
+            if not isinstance(expected, CacheKeyValue):
+                expected = CacheKeyValue(expected)
             return max_diff(
                 [expected.key_cache, expected.value_cache],
                 [got[0], got[1]],
