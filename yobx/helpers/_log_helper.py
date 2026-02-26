@@ -44,7 +44,7 @@ def mann_kendall(series: Sequence[float], threshold: float = 0.5):
     aseries = np.asarray(series)
     stat = 0
     n = len(aseries)
-    var = n * (n - 1) * (2 * n + 5)
+    var = n * (n - 1) * (2 * n + 5) / 18
     for i in range(n - 1):
         stat += np.sign(aseries[i + 1 :] - aseries[i]).sum()
     var = var**0.5
