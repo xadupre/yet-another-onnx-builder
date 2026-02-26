@@ -7,6 +7,7 @@ yobx.helpers
 
     cache_helper
     cube_helper
+    dot_helper
     helper
     mini_onnx_builder
     onnx_helper
