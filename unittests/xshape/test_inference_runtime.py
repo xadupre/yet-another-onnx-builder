@@ -342,6 +342,65 @@ class TestComputeConstant(ExtTestCase):
         self.assertEqual(b.get_shape("s"), (2,))
 
 
+class TestMakeNodeSetTypeShapeConstantConstant(ExtTestCase):
+    def test_constant_sets_shape_and_type(self):
+        b = BasicShapeBuilder()
+        value = oh.make_tensor("value", TFLOAT, [2, 3], [1.0] * 6)
+        node = oh.make_node("Constant", [], ["c"], value=value)
+        result = b._make_node_set_type_shape_constant(node, {})
+        self.assertEqual(result, (2, 3))
+        self.assertEqual(b.get_shape("c"), (2, 3))
+        self.assertEqual(b.get_type("c"), TFLOAT)
+
+    def test_constant_marks_output_as_constant(self):
+        b = BasicShapeBuilder()
+        value = oh.make_tensor("value", TFLOAT, [2, 3], [1.0] * 6)
+        node = oh.make_node("Constant", [], ["c"], value=value)
+        b._make_node_set_type_shape_constant(node, {})
+        self.assertTrue(b.is_constant("c"))
+
+    def test_constant_adds_doc_string_tag(self):
+        b = BasicShapeBuilder()
+        value = oh.make_tensor("value", TFLOAT, [2, 3], [1.0] * 6)
+        node = oh.make_node("Constant", [], ["c"], value=value)
+        b._make_node_set_type_shape_constant(node, {})
+        self.assertIn(":constant-3:", node.doc_string)
+
+    def test_constant_int64_tensor(self):
+        b = BasicShapeBuilder()
+        value = oh.make_tensor("value", TINT64, [4], [1, 2, 3, 4])
+        node = oh.make_node("Constant", [], ["c"], value=value)
+        result = b._make_node_set_type_shape_constant(node, {})
+        self.assertEqual(result, (4,))
+        self.assertEqual(b.get_shape("c"), (4,))
+        self.assertEqual(b.get_type("c"), TINT64)
+
+    def test_constant_scalar_tensor(self):
+        b = BasicShapeBuilder()
+        value = oh.make_tensor("value", TFLOAT, [], [3.14])
+        node = oh.make_node("Constant", [], ["c"], value=value)
+        result = b._make_node_set_type_shape_constant(node, {})
+        self.assertEqual(result, ())
+        self.assertEqual(b.get_shape("c"), ())
+        self.assertEqual(b.get_type("c"), TFLOAT)
+
+    def test_constant_value_float_attribute(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Constant", [], ["c"], value_float=1.5)
+        result = b._make_node_set_type_shape_constant(node, {})
+        self.assertEqual(result, ())
+        self.assertEqual(b.get_shape("c"), ())
+        self.assertEqual(b.get_type("c"), TFLOAT)
+
+    def test_constant_value_int_attribute(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Constant", [], ["c"], value_int=42)
+        result = b._make_node_set_type_shape_constant(node, {})
+        self.assertEqual(result, ())
+        self.assertEqual(b.get_shape("c"), ())
+        self.assertEqual(b.get_type("c"), TINT64)
+
+
 class TestMakeNodeSetTypeShapeConstantCustomDomain(ExtTestCase):
     def test_custom_domain_returns_none(self):
         b = BasicShapeBuilder()

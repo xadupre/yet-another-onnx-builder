@@ -12,7 +12,7 @@ from ..helpers import string_type
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape
 from ._builder_runtime import _BuilderRuntime
 from ._shape_runtime import _ShapeRuntime
-from ._inference_runtime import _InferenceRuntime
+from ._inference_runtime import _InferenceRuntime, _OptimizationOptions
 from .rename_expressions import parse_expression_tokens
 from .simplify_expressions import simplify_expression
 from ._onnx_helper import str_tensor_proto_type
@@ -70,6 +70,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         self.maybe_disable_fake_tensor_mode = _maybe_disable_fake_tensor_mode
         self.main_opset = opset or 18
         self.time_evaluation_constants_ = 0
+        self.optimization_options = _OptimizationOptions()
 
     @property
     def input_names(self) -> List[str]:
