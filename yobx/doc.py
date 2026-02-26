@@ -253,12 +253,11 @@ def draw_graph_graphviz(dot: Union[str, onnx.ModelProto], image: str, engine: st
     Draws a graph using :epkg:`Graphviz`.
 
     :param dot: dot graph or ModelProto
-    :param image: output image, None, just returns the output
+    :param image: output image file path
     :param engine: *dot* or *neato*
-    :return: :epkg:`Graphviz` output or
-        the dot text if *image* is None
+    :return: :epkg:`Graphviz` output
 
-    The function creates a temporary file to store the dot file if *image* is not None.
+    The function creates a temporary file to store the dot file.
     """
     if isinstance(dot, onnx.ModelProto):
         sdot = to_dot(dot)
