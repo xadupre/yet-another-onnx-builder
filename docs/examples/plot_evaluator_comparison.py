@@ -28,11 +28,8 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import torch
-from yobx.reference import (
-    ExtendedReferenceEvaluator,
-    OnnxruntimeEvaluator,
-    TorchReferenceEvaluator,
-)
+from yobx.reference import ExtendedReferenceEvaluator, OnnxruntimeEvaluator
+from yobx.reference.torch_evaluator import TorchReferenceEvaluator
 
 TFLOAT = onnx.TensorProto.FLOAT
 

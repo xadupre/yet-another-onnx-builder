@@ -9,7 +9,7 @@ yobx.reference.torch_evaluator
 TorchReferenceEvaluator
 +++++++++++++++++++++++
 
-.. autoclass:: yobx.reference.TorchReferenceEvaluator
+.. autoclass:: yobx.reference.torch_evaluator.TorchReferenceEvaluator
     :members:
     :no-undoc-members:
 

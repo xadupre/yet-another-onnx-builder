@@ -433,7 +433,7 @@ Basic usage
     import onnx.helper as oh
     import torch
     from yobx.helpers import string_type
-    from yobx.reference import TorchReferenceEvaluator
+    from yobx.reference.torch_evaluator import TorchReferenceEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
     model = oh.make_model(
@@ -472,7 +472,7 @@ memory is reclaimed.
     import onnx.helper as oh
     import torch
     from yobx.helpers import string_type
-    from yobx.reference import TorchReferenceEvaluator
+    from yobx.reference.torch_evaluator import TorchReferenceEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
     model = oh.make_model(
@@ -515,7 +515,7 @@ keeping the rest of the graph in PyTorch.
     import onnx.helper as oh
     import torch
     from yobx.helpers import string_type
-    from yobx.reference import TorchReferenceEvaluator
+    from yobx.reference.torch_evaluator import TorchReferenceEvaluator
     from yobx.reference.torch_ops import OpRunKernel, OpRunTensor
 
     TFLOAT = onnx.TensorProto.FLOAT
