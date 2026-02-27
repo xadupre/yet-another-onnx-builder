@@ -3,7 +3,7 @@ import torch
 import transformers
 from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.helpers.cache_helper import make_dynamic_cache, make_static_cache
-from yobx.torch.flatten import (
+from yobx.torch.transformers.flatten import (
     flatten_dynamic_cache,
     flatten_with_keys_dynamic_cache,
     unflatten_dynamic_cache,
