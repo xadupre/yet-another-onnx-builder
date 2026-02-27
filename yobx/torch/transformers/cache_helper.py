@@ -5,16 +5,19 @@ import transformers
 
 KWARGS_LAYER = {}
 if hasattr(transformers.cache_utils, "DynamicSlidingWindowLayer"):
-    KWARGS_LAYER.update(
-        {
-            transformers.cache_utils.DynamicSlidingWindowLayer: lambda tensor: {
-                "sliding_window": tensor.shape[2]
-            },
-            transformers.cache_utils.StaticSlidingWindowLayer: lambda tensor: {
-                "sliding_window": tensor.shape[2]
-            },
-        }
-    )
+    KWARGS_LAYER[transformers.cache_utils.DynamicSlidingWindowLayer] = lambda tensor: {
+        "sliding_window": tensor.shape[2]
+    }
+if hasattr(transformers.cache_utils, "StaticSlidingWindowLayer"):
+    # transformers >= 4.57
+    KWARGS_LAYER[transformers.cache_utils.StaticSlidingWindowLayer] = lambda tensor: {
+        "sliding_window": tensor.shape[2]
+    }
+elif hasattr(transformers.cache_utils, "SlidingWindowLayer"):
+    # transformers 4.56.x uses SlidingWindowLayer instead of StaticSlidingWindowLayer
+    KWARGS_LAYER[transformers.cache_utils.SlidingWindowLayer] = lambda tensor: {
+        "sliding_window": tensor.shape[2]
+    }
 
 
 def _preprocess_key_value_pairs(

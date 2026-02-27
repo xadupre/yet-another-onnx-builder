@@ -50,7 +50,7 @@ torch = [
     "optree",
     "sentencepiece",
     "torch>=2.10",
-    "transformers>=4.57",
+    "transformers>=4.56",
 ]
 
 [tool.setuptools.packages.find]
