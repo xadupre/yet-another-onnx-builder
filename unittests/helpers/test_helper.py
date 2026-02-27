@@ -3,7 +3,61 @@ import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
 from yobx.helpers import make_hash, string_type, string_sig, string_signature
-from yobx.helpers.helper import flatten_object
+from yobx.helpers.helper import flatten_object, size_type
+from yobx.helpers.onnx_helper import (
+    tensor_dtype_to_np_dtype,
+    onnx_dtype_name,
+    np_dtype_to_tensor_dtype,
+)
+
+
+class TestSizeType(ExtTestCase):
+    def test_size_type_onnx(self):
+        from yobx.torch.torch_helper import onnx_dtype_to_torch_dtype
+
+        for i in range(1, 40):
+            with self.subTest(i=i):
+                try:
+                    name = onnx_dtype_name(i)
+                except ValueError:
+                    continue
+                if name in {"NAME_FIELD_NUMBER"}:
+                    continue
+                if name not in {"STRING", "UINT4", "INT4", "FLOAT4E2M1", "INT2", "UINT2"}:
+                    size_type(i)
+
+                if name not in {
+                    "STRING",
+                    "UINT4",
+                    "INT4",
+                    "INT2",
+                    "UINT2",
+                    "FLOAT4E2M1",
+                    "FLOAT8E5M2FNUZ",
+                    "FLOAT8E5M2",
+                    "FLOAT8E4M3FN",
+                    "FLOAT8E4M3FNUZ",
+                    "FLOAT8E8M0",
+                }:
+                    onnx_dtype_to_torch_dtype(i)
+                    tensor_dtype_to_np_dtype(i)
+
+    def test_size_type_numpy(self):
+        for dt in {
+            np.float32,
+            np.float64,
+            np.float16,
+            np.int32,
+            np.int64,
+            np.int8,
+            np.int16,
+            np.uint8,
+            np.uint16,
+            np.uint32,
+            np.uint64,
+        }:
+            size_type(dt)
+            np_dtype_to_tensor_dtype(dt)
 
 
 class TestStringType(ExtTestCase):

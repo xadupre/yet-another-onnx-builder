@@ -1189,7 +1189,7 @@ class InputObserver:
         The function catches exceptions, it shows the error in the returned
         summary.
         """
-        from ..reference import OnnxruntimeEvaluator
+        from ..reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 
         sess = OnnxruntimeEvaluator(onnx_model, whole=True)
         input_names = sess.input_names

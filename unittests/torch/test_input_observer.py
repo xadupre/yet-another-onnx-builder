@@ -1,3 +1,4 @@
+import os
 import itertools
 import unittest
 import pandas
@@ -700,7 +701,8 @@ class TestInputObserver(ExtTestCase):
             exporter="custom",
             filename=proto_name,
         )
-        self.skipTest("not implemented yet")
+        if not os.path.exists(proto_name):
+            self.skipTest("to_onnx not implemented yet")
         data = observer.check_discrepancies(proto_name, progress_bar=False, include_io=True)
         df = pandas.DataFrame(data)
         self.assertLess(df["abs"].max(), 1e-5)
@@ -731,7 +733,8 @@ class TestInputObserver(ExtTestCase):
             exporter="custom",
             filename=proto_name,
         )
-        self.skipTest("not implemented yet")
+        if not os.path.exists(proto_name):
+            self.skipTest("to_onnx not implemented yet")
         data = observer.check_discrepancies(proto_name, progress_bar=False)
         self.assertEqual(len(data), 3)
         self.assertIsInstance(data[0], dict)
@@ -1184,8 +1187,8 @@ class TestInputObserver(ExtTestCase):
         self.assertIsInstance(args, tuple)
         self.assertEqual(len(args), 3)
 
-        self.skipTest("not implemented yet")
         # _get_range_constraints
+        self.skipTest("not implemented yet")
         with torch_export_patches(patch_torch=True):
             torch.export.export(
                 model,

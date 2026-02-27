@@ -129,7 +129,7 @@ def flattening_functions(
             f"flatten_{lname}" in all_functions
         ), f"Unable to find function 'flatten_{lname}' in {list(all_functions)}"
         classes[cls] = (  # type: ignore[misc]
-            lambda verbose=verbose, _ln=lname, cls=cls, _al=all_functions: register_class_flattening(  # noqa: E501
+            lambda verbose=verbose, _ln=lname, cls=cls, _al=all_functions: register_class_flattening(  # type: ignore # noqa: E501
                 cls,
                 _al[f"flatten_{_ln}"],
                 _al[f"unflatten_{_ln}"],
@@ -261,7 +261,7 @@ def register_flattening_functions(
     patch_transformers: bool = False, verbose: int = 0
 ) -> Dict[type, bool]:
     """The necessary modifications to run the fx Graph."""
-    fct_callable = replacement_before_exporting if patch_transformers else (lambda x: x)
+    fct_callable = replacement_before_exporting if patch_transformers else (lambda x: x)  # type: ignore
     done = register_cache_flattening(patch_transformers=patch_transformers, verbose=verbose)
     try:
         yield fct_callable
