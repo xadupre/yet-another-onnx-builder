@@ -491,6 +491,24 @@ def requires_torch(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
+def requires_onnx_diagnostic(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`onnx_diagnostic` is not recent enough."""
+    try:
+        import onnx_diagnostic
+    except ImportError:
+        return unittest.skip("onnx_diagnostic missing")
+
+    if not version:
+        return lambda x: x
+
+    import packaging.version as pv
+
+    if pv.Version(onnx_diagnostic.__version__) < pv.Version(version):
+        msg = f"onnx_diagnostic version {onnx_diagnostic.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def requires_matplotlib(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`pytorch` is not recent enough."""
     try:
