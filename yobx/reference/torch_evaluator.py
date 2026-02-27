@@ -38,7 +38,8 @@ def get_kernels() -> Dict[Tuple[str, str, int], type[torch_ops.OpRunKernel]]:
 class TorchReferenceEvaluator:
     """
     Torch evaluator for onnx models.
-    The model does not stores the original proto it evaluates to avoid
+    The model does not store the original proto it evaluates in order to avoid
+    unnecessary memory usage and potential side effects from mutating a shared object.
 
     :param proto: a proto
     :param providers: where to run the model
