@@ -4,7 +4,7 @@
 Flattening Functionalities
 ============================
 
-``torch.export.export`` and the :epkg:`torch` pytree machinery require every
+:func:`torch.export.export` and the :epkg:`torch` pytree machinery require every
 Python object that appears as a model input or output to be **registered** as a
 pytree node.  When a class is not registered, exporting fails with a cryptic
 error.
@@ -184,7 +184,7 @@ following classes from :epkg:`transformers` are registered:
 The flatten functions are defined in
 :mod:`yobx.torch.transformers.flatten_class`.  The module also patches
 registrations that are already present but known to be incompatible with
-``torch.export.export`` (see ``WRONG_REGISTRATIONS``).
+:func:`torch.export.export` (see ``WRONG_REGISTRATIONS``).
 
 ``DynamicCache`` layers
 ------------------------
