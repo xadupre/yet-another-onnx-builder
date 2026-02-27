@@ -252,7 +252,7 @@ class InferenceSessionForNumpy(_InferenceSession):
         self, output_names: Optional[List[str]], feeds: Dict[str, TensorLike]
     ) -> List[Optional[TensorLike]]:
         """Calls :meth:`onnxruntime.InferenceSession.run`."""
-        # sess.run does not support blfoat16
+        # sess.run does not support bfloat16
         # res = self.sess.run(output_names, feeds)
         return self._post_process_inplace(list(self.run_dlpack(output_names, feeds)))
 
