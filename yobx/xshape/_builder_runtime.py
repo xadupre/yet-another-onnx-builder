@@ -31,7 +31,7 @@ class _BuilderRuntime:
     """
 
     def onnx_dtype_to_torch_dtype(self, itype: int) -> "torch.dtype":  # noqa: F821
-        """See :func:`yobx.torch.torch_helper.onnx_dtype_to_torch_dtype>`."""
+        """See :func:`yobx.torch.torch_helper.onnx_dtype_to_torch_dtype`."""
         from ..torch.torch_helper import onnx_dtype_to_torch_dtype
 
         return onnx_dtype_to_torch_dtype(itype)
