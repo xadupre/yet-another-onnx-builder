@@ -17,45 +17,6 @@ from yobx.torch.flatten import (
     flatten_with_keys_base_model_output,
     unflatten_base_model_output,
 )
-
-try:
-    from transformers.cache_utils import SlidingWindowCache
-    from yobx.torch.flatten import (
-        flatten_sliding_window_cache,
-        flatten_with_keys_sliding_window_cache,
-        unflatten_sliding_window_cache,
-    )
-except ImportError:
-    SlidingWindowCache = None
-
-try:
-    from transformers.cache_utils import HybridCache
-    from yobx.torch.flatten import (
-        flatten_hybrid_cache,
-        flatten_with_keys_hybrid_cache,
-        unflatten_hybrid_cache,
-    )
-except ImportError:
-    HybridCache = None
-
-try:
-    from transformers.models.mamba.modeling_mamba import MambaCache
-    from yobx.torch.flatten import (
-        flatten_mamba_cache,
-        flatten_with_keys_mamba_cache,
-        unflatten_mamba_cache,
-    )
-except ImportError:
-    try:
-        from transformers.cache_utils import MambaCache  # type: ignore[no-redef]
-        from yobx.torch.flatten import (  # type: ignore[no-redef]
-            flatten_mamba_cache,
-            flatten_with_keys_mamba_cache,
-            unflatten_mamba_cache,
-        )
-    except ImportError:
-        MambaCache = None
-
 from transformers.modeling_outputs import BaseModelOutput
 
 
@@ -152,34 +113,6 @@ class TestFlatten(ExtTestCase):
         rebuilt = unflatten_base_model_output(flat, context)
         self.assertIsInstance(rebuilt, BaseModelOutput)
         self.assertEqualArray(t, rebuilt.last_hidden_state)
-
-    @unittest.skipIf(MambaCache is None, "MambaCache not available")
-    def test_flatten_mamba_cache(self):
-        class _config:
-            intermediate_size = 16
-            state_size = 4
-            conv_kernel = 4
-            num_hidden_layers = 2
-
-        cache = MambaCache(_config(), max_batch_size=1, dtype=torch.float32)
-        flat, context = flatten_mamba_cache(cache)
-        self.assertEqual(2, len(flat))
-        self.assertEqual(["conv_states", "ssm_states"], context)
-
-    @unittest.skipIf(MambaCache is None, "MambaCache not available")
-    def test_unflatten_mamba_cache(self):
-        class _config:
-            intermediate_size = 16
-            state_size = 4
-            conv_kernel = 4
-            num_hidden_layers = 2
-
-        cache = MambaCache(_config(), max_batch_size=1, dtype=torch.float32)
-        flat, context = flatten_mamba_cache(cache)
-        rebuilt = unflatten_mamba_cache(flat, context)
-        self.assertIsInstance(rebuilt, MambaCache)
-        self.assertEqual(len(cache.conv_states), len(rebuilt.conv_states))
-        self.assertEqual(len(cache.ssm_states), len(rebuilt.ssm_states))
 
     @requires_transformers("4.57")
     def test_flatten_dynamic_cache_mixed_layers(self):
