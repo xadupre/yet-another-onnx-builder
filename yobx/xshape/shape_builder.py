@@ -6,7 +6,7 @@ from ..helpers import string_type
 from ..helpers.onnx_helper import dtype_to_tensor_dtype
 from ._shape_helper import DYNAMIC_SHAPE
 from .evaluate_expressions import evaluate_expression
-from ._onnx_helper import (
+from ..helpers.onnx_helper import (
     element_wise_binary_op_types,
     element_wise_op_cmp_types,
     unary_like_op_types,
