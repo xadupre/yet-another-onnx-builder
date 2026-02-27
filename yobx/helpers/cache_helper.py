@@ -416,4 +416,3 @@ def make_static_cache(
     for i, (key, value) in enumerate(key_value_pairs):
         cache.update(key, value, i)
     return finalize_cache(cache)  # type: ignore[return-value]
-

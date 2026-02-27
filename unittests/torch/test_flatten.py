@@ -1,23 +1,25 @@
 import unittest
 import torch
 import transformers
+from transformers.modeling_outputs import BaseModelOutput
 from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.helpers.cache_helper import make_dynamic_cache, make_static_cache
-from yobx.torch.transformers.flatten import (
+from yobx.torch.flatten import (
+    flatten_base_model_output,
+    flatten_with_keys_base_model_output, #
+    unflatten_base_model_output,
+)
+from yobx.torch.transformers.flatten_class import (
     flatten_dynamic_cache,
     flatten_with_keys_dynamic_cache,
     unflatten_dynamic_cache,
     flatten_static_cache,
-    flatten_with_keys_static_cache,
+    flatten_with_keys_static_cache, #
     unflatten_static_cache,
     flatten_encoder_decoder_cache,
-    flatten_with_keys_encoder_decoder_cache,
+    flatten_with_keys_encoder_decoder_cache, #
     unflatten_encoder_decoder_cache,
-    flatten_base_model_output,
-    flatten_with_keys_base_model_output,
-    unflatten_base_model_output,
 )
-from transformers.modeling_outputs import BaseModelOutput
 
 
 class TestFlatten(ExtTestCase):
@@ -42,7 +44,7 @@ class TestFlatten(ExtTestCase):
         kv_pairs, context = flatten_with_keys_dynamic_cache(cache)
         self.assertEqual(4, len(kv_pairs))
         self.assertEqual(["key_0", "value_0", "key_1", "value_1"], context)
-        for key_entry, val in kv_pairs:
+        for _key_entry, val in kv_pairs:
             self.assertIsInstance(val, torch.Tensor)
 
     def test_unflatten_dynamic_cache(self):
