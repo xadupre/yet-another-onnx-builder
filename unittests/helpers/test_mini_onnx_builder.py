@@ -3,7 +3,7 @@ import numpy as np
 import ml_dtypes
 import onnx
 import torch
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.helpers.mini_onnx_builder import (
     create_onnx_model_from_input_tensors,
@@ -217,6 +217,7 @@ class TestMiniOnnxBuilder(ExtTestCase):
                 restored = create_input_tensors_from_onnx_model(model)
                 self.assertEqualAny(inputs, restored)
 
+    @requires_transformers("4.57")
     def test_mini_onnx_builder_transformers(self):
         cache = make_dynamic_cache([(torch.ones((3, 3)), torch.ones((3, 3)) * 2)])
         dc = CacheKeyValue(cache)
@@ -231,6 +232,7 @@ class TestMiniOnnxBuilder(ExtTestCase):
                 restored = create_input_tensors_from_onnx_model(model)
                 self.assertEqualAny(inputs, restored)
 
+    @requires_transformers("4.57")
     def test_mini_onnx_builder_transformers_sep(self):
         cache = make_dynamic_cache([(torch.ones((3, 3)), torch.ones((3, 3)) * 2)])
         dc = CacheKeyValue(cache)

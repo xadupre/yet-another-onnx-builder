@@ -5,6 +5,7 @@ import torch
 from yobx.ext_test_case import (
     ExtTestCase,
     requires_torch,
+    requires_transformers,
     hide_stdout,
     skipif_ci_windows,
 )
@@ -778,6 +779,7 @@ class TestTracing(ExtTestCase):
                     self.assertEqual(type(a[k]), type(b[k]))
 
     @requires_torch("2.9.99")
+    @requires_transformers("4.57")
     def test_tree_unflatten_with_proxy_dynamic_cache(self):
         graph = torch.fx.Graph()
         tr = CustomTracer()

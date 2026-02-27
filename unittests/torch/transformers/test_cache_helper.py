@@ -34,6 +34,7 @@ class TestCacheHelpers(ExtTestCase):
             string_type(dynamic_shapes),
         )
 
+    @requires_transformers("4.57")
     def test_replace_by(self):
         bsize, nheads, slen, dim = 2, 4, 3, 7
 
@@ -45,6 +46,7 @@ class TestCacheHelpers(ExtTestCase):
             self.string_type(past_key_values, with_shape=True),
         )
 
+    @requires_transformers("4.57")
     def test_make_static_cache(self):
         cache = make_static_cache(
             [
@@ -108,6 +110,7 @@ class TestCacheHelpers(ExtTestCase):
         self.assertEqualArray(t3, lst[2])
         self.assertEqualArray(t4, lst[3])
 
+    @requires_transformers("4.57")
     def test_cache_key_value_from_dynamic_cache(self):
         bsize, nheads, slen, dim = 2, 4, 3, 7
         t1 = torch.randn(bsize, nheads, slen, dim)
@@ -137,6 +140,7 @@ class TestCacheHelpers(ExtTestCase):
         self.assertIsInstance(rebuilt, transformers.cache_utils.DynamicCache)
         self.assertEqual(0, max_diff(cache, rebuilt)["abs"])
 
+    @requires_transformers("4.57")
     def test_cache_key_value_cls_layers(self):
         bsize, nheads, slen, dim = 2, 4, 3, 7
         t1 = torch.randn(bsize, nheads, slen, dim)
@@ -161,6 +165,7 @@ class TestCacheHelpers(ExtTestCase):
         cv = CacheKeyValue(cache)
         self.assertEqual(0, max_diff(cv, cv)["abs"])
 
+    @requires_transformers("4.57")
     def test_max_diff_cache_key_value_vs_tuple(self):
         bsize, nheads, slen, dim = 2, 4, 3, 7
         t1 = torch.randn(bsize, nheads, slen, dim)
