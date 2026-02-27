@@ -203,17 +203,17 @@ A ``DynamicCache`` can contain layers of different types
 context encodes each layer type as a short letter code so that the
 correct layer class and its kwargs are recreated on unflatten:
 
-+----------------------------+------+
-| Layer class                | Code |
-+============================+======+
-| ``DynamicLayer``           | D    |
-+----------------------------+------+
-| ``DynamicSlidingWindowLayer`` | W |
-+----------------------------+------+
-| ``StaticLayer``            | S    |
-+----------------------------+------+
-| ``StaticSlidingWindowLayer`` | X  |
-+----------------------------+------+
++-------------------------------+------+
+| Layer class                   | Code |
++===============================+======+
+| ``DynamicLayer``              | D    |
++-------------------------------+------+
+| ``DynamicSlidingWindowLayer`` | W    |
++-------------------------------+------+
+| ``StaticLayer``               | S    |
++-------------------------------+------+
+| ``StaticSlidingWindowLayer``  | X    |
++-------------------------------+------+
 
 .. seealso::
 
