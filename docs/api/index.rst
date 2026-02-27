@@ -6,4 +6,5 @@ API Reference
 
    helpers/index
    reference/index
+   torch/index
    xshape/index
