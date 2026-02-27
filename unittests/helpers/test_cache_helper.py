@@ -3,7 +3,12 @@ import torch
 import transformers
 from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.helpers import string_type, max_diff
-from yobx.helpers.cache_helper import CacheKeyValue, make_dynamic_cache, make_static_cache
+from yobx.helpers.cache_helper import (
+    CacheKeyValue,
+    flatten_unflatten_for_dynamic_shapes,
+    make_dynamic_cache,
+    make_static_cache,
+)
 
 
 class TestCacheHelpers(ExtTestCase):
@@ -207,6 +212,81 @@ class TestCacheHelpers(ExtTestCase):
         )
         self.assertEqual(0, max_diff(cache, cache)["abs"])
         self.assertEqual(cache.layers[1].sliding_window, 12)
+
+
+    def test_flatten_unflatten_tensor(self):
+        t = torch.randn(2, 3)
+        result = flatten_unflatten_for_dynamic_shapes(t)
+        self.assertEqualArray(t, result)
+
+    def test_flatten_unflatten_list_of_tensors(self):
+        t1 = torch.randn(2, 3)
+        t2 = torch.randn(4, 5)
+        result = flatten_unflatten_for_dynamic_shapes([t1, t2])
+        self.assertIsInstance(result, list)
+        self.assertEqual(2, len(result))
+        self.assertEqualArray(t1, result[0])
+        self.assertEqualArray(t2, result[1])
+
+    def test_flatten_unflatten_dict_of_tensors(self):
+        t1 = torch.randn(2, 3)
+        t2 = torch.randn(4, 5)
+        result = flatten_unflatten_for_dynamic_shapes({"a": t1, "b": t2}, use_dict=True)
+        self.assertIsInstance(result, dict)
+        self.assertIn("a", result)
+        self.assertIn("b", result)
+        self.assertEqualArray(t1, result["a"])
+        self.assertEqualArray(t2, result["b"])
+
+    def test_flatten_unflatten_dict_use_dict_false(self):
+        t1 = torch.randn(2, 3)
+        t2 = torch.randn(4, 5)
+        result = flatten_unflatten_for_dynamic_shapes({"a": t1, "b": t2}, use_dict=False)
+        self.assertIsInstance(result, list)
+        self.assertEqual(2, len(result))
+
+    def test_flatten_unflatten_dynamic_cache(self):
+        bsize, nheads, slen, dim = 2, 4, 3, 7
+        t1 = torch.randn(bsize, nheads, slen, dim)
+        t2 = torch.randn(bsize, nheads, slen, dim)
+        cache = make_dynamic_cache([(t1, t2)])
+        result = flatten_unflatten_for_dynamic_shapes(cache)
+        self.assertIsInstance(result, list)
+        flat = torch.utils._pytree.tree_leaves(result)
+        # 1 layer => 2 tensors (key + value)
+        self.assertEqual(2, len(flat))
+
+    def test_flatten_unflatten_dynamic_cache_use_dict(self):
+        bsize, nheads, slen, dim = 2, 4, 3, 7
+        t1 = torch.randn(bsize, nheads, slen, dim)
+        t2 = torch.randn(bsize, nheads, slen, dim)
+        cache = make_dynamic_cache([(t1, t2)])
+        result = flatten_unflatten_for_dynamic_shapes(cache, use_dict=True)
+        self.assertIsInstance(result, list)
+        flat = torch.utils._pytree.tree_leaves(result)
+        # 1 layer => 2 tensors (key + value)
+        self.assertEqual(2, len(flat))
+
+    def test_flatten_unflatten_change_function(self):
+        bsize, nheads, slen, dim = 2, 4, 3, 7
+        t1 = torch.randn(bsize, nheads, slen, dim)
+        t2 = torch.randn(bsize, nheads, slen, dim)
+        result = flatten_unflatten_for_dynamic_shapes(
+            [t1, t2], change_function=lambda t: list(t.shape)
+        )
+        self.assertIsInstance(result, list)
+        self.assertEqual(2, len(result))
+        self.assertEqual([bsize, nheads, slen, dim], result[0])
+        self.assertEqual([bsize, nheads, slen, dim], result[1])
+
+    def test_flatten_unflatten_tuple(self):
+        t1 = torch.randn(2, 3)
+        t2 = torch.randn(4, 5)
+        result = flatten_unflatten_for_dynamic_shapes((t1, t2), use_dict=True)
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(2, len(result))
+        self.assertEqualArray(t1, result[0])
+        self.assertEqualArray(t2, result[1])
 
 
 if __name__ == "__main__":
