@@ -649,6 +649,28 @@ def string_sig(f: Callable, kwargs: Optional[Dict[str, Any]] = None) -> str:
     return f"{name}({atts})"
 
 
+def get_sig_kwargs(obj: Any) -> Dict[str, Any]:
+    """
+    Returns the current values of the parameters of an object's ``__init__`` method.
+
+    :param obj: an object with an ``__init__`` method
+    :return: a dictionary mapping parameter names to their current values
+    """
+    sig = inspect.signature(obj.__init__)
+    kwargs = {}
+    for p in sig.parameters:
+        if p == "self":
+            continue
+        pp = sig.parameters[p]
+        if pp.kind in (pp.VAR_POSITIONAL, pp.VAR_KEYWORD):
+            continue
+        if hasattr(obj, p):
+            kwargs[p] = getattr(obj, p)
+        elif pp.default is not inspect.Parameter.empty:
+            kwargs[p] = pp.default
+    return kwargs
+
+
 def make_hash(obj: Any) -> str:
     """
     Returns a simple hash of ``id(obj)`` in four letter.

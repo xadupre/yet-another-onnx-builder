@@ -1,1 +1,2 @@
+from .export_options import ExportOptions
 from .flatten_helper import register_flattening_functions
