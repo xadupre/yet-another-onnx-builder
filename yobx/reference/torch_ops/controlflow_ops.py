@@ -16,7 +16,9 @@ class OpRunControlFlow(OpRunKernel):
         self,
         node: onnx.NodeProto,
         version: Optional[int] = None,
-        parent: Optional["yobx.reference.TorchReferenceEvaluator"] = None,  # noqa: F821
+        parent: Optional[
+            "yobx.reference.torch_evaluator.TorchReferenceEvaluator"  # noqa: F821
+        ] = None,
         verbose: int = 0,
     ):
         super().__init__(node, version, verbose=verbose)
@@ -51,7 +53,9 @@ class Loop_16(OpRunControlFlow):
         self,
         node: onnx.NodeProto,
         version: Optional[int] = None,
-        parent: Optional["yobx.reference.TorchReferenceEvaluator"] = None,  # noqa: F821
+        parent: Optional[
+            "yobx.reference.torch_evaluator.TorchReferenceEvaluator"  # noqa: F821
+        ] = None,
         verbose: int = 0,
     ):
         super().__init__(node, version, parent, verbose=verbose)

@@ -74,7 +74,7 @@ class TorchReferenceEvaluator:
         import onnx.helper as oh
         import torch
         from yobx.helpers import string_type
-        from yobx.reference import TorchReferenceEvaluator
+        from yobx.reference.torch_evaluator import TorchReferenceEvaluator
 
         TFLOAT = onnx.TensorProto.FLOAT
 
@@ -113,7 +113,7 @@ class TorchReferenceEvaluator:
         import onnx.helper as oh
         import torch
         from yobx.helpers import string_type
-        from yobx.reference import TorchReferenceEvaluator
+        from yobx.reference.torch_evaluator import TorchReferenceEvaluator
 
         TFLOAT = onnx.TensorProto.FLOAT
 
@@ -161,7 +161,7 @@ class TorchReferenceEvaluator:
         import torch
         from yobx.helpers import string_type
         from yobx.torch.torch_helper import onnx_dtype_to_torch_dtype
-        from yobx.reference import TorchReferenceEvaluator
+        from yobx.reference.torch_evaluator import TorchReferenceEvaluator
         from yobx.reference.torch_ops import OpRunKernel, OpRunTensor
 
         TFLOAT16 = onnx.TensorProto.FLOAT16
