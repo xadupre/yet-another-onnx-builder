@@ -1,7 +1,6 @@
 from typing import Optional
 import onnx
 import torch
-from ...helpers.torch_helper import onnx_dtype_to_torch_dtype
 from . import OpRunKernel, OpRunSequence, OpRunTensor
 
 
@@ -41,6 +40,8 @@ class SequenceEmpty_11(OpRunOpSequence):
 
     def __init__(self, node: onnx.NodeProto, version: Optional[int] = None, verbose: int = 0):
         super().__init__(node, version, verbose=verbose)
+        from ...torch.torch_helper import onnx_dtype_to_torch_dtype
+
         self.dtype = onnx_dtype_to_torch_dtype(
             self.get_attribute_int(node, "dtype", onnx.TensorProto.FLOAT)  # type: ignore[arg-type]
         )

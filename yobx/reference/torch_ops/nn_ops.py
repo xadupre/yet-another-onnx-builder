@@ -1,7 +1,6 @@
 from typing import Optional, Tuple
 import onnx
 import torch
-from ...helpers.torch_helper import onnx_dtype_to_torch_dtype
 from . import OpRunKernel, OpRunTensor
 
 
@@ -128,6 +127,8 @@ class LayerNormalization_17(OpRunKernel):
         super().__init__(node, version, verbose=verbose)
         self.axis = self.get_attribute_int(node, "axis", -1)
         self.epsilon = self.get_attribute_float(node, "epsilon", 1e-5)
+        from ...torch.torch_helper import onnx_dtype_to_torch_dtype
+
         self.stash_type = onnx_dtype_to_torch_dtype(
             self.get_attribute_int(node, "stash_type", onnx.TensorProto.FLOAT)  # type: ignore[arg-type]
         )
@@ -179,6 +180,8 @@ class Softmax_13(OpRunKernel):
         assert isinstance(self.axis, int), f"Unexpected value for attribute axis={self.axis!r}"
         # this is out of spec
         stash_type = self.get_attribute_int(node, "stash_type", None)
+        from ...torch.torch_helper import onnx_dtype_to_torch_dtype
+
         self.stash_type = None if stash_type is None else onnx_dtype_to_torch_dtype(stash_type)
 
     def run(self, data: OpRunTensor) -> OpRunTensor:

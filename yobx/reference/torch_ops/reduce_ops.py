@@ -1,7 +1,6 @@
 from typing import Optional, Tuple
 import onnx
 import torch
-from ...helpers.torch_helper import onnx_dtype_to_torch_dtype
 from . import OpRunKernel, OpRunTensor
 
 
@@ -22,6 +21,8 @@ class ReduceOp(OpRunKernel):
         ), f"Not implemented with noop_with_empty_axes={self.noop_with_empty_axes}"
         # this is out of spec
         stash_type = self.get_attribute_int(node, "stash_type", None)
+        from ...torch.torch_helper import onnx_dtype_to_torch_dtype
+
         self.stash_type = None if stash_type is None else onnx_dtype_to_torch_dtype(stash_type)
 
 

@@ -1,7 +1,6 @@
 from typing import Optional
 import onnx
 import torch
-from ...helpers.torch_helper import onnx_dtype_to_torch_dtype
 from . import OpRunKernel, OpRunTensor
 
 
@@ -12,6 +11,8 @@ class Cast_6(OpRunKernel):
         super().__init__(node, version, verbose=verbose)
         to = self.get_attribute_int(node, "to", 0)
         assert isinstance(to, int), f"Unexpected value for attribute to={to!r}"
+        from ...torch.torch_helper import onnx_dtype_to_torch_dtype
+
         self.to = onnx_dtype_to_torch_dtype(to)
         self.saturate = self.get_attribute_int(node, "saturate", 1)
         assert self.saturate == 1, f"saturate={self.saturate} not implemented for Cast"
