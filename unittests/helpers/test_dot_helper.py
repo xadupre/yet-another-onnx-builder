@@ -109,5 +109,135 @@ class TestDotHelper(ExtTestCase):
         self.assertEqual(expected, dot.strip("\n").replace(" ", ""))
 
 
+    def test_to_dot_if(self):
+        TFLOAT = onnx.TensorProto.FLOAT
+        then_z = oh.make_tensor_value_info("then_z", TFLOAT, [3])
+        then_graph = oh.make_graph(
+            [oh.make_node("Add", ["X", "X"], ["then_z"])],
+            "then_branch",
+            [],
+            [then_z],
+        )
+        else_z = oh.make_tensor_value_info("else_z", TFLOAT, [3])
+        else_graph = oh.make_graph(
+            [oh.make_node("Neg", ["X"], ["else_z"])],
+            "else_branch",
+            [],
+            [else_z],
+        )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "If",
+                        ["cond"],
+                        ["Z"],
+                        then_branch=then_graph,
+                        else_branch=else_graph,
+                    )
+                ],
+                "if_graph",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [3]),
+                    oh.make_tensor_value_info("cond", onnx.TensorProto.BOOL, []),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, [3])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        dot = to_dot(model)
+        self.assertIn("If_", dot)
+        self.assertIn("style=dotted", dot)
+
+    def test_to_dot_scan(self):
+        TFLOAT = onnx.TensorProto.FLOAT
+        body_z = oh.make_tensor_value_info("body_z", TFLOAT, [])
+        body_out = oh.make_tensor_value_info("body_out", TFLOAT, [])
+        body_graph = oh.make_graph(
+            [
+                oh.make_node("Add", ["state", "x_elem"], ["sum_"]),
+                oh.make_node("Mul", ["sum_", "scale"], ["body_z"]),
+                oh.make_node("Identity", ["body_z"], ["body_out"]),
+            ],
+            "scan_body",
+            [
+                oh.make_tensor_value_info("state", TFLOAT, []),
+                oh.make_tensor_value_info("x_elem", TFLOAT, []),
+            ],
+            [body_z, body_out],
+        )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "Scan",
+                        ["init", "X"],
+                        ["final", "output"],
+                        num_scan_inputs=1,
+                        body=body_graph,
+                    )
+                ],
+                "scan_graph",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [5]),
+                    oh.make_tensor_value_info("init", TFLOAT, []),
+                    oh.make_tensor_value_info("scale", TFLOAT, []),
+                ],
+                [
+                    oh.make_tensor_value_info("final", TFLOAT, []),
+                    oh.make_tensor_value_info("output", TFLOAT, [5]),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        dot = to_dot(model)
+        self.assertIn("Scan_", dot)
+        self.assertIn("style=dotted", dot)
+
+    def test_to_dot_loop(self):
+        TFLOAT = onnx.TensorProto.FLOAT
+        TINT64 = onnx.TensorProto.INT64
+        TBOOL = onnx.TensorProto.BOOL
+        body_cond = oh.make_tensor_value_info("cond_out", TBOOL, [])
+        body_v = oh.make_tensor_value_info("v_out", TFLOAT, [])
+        body_graph = oh.make_graph(
+            [
+                oh.make_node("Identity", ["cond_in"], ["cond_out"]),
+                oh.make_node("Mul", ["v_in", "scale"], ["v_out"]),
+            ],
+            "loop_body",
+            [
+                oh.make_tensor_value_info("iter", TINT64, []),
+                oh.make_tensor_value_info("cond_in", TBOOL, []),
+                oh.make_tensor_value_info("v_in", TFLOAT, []),
+            ],
+            [body_cond, body_v],
+        )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "Loop", ["max_iter", "cond", "v0"], ["v_final"], body=body_graph
+                    )
+                ],
+                "loop_graph",
+                [
+                    oh.make_tensor_value_info("max_iter", TINT64, []),
+                    oh.make_tensor_value_info("cond", TBOOL, []),
+                    oh.make_tensor_value_info("v0", TFLOAT, []),
+                    oh.make_tensor_value_info("scale", TFLOAT, []),
+                ],
+                [oh.make_tensor_value_info("v_final", TFLOAT, [])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        dot = to_dot(model)
+        self.assertIn("Loop_", dot)
+        self.assertIn("style=dotted", dot)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
