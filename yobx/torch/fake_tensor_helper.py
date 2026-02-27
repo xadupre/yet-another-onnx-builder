@@ -151,10 +151,20 @@ class FakeTensorContext:
         if x is None:
             return None
         if type(x) in (list, tuple):
+            if dynamic_shapes is None:
+                ds_list = [None] * len(x)
+            else:
+                assert len(x) == len(dynamic_shapes), (
+                    f"Length mismatch between x (len={len(x)}) and "
+                    f"dynamic_shapes (len={len(dynamic_shapes)}); "
+                    f"dynamic_shapes must have one entry per element of x, "
+                    f"or be None to use no dynamic dimensions"
+                )
+                ds_list = dynamic_shapes
             return x.__class__(
                 [
                     self.make_fake_with_dynamic_dimensions(i, dynamic_shapes=ds)
-                    for i, ds in zip(x, dynamic_shapes)
+                    for i, ds in zip(x, ds_list)
                 ]
             )
         if type(x) is dict:
