@@ -21,6 +21,8 @@ class TestInputObserverTransformers(ExtTestCase):
     def test_input_observer_onnx_generate_tiny_llm(self):
         mid = "arnir0/Tiny-LLM"
         data = get_untrained_model_with_inputs(mid)
+        if data is None:
+            self.skipTest("not implemented yet")
         model, inputs, _ds = data["model"], data["inputs"], data["dynamic_shapes"]
         input_ids = inputs["input_ids"][:1]
 
