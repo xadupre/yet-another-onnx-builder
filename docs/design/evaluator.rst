@@ -15,7 +15,8 @@ but differ in their backend, tensor type, and primary use-case:
 |                                    | (Python)            | ``ndarray``    | Python debugging                 |
 +------------------------------------+---------------------+----------------+----------------------------------+
 | :class:`OnnxruntimeEvaluator`      | ONNX Runtime        | NumPy or       | debugging ORT execution,         |
-|                                    | (node-by-node)      | PyTorch        | inspecting intermediate results  |
+|                                    | (node-by-node or    | PyTorch        | inspecting intermediate results, |
+|                                    | whole, ``whole=``)  |                | or whole-model ORT inference     |
 +------------------------------------+---------------------+----------------+----------------------------------+
 | :class:`TorchReferenceEvaluator`   | PyTorch (Python)    | ``torch.Tensor``| GPU execution, memory-efficient  |
 |                                    |                     |                | evaluation, custom PyTorch ops   |
@@ -37,6 +38,9 @@ differences are:
   :class:`onnxruntime.InferenceSession`.  Because every node is run in
   isolation it is easy to inspect every intermediate result and to compare
   them against a reference.  Accepts both NumPy arrays and PyTorch tensors.
+  Pass ``whole=True`` to skip node-by-node splitting and hand the complete
+  model to a single ORT session (faster, but intermediate results are not
+  accessible).
 
 * **TorchReferenceEvaluator** — runs every node with hand-written PyTorch
   kernels.  Inputs and outputs are :class:`torch.Tensor`.  Supports CUDA
