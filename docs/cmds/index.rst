@@ -8,4 +8,8 @@ Command Lines
 .. toctree::
     :maxdepth: 1
 
+    agg
+    dot
+    find
     partition
+    print
