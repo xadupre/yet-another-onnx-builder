@@ -6,6 +6,7 @@ from yobx.helpers.helper import get_sig_kwargs
 from yobx.torch.export_options import (
     ExportOptions,
     _inplace_nodes,
+    _remove_inplace_nodes,
     apply_decompositions,
     insert_contiguous_between_transpose_and_view,
 )
@@ -258,6 +259,157 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
+    def test_export_strategy_none(self):
+        """Strategy 'none' behaves like the default export."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(strategy="none")
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    def test_export_strategy_nostrict(self):
+        """Strategy 'nostrict' exports with strict=False."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(strategy="nostrict")
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    def test_export_strategy_strict_dec(self):
+        """Strategy 'strict-dec' exports with strict=True and default decompositions."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(strategy="strict-dec")
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    def test_export_strategy_strict_decall(self):
+        """Strategy 'strict-decall' exports with strict=True and all decompositions."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(strategy="strict-decall")
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    def test_export_strategy_nostrict_dec(self):
+        """Strategy 'nostrict-dec' exports with strict=False and default decompositions."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(strategy="nostrict-dec")
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    def test_export_strategy_nostrict_decall(self):
+        """Strategy 'nostrict-decall' exports with strict=False and all decompositions."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(strategy="nostrict-decall")
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    @ignore_warnings(UserWarning)
+    def test_export_strategy_jit_dec(self):
+        """Strategy 'jit-dec' exports via JIT with default decompositions."""
+        try:
+            from torch._export.converter import TS2EPConverter  # noqa: F401
+        except ImportError:
+            self.skipTest("TS2EPConverter not available in this torch version")
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(strategy="jit-dec")
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    @ignore_warnings(UserWarning)
+    def test_export_strategy_jit_decall(self):
+        """Strategy 'jit-decall' exports via JIT with all decompositions."""
+        try:
+            from torch._export.converter import TS2EPConverter  # noqa: F401
+        except ImportError:
+            self.skipTest("TS2EPConverter not available in this torch version")
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(strategy="jit-decall")
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    def test_export_strategy_fake(self):
+        """Strategy 'fake' exports with fake tensors (skipped if onnx_diagnostic missing)."""
+        try:
+            from onnx_diagnostic.export.shape_helper import (  # noqa: F401
+                make_fake_with_dynamic_dimensions,
+            )
+        except ImportError:
+            self.skipTest("onnx_diagnostic is not installed")
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(strategy="fake")
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
 @requires_torch("2.0")
 class TestApplyDecompositions(ExtTestCase):
     def test_apply_decompositions_none(self):
@@ -320,6 +472,28 @@ class TestInplaceFunctions(ExtTestCase):
         ep = torch.export.export(SimpleModel(), (torch.randn(2, 3),))
         nodes = _inplace_nodes(ep.graph)
         self.assertIsInstance(nodes, list)
+
+    def test_remove_inplace_nodes(self):
+        """_remove_inplace_nodes removes inplace-style nodes that have no users."""
+        # Build a raw fx.Graph with one fake inplace-style node (no users)
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+
+        def fake_inplace_(a):
+            pass
+
+        fake_inplace_.__name__ = "fake_"
+        graph.call_function(fake_inplace_, (x,))
+        graph.output(x)
+
+        nodes_before = _inplace_nodes(graph)
+        self.assertEqual(len(nodes_before), 1)
+
+        n_removed = _remove_inplace_nodes(graph)
+        self.assertEqual(n_removed, 1)
+
+        nodes_after = _inplace_nodes(graph)
+        self.assertEqual(len(nodes_after), 0)
 
 
 @requires_torch("2.0")
