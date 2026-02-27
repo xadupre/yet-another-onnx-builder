@@ -2,7 +2,7 @@ import os
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
-from yobx.ext_test_case import ExtTestCase, ignore_warnings
+from yobx.ext_test_case import ExtTestCase, ignore_warnings, skip_if_windows
 from yobx._command_lines_parser import main
 from yobx.helpers.cube_helper import enumerate_csv_files
 
@@ -36,6 +36,7 @@ class TestCommandLines(ExtTestCase):
         self.assertIsInstance(text, str)
 
     @ignore_warnings(UserWarning)
+    @skip_if_windows("crashing")
     def test_d_parser_agg(self):
         path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "helpers", "data"))
         assert list(enumerate_csv_files([f"{path}/*.zip"]))

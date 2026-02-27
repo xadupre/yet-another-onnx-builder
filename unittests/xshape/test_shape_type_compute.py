@@ -696,9 +696,11 @@ class TestShapeTypeCompute(ExtTestCase):
 
     def test_op_max_pool_ceil_mode(self):
         model = _make_model(
-            [oh.make_node(
-                "MaxPool", ["X"], ["Y"], kernel_shape=[2, 2], strides=[2, 2], ceil_mode=1
-            )],
+            [
+                oh.make_node(
+                    "MaxPool", ["X"], ["Y"], kernel_shape=[2, 2], strides=[2, 2], ceil_mode=1
+                )
+            ],
             [_mkv_("X", TFLOAT, [1, 1, 7, 7])],
             [_mkv_("Y", TFLOAT, [1, 1, 4, 4])],
         )
