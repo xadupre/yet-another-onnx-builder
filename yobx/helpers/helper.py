@@ -1326,7 +1326,7 @@ def size_type(dtype: Any) -> int:
 
 def string_diff(diff: Dict[str, Any], js: bool = False, ratio: bool = False, **kwargs) -> str:
     """
-    Renders discrepancies return by :func:`max_diff` into one string.
+    Renders discrepancies returned by :func:`max_diff` into one string.
 
     :param diff: differences
     :param js: json format
@@ -1354,8 +1354,8 @@ def string_diff(diff: Dict[str, Any], js: bool = False, ratio: bool = False, **k
         for k, v in diff["rep"].items():
             if v > 0:
                 rows.append(f"#{v}{k}")
-        suffix = "-".join(rows)
-        suffix = f"/{suffix}"
+        if rows:
+            suffix = "/" + "-".join(rows)
     if "argm" in diff:
         sa = (
             ",".join(map(str, diff["argm"]))
