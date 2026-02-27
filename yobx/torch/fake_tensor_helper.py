@@ -14,8 +14,8 @@ class FakeTensorContext:
         else:
             self.fake_mode = fake_mode
         self._candidates = self._first_primes()
-        self._unique_: Set[str] = set()
-        self._mapping_int: Dict[int, str] = {}
+        self._unique_: Set[int] = set()
+        self._mapping_int: Dict[int, Any] = {}
         self._mapping_str: Dict[str, int] = {}
 
     @classmethod
