@@ -108,7 +108,6 @@ class TestDotHelper(ExtTestCase):
         self.maxDiff = None
         self.assertEqual(expected, dot.strip("\n").replace(" ", ""))
 
-
     def test_to_dot_if(self):
         TFLOAT = onnx.TensorProto.FLOAT
         then_z = oh.make_tensor_value_info("then_z", TFLOAT, [3])
@@ -217,11 +216,7 @@ class TestDotHelper(ExtTestCase):
         )
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node(
-                        "Loop", ["max_iter", "cond", "v0"], ["v_final"], body=body_graph
-                    )
-                ],
+                [oh.make_node("Loop", ["max_iter", "cond", "v0"], ["v_final"], body=body_graph)],
                 "loop_graph",
                 [
                     oh.make_tensor_value_info("max_iter", TINT64, []),

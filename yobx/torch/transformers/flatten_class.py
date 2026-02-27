@@ -13,7 +13,8 @@ import torch
 import transformers.cache_utils
 from transformers.cache_utils import Cache, DynamicCache, EncoderDecoderCache, StaticCache
 from transformers.modeling_outputs import BaseModelOutput
-from yobx.helpers.cache_helper import make_dynamic_cache, make_static_cache, CacheKeyValue
+from ...helpers.cache_helper import make_dynamic_cache, make_static_cache, CacheKeyValue
+from ..flatten import make_serialization_function_for_dataclass
 
 SUPPORTED_DATACLASSES: Set[type] = set()
 
@@ -94,9 +95,7 @@ def _unflatten_cache(
 ) -> DynamicCache:
     """Restores a cache from python objects."""
     expected = list(
-        itertools.chain.from_iterable(
-            (f"key_{i}", f"value_{i}") for i in range(len(values) // 2)
-        )
+        itertools.chain.from_iterable((f"key_{i}", f"value_{i}") for i in range(len(values) // 2))
     )
     if expected == context:
         res = make_cache(list(zip(values[::2], values[1::2])))
@@ -106,9 +105,7 @@ def _unflatten_cache(
             PARSE_LAYER_NAMES[SHORTEN_LAYER_NAMES[name.split("_")[1][0]]](name.split("_")[1])
             for name in context
         ][::2]
-        cls_layers = [
-            getattr(transformers.cache_utils, cls_name) for cls_name in cls_layer_names
-        ]
+        cls_layers = [getattr(transformers.cache_utils, cls_name) for cls_name in cls_layer_names]
         res = make_cache(
             list(zip(values[::2], values[1::2])), cls_layers=cls_layers, cls_kwargs=cls_kwargs
         )
@@ -238,48 +235,6 @@ def unflatten_encoder_decoder_cache(
 def _lower_name_with_(name: str) -> str:
     s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
-
-
-def make_serialization_function_for_dataclass(
-    cls: type, supported_classes: Set[type]
-) -> Tuple[Callable, Callable, Callable]:
-    """
-    Automatically creates serialization functions for a class decorated with
-    ``dataclasses.dataclass``.
-
-    :param cls: the dataclass type
-    :param supported_classes: set to register the class into
-    :return: tuple of (flatten, flatten_with_keys, unflatten) callables
-    """
-
-    def flatten_cls(obj: cls) -> Tuple[List[Any], torch.utils._pytree.Context]:  # type: ignore[valid-type]
-        """Serializes a ``%s`` with python objects."""
-        return list(obj.values()), list(obj.keys())
-
-    def flatten_with_keys_cls(
-        obj: cls,  # type: ignore[valid-type]
-    ) -> Tuple[List[Tuple[torch.utils._pytree.KeyEntry, Any]], torch.utils._pytree.Context]:
-        """Serializes a ``%s`` with python objects with keys."""
-        values, context = list(obj.values()), list(obj.keys())
-        return [
-            (torch.utils._pytree.MappingKey(k), v) for k, v in zip(context, values)
-        ], context
-
-    def unflatten_cls(
-        values: List[Any], context: torch.utils._pytree.Context, output_type=None
-    ) -> cls:  # type: ignore[valid-type]
-        """Restores an instance of ``%s`` from python objects."""
-        return cls(**dict(zip(context, values)))
-
-    name = _lower_name_with_(cls.__name__)
-    flatten_cls.__name__ = f"flatten_{name}"
-    flatten_with_keys_cls.__name__ = f"flatten_with_keys_{name}"
-    unflatten_cls.__name__ = f"unflatten_{name}"
-    flatten_cls.__doc__ = flatten_cls.__doc__ % cls.__name__
-    flatten_with_keys_cls.__doc__ = flatten_with_keys_cls.__doc__ % cls.__name__
-    unflatten_cls.__doc__ = unflatten_cls.__doc__ % cls.__name__
-    supported_classes.add(cls)
-    return flatten_cls, flatten_with_keys_cls, unflatten_cls
 
 
 (

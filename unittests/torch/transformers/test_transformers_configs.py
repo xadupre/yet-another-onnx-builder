@@ -1,7 +1,7 @@
 import os
 import unittest
 from yobx.ext_test_case import ExtTestCase, requires_transformers
-from yobx.transformers.models.configs import (
+from yobx.torch.transformers.models.configs import (
     _retrieve_cached_configurations,
     get_cached_configuration,
 )

@@ -60,9 +60,7 @@ class TestFilterOps(ExtTestCase):
             op_schema = None
 
         # Both versions are within opset 3; MyOp_2 should win
-        result = ExtendedReferenceEvaluator.filter_ops(
-            None, [MyOp_1, MyOp_2], {"test.domain": 3}
-        )
+        result = ExtendedReferenceEvaluator.filter_ops(None, [MyOp_1, MyOp_2], {"test.domain": 3})
         result_names = [cl.__name__ for cl in result]
         self.assertIn("MyOp", result_names)
         self.assertNotIn("MyOp_1", result_names)
@@ -113,7 +111,6 @@ class TestFilterOps(ExtTestCase):
 
     def test_opsets_from_model_proto(self):
         """When proto is a ModelProto and opsets=None, opsets are inferred from the model."""
-        import onnx
 
         class MyOp_1(OpRun):
             op_domain = "test.domain"

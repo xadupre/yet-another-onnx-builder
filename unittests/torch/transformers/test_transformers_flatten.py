@@ -1,26 +1,26 @@
 import unittest
 import torch
 import transformers
+from transformers.modeling_outputs import BaseModelOutput
 from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.helpers.cache_helper import make_dynamic_cache, make_static_cache
-from yobx.torch.transformers.flatten import (
+from yobx.torch.transformers.flatten_class import (
     flatten_dynamic_cache,
     flatten_with_keys_dynamic_cache,
     unflatten_dynamic_cache,
     flatten_static_cache,
-    flatten_with_keys_static_cache,
+    flatten_with_keys_static_cache,  #
     unflatten_static_cache,
     flatten_encoder_decoder_cache,
-    flatten_with_keys_encoder_decoder_cache,
+    flatten_with_keys_encoder_decoder_cache,  #
     unflatten_encoder_decoder_cache,
+    flatten_with_keys_base_model_output,  #
     flatten_base_model_output,
-    flatten_with_keys_base_model_output,
     unflatten_base_model_output,
 )
-from transformers.modeling_outputs import BaseModelOutput
 
 
-class TestFlatten(ExtTestCase):
+class TestTransformersFlatten(ExtTestCase):
     def _make_cache(self, n_layers=2, bsize=2, nheads=4, slen=3, dim=7):
         return make_dynamic_cache(
             [
@@ -42,7 +42,7 @@ class TestFlatten(ExtTestCase):
         kv_pairs, context = flatten_with_keys_dynamic_cache(cache)
         self.assertEqual(4, len(kv_pairs))
         self.assertEqual(["key_0", "value_0", "key_1", "value_1"], context)
-        for key_entry, val in kv_pairs:
+        for _key_entry, val in kv_pairs:
             self.assertIsInstance(val, torch.Tensor)
 
     def test_unflatten_dynamic_cache(self):
@@ -72,6 +72,17 @@ class TestFlatten(ExtTestCase):
         self.assertEqual(4, len(flat))
         self.assertEqual(["key_0", "value_0", "key_1", "value_1"], context)
 
+    def test_flatten_with_keys_static_cache(self):
+        cache = make_static_cache(
+            [(torch.rand((2, 4, 3, 7)), torch.rand((2, 4, 3, 7))) for _ in range(2)],
+            max_cache_len=3,
+        )
+        kv_pairs, context = flatten_with_keys_static_cache(cache)
+        self.assertEqual(4, len(kv_pairs))
+        self.assertEqual(["key_0", "value_0", "key_1", "value_1"], context)
+        for _key_entry, val in kv_pairs:
+            self.assertIsInstance(val, torch.Tensor)
+
     def test_unflatten_static_cache(self):
         cache = make_static_cache(
             [(torch.rand((2, 4, 3, 7)), torch.rand((2, 4, 3, 7))) for _ in range(2)],
@@ -92,6 +103,17 @@ class TestFlatten(ExtTestCase):
         self.assertIsInstance(flat, list)
         self.assertIsInstance(context, list)
 
+    def test_flatten_with_keys_encoder_decoder_cache(self):
+        self_cache = self._make_cache()
+        cross_cache = self._make_cache()
+        ec_cache = transformers.cache_utils.EncoderDecoderCache(self_cache, cross_cache)
+        kv_pairs, context = flatten_with_keys_encoder_decoder_cache(ec_cache)
+        self.assertIsInstance(kv_pairs, list)
+        self.assertIsInstance(context, list)
+        self.assertEqual(2, len(kv_pairs))
+        for _key_entry, val in kv_pairs:
+            self.assertIsInstance(val, transformers.cache_utils.DynamicCache)
+
     def test_unflatten_encoder_decoder_cache(self):
         self_cache = self._make_cache()
         cross_cache = self._make_cache()
@@ -105,6 +127,15 @@ class TestFlatten(ExtTestCase):
         flat, context = flatten_base_model_output(output)
         self.assertIsInstance(flat, list)
         self.assertIsInstance(context, list)
+
+    def test_flatten_with_keys_base_model_output(self):
+        t = torch.randn(2, 3, 4)
+        output = BaseModelOutput(last_hidden_state=t)
+        kv_pairs, context = flatten_with_keys_base_model_output(output)
+        self.assertIsInstance(kv_pairs, list)
+        self.assertIsInstance(context, list)
+        for _key_entry, val in kv_pairs:
+            self.assertIsInstance(val, torch.Tensor)
 
     def test_unflatten_base_model_output(self):
         t = torch.randn(2, 3, 4)
