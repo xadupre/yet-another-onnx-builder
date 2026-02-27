@@ -1,0 +1,83 @@
+import ast
+import unittest
+from yobx.ext_test_case import ExtTestCase
+from yobx.xshape.expressions.simplify_expressions import (
+    SimpleSimpliflyTransformer,
+    simplify_expression,
+    simplify_two_expressions,
+)
+from yobx.xshape._shape_helper import is_static_shape, all_float
+
+
+class TestSimplifyExpressions(ExtTestCase):
+    def test_simplify_expression(self):
+        self.assertEqual(simplify_expression("x - y + y"), "x")
+        self.assertEqual(simplify_expression("2*x + 3*x - x"), "4*x")
+        self.assertEqual(simplify_expression("a + b - a"), "b")
+        self.assertEqual(simplify_expression("5 + x - 2 + 3"), "x+6")
+        self.assertEqual(simplify_expression("x - x"), "0")
+        self.assertEqual(simplify_expression("Max(x,y)"), "x^y")
+
+    def test_simplify_expression2(self):
+        self.assertEqual(simplify_expression("5 + x - (2 + 3)"), "x")
+
+    def test_simplify_expression3(self):
+        self.assertEqual(simplify_expression("x - 1"), "x-1")
+        self.assertEqual(simplify_expression("1 - x"), "-x+1")
+
+    def test_simplify_two_expressions(self):
+        self.assertEqual(
+            simplify_two_expressions("s52+seq_length", "s52+s70"), {"s70": -1, "seq_length": 1}
+        )
+        self.assertEqual(simplify_two_expressions("e*2", "e+e"), {})
+
+    def test_all_float(self):
+        self.assertTrue(all_float([6.7, 7.8]))
+
+    def test_is_static_shape(self):
+        self.assertFalse(is_static_shape(None))
+
+    def test_simplify_expression_bracket(self):
+        self.assertEqual("x", simplify_expression("2*x//2"))
+        self.assertEqual("x", simplify_expression("(2*x)//2"))
+        self.assertEqual("x", simplify_expression("(x*y)//y"))
+        self.assertEqual("x", simplify_expression("(x*(y+1))//(y+1)"))
+        self.assertEqual("c//2", simplify_expression("((c)//(2))"))
+
+    def test_simplify_add_sub(self):
+        self.assertEqual("b+c", simplify_expression("b+c-CeilToInt(b+c,2)+CeilToInt(b+c,2)"))
+
+    def test_simplify_function(self):
+        self.assertEqual("CeilToInt(b+c,2)", simplify_expression("CeilToInt(b+c,2)"))
+
+    def test_simplify_function_order(self):
+        self.assertEqual("a+b", simplify_expression("b+a"))
+
+    def test_simplify_function_order3(self):
+        self.assertEqual("a+b+c", simplify_expression("c+b+a"))
+        self.assertEqual("a+b+c", simplify_expression("b+c+a"))
+        self.assertEqual("a+b+c", simplify_expression("a+c+b"))
+
+    def test_simple_simplify_add(self):
+        tr = SimpleSimpliflyTransformer()
+        for expr, expected in [("x + 0", "x"), ("0 + x", "x")]:
+            tree = ast.parse(expr, mode="eval")
+            new_tree = tr.visit(tree)
+            self.assertEqual(ast.unparse(new_tree), expected)
+
+    def test_simple_simplify_mult(self):
+        tr = SimpleSimpliflyTransformer()
+        for expr, expected in [("x * 1", "x"), ("1 * x", "x")]:
+            tree = ast.parse(expr, mode="eval")
+            new_tree = tr.visit(tree)
+            self.assertEqual(ast.unparse(new_tree), expected)
+
+    def test_simplify_function_floordiv_int(self):
+        self.assertEqual("512*a", simplify_expression("1024*a//2"))
+        self.assertEqual("a", simplify_expression("1024*a//1024"))
+        self.assertEqual("a+b", simplify_expression("1024*(a+b)//1024"))
+        self.assertEqual("2*a+2*b", simplify_expression("1024*(a+b)//1024*2"))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
