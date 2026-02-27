@@ -21,8 +21,8 @@ from .tracing import (
 
 def use_dyn_not_str(dynamic_shapes: Any, default_value=None) -> Any:
     """
-    Some functions returns dynamic shapes as string.
-    This functions replaces them with ``torch.export.Dim.DYNAMIC``.
+    Some functions return dynamic shapes as string.
+    This function replaces them with ``torch.export.Dim.DYNAMIC``.
     ``default_value=torch.export.Dim.AUTO`` changes the default value.
     """
     if isinstance(dynamic_shapes, list):
