@@ -232,8 +232,11 @@ def unregister_class_flattening(cls: type, verbose: int = 0):
     if cls in torch.fx._pytree.SUPPORTED_NODES_EXACT_MATCH:
         del torch.fx._pytree.SUPPORTED_NODES_EXACT_MATCH[cls]
     torch.utils._pytree._deregister_pytree_node(cls)
-    if cls in torch.utils._pytree.SUPPORTED_NODES:
+    try:  # noqa: SIM105
         optree.unregister_pytree_node(cls, namespace="torch")
+    except ValueError:
+        # already unregistered.
+        pass
     assert cls not in torch.utils._pytree.SUPPORTED_NODES, (
         f"{cls} was not successful unregistered "
         f"from torch.utils._pytree.SUPPORTED_NODES="

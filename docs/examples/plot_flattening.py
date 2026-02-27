@@ -28,6 +28,7 @@ including the :epkg:`transformers` cache registrations.
 
 from dataclasses import dataclass
 import torch
+import torch.utils._pytree
 from yobx.torch.flatten_helper import (
     make_flattening_function_for_dataclass,
     register_class_flattening,
@@ -186,8 +187,8 @@ print("round-trip OK again")
 # it was before.
 assert EncoderOutput in torch.utils._pytree.SUPPORTED_NODES
 assert EncoderOutput2 in torch.utils._pytree.SUPPORTED_NODES
-unregister_class_flattening(EncoderOutput2)
 unregister_class_flattening(EncoderOutput)
+unregister_class_flattening(EncoderOutput2)
 print("EncoderOutput and EncoderOutput2 unregistered")
 assert EncoderOutput not in torch.utils._pytree.SUPPORTED_NODES
 assert EncoderOutput2 not in torch.utils._pytree.SUPPORTED_NODES
