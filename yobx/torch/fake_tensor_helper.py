@@ -381,8 +381,5 @@ def make_fake_with_dynamic_dimensions(
     if x is None:
         return None, None
     if context is None:
-        from ..helpers.fake_tensor_helper import FakeTensorContext
-
         context = FakeTensorContext()
-
     return context.make_fake_with_dynamic_dimensions(x, dynamic_shapes), context
