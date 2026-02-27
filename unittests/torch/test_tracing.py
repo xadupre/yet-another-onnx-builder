@@ -6,6 +6,7 @@ from yobx.ext_test_case import (
     ExtTestCase,
     requires_torch,
     requires_onnx_diagnostic,
+    requires_transformers,
     hide_stdout,
     skipif_ci_windows,
 )
@@ -788,6 +789,7 @@ class TestTracing(ExtTestCase):
 
     @requires_onnx_diagnostic("0.8.8")
     @requires_torch("2.9.99")
+    @requires_transformers("4.57")
     def test_tree_unflatten_with_proxy_dynamic_cache(self):
         from onnx_diagnostic.helpers.cache_helper import make_dynamic_cache
         from onnx_diagnostic.torch_export_patches import torch_export_patches
