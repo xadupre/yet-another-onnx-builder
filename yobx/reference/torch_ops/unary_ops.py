@@ -66,7 +66,7 @@ class Not_1(OpRunKernel):
 
 
 class Reciprocal_1(OpRunKernel):
-    """REciprocal"""
+    """Reciprocal"""
 
     def run(self, x: OpRunTensor) -> OpRunTensor:
         return OpRunTensor(1 / x.tensor)
