@@ -73,7 +73,7 @@ class Reciprocal_1(OpRunKernel):
 
 
 class Sigmoid_6(OpRunKernel):
-    """Sqrt"""
+    """Sigmoid"""
 
     def run(self, x: OpRunTensor) -> OpRunTensor:
         return OpRunTensor(torch.sigmoid(x.tensor))
