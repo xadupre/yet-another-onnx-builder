@@ -103,7 +103,7 @@ class FakeTensorContext:
             new_shape[i] = fake_tensor.shape[i]
 
         reduced_tensor = self.from_tensor(true_tensor, static_shapes=True).sum(
-            axis=tuple(sorted(sh)), keepdim=True
+            dim=tuple(sorted(sh)), keepdim=True
         )
         if len(reduced_tensor.shape) == 0 == len(new_shape):
             return reduced_tensor
