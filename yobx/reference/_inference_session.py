@@ -618,7 +618,7 @@ def investigate_onnxruntime_issue(
         import numpy as np
         import onnx
         import onnx.helper as oh
-        from yobx.helpers.ort_session import investigate_onnxruntime_issue
+        from yobx.reference._inference_session import investigate_onnxruntime_issue
 
         TFLOAT = onnx.TensorProto.FLOAT
         model = oh.make_model(
