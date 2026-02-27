@@ -51,7 +51,7 @@ class SequenceEmpty_11(OpRunOpSequence):
 
 
 class SequenceInsert_11(OpRunOpSequence):
-    "SqeuenceInsert"
+    "SequenceInsert"
 
     def run(
         self,
