@@ -424,10 +424,17 @@ def make_static_cache(
         dtype=key_value_pairs[0][0].dtype,
         max_cache_len=max_cache_len,
     )
-    assert hasattr(cache, "layers"), f"Missing attribute 'layers' for {cache!r}"
-    # transformers>= 4.55.2, layers are empty
-    for i, (key, value) in enumerate(key_value_pairs):
-        cache.update(key, value, i)
+    if hasattr(cache, "layers"):
+        # transformers >= 4.50: layers exist (empty in >= 4.55.2)
+        for i, (key, value) in enumerate(key_value_pairs):
+            cache.update(key, value, i)
+    else:
+        # transformers < 4.50: key_cache/value_cache are pre-allocated tensors;
+        # update() requires cache_position to write into the correct slice.
+        for i, (key, value) in enumerate(key_value_pairs):
+            seq_len = key.shape[2]
+            cache_position = torch.arange(seq_len, device=key.device)
+            cache.update(key, value, i, {"cache_position": cache_position})
     return finalize_cache(cache)  # type: ignore[return-value]
 
 
