@@ -830,8 +830,10 @@ class InputObserverInfo:
 
     def remove_inputs(self, input_names: Sequence[str | int]):
         """Lets the users drops inputs."""
-        if self.args_name_and_position is not None and self.args_name_and_position in input_names:
-            raise ValueError(f"Cannot remove variadic {self.args_name_and_position}")
+        if self.args_name_and_position is not None:
+            args_name, args_pos = self.args_name_and_position
+            if args_name in input_names or args_pos in input_names:
+                raise ValueError(f"Cannot remove variadic {self.args_name_and_position}")
         if self.kwargs_name is not None and self.kwargs_name in input_names:
             raise ValueError(f"Cannot remove variadic {self.kwargs_name}")
         for candidate in self.inputs:
