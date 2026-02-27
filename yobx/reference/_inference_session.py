@@ -215,7 +215,7 @@ class InferenceSessionForNumpy(_InferenceSession):
     :param log_verbosity_level: see :class:`onnxruntime.SessionOptions`
     :param optimized_model_filepath:  see :class:`onnxruntime.SessionOptions`
     :param disable_aot_function_inlining:  see :class:`onnxruntime.SessionOptions`
-    :param use_training_api: use onnxruntime-traning API
+    :param use_training_api: use onnxruntime-training API
     """
 
     def __init__(
