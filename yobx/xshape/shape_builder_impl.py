@@ -4,7 +4,6 @@ import pprint
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 import numpy as np
 import onnx
-import onnx.helper as oh
 import onnx.numpy_helper as onh
 from onnx.external_data_helper import uses_external_data
 from onnx.reference import ReferenceEvaluator
@@ -15,7 +14,7 @@ from ._shape_runtime import _ShapeRuntime
 from ._inference_runtime import _InferenceRuntime, _OptimizationOptions
 from .rename_expressions import parse_expression_tokens
 from .simplify_expressions import simplify_expression
-from ._onnx_helper import str_tensor_proto_type
+from ._onnx_helper import str_tensor_proto_type, np_dtype_to_tensor_dtype
 from .shape_builder import ShapeBuilder
 
 
@@ -225,7 +224,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             ref = ReferenceEvaluator(value)
             val = ref.run(None, {})[0]
             self.constants_computed_[name] = val
-            self.set_type(name, oh.np_dtype_to_tensor_dtype(val.dtype))
+            self.set_type(name, np_dtype_to_tensor_dtype(val.dtype))
             self.set_shape(name, tuple(map(int, val.shape)))
         else:
             raise TypeError(f"Unexpected type {type(value)} for value.")

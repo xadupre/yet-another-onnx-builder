@@ -28,7 +28,7 @@ def get_cached_configuration(
     .. runpython::
 
         import pprint
-        from yobx.transformers.configs import _retrieve_cached_configurations
+        from yobx.torch.transformers.configs import _retrieve_cached_configurations
 
         configs = _retrieve_cached_configurations()
         pprint.pprint(sorted(configs))

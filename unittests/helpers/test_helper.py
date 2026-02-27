@@ -1,11 +1,14 @@
 import inspect
 import unittest
 import numpy as np
-import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
 from yobx.helpers import make_hash, string_type, string_sig, string_signature
-from yobx.helpers.helper import flatten_object, size_type, onnx_dtype_name
-from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
+from yobx.helpers.helper import flatten_object, size_type
+from yobx.helpers.onnx_helper import (
+    tensor_dtype_to_np_dtype,
+    onnx_dtype_name,
+    np_dtype_to_tensor_dtype,
+)
 
 
 class TestSizeType(ExtTestCase):
@@ -54,7 +57,7 @@ class TestSizeType(ExtTestCase):
             np.uint64,
         }:
             size_type(dt)
-            onh.np_dtype_to_tensor_dtype(dt)
+            np_dtype_to_tensor_dtype(dt)
 
 
 class TestStringType(ExtTestCase):

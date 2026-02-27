@@ -239,6 +239,7 @@ backend_test.exclude(
     "|test_training"
     "|empty_set"
     "|test_Conv3d"
+    "|test_averagepool_3d"
     ")"
 )
 

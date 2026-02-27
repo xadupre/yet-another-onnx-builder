@@ -2,6 +2,7 @@ import functools
 import re
 from typing import Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
+import ml_dtypes
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
@@ -92,7 +93,45 @@ def onnx_dtype_name(itype: int, exc: bool = True) -> str:
 
 def np_dtype_to_tensor_dtype(dtype: np.dtype) -> int:
     """Converts a numpy dtype to an onnx element type."""
-    return oh.np_dtype_to_tensor_dtype(dtype)
+    try:
+        return oh.np_dtype_to_tensor_dtype(dtype)
+    except ValueError as e:
+        if dtype == np.int64:
+            return onnx.TensorProto.INT64
+        if dtype == np.float32:
+            return onnx.TensorProto.FLOAT
+        if dtype == np.float16:
+            return onnx.TensorProto.FLOAT16
+
+        if dtype == np.bool_:
+            return onnx.TensorProto.BOOL
+        if dtype == np.int8:
+            return onnx.TensorProto.INT8
+        if dtype == np.uint8:
+            return onnx.TensorProto.UINT8
+
+        if dtype == np.float64:
+            return onnx.TensorProto.DOUBLE
+
+        if dtype == np.int32:
+            return onnx.TensorProto.INT32
+        if dtype == np.int16:
+            return onnx.TensorProto.INT16
+
+        if dtype == np.uint64:
+            return onnx.TensorProto.UINT64
+        if dtype == np.uint32:
+            return onnx.TensorProto.UINT32
+        if dtype == np.uint16:
+            return onnx.TensorProto.UINT16
+
+        if dtype == ml_dtypes.bfloat16:
+            return onnx.TensorProto.BFLOAT16
+
+        if dtype == np.str_:
+            return onnx.TensorProto.STRING
+
+        raise ValueError(f"Unable to convert {dtype=} into ONNX dtype.") from e
 
 
 def dtype_to_tensor_dtype(dt: Union[np.dtype, "torch.dtype"]) -> int:  # type: ignore[arg-type,name-defined] # noqa: F821
