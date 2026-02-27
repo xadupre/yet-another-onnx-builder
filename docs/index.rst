@@ -1,6 +1,8 @@
 yet-another-onnx-builder documentation
 ======================================
 
+`yet-another-onnx-builder on GitHub <https://github.com/xadupre/yet-another-onnx-builder>`_
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents

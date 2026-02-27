@@ -13,7 +13,6 @@ yobx.xshape
     _inference_runtime
     _shape_runtime
     _shape_helper
-    _onnx_helper
     shape_builder
     shape_builder_impl
     shape_type_compute

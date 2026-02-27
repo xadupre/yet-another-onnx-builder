@@ -189,6 +189,15 @@ registrations that are already present but known to be incompatible with
 ``DynamicCache`` layers
 ------------------------
 
+.. note::
+    The layer-type-aware flattening described below relies on the ``layers``
+    attribute of :class:`transformers.cache_utils.DynamicCache`, which was
+    introduced in **transformers >= 4.50**.  On older versions of
+    ``transformers`` the cache is serialized with plain ``key_<i>`` /
+    ``value_<i>`` keys and no per-layer type information is preserved.  Use
+    :func:`~yobx.torch.transformers.flatten_class.flatten_dynamic_cache` only
+    with ``transformers >= 4.50`` if you need to round-trip mixed layer types.
+
 A ``DynamicCache`` can contain layers of different types
 (``DynamicLayer``, ``DynamicSlidingWindowLayer``, etc.).  The flatten
 context encodes each layer type as a short letter code so that the
