@@ -190,3 +190,4 @@ unregister_class_flattening(EncoderOutput2)
 unregister_class_flattening(EncoderOutput)
 print("EncoderOutput and EncoderOutput2 unregistered")
 assert EncoderOutput not in torch.utils._pytree.SUPPORTED_NODES
+assert EncoderOutput2 not in torch.utils._pytree.SUPPORTED_NODES
