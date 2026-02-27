@@ -306,8 +306,8 @@ def make_fake(
 
 
 def make_fake_with_dynamic_dimensions(
-    x: Any, dynamic_shapes: Any, context: Optional["FakeTensorContext"] = None
-) -> Tuple[Optional[Any], Optional["FakeTensorContext"]]:
+    x: Any, dynamic_shapes: Any, context: Optional[FakeTensorContext] = None
+) -> Tuple[Optional[Any], Optional[FakeTensorContext]]:
     """
     Replaces all tensors by fake tensor respecting the same
     constraints as the following dynamic shapes.
