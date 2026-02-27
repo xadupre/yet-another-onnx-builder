@@ -20,7 +20,7 @@ from yobx.torch.transformers.flatten_class import (
 )
 
 
-class TestFlatten(ExtTestCase):
+class TestTransformersFlatten(ExtTestCase):
     def _make_cache(self, n_layers=2, bsize=2, nheads=4, slen=3, dim=7):
         return make_dynamic_cache(
             [
