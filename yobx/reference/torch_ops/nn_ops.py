@@ -157,7 +157,7 @@ class LayerNormalization_17(OpRunKernel):
         if not self.compute_std:
             return OpRunTensor(res.to(original_dtype))
         axes = tuple(range(len(xt.shape)))[self.axis :]
-        mean, var = torch.var(xt, dim=axes, keepdim=False)
+        var, mean = torch.var_mean(xt, dim=axes, keepdim=False)
         x_inv_std_dev = torch.reciprocal(torch.sqrt(var + self.epsilon))
         return (
             OpRunTensor(res.to(original_dtype)),
