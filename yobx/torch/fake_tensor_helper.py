@@ -37,7 +37,7 @@ class FakeTensorContext:
             i += 1
             assert i < len(
                 self._candidates
-            ), f"Two many unique dimensions to generate, requested: {len(self._unique_)}"
+            ), f"Too many unique dimensions to generate, requested: {len(self._unique_)}"
             c = self._candidates[i]
         self._unique_.add(c)
         return c
