@@ -160,7 +160,7 @@ def replacement_before_exporting(args: Any) -> Any:
 
 def register_cache_flattening(
     patch_transformers: bool = False, verbose: int = 0
-) -> Dict[str, bool]:
+) -> Dict[type, bool]:
     """
     Registers many classes with
     :func:`yobx.torch.flatten_helper.register_class_flattening`.
@@ -252,14 +252,14 @@ def unregister_class_flattening(cls: type, verbose: int = 0):
         print(f"[unregister_cache_flattening] unregistered {cls.__name__}")
 
 
-def unregister_cache_flattening(undo: Dict[str, bool], verbose: int = 0):
+def unregister_cache_flattening(undo: Dict[type, bool], verbose: int = 0):
     """
     Undo the registration made by
     :func:`yobx.torch.flatten_helper.register_cache_flattening`.
     """
     cls_ensemble = set(undo)
     for cls in cls_ensemble:
-        if undo.get(cls.__name__, False):
+        if undo.get(cls, False):
             unregister_class_flattening(cls, verbose)
 
 
