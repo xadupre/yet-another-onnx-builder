@@ -13,8 +13,11 @@ import torch
 import transformers.cache_utils
 from transformers.cache_utils import Cache, DynamicCache, EncoderDecoderCache, StaticCache
 from transformers.modeling_outputs import BaseModelOutput
-from ...helpers.cache_helper import make_dynamic_cache, make_static_cache, CacheKeyValue
-from ..flatten import make_serialization_function_for_dataclass
+from .cache_helper import make_dynamic_cache, make_static_cache, CacheKeyValue
+from ..flatten_helper import (
+    make_flattening_function_for_dataclass,
+    register_class_flattening,
+)
 
 SUPPORTED_DATACLASSES: Set[type] = set()
 
@@ -241,4 +244,26 @@ def _lower_name_with_(name: str) -> str:
     flatten_base_model_output,
     flatten_with_keys_base_model_output,
     unflatten_base_model_output,
-) = make_serialization_function_for_dataclass(BaseModelOutput, SUPPORTED_DATACLASSES)
+) = make_flattening_function_for_dataclass(BaseModelOutput, SUPPORTED_DATACLASSES)
+
+
+TRANSFORMERS_CLASSES = {
+    DynamicCache: lambda: register_class_flattening(
+        DynamicCache,
+        flatten_dynamic_cache,
+        unflatten_dynamic_cache,
+        flatten_with_keys_dynamic_cache,
+    ),
+    EncoderDecoderCache: lambda: register_class_flattening(
+        EncoderDecoderCache,
+        flatten_encoder_decoder_cache,
+        unflatten_encoder_decoder_cache,
+        flatten_with_keys_encoder_decoder_cache,
+    ),
+    StaticCache: lambda: register_class_flattening(
+        StaticCache,
+        flatten_static_cache,
+        unflatten_static_cache,
+        flatten_with_keys_static_cache,
+    ),
+}

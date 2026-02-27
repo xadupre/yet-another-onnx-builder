@@ -23,7 +23,7 @@ class TestTorchDtypeToOnnxDtype(ExtTestCase):
         cls.torch = torch
 
     def setUp(self):
-        from yobx.helpers.torch_helper import torch_dtype_to_onnx_dtype
+        from yobx.torch.torch_helper import torch_dtype_to_onnx_dtype
 
         self.convert = torch_dtype_to_onnx_dtype
 
@@ -107,7 +107,7 @@ class TestToNumpy(ExtTestCase):
         cls.torch = torch
 
     def setUp(self):
-        from yobx.helpers.torch_helper import to_numpy
+        from yobx.torch.torch_helper import to_numpy
 
         self.to_numpy = to_numpy
 
@@ -180,7 +180,7 @@ class TestOnnxDtypeToTorchDtype(ExtTestCase):
         cls.torch = torch
 
     def setUp(self):
-        from yobx.helpers.torch_helper import onnx_dtype_to_torch_dtype
+        from yobx.torch.torch_helper import onnx_dtype_to_torch_dtype
 
         self.convert = onnx_dtype_to_torch_dtype
 
