@@ -6,7 +6,7 @@ import numpy as np
 
 
 def _string_tensor(obj, cls: str, with_shape: bool, with_device: bool) -> str:
-    from .torch_helper import torch_dtype_to_onnx_dtype
+    from ..torch.torch_helper import torch_dtype_to_onnx_dtype
 
     i = torch_dtype_to_onnx_dtype(obj.dtype)
     prefix = ("G" if obj.get_device() >= 0 else "C") if with_device else ""
@@ -295,7 +295,7 @@ def string_type(
         return _string_tensor(obj, "F", with_shape, with_device)
 
     if isinstance(obj, torch.Tensor):
-        from .torch_helper import torch_dtype_to_onnx_dtype
+        from ..torch.torch_helper import torch_dtype_to_onnx_dtype
 
         if with_min_max:
             s = string_type(obj, with_shape=with_shape, with_device=with_device)
@@ -906,12 +906,12 @@ def max_diff(
         import torch
 
         if isinstance(expected, torch.Tensor):
-            from .torch_helper import to_numpy
+            from .torch.torch_helper import to_numpy
 
             dev = 0 if expected.device.type == "cpu" else 1
             expected = to_numpy(expected)
         if isinstance(got, torch.Tensor):
-            from .torch_helper import to_numpy
+            from .torch.torch_helper import to_numpy
 
             dev = 0 if got.device.type == "cpu" else 1
             got = to_numpy(got)

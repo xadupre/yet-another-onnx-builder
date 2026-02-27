@@ -11,7 +11,6 @@ yobx.helpers
     helper
     mini_onnx_builder
     onnx_helper
-    torch_helper
 
 Other functions
 +++++++++++++++

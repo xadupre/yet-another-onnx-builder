@@ -23,7 +23,7 @@ class TestTorchDtypeToOnnxDtype(ExtTestCase):
         cls.torch = torch
 
     def setUp(self):
-        from yobx.helpers.torch_helper import torch_dtype_to_onnx_dtype
+        from yobx.torch.torch_helper import torch_dtype_to_onnx_dtype
 
         self.convert = torch_dtype_to_onnx_dtype
 

@@ -5,7 +5,6 @@ import numpy as np
 from onnx import NodeProto
 from ..helpers import string_type
 from ..helpers.onnx_helper import dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
-from ..helpers.torch_helper import onnx_dtype_to_torch_dtype
 from ..xshape._shape_helper import DYNAMIC_SHAPE, STATIC_SHAPE, all_int, all_int_or_str
 from ..xshape.simplify_expressions import simplify_expression
 from ..xshape._onnx_helper import str_tensor_proto_type
@@ -30,6 +29,12 @@ class _BuilderRuntime:
     used while exporting a model, by :meth:`_InferenceRuntime.compute_constant
     <yobx.xshape._inference_runtime._InferenceRuntime.compute_constant>`.
     """
+
+    def onnx_dtype_to_torch_dtype(itype: int) -> "torch.dtype":  # noqa: F821
+        """See :func:`yobx.torch.torch_helper.onnx_dtype_to_torch_dtype>`."""
+        from ..torch.torch_helper import onnx_dtype_to_torch_dtype
+
+        return onnx_dtype_to_torch_dtype(itype)
 
     def _apply_slice_to_shape(
         self,
@@ -249,7 +254,7 @@ class _BuilderRuntime:
         if isinstance(x, np.ndarray):
             # Type conversion between numpy and torch is not robust.
             itype = dtype_to_tensor_dtype(x.dtype)
-            ttype = onnx_dtype_to_torch_dtype(itype)
+            ttype = self.onnx_dtype_to_torch_dtype(itype)
             x = self.torch.from_numpy(x.copy()).to(ttype)
         return [self.torch.permute(x, perm).to(x.dtype)]
 
@@ -353,7 +358,7 @@ class _BuilderRuntime:
         if isinstance(x, np.ndarray):
             # Type conversion between numpy and torch is not robust.
             itype = dtype_to_tensor_dtype(x.dtype)
-            ttype = onnx_dtype_to_torch_dtype(itype)
+            ttype = self.onnx_dtype_to_torch_dtype(itype)
             x = self.make_torch_tensor_from_np_array(x).to(ttype)
             assert "FakeTensor" not in str(type(x)), (
                 f"FakeTensor {node.output[0]!r} cannot be a constant {type(x)}, "
@@ -364,7 +369,7 @@ class _BuilderRuntime:
             f"Unexpected type {type(x)} for x for node type {node.op_type}, "
             f"name={node.name}, inputs={node.input}, outputs={node.output}"
         )
-        ttype = onnx_dtype_to_torch_dtype(to)
+        ttype = self.onnx_dtype_to_torch_dtype(to)
         return [x.to(ttype)]
 
     def _apply_unary_function(
@@ -386,7 +391,7 @@ class _BuilderRuntime:
                 f"Not implemented for op_type={node.op_type!r}, node={node}, feeds={feeds}"
             )
 
-        ttype = onnx_dtype_to_torch_dtype(itype)
+        ttype = self.onnx_dtype_to_torch_dtype(itype)
         if node.op_type == "Sqrt":
             return [self.torch.sqrt(x).to(ttype)]
         if node.op_type == "Exp":
@@ -482,7 +487,7 @@ class _BuilderRuntime:
             elif isinstance(v, np.ndarray):
                 # Type conversion between numpy and torch is not robust.
                 itype = dtype_to_tensor_dtype(v.dtype)
-                ttype = onnx_dtype_to_torch_dtype(itype)
+                ttype = self.onnx_dtype_to_torch_dtype(itype)
                 x = self.make_torch_tensor_from_np_array(v.copy()).to(ttype)
                 assert "FakeTensor" not in str(type(x)), (
                     f"FakeTensor {node.output[0]!r} cannot be a constant {type(x)}, "
@@ -508,7 +513,7 @@ class _BuilderRuntime:
             if isinstance(v, np.ndarray):
                 # Type conversion between numpy and torch is not robust.
                 itype = dtype_to_tensor_dtype(v.dtype)
-                ttype = onnx_dtype_to_torch_dtype(itype)
+                ttype = self.onnx_dtype_to_torch_dtype(itype)
                 x = self.torch.from_numpy(v)
                 assert x.dtype == ttype, (
                     f"Unexpected conversion from numpy {v.dtype} to "

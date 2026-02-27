@@ -47,7 +47,7 @@ def make_feeds(
     flat = flatten_object(inputs, drop_keys=True)
     if use_numpy:
         import torch
-        from .torch_helper import to_numpy
+        from .torch.torch_helper import to_numpy
 
         flat = [to_numpy(t) if isinstance(t, torch.Tensor) else t for t in flat]
     names = (

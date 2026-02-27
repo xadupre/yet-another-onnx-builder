@@ -1,7 +1,7 @@
 import numpy as np
 import onnx
 import torch
-from .onnx_helper import onnx_dtype_name
+from ..helpers.onnx_helper import onnx_dtype_name
 
 _TYPENAME = dict(
     FLOAT=onnx.TensorProto.FLOAT,
