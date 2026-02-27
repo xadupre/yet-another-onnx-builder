@@ -9,6 +9,7 @@ Adapted from
 import os
 import time
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+import torch
 from ..helpers import max_diff, string_diff, string_type
 from ..helpers.helper import string_sig, get_sig_kwargs
 from .torch_helper import torch_deepcopy
@@ -275,9 +276,6 @@ class ExportOptions:
         verbose: int = 0,
     ) -> Union["torch.export.ExportedProgram", "torch.fx.GraphModule"]:  # noqa: F821
         """Exports the model into an exported program."""
-        import torch
-        from .torch_helper import torch_deepcopy
-
         print_exported_program = os.environ.get("PRINT_EXPORTED_PROGRAM", "0") in (1, "1")
 
         if self.fake:

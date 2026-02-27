@@ -17,6 +17,7 @@ from torch.fx import Node
 from torch.fx.proxy import TracerBase
 from ..helpers import flatten_object, string_type
 from .fake_tensor_helper import make_fake_with_dynamic_dimensions
+from .torch_helper import torch_deepcopy
 
 _torch_cat = torch.cat
 
@@ -650,8 +651,6 @@ class CustomTracer(torch.fx.Tracer):
 
         traced_model = None
         if concrete_args:
-            from .torch_helper import torch_deepcopy
-
             if dynamic_shapes is None:
                 dynamic_shapes = (
                     ({},) * len(concrete_args)
