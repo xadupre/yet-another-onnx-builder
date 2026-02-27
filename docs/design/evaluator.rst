@@ -313,7 +313,7 @@ The API mirrors :class:`onnx.reference.ReferenceEvaluator`: pass an
     import numpy as np
     import onnx
     import onnx.helper as oh
-    from yobx.reference import OnnxruntimeEvaluator
+    from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
     model = oh.make_model(
@@ -348,7 +348,7 @@ intermediate tensors) to its value.
     import numpy as np
     import onnx
     import onnx.helper as oh
-    from yobx.reference import OnnxruntimeEvaluator
+    from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
     model = oh.make_model(
@@ -388,7 +388,7 @@ not allow intermediate result inspection.
     import numpy as np
     import onnx
     import onnx.helper as oh
-    from yobx.reference import OnnxruntimeEvaluator
+    from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
     model = oh.make_model(

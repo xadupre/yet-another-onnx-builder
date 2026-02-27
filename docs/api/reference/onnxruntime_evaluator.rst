@@ -9,7 +9,7 @@ yobx.reference.onnxruntime_evaluator
 OnnxruntimeEvaluator
 ++++++++++++++++++++
 
-.. autoclass:: yobx.reference.OnnxruntimeEvaluator
+.. autoclass:: yobx.reference.onnxruntime_evaluator.OnnxruntimeEvaluator
     :members:
     :no-undoc-members:
 
