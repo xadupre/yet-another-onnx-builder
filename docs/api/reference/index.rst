@@ -6,10 +6,5 @@ yobx.reference
     :caption: modules
 
     evaluator
-
-ExtendedReferenceEvaluator
-++++++++++++++++++++++++++
-
-.. autoclass:: yobx.reference.ExtendedReferenceEvaluator
-    :members:
-    :no-undoc-members:
+    onnxruntime_evaluator
+    torch_evaluator
