@@ -573,7 +573,7 @@ def investigate_onnxruntime_issue(
     quiet: bool = False,
 ):
     """
-    Invgestigates a crashing model. It tries every node until
+    Investigates a crashing model. It tries every node until
     it crashes by adding the ones one by one in the model.
 
     :param proto: model or inference session
