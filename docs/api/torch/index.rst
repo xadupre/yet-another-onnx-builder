@@ -6,7 +6,9 @@ yobx.torch
     :caption: modules
 
     flatten_helper
-    transformers_flatten_class
+    input_observer
+    torch_helper
+    transformers/index
 
 register_flattening_functions
 +++++++++++++++++++++++++++++
