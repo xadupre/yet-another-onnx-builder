@@ -34,6 +34,7 @@ class TestCacheHelpers(ExtTestCase):
             string_type(dynamic_shapes),
         )
 
+    @requires_transformers("4.57")
     def test_replace_by(self):
         bsize, nheads, slen, dim = 2, 4, 3, 7
 
