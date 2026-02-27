@@ -149,7 +149,7 @@ class FakeTensorContext:
         If caches are used, it requires ``transformers>=4.57``.
         """
         if x is None:
-            return None, None
+            return None
         if type(x) in (list, tuple):
             return x.__class__(
                 [
