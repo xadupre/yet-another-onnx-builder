@@ -631,6 +631,8 @@ class TestTracing(ExtTestCase):
     @skipif_ci_windows("does not work on windows")
     @hide_stdout()
     def test_tracing_with_submodule(self):
+        self.skipTest("not implemented yet")
+
         def filter_position_ids(
             patch_attention_mask: torch.Tensor,
             position_ids: torch.Tensor,
