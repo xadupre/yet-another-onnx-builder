@@ -21,7 +21,8 @@ The example below shows three progressively richer scenarios:
 2. **LLM-like model** — inputs that include a
    :class:`transformers.cache_utils.DynamicCache` (key-value cache), which requires
    registering custom pytree flattening rules via
-   :func:`register_flattening_functions <yobx.torch.flatten_helper.register_flattening_functions>`.
+   :func:`register_flattening_functions
+   <yobx.torch.flatten_helper.register_flattening_functions>`.
 3. **Multimodal model** — a model that receives ``pixel_values`` only on the very first
    call (the *prefill* step).  The ``value_if_missing`` argument tells the observer what
    to substitute when the input is absent, so that the dynamic shape analysis remains
@@ -39,8 +40,8 @@ from yobx.torch.input_observer import InputObserver
 from yobx.torch.transformers.cache_helper import make_dynamic_cache
 
 # %%
-# 1. Simple model – two tensor inputs
-# -------------------------------------
+# 1. Simple model - two tensor inputs
+# -----------------------------------
 #
 # We start with the most basic case: a model that takes two float tensors and
 # returns their sum.  We run it with three different shapes so that the observer
@@ -86,8 +87,8 @@ args_add = observer_add.infer_arguments()
 print("Inferred arguments:", string_type(args_add, with_shape=True))
 
 # %%
-# 2. LLM-like model – inputs with a DynamicCache
-# ------------------------------------------------
+# 2. LLM-like model - inputs with a DynamicCache
+# ----------------------------------------------
 #
 # Transformer language models store previously computed key/value pairs in a
 # :class:`transformers.cache_utils.DynamicCache`.  Because ``DynamicCache`` is a custom
@@ -176,8 +177,8 @@ print("Inferred kwargs:", string_type(kwargs_llm, with_shape=True))
 # (head dimension) are static.
 
 # %%
-# 3. Multimodal model – pixel_values present only on the first call
-# ------------------------------------------------------------------
+# 3. Multimodal model - pixel_values present only on the first call
+# -----------------------------------------------------------------
 #
 # Vision-language models like Gemma3 or LLaVA receive ``pixel_values`` only during
 # the prefill step. Subsequent decode steps omit that argument and introduce
@@ -243,9 +244,7 @@ model_mm = MultimodalModel()
 # shape and dtype when it is absent.  The zero batch dimension signals
 # "optional but with this shape when present".
 observer_mm = InputObserver(
-    value_if_missing=dict(
-        pixel_values=torch.empty((0, 3, image_h, image_w), dtype=torch.float32)
-    )
+    value_if_missing=dict(pixel_values=torch.empty((0, 3, image_h, image_w), dtype=torch.float32))
 )
 
 with (
@@ -268,7 +267,7 @@ print("Inferred kwargs:", string_type(kwargs_mm, with_shape=True))
 # Note that ``pixel_values`` now appears in the inferred arguments with an empty
 # first dimension (batch=0) even though it was absent in two of the three calls.
 # The spatial dimensions 2 and 3 (height and width) are not dynamic because they
-# were always 224×224.
+# were always 224x224.
 #
 # These shapes and arguments can be passed directly to
 # :func:`torch.export.export` or :func:`torch.onnx.export`:
