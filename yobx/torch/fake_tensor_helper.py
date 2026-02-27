@@ -290,3 +290,99 @@ def make_fake(
     if context is None:
         context = FakeTensorContext()
     return context.make_fake(x), context
+
+
+def make_fake_with_dynamic_dimensions(
+    x: Any, dynamic_shapes: Any, context: Optional["FakeTensorContext"] = None  # noqa: F821
+) -> Tuple[Any, "FakeTensorContext"]:  # noqa: F821
+    """
+    Replaces all tensors by fake tensor respecting the same
+    constraints as the following dynamic shapes.
+    This uses function :func:`yobx.torch.fake_tensor_helper.make_fake`.
+    Parameter ``existing`` is used to reused the same object when the dynamic
+    dimension is given the same name as another one.
+    This function works with caches only if ``transformers>=4.57``.
+
+    A simple tensor:
+
+    .. runpython::
+        :showcode:
+
+        import torch
+        from yobx.torch.transformers.cache_helper import make_dynamic_cache
+        from yobx.torch.fake_tensor_helper import make_fake_with_dynamic_dimensions
+
+        inputs, _ = make_fake_with_dynamic_dimensions(
+            torch.rand((2, 3, 4, 5), dtype=torch.float32),
+            {0: "batch", 2: "cache_length"},
+        )
+        print(inputs)
+
+    Two tensors:
+
+    .. runpython::
+        :showcode:
+
+        import torch
+        from yobx.torch.transformers.cache_helper import make_dynamic_cache
+        from yobx.torch.fake_tensor_helper import make_fake_with_dynamic_dimensions
+
+        inputs, _ = make_fake_with_dynamic_dimensions(
+            (
+                torch.rand((2, 3, 4, 5), dtype=torch.float32),
+                torch.rand((2, 3, 4, 5), dtype=torch.float32),
+            ),
+            ({0: "batch", 2: "cache_length"}, {0: "batch", 2: "cache_length"}),
+        )
+        print(inputs)
+
+    With a cache:
+
+    .. runpython::
+        :showcode:
+
+        import pprint
+        import torch
+        from yobx.torch.transformers.cache_helper import make_dynamic_cache
+        from yobx.torch.fake_tensor_helper import make_fake_with_dynamic_dimensions
+
+        inputs, _ = make_fake_with_dynamic_dimensions(
+            dict(
+                input_ids=torch.randint(30360, size=(2, 3), dtype=torch.int64),
+                attention_mask=torch.randint(1, size=(2, 33), dtype=torch.int64),
+                position_ids=torch.randint(32, size=(2, 3), dtype=torch.int64),
+                past_key_values=make_dynamic_cache(
+                    [
+                        (
+                            torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                            torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                        ),
+                        (
+                            torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                            torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                        ),
+                    ]
+                ),
+            ),
+            dynamic_shapes={
+                "input_ids": {0: "batch", 1: "seq_length"},
+                "attention_mask": {0: "batch", 1: "cache+seq"},
+                "position_ids": {0: "batch", 1: "seq_length"},
+                "past_key_values": [
+                    {0: "batch", 2: "cache_length"},
+                    {0: "batch", 2: "cache_length"},
+                    {0: "batch", 2: "cache_length"},
+                    {0: "batch", 2: "cache_length"},
+                ],
+            },
+        )
+        pprint.pprint(inputs)
+    """
+    if x is None:
+        return None, None
+    if context is None:
+        from ..helpers.fake_tensor_helper import FakeTensorContext
+
+        context = FakeTensorContext()
+
+    return context.make_fake_with_dynamic_dimensions(x, dynamic_shapes), context
