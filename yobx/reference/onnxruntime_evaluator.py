@@ -90,7 +90,7 @@ class OnnxruntimeEvaluator:
     :param log_verbosity_level: see :class:`onnxruntime.SessionOptions`
     :param optimized_model_filepath:  see :class:`onnxruntime.SessionOptions`
     :param disable_aot_function_inlining:  see :class:`onnxruntime.SessionOptions`
-    :param use_training_api: use onnxruntime-traning API
+    :param use_training_api: use onnxruntime-training API
     :param verbose: verbosity
     :param local_functions: additional local function
     :param ir_version: ir version to use when unknown
