@@ -917,7 +917,7 @@ class ExtTestCase(unittest.TestCase):
         for a, b in zip(expected, value):
             self.assertEqualArray(a, b, atol=atol, rtol=rtol)
 
-    def to_numpy(tensor):
+    def to_numpy(self, tensor):
         """Converts a :class:`torch.Tensor` to :class:`numpy.ndarray`."""
         try:
             return tensor.detach().cpu().numpy()

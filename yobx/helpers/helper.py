@@ -1212,3 +1212,90 @@ def max_diff(
         f"{string_type(expected)} ({type(expected)}), got={string_type(got)},\n"
         f"level={level}"
     )
+
+
+def size_type(dtype: Any) -> int:
+    """Returns the element size for an element type."""
+    if isinstance(dtype, int):
+        from onnx import TensorProto
+
+        # It is a TensorProto.DATATYPE
+        if dtype in {
+            TensorProto.DOUBLE,
+            TensorProto.INT64,
+            TensorProto.UINT64,
+            TensorProto.COMPLEX64,
+        }:
+            return 8
+        if dtype in {TensorProto.FLOAT, TensorProto.INT32, TensorProto.UINT32}:
+            return 4
+        if dtype in {
+            TensorProto.FLOAT16,
+            TensorProto.BFLOAT16,
+            TensorProto.INT16,
+            TensorProto.UINT16,
+        }:
+            return 2
+        if dtype in {
+            TensorProto.INT8,
+            TensorProto.UINT8,
+            TensorProto.BOOL,
+            TensorProto.FLOAT8E4M3FN,
+            TensorProto.FLOAT8E4M3FNUZ,
+            TensorProto.FLOAT8E5M2,
+            TensorProto.FLOAT8E5M2FNUZ,
+            getattr(TensorProto, "FLOAT8E8M0", None),
+        }:
+            return 1
+        if dtype in {TensorProto.COMPLEX128}:
+            return 16
+        from .onnx_helper import onnx_dtype_name
+
+        raise AssertionError(
+            f"Unable to return the element size for type {onnx_dtype_name(dtype)}"
+        )
+
+    if dtype == np.float64 or dtype == np.int64:
+        return 8
+    if dtype == np.float32 or dtype == np.float32:
+        return 4
+    if dtype == np.float16 or dtype == np.int16:
+        return 2
+    if dtype == np.int32:
+        return 4
+    if dtype == np.int8:
+        return 1
+    if hasattr(np, "uint64"):
+        # it fails on mac
+        if dtype == np.uint64:
+            return 8
+        if dtype == np.uint32:
+            return 4
+        if dtype == np.uint16:
+            return 2
+        if dtype == np.uint8:
+            return 1
+
+    import torch
+
+    if dtype in {torch.float64, torch.int64}:
+        return 8
+    if dtype in {torch.float32, torch.int32}:
+        return 4
+    if dtype in {torch.float16, torch.int16, torch.bfloat16}:
+        return 2
+    if dtype in {torch.int8, torch.uint8, torch.bool}:
+        return 1
+    if hasattr(torch, "uint64"):
+        # it fails on mac
+        if dtype in {torch.uint64}:
+            return 8
+        if dtype in {torch.uint32}:
+            return 4
+        if dtype in {torch.uint16}:
+            return 2
+    import ml_dtypes
+
+    if dtype == ml_dtypes.bfloat16:
+        return 2
+    raise AssertionError(f"Unexpected dtype={dtype}")
