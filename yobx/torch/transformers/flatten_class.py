@@ -74,9 +74,9 @@ def _flatten_key_value_cache(cache: Cache) -> Tuple[List[Any], torch.utils._pytr
 
     keys = []
     for i in range(len(ca.key_cache)):  # type: ignore[arg-type]
-        letter = SHORTEN_LAYER_NAMES[ca.cls_layers[i].__name__]  # type: ignore[index;union-attr]
+        letter = SHORTEN_LAYER_NAMES[ca.cls_layers[i].__name__]  # type: ignore[index,union-attr]
         if hasattr(cache, "layers"):
-            kwargs = KWARGS_LAYER_NAMES[ca.cls_layers[i].__name__](cache.layers[i])  # type: ignore[index;union-attr]
+            kwargs = KWARGS_LAYER_NAMES[ca.cls_layers[i].__name__](cache.layers[i])  # type: ignore[index,union-attr]
         else:
             kwargs = ""
         keys.extend([f"key_{letter}{kwargs}_{i}", f"value_{letter}{kwargs}_{i}"])
