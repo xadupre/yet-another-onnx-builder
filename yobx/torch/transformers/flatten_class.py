@@ -58,25 +58,25 @@ PARSE_LAYER_NAMES = {
 
 def _flatten_key_value_cache(cache: Cache) -> Tuple[List[Any], torch.utils._pytree.Context]:
     ca = CacheKeyValue(cache)
-    flat = list(itertools.chain.from_iterable(zip(ca.key_cache, ca.value_cache)))
+    flat = list(itertools.chain.from_iterable(zip(ca.key_cache, ca.value_cache)))  # type: ignore[arg-type]
     unique = set(ca.cls_layers) if ca.cls_layers else None
     if (
         cache.__class__.__name__ != "DynamicCache"
         or unique is None
-        or (len(unique) == 1 and unique.pop().__name__ == "DynamicLayer")
+        or (len(unique) == 1 and unique.pop().__name__ == "DynamicLayer")  # type: ignore
     ):
         keys = list(
             itertools.chain.from_iterable(
-                (f"key_{i}", f"value_{i}") for i in range(len(ca.key_cache))
+                (f"key_{i}", f"value_{i}") for i in range(len(ca.key_cache))  # type: ignore[arg-type]
             )
         )
         return flat, keys
 
     keys = []
-    for i in range(len(ca.key_cache)):
-        letter = SHORTEN_LAYER_NAMES[ca.cls_layers[i].__name__]
+    for i in range(len(ca.key_cache)):  # type: ignore[arg-type]
+        letter = SHORTEN_LAYER_NAMES[ca.cls_layers[i].__name__]  # type: ignore[index,union-attr]
         if hasattr(cache, "layers"):
-            kwargs = KWARGS_LAYER_NAMES[ca.cls_layers[i].__name__](cache.layers[i])
+            kwargs = KWARGS_LAYER_NAMES[ca.cls_layers[i].__name__](cache.layers[i])  # type: ignore[index,union-attr]
         else:
             kwargs = ""
         keys.extend([f"key_{letter}{kwargs}_{i}", f"value_{letter}{kwargs}_{i}"])
@@ -174,8 +174,8 @@ def unflatten_static_cache(
     values: List[Any], context: torch.utils._pytree.Context, output_type=None
 ) -> StaticCache:
     """Restores a :class:`transformers.cache_utils.StaticCache` from python objects."""
-    return _unflatten_cache(
-        lambda *args, **kwargs: make_static_cache(
+    return _unflatten_cache(  # type: ignore[return-value]
+        lambda *args, **kwargs: make_static_cache(  # type: ignore[misc]
             *args, max_cache_len=values[0].shape[2], **kwargs
         ),
         values,

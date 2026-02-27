@@ -28,13 +28,13 @@ def make_flattening_function_for_dataclass(
 
     def flatten_cls(obj: cls) -> Tuple[List[Any], torch.utils._pytree.Context]:  # type: ignore[valid-type]
         """Serializes a ``%s`` with python objects."""
-        return list(obj.values()), list(obj.keys())
+        return list(obj.values()), list(obj.keys())  # type: ignore[attr-defined]
 
     def flatten_with_keys_cls(
         obj: cls,  # type: ignore[valid-type]
     ) -> Tuple[List[Tuple[torch.utils._pytree.KeyEntry, Any]], torch.utils._pytree.Context]:
         """Serializes a ``%s`` with python objects with keys."""
-        values, context = list(obj.values()), list(obj.keys())
+        values, context = list(obj.values()), list(obj.keys())  # type: ignore[attr-defined]
         return [(torch.utils._pytree.MappingKey(k), v) for k, v in zip(context, values)], context
 
     def unflatten_cls(
@@ -47,9 +47,9 @@ def make_flattening_function_for_dataclass(
     flatten_cls.__name__ = f"flatten_{name}"
     flatten_with_keys_cls.__name__ = f"flatten_with_keys_{name}"
     unflatten_cls.__name__ = f"unflatten_{name}"
-    flatten_cls.__doc__ = flatten_cls.__doc__ % cls.__name__
-    flatten_with_keys_cls.__doc__ = flatten_with_keys_cls.__doc__ % cls.__name__
-    unflatten_cls.__doc__ = unflatten_cls.__doc__ % cls.__name__
+    flatten_cls.__doc__ = flatten_cls.__doc__ % cls.__name__  # type: ignore[operator]
+    flatten_with_keys_cls.__doc__ = flatten_with_keys_cls.__doc__ % cls.__name__  # type: ignore[operator]
+    unflatten_cls.__doc__ = unflatten_cls.__doc__ % cls.__name__  # type: ignore[operator]
     supported_classes.add(cls)
     return flatten_cls, flatten_with_keys_cls, unflatten_cls
 
@@ -105,15 +105,15 @@ def register_class_flattening(
 
 def flattening_functions(
     patch_transformers: bool = False, patch_diffusers: bool = False, verbose: int = 0
-) -> Dict[type, Callable[[int], bool]]:
+) -> Dict[type, Callable[[], bool]]:
     """Returns the list of flattening functions."""
 
     supported_classes: Set[type] = set()
-    classes: Dict[type, Callable[[int], bool]] = {}
+    classes: Dict[type, Callable[[], bool]] = {}
     all_functions: Dict[type, Optional[str]] = {}
 
     if patch_transformers:
-        from .transformers.flatten_class import (
+        from .transformers.flatten_class import (  # type: ignore[attr-defined]
             __dict__ as dtr,
             SUPPORTED_DATACLASSES,
             TRANSFORMERS_CLASSES,
@@ -128,7 +128,7 @@ def flattening_functions(
         assert (
             f"flatten_{lname}" in all_functions
         ), f"Unable to find function 'flatten_{lname}' in {list(all_functions)}"
-        classes[cls] = (
+        classes[cls] = (  # type: ignore[misc]
             lambda verbose=verbose, _ln=lname, cls=cls, _al=all_functions: register_class_flattening(  # noqa: E501
                 cls,
                 _al[f"flatten_{_ln}"],
@@ -253,7 +253,9 @@ def unregister_cache_flattening(undo: Dict[type, bool], verbose: int = 0):
 
 
 @contextlib.contextmanager
-def register_flattening_functions(patch_transformers: bool = False, verbose: int = 0) -> Callable:
+def register_flattening_functions(
+    patch_transformers: bool = False, verbose: int = 0
+) -> Dict[type, bool]:
     """The necessary modifications to run the fx Graph."""
     fct_callable = replacement_before_exporting if patch_transformers else (lambda x: x)
     done = register_cache_flattening(patch_transformers=patch_transformers, verbose=verbose)

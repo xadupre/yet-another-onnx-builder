@@ -36,7 +36,7 @@ def get_cached_configuration(
     cached = _retrieve_cached_configurations()
     assert cached, "no cached configuration, which is weird"
     if name in cached:
-        conf = cached[name]()
+        conf = cached[name]()  # type: ignore[operator]
         return conf
     assert not exc and not os.environ.get("NOHTTP", ""), (
         f"Unable to find {name!r} (exc={exc}, "

@@ -1,8 +1,11 @@
+import sys
+import warnings
 from typing import Any
 import numpy as np
 import onnx
+import onnx.numpy_helper as onh
 import torch
-from ..helpers.onnx_helper import onnx_dtype_name
+from ..helpers.onnx_helper import onnx_dtype_name, tensor_dtype_to_np_dtype
 
 _TYPENAME = dict(
     FLOAT=onnx.TensorProto.FLOAT,
@@ -175,3 +178,44 @@ def torch_deepcopy(value: Any) -> Any:
         f"torch_deepcopy not implemented for type {type(value)}, "
         f"add attribute '__nocopy__' to return it as is."
     )
+
+
+def to_tensor(tensor: onnx.TensorProto, base_dir: str = "") -> torch.Tensor:
+    """
+    Converts a TensorProto to a torch.Tensor.
+
+    :param tensor: a TensorProto object.
+    :param base_dir: if external tensor exists, base_dir can help to find the path to it
+    :return: the converted torch tensor
+    """
+    assert not tensor.HasField("segment"), "Currently not supporting loading segments."
+    assert (
+        tensor.data_type != onnx.TensorProto.UNDEFINED
+    ), "The element type in the input tensor is not defined."
+    assert tensor.data_type != onnx.TensorProto.STRING, "to_tensor not implemented for strings"
+
+    tensor_dtype = tensor.data_type
+    torch_dtype = onnx_dtype_to_torch_dtype(tensor_dtype)
+    dims = tuple(tensor.dims)
+    if onnx.external_data_helper.uses_external_data(tensor):
+        # Load raw data from external tensor if it exists
+        onnx.external_data_helper.load_external_data_for_tensor(tensor, base_dir)
+
+    if tensor.HasField("raw_data"):
+        raw_data = tensor.raw_data
+        if len(raw_data) == 0:
+            return torch.tensor([], dtype=torch_dtype).reshape(dims)
+        if sys.byteorder == "big":
+            # Convert endian from little to big
+            raw_data = (
+                np.frombuffer(raw_data, dtype=tensor_dtype_to_np_dtype(tensor_dtype))
+                .byteswap()
+                .tobytes()
+            )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return torch.frombuffer(raw_data, dtype=torch_dtype).reshape(dims)
+
+    # Other cases, it should be small tensor. We use numpy.
+    np_tensor = onh.to_array(tensor)
+    return torch.from_numpy(np_tensor)

@@ -3,6 +3,7 @@ import torch
 import transformers
 from transformers.modeling_outputs import BaseModelOutput
 from yobx.ext_test_case import ExtTestCase, requires_transformers
+from yobx.torch.flatten_helper import register_class_flattening, unregister_class_flattening
 from yobx.torch.transformers.cache_helper import make_dynamic_cache, make_static_cache
 from yobx.torch.transformers.flatten_class import (
     flatten_dynamic_cache,
@@ -165,6 +166,36 @@ class TestTransformersFlatten(ExtTestCase):
         from yobx.helpers import max_diff
 
         self.assertEqual(0, max_diff(cache, rebuilt)["abs"])
+
+    def test_register_class_flattening_with_f_check(self):
+        """Test register_class_flattening verifies the registration using f_check."""
+        already_registered = (
+            transformers.cache_utils.DynamicCache in torch.utils._pytree.SUPPORTED_NODES
+        )
+        if already_registered:
+            unregister_class_flattening(transformers.cache_utils.DynamicCache)
+        try:
+
+            def f_check():
+                return self._make_cache()
+
+            registered = register_class_flattening(
+                transformers.cache_utils.DynamicCache,
+                flatten_dynamic_cache,
+                unflatten_dynamic_cache,
+                flatten_with_keys_dynamic_cache,
+                f_check=f_check,
+            )
+            self.assertTrue(registered)
+        finally:
+            unregister_class_flattening(transformers.cache_utils.DynamicCache)
+            if already_registered:
+                register_class_flattening(
+                    transformers.cache_utils.DynamicCache,
+                    flatten_dynamic_cache,
+                    unflatten_dynamic_cache,
+                    flatten_with_keys_dynamic_cache,
+                )
 
 
 if __name__ == "__main__":
