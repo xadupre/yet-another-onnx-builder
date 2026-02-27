@@ -5,7 +5,6 @@ import torch
 from yobx.ext_test_case import (
     ExtTestCase,
     requires_torch,
-    requires_onnx_diagnostic,
     hide_stdout,
     skipif_ci_windows,
 )
@@ -626,7 +625,6 @@ class TestTracing(ExtTestCase):
         op = torch._library.utils.lookup_op("aten::masked_fill.Scalar")
         self.assertEqual("aten::masked_fill.Scalar", op.name())
 
-    @requires_onnx_diagnostic("0.8.7")
     @skipif_ci_windows("does not work on windows")
     @hide_stdout()
     def test_tracing_with_submodule(self):
@@ -781,7 +779,6 @@ class TestTracing(ExtTestCase):
                 for k in a:
                     self.assertEqual(type(a[k]), type(b[k]))
 
-    @requires_onnx_diagnostic("0.8.8")
     @requires_torch("2.9.99")
     def test_tree_unflatten_with_proxy_dynamic_cache(self):
         from onnx_diagnostic.helpers.cache_helper import make_dynamic_cache

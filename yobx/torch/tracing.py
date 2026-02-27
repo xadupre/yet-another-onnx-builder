@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 import torch
 from torch.fx import Node
 from torch.fx.proxy import TracerBase
-from ..helpers import string_type
+from ..helpers import flatten_object, string_type
 
 _torch_cat = torch.cat
 
@@ -515,10 +515,6 @@ class CustomTracer(torch.fx.Tracer):
     def make_args_names(cls, concrete_args, flat_concrete_args):
         if not isinstance(concrete_args, dict):
             return [f"a{i}" for i in range(len(flat_concrete_args))]
-        try:
-            from onnx_diagnostic.helpers import flatten_object
-        except ImportError:
-            flatten_object = None
 
         if flatten_object is not None:
             flat_conc = {k: flatten_object(v, drop_keys=True) for k, v in concrete_args.items()}
