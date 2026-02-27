@@ -26,8 +26,10 @@ See :ref:`l-design-flatten` for a full description of the flattening design
 including the :epkg:`transformers` cache registrations.
 """
 
+from dataclasses import dataclass
 import torch
 from yobx.torch.flatten_helper import (
+    make_flattening_function_for_dataclass,
     register_class_flattening,
     unregister_class_flattening,
 )
@@ -87,6 +89,7 @@ registered = register_class_flattening(
     unflatten_encoder_output,
     flatten_with_keys_encoder_output,
 )
+assert EncoderOutput in torch.utils._pytree.SUPPORTED_NODES
 print("registered:", registered)
 
 # %%
@@ -96,10 +99,7 @@ print("registered:", registered)
 # Once registered, ``torch.utils._pytree.tree_flatten`` can decompose any
 # nested Python structure that contains :class:`EncoderOutput` objects.
 
-output = EncoderOutput(
-    last_hidden_state=torch.zeros(2, 5, 8),
-    pooler_output=torch.ones(2, 8),
-)
+output = EncoderOutput(t1=torch.zeros(2, 5, 8), t2=torch.ones(2, 8))
 
 flat, spec = torch.utils._pytree.tree_flatten(output)
 print("number of leaf tensors:", len(flat))
@@ -117,9 +117,8 @@ for i, t in enumerate(flat):
 restored = torch.utils._pytree.tree_unflatten(flat, spec)
 print("restored type :", type(restored).__name__)
 print("restored keys :", list(restored.keys()))
-assert isinstance(restored, EncoderOutput)
-assert torch.equal(restored["last_hidden_state"], output["last_hidden_state"])
-assert torch.equal(restored["pooler_output"], output["pooler_output"])
+assert torch.equal(restored["t1"], output["t1"])
+assert torch.equal(restored["t2"], output["t2"])
 print("round-trip OK")
 
 # %%
@@ -132,23 +131,49 @@ print("round-trip OK")
 # <yobx.torch.flatten_helper.make_flattening_function_for_dataclass>`
 # generates the three required callables automatically.
 
-from yobx.torch.flatten_helper import make_flattening_function_for_dataclass
+
+@dataclass
+class EncoderOutput2:
+    """Holds the output tensors produced by a (mock) encoder."""
+
+    t1: torch.Tensor
+    t2: torch.Tensor
+
 
 supported = set()
-
-
-class DecoderOutput(dict):
-    """Holds the output tensors produced by a (mock) decoder."""
-
-
 flatten_fn, flatten_with_keys_fn, unflatten_fn = make_flattening_function_for_dataclass(
-    DecoderOutput, supported
+    EncoderOutput2, supported
 )
+
 print("auto-generated names:")
 print(" ", flatten_fn.__name__)
 print(" ", flatten_with_keys_fn.__name__)
 print(" ", unflatten_fn.__name__)
 print("supported set:", {c.__name__ for c in supported})
+
+# %%
+# Let's register.
+
+registered = register_class_flattening(
+    EncoderOutput2, flatten_fn, unflatten_fn, flatten_with_keys_fn
+)
+assert EncoderOutput2 in torch.utils._pytree.SUPPORTED_NODES
+print("registered:", registered)
+
+
+# %%
+# New test.
+
+output2 = EncoderOutput2(t1=torch.zeros(2, 5, 8), t2=torch.ones(2, 8))
+
+flat, spec = torch.utils._pytree.tree_flatten(output)
+restored = torch.utils._pytree.tree_unflatten(flat, spec)
+print("restored type :", type(restored).__name__)
+print("restored keys :", list(restored.keys()))
+assert torch.equal(restored["t1"], output["t1"])
+assert torch.equal(restored["t2"], output["t2"])
+print("round-trip OK again")
+
 
 # %%
 # 7. Unregister to restore the original state
@@ -159,7 +184,9 @@ print("supported set:", {c.__name__ for c in supported})
 # <yobx.torch.flatten_helper.unregister_class_flattening>` to undo the
 # registration and leave ``torch.utils._pytree.SUPPORTED_NODES`` exactly as
 # it was before.
-
+assert EncoderOutput in torch.utils._pytree.SUPPORTED_NODES
+assert EncoderOutput2 in torch.utils._pytree.SUPPORTED_NODES
+unregister_class_flattening(EncoderOutput2)
 unregister_class_flattening(EncoderOutput)
-print("EncoderOutput unregistered")
+print("EncoderOutput and EncoderOutput2 unregistered")
 assert EncoderOutput not in torch.utils._pytree.SUPPORTED_NODES
