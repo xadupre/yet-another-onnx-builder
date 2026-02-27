@@ -578,7 +578,6 @@ def investigate_onnxruntime_issue(
 
     :param proto: model or inference session
     :param session_options: options
-    :param providers: providers
     :param nvtx: enable nvidia events
     :param providers: `None`, `"CPU"`, `"CUDA"` or a list of providers
     :param graph_optimization_level: see :class:`onnxruntime.SessionOptions`
