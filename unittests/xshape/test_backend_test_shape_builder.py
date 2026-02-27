@@ -11,7 +11,7 @@ from yobx.helpers.onnx_helper import pretty_onnx
 from yobx.helpers.rt_helper import make_feeds
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xshape import BasicShapeBuilder
-from yobx.xshape._onnx_helper import (
+from yobx.helpers.onnx_helper import (
     overwrite_shape_in_model_proto,
     replace_static_dimensions_by_strings,
 )

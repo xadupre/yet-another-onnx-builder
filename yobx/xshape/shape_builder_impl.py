@@ -15,7 +15,7 @@ from ._shape_runtime import _ShapeRuntime
 from ._inference_runtime import _InferenceRuntime, _OptimizationOptions
 from .rename_expressions import parse_expression_tokens
 from .simplify_expressions import simplify_expression
-from ._onnx_helper import str_tensor_proto_type
+from ..helpers.onnx_helper import str_tensor_proto_type
 from .shape_builder import ShapeBuilder
 
 

@@ -2,7 +2,7 @@ import unittest
 import onnx
 import onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape._onnx_helper import (
+from yobx.helpers.onnx_helper import (
     element_wise_binary_op_types,
     element_wise_op_cmp_types,
     unary_like_op_types,
