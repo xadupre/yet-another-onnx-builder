@@ -1,7 +1,7 @@
 import contextlib
 import pprint
 import re
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
 import optree
 import torch
 from ..helpers import string_type
@@ -259,7 +259,7 @@ def unregister_cache_flattening(undo: Dict[type, bool], verbose: int = 0):
 @contextlib.contextmanager
 def register_flattening_functions(
     patch_transformers: bool = False, verbose: int = 0
-) -> Dict[type, bool]:
+) -> Iterator[Callable]:
     """The necessary modifications to run the fx Graph."""
     fct_callable = replacement_before_exporting if patch_transformers else (lambda x: x)  # type: ignore
     done = register_cache_flattening(patch_transformers=patch_transformers, verbose=verbose)
