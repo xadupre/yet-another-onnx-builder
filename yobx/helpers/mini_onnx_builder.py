@@ -384,7 +384,7 @@ def _flatten_iterator(obj: Any, sep: str) -> Iterator:
                 for i, (k, v) in enumerate(obj.items()):
                     assert sep not in k, (
                         f"Key {k!r} cannot contain '{sep}'. "
-                        f"It would interfere with the serialization."
+                        f"It would interfere with the flattening."
                     )
 
                     def _mk(k):
@@ -402,7 +402,7 @@ def _flatten_iterator(obj: Any, sep: str) -> Iterator:
         elif obj.__class__.__name__ == "DynamicCache":
             # transformers
             import transformers
-            from .cache_helper import CacheKeyValue
+            from ..torch.transformers.cache_helper import CacheKeyValue
 
             assert isinstance(
                 obj, transformers.cache_utils.DynamicCache
@@ -419,7 +419,7 @@ def _flatten_iterator(obj: Any, sep: str) -> Iterator:
         elif obj.__class__.__name__ == "StaticCache":
             # transformers
             import transformers
-            from .cache_helper import CacheKeyValue
+            from ..torch.transformers.cache_helper import CacheKeyValue
 
             assert isinstance(
                 obj, transformers.cache_utils.StaticCache
@@ -586,7 +586,7 @@ def _unflatten(
 
     def _make(ty: type, res: Any) -> Any:
         if ty.__name__ == "DynamicCache":
-            from .cache_helper import CacheKeyValue
+            from ..torch.transformers.cache_helper import CacheKeyValue
 
             cc = CacheKeyValue()
             for k, v in res:

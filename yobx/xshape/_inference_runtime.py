@@ -4,7 +4,6 @@ import numpy as np
 import onnx
 from ..helpers import string_type
 from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
-from ..helpers.torch_helper import onnx_dtype_to_torch_dtype
 from ..reference import ExtendedReferenceEvaluator
 from ._shape_helper import (
     all_int,
@@ -560,6 +559,8 @@ class _InferenceRuntime:
                     # (like transpose(x: float36) --> float32)
                     itype = self.get_type(n)
                     if hasattr(val, "detach"):
+                        from ..torch.torch_helper import onnx_dtype_to_torch_dtype
+
                         val = val.to(onnx_dtype_to_torch_dtype(itype))
                     else:
                         val = val.astype(tensor_dtype_to_np_dtype(itype))

@@ -3,7 +3,11 @@ import torch
 import transformers
 from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.helpers import string_type, max_diff
-from yobx.helpers.cache_helper import CacheKeyValue, make_dynamic_cache, make_static_cache
+from yobx.torch.transformers.cache_helper import (
+    CacheKeyValue,
+    make_dynamic_cache,
+    make_static_cache,
+)
 
 
 class TestCacheHelpers(ExtTestCase):

@@ -11,7 +11,7 @@ from yobx.helpers.mini_onnx_builder import (
     proto_from_array,
     MiniOnnxBuilder,
 )
-from yobx.helpers.cache_helper import make_dynamic_cache, CacheKeyValue
+from yobx.torch.transformers.cache_helper import make_dynamic_cache, CacheKeyValue
 from yobx.helpers import string_type
 
 
