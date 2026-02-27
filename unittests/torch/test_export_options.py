@@ -27,7 +27,6 @@ class TestExportOptions(ExtTestCase):
     def test_default_init(self):
         opts = ExportOptions()
         self.assertFalse(opts.strict)
-        self.assertFalse(opts.fallback)
         self.assertFalse(opts.jit)
         self.assertFalse(opts.dynamo)
         self.assertIsNone(opts.decomposition_table)
@@ -63,10 +62,6 @@ class TestExportOptions(ExtTestCase):
     def test_strategy_jit(self):
         opts = ExportOptions(strategy="jit")
         self.assertTrue(opts.jit)
-
-    def test_strategy_fallback(self):
-        opts = ExportOptions(strategy="fallback")
-        self.assertTrue(opts.fallback)
 
     def test_strategy_dec(self):
         opts = ExportOptions(strategy="dec")
@@ -107,34 +102,6 @@ class TestExportOptions(ExtTestCase):
         cloned = opts.clone(strict=False)
         self.assertFalse(cloned.strict)
         self.assertEqual(cloned.decomposition_table, "default")
-
-    def test_get_fallback_options_default(self):
-        opts = ExportOptions()
-        fallback = opts.get_fallback_options()
-        self.assertIsInstance(fallback, list)
-        self.assertGreater(len(fallback), 0)
-        for f in fallback:
-            self.assertIsInstance(f, ExportOptions)
-
-    def test_get_fallback_options_strict(self):
-        opts = ExportOptions()
-        fallback = opts.get_fallback_options("strict")
-        self.assertEqual(len(fallback), 2)
-
-    def test_get_fallback_options_nostrict(self):
-        opts = ExportOptions()
-        fallback = opts.get_fallback_options("nostrict")
-        self.assertEqual(len(fallback), 2)
-
-    def test_get_fallback_options_jit(self):
-        opts = ExportOptions()
-        fallback = opts.get_fallback_options("jit")
-        self.assertEqual(len(fallback), 2)
-
-    def test_get_fallback_options_invalid_kind(self):
-        opts = ExportOptions()
-        with self.assertRaises(AssertionError):
-            opts.get_fallback_options("not-a-kind")
 
     def test_allowed_strategies(self):
         for strategy in ExportOptions._allowed:
@@ -291,24 +258,6 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
-    def test_export_fallback_strategy(self):
-        """Fallback strategy tries multiple options and returns the first successful one."""
-        model = _Neuron()
-        x = torch.rand(2, 5)
-        opts = ExportOptions(strategy="fallback")
-        ep = opts.export(
-            model,
-            args=(x,),
-            kwargs=None,
-            tracing_mode=False,
-            dynamic_shapes=None,
-            same_signature=True,
-        )
-        self.assertIsInstance(ep, torch.export.ExportedProgram)
-        # The winning fallback option is recorded
-        self.assertIsNotNone(opts._last_working)
-
-
 @requires_torch("2.0")
 class TestApplyDecompositions(ExtTestCase):
     def test_apply_decompositions_none(self):
@@ -380,7 +329,6 @@ class TestGetSigKwargs(ExtTestCase):
         kw = get_sig_kwargs(opts)
         self.assertEqual(kw["strict"], True)
         self.assertEqual(kw["decomposition_table"], "default")
-        self.assertFalse(kw["fallback"])
         self.assertFalse(kw["jit"])
 
 

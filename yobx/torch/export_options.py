@@ -7,7 +7,6 @@ Adapted from
 """
 
 import os
-import pprint
 import time
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 from ..helpers.helper import string_sig, get_sig_kwargs, string_type
@@ -24,7 +23,6 @@ class ExportOptions:
 
     :param strict: strict export or not, it only applies
         if :func:`torch.export.export` is called
-    :param fallback: fallback to jit
     :param decomposition_table: decomposition_table, a string such as ``'default'``
         or ``'all'``, or a custom decomposition dict
     :param dynamo: to use ``torch._dynamo.export`` instead of :func:`torch.export.export`
@@ -58,9 +56,6 @@ class ExportOptions:
         "jit": {"jit": True},
         "jit-dec": {"jit": True, "decomposition_table": "default"},
         "jit-decall": {"jit": True, "decomposition_table": "all"},
-        "fallback": {"fallback": True},
-        "fallback-dec": {"fallback": True, "decomposition_table": "default"},
-        "fallback-decall": {"fallback": True, "decomposition_table": "all"},
         "dec": {"decomposition_table": "default"},
         "decall": {"decomposition_table": "all"},
         "fake": {"fake": True},
@@ -69,7 +64,6 @@ class ExportOptions:
     def __init__(
         self,
         strict: bool = False,
-        fallback: bool = False,
         jit: bool = False,
         decomposition_table: Optional[
             Union[str, Dict[TorchOpOverload, Callable[..., Any]]]
@@ -86,7 +80,6 @@ class ExportOptions:
         fake: bool = False,
     ):
         self.strict = strict
-        self.fallback = fallback
         self.save_ep = save_ep
         self.decomposition_table = (
             None if decomposition_table in ("none", None) else decomposition_table
@@ -143,30 +136,6 @@ class ExportOptions:
             self.decomposition_table, dict
         ), f"Unexpected type {type(self.decomposition_table)} for decomposition_table"
         return self.decomposition_table
-
-    def get_fallback_options(self, kind: Optional[str] = None) -> List["ExportOptions"]:
-        """Returns the fallback scenario."""
-        if kind is None or kind in ("fallback", "fallback-dec", "fallback-decall"):
-            other_dec = None if self.decomposition_table else "default"
-            return [
-                self.clone(strict=True, decomposition_table=self.decomposition_table),
-                self.clone(strict=False, decomposition_table=self.decomposition_table),
-                self.clone(strict=True, decomposition_table=other_dec),
-                self.clone(strict=False, decomposition_table=other_dec),
-                self.clone(dynamo=True, decomposition_table=self.decomposition_table),
-                self.clone(dynamo=True, decomposition_table=other_dec),
-                self.clone(jit=True, decomposition_table=self.decomposition_table),
-            ]
-        if kind == "strict":
-            return [self.clone(strict=True), self.clone(strict=False)]
-        if kind == "nostrict":
-            return [self.clone(strict=False), self.clone(strict=True)]
-        if kind == "jit":
-            return [
-                self.clone(strict=True),
-                self.clone(jit=True, decomposition_table=self.decomposition_table),
-            ]
-        raise AssertionError(f"Unable to return fallback strategy with kind={kind!r}")
 
     def post_process_exported_program(
         self,
@@ -359,91 +328,6 @@ class ExportOptions:
                         f"[ExportOptions.export] fake args="
                         f"{_string_type(args, with_shape=True)}"
                     )
-
-        if self.fallback or self.strategy in {
-            "fallback",
-            "fallback-dec",
-            "fallback-decomposition",
-        }:
-            self._last_working = None
-            if verbose:
-                print("[ExportOptions.export] fallback")
-            tries = self.get_fallback_options(self.strategy)
-            excs = []
-            for ion, opt in enumerate(tries):
-                if verbose:
-                    print(f"[ExportOptions.export] tries {ion + 1}/{len(tries)}: {opt}")
-                try:
-                    res = opt.export(
-                        mod,
-                        args,
-                        kwargs,
-                        tracing_mode=tracing_mode,
-                        dynamic_shapes=dynamic_shapes,
-                        same_signature=same_signature,
-                        input_names=input_names,
-                        exc=False,
-                        verbose=max(verbose - 1, 0),
-                    )
-                except Exception as e:
-                    excs.append((opt, e))
-                    if verbose:
-                        se = str(e).split("\n", maxsplit=1)[0]
-                        print(f"[ExportOptions.export] fails due to {se}")
-                    continue
-
-                if isinstance(res, torch.export.ExportedProgram):
-                    inplace_nodes = _inplace_nodes(res.graph)
-                    if inplace_nodes:
-                        excs.append(
-                            (
-                                opt,
-                                f"Probable inplace modifications, "
-                                f"there are nodes with no users: {inplace_nodes}.",
-                            )
-                        )
-                        if verbose:
-                            print(f"[ExportOptions.export] fails due to {excs[-1][-1]}")
-
-                        if not opt.decomposition_table:
-                            if verbose:
-                                print(
-                                    f"[ExportOptions.export] current decomposition_table="
-                                    f"{opt.decomposition_table}, let's try with 'default'"
-                                )
-                            res = apply_decompositions(res, "default", self.backed_size_oblivious)
-                            inplace_nodes = _inplace_nodes(res.graph)
-                            if inplace_nodes:
-                                excs.append(
-                                    (
-                                        opt,
-                                        f"Probable inplace modifications, "
-                                        f"even after decomposition. "
-                                        f"there are nodes with no users: {inplace_nodes}.",
-                                    )
-                                )
-                                if verbose:
-                                    print(
-                                        f"[ExportOptions.export] fails again with "
-                                        f"{excs[-1][-1]}"
-                                    )
-                                continue
-                            opt.decomposition_table = "default"
-                        else:
-                            continue
-
-                if verbose:
-                    print(f"[ExportOptions.export] winning options {opt}")
-                self._last_working = opt
-                return res
-
-            if exc:
-                raise RuntimeError(
-                    f"None of the following options {tries} worked, args="
-                    f"{string_type(args, limit=20)}, kwargs={string_type(kwargs, limit=20)}, "
-                    f"exception=\n-----\n{pprint.pformat(excs)}"
-                )
-            return None
 
         if verbose:
             print(
