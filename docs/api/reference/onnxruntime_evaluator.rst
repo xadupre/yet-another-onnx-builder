@@ -5,3 +5,11 @@ yobx.reference.onnxruntime_evaluator
     :members:
     :no-undoc-members:
     :exclude-members: OnnxruntimeEvaluator
+
+OnnxruntimeEvaluator
+++++++++++++++++++++
+
+.. autoclass:: yobx.reference.OnnxruntimeEvaluator
+    :members:
+    :no-undoc-members:
+

@@ -6,3 +6,9 @@ yobx.reference.evaluator
     :no-undoc-members:
     :exclude-members: ExtendedReferenceEvaluator
 
+ExtendedReferenceEvaluator
+++++++++++++++++++++++++++
+
+.. autoclass:: yobx.reference.ExtendedReferenceEvaluator
+    :members:
+    :no-undoc-members:
