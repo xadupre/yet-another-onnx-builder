@@ -330,9 +330,7 @@ class ExportOptions:
                     )
 
         if verbose:
-            print(
-                f"[ExportOptions.export] {self!r} - export {type(mod).__name__!r}"
-            )
+            print(f"[ExportOptions.export] {self!r} - export {type(mod).__name__!r}")
             begin = time.perf_counter()
 
         if self.dynamo:
