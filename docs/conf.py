@@ -33,6 +33,11 @@ html_theme = "furo"
 html_static_path = ["_static"]
 html_logo = "_static/logo.svg"
 html_favicon = "_static/logo.svg"
+html_theme_options = {
+    "source_repository": "https://github.com/xadupre/yet-another-onnx-builder",
+    "source_branch": "main",
+    "source_directory": "docs/",
+}
 
 
 def linkcode_resolve(domain, info):
