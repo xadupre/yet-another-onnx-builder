@@ -127,21 +127,46 @@ def _unflatten_cache(
 def flatten_dynamic_cache(
     dynamic_cache: DynamicCache,
 ) -> Tuple[List[Any], torch.utils._pytree.Context]:
-    """Serializes a :class:`transformers.cache_utils.DynamicCache` with python objects."""
+    """
+    Serializes a :class:`transformers.cache_utils.DynamicCache` with python objects.
+
+    .. note::
+        Mixed-layer-type encoding (e.g. ``DynamicSlidingWindowLayer``) is only
+        supported when ``DynamicCache`` exposes a ``layers`` attribute, which was
+        introduced in ``transformers >= 4.50``.  On older versions the cache is
+        serialized with plain ``key_<i>`` / ``value_<i>`` keys and no per-layer
+        type information is preserved.
+    """
     return _flatten_key_value_cache(dynamic_cache)
 
 
 def flatten_with_keys_dynamic_cache(
     dynamic_cache: DynamicCache,
 ) -> Tuple[List[Tuple[torch.utils._pytree.KeyEntry, Any]], torch.utils._pytree.Context]:
-    """Serializes a :class:`transformers.cache_utils.DynamicCache` with python objects."""
+    """
+    Serializes a :class:`transformers.cache_utils.DynamicCache` with python objects.
+
+    .. note::
+        Mixed-layer-type encoding (e.g. ``DynamicSlidingWindowLayer``) is only
+        supported when ``DynamicCache`` exposes a ``layers`` attribute, which was
+        introduced in ``transformers >= 4.50``.  On older versions the cache is
+        serialized with plain ``key_<i>`` / ``value_<i>`` keys and no per-layer
+        type information is preserved.
+    """
     return _flatten_with_keys_cache(dynamic_cache)
 
 
 def unflatten_dynamic_cache(
     values: List[Any], context: torch.utils._pytree.Context, output_type=None
 ) -> DynamicCache:
-    """Restores a :class:`transformers.cache_utils.DynamicCache` from python objects."""
+    """
+    Restores a :class:`transformers.cache_utils.DynamicCache` from python objects.
+
+    .. note::
+        Reconstruction of mixed layer types requires ``DynamicCache`` to expose
+        a ``layers`` attribute (``transformers >= 4.50``).  On older versions
+        only homogeneous ``DynamicLayer`` caches can be restored.
+    """
     return _unflatten_cache(make_dynamic_cache, values, context, output_type=output_type)
 
 
