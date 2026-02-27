@@ -131,13 +131,7 @@ backend_test.exclude(
 )
 
 # Integer and unsigned integer types not fully supported by torch.
-backend_test.exclude(
-    "(test_div_int8"
-    "|test_div_int16"
-    "|test_div_uint"
-    "|test_pow_types_int"
-    ")"
-)
+backend_test.exclude("(test_div_int8|test_div_int16|test_div_uint|test_pow_types_int)")
 
 # LayerNormalization: known numerical failures.
 backend_test.exclude("(test_layer_normalization)")

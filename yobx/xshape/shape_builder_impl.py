@@ -4,11 +4,11 @@ import pprint
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 import numpy as np
 import onnx
-import onnx.helper as oh
 import onnx.numpy_helper as onh
 from onnx.external_data_helper import uses_external_data
 from onnx.reference import ReferenceEvaluator
 from ..helpers import string_type
+from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape
 from ._builder_runtime import _BuilderRuntime
 from ._shape_runtime import _ShapeRuntime
@@ -225,7 +225,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             ref = ReferenceEvaluator(value)
             val = ref.run(None, {})[0]
             self.constants_computed_[name] = val
-            self.set_type(name, oh.np_dtype_to_tensor_dtype(val.dtype))
+            self.set_type(name, np_dtype_to_tensor_dtype(val.dtype))
             self.set_shape(name, tuple(map(int, val.shape)))
         else:
             raise TypeError(f"Unexpected type {type(value)} for value.")
