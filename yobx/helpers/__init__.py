@@ -1,4 +1,5 @@
 from .helper import (
+    flatten_object,
     make_hash,
     max_diff,
     string_type,

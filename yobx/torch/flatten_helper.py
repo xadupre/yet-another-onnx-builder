@@ -210,8 +210,8 @@ def register_cache_flattening(
             )
             if verbose:
                 print(f"[_fix_registration] {cls.__name__} is unregistered and registered first")
-            unregister_class_flattening(cls, verbose=verbose)
-            registration_functions[cls](verbose=verbose)  # type: ignore[arg-type, call-arg]
+            unregister_class_flattening(cls)
+            registration_functions[cls]()  # type: ignore[arg-type, call-arg]
             if verbose:
                 print(f"[_fix_registration] {cls.__name__} done.")
             # To avoid doing it multiple times.
@@ -220,7 +220,7 @@ def register_cache_flattening(
     # classes with no registration at all.
     done = {}
     for k, v in registration_functions.items():
-        done[k] = v(verbose=verbose)  # type: ignore[arg-type, call-arg]
+        done[k] = v()  # type: ignore[arg-type, call-arg]
     return done
 
 
@@ -264,16 +264,10 @@ def unregister_cache_flattening(undo: Dict[str, bool], verbose: int = 0):
 
 
 @contextlib.contextmanager
-def register_flattening_functions(
-    patch_transformers: bool = False, patch_diffusers: bool = False, verbose: int = 0
-) -> Callable:
+def register_flattening_functions(patch_transformers: bool = False, verbose: int = 0) -> Callable:
     """The necessary modifications to run the fx Graph."""
-    fct_callable = (
-        replacement_before_exporting if patch_transformers or patch_diffusers else (lambda x: x)
-    )
-    done = register_cache_flattening(
-        patch_transformers=patch_transformers, patch_diffusers=patch_diffusers, verbose=verbose
-    )
+    fct_callable = replacement_before_exporting if patch_transformers else (lambda x: x)
+    done = register_cache_flattening(patch_transformers=patch_transformers, verbose=verbose)
     try:
         yield fct_callable
     finally:

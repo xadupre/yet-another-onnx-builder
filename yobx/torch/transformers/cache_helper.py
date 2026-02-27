@@ -319,6 +319,19 @@ def make_dynamic_cache(
     return finalize_cache(cache)  # type: ignore[return-value]
 
 
+def make_dynamic_shapes_kv_cache(
+    cache: transformers.cache_utils.Cache, shape_of_one: Dict[int, Any]
+) -> List[Dict[int, Any]]:
+    """
+    Returns the dynamic shapes for key-value cache
+
+    :param cache: a cache
+    :param shape_of_one: shape of one element
+    :return: dynamic shapes
+    """
+    return [shape_of_one for _ in range(CacheKeyValue(cache).n_layers * 2)]
+
+
 def finalize_cache(cache: transformers.cache_utils.Cache) -> transformers.cache_utils.Cache:
     """
     Ensures the created cache is consistent.
@@ -416,3 +429,16 @@ def make_static_cache(
     for i, (key, value) in enumerate(key_value_pairs):
         cache.update(key, value, i)
     return finalize_cache(cache)  # type: ignore[return-value]
+
+
+def make_encoder_decoder_cache(
+    self_attention_cache: transformers.cache_utils.DynamicCache,
+    cross_attention_cache: transformers.cache_utils.DynamicCache,
+) -> transformers.cache_utils.EncoderDecoderCache:
+    """Creates an EncoderDecoderCache."""
+    return transformers.cache_utils.EncoderDecoderCache(
+        # self_attention_cache=self_attention_cache,
+        # cross_attention_cache=cross_attention_cache
+        self_attention_cache,
+        cross_attention_cache,
+    )

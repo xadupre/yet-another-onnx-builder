@@ -11,10 +11,9 @@ from yobx.helpers import flatten_object
 from yobx.torch.transformers.cache_helper import (
     make_encoder_decoder_cache,
     make_dynamic_cache,
-    make_static_cache,
-    make_sliding_window_cache,
-    flatten_unflatten_for_dynamic_shapes,
     make_dynamic_shapes_kv_cache,
+    make_static_cache,
+    flatten_unflatten_for_dynamic_shapes,
     CacheKeyValue,
 )
 from yobx.torch.torch_helper import torch_deepcopy
@@ -181,121 +180,6 @@ class TestPatchSerialization(ExtTestCase):
             self.assertEqual("#1[T1r3]", self.string_type(unflat))
 
     @ignore_warnings(UserWarning)
-    @unittest.skipIf(not make_sliding_window_cache, "SlidingWindowCache was removed")
-    def test_base_sliding_window_cache_unflatten_flatten(self):
-        cache = make_sliding_window_cache([(torch.rand((4, 4, 4, 4)), torch.rand((4, 4, 4, 4)))])
-        with register_flattening_functions(patch_transformers=True):
-            cache2 = torch_deepcopy([cache])
-            self.assertEqualAny([cache], cache2)
-
-    @ignore_warnings(UserWarning)
-    @unittest.skipIf(make_sliding_window_cache, "transformers<5")
-    def test_base_sliding_window_cache_unflatten_flatten5(self):
-        cache = make_dynamic_cache(
-            [(torch.rand((4, 4, 4, 4)), torch.rand((4, 4, 4, 4)))],
-            cls_layers="DynamicSlidingWindowLayer",
-        )
-        with register_flattening_functions(patch_transformers=True):
-            cache2 = torch_deepcopy([cache])
-            self.assertEqualAny([cache], cache2)
-            self.assertEqual(
-                [type(lay) for lay in cache.layers], [type(lay) for lay in cache2[0].layers]
-            )
-
-    @ignore_warnings(UserWarning)
-    @requires_torch("2.7.99")
-    @unittest.skipIf(not make_sliding_window_cache, "SlidingWindowCache was removed")
-    def test_sliding_window_cache_export(self):
-        class Model(torch.nn.Module):
-            def forward(self, cache):
-                dc = CacheKeyValue(cache)
-                return dc.key_cache[0]
-
-        cache = make_sliding_window_cache(
-            [
-                (torch.rand((4, 4, 4, 4)), torch.rand((4, 4, 4, 4))),
-                (torch.rand((4, 4, 4, 4)), torch.rand((4, 4, 4, 4))),
-            ]
-        )
-        model = Model()
-        model(cache)
-        DYN = torch.export.Dim.DYNAMIC
-        ds = make_dynamic_shapes_kv_cache(cache, {0: DYN})
-
-        with register_flattening_functions(patch_transformers=True):
-            torch.export.export(model, (cache,), dynamic_shapes=(ds,))
-
-    @ignore_warnings(UserWarning)
-    @requires_torch("2.7.99")
-    @unittest.skipIf(make_sliding_window_cache, "transformers<5")
-    def test_sliding_window_cache_export5(self):
-        class Model(torch.nn.Module):
-            def forward(self, cache):
-                dc = CacheKeyValue(cache)
-                return dc.key_cache[0]
-
-        cache = make_dynamic_cache(
-            [
-                (torch.rand((4, 4, 4, 4)), torch.rand((4, 4, 4, 4))),
-                (torch.rand((4, 4, 4, 4)), torch.rand((4, 4, 4, 4))),
-            ],
-            cls_layers="DynamicSlidingWindowLayer",
-        )
-        model = Model()
-        model(cache)
-        DYN = torch.export.Dim.DYNAMIC
-        ds = make_dynamic_shapes_kv_cache(cache, {0: DYN})
-
-        with register_flattening_functions(patch_transformers=True):
-            torch.export.export(model, (cache,), dynamic_shapes=(ds,))
-
-    @ignore_warnings(UserWarning)
-    @unittest.skipIf(not make_sliding_window_cache, "SlidingWindowCache was removed")
-    def test_sliding_window_cache_flatten(self):
-        cache = make_sliding_window_cache([(torch.rand((4, 4, 4, 4)), torch.rand((4, 4, 4, 4)))])
-        with register_flattening_functions(patch_transformers=True):
-            flat, _spec = torch.utils._pytree.tree_flatten(cache)
-            self.assertEqual(
-                "#2[T1s4x4x4x4,T1s4x4x4x4]",
-                self.string_type(flat, with_shape=True),
-            )
-            cache2 = torch.utils._pytree.tree_unflatten(flat, _spec)
-            self.assertEqual(
-                self.string_type(cache, with_shape=True, with_min_max=True),
-                self.string_type(cache2, with_shape=True, with_min_max=True),
-            )
-
-    @ignore_warnings(UserWarning)
-    @unittest.skipIf(make_sliding_window_cache, "transformers<5")
-    def test_sliding_window_cache_flatten5(self):
-        cache = make_dynamic_cache(
-            [
-                (torch.rand((4, 4, 4, 4)), torch.rand((4, 4, 4, 4))),
-                (torch.rand((4, 4, 4, 4)), torch.rand((4, 4, 4, 4))),
-            ],
-            cls_layers="DynamicSlidingWindowLayer",
-            cls_kwargs=[dict(sliding_window=11), dict(sliding_window=12)],
-        )
-        self.assertEqual(cache.layers[0].sliding_window, 11)
-        self.assertEqual(cache.layers[1].sliding_window, 12)
-        with register_flattening_functions(patch_transformers=True):
-            flat, _spec = torch.utils._pytree.tree_flatten(cache)
-            self.assertEqual(
-                "#4[T1s4x4x4x4,T1s4x4x4x4,T1s4x4x4x4,T1s4x4x4x4]",
-                self.string_type(flat, with_shape=True),
-            )
-            cache2 = torch.utils._pytree.tree_unflatten(flat, _spec)
-            self.assertEqual(
-                self.string_type(cache, with_shape=True, with_min_max=True),
-                self.string_type(cache2, with_shape=True, with_min_max=True),
-            )
-            self.assertEqual(
-                [type(lay) for lay in cache.layers], [type(lay) for lay in cache2.layers]
-            )
-            self.assertEqual(cache2.layers[0].sliding_window, 11)
-            self.assertEqual(cache2.layers[1].sliding_window, 12)
-
-    @ignore_warnings(UserWarning)
     @requires_torch("2.7.99")
     def test_static_cache(self):
         bo = make_static_cache(
@@ -356,7 +240,7 @@ class TestPatchSerialization(ExtTestCase):
         DYN = torch.export.Dim.DYNAMIC
         ds = make_dynamic_shapes_kv_cache(bo, {0: DYN})
 
-        with register_flattening_functions(patch_transformers=True, stop_if_static=1):
+        with register_flattening_functions(patch_transformers=True):
             torch.export.export(model, (bo,), dynamic_shapes=(ds,))
 
     @ignore_warnings(UserWarning)
