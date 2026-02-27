@@ -20,7 +20,8 @@ from yobx.torch.torch_helper import torch_deepcopy
 from yobx.torch.flatten_helper import register_flattening_functions, replacement_before_exporting
 
 
-class TestPatchSerialization(ExtTestCase):
+@requires_transformers("4.57")
+class TestPatchFlattening(ExtTestCase):
     @ignore_warnings(UserWarning)
     def test_encoder_decoder_cache_flatten(self):
         cache = make_encoder_decoder_cache(
