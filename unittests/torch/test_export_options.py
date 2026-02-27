@@ -1,13 +1,25 @@
 """Tests for ExportOptions in yobx.torch.export_options."""
 import unittest
 import torch
-from yobx.ext_test_case import ExtTestCase, requires_torch
+from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch
 from yobx.helpers.helper import get_sig_kwargs
 from yobx.torch.export_options import (
     ExportOptions,
     _inplace_nodes,
+    apply_decompositions,
     insert_contiguous_between_transpose_and_view,
 )
+
+
+class _Neuron(torch.nn.Module):
+    """Simple Linear+relu model used as a shared test fixture."""
+
+    def __init__(self, n_dims: int = 5, n_targets: int = 3):
+        super().__init__()
+        self.linear = torch.nn.Linear(n_dims, n_targets)
+
+    def forward(self, x):
+        return torch.relu(self.linear(x))
 
 
 @requires_torch("2.0")
@@ -196,6 +208,143 @@ class TestExportOptions(ExtTestCase):
             same_signature=True,
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    def test_export_neuron_model(self):
+        """Neuron (Linear+relu) model export matches upstream Neuron fixture."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions()
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    def test_export_with_dynamic_shapes(self):
+        """Export a Neuron model with a dynamic batch dimension."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        batch = torch.export.Dim("batch")
+        opts = ExportOptions()
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=({0: batch},),
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    @ignore_warnings(UserWarning)
+    def test_export_with_jit(self):
+        """Export with jit=True using TS2EPConverter."""
+        try:
+            from torch._export.converter import TS2EPConverter  # noqa: F401
+        except ImportError:
+            self.skipTest("TS2EPConverter not available in this torch version")
+
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(jit=True)
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    def test_export_with_decomposition_default(self):
+        """Export with dec strategy applies default decompositions."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(strategy="dec")
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    def test_export_with_decomposition_all(self):
+        """Export with decall strategy applies all decompositions."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(strategy="decall")
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    def test_export_fallback_strategy(self):
+        """Fallback strategy tries multiple options and returns the first successful one."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(strategy="fallback")
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+        # The winning fallback option is recorded
+        self.assertIsNotNone(opts._last_working)
+
+
+@requires_torch("2.0")
+class TestApplyDecompositions(ExtTestCase):
+    def test_apply_decompositions_none(self):
+        """apply_decompositions with None table is a no-op and returns the same object."""
+        ep = torch.export.export(_Neuron(), (torch.rand(2, 5),))
+        result = apply_decompositions(ep, None, False)
+        self.assertIs(result, ep)
+
+    def test_apply_decompositions_default(self):
+        """apply_decompositions with 'default' table produces an ExportedProgram."""
+        ep = torch.export.export(_Neuron(), (torch.rand(2, 5),))
+        result = apply_decompositions(ep, "default", False)
+        self.assertIsInstance(result, torch.export.ExportedProgram)
+
+    def test_apply_decompositions_all(self):
+        """apply_decompositions with 'all' runs full decompositions."""
+        ep = torch.export.export(_Neuron(), (torch.rand(2, 5),))
+        result = apply_decompositions(ep, "all", False)
+        self.assertIsInstance(result, torch.export.ExportedProgram)
+
+
+@requires_torch("2.0")
+class TestPostProcessExportedProgram(ExtTestCase):
+    def test_post_process_no_decomposition(self):
+        """post_process_exported_program with no decomposition table returns same program."""
+        ep = torch.export.export(_Neuron(), (torch.rand(2, 5),))
+        opts = ExportOptions()
+        result = opts.post_process_exported_program(ep)
+        self.assertIsInstance(result, torch.export.ExportedProgram)
+
+    def test_post_process_with_decomposition(self):
+        """post_process_exported_program with decomposition applies decompositions."""
+        ep = torch.export.export(_Neuron(), (torch.rand(2, 5),))
+        opts = ExportOptions(decomposition_table="default")
+        result = opts.post_process_exported_program(ep)
+        self.assertIsInstance(result, torch.export.ExportedProgram)
 
 
 @requires_torch("2.0")
