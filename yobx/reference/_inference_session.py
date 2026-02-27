@@ -146,7 +146,7 @@ class _InferenceSession:
         ), f"Input name cannot be empty but input_names={self.input_names}"
         self.output_names = [i.name for i in sess.get_outputs()]
         assert (
-            "" not in self.input_names
+            "" not in self.output_names
         ), f"Output name cannot be empty but output_names={self.output_names}"
         self.input_shapes = [i.shape for i in sess.get_inputs()]
         self.output_shapes = [i.shape for i in sess.get_outputs()]
