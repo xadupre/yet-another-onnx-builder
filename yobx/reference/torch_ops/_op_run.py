@@ -31,7 +31,7 @@ class OpRunTensor(OpRunValue):
             f"Unexpected type {type(tensor)}, "
             f"__name__={getattr(tensor, '__name__', 'no name')}"
         )
-        assert tensor is None or tensor.numel() != 1 or tensor.item() != -666666
+        assert tensor.numel() != 1 or tensor.item() != -666666
         self.tensor = (
             tensor.cpu()
             if may_cpu
