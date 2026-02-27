@@ -5,5 +5,6 @@ Elements of Design
 
    cube
    evaluator
+   flatten
    helpers
    shape
