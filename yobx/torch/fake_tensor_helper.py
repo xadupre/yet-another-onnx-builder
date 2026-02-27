@@ -233,7 +233,10 @@ class FakeTensorContext:
 
                 x = torch.empty(tuple(new_shape), dtype=x.dtype, device=x.device)
 
-            t = self.fake_reshape(x, dynamic_shapes) if dynamic_shapes is not None else x  # type: ignore[arg-type]
+            if dynamic_shapes is not None:
+                t = self.fake_reshape(x, dynamic_shapes)  # type: ignore[arg-type]
+            else:
+                t = self.from_tensor(x, static_shapes=True)
             assert t.device == x.device, f"device mismatch {x.device} -> {t.device}"
             assert t.dtype == x.dtype, f"dtype mismatch {x.dtype} -> {t.dtype}"
             return t
