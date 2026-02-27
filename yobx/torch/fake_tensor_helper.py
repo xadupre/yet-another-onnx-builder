@@ -119,12 +119,12 @@ class FakeTensorContext:
             return {k: self.make_fake(v) for k, v in x.items()}
         if x.__class__.__name__ in {"DynamicCache", "StaticCache", "HybridCache"}:
             assert hasattr(x, "layers"), (
-                f"Une more recent version of transformers (>=4.55), "
+                f"A more recent version of transformers (>=4.55), "
                 f"'layers' not found in class {type(x)}"
             )
             for layer in x.layers:
                 assert hasattr(layer, "keys") and hasattr(layer, "values"), (
-                    f"Une more recent version of transformers (>=4.55), 'layers' "
+                    f"A more recent version of transformers (>=4.55), 'layers' "
                     f"not found in class {type(layer)} ({dir(layer)})"
                 )
                 layer.keys = self.make_fake(layer.keys)
