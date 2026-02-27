@@ -249,7 +249,9 @@ class InferenceSessionForNumpy(_InferenceSession):
         )
 
     def run(
-        self, output_names: Optional[List[str]], feeds: Dict[str, TensorLike]
+        self,
+        output_names: Optional[List[str]],
+        feeds: Union[Dict[str, np.ndarray], Dict[str, ORTC.OrtValue]],
     ) -> List[Optional[TensorLike]]:
         """Calls :meth:`onnxruntime.InferenceSession.run`."""
         # sess.run does not support bfloat16
