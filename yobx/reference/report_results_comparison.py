@@ -1,4 +1,6 @@
 from typing import Any, Dict, List, Set, Tuple, Union
+from ..helpers.onnx_helper import dtype_to_tensor_dtype
+from ..helpers import max_diff, string_type
 
 ReportKeyNameType = Union[str, Tuple[str, int, str]]
 ReportKeyValueType = Tuple[int, Tuple[int, ...]]
@@ -8,16 +10,13 @@ class ReportResultComparison:
     """
     Holds tensors a runtime can use as a reference to compare
     intermediate results.
-    See :meth:`yobx.reference.torch_evaluator.TorchReferenceEvaluator.run`.
+    See :meth:`yobx.reference..torch_evaluator.TorchReferenceEvaluator.run`.
 
     :param tensors: tensor
     """
 
     # pyrefly: ignore[unknown-name]
     def __init__(self, tensors: Dict[ReportKeyNameType, "torch.Tensor"]):  # type: ignore[name-defined] # noqa: F821
-        from ..helpers.onnx_helper import dtype_to_tensor_dtype
-        from ..helpers import max_diff, string_type
-
         assert all(
             hasattr(v, "shape") and hasattr(v, "dtype") for v in tensors.values()
         ), f"One of the tensors is not: {string_type(tensors, with_shape=True)}"
