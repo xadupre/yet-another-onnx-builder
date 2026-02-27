@@ -15,7 +15,9 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 import torch
 from torch.fx import Node
 from torch.fx.proxy import TracerBase
-from ..helpers import string_type
+from ..helpers import flatten_object, string_type
+from .fake_tensor_helper import make_fake_with_dynamic_dimensions
+from .torch_helper import torch_deepcopy
 
 _torch_cat = torch.cat
 
@@ -515,10 +517,6 @@ class CustomTracer(torch.fx.Tracer):
     def make_args_names(cls, concrete_args, flat_concrete_args):
         if not isinstance(concrete_args, dict):
             return [f"a{i}" for i in range(len(flat_concrete_args))]
-        try:
-            from onnx_diagnostic.helpers import flatten_object
-        except ImportError:
-            flatten_object = None
 
         if flatten_object is not None:
             flat_conc = {k: flatten_object(v, drop_keys=True) for k, v in concrete_args.items()}
@@ -653,9 +651,6 @@ class CustomTracer(torch.fx.Tracer):
 
         traced_model = None
         if concrete_args:
-            from onnx_diagnostic.export.shape_helper import make_fake_with_dynamic_dimensions
-            from .torch_helper import torch_deepcopy
-
             if dynamic_shapes is None:
                 dynamic_shapes = (
                     ({},) * len(concrete_args)

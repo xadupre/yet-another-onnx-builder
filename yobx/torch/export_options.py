@@ -9,7 +9,10 @@ Adapted from
 import os
 import time
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
-from ..helpers.helper import string_sig, get_sig_kwargs, string_type
+import torch
+from ..helpers import max_diff, string_diff, string_type
+from ..helpers.helper import string_sig, get_sig_kwargs
+from .torch_helper import torch_deepcopy
 
 # Type alias for torch operator overload
 # (forward reference avoids importing torch at module level)
@@ -234,13 +237,9 @@ class ExportOptions:
         prefer_deferred_runtime_asserts_over_guards: bool = False,
     ) -> "torch.export.ExportedProgram":  # noqa: F821
         import torch
+        from . import use_dyn_not_str
 
-        try:
-            from onnx_diagnostic.torch_export_patches.patch_inputs import use_dyn_not_str
-
-            dyn_shapes = use_dyn_not_str(dynamic_shapes)
-        except ImportError:
-            dyn_shapes = dynamic_shapes
+        dyn_shapes = use_dyn_not_str(dynamic_shapes)
 
         export_kwargs: Dict[str, Any] = {
             "strict": self.strict,
@@ -277,23 +276,15 @@ class ExportOptions:
         verbose: int = 0,
     ) -> Union["torch.export.ExportedProgram", "torch.fx.GraphModule"]:  # noqa: F821
         """Exports the model into an exported program."""
-        import torch
-        from .torch_helper import torch_deepcopy
-
         print_exported_program = os.environ.get("PRINT_EXPORTED_PROGRAM", "0") in (1, "1")
 
         if self.fake:
             assert not (
                 args and kwargs
             ), "Option with fake tensors is not available if both args and kwargs are specified"
-            try:
-                from onnx_diagnostic.export.shape_helper import make_fake_with_dynamic_dimensions
-                from onnx_diagnostic.helpers import string_type as _string_type
-            except ImportError:
-                raise ImportError(
-                    "onnx_diagnostic is required for fake=True export option. "
-                    "Install it with: pip install onnx-diagnostic"
-                ) from None
+            from yobx.helpers import string_type as _string_type
+            from .fake_tensor_helper import make_fake_with_dynamic_dimensions
+
             dynamic_shapes_str = self.use_str_not_dyn(dynamic_shapes)
             if verbose:
                 print(f"[ExportOptions.export] dynamic_shapes={dynamic_shapes}")
@@ -466,23 +457,12 @@ class ExportOptions:
         verbose: int = 0,
     ):
         """Validates the exported program by running the model."""
-        from .torch_helper import torch_deepcopy
-
-        try:
-            from onnx_diagnostic.helpers import max_diff, string_diff
-            from onnx_diagnostic.helpers import string_type as _string_type
-        except ImportError:
-            raise ImportError(
-                "onnx_diagnostic is required for validate_ep=True export option. "
-                "Install it with: pip install onnx-diagnostic"
-            ) from None
-
         ar, kws = torch_deepcopy((args, kwargs))
         if verbose:
             print(
                 f"[ExportOptions.validate_exported_program] run model with "
-                f"args={_string_type(args, with_shape=True)} and "
-                f"kwargs={_string_type(kwargs, with_shape=True)}"
+                f"args={string_type(args, with_shape=True)} and "
+                f"kwargs={string_type(kwargs, with_shape=True)}"
             )
         expected = model(*(ar or []), **(kws or {}))
         ar, kws = torch_deepcopy((args, kwargs))

@@ -391,14 +391,6 @@ class TestExportOptions(ExtTestCase):
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
     def test_export_strategy_fake(self):
-        """Strategy 'fake' exports with fake tensors (skipped if onnx_diagnostic missing)."""
-        self.skipTest("fix later")
-        try:
-            from onnx_diagnostic.export.shape_helper import (  # noqa: F401
-                make_fake_with_dynamic_dimensions,
-            )
-        except ImportError:
-            self.skipTest("onnx_diagnostic is not installed")
         model = _Neuron()
         x = torch.rand(2, 5)
         opts = ExportOptions(strategy="fake")

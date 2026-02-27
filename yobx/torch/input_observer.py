@@ -303,24 +303,29 @@ class InputObserverInfo:
     and the arguments to send to :func:`torch.export.export`.
 
     Args:
-        signature_names: Names of the arguments of the method
+        signature_names:
+            Names of the arguments of the method
             the collector tensors come from. They are used if it becomes
             necessary to move positional arguments to named ones.
             They are used a second time because :func:`torch.export.export`
             cares about the order in kwargs and dynamic shapes, it needs
             to be the same in the ordered dictionaries `add_inputs` receive.
-        default_values: Default values defined by the signature of the function,
+        default_values:
+            Default values defined by the signature of the function,
             any value equal to that is ignored to simplify the export.
-        value_if_missing: If an argument is missing,
+        value_if_missing:
+            If an argument is missing,
             a default value will be taken in this dictionary,
             this is used when after the prefill step, an argument
             disappears (such as `pixel_values`) and another one
             is added (such as `past_key_values`).
             The values are only to infer dynamic shapes and arguments,
             not to run the model.
-        args_name_and_position: Name of parameter `*args`
+        args_name_and_position:
+            Name of parameter `*args`
             and its position if it exists.
-        kwargs_name: Name of the variable keyword parameter `**kwargs` if it exists.
+        kwargs_name:
+            Name of the variable keyword parameter `**kwargs` if it exists.
 
     This is used by class :class:`InputObserver`.
     """
@@ -1178,16 +1183,14 @@ class InputObserver:
             progress_bar:
                 Shows a progress bar (requires :epkg:`tqdm`).
             include_io:
-                Shows inputs/outputs shapes in the summary
-                returned by this function.
+                Shows inputs/outputs shapes in the summary returned by this function.
             skip_none:
                 Does not check discrepancies when an output is None.
 
         Returns:
             A list of dictionaries, ready to be consumed by a dataframe.
 
-        The function catches exceptions, it shows the error in the returned
-        summary.
+        The function catches exceptions, it shows the error in the returned summary.
         """
         from ..reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 
