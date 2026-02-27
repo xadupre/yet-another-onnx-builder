@@ -106,7 +106,7 @@ def dtype_to_tensor_dtype(dt: Union[np.dtype, "torch.dtype"]) -> int:  # type: i
         return np_dtype_to_tensor_dtype(dt)
     except (KeyError, TypeError, ValueError):
         pass
-    from .torch.torch_helper import torch_dtype_to_onnx_dtype
+    from ..torch.torch_helper import torch_dtype_to_onnx_dtype
 
     return torch_dtype_to_onnx_dtype(dt)  # type: ignore[arg-type]
 

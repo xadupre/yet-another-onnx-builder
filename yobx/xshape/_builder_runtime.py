@@ -30,7 +30,7 @@ class _BuilderRuntime:
     <yobx.xshape._inference_runtime._InferenceRuntime.compute_constant>`.
     """
 
-    def onnx_dtype_to_torch_dtype(itype: int) -> "torch.dtype":  # noqa: F821
+    def onnx_dtype_to_torch_dtype(self, itype: int) -> "torch.dtype":  # noqa: F821
         """See :func:`yobx.torch.torch_helper.onnx_dtype_to_torch_dtype>`."""
         from ..torch.torch_helper import onnx_dtype_to_torch_dtype
 
