@@ -18,6 +18,8 @@ from yobx.torch.tracing import (
     setitem_with_transformation,
     tree_unflatten_with_proxy,
 )
+from yobx.torch import register_flattening_functions
+from yobx.torch.transformers.cache_helper import make_dynamic_cache
 
 
 @requires_torch("2.0")
@@ -628,8 +630,6 @@ class TestTracing(ExtTestCase):
     @skipif_ci_windows("does not work on windows")
     @hide_stdout()
     def test_tracing_with_submodule(self):
-        from onnx_diagnostic.torch_export_patches import torch_export_patches
-
         def filter_position_ids(
             patch_attention_mask: torch.Tensor,
             position_ids: torch.Tensor,
@@ -703,7 +703,7 @@ class TestTracing(ExtTestCase):
         self.assertEqualArray(true_expected, expected)
 
         DYN = torch.export.Dim.DYNAMIC
-        with torch_export_patches(patch_torch=True):
+        with register_flattening_functions(patch_torch=True):
             ep = torch.export.export(model, inputs, dynamic_shapes=({0: DYN}, {0: DYN}, {0: DYN}))
 
         CustomTracer.remove_inplace(ep.graph, recursive=True, verbose=10)
@@ -723,7 +723,6 @@ class TestTracing(ExtTestCase):
         got = ep.module()(*inputs)
         self.assertEqualArray(expected, got)
 
-    @requires_onnx_diagnostic("0.8.8")
     @requires_torch("2.9.99")
     def test_tree_unflatten_with_proxy_none(self):
         nested = [
@@ -741,7 +740,6 @@ class TestTracing(ExtTestCase):
         unflatten = tree_unflatten_with_proxy(tree_spec, flat_list)
         self.assertEqualAny(nested, unflatten)
 
-    @requires_onnx_diagnostic("0.8.8")
     @requires_torch("2.9.99")
     def test_tree_unflatten_with_proxy_custom_proxy(self):
         graph = torch.fx.Graph()
@@ -781,9 +779,6 @@ class TestTracing(ExtTestCase):
 
     @requires_torch("2.9.99")
     def test_tree_unflatten_with_proxy_dynamic_cache(self):
-        from onnx_diagnostic.helpers.cache_helper import make_dynamic_cache
-        from onnx_diagnostic.torch_export_patches import torch_export_patches
-
         graph = torch.fx.Graph()
         tr = CustomTracer()
         tr.graph = torch.fx.Graph(tracer_cls=CustomTracer)
@@ -799,7 +794,7 @@ class TestTracing(ExtTestCase):
                 [(torch.randn(2, 32, 30, 96), torch.randn(2, 32, 30, 96)) for i in range(2)]
             ),
         ]
-        with torch_export_patches(patch_transformers=True):
+        with register_flattening_functions(patch_transformers=True):
             flat_list, tree_spec = torch.utils._pytree.tree_flatten(nested)
             self.assertEqual(len(flat_list), 7)
             unflatten = tree_unflatten_with_proxy(tree_spec, cps)
