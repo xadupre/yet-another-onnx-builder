@@ -592,7 +592,7 @@ def investigate_onnxruntime_issue(
         ``lambda model: onnxruntime.InferenceSession(
         model.SerializeToString(), providers=["CPUExecutionProvider"])``
     :param feeds: run onnxruntime as well
-    :param verbosity: verbosity level
+    :param verbose: verbosity level
     :param dump_filename: if not None, the function dumps the last model run
     :param infer_shapes: run shape inference
     :param quiet: if True, raises an exception, False, just stops and
