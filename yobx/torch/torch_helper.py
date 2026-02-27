@@ -182,11 +182,11 @@ def torch_deepcopy(value: Any) -> Any:
 
 def to_tensor(tensor: onnx.TensorProto, base_dir: str = "") -> torch.Tensor:
     """
-    Converts a TensorProto to a numpy array.
+    Converts a TensorProto to a torch.Tensor.
 
     :param tensor: a TensorProto object.
     :param base_dir: if external tensor exists, base_dir can help to find the path to it
-    :return: the converted tensor
+    :return: the converted torch tensor
     """
     assert not tensor.HasField("segment"), "Currently not supporting loading segments."
     assert (
