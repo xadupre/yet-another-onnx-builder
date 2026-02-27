@@ -514,7 +514,7 @@ class InferenceSessionForTorch(_InferenceSession):
         for k, v in feeds.items():
             assert k != "", f"Input cannot be empty but feeds names={list(feeds)}"
             assert hasattr(v, "device"), (
-                f"Unepxected class {type(v)} for input {k!r}, "
+                f"Unexpected class {type(v)} for input {k!r}, "
                 f"feeds={string_type(feeds, with_shape=True)}"
             )
             device = max(device, v.get_device())
