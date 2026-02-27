@@ -17,7 +17,7 @@ from yobx.torch.transformers.cache_helper import (
     CacheKeyValue,
 )
 from yobx.torch.torch_helper import torch_deepcopy
-from yobx.torch.flatten_helper import register_flattening_functions
+from yobx.torch.flatten_helper import register_flattening_functions, replacement_before_exporting
 
 
 class TestPatchSerialization(ExtTestCase):
@@ -339,6 +339,73 @@ class TestPatchSerialization(ExtTestCase):
             )
             got = ep.module()(**inputs_copied)
             self.assertEqualAny(expected, got)
+
+    @ignore_warnings(UserWarning)
+    def test_replacement_before_exporting_none(self):
+        self.assertIsNone(replacement_before_exporting(None))
+
+    @ignore_warnings(UserWarning)
+    def test_replacement_before_exporting_scalars(self):
+        self.assertEqual(1, replacement_before_exporting(1))
+        self.assertEqual(1.5, replacement_before_exporting(1.5))
+
+    @ignore_warnings(UserWarning)
+    def test_replacement_before_exporting_tensor(self):
+        t = torch.rand((3, 4))
+        result = replacement_before_exporting(t)
+        self.assertIs(t, result)
+
+    @ignore_warnings(UserWarning)
+    def test_replacement_before_exporting_dict(self):
+        d = {"a": torch.rand((2, 3)), "b": 1}
+        result = replacement_before_exporting(d)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(set(result.keys()), {"a", "b"})
+        self.assertIs(result["a"], d["a"])
+        self.assertEqual(result["b"], 1)
+
+    @ignore_warnings(UserWarning)
+    def test_replacement_before_exporting_tuple(self):
+        t = (torch.rand((2, 3)), 1)
+        result = replacement_before_exporting(t)
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        self.assertIs(result[0], t[0])
+        self.assertEqual(result[1], 1)
+
+    @ignore_warnings(UserWarning)
+    def test_replacement_before_exporting_list(self):
+        lst = [torch.rand((2, 3)), 1]
+        result = replacement_before_exporting(lst)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        self.assertIs(result[0], lst[0])
+        self.assertEqual(result[1], 1)
+
+    @ignore_warnings(UserWarning)
+    def test_replacement_before_exporting_nested(self):
+        inner = [torch.rand((2,)), torch.rand((3,))]
+        outer = {"x": inner, "y": (1, 2)}
+        result = replacement_before_exporting(outer)
+        self.assertIsInstance(result, dict)
+        self.assertIsInstance(result["x"], list)
+        self.assertIsInstance(result["y"], tuple)
+        self.assertIs(result["x"][0], inner[0])
+
+    @ignore_warnings(UserWarning)
+    def test_replacement_before_exporting_base_model_output(self):
+        # BaseModelOutput is a dict subclass; type check prevents recursion
+        bo = BaseModelOutput(last_hidden_state=torch.rand((4, 4, 4)))
+        result = replacement_before_exporting(bo)
+        self.assertIs(result, bo)
+
+    @ignore_warnings(UserWarning)
+    def test_replacement_before_exporting_base_model_output_in_tuple(self):
+        bo = BaseModelOutput(last_hidden_state=torch.rand((4, 4, 4)))
+        t = (bo,)
+        result = replacement_before_exporting(t)
+        self.assertIsInstance(result, tuple)
+        self.assertIs(result[0], bo)
 
 
 if __name__ == "__main__":
