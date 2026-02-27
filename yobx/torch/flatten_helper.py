@@ -128,7 +128,7 @@ def flattening_functions(
         assert (
             f"flatten_{lname}" in all_functions
         ), f"Unable to find function 'flatten_{lname}' in {list(all_functions)}"
-        classes[cls] = (
+        classes[cls] = (  # type: ignore[misc]
             lambda verbose=verbose, _ln=lname, cls=cls, _al=all_functions: register_class_flattening(  # noqa: E501
                 cls,
                 _al[f"flatten_{_ln}"],
@@ -253,7 +253,9 @@ def unregister_cache_flattening(undo: Dict[type, bool], verbose: int = 0):
 
 
 @contextlib.contextmanager
-def register_flattening_functions(patch_transformers: bool = False, verbose: int = 0) -> Callable:
+def register_flattening_functions(
+    patch_transformers: bool = False, verbose: int = 0
+) -> Dict[type, bool]:
     """The necessary modifications to run the fx Graph."""
     fct_callable = replacement_before_exporting if patch_transformers else (lambda x: x)
     done = register_cache_flattening(patch_transformers=patch_transformers, verbose=verbose)

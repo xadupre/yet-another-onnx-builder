@@ -619,10 +619,10 @@ class TorchReferenceEvaluator:
                 )
 
         # inputs
-        for k, v in zip(self.input_names, args):
+        for k, v in zip(self.input_names, args):  # type: ignore[assignment]
             r = self.runtime_info[k]
             r.set_value(
-                torch_ops.OpRunTensor(None) if v is None else v.__class__(v.tensor_or_sequence)
+                torch_ops.OpRunTensor(None) if v is None else v.__class__(v.tensor_or_sequence)  # type: ignore[attr-defined]
             )
 
         # node execution

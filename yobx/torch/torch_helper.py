@@ -5,7 +5,7 @@ import numpy as np
 import onnx
 import onnx.numpy_helper as onh
 import torch
-from ..helpers.onnx_helper import onnx_dtype_name
+from ..helpers.onnx_helper import onnx_dtype_name, tensor_dtype_to_np_dtype
 
 _TYPENAME = dict(
     FLOAT=onnx.TensorProto.FLOAT,
@@ -207,7 +207,11 @@ def to_tensor(tensor: onnx.TensorProto, base_dir: str = "") -> torch.Tensor:
             return torch.tensor([], dtype=torch_dtype).reshape(dims)
         if sys.byteorder == "big":
             # Convert endian from little to big
-            raw_data = torch.frombuffer(raw_data, dtype=torch_dtype).byteswap().tobytes()
+            raw_data = (
+                np.frombuffer(raw_data, dtype=tensor_dtype_to_np_dtype(tensor_dtype))
+                .byteswap()
+                .tobytes()
+            )
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             return torch.frombuffer(raw_data, dtype=torch_dtype).reshape(dims)

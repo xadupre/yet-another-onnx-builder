@@ -63,7 +63,7 @@ def _flatten_key_value_cache(cache: Cache) -> Tuple[List[Any], torch.utils._pytr
     if (
         cache.__class__.__name__ != "DynamicCache"
         or unique is None
-        or (len(unique) == 1 and unique.pop().__name__ == "DynamicLayer")  # type: ignore[arg-defined]
+        or (len(unique) == 1 and unique.pop().__name__ == "DynamicLayer")  # type: ignore
     ):
         keys = list(
             itertools.chain.from_iterable(

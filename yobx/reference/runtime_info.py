@@ -117,7 +117,7 @@ class RuntimeValue:
             f"kind={self.kind}{text}, value={self.value.string_type()})"
         )
 
-    def set_value(self, value: Union["torch.Tensor", TensorLike]):  # noqa: F821
+    def set_value(self, value: Union["torch.Tensor", TensorLike]):  # type: ignore[name-defined] # noqa: F821
         """Sets the value."""
         assert value is not None, "Use clean_value to set a value to None"
         self.value = value
