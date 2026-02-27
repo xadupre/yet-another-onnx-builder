@@ -1549,9 +1549,7 @@ class CustomTracer(torch.fx.Tracer):
                     "aten::zeros",
                     "expand",
                     "aten::__and__.Tensor",
-                } or not (
-                    node_target_name.endswith(("_", "_.Tensor"))
-                ):
+                } or not (node_target_name.endswith(("_", "_.Tensor"))):
                     # This node cannot be one inplace modification.
                     # The node is just not used.
                     cls.graph_erase_node(graph, node)

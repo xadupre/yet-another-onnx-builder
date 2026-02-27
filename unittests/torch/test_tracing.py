@@ -12,12 +12,7 @@ from yobx.ext_test_case import (
 from yobx.torch.tracing import (
     CustomTracer,
     CustomProxy,
-    CustomAttribute,
-    CustomParameterProxy,
-    CustomProxyInt,
-    CustomProxyFloat,
     CondCCOp,
-    LEAVE_INPLACE,
     _len,
     _isinstance,
     replace_problematic_function_before_tracing,
@@ -93,9 +88,7 @@ class TestCustomTracer(ExtTestCase):
             def forward(self, x):
                 return x
 
-        tracer = CustomTracer(
-            module_leaves={MyModule: lambda m, module_qualified_name: True}
-        )
+        tracer = CustomTracer(module_leaves={MyModule: lambda m, module_qualified_name: True})
         self.assertTrue(tracer.is_leaf_module(MyModule(), "mymodule"))
 
     def test_len_with_proxy(self):
@@ -146,9 +139,7 @@ class TestCustomTracer(ExtTestCase):
             def forward(self, x):
                 return self.leaf(x) + 1
 
-        tracer = CustomTracer(
-            module_leaves={LeafModule: lambda m, module_qualified_name: True}
-        )
+        tracer = CustomTracer(module_leaves={LeafModule: lambda m, module_qualified_name: True})
         graph = tracer.trace(OuterModule())
         # LeafModule should appear as call_module node
         module_calls = [n for n in graph.nodes if n.op == "call_module"]
@@ -256,9 +247,7 @@ class TestTracing(ExtTestCase):
         expected = model(x)
         graph = CustomTracer().trace(model, remove_inplace=False)
         self.assertEqual(
-            len(
-                [node for node in graph.nodes if len(node.users) == 0 and node.op != "output"]
-            ),
+            len([node for node in graph.nodes if len(node.users) == 0 and node.op != "output"]),
             1,
         )
         self.assertIn("(%clone, 3)", str(graph))
@@ -285,9 +274,7 @@ class TestTracing(ExtTestCase):
         expected = model(x)
         graph = CustomTracer().trace(model, remove_inplace=False)
         self.assertEqual(
-            len(
-                [node for node in graph.nodes if len(node.users) == 0 and node.op != "output"]
-            ),
+            len([node for node in graph.nodes if len(node.users) == 0 and node.op != "output"]),
             2,
         )
         self.assertIn("(%clone, 3)", str(graph))
@@ -703,9 +690,7 @@ class TestTracing(ExtTestCase):
 
         class Model(torch.nn.Module):
             def forward(self, patch_attention_mask, position_ids, boundaries):
-                res = scan_filter_position_ids(
-                    patch_attention_mask, position_ids, boundaries, 32
-                )
+                res = scan_filter_position_ids(patch_attention_mask, position_ids, boundaries, 32)
                 return res[0]
 
         patch_attention_mask = torch.randint(0, 17, (32, 32, 32)) >= 1
@@ -721,9 +706,7 @@ class TestTracing(ExtTestCase):
 
         DYN = torch.export.Dim.DYNAMIC
         with torch_export_patches(patch_torch=True):
-            ep = torch.export.export(
-                model, inputs, dynamic_shapes=({0: DYN}, {0: DYN}, {0: DYN})
-            )
+            ep = torch.export.export(model, inputs, dynamic_shapes=({0: DYN}, {0: DYN}, {0: DYN}))
 
         CustomTracer.remove_inplace(ep.graph, recursive=True, verbose=10)
 
@@ -768,9 +751,7 @@ class TestTracing(ExtTestCase):
         tr.graph = torch.fx.Graph(tracer_cls=CustomTracer)
         cps = []
         for i in range(6):
-            node = graph.create_node(
-                "placeholder", f"tx{i}", args=(), kwargs={}, name=f"txn{i}"
-            )
+            node = graph.create_node("placeholder", f"tx{i}", args=(), kwargs={}, name=f"txn{i}")
             cps.append(CustomProxy(node, tr))
 
         nested = [
@@ -811,9 +792,7 @@ class TestTracing(ExtTestCase):
         tr.graph = torch.fx.Graph(tracer_cls=CustomTracer)
         cps = []
         for i in range(7):
-            node = graph.create_node(
-                "placeholder", f"tx{i}", args=(), kwargs={}, name=f"txn{i}"
-            )
+            node = graph.create_node("placeholder", f"tx{i}", args=(), kwargs={}, name=f"txn{i}")
             cps.append(CustomProxy(node, tr))
 
         nested = [
@@ -957,4 +936,3 @@ class TestTracing(ExtTestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-
