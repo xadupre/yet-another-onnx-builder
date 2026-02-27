@@ -8,7 +8,7 @@ class ReportResultComparison:
     """
     Holds tensors a runtime can use as a reference to compare
     intermediate results.
-    See :meth:`yobx.reference..torch_evaluator.TorchReferenceEvaluator.run`.
+    See :meth:`yobx.reference.torch_evaluator.TorchReferenceEvaluator.run`.
 
     :param tensors: tensor
     """

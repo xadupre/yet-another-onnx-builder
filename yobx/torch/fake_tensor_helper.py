@@ -37,7 +37,7 @@ class FakeTensorContext:
             i += 1
             assert i < len(
                 self._candidates
-            ), f"Two many unique dimensions to generate, requested: {len(self._unique_)}"
+            ), f"Too many unique dimensions to generate, requested: {len(self._unique_)}"
             c = self._candidates[i]
         self._unique_.add(c)
         return c
@@ -119,12 +119,12 @@ class FakeTensorContext:
             return {k: self.make_fake(v) for k, v in x.items()}
         if x.__class__.__name__ in {"DynamicCache", "StaticCache", "HybridCache"}:
             assert hasattr(x, "layers"), (
-                f"Une more recent version of transformers (>=4.55), "
+                f"A more recent version of transformers (>=4.55), "
                 f"'layers' not found in class {type(x)}"
             )
             for layer in x.layers:
                 assert hasattr(layer, "keys") and hasattr(layer, "values"), (
-                    f"Une more recent version of transformers (>=4.55), 'layers' "
+                    f"A more recent version of transformers (>=4.55), 'layers' "
                     f"not found in class {type(layer)} ({dir(layer)})"
                 )
                 layer.keys = self.make_fake(layer.keys)
@@ -149,7 +149,7 @@ class FakeTensorContext:
         If caches are used, it requires ``transformers>=4.57``.
         """
         if x is None:
-            return None, None
+            return None
         if type(x) in (list, tuple):
             return x.__class__(
                 [
