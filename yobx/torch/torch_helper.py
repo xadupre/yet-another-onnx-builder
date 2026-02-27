@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import onnx
 import torch
@@ -117,3 +118,46 @@ def to_numpy(tensor: torch.Tensor) -> np.ndarray:
     conv = {torch.bfloat16: ml_dtypes.bfloat16}
     assert tensor.dtype in conv, f"Unsupported type {tensor.dtype}, not in {conv}"
     return tensor.detach().to(torch.float32).cpu().numpy().astype(conv[tensor.dtype])
+
+
+def torch_deepcopy(value: Any) -> Any:
+    """
+    Makes a deep copy.
+
+    :param value: any value
+    :return: a deep copy
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float, str)):
+        return value
+    if isinstance(value, tuple):
+        return tuple(torch_deepcopy(v) for v in value)
+    if isinstance(value, list):
+        if type(value) is list:
+            return [torch_deepcopy(v) for v in value]
+    if isinstance(value, set):
+        return {torch_deepcopy(v) for v in value}
+    if isinstance(value, dict):
+        if type(value) is dict:
+            return {k: torch_deepcopy(v) for k, v in value.items()}
+        # for BaseModelOutput
+        return value.__class__(**{k: torch_deepcopy(v) for k, v in value.items()})
+    if isinstance(value, np.ndarray):
+        return value.copy()
+    if hasattr(value, "clone"):
+        return value.clone()
+    if value.__class__ in torch.utils._pytree.SUPPORTED_NODES:
+        args, spec = torch.utils._pytree.tree_flatten(value)
+        new_args = torch_deepcopy(args)
+        return torch.utils._pytree.tree_unflatten(new_args, spec)
+
+    if hasattr(value, "__nocopy__"):
+        return value
+
+    # We should have a code using serialization, deserialization assuming a model
+    # cannot be exported without them.
+    raise NotImplementedError(
+        f"torch_deepcopy not implemented for type {type(value)}, "
+        f"add attribute '__nocopy__' to return it as is."
+    )
