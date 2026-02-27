@@ -585,7 +585,7 @@ def investigate_onnxruntime_issue(
     :param log_verbosity_level: see :class:`onnxruntime.SessionOptions`
     :param optimized_model_filepath:  see :class:`onnxruntime.SessionOptions`
     :param disable_aot_function_inlining:  see :class:`onnxruntime.SessionOptions`
-    :param use_training_api: use onnxruntime-traning API
+    :param use_training_api: use onnxruntime-training API
     :param onnx_to_session: function to load a model into an inference session if
         automated way implemented in this function is not enough,
         if it is equal ``cpu_session``, the callable becomes:
