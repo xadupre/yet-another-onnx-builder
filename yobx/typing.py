@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Protocol, Tuple, runtime_checkable
+from typing import Dict, List, Protocol, Tuple, runtime_checkable
 
 
 @runtime_checkable
