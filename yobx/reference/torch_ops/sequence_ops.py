@@ -36,7 +36,7 @@ class ConcatFromSequence_11(OpRunOpSequence):
 
 
 class SequenceEmpty_11(OpRunOpSequence):
-    "SqeuenceEmpty"
+    "SequenceEmpty"
 
     def __init__(self, node: onnx.NodeProto, version: Optional[int] = None, verbose: int = 0):
         super().__init__(node, version, verbose=verbose)
