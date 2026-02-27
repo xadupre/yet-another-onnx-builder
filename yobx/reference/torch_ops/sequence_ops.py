@@ -28,7 +28,7 @@ class ConcatFromSequence_11(OpRunOpSequence):
                 seq2 = [s.unsqueeze(len(s.shape)) for s in seq]
                 res = torch.cat(seq2, axis=-1)
             else:
-                seq2 = [s.expand(self.axis) for s in seq]
+                seq2 = [s.unsqueeze(self.axis) for s in seq]
                 res = torch.cat(seq2, axis=self.axis)
         else:
             res = torch.cat(seq, axis=self.axis)
