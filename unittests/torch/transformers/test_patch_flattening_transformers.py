@@ -244,7 +244,7 @@ class TestPatchSerialization(ExtTestCase):
             torch.export.export(model, (bo,), dynamic_shapes=(ds,))
 
     @ignore_warnings(UserWarning)
-    @requires_transformers("4.99")
+    @requires_transformers("4.57")
     def test_dynamic_cache_flatten_unflatten(self):
         values = [
             (torch.rand((2, 4, 4, 4)), torch.rand((2, 4, 4, 4))),
@@ -263,7 +263,7 @@ class TestPatchSerialization(ExtTestCase):
             )
 
     @ignore_warnings(UserWarning)
-    @requires_transformers("4.99")
+    @requires_transformers("4.57")
     def test_dynamic_cache_in_a_model_args(self):
         import torch
 
@@ -299,7 +299,7 @@ class TestPatchSerialization(ExtTestCase):
             self.assertEqualAny(expected, got)
 
     @ignore_warnings(UserWarning)
-    @requires_transformers("4.99")
+    @requires_transformers("4.57")
     def test_dynamic_cache_in_a_model_kwargs(self):
         import torch
 
