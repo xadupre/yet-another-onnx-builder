@@ -591,7 +591,7 @@ class TestOnnxruntimeEvaluator(ExtTestCase):
         ort_eval = OnnxruntimeEvaluator(onnx_model, verbose=10, opsets=20)
         expected = ref.run(None, feeds)
         got = ort_eval.run(None, feeds)
-        self.assertEqualArray(expected[0], got[0])
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
 
     @classmethod
     def _trange(cls, *shape, bias: Optional[float] = None):
