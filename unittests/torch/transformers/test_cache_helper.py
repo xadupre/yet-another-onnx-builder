@@ -164,6 +164,7 @@ class TestCacheHelpers(ExtTestCase):
         cv = CacheKeyValue(cache)
         self.assertEqual(0, max_diff(cv, cv)["abs"])
 
+    @requires_transformers("4.57")
     def test_max_diff_cache_key_value_vs_tuple(self):
         bsize, nheads, slen, dim = 2, 4, 3, 7
         t1 = torch.randn(bsize, nheads, slen, dim)
