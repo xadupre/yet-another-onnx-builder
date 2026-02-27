@@ -295,7 +295,7 @@ class OnnxruntimeEvaluator:
         :param report_cmp: used as a reference,
             every intermediate results is compare to every existing one,
             if not empty, it is an instance of
-            :class:`onnx_diagnostic.reference.ReportResultComparison`
+            :class:`yobx.reference.ReportResultComparison`
         :return: outputs, as a list if return_all is False,
             as a dictionary if return_all is True
         """

@@ -56,7 +56,7 @@ class TorchReferenceEvaluator:
     * `constants`: all initializers or constants
     * `kernels`: kernels
     * `runtime_info`: produced by :func:`first_used_last_used
-      <onnx_diagnostic.torch_onnx.runtime_info.first_used_last_used>`
+      <yobx.reference.runtime_info.first_used_last_used>`
     * `last_used`: contains the list of intermediate results,
        to remove after every node execution,
        this avoid the memory to grow too much
@@ -74,7 +74,7 @@ class TorchReferenceEvaluator:
         import onnx.helper as oh
         import torch
         from yobx.helpers import string_type
-        from yobx.reference import TorchReferenceEvaluator
+        from yobx.reference.torch_evaluator import TorchReferenceEvaluator
 
         TFLOAT = onnx.TensorProto.FLOAT
 
@@ -113,7 +113,7 @@ class TorchReferenceEvaluator:
         import onnx.helper as oh
         import torch
         from yobx.helpers import string_type
-        from yobx.reference import TorchReferenceEvaluator
+        from yobx.reference.torch_evaluator import TorchReferenceEvaluator
 
         TFLOAT = onnx.TensorProto.FLOAT
 
@@ -161,7 +161,7 @@ class TorchReferenceEvaluator:
         import torch
         from yobx.helpers import string_type
         from yobx.torch.torch_helper import onnx_dtype_to_torch_dtype
-        from yobx.reference import TorchReferenceEvaluator
+        from yobx.reference.torch_evaluator import TorchReferenceEvaluator
         from yobx.reference.torch_ops import OpRunKernel, OpRunTensor
 
         TFLOAT16 = onnx.TensorProto.FLOAT16
@@ -466,7 +466,7 @@ class TorchReferenceEvaluator:
         :param report_cmp: used as a reference,
             every intermediate results is compare to every existing one,
             if not empty, it is an instance of
-            :class:`onnx_diagnostic.reference.ReportResultComparison`
+            :class:`yobx.reference.ReportResultComparison`
         :return: output tensors.
         """
         use_numpy = any(isinstance(t, np.ndarray) for t in feeds.values())

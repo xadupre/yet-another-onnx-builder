@@ -8,19 +8,19 @@ Evaluators
 They share a common interface (``__init__(proto, ...)`` + ``run(outputs, feeds)``)
 but differ in their backend, tensor type, and primary use-case:
 
-+------------------------------------+---------------------+----------------+----------------------------------+
-| Class                              | Backend             | Tensor type    | Best suited for                  |
-+====================================+=====================+================+==================================+
-| :class:`ExtendedReferenceEvaluator`| onnx reference      | NumPy          | unit-testing, contrib ops, pure  |
-|                                    | (Python)            | ``ndarray``    | Python debugging                 |
-+------------------------------------+---------------------+----------------+----------------------------------+
-| :class:`OnnxruntimeEvaluator`      | ONNX Runtime        | NumPy or       | debugging ORT execution,         |
-|                                    | (node-by-node or    | PyTorch        | inspecting intermediate results, |
-|                                    | whole, ``whole=``)  |                | or whole-model ORT inference     |
-+------------------------------------+---------------------+----------------+----------------------------------+
-| :class:`TorchReferenceEvaluator`   | PyTorch (Python)    | ``torch.Tensor``| GPU execution, memory-efficient  |
-|                                    |                     |                | evaluation, custom PyTorch ops   |
-+------------------------------------+---------------------+----------------+----------------------------------+
++------------------------------------+---------------------+-----------------+-----------------------------------+
+| Class                              | Backend             | Tensor type     | Best suited for                   |
++====================================+=====================+=================+===================================+
+| :class:`ExtendedReferenceEvaluator`| onnx reference      | NumPy           | unit-testing, contrib ops, pure   |
+|                                    | (Python)            | ``ndarray``     | Python debugging                  |
++------------------------------------+---------------------+-----------------+-----------------------------------+
+| :class:`OnnxruntimeEvaluator`      | ONNX Runtime        | NumPy or        | debugging ORT execution,          |
+|                                    | (node-by-node or    | PyTorch         | inspecting intermediate results,  |
+|                                    | whole, ``whole=``)  |                 | or whole-model ORT inference      |
++------------------------------------+---------------------+-----------------+-----------------------------------+
+| :class:`TorchReferenceEvaluator`   | PyTorch (Python)    | ``torch.Tensor``| GPU execution, memory-efficient   |
+|                                    |                     |                 | evaluation, custom PyTorch ops    |
++------------------------------------+---------------------+-----------------+-----------------------------------+
 
 .. rubric:: Quick comparison
 

@@ -260,7 +260,19 @@ def unregister_cache_flattening(undo: Dict[type, bool], verbose: int = 0):
 def register_flattening_functions(
     patch_transformers: bool = False, verbose: int = 0
 ) -> Iterator[Callable]:
-    """The necessary modifications to run the fx Graph."""
+    """
+    The context manager registers flattening functions
+    the exporter needs to handle any custom class.
+    This is used to create a signature taking only tensors
+    as inputs even though the code shows nested structures.
+
+    .. code-block:: python
+
+        from yobx.torch import register_flattening_functions
+
+        with register_flattening_functions(patch_transformers=True):
+            # ...
+    """
     fct_callable = replacement_before_exporting if patch_transformers else (lambda x: x)  # type: ignore
     done = register_cache_flattening(patch_transformers=patch_transformers, verbose=verbose)
     try:
