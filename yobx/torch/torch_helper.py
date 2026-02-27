@@ -155,6 +155,20 @@ def torch_deepcopy(value: Any) -> Any:
     if hasattr(value, "__nocopy__"):
         return value
 
+    if value.__class__.__name__ == "DynamicCache":
+        # No flattening registration. Let's do something anyway.
+        from .transformers.flatten_class import flatten_dynamic_cache, unflatten_dynamic_cache
+
+        flat, context = flatten_dynamic_cache(value)
+        return unflatten_dynamic_cache(torch_deepcopy(flat), context)
+
+    if value.__class__.__name__ == "StaticCache":
+        # No flattening registration. Let's do something anyway.
+        from .transformers.flatten_class import flatten_static_cache, unflatten_static_cache
+
+        flat, context = flatten_static_cache(value)
+        return unflatten_static_cache(torch_deepcopy(flat), context)
+
     # We should have a code using serialization, deserialization assuming a model
     # cannot be exported without them.
     raise NotImplementedError(

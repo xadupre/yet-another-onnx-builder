@@ -231,18 +231,8 @@ def unregister_class_flattening(cls: type, verbose: int = 0):
         del torch.fx._pytree.SUPPORTED_NODES[cls]
     if cls in torch.fx._pytree.SUPPORTED_NODES_EXACT_MATCH:
         del torch.fx._pytree.SUPPORTED_NODES_EXACT_MATCH[cls]
-    if hasattr(torch.utils._pytree, "_deregister_pytree_node"):
-        # torch >= 2.7
-        torch.utils._pytree._deregister_pytree_node(cls)
-    else:
-        if cls in torch.utils._pytree.SUPPORTED_NODES:
-            del torch.utils._pytree.SUPPORTED_NODES[cls]
+    torch.utils._pytree._deregister_pytree_node(cls)
     optree.unregister_pytree_node(cls, namespace="torch")
-    if cls in torch.utils._pytree.SUPPORTED_NODES:
-        import packaging.version as pv
-
-        if pv.Version(torch.__version__) < pv.Version("2.7.0"):
-            del torch.utils._pytree.SUPPORTED_NODES[cls]  # pragma: no cover
     assert cls not in torch.utils._pytree.SUPPORTED_NODES, (
         f"{cls} was not successful unregistered "
         f"from torch.utils._pytree.SUPPORTED_NODES="
@@ -257,8 +247,7 @@ def unregister_cache_flattening(undo: Dict[type, bool], verbose: int = 0):
     Undo the registration made by
     :func:`yobx.torch.flatten_helper.register_cache_flattening`.
     """
-    cls_ensemble = set(undo)
-    for cls in cls_ensemble:
+    for cls in undo:
         if undo.get(cls, False):
             unregister_class_flattening(cls, verbose)
 

@@ -609,7 +609,7 @@ class InputObserverInfo:
         )
         torch._check(
             len(flat_inputs) == len(flat_dynamic_shapes),
-            (
+            lambda: (
                 f"Length mismatch len(flat_inputs)={len(flat_inputs)}, "
                 f"len(flat_dynamic_shapes)={len(flat_dynamic_shapes)}"
             ),

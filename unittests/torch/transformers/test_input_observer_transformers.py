@@ -113,8 +113,11 @@ class TestInputObserverTransformers(ExtTestCase):
             model(cache2)
             dyn_shapes = observer.infer_dynamic_shapes()
             args = observer.infer_arguments(0)
-        dyn_shapes_out = observer.infer_dynamic_shapes()
-        args0 = observer.infer_arguments(0)
+
+        with register_flattening_functions(patch_transformers=True):
+            dyn_shapes_out = observer.infer_dynamic_shapes()
+            args0 = observer.infer_arguments(0)
+
         self.assertEqual(dyn_shapes, dyn_shapes_out)
         cst = torch.export.Dim.DYNAMIC
         self.assertEqual(
@@ -193,8 +196,11 @@ class TestInputObserverTransformers(ExtTestCase):
             model(cache=cache2)
             dyn_shapes = observer.infer_dynamic_shapes()
             args = observer.infer_arguments(0)
-        dyn_shapes_out = observer.infer_dynamic_shapes()
-        args0 = observer.infer_arguments(0)
+
+        with register_flattening_functions(patch_transformers=True):
+            dyn_shapes_out = observer.infer_dynamic_shapes()
+            args0 = observer.infer_arguments(0)
+
         self.assertEqual(dyn_shapes, dyn_shapes_out)
         cst = torch.export.Dim.DYNAMIC
         self.assertEqual(
@@ -294,7 +300,9 @@ class TestInputObserverTransformers(ExtTestCase):
             for kwargs in inputs:
                 model(**kwargs)
 
-        shapes = observer.infer_dynamic_shapes(set_batch_dimension_for=True)
+        with register_flattening_functions(patch_transformers=True):
+            shapes = observer.infer_dynamic_shapes(set_batch_dimension_for=True)
+
         cst = torch.export.Dim.DYNAMIC
         expected = {
             "input_ids": {0: cst, 1: cst},
