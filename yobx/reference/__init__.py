@@ -1,1 +1,2 @@
 from .evaluator import ExtendedReferenceEvaluator
+from .report_results_comparison import ReportResultComparison
