@@ -9,3 +9,8 @@ yobx.torch
     input_observer
     torch_helper
     transformers/index
+
+register_flattening_functions
++++++++++++++++++++++++++++++
+
+.. autofunction:: yobx.torch.register_flattening_functions

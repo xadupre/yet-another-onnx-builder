@@ -4,10 +4,13 @@ from typing import Dict, Generator, List, Tuple
 import numpy as np
 from onnx import NodeProto
 from ..helpers import string_type
-from ..helpers.onnx_helper import dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
+from ..helpers.onnx_helper import (
+    dtype_to_tensor_dtype,
+    tensor_dtype_to_np_dtype,
+    str_tensor_proto_type,
+)
 from ..xshape._shape_helper import DYNAMIC_SHAPE, STATIC_SHAPE, all_int, all_int_or_str
 from ..xshape.simplify_expressions import simplify_expression
-from ..xshape._onnx_helper import str_tensor_proto_type
 
 
 @contextlib.contextmanager
