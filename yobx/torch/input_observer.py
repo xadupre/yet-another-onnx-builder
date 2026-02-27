@@ -887,7 +887,7 @@ class InputObserver:
     >>> ep = torch.export.export(  # or torch.onnx.export
     >>>     model,
     >>>     input_observer.infer_arguments(),
-    >>>     dynamic_shapes.input_observer.infer_dynamic_shapes(),
+    >>>     dynamic_shapes=input_observer.infer_dynamic_shapes(),
     >>> )
 
     With LLM:
@@ -899,7 +899,7 @@ class InputObserver:
     >>>     model,
     >>>     (),
     >>>     kwargs=input_observer.infer_arguments(),
-    >>>     dynamic_shapes.input_observer.infer_dynamic_shapes(),
+    >>>     dynamic_shapes=input_observer.infer_dynamic_shapes(),
     >>> )
 
     The last example considers an LLM taking images and text as inputs.
