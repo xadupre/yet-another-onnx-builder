@@ -55,7 +55,7 @@ def make_flattening_function_for_dataclass(
 
 
 def register_class_flattening(
-    cls,
+    cls: type,
     f_flatten: Callable,
     f_unflatten: Callable,
     f_flatten_with_keys: Callable,
@@ -75,8 +75,9 @@ def register_class_flattening(
     :param verbose: verbosity
     :return: registered or not
     """
-    if cls is not None and cls in torch.utils._pytree.SUPPORTED_NODES:
-        if verbose and cls is not None:
+    assert cls is not None, "cls=None not allowed here"
+    if cls in torch.utils._pytree.SUPPORTED_NODES:
+        if verbose:
             print(f"[register_class_flattening] already registered {cls.__name__}")
         return False
 

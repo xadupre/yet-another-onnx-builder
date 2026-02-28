@@ -151,6 +151,7 @@ class ExportOptions:
         Run decompositions, remove inplace operations.
         The graph is modified inplace.
         """
+        begin = time.perf_counter()  # to avoid many warnings from pyrefly
         if verbose:
             print(
                 f"[ExportOptions.export] post_process_exported_program "
@@ -278,6 +279,7 @@ class ExportOptions:
     ) -> Union["torch.export.ExportedProgram", "torch.fx.GraphModule"]:  # noqa: F821
         """Exports the model into an exported program."""
         print_exported_program = os.environ.get("PRINT_EXPORTED_PROGRAM", "0") in (1, "1")
+        begin = time.perf_counter()  # to avoid many warnings from pyrefly
 
         if self.fake:
             assert not (
