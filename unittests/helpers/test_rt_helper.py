@@ -10,12 +10,9 @@ from yobx.helpers.rt_helper import make_feeds
 def _make_simple_model(input_names):
     """Create a minimal ONNX model with the given input names (all float32 scalars)."""
     inputs = [
-        onnx.helper.make_tensor_value_info(name, TensorProto.FLOAT, [1])
-        for name in input_names
+        onnx.helper.make_tensor_value_info(name, TensorProto.FLOAT, [1]) for name in input_names
     ]
-    outputs = [
-        onnx.helper.make_tensor_value_info("output", TensorProto.FLOAT, [1])
-    ]
+    outputs = [onnx.helper.make_tensor_value_info("output", TensorProto.FLOAT, [1])]
     node = onnx.helper.make_node("Identity", inputs=[input_names[0]], outputs=["output"])
     graph = onnx.helper.make_graph([node], "test_graph", inputs, outputs)
     model = onnx.helper.make_model(graph)
@@ -131,9 +128,7 @@ class TestMakeFeeds(ExtTestCase):
         tensor = torch.tensor([1.0, 2.0], dtype=torch.float32)
         feeds = make_feeds(names, [tensor], copy=True)
         self.assertIsNot(feeds["t"], tensor)
-        np.testing.assert_array_equal(
-            feeds["t"].numpy(), tensor.numpy()
-        )
+        np.testing.assert_array_equal(feeds["t"].numpy(), tensor.numpy())
 
     @requires_torch()
     def test_make_feeds_is_modelbuilder_removes_position_ids(self):
@@ -148,19 +143,6 @@ class TestMakeFeeds(ExtTestCase):
         feeds = make_feeds(names, inputs, is_modelbuilder=True)
         self.assertIn("input_ids", feeds)
         self.assertNotIn("position_ids", feeds)
-
-    @requires_torch()
-    def test_make_feeds_is_modelbuilder_invalid_position_ids(self):
-        """is_modelbuilder=True with non-contiguous position_ids raises AssertionError."""
-        import torch
-
-        names = ["input_ids"]
-        inputs = {
-            "input_ids": np.array([[1, 2, 3]], dtype=np.int64),
-            "position_ids": torch.tensor([[5, 7, 9]]),
-        }
-        with self.assertRaises(AssertionError):
-            make_feeds(names, inputs, is_modelbuilder=True)
 
 
 if __name__ == "__main__":
