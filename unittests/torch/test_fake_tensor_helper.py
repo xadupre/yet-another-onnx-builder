@@ -2,7 +2,11 @@ import unittest
 import torch
 from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.helpers import flatten_object
-from yobx.torch.transformers.cache_helper import make_dynamic_cache
+from yobx.torch.transformers.cache_helper import (
+    make_dynamic_cache,
+    make_encoder_decoder_cache,
+    make_static_cache,
+)
 from yobx.torch.fake_tensor_helper import make_fake, FakeTensorContext
 
 
@@ -25,6 +29,96 @@ class TestMakeTensorHelper(ExtTestCase):
                             torch.rand((2, 32, 30, 96), dtype=torch.float16),
                         ),
                     ]
+                ),
+            )
+        )
+        flat = flatten_object(inputs, drop_keys=True)
+        for t in flat:
+            self.assertIsInstance(t, torch.Tensor)
+            assert all(
+                isinstance(s, torch.SymInt) for s in t.shape
+            ), f"Wrong type {[type(s) for s in t.shape]} in {t.shape}"
+
+    @requires_transformers("4.55")
+    def test_fake_inputs_many_caches(self):
+        n_layers = 32
+        inputs, _ = make_fake(
+            dict(
+                input_ids=torch.randint(30360, size=(2, 3), dtype=torch.int64),
+                attention_mask=torch.randint(1, size=(2, 33), dtype=torch.int64),
+                position_ids=torch.randint(32, size=(2, 3), dtype=torch.int64),
+                past_key_values=make_dynamic_cache(
+                    [
+                        (
+                            torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                            torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                        )
+                        for _ in range(n_layers)
+                    ]
+                ),
+            )
+        )
+        flat = flatten_object(inputs, drop_keys=True)
+        for t in flat:
+            self.assertIsInstance(t, torch.Tensor)
+            assert all(
+                isinstance(s, torch.SymInt) for s in t.shape
+            ), f"Wrong type {[type(s) for s in t.shape]} in {t.shape}"
+
+    @requires_transformers("4.57")
+    def test_fake_inputs_many_static_caches(self):
+        n_layers = 32
+        inputs, _ = make_fake(
+            dict(
+                input_ids=torch.randint(30360, size=(2, 3), dtype=torch.int64),
+                attention_mask=torch.randint(1, size=(2, 33), dtype=torch.int64),
+                position_ids=torch.randint(32, size=(2, 3), dtype=torch.int64),
+                past_key_values=make_static_cache(
+                    [
+                        (
+                            torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                            torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                        )
+                        for _ in range(n_layers)
+                    ],
+                    max_cache_len=60,
+                ),
+            )
+        )
+        flat = flatten_object(inputs, drop_keys=True)
+        for t in flat:
+            self.assertIsInstance(t, torch.Tensor)
+            assert all(
+                isinstance(s, torch.SymInt) for s in t.shape
+            ), f"Wrong type {[type(s) for s in t.shape]} in {t.shape}"
+
+    @requires_transformers("4.55")
+    def test_fake_inputs_encoder_decoder_cache(self):
+        n_layers = 32
+        inputs, _ = make_fake(
+            dict(
+                input_ids=torch.randint(30360, size=(2, 3), dtype=torch.int64),
+                attention_mask=torch.randint(1, size=(2, 33), dtype=torch.int64),
+                position_ids=torch.randint(32, size=(2, 3), dtype=torch.int64),
+                past_key_values=make_encoder_decoder_cache(
+                    make_dynamic_cache(
+                        [
+                            (
+                                torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                                torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                            )
+                            for _ in range(n_layers)
+                        ]
+                    ),
+                    make_dynamic_cache(
+                        [
+                            (
+                                torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                                torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                            )
+                            for _ in range(n_layers)
+                        ]
+                    ),
                 ),
             )
         )

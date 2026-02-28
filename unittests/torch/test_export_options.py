@@ -1,11 +1,14 @@
 """Tests for ExportOptions in yobx.torch.export_options."""
 
+import os
+import tempfile
 import unittest
 import torch
-from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch
+from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings, requires_torch
 from yobx.helpers.helper import get_sig_kwargs
 from yobx.torch.export_options import (
     ExportOptions,
+    _get_decomposition_table_by_name,
     _inplace_nodes,
     _remove_inplace_nodes,
     apply_decompositions,
@@ -404,6 +407,77 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
+    @hide_stdout()
+    def test_export_with_verbosity(self):
+        """Export a simple model with verbose=1 to exercise the verbose code paths."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions()
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+            verbose=1,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    @hide_stdout()
+    def test_post_process_with_verbosity(self):
+        """post_process_exported_program with verbose=1 exercises the verbose code paths."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        ep = torch.export.export(model, (x,))
+        opts = ExportOptions(decomposition_table="default")
+        result = opts.post_process_exported_program(ep, verbose=1)
+        self.assertIsInstance(result, torch.export.ExportedProgram)
+
+    def test_export_with_save_ep_true(self):
+        """export() with save_ep=<str> saves the exported program files to disk."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_path = os.path.join(tmpdir, "model")
+            opts = ExportOptions(save_ep=save_path)
+            ep = opts.export(
+                model,
+                args=(x,),
+                kwargs=None,
+                tracing_mode=False,
+                dynamic_shapes=None,
+                same_signature=True,
+            )
+            self.assertIsInstance(ep, torch.export.ExportedProgram)
+            self.assertTrue(os.path.isfile(f"{save_path}.ep"))
+            self.assertTrue(os.path.isfile(f"{save_path}.ep.graph"))
+            self.assertTrue(os.path.isfile(f"{save_path}.input.pt"))
+            self.assertTrue(os.path.isfile(f"{save_path}.ep.pt2"))
+
+    def test_export_with_save_ep_tuple(self):
+        """export() with save_ep=(str, int) respects the size threshold."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_path = os.path.join(tmpdir, "model")
+            # threshold of 0 means the model is always too large to save .pt files
+            opts = ExportOptions(save_ep=(save_path, 0))
+            ep = opts.export(
+                model,
+                args=(x,),
+                kwargs=None,
+                tracing_mode=False,
+                dynamic_shapes=None,
+                same_signature=True,
+            )
+            self.assertIsInstance(ep, torch.export.ExportedProgram)
+            self.assertTrue(os.path.isfile(f"{save_path}.ep"))
+            self.assertTrue(os.path.isfile(f"{save_path}.ep.graph"))
+            # With threshold=0, model is too big so .pt files should NOT be saved
+            self.assertFalse(os.path.isfile(f"{save_path}.input.pt"))
+            self.assertFalse(os.path.isfile(f"{save_path}.ep.pt2"))
+
 
 @requires_torch("2.0")
 class TestApplyDecompositions(ExtTestCase):
@@ -456,6 +530,86 @@ class TestInsertContiguous(ExtTestCase):
         result = insert_contiguous_between_transpose_and_view(ep)
         self.assertIs(result, ep)
 
+    def test_insert_contiguous_call_method_transpose_view(self):
+        """A contiguous node is inserted between call_method transpose and view nodes."""
+
+        # Build a raw fx.Graph with transpose -> view call_method nodes
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        t = graph.call_method("transpose", args=(x, 0, 1))
+        v = graph.call_method("view", args=(t, -1))
+        graph.output(v)
+        gm = torch.fx.GraphModule({}, graph)
+
+        class _FakeEP:
+            def __init__(self, gm):
+                self.graph_module = gm
+
+        fake_ep = _FakeEP(gm)
+        result = insert_contiguous_between_transpose_and_view(fake_ep)
+
+        contiguous_nodes = [
+            n
+            for n in result.graph_module.graph.nodes
+            if n.op == "call_method" and n.target == "contiguous"
+        ]
+        self.assertEqual(len(contiguous_nodes), 1)
+        # Verify graph structure: contiguous is between transpose and view
+        contiguous_node = contiguous_nodes[0]
+        self.assertEqual(contiguous_node.args[0].target, "transpose")
+        view_users = list(contiguous_node.users)
+        self.assertEqual(len(view_users), 1)
+        self.assertEqual(view_users[0].target, "view")
+
+    def test_insert_contiguous_aten_transpose_view(self):
+        """A contiguous node is inserted between aten::transpose.int and aten::view."""
+
+        class TransposeViewModel(torch.nn.Module):
+            def forward(self, x):
+                return x.transpose(0, 1).transpose(0, 1).view(-1)
+
+        TransposeViewModel()(torch.randn(2, 3))
+        ep = torch.export.export(TransposeViewModel(), (torch.randn(2, 3),))
+
+        # Only run the insertion check when the pattern is present in the graph;
+        # some torch versions normalise .view() to aten::reshape instead.
+        has_pattern = any(
+            n.op == "call_function"
+            and hasattr(n.target, "name")
+            and n.target.name() == "aten::transpose.int"
+            and any(
+                u.op == "call_function"
+                and hasattr(u.target, "name")
+                and u.target.name() == "aten::view"
+                for u in n.users
+            )
+            for n in ep.graph_module.graph.nodes
+        )
+
+        result = insert_contiguous_between_transpose_and_view(ep)
+
+        if has_pattern:
+            contiguous_nodes = [
+                n
+                for n in result.graph_module.graph.nodes
+                if n.op == "call_method" and n.target == "contiguous"
+            ]
+            self.assertGreater(len(contiguous_nodes), 0)
+            # Verify graph structure: contiguous sits between transpose and view
+            contiguous_node = contiguous_nodes[0]
+            self.assertEqual(contiguous_node.args[0].target.name(), "aten::transpose.int")
+            view_users = [
+                u
+                for u in contiguous_node.users
+                if u.op == "call_function"
+                and hasattr(u.target, "name")
+                and u.target.name() == "aten::view"
+            ]
+            self.assertGreater(len(view_users), 0)
+        else:
+            # Pattern absent: function is a no-op and returns the same object
+            self.assertIs(result, ep)
+
 
 @requires_torch("2.0")
 class TestInplaceFunctions(ExtTestCase):
@@ -489,6 +643,212 @@ class TestInplaceFunctions(ExtTestCase):
 
         nodes_after = _inplace_nodes(graph)
         self.assertEqual(len(nodes_after), 0)
+
+    def test_remove_inplace_nodes_empty_graph(self):
+        """_remove_inplace_nodes returns 0 when there are no inplace nodes."""
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        graph.output(x)
+
+        n_removed = _remove_inplace_nodes(graph)
+        self.assertEqual(n_removed, 0)
+
+    def test_remove_inplace_nodes_with_users_returns_minus_one(self):
+        """_remove_inplace_nodes returns -1 when an inplace node still has users."""
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+
+        def fake_inplace_(a):
+            return a
+
+        fake_inplace_.__name__ = "fake_"
+        inplace_node = graph.call_function(fake_inplace_, (x,))
+        # Make inplace_node have a user by using it in the output
+        graph.output(inplace_node)
+
+        n_removed = _remove_inplace_nodes(graph)
+        self.assertEqual(n_removed, -1)
+        # The inplace node must still be present in the graph's nodes
+        node_names = [n.op for n in graph.nodes]
+        self.assertIn("call_function", node_names)
+
+    def test_remove_inplace_nodes_mixed(self):
+        """_remove_inplace_nodes returns -1 when some inplace nodes have users."""
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+
+        def fake_inplace_(a):
+            return a
+
+        fake_inplace_.__name__ = "fake_"
+        # One node without users (removable)
+        graph.call_function(fake_inplace_, (x,))
+        # One node with a user (not removable)
+        inplace_node2 = graph.call_function(fake_inplace_, (x,))
+        graph.output(inplace_node2)
+
+        n_removed = _remove_inplace_nodes(graph)
+        self.assertEqual(n_removed, -1)
+
+    def test_remove_inplace_nodes_dot_underscore_pattern(self):
+        """_remove_inplace_nodes handles node names containing '_.'."""
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+
+        def fake_inplace_(a):
+            pass
+
+        # Simulate names like "aten.add_" that contain "_."
+        fake_inplace_.__name__ = "aten.add_"
+        graph.call_function(fake_inplace_, (x,))
+        graph.output(x)
+
+        nodes_before = _inplace_nodes(graph)
+        self.assertEqual(len(nodes_before), 1)
+
+        n_removed = _remove_inplace_nodes(graph)
+        self.assertEqual(n_removed, 1)
+
+        nodes_after = _inplace_nodes(graph)
+        self.assertEqual(len(nodes_after), 0)
+
+    def test_remove_inplace_nodes_call_method(self):
+        """_remove_inplace_nodes handles call_method ops with inplace-style names."""
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        # call_method uses string as target
+        graph.call_method("add_", (x,))
+        graph.output(x)
+
+        nodes_before = _inplace_nodes(graph)
+        self.assertEqual(len(nodes_before), 1)
+
+        n_removed = _remove_inplace_nodes(graph)
+        self.assertEqual(n_removed, 1)
+
+        nodes_after = _inplace_nodes(graph)
+        self.assertEqual(len(nodes_after), 0)
+
+    def test_remove_inplace_nodes_verbose(self):
+        """_remove_inplace_nodes does not crash with verbose=1."""
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+
+        def fake_inplace_(a):
+            pass
+
+        fake_inplace_.__name__ = "fake_"
+        graph.call_function(fake_inplace_, (x,))
+        graph.output(x)
+
+        n_removed = _remove_inplace_nodes(graph, verbose=1)
+        self.assertEqual(n_removed, 1)
+
+
+@requires_torch("2.0")
+class TestGetDecompositionTable(ExtTestCase):
+    def test_get_decomposition_table_none(self):
+        """get_decomposition_table returns None when decomposition_table is None."""
+        opts = ExportOptions(decomposition_table=None)
+        self.assertIsNone(opts.get_decomposition_table())
+
+    def test_get_decomposition_table_all(self):
+        """get_decomposition_table returns None when decomposition_table is 'all'."""
+        opts = ExportOptions(decomposition_table="all")
+        self.assertIsNone(opts.get_decomposition_table())
+
+    def test_get_decomposition_table_default(self):
+        """get_decomposition_table returns a dict when decomposition_table is 'default'."""
+        opts = ExportOptions(decomposition_table="default")
+        table = opts.get_decomposition_table()
+        self.assertIsInstance(table, dict)
+        self.assertGreater(len(table), 0)
+
+    def test_get_decomposition_table_dict(self):
+        """get_decomposition_table returns the dict directly when given a dict."""
+        custom = {object(): lambda: None}
+        opts = ExportOptions(decomposition_table=custom)
+        self.assertIs(opts.get_decomposition_table(), custom)
+
+    def test_get_decomposition_table_by_name_default(self):
+        """_get_decomposition_table_by_name('default') returns a non-empty dict."""
+        table = _get_decomposition_table_by_name("default")
+        self.assertIsInstance(table, dict)
+        self.assertGreater(len(table), 0)
+
+    def test_get_decomposition_table_by_name_unknown(self):
+        """_get_decomposition_table_by_name raises ValueError for unknown names."""
+        with self.assertRaises(ValueError):
+            _get_decomposition_table_by_name("unknown")
+
+
+class TestValidateExportedProgram(ExtTestCase):
+    def test_validate_exported_program_no_discrepancy(self):
+        """validate_exported_program passes when model and exported program agree."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        ep = torch.export.export(model, (x,))
+        opts = ExportOptions(validate_ep=True)
+        # Should not raise
+        opts.validate_exported_program(model, ep, (x,), None)
+
+    def test_validate_exported_program_custom_atol(self):
+        """validate_exported_program passes with a custom float atol."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        ep = torch.export.export(model, (x,))
+        opts = ExportOptions(validate_ep=1e-3)
+        opts.validate_exported_program(model, ep, (x,), None)
+
+    def test_validate_exported_program_raises_on_discrepancy(self):
+        """validate_exported_program raises AssertionError when outputs differ."""
+
+        class ConstantModel(torch.nn.Module):
+            def forward(self, x):
+                return x + 1.0
+
+        class MismatchedModel(torch.nn.Module):
+            def forward(self, x):
+                return x + 100.0
+
+        x = torch.rand(2, 3)
+        ep = torch.export.export(MismatchedModel(), (x,))
+        reference_model = ConstantModel()
+        opts = ExportOptions(validate_ep=True)
+        with self.assertRaises(AssertionError):
+            opts.validate_exported_program(reference_model, ep, (x,), None)
+
+    def test_export_with_validate_ep_true(self):
+        """export() with validate_ep=True runs validate_exported_program internally."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(validate_ep=True)
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+        self.assertTrue(hasattr(opts, "_stat_time_validate_exported_program"))
+
+    def test_export_with_validate_ep_float(self):
+        """export() with validate_ep as float uses it as atol."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(validate_ep=1e-4)
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+        self.assertTrue(hasattr(opts, "_stat_time_validate_exported_program"))
 
 
 @requires_torch("2.0")
