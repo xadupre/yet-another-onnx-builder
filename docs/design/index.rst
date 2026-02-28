@@ -9,3 +9,4 @@ Elements of Design
    flatten
    helpers
    shape
+   translate
