@@ -458,8 +458,8 @@ Basic usage
     result = sess.run(None, feeds)
     print(string_type(result, with_shape=True, with_min_max=True))
 
-Verbose mode
-------------
+Inspecting intermediate results
+-------------------------------
 
 Pass ``verbose=1`` to print every kernel execution and every tensor freed
 during the run.  This lets you trace the exact execution order and see when
