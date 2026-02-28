@@ -120,7 +120,11 @@ class Translater:
                         name=i.name,
                         elem_type=i.type.tensor_type.elem_type,
                         shape=tuple(
-                            d.dim_value or d.dim_param
+                            (
+                                d.dim_value
+                                if d.dim_value != 0
+                                else (d.dim_param or None)
+                            )
                             for d in i.type.tensor_type.shape.dim
                         ),
                     )
