@@ -3,24 +3,47 @@ import sys
 import time
 from typing import Any, Dict, List, Optional
 import numpy as np
-from onnx import GraphProto, ModelProto, StringStringEntryProto, TensorProto, load_model
-from onnx.model_container import ModelContainer, _set_external_data
+import onnx
+from onnx.model_container import ModelContainer
 from onnx.external_data_helper import _get_all_tensors, uses_external_data
 from onnx.inliner import inline_local_functions
 from ..helpers.mini_onnx_builder import proto_from_array
 from ..helpers.onnx_helper import dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
 
 STORAGE_TYPE = {
-    TensorProto.FLOAT16: np.int16,
-    TensorProto.BFLOAT16: np.int16,
+    onnx.TensorProto.FLOAT16: np.int16,
+    onnx.TensorProto.BFLOAT16: np.int16,
 }
+
+
+def _set_external_data(
+    tensor: onnx.TensorProto,
+    location: str,
+    offset: Optional[int] = None,
+    length: Optional[int] = None,
+    checksum: Optional[str] = None,
+    basepath: Optional[str] = None,
+) -> None:
+    del tensor.external_data[:]
+    tensor.data_location = onnx.TensorProto.EXTERNAL
+    for k, v in {
+        "location": location,
+        "offset": offset,
+        "length": length,
+        "checksum": checksum,
+        "basepath": basepath,
+    }.items():
+        if v is not None:
+            entry = tensor.external_data.add()
+            entry.key = k
+            entry.value = str(v)
 
 
 def _get_type(elem_type: Any) -> int:
     if isinstance(elem_type, int):
         return elem_type
     if elem_type is None:
-        return TensorProto.UNDEFINED
+        return onnx.TensorProto.UNDEFINED
     return dtype_to_tensor_dtype(elem_type)
 
 
@@ -42,7 +65,7 @@ class ExtendedModelContainer(ModelContainer):
         }
         self.inline = False
 
-    def save(self, file_path: str, all_tensors_to_one_file: bool = True) -> ModelProto:
+    def save(self, file_path: str, all_tensors_to_one_file: bool = True) -> onnx.ModelProto:
         """
         Saves the large model.
         The function returns a ModelProto,
@@ -71,7 +94,7 @@ class ExtendedModelContainer(ModelContainer):
                 can be used to load them later
         :return: self
         """
-        self.model_proto_ = load_model(file_path, load_external_data=False)
+        self.model_proto_ = onnx.load(file_path, load_external_data=False)
         if load_large_initializers:
             self._load_large_initializers(file_path)
         return self
@@ -80,7 +103,7 @@ class ExtendedModelContainer(ModelContainer):
         self,
         file_path: str,
         all_tensors_to_one_file: bool,
-    ) -> ModelProto:
+    ) -> onnx.ModelProto:
         """Save the large model into a main onnx file and one file
         per tensor. Follows the same format as :func:`write_external_data_tensors
         <onnx.external_data_helper.write_external_data_tensors>`.
@@ -115,7 +138,7 @@ class ExtendedModelContainer(ModelContainer):
         if folder and not os.path.exists(folder):
             raise FileNotFoundError(f"Folder {folder!r} does not exist.")
         proto = self.model_proto.SerializeToString()
-        copy = ModelProto()
+        copy = onnx.ModelProto()
         copy.ParseFromString(proto)
         prefix = os.path.splitext(os.path.split(file_path)[-1])[0]
 
@@ -129,7 +152,7 @@ class ExtendedModelContainer(ModelContainer):
         for tensor in _get_all_tensors(copy):
             if not uses_external_data(tensor):
                 continue
-            prop: Optional[StringStringEntryProto] = None
+            prop: Optional[onnx.StringStringEntryProto] = None
             for ext in tensor.external_data:  # type: ignore[assignment]
                 if ext.key == "location":  # type: ignore[attr-defined]
                     prop = ext  # type: ignore[assignment]
@@ -152,7 +175,7 @@ class ExtendedModelContainer(ModelContainer):
                 begin = time.perf_counter()
                 tensor_bytes = np_tensor.tobytes()
                 self._stats["time_export_tobytes"] += time.perf_counter() - begin
-            elif isinstance(np_tensor, TensorProto):
+            elif isinstance(np_tensor, onnx.TensorProto):
                 tensor_bytes = np_tensor.raw_data
                 assert len(tensor_bytes) > 0, f"One tensor is null, np_tensor={np_tensor}."
             else:
@@ -212,7 +235,7 @@ class ExtendedModelContainer(ModelContainer):
 
     def _deserialize_graph(
         self,
-        proto: GraphProto,
+        proto: onnx.GraphProto,
         scoped_values: List[Dict[str, "onnx_ir.Value"]],  # noqa: F821
     ) -> "onnx_ir.Graph":  # noqa: F821
         """See :epkg:`onnxscript`."""
@@ -341,7 +364,7 @@ class ExtendedModelContainer(ModelContainer):
             return getattr(proto, field)
         return None
 
-    def to_ir(self) -> "onnx_ir.Model":  # noqa: F821
+    def to_ir(self) -> "onnx_ir.Model":  # type: ignore # noqa: F821
         """Conversion to :class:`onnx_ir.Model`."""
         import onnx_ir as oir
         import onnx_ir.serde as oirs
