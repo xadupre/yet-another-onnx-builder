@@ -157,9 +157,7 @@ tensor_names = ["X", "Y", "added", "concat_out", "Z"]
 # Collect onnx.shape_inference shapes as strings
 onnx_shapes = {}
 for vi in (
-    list(inferred.graph.input)
-    + list(inferred.graph.value_info)
-    + list(inferred.graph.output)
+    list(inferred.graph.input) + list(inferred.graph.value_info) + list(inferred.graph.output)
 ):
     t = vi.type.tensor_type
     if t.HasField("shape"):
@@ -176,8 +174,7 @@ builder_shapes = {name: str(builder.get_shape(name)) for name in tensor_names}
 
 col_labels = ["tensor", "onnx.shape_inference", "BasicShapeBuilder"]
 table_data = [
-    [name, onnx_shapes.get(name, "—"), builder_shapes.get(name, "—")]
-    for name in tensor_names
+    [name, onnx_shapes.get(name, "—"), builder_shapes.get(name, "—")] for name in tensor_names
 ]
 
 fig, ax = plt.subplots(figsize=(8, 2.5))
