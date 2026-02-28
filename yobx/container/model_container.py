@@ -9,7 +9,7 @@ from onnx.external_data_helper import _get_all_tensors, uses_external_data
 from onnx.inliner import inline_local_functions
 from ..helpers.mini_onnx_builder import proto_from_array
 from ..helpers.onnx_helper import dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
-from .model_container_stats import ModelContainerStats
+from .build_stats import BuildStats
 
 STORAGE_TYPE = {
     onnx.TensorProto.FLOAT16: np.int16,
@@ -56,7 +56,7 @@ class ExtendedModelContainer(ModelContainer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._stats = ModelContainerStats()
+        self._stats = BuildStats()
         self.inline = False
 
     def save(self, file_path: str, all_tensors_to_one_file: bool = True) -> onnx.ModelProto:

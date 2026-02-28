@@ -75,9 +75,7 @@ class TestExtendedModelContainer(ExtTestCase):
         from yobx.container import ExtendedModelContainer
 
         container = ExtendedModelContainer()
-        self.assertIsInstance(container._stats, dict)
         self.assertFalse(container.inline)
-        self.assertIn("time_export_write_model", container._stats)
 
     def test_save_load_numpy(self):
         from yobx.container import ExtendedModelContainer
