@@ -3,7 +3,6 @@ import pprint
 import re
 from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
 import optree
-import torch
 import torch.utils._pytree as pytree
 from ..helpers import string_type
 
@@ -33,7 +32,7 @@ def make_flattening_function_for_dataclass(
 
     def flatten_with_keys_cls(
         obj: cls,  # type: ignore[valid-type]
-    ) -> Tuple[List[Tuple[pytree.KeyEntry, Any]], pytree.Context]:
+    ) -> Tuple[List[Tuple[pytree.MappingKey, Any]], pytree.Context]:
         """Serializes a ``%s`` with python objects with keys."""
         values, context = list(obj.values()), list(obj.keys())  # type: ignore[attr-defined]
         return [(pytree.MappingKey(k), v) for k, v in zip(context, values)], context
@@ -178,6 +177,7 @@ def register_cache_flattening(
     import packaging.version as pv
 
     wrong: Dict[type, Optional[str]] = {}
+    transformers_version: Optional[str] = None
     if patch_transformers:
         import transformers
         from .transformers.flatten_class import WRONG_REGISTRATIONS
@@ -204,7 +204,10 @@ def register_cache_flattening(
             cls in pytree.SUPPORTED_NODES
             and cls not in PATCH_OF_PATCHES
             # and pv.Version(torch.__version__) < pv.Version("2.7")
-            and (version is None or transformers_version >= pv.Version(version))
+            and (
+                version is None
+                or (transformers_version and transformers_version >= pv.Version(version))
+            )
         ):
             assert cls in registration_functions, (
                 f"{cls} has no registration functions mapped to it, "
@@ -229,10 +232,12 @@ def register_cache_flattening(
 def unregister_class_flattening(cls: type, verbose: int = 0):
     """Undo the registration for a class."""
     # pytree._deregister_pytree_flatten_spec(cls)
-    if cls in torch.fx._pytree.SUPPORTED_NODES:
-        del torch.fx._pytree.SUPPORTED_NODES[cls]
-    if cls in torch.fx._pytree.SUPPORTED_NODES_EXACT_MATCH:
-        del torch.fx._pytree.SUPPORTED_NODES_EXACT_MATCH[cls]
+    import torch.fx._pytree as fxpytree
+
+    if cls in fxpytree.SUPPORTED_NODES:
+        del fxpytree.SUPPORTED_NODES[cls]
+    if cls in fxpytree.SUPPORTED_NODES_EXACT_MATCH:
+        del fxpytree.SUPPORTED_NODES_EXACT_MATCH[cls]
     pytree._deregister_pytree_node(cls)
     try:  # noqa: SIM105
         optree.unregister_pytree_node(cls, namespace="torch")

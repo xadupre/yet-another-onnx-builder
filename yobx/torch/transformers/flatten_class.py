@@ -85,7 +85,7 @@ def _flatten_key_value_cache(cache: Cache) -> Tuple[List[Any], pytree.Context]:
 
 def _flatten_with_keys_cache(
     cache: Cache,
-) -> Tuple[List[Tuple[pytree.KeyEntry, Any]], pytree.Context]:
+) -> Tuple[List[Tuple[pytree.MappingKey, Any]], pytree.Context]:
     values, context = _flatten_key_value_cache(cache)
     return [(pytree.MappingKey(k), v) for k, v in zip(context, values)], context
 
@@ -201,7 +201,9 @@ def unflatten_static_cache(
     """Restores a :class:`transformers.cache_utils.StaticCache` from python objects."""
     return _unflatten_cache(  # type: ignore[return-value]
         lambda *args, **kwargs: make_static_cache(  # type: ignore[misc]
-            *args, max_cache_len=values[0].shape[2], **kwargs
+            *args,
+            max_cache_len=values[0].shape[2],  # pyrefly: ignore[bad-keyword-argument]
+            **kwargs,
         ),
         values,
         context,
