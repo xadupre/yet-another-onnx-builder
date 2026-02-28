@@ -2,14 +2,14 @@
 Flatten and unflatten functions for transformers cache types.
 
 Enables registration of transformers cache classes with
-:mod:`torch.utils._pytree` so that :func:`torch.export.export`
+:mod:`pytree` so that :func:`torch.export.export`
 can handle them as inputs and outputs.
 """
 
 import itertools
 import re
 from typing import Any, Callable, List, Set, Tuple
-import torch
+import torch.utils._pytree as pytree
 import transformers.cache_utils
 from transformers.cache_utils import Cache, DynamicCache, EncoderDecoderCache, StaticCache
 from transformers.modeling_outputs import BaseModelOutput
@@ -56,7 +56,7 @@ PARSE_LAYER_NAMES = {
 }
 
 
-def _flatten_key_value_cache(cache: Cache) -> Tuple[List[Any], torch.utils._pytree.Context]:
+def _flatten_key_value_cache(cache: Cache) -> Tuple[List[Any], pytree.Context]:
     ca = CacheKeyValue(cache)
     flat = list(itertools.chain.from_iterable(zip(ca.key_cache, ca.value_cache)))  # type: ignore[arg-type]
     unique = set(ca.cls_layers) if ca.cls_layers else None
@@ -85,15 +85,15 @@ def _flatten_key_value_cache(cache: Cache) -> Tuple[List[Any], torch.utils._pytr
 
 def _flatten_with_keys_cache(
     cache: Cache,
-) -> Tuple[List[Tuple[torch.utils._pytree.KeyEntry, Any]], torch.utils._pytree.Context]:
+) -> Tuple[List[Tuple[pytree.KeyEntry, Any]], pytree.Context]:
     values, context = _flatten_key_value_cache(cache)
-    return [(torch.utils._pytree.MappingKey(k), v) for k, v in zip(context, values)], context
+    return [(pytree.MappingKey(k), v) for k, v in zip(context, values)], context
 
 
 def _unflatten_cache(
     make_cache: Callable,
     values: List[Any],
-    context: torch.utils._pytree.Context,
+    context: pytree.Context,
     output_type=None,
 ) -> DynamicCache:
     """Restores a cache from python objects."""
@@ -126,7 +126,7 @@ def _unflatten_cache(
 
 def flatten_dynamic_cache(
     dynamic_cache: DynamicCache,
-) -> Tuple[List[Any], torch.utils._pytree.Context]:
+) -> Tuple[List[Any], pytree.Context]:
     """
     Serializes a :class:`transformers.cache_utils.DynamicCache` with python objects.
 
@@ -142,7 +142,7 @@ def flatten_dynamic_cache(
 
 def flatten_with_keys_dynamic_cache(
     dynamic_cache: DynamicCache,
-) -> Tuple[List[Tuple[torch.utils._pytree.KeyEntry, Any]], torch.utils._pytree.Context]:
+) -> Tuple[List[Tuple[pytree.KeyEntry, Any]], pytree.Context]:
     """
     Serializes a :class:`transformers.cache_utils.DynamicCache` with python objects.
 
@@ -157,7 +157,7 @@ def flatten_with_keys_dynamic_cache(
 
 
 def unflatten_dynamic_cache(
-    values: List[Any], context: torch.utils._pytree.Context, output_type=None
+    values: List[Any], context: pytree.Context, output_type=None
 ) -> DynamicCache:
     """
     Restores a :class:`transformers.cache_utils.DynamicCache` from python objects.
@@ -177,7 +177,7 @@ def unflatten_dynamic_cache(
 
 def flatten_static_cache(
     cache: StaticCache,
-) -> Tuple[List[Any], torch.utils._pytree.Context]:
+) -> Tuple[List[Any], pytree.Context]:
     """Serializes a :class:`transformers.cache_utils.StaticCache` with python objects."""
     ca = CacheKeyValue(cache)
     assert not ca.key_cache or cache.max_cache_len == ca.key_cache[0].shape[2], (
@@ -190,13 +190,13 @@ def flatten_static_cache(
 
 def flatten_with_keys_static_cache(
     cache: StaticCache,
-) -> Tuple[List[Tuple[torch.utils._pytree.KeyEntry, Any]], torch.utils._pytree.Context]:
+) -> Tuple[List[Tuple[pytree.KeyEntry, Any]], pytree.Context]:
     """Serializes a :class:`transformers.cache_utils.StaticCache` with python objects."""
     return _flatten_with_keys_cache(cache)
 
 
 def unflatten_static_cache(
-    values: List[Any], context: torch.utils._pytree.Context, output_type=None
+    values: List[Any], context: pytree.Context, output_type=None
 ) -> StaticCache:
     """Restores a :class:`transformers.cache_utils.StaticCache` from python objects."""
     return _unflatten_cache(  # type: ignore[return-value]
@@ -216,7 +216,7 @@ def unflatten_static_cache(
 
 def flatten_encoder_decoder_cache(
     ec_cache: EncoderDecoderCache,
-) -> Tuple[List[Any], torch.utils._pytree.Context]:
+) -> Tuple[List[Any], pytree.Context]:
     """
     Serializes a :class:`transformers.cache_utils.EncoderDecoderCache`
     with python objects.
@@ -225,14 +225,14 @@ def flatten_encoder_decoder_cache(
         "self_attention_cache": ec_cache.self_attention_cache,
         "cross_attention_cache": ec_cache.cross_attention_cache,
     }
-    return torch.utils._pytree._dict_flatten(dictionary)
+    return pytree._dict_flatten(dictionary)
 
 
 def flatten_with_keys_encoder_decoder_cache(
     ec_cache: EncoderDecoderCache,
 ) -> Tuple[
-    List[Tuple[torch.utils._pytree.KeyEntry, Any]],
-    torch.utils._pytree.Context,
+    List[Tuple[pytree.KeyEntry, Any]],
+    pytree.Context,
 ]:
     """
     Serializes a :class:`transformers.cache_utils.EncoderDecoderCache`
@@ -242,14 +242,14 @@ def flatten_with_keys_encoder_decoder_cache(
         "self_attention_cache": ec_cache.self_attention_cache,
         "cross_attention_cache": ec_cache.cross_attention_cache,
     }
-    return torch.utils._pytree._dict_flatten_with_keys(dictionary)
+    return pytree._dict_flatten_with_keys(dictionary)
 
 
 def unflatten_encoder_decoder_cache(
-    values: List[Any], context: torch.utils._pytree.Context, output_type=None
+    values: List[Any], context: pytree.Context, output_type=None
 ) -> EncoderDecoderCache:
     """Restores a :class:`transformers.cache_utils.EncoderDecoderCache` from python objects."""
-    dictionary = torch.utils._pytree._dict_unflatten(values, context)
+    dictionary = pytree._dict_unflatten(values, context)
     return EncoderDecoderCache(
         dictionary["self_attention_cache"], dictionary["cross_attention_cache"]
     )
