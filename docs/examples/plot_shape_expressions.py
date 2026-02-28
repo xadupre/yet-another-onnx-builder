@@ -205,9 +205,7 @@ rows = [
     ["Split S1", "('a', 'CeilToInt(b+c,2)')"],
     ["Split S2", "('a', 'b+c-CeilToInt(b+c,2)')"],
 ]
-simplify_rows = [
-    [expr, simplify_expression(expr)] for expr in examples
-]
+simplify_rows = [[expr, simplify_expression(expr)] for expr in examples]
 
 fig, axes = plt.subplots(1, 2, figsize=(10, 3))
 

@@ -1,6 +1,6 @@
 import unittest
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape.rename_expressions import (
+from yobx.xshape.expressions.rename_expressions import (
     parse_expression_tokens,
     rename_expression,
     rename_dynamic_dimensions,

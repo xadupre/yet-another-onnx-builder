@@ -1,7 +1,7 @@
 import ast
 import unittest
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape.simplify_expressions import (
+from yobx.xshape.expressions.simplify_expressions import (
     SimpleSimpliflyTransformer,
     simplify_expression,
     simplify_two_expressions,

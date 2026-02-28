@@ -149,7 +149,9 @@ nodes = [
 node_pos = {}
 for x, y, label, color in nodes:
     box = mpatches.FancyBboxPatch(
-        (x - 0.6, y - 0.45), 1.2, 0.9,
+        (x - 0.6, y - 0.45),
+        1.2,
+        0.9,
         boxstyle="round,pad=0.08",
         linewidth=1.2,
         edgecolor="#888888",
