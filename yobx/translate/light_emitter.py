@@ -118,3 +118,18 @@ class LightEmitter(BaseEmitter):
             str_outputs = ", ".join([f"{o!r}" for o in outputs])
             inst.append(f"rename({str_outputs})")
         return inst
+
+    def _emit_begin_function(self, **kwargs: Dict[str, Any]) -> List[str]:
+        return []
+
+    def _emit_end_function(self, **kwargs: Dict[str, Any]) -> List[str]:
+        return []
+
+    def _emit_function_input(self, **kwargs: Dict[str, Any]) -> List[str]:
+        return []
+
+    def _emit_function_output(self, **kwargs: Dict[str, Any]) -> List[str]:
+        return []
+
+    def _emit_function_attributes(self, **kwargs: Dict[str, Any]) -> List[str]:
+        return []

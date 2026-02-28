@@ -16,7 +16,7 @@ def translate_header(api: str = "onnx"):
             import onnx
             import onnx.helper as oh
             import onnx.numpy_helper as onh
-            from yobx.translate.make_helper import make_node_extended
+            from yobx.translate.make_helper import make_ref_attribute
             """
         )
     if api == "onnx-short":
@@ -27,7 +27,7 @@ def translate_header(api: str = "onnx"):
             import onnx
             import onnx.helper as oh
             import onnx.numpy_helper as onh
-            from yobx.translate.make_helper import make_node_extended
+            from yobx.translate.make_helper import make_ref_attribute
             """
         )
     if api == "light":

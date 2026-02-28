@@ -67,6 +67,10 @@ class Translater:
                 self.proto_.attribute if hasattr(self.proto_, "attribute") else []
             )
             is_function = isinstance(self.proto_, FunctionProto)
+            if not is_function:
+                # Standalone GraphProto: emit START to initialize emitter state
+                # (defines opset_imports/functions variables for InnerEmitter)
+                rows.extend(self.emitter(EventType.START, opsets={}))
             last_event = (
                 EventType.TO_ONNX_FUNCTION if is_function else EventType.TO_ONNX_MODEL
             )
@@ -120,11 +124,7 @@ class Translater:
                         name=i.name,
                         elem_type=i.type.tensor_type.elem_type,
                         shape=tuple(
-                            (
-                                d.dim_value
-                                if d.dim_value != 0
-                                else (d.dim_param or None)
-                            )
+                            d.dim_param or (d.dim_value if d.dim_value != 0 else None)
                             for d in i.type.tensor_type.shape.dim
                         ),
                     )

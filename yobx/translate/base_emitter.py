@@ -150,13 +150,11 @@ class BaseEmitter:
                     return [], str(v.tolist())
 
         if value[0].type == AttributeProto.GRAPH:
-            from .translate import Translater
-
-            tr = Translater(value[0].g, emitter=self)
-            rows = tr.export(as_str=False, single_line=False)
-            # last instruction is to_onnx, let's drop it.
-            srows = ".".join(rows[:-1])
-            return [], f"g().{srows}"
+            raise NotImplementedError(
+                "Rendering GRAPH attributes is not supported by BaseEmitter. "
+                "Emitters that support subgraph attributes must override "
+                "render_attribute_value for AttributeProto.GRAPH."
+            )
 
         if isinstance(value, tuple) and len(value) == 2 and value[1] is None:
             # in a function, an attribute receiving a value from an attribute

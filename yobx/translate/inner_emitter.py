@@ -15,6 +15,9 @@ _ELEMENT_TYPE_NAME = {
 class InnerEmitter(BaseEmitter):
     """Converts event into proper onnx.helper code."""
 
+    def __init__(self):
+        self.ir_version = None
+
     def render_attribute_value(self, value: Any) -> Tuple[List[str], str]:
         """
         Renders an attribute value into a string.
@@ -52,6 +55,7 @@ class InnerEmitter(BaseEmitter):
         return "\n".join(rows)
 
     def _emit_start(self, **kwargs: Dict[str, Any]) -> List[str]:
+        self.ir_version = kwargs.get("ir_version", None)
         lines = ["opset_imports = ["]
         opsets = kwargs.get("opsets", {})
         for k, v in opsets.items():
@@ -64,9 +68,11 @@ class InnerEmitter(BaseEmitter):
             "model = oh.make_model(",
             "    graph,",
             "    functions=functions,",
-            "    opset_imports=opset_imports",
-            ")",
+            "    opset_imports=opset_imports,",
         ]
+        if self.ir_version:
+            lines.append(f"    ir_version={self.ir_version},")
+        lines.append(")")
         return lines
 
     def _emit_begin_graph(self, **kwargs: Dict[str, Any]) -> List[str]:
@@ -138,31 +144,56 @@ class InnerEmitter(BaseEmitter):
 
     def _emit_node(self, **kwargs: Dict[str, Any]) -> List[str]:
         op_type = kwargs["op_type"]
-        inputs = kwargs["inputs"]
-        outputs = kwargs["outputs"]
+        inputs = list(kwargs["inputs"])
+        outputs = list(kwargs["outputs"])
         before_lines = []
-        lines = [
-            "nodes.append(",
-            "    make_node_extended(",
-            f"        {op_type!r},",
-            f"        {list(inputs)},",
-            f"        {list(outputs)},",
-        ]
         domain = kwargs.get("domain", "")
-        if domain:
-            lines.append(f"        domain={domain!r},")
         atts = kwargs.get("atts", {})
+
+        # Separate regular attrs from ref attrs (ref_attr_name attributes, value is None)
+        regular_atts = []
+        ref_attr_appends = []
         for k, v in atts.items():
             before, value = self.render_attribute_value(v)
             before_lines.extend(before)
-            lines.append(f"        {k}={value},")
-        lines[-1] = lines[-1][:-1]
-        lines.extend(["    )", ")"])
-        return before_lines + lines
+            if v[1] is None and getattr(v[0], "ref_attr_name", ""):
+                # ref attribute: must be appended to node.attribute separately
+                ref_attr_appends.append(f"node.attribute.append({value})")
+            else:
+                regular_atts.append((k, value))
+
+        # Build argument list for oh.make_node
+        args = [
+            f"        {op_type!r},",
+            f"        {inputs},",
+            f"        {outputs},",
+        ]
+        if domain:
+            args.append(f"        domain={domain!r},")
+        for k, value in regular_atts:
+            args.append(f"        {k}={value},")
+        # Remove trailing comma from last arg
+        if args:
+            args[-1] = args[-1].rstrip(",")
+
+        call_lines = ["    oh.make_node(", *args, "    )"]
+
+        if ref_attr_appends:
+            # Use a temporary node variable to allow appending ref attributes
+            lines = [*before_lines, "node = (", *call_lines, ")"]
+            lines.extend(ref_attr_appends)
+            lines.append("nodes.append(node)")
+        else:
+            lines = [*before_lines, "nodes.append(", *call_lines, ")"]
+        return lines
 
     def _emit_begin_function(self, **kwargs: Dict[str, Any]) -> List[str]:
+        opsets = kwargs.get("opsets", {})
         lines = [
             "",
+            "opset_imports_f = [",
+            *[f"    oh.make_opsetid({k!r}, {v!r})," for k, v in opsets.items()],
+            "]",
             f"name_f = {kwargs['name']!r}",
             f"domain_f = {kwargs['domain']!r}",
             "nodes = []",
@@ -189,17 +220,19 @@ class InnerEmitter(BaseEmitter):
 
     def _emit_end_function(self, **kwargs: Dict[str, Any]) -> List[str]:
         lines = [
-            "functions.append(",
-            "    oh.make_function(",
-            "        domain_f, ",
-            "        name_f, ",
-            "        inputs, ",
-            "        outputs, ",
-            "        nodes, ",
-            "        attributes=atts, ",
-            "        opset_imports=opset_imports,",
-            "   )",
+            "function = oh.make_function(",
+            "    domain_f,",
+            "    name_f,",
+            "    inputs,",
+            "    outputs,",
+            "    nodes,",
+            "    attributes=atts,",
+            "    opset_imports=opset_imports_f,",
             ")",
+            "try:",
+            "    functions.append(function)",
+            "except NameError:",
+            "    pass",
         ]
         return lines
 
