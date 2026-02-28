@@ -138,3 +138,32 @@ proto_exact = create_onnx_model_from_input_tensors(big)
 print(f"randomized model size : {proto_rand.ByteSize():>8} bytes")
 print(f"exact      model size : {proto_exact.ByteSize():>8} bytes")
 assert proto_rand.ByteSize() < proto_exact.ByteSize()
+
+# %%
+# Plot: model size comparison
+# ----------------------------
+#
+# The bar chart below illustrates the difference in serialized model size
+# between a model that stores the actual weight values (``exact``) and one
+# that replaces them with a random-number generator node (``randomized``).
+
+import matplotlib.pyplot as plt  # noqa: E402
+
+sizes = [proto_exact.ByteSize(), proto_rand.ByteSize()]
+labels = ["exact", "randomized"]
+
+fig, ax = plt.subplots(figsize=(5, 4))
+bars = ax.bar(labels, sizes, color=["#4c72b0", "#dd8452"])
+ax.set_ylabel("Serialized size (bytes)")
+ax.set_title("ONNX model size: exact weights vs randomized")
+for bar, size in zip(bars, sizes):
+    ax.text(
+        bar.get_x() + bar.get_width() / 2,
+        bar.get_height() * 1.01,
+        f"{size:,}",
+        ha="center",
+        va="bottom",
+        fontsize=9,
+    )
+plt.tight_layout()
+plt.show()
