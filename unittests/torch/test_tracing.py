@@ -238,6 +238,88 @@ class TestCustomTracer(ExtTestCase):
         self.assertIsNotNone(graph)
         graph.lint()
 
+    def test_make_args_names_dict(self):
+        import torch.utils._pytree as pytree
+
+        concrete_args = {"x": torch.randn(3, 4), "y": torch.randn(3, 4)}
+        flat, _spec = pytree.tree_flatten(concrete_args)
+        names = CustomTracer.make_args_names(concrete_args, flat)
+        self.assertEqual(names, ["x", "y"])
+
+    def test_make_args_names_list(self):
+        import torch.utils._pytree as pytree
+
+        concrete_args = [torch.randn(3, 4), torch.randn(3, 4)]
+        flat, _spec = pytree.tree_flatten(concrete_args)
+        names = CustomTracer.make_args_names(concrete_args, flat)
+        self.assertEqual(names, ["a0", "a1"])
+
+    def test_make_args_names_dict_with_list_value(self):
+        import torch.utils._pytree as pytree
+
+        concrete_args = {
+            "x": torch.randn(3, 4),
+            "items": [torch.randn(2, 4), torch.randn(2, 4)],
+        }
+        flat, _spec = pytree.tree_flatten(concrete_args)
+        names = CustomTracer.make_args_names(concrete_args, flat)
+        self.assertEqual(names, ["x", "items_0", "items_1"])
+
+    def test_make_wrapped_model_dict_tensors(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        model = Model()
+        concrete_args = {"x": torch.randn(3, 4), "y": torch.randn(3, 4)}
+        wrapped, arg_names = CustomTracer.make_wrapped_model(model, concrete_args)
+        self.assertIsInstance(wrapped, torch.nn.Module)
+        self.assertEqual(arg_names, ["x", "y"])
+        self.assertTrue(hasattr(wrapped, "_traced_m2"))
+        x, y = torch.randn(3, 4), torch.randn(3, 4)
+        result = wrapped(x, y)
+        self.assertEqual(result.shape, torch.Size([3, 4]))
+
+    def test_make_wrapped_model_dict_tensors_mixed(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, items):
+                return x + items[0] + items[1]
+
+        model = Model()
+        concrete_args = {
+            "x": torch.randn(3, 4),
+            "items": [torch.randn(3, 4), torch.randn(3, 4)],
+        }
+        wrapped, arg_names = CustomTracer.make_wrapped_model(model, concrete_args)
+        self.assertIsInstance(wrapped, torch.nn.Module)
+        self.assertEqual(arg_names, ["x", "items_0", "items_1"])
+        self.assertTrue(hasattr(wrapped, "_traced_m2"))
+        x, i0, i1 = torch.randn(3, 4), torch.randn(3, 4), torch.randn(3, 4)
+        result = wrapped(x, i0, i1)
+        self.assertEqual(result.shape, torch.Size([3, 4]))
+
+    @requires_transformers("4.57")
+    def test_make_wrapped_model_dynamic_cache(self):
+        from yobx.torch import register_flattening_functions
+
+        class ModelWithCache(torch.nn.Module):
+            def forward(self, x, cache):
+                return x
+
+        model = ModelWithCache()
+        cache = make_dynamic_cache([(torch.randn(2, 4, 5, 8), torch.randn(2, 4, 5, 8))])
+        concrete_args = {"x": torch.randn(2, 5, 16), "cache": cache}
+        with register_flattening_functions(patch_transformers=True):
+            wrapped, arg_names = CustomTracer.make_wrapped_model(model, concrete_args)
+        self.assertIsInstance(wrapped, torch.nn.Module)
+        self.assertTrue(hasattr(wrapped, "_traced_m1"))
+        self.assertEqual(arg_names[0], "x")
+        x = torch.randn(2, 5, 16)
+        key = torch.randn(2, 4, 5, 8)
+        val = torch.randn(2, 4, 5, 8)
+        result = wrapped(x, key, val)
+        self.assertEqual(result.shape, torch.Size([2, 5, 16]))
+
 
 @requires_torch("2.0")
 class TestTracing(ExtTestCase):
