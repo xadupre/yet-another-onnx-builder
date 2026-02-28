@@ -151,17 +151,19 @@ class OpsVar:
         pads: Optional[List[int]] = None,
         strides: Optional[List[int]] = None,
     ) -> "Var":
-        return self.make_node(
-            "LpPool",
-            self,
-            auto_pad=auto_pad,
-            ceil_mode=ceil_mode,
-            dilations=dilations or [],
-            kernel_shape=kernel_shape or [],
-            p=p,
-            pads=pads or [],
-            strides=strides or [],
-        )
+        attrs = {
+            "auto_pad": auto_pad,
+            "ceil_mode": ceil_mode,
+            "kernel_shape": kernel_shape or [],
+            "p": p,
+        }
+        if dilations is not None:
+            attrs["dilations"] = dilations
+        if pads is not None:
+            attrs["pads"] = pads
+        if strides is not None:
+            attrs["strides"] = strides
+        return self.make_node("LpPool", self, **attrs)
 
     def MeanVarianceNormalization(self, axes: Optional[List[int]] = None) -> "Var":
         return self.make_node(
