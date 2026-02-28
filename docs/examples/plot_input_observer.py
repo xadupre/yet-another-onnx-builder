@@ -170,9 +170,7 @@ inputs_masked = [
 
 # We tell the observer that when ``mask`` is absent it should be treated as an
 # all-ones tensor with batch=0 (the zero batch dimension signals "optional").
-observer_masked = InputObserver(
-    value_if_missing=dict(mask=torch.ones(0, seq_len))
-)
+observer_masked = InputObserver(value_if_missing=dict(mask=torch.ones(0, seq_len)))
 
 with observer_masked(model_masked):
     for kwargs in inputs_masked:
@@ -232,27 +230,52 @@ ax.set_title("InputObserver workflow", fontsize=12)
 
 # Phase boxes
 phase_data = [
-    (0.2, "#dce9f5", "#4c72b0", "1. Observe", ["model(x1, y1)", "model(x2, y2)", "model(x3, y3)"]),
+    (
+        0.2,
+        "#dce9f5",
+        "#4c72b0",
+        "1. Observe",
+        ["model(x1, y1)", "model(x2, y2)", "model(x3, y3)"],
+    ),
     (4.2, "#fde8d8", "#dd8452", "2. Analyse", ["infer_dynamic_shapes()", "infer_arguments()"]),
-    (8.2, "#d5ecd4", "#3a8a3a", "3. Export", ["torch.export.export(", "  model, args,", "  dynamic_shapes=dyn)"]),
+    (
+        8.2,
+        "#d5ecd4",
+        "#3a8a3a",
+        "3. Export",
+        ["torch.export.export(", "  model, args,", "  dynamic_shapes=dyn)"],
+    ),
 ]
 
 for x0, fc, ec, title, lines in phase_data:
     box = mpatches.FancyBboxPatch(
-        (x0, 0.8), 3.6, 3.2,
-        boxstyle="round,pad=0.15", linewidth=1.5,
-        edgecolor=ec, facecolor=fc,
+        (x0, 0.8),
+        3.6,
+        3.2,
+        boxstyle="round,pad=0.15",
+        linewidth=1.5,
+        edgecolor=ec,
+        facecolor=fc,
     )
     ax.add_patch(box)
     ax.text(x0 + 1.8, 3.7, title, ha="center", va="center", fontsize=9, fontweight="bold")
     for i, line in enumerate(lines):
-        ax.text(x0 + 1.8, 3.0 - i * 0.55, line, ha="center", va="center",
-                fontsize=7.5, family="monospace")
+        ax.text(
+            x0 + 1.8,
+            3.0 - i * 0.55,
+            line,
+            ha="center",
+            va="center",
+            fontsize=7.5,
+            family="monospace",
+        )
 
 # Arrows between phases
 for x in (3.8, 7.8):
     ax.annotate(
-        "", xy=(x + 0.4, 2.4), xytext=(x, 2.4),
+        "",
+        xy=(x + 0.4, 2.4),
+        xytext=(x, 2.4),
         arrowprops=dict(arrowstyle="->", color="#555555", lw=1.5),
     )
 

@@ -76,11 +76,7 @@ class TestDocumentationExamples(ExtTestCase):
             if not reason and not has_dot and name in {"plot_dump_intermediate_results.py"}:
                 reason = "dot not installed"
 
-            if (
-                not reason
-                and sys.platform.startswith("win")
-                and name in {"plot_evaluator_comparison.py"}
-            ):
+            if not reason and sys.platform.startswith("win"):
                 reason = "CI complains on Windows"
 
             if reason:
