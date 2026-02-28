@@ -240,7 +240,7 @@ class TestCustomTracer(ExtTestCase):
         result = wrapped(x, i0, i1)
         self.assertEqual(result.shape, torch.Size([3, 4]))
 
-    @requires_transformers("4.37")
+    @requires_transformers("4.57")
     def test_make_wrapped_model_dynamic_cache(self):
         from yobx.torch import register_flattening_functions
 
@@ -249,9 +249,7 @@ class TestCustomTracer(ExtTestCase):
                 return x
 
         model = ModelWithCache()
-        cache = make_dynamic_cache(
-            [(torch.randn(2, 4, 5, 8), torch.randn(2, 4, 5, 8))]
-        )
+        cache = make_dynamic_cache([(torch.randn(2, 4, 5, 8), torch.randn(2, 4, 5, 8))])
         concrete_args = {"x": torch.randn(2, 5, 16), "cache": cache}
         with register_flattening_functions(patch_transformers=True):
             wrapped, arg_names = CustomTracer.make_wrapped_model(model, concrete_args)
