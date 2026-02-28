@@ -268,7 +268,23 @@ class Vars(BaseVar, OpsVars):
             elif isinstance(v, Var):
                 self.vars_.append(v)
             else:
-                raise TypeError(f"Expected Var or str, got {type(v)}.")
+                # Allow numpy arrays and scalar-like values by turning them into
+                # constant Vars via the parent graph when possible. This mirrors
+                # OnnxGraph.make_node(), which already accepts np.ndarray inputs.
+                if isinstance(v, (np.ndarray, np.generic)) or np.isscalar(v):
+                    const_maker = getattr(self.parent, "make_const", None)
+                    if const_maker is None:
+                        const_maker = getattr(self.parent, "const", None)
+                    if const_maker is None or not callable(const_maker):
+                        raise TypeError(
+                            f"Expected Var or str, and no suitable constant "
+                            f"factory found on parent graph to handle value "
+                            f"of type {type(v)}."
+                        )
+                    const_var = const_maker(v)
+                    self.vars_.append(const_var)
+                else:
+                    raise TypeError(f"Expected Var or str, got {type(v)}.")
 
     def __len__(self) -> int:
         return len(self.vars_)
