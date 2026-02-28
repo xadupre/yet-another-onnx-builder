@@ -394,7 +394,7 @@ class ExportOptions:
         self._stat_time_torch_export_export_oblivious = time.perf_counter() - begin
 
         if self.strict:
-            args, kwargs = args0, kwargs0
+            args, kwargs = args0, kwargs0  # pyrefly: ignore[unbound-name]
 
         if exported_program is None:
             if verbose:

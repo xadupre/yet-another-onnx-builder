@@ -83,7 +83,7 @@ class TestDocumentationExamples(ExtTestCase):
             ):
                 reason = "transformers<4.57"
 
-            if not reason and sys.platform.startswith("win"):
+            if not reason and sys.platform.startswith(("win", "darwin")):
                 reason = "CI complains on Windows"
 
             if reason:

@@ -13,6 +13,7 @@ import textwrap
 import types
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 import torch
+import torch.utils._pytree as pytree
 from torch.fx import Node
 from torch.fx.proxy import TracerBase
 from ..helpers import flatten_object, string_type
@@ -239,11 +240,9 @@ class CustomParameterProxy(CustomProxy):
         return self.param.nelement()
 
 
-def tree_unflatten_with_proxy(
-    tree_spec: torch.utils._pytree.PyTree, leaves: Iterable[Any]
-) -> Any:
+def tree_unflatten_with_proxy(tree_spec: pytree.PyTree, leaves: Iterable[Any]) -> Any:
     """
-    More robust implementation of ``torch.utils._pytree.tree_unflatten``
+    More robust implementation of ``pytree.tree_unflatten``
     supporting ``DynamicCache``.
     """
     if isinstance(leaves, (list, tuple)):
@@ -256,7 +255,7 @@ def tree_unflatten_with_proxy(
     if tree_spec.is_leaf():
         return leaves[0]
 
-    unflatten_fn = torch.utils._pytree.SUPPORTED_NODES[tree_spec.type].unflatten_fn
+    unflatten_fn = pytree.SUPPORTED_NODES[tree_spec.type].unflatten_fn
 
     # Recursively unflatten the children
     start = 0
@@ -544,7 +543,7 @@ class CustomTracer(torch.fx.Tracer):
 
     @classmethod
     def make_wrapped_model(cls, root, concrete_args):
-        flat_concrete_args, spec = torch.utils._pytree.tree_flatten(concrete_args)
+        flat_concrete_args, spec = pytree.tree_flatten(concrete_args)
         args_names = cls.make_args_names(concrete_args, flat_concrete_args)
 
         if (
@@ -580,7 +579,7 @@ class CustomTracer(torch.fx.Tracer):
 
             return FlatArgWrap(root, spec), args_names
 
-        # torch.utils._pytree.tree_unflatten does not work on CustomProxy
+        # pytree.tree_unflatten does not work on CustomProxy
 
         def make_method(args_names):
             args = ", ".join(args_names)
@@ -662,7 +661,7 @@ class CustomTracer(torch.fx.Tracer):
                 concrete_args.values() if isinstance(concrete_args, dict) else concrete_args
             )
 
-            if any(type(a) in torch.utils._pytree.SUPPORTED_NODES for a in flat_args):
+            if any(type(a) in pytree.SUPPORTED_NODES for a in flat_args):
                 # tracing does not know the input type so we need to flatten everything.
                 if verbose > 0:
                     print("[CustomTracer.trace] wraps for serializable args")
@@ -670,9 +669,7 @@ class CustomTracer(torch.fx.Tracer):
                 traced_concrete_args, _ = make_fake_with_dynamic_dimensions(
                     torch_deepcopy(concrete_args), dynamic_shapes
                 )
-                self._traced_concrete_args, _ = torch.utils._pytree.tree_flatten(
-                    traced_concrete_args
-                )
+                self._traced_concrete_args, _ = pytree.tree_flatten(traced_concrete_args)
                 traced_model = new_model
             else:
                 new_names = None
@@ -704,10 +701,8 @@ class CustomTracer(torch.fx.Tracer):
             if new_names and verbose > 0:
                 print(f"[CustomTracer.trace] -- new_names={new_names}")
             if new_names:
-                flat_concrete_args, _spec = torch.utils._pytree.tree_flatten(concrete_args)
-                flat_traced_concrete_args, _spec = torch.utils._pytree.tree_flatten(
-                    self._traced_concrete_args
-                )
+                flat_concrete_args, _spec = pytree.tree_flatten(concrete_args)
+                flat_traced_concrete_args, _spec = pytree.tree_flatten(self._traced_concrete_args)
             mapped = set()
             for node in graph.nodes:
                 if node.op == "placeholder":

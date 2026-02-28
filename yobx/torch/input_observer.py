@@ -4,6 +4,7 @@ import time
 from typing import Any, Callable, Sequence
 import onnx
 import torch
+import torch.utils._pytree as pytree
 from ..helpers import max_diff, string_type
 
 EOL = "\n"
@@ -32,7 +33,7 @@ def _flatten_unflatten_for_dynamic_shapes(
     """
     if isinstance(obj, torch.Tensor):
         return change_function(obj) if change_function else obj
-    flat, spec = torch.utils._pytree.tree_flatten(obj)
+    flat, spec = pytree.tree_flatten(obj)
     start = 0
     end = 0
     subtrees = []
@@ -127,7 +128,7 @@ class InputCandidate:
     ):
         self.args = args
         self.kwargs = kwargs
-        self.flat_list, self.spec = torch.utils._pytree.tree_flatten((args, kwargs))
+        self.flat_list, self.spec = pytree.tree_flatten((args, kwargs))
         self._position_to_args_kwargs: list[int | str] | None = None
         self._n_tensors_for_args_kwargs: dict[int | str, int] | None = None
         self.cst_kwargs = cst_kwargs.copy()
@@ -137,9 +138,9 @@ class InputCandidate:
                 (None if not isinstance(t, torch.Tensor) else t.clone().detach())
                 for t in self.flat_list
             ]
-            self.args, self.kwargs = torch.utils._pytree.tree_unflatten(self.flat_list, self.spec)
+            self.args, self.kwargs = pytree.tree_unflatten(self.flat_list, self.spec)
 
-        self.aligned_spec: torch.utils._pytree.PyTreeSpec | None = None
+        self.aligned_spec: pytree.PyTreeSpec | None = None
         self.aligned_flat_list: list[torch.Tensor | None] | None = None
 
     def remove_inputs(self, input_names: Sequence[str | int]):
@@ -161,7 +162,7 @@ class InputCandidate:
         # Update stored positional arguments.
         self.args = tuple(args_list)
         # remove any temporary structures
-        self.flat_list, self.spec = torch.utils._pytree.tree_flatten((self.args, self.kwargs))
+        self.flat_list, self.spec = pytree.tree_flatten((self.args, self.kwargs))
         self._position_to_args_kwargs = None
         self._n_tensors_for_args_kwargs = None
         self.aligned_spec = None
@@ -193,11 +194,11 @@ class InputCandidate:
 
         flat_index_to_args: list[int | str] = []
         for index_args, a in enumerate(self.args):
-            size = len(torch.utils._pytree.tree_flatten(a)[0])
+            size = len(pytree.tree_flatten(a)[0])
             self._n_tensors_for_args_kwargs[index_args] = size
             flat_index_to_args.extend([index_args] * size)
         for k, v in self.kwargs.items():
-            size = len(torch.utils._pytree.tree_flatten(v)[0])
+            size = len(pytree.tree_flatten(v)[0])
             self._n_tensors_for_args_kwargs[k] = size
             flat_index_to_args.extend([k] * size)
 
@@ -227,7 +228,7 @@ class InputCandidate:
     def _set_aligned_flat_list(
         self,
         aligned_flat_list: list[torch.Tensor | None],
-        aligned_spec: torch.utils._pytree.PyTreeSpec,
+        aligned_spec: pytree.PyTreeSpec,
     ):
         self.aligned_flat_list = aligned_flat_list
         self.aligned_spec = aligned_spec
@@ -260,7 +261,7 @@ class InputCandidate:
         flat = []
         for i in range(len(best_candidate.args)):
             if i < len(args) and (isinstance(args[i], torch.Tensor) or args[i]):
-                ts = torch.utils._pytree.tree_flatten(self.args[i])[0]
+                ts = pytree.tree_flatten(self.args[i])[0]
                 if i in captured_inputs and captured_inputs[i] != len(ts):
                     raise RuntimeError(
                         f"Positional argument {i} has {len(ts)} tensors "
@@ -275,7 +276,7 @@ class InputCandidate:
 
         for k in best_candidate.kwargs:
             if k in kwargs and (isinstance(kwargs[k], torch.Tensor) or kwargs[k]):
-                ts = torch.utils._pytree.tree_flatten(kwargs[k])[0]
+                ts = pytree.tree_flatten(kwargs[k])[0]
                 if k in captured_inputs and captured_inputs[k] != len(ts):
                     raise RuntimeError(
                         f"Named argument {k!r} has {len(ts)} tensors "
@@ -341,7 +342,7 @@ class InputObserverInfo:
         self.default_values = default_values
         self.value_if_missing = value_if_missing
         self.inputs: list[InputCandidate] = []
-        self.outputs_specs: list[torch.utils._pytree.PyTreeSpec] = []
+        self.outputs_specs: list[pytree.PyTreeSpec] = []
         self.flat_outputs: list[list[torch.Tensor | None]] = []
         self.latencies: list[float] = []
         self.args_name_and_position = args_name_and_position
@@ -435,7 +436,7 @@ class InputObserverInfo:
 
     def add_outputs(self, res: torch.Tensor | tuple[torch.Tensor, ...], latency: float):
         """Stores outputs. They are deepcopied."""
-        flat_res, spec = torch.utils._pytree.tree_flatten(res)
+        flat_res, spec = pytree.tree_flatten(res)
         self.outputs_specs.append(spec)
         self.flat_outputs.append([(None if t is None else t.clone().detach()) for t in flat_res])
         self.latencies.append(latency)
@@ -609,7 +610,7 @@ class InputObserverInfo:
         # This does not work in all cases but every time every available argument is flattened
         # with the same number of tensors. The function does not check
         # if that assumption is true.
-        flat_inputs, _max_spec = torch.utils._pytree.tree_flatten(
+        flat_inputs, _max_spec = pytree.tree_flatten(
             (self._best_candidate.args, self._best_candidate.kwargs)
         )
         torch._check(
@@ -687,7 +688,7 @@ class InputObserverInfo:
                 It produces a single list of tensors easier to process or modify
                 rather than a nested structure holding the same tensors.
                 The original structure can be restored with
-                ``torch.utils._pytree.tree_unflatten(flat_list, self.aligned_spec)``.
+                ``pytree.tree_unflatten(flat_list, self.aligned_spec)``.
                 This mechanism is used to replace None values by empty tensors.
             as_args_kwargs: If True, the method always returns `(args, kwargs)`,
                 otherwise, it returns either a tuple (only args) or a dictionary
@@ -781,7 +782,7 @@ class InputObserverInfo:
         # type checking
         assert candidate is not None
         assert candidate.aligned_spec is not None
-        args, kwargs = torch.utils._pytree.tree_unflatten(
+        args, kwargs = pytree.tree_unflatten(
             aligned_flat_list,
             candidate.aligned_spec,
         )
@@ -1104,7 +1105,7 @@ class InputObserver:
                 It produces a single list of tensors easier to process or modify
                 rather than a nested structure holding the same tensors.
                 The original structure can be restored with
-                ``torch.utils._pytree.tree_unflatten(flat_list, self.aligned_spec)``.
+                ``pytree.tree_unflatten(flat_list, self.aligned_spec)``.
                 This mechanism is used to replace None values by empty tensors.
             as_args_kwargs:
                 If True, the method always returns `(args, kwargs)`,
