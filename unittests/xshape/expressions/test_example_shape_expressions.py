@@ -5,7 +5,7 @@ import onnx.helper as oh
 import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
 from yobx.xshape import BasicShapeBuilder
-from yobx.xshape.simplify_expressions import simplify_expression
+from yobx.xshape.expressions.simplify_expressions import simplify_expression
 
 TFLOAT = onnx.TensorProto.FLOAT
 
