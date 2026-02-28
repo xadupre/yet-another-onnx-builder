@@ -36,8 +36,6 @@ class BuildStats:
             )
 
     def __getitem__(self, key: str) -> float | int | bool | str:
-        if len(self):
-            raise KeyError(f"No statistics for key={key!r}")
         assert isinstance(key, str), f"Unexpected type {type(key)}"
         return self._data.get(key, 0.0)  # To support +=.
 

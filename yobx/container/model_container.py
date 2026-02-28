@@ -284,7 +284,7 @@ class ExtendedModelContainer(ModelContainer):
             else:
                 t = oirs.deserialize_tensor(tensor)  # type: ignore
             initializer_tensors.append(t)
-        inputs = [oir.Input(info.name) for info in proto.input]
+        inputs = [oir.Input(info.name) for info in proto.input]  # pyrefly: ignore[deprecated]
         for info, value in zip(proto.input, inputs):
             oirs.deserialize_value_info_proto(info, value)
             if value.name in quantization_annotations:
