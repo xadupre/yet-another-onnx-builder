@@ -7,6 +7,7 @@ yobx.torch
 
     flatten_helper
     input_observer
+    model_container
     torch_helper
     transformers/index
 
