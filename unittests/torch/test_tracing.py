@@ -821,6 +821,41 @@ class TestTracing(ExtTestCase):
                             t,
                         )
 
+    def test_make_args_names_non_dict(self):
+        # When concrete_args is not a dict, names are a0, a1, ...
+        t = torch.randn(2, 3)
+        names = CustomTracer.make_args_names([t, t, t], [t, t, t])
+        self.assertEqual(names, ["a0", "a1", "a2"])
+
+    def test_make_args_names_non_dict_empty(self):
+        names = CustomTracer.make_args_names([], [])
+        self.assertEqual(names, [])
+
+    def test_make_args_names_dict_single_tensors(self):
+        # Dict where each value is a single tensor → keys become names
+        t1 = torch.randn(2, 3)
+        t2 = torch.randn(4, 5)
+        concrete_args = {"x": t1, "y": t2}
+        flat_concrete_args = [t1, t2]
+        names = CustomTracer.make_args_names(concrete_args, flat_concrete_args)
+        self.assertEqual(names, ["x", "y"])
+
+    def test_make_args_names_dict_list_of_tensors(self):
+        # Dict where each value is a list of tensors → names become key_0, key_1, ...
+        t1, t2, t3 = torch.randn(2, 3), torch.randn(2, 3), torch.randn(2, 3)
+        concrete_args = {"past": [t1, t2, t3]}
+        flat_concrete_args = [t1, t2, t3]
+        names = CustomTracer.make_args_names(concrete_args, flat_concrete_args)
+        self.assertEqual(names, ["past_0", "past_1", "past_2"])
+
+    def test_make_args_names_dict_mixed(self):
+        # Dict with mixed: a single tensor and a list of tensors
+        t1, t2, t3 = torch.randn(2, 3), torch.randn(2, 3), torch.randn(2, 3)
+        concrete_args = {"x": t1, "past": [t2, t3]}
+        flat_concrete_args = [t1, t2, t3]
+        names = CustomTracer.make_args_names(concrete_args, flat_concrete_args)
+        self.assertEqual(names, ["x", "past_0", "past_1"])
+
     def test_tracing_submodule(self):
         class SubModule(torch.nn.Module):
             def __init__(self, n_dims: int = 3, n_targets: int = 1, kind: int = 0):
