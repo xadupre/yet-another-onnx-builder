@@ -11,12 +11,16 @@ yet-another-onnx-builder documentation
    design/index
    auto_examples/index
 
-
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: API
 
    api/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: misc
+
    index_stats
 
 Indices and tables
