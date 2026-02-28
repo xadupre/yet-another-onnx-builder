@@ -9,7 +9,6 @@ from onnx.external_data_helper import _get_all_tensors, uses_external_data
 from onnx.inliner import inline_local_functions
 from ..helpers.mini_onnx_builder import proto_from_array
 from ..helpers.onnx_helper import dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
-from .torch_helper import torch_dtype_to_onnx_dtype
 
 STORAGE_TYPE = {
     TensorProto.FLOAT16: np.int16,
@@ -245,6 +244,8 @@ class TorchModelContainer(ModelContainer):
                         metadata_props=oirs.deserialize_metadata_props(tensor.metadata_props),
                     )
                 elif hasattr(np_tensor, "shape"):
+                    from .torch_helper import torch_dtype_to_onnx_dtype
+
                     t = oir.Tensor(
                         np_tensor.detach(),
                         name=tensor.name,
