@@ -5,5 +5,5 @@ yobx.container
     :maxdepth: 1
     :caption: modules
 
-    builder_stats
+    build_stats
     model_container
