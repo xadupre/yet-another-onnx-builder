@@ -31,7 +31,7 @@ def _make_simple_model_with_external(initializer_name: str, data: np.ndarray):
 @requires_torch("2.9")
 class TestGetType(ExtTestCase):
     def setUp(self):
-        from yobx.torch.model_container import _get_type
+        from yobx.container.model_container import _get_type
 
         self._get_type = _get_type
 
@@ -60,32 +60,32 @@ class TestGetType(ExtTestCase):
         self.assertEqual(self._get_type(None), onnx.TensorProto.UNDEFINED)
 
     def test_unknown_raises(self):
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception):  # noqa: B017
             self._get_type("unknown_type")
 
 
 @requires_torch("2.9")
-class TestTorchModelContainer(ExtTestCase):
+class TestExtendedModelContainer(ExtTestCase):
     def test_import(self):
-        from yobx.torch.model_container import TorchModelContainer
+        from yobx.container import ExtendedModelContainer
 
-        self.assertIsNotNone(TorchModelContainer)
+        self.assertIsNotNone(ExtendedModelContainer)
 
     def test_init(self):
-        from yobx.torch.model_container import TorchModelContainer
+        from yobx.container import ExtendedModelContainer
 
-        container = TorchModelContainer()
+        container = ExtendedModelContainer()
         self.assertIsInstance(container._stats, dict)
         self.assertFalse(container.inline)
         self.assertIn("time_export_write_model", container._stats)
 
     def test_save_load_numpy(self):
-        from yobx.torch.model_container import TorchModelContainer
+        from yobx.container import ExtendedModelContainer
 
         data = np.ones((3, 4), dtype=np.float32)
         model = _make_simple_model_with_external("weight", data)
 
-        container = TorchModelContainer()
+        container = ExtendedModelContainer()
         container.model_proto = model
         container.large_initializers = {"#weight": data}
 
@@ -98,12 +98,12 @@ class TestTorchModelContainer(ExtTestCase):
 
     def test_save_torch_tensor(self):
         import torch
-        from yobx.torch.model_container import TorchModelContainer
+        from yobx.container import ExtendedModelContainer
 
         data = torch.ones(3, 4, dtype=torch.float32)
         model = _make_simple_model_with_external("weight", data.numpy())
 
-        container = TorchModelContainer()
+        container = ExtendedModelContainer()
         container.model_proto = model
         container.large_initializers = {"#weight": data}
 
@@ -114,11 +114,10 @@ class TestTorchModelContainer(ExtTestCase):
             self.assertTrue(os.path.exists(file_path))
 
     def test_exported_from_yobx_torch(self):
-        from yobx.torch import TorchModelContainer
+        from yobx.container import ExtendedModelContainer
 
-        self.assertIsNotNone(TorchModelContainer)
+        self.assertIsNotNone(ExtendedModelContainer)
 
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-

@@ -24,7 +24,7 @@ def _get_type(elem_type: Any) -> int:
     return dtype_to_tensor_dtype(elem_type)
 
 
-class TorchModelContainer(ModelContainer):
+class ExtendedModelContainer(ModelContainer):
     """
     Overwrites :class:`onnx.model_container.ModelContainer`
     to support torch tensors.
@@ -57,7 +57,9 @@ class TorchModelContainer(ModelContainer):
         """
         return self._save_external(file_path, all_tensors_to_one_file=all_tensors_to_one_file)
 
-    def load(self, file_path: str, load_large_initializers: bool = True) -> "TorchModelContainer":
+    def load(
+        self, file_path: str, load_large_initializers: bool = True
+    ) -> "ExtendedModelContainer":
         """
         Loads the large model.
 
