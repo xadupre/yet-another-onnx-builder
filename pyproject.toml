@@ -131,6 +131,7 @@ ignore_missing_imports = true
 module = [
     "yobx.doc",
     "yobx.ext_test_case",
+    "yobx.builder.light.*",
     "yobx.helpers.helper",
     "yobx.reference.ops.*",
     "yobx.reference.torch_ops.*",
@@ -151,6 +152,7 @@ project-includes = ["yobx/**/*.py"]
 project-excludes = [
     "yobx/doc.py",
     "yobx/ext_test_case.py",
+    "yobx/builder/light.*",
     "yobx/helpers/_onnx_simple_text_plot.py",
     "yobx/helpers/helper.py",
     "yobx/reference/ops/*",

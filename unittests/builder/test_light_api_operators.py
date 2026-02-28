@@ -10,9 +10,8 @@ import unittest
 
 import numpy as np
 
-from yobx.builder.light import start, Var, Vars
+from yobx.builder.light import start, Vars
 from yobx.ext_test_case import ExtTestCase
-
 
 # ---------------------------------------------------------------------------
 # Module-level helpers
@@ -32,7 +31,7 @@ def _xy():
 
 
 # ---------------------------------------------------------------------------
-# OpsVar – single-input operators
+# OpsVar - single-input operators
 # ---------------------------------------------------------------------------
 
 
@@ -513,7 +512,7 @@ class TestOpsVarOperators(ExtTestCase):
 
 
 # ---------------------------------------------------------------------------
-# OpsVars – multi-input operators
+# OpsVars - multi-input operators
 # ---------------------------------------------------------------------------
 
 
