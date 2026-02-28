@@ -111,6 +111,58 @@ class TestExtendedModelContainer(ExtTestCase):
             self.assertIsInstance(saved, onnx.ModelProto)
             self.assertTrue(os.path.exists(file_path))
 
+    def test_save_then_load_all_in_one_file(self):
+        """Round-trip: save a model with a numpy initializer and reload it."""
+        from yobx.container import ExtendedModelContainer
+
+        data = np.ones((3, 4), dtype=np.float32)
+        model = _make_simple_model_with_external("weight", data)
+
+        container = ExtendedModelContainer()
+        container.model_proto = model
+        container.large_initializers = {"#weight": data}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            file_path = os.path.join(tmp, "model.onnx")
+            container.save(file_path, all_tensors_to_one_file=True)
+            self.assertTrue(os.path.exists(file_path))
+            self.assertTrue(os.path.exists(file_path + ".data"))
+
+            loaded = ExtendedModelContainer().load(file_path)
+            self.assertIsInstance(loaded.model_proto, onnx.ModelProto)
+            self.assertEqual(loaded.model_proto.graph.node[0].op_type, "Add")
+            self.assertGreater(len(loaded.large_initializers), 0)
+            weight = next(iter(loaded.large_initializers.values()))
+            self.assertEqual(weight.shape, data.shape)
+
+    def test_save_then_load_one_file_per_tensor(self):
+        """Round-trip: save with one file per tensor and reload it."""
+        from yobx.container import ExtendedModelContainer
+
+        data = np.ones((3, 4), dtype=np.float32)
+        model = _make_simple_model_with_external("weight", data)
+
+        container = ExtendedModelContainer()
+        container.model_proto = model
+        container.large_initializers = {"#weight": data}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            file_path = os.path.join(tmp, "model.onnx")
+            container.save(file_path, all_tensors_to_one_file=False)
+            self.assertTrue(os.path.exists(file_path))
+            # At least one per-tensor weight file should be written alongside
+            weight_files = [
+                f for f in os.listdir(tmp) if f != "model.onnx"
+            ]
+            self.assertGreater(len(weight_files), 0)
+
+            loaded = ExtendedModelContainer().load(file_path)
+            self.assertIsInstance(loaded.model_proto, onnx.ModelProto)
+            self.assertEqual(loaded.model_proto.graph.node[0].op_type, "Add")
+            self.assertGreater(len(loaded.large_initializers), 0)
+            weight = next(iter(loaded.large_initializers.values()))
+            self.assertEqual(weight.shape, data.shape)
+
     def test_exported_from_yobx_torch(self):
         from yobx.container import ExtendedModelContainer
 
