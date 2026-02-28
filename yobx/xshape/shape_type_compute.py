@@ -1996,6 +1996,7 @@ def set_type_shape_fused_matmul(self: ShapeBuilder, node: NodeProto):
     transA = transA.i if transA else 0
     transB = self.get_attribute(node, "transB", exc=False)
     transB = transB.i if transB else 0
+    name = node.output[0]
     if transA == 0 and transB == 0:
         return set_type_shape_matmul(self, name, x, y)
     if self.has_device(x) and self.has_device(y) and self.get_device(x) == self.get_device(y):
@@ -2122,7 +2123,10 @@ def set_type_shape_tri_matrix(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_transpose_2d_cast_fp16(self: ShapeBuilder, node: NodeProto):
-    """Sets the output shape for node type Transpose2DCastFP16 (transposes and casts to float16)."""
+    """
+    Sets the output shape for node type Transpose2DCastFP16
+    (transposes and casts to float16).
+    """
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
     self.set_type(node.output[0], TensorProto.FLOAT16)
@@ -2133,7 +2137,10 @@ def set_type_shape_transpose_2d_cast_fp16(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_transpose_2d_cast_fp32(self: ShapeBuilder, node: NodeProto):
-    """Sets the output shape for node type Transpose2DCastFP32 (transposes and casts to float32)."""
+    """
+    Sets the output shape for node type Transpose2DCastFP32
+    (transposes and casts to float32).
+    """
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
     self.set_type(node.output[0], TensorProto.FLOAT)
