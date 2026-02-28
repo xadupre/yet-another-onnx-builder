@@ -492,6 +492,76 @@ class TestInplaceFunctions(ExtTestCase):
 
 
 @requires_torch("2.0")
+class TestValidateExportedProgram(ExtTestCase):
+    def test_validate_exported_program_no_discrepancy(self):
+        """validate_exported_program passes when model and exported program agree."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        ep = torch.export.export(model, (x,))
+        opts = ExportOptions(validate_ep=True)
+        # Should not raise
+        opts.validate_exported_program(model, ep, (x,), None)
+
+    def test_validate_exported_program_custom_atol(self):
+        """validate_exported_program passes with a custom float atol."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        ep = torch.export.export(model, (x,))
+        opts = ExportOptions(validate_ep=1e-3)
+        opts.validate_exported_program(model, ep, (x,), None)
+
+    def test_validate_exported_program_raises_on_discrepancy(self):
+        """validate_exported_program raises AssertionError when outputs differ."""
+
+        class ConstantModel(torch.nn.Module):
+            def forward(self, x):
+                return x + 1.0
+
+        class MismatchedModel(torch.nn.Module):
+            def forward(self, x):
+                return x + 100.0
+
+        x = torch.rand(2, 3)
+        ep = torch.export.export(MismatchedModel(), (x,))
+        reference_model = ConstantModel()
+        opts = ExportOptions(validate_ep=True)
+        with self.assertRaises(AssertionError):
+            opts.validate_exported_program(reference_model, ep, (x,), None)
+
+    def test_export_with_validate_ep_true(self):
+        """export() with validate_ep=True runs validate_exported_program internally."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(validate_ep=True)
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+        self.assertTrue(hasattr(opts, "_stat_time_validate_exported_program"))
+
+    def test_export_with_validate_ep_float(self):
+        """export() with validate_ep as float uses it as atol."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(validate_ep=1e-4)
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+        self.assertTrue(hasattr(opts, "_stat_time_validate_exported_program"))
+
+
+@requires_torch("2.0")
 class TestGetSigKwargs(ExtTestCase):
     def test_get_sig_kwargs_returns_correct_values(self):
         opts = ExportOptions(strict=True, decomposition_table="default")
