@@ -246,6 +246,85 @@ def draw_graph_graphviz(dot: Union[str, onnx.ModelProto], image: str, engine: st
         return out
 
 
+def plot_evaluator_comparison() -> "matplotlib.axes.Axes":  # noqa: F821
+    """
+    Builds a small ``Tanh(X + Y)`` ONNX model, runs it through all three
+    evaluators shipped with *yobx* and returns a figure with one heat-map
+    panel per evaluator.
+
+    The three panels are expected to be identical, which visually confirms
+    that :class:`ExtendedReferenceEvaluator
+    <yobx.reference.evaluator.ExtendedReferenceEvaluator>`,
+    :class:`OnnxruntimeEvaluator
+    <yobx.reference.onnxruntime_evaluator.OnnxruntimeEvaluator>`, and
+    :class:`TorchReferenceEvaluator
+    <yobx.reference.torch_evaluator.TorchReferenceEvaluator>` all produce
+    the same result.
+
+    :return: array of matplotlib :class:`~matplotlib.axes.Axes`
+
+    .. plot::
+
+        import matplotlib.pyplot as plt
+        from yobx.doc import plot_evaluator_comparison
+
+        plot_evaluator_comparison()
+        plt.show()
+    """
+    import matplotlib.pyplot as plt
+    import torch
+    import onnx
+    import onnx.helper as oh
+    from .reference import ExtendedReferenceEvaluator
+    from .reference.onnxruntime_evaluator import OnnxruntimeEvaluator
+    from .reference.torch_evaluator import TorchReferenceEvaluator
+
+    TFLOAT = onnx.TensorProto.FLOAT
+
+    model = oh.make_model(
+        oh.make_graph(
+            [
+                oh.make_node("Add", ["X", "Y"], ["T"]),
+                oh.make_node("Tanh", ["T"], ["Z"]),
+            ],
+            "add_tanh",
+            [
+                oh.make_tensor_value_info("X", TFLOAT, [None, None]),
+                oh.make_tensor_value_info("Y", TFLOAT, [None, None]),
+            ],
+            [oh.make_tensor_value_info("Z", TFLOAT, [None, None])],
+        ),
+        opset_imports=[oh.make_opsetid("", 18)],
+        ir_version=10,
+    )
+
+    x = np.array([[1.0, -2.0], [3.0, -4.0]], dtype=np.float32)
+    y = np.array([[0.5, 0.5], [-0.5, -0.5]], dtype=np.float32)
+
+    ref = ExtendedReferenceEvaluator(model)
+    (result_ref,) = ref.run(None, {"X": x, "Y": y})
+
+    ort_eval = OnnxruntimeEvaluator(model)
+    (result_ort,) = ort_eval.run(None, {"X": x, "Y": y})
+
+    torch_eval = TorchReferenceEvaluator(model)
+    x_t = torch.from_numpy(x)
+    y_t = torch.from_numpy(y)
+    (result_torch,) = torch_eval.run(None, {"X": x_t, "Y": y_t})
+
+    fig, axes = plt.subplots(1, 3, figsize=(9, 3), sharey=True)
+    labels = ["ExtendedRef", "OnnxruntimeEval", "TorchEval"]
+    results_all = [result_ref, result_ort, result_torch.numpy()]
+    for ax, label, res in zip(axes, labels, results_all):
+        im = ax.imshow(res, cmap="RdBu", vmin=-1, vmax=1, aspect="auto")
+        ax.set_title(label, fontsize=9)
+        ax.set_xlabel("col")
+    axes[0].set_ylabel("row")
+    fig.colorbar(im, ax=axes.tolist(), shrink=0.8, label="Tanh(X+Y)")
+    fig.suptitle("Outputs from all three evaluators (Tanh(X + Y))")
+    return axes
+
+
 def plot_dot(
     dot: Union[str, onnx.ModelProto],
     ax: Optional["matplotlib.axis.Axis"] = None,  # noqa: F821
