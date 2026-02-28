@@ -69,10 +69,7 @@ class LightEmitter(BaseEmitter):
                 f"{_ELEMENT_TYPE_NAME[elem_type]}, shape={shape!r})"
             ]
         if elem_type:
-            return [
-                f"vin({name!r}, elem_type=onnx.TensorProto."
-                f"{_ELEMENT_TYPE_NAME[elem_type]})"
-            ]
+            return [f"vin({name!r}, elem_type=onnx.TensorProto.{_ELEMENT_TYPE_NAME[elem_type]})"]
         return [f"vin({name!r})"]
 
     def _emit_output(self, **kwargs: Dict[str, Any]) -> List[str]:
@@ -88,9 +85,7 @@ class LightEmitter(BaseEmitter):
                 f"shape={shape!r})"
             )
         elif elem_type:
-            inst.append(
-                f"vout(elem_type=onnx.TensorProto.{_ELEMENT_TYPE_NAME[elem_type]})"
-            )
+            inst.append(f"vout(elem_type=onnx.TensorProto.{_ELEMENT_TYPE_NAME[elem_type]})")
         else:
             inst.append("vout()")
         return inst

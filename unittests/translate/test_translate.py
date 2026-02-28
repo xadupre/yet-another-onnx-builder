@@ -4,7 +4,7 @@ import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
-from yobx.translate import translate, translate_header, Translater
+from yobx.translate import translate, translate_header, Translator
 from yobx.translate.inner_emitter import InnerEmitter
 from yobx.translate.light_emitter import LightEmitter
 from yobx.translate.make_helper import make_ref_attribute
@@ -95,14 +95,14 @@ class TestTranslate(ExtTestCase):
 
     def test_translater_inner_emitter(self):
         model = _make_simple_model()
-        tr = Translater(model, emitter=InnerEmitter())
+        tr = Translator(model, emitter=InnerEmitter())
         code = tr.export(as_str=True)
         self.assertIsInstance(code, str)
         self.assertIn("opset_imports", code)
 
     def test_translater_light_emitter(self):
         model = _make_simple_model()
-        tr = Translater(model, emitter=LightEmitter())
+        tr = Translator(model, emitter=LightEmitter())
         code = tr.export(as_str=True)
         self.assertIsInstance(code, str)
         self.assertIn("start(", code)
@@ -111,9 +111,7 @@ class TestTranslate(ExtTestCase):
         # Build a model with a large initializer (>16 elements to trigger short form)
         X = oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [5, 5])
         Y = oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [5, 5])
-        big_w = onh.from_array(
-            np.random.randn(5, 5).astype(np.float32), name="big_weight"
-        )
+        big_w = onh.from_array(np.random.randn(5, 5).astype(np.float32), name="big_weight")
         add = oh.make_node("Add", ["X", "big_weight"], ["Y"])
         graph = oh.make_graph([add], "big_model", [X], [Y], [big_w])
         model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 17)])
@@ -165,7 +163,7 @@ class TestTranslate(ExtTestCase):
         """Translating a standalone GraphProto should produce executable code."""
         model = _make_simple_model()
         graph = model.graph
-        tr = Translater(graph, emitter=InnerEmitter())
+        tr = Translator(graph, emitter=InnerEmitter())
         code = tr.export(as_str=True)
         self.assertIsInstance(code, str)
         self.assertIn("oh.make_graph", code)
@@ -183,7 +181,7 @@ class TestTranslate(ExtTestCase):
             nodes=[node_add],
             opset_imports=[oh.make_opsetid("", 17)],
         )
-        tr = Translater(func, emitter=InnerEmitter())
+        tr = Translator(func, emitter=InnerEmitter())
         code = tr.export(as_str=True)
         self.assertIsInstance(code, str)
         # Should define a 'function' variable

@@ -36,9 +36,7 @@ class BuilderEmitter(BaseEmitter):
 
     def join(self, rows: List[str], single_line: bool = False) -> str:
         "Join the rows"
-        assert (
-            not single_line
-        ), f"The emitter {type(self)} does not work with single_line=True."
+        assert not single_line, f"The emitter {type(self)} does not work with single_line=True."
         return "\n".join(rows)
 
     def _emit_start(self, **kwargs: Dict[str, Any]) -> List[str]:
@@ -51,9 +49,7 @@ class BuilderEmitter(BaseEmitter):
         inps = ", ".join(["g.op", *[f'"{i}"' for i in self.inputs]])
         inputs = []
         for inp, stype, shape in self.inputs_full_:
-            inputs.append(
-                f'g.make_tensor_input("{inp}", onnx.TensorProto.{stype}, {shape})'
-            )
+            inputs.append(f'g.make_tensor_input("{inp}", onnx.TensorProto.{stype}, {shape})')
         outputs = []
         for inp, stype, shape in self.outputs_full_:
             outputs.append(
@@ -120,9 +116,7 @@ class BuilderEmitter(BaseEmitter):
             if shape is None:
                 inp = f'{name}: "{_itype_to_string(itype)}"'
             else:
-                inp = (
-                    f'{name}: "{_itype_to_string(itype)}[{", ".join(map(str, shape))}]"'
-                )
+                inp = f'{name}: "{_itype_to_string(itype)}[{", ".join(map(str, shape))}]"'
         self.inputs_full.append(inp)
         self.inputs.append(name)
         self.inputs_full_.append((name, _itype_to_string(itype), shape))
@@ -141,9 +135,7 @@ class BuilderEmitter(BaseEmitter):
             stype = str(val.dtype).split(".")[-1]
             name = self._clean_result_name(init.name)
             package = "np" if hasattr(np, stype) else "ml_dtypes"
-            rows.append(
-                f"    {name} = np.array({val.tolist()}, dtype={package}.{stype})"
-            )
+            rows.append(f"    {name} = np.array({val.tolist()}, dtype={package}.{stype})")
         return rows
 
     def _emit_begin_return(self, **kwargs: Dict[str, Any]) -> List[str]:

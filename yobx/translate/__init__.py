@@ -1,6 +1,6 @@
 import textwrap
 from onnx import ModelProto
-from .translate import Translater
+from .translate import Translator
 from .inner_emitter import InnerEmitter, InnerEmitterShortInitializer
 from .builder_emitter import BuilderEmitter
 from .light_emitter import LightEmitter
@@ -9,46 +9,38 @@ from .light_emitter import LightEmitter
 def translate_header(api: str = "onnx"):
     """Returns the necessary imports header for each api."""
     if api == "onnx":
-        return textwrap.dedent(
-            """
+        return textwrap.dedent("""
             import numpy as np
             import ml_dtypes
             import onnx
             import onnx.helper as oh
             import onnx.numpy_helper as onh
             from yobx.translate.make_helper import make_ref_attribute
-            """
-        )
+            """)
     if api == "onnx-short":
-        return textwrap.dedent(
-            """
+        return textwrap.dedent("""
             import numpy as np
             import ml_dtypes
             import onnx
             import onnx.helper as oh
             import onnx.numpy_helper as onh
             from yobx.translate.make_helper import make_ref_attribute
-            """
-        )
+            """)
     if api == "light":
-        return textwrap.dedent(
-            """
+        return textwrap.dedent("""
             import numpy as np
             import ml_dtypes
             import onnx
             from onnx_array_api.light_api import start
             from yobx.translate import translate
-            """
-        )
+            """)
     if api == "builder":
-        return textwrap.dedent(
-            """
+        return textwrap.dedent("""
             import numpy as np
             import ml_dtypes
             import onnx
             from onnx_array_api.graph_api import GraphBuilder
-            """
-        )
+            """)
     raise ValueError(f"Unexpected value {api!r} for api.")
 
 
@@ -71,15 +63,15 @@ def translate(proto: ModelProto, single_line: bool = False, api: str = "onnx") -
     :return: code as a string
     """
     if api == "onnx":
-        tr = Translater(proto, emitter=InnerEmitter())
+        tr = Translator(proto, emitter=InnerEmitter())
         return tr.export(as_str=True)
     if api == "onnx-short":
-        tr = Translater(proto, emitter=InnerEmitterShortInitializer())
+        tr = Translator(proto, emitter=InnerEmitterShortInitializer())
         return tr.export(as_str=True)
     if api == "light":
-        tr = Translater(proto, emitter=LightEmitter())
+        tr = Translator(proto, emitter=LightEmitter())
         return tr.export(single_line=single_line, as_str=True)
     if api == "builder":
-        tr = Translater(proto, emitter=BuilderEmitter())
+        tr = Translator(proto, emitter=BuilderEmitter())
         return tr.export(as_str=True)
     raise ValueError(f"Unexpected value {api!r} for api.")

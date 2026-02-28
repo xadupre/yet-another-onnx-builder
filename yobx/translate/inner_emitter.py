@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from onnx import AttributeProto, TensorProto
 from .base_emitter import BaseEmitter
-from .translate import Translater
+from .translate import Translator
 
 # Mapping from ONNX element type integer to name string
 _ELEMENT_TYPE_NAME = {
@@ -26,7 +26,7 @@ class InnerEmitter(BaseEmitter):
         :return: rows to append before, actual value
         """
         if value[0].type == AttributeProto.GRAPH:
-            tr = Translater(value[0].g, emitter=self)
+            tr = Translator(value[0].g, emitter=self)
             rows = tr.export(as_str=False, single_line=False)
             new_rows = [f"def _make_local_graph_{value[0].name}():"]
             for line in rows:
@@ -261,8 +261,7 @@ class InnerEmitterShortInitializer(InnerEmitter):
             ]
         if "int" in sdtype:
             return [
-                f"value = np.random.randint(0, 10, size={value.shape})"
-                f".astype({sdtype})",
+                f"value = np.random.randint(0, 10, size={value.shape}).astype({sdtype})",
                 "initializers.append(",
                 f"    {fra}(",
                 f"        np.array(value, dtype={sdtype}),",
@@ -271,8 +270,7 @@ class InnerEmitterShortInitializer(InnerEmitter):
                 ")",
             ]
         return [
-            f"value = np.random.randn({', '.join(map(str, value.shape))})"
-            f".astype({sdtype})",
+            f"value = np.random.randn({', '.join(map(str, value.shape))}).astype({sdtype})",
             "initializers.append(",
             f"    {fra}(",
             f"        np.array(value, dtype={sdtype}),",

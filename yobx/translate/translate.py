@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from .inner_emitter import InnerEmitter
 
 
-class Translater:
+class Translator:
     """
     Translates an ONNX graph into Python code using the selected emitter.
     """
@@ -41,9 +41,7 @@ class Translater:
         if isinstance(self.proto_, ModelProto):
             opsets = {d.domain: d.version for d in self.proto_.opset_import}
             rows.extend(
-                self.emitter(
-                    EventType.START, opsets=opsets, ir_version=self.proto_.ir_version
-                )
+                self.emitter(EventType.START, opsets=opsets, ir_version=self.proto_.ir_version)
             )
             inputs = self.proto_.graph.input
             outputs = self.proto_.graph.output
@@ -63,17 +61,13 @@ class Translater:
             else:
                 initializers = []
                 sparse_initializers = []
-            attributes = (
-                self.proto_.attribute if hasattr(self.proto_, "attribute") else []
-            )
+            attributes = self.proto_.attribute if hasattr(self.proto_, "attribute") else []
             is_function = isinstance(self.proto_, FunctionProto)
             if not is_function:
                 # Standalone GraphProto: emit START to initialize emitter state
                 # (defines opset_imports/functions variables for InnerEmitter)
                 rows.extend(self.emitter(EventType.START, opsets={}))
-            last_event = (
-                EventType.TO_ONNX_FUNCTION if is_function else EventType.TO_ONNX_MODEL
-            )
+            last_event = EventType.TO_ONNX_FUNCTION if is_function else EventType.TO_ONNX_MODEL
         else:
             raise ValueError(f"Unexpected type {type(self.proto_)} for proto.")
 
@@ -92,9 +86,7 @@ class Translater:
         elif isinstance(self.proto_, GraphProto):
             rows.extend(self.emitter(EventType.BEGIN_GRAPH, name=self.proto_.name))
         else:
-            rows.extend(
-                self.emitter(EventType.BEGIN_GRAPH, name=self.proto_.graph.name)
-            )
+            rows.extend(self.emitter(EventType.BEGIN_GRAPH, name=self.proto_.graph.name))
 
         for i in initializers:
             rows.extend(
@@ -108,9 +100,7 @@ class Translater:
 
         rows.extend(
             self.emitter(
-                EventType.BEGIN_FUNCTION_SIGNATURE
-                if is_function
-                else EventType.BEGIN_SIGNATURE
+                EventType.BEGIN_FUNCTION_SIGNATURE if is_function else EventType.BEGIN_SIGNATURE
             )
         )
 
@@ -131,15 +121,11 @@ class Translater:
                 )
 
         if is_function and attributes:
-            rows.extend(
-                self.emitter(EventType.FUNCTION_ATTRIBUTES, attributes=list(attributes))
-            )
+            rows.extend(self.emitter(EventType.FUNCTION_ATTRIBUTES, attributes=list(attributes)))
 
         rows.extend(
             self.emitter(
-                EventType.END_FUNCTION_SIGNATURE
-                if is_function
-                else EventType.END_SIGNATURE
+                EventType.END_FUNCTION_SIGNATURE if is_function else EventType.END_SIGNATURE
             )
         )
 
@@ -158,9 +144,7 @@ class Translater:
 
         rows.extend(
             self.emitter(
-                EventType.BEGIN_FUNCTION_RETURN
-                if is_function
-                else EventType.BEGIN_RETURN
+                EventType.BEGIN_FUNCTION_RETURN if is_function else EventType.BEGIN_RETURN
             )
         )
 
@@ -181,9 +165,7 @@ class Translater:
                 )
 
         rows.extend(
-            self.emitter(
-                EventType.END_FUNCTION_RETURN if is_function else EventType.END_RETURN
-            )
+            self.emitter(EventType.END_FUNCTION_RETURN if is_function else EventType.END_RETURN)
         )
 
         if isinstance(self.proto_, (GraphProto, FunctionProto)):
@@ -209,9 +191,7 @@ class Translater:
             return self.emitter.join(rows, single_line=single_line)
         return rows
 
-    def extract_attributes(
-        self, node: NodeProto
-    ) -> Dict[str, Tuple[AttributeProto, Any]]:
+    def extract_attributes(self, node: NodeProto) -> Dict[str, Tuple[AttributeProto, Any]]:
         """
         Extracts all attributes of a node.
 
@@ -235,11 +215,7 @@ class Translater:
             if att.type == AttributeProto.FLOATS:
                 atts[att.name] = (att, np.array(att.floats, dtype=np.float32))
                 continue
-            if (
-                att.type == AttributeProto.GRAPH
-                and hasattr(att, "g")
-                and att.g is not None
-            ):
+            if att.type == AttributeProto.GRAPH and hasattr(att, "g") and att.g is not None:
                 atts[att.name] = (att, None)
                 continue
             if att.type == AttributeProto.SPARSE_TENSOR:
