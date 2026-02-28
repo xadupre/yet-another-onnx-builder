@@ -48,3 +48,44 @@ Dump the dot graph source:
 .. code-block:: bash
 
     python -m yobx print dot model.onnx
+
+Output on a Dummy Model
++++++++++++++++++++++++
+
+The following block builds a small ``Add + Relu`` model on the fly and runs
+the command to show what the output actually looks like.
+
+.. runpython::
+
+    import os
+    import tempfile
+    import onnx
+    import onnx.helper as oh
+    from yobx._command_lines_parser import _cmd_print
+
+    TFLOAT = onnx.TensorProto.FLOAT
+    model = oh.make_model(
+        oh.make_graph(
+            [
+                oh.make_node("Add", ["X", "Y"], ["added"]),
+                oh.make_node("Relu", ["added"], ["Z"]),
+            ],
+            "add_relu",
+            [
+                oh.make_tensor_value_info("X", TFLOAT, [2, 3]),
+                oh.make_tensor_value_info("Y", TFLOAT, [2, 3]),
+            ],
+            [oh.make_tensor_value_info("Z", TFLOAT, [2, 3])],
+        ),
+        opset_imports=[oh.make_opsetid("", 18)],
+        ir_version=10,
+    )
+    fd, tmp = tempfile.mkstemp(suffix=".onnx")
+    os.close(fd)
+    onnx.save(model, tmp)
+
+    print("--- pretty ---")
+    _cmd_print(["print", "pretty", tmp])
+    print()
+    print("--- printer ---")
+    _cmd_print(["print", "printer", tmp])
