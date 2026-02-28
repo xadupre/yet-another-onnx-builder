@@ -629,6 +629,75 @@ class TestTracing(ExtTestCase):
         op = torch._library.utils.lookup_op("aten::masked_fill.Scalar")
         self.assertEqual("aten::masked_fill.Scalar", op.name())
 
+    def test_trace_with_concrete_args_simple(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        model = Model()
+        x = torch.ones((4, 4))
+        y = torch.ones((4, 4)) * 2
+        graph = CustomTracer().trace(model, concrete_args={"x": x, "y": y})
+        placeholders = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(placeholders), 2)
+        for p in placeholders:
+            self.assertIn("example_value", p.meta)
+            self.assertIn("val", p.meta)
+        mod = torch.fx.GraphModule(model, graph)
+        got = mod(x, y)
+        self.assertEqualArray(model(x, y), got)
+
+    def test_trace_with_concrete_args_and_dynamic_shapes(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        model = Model()
+        x = torch.ones((4, 4))
+        y = torch.ones((4, 4)) * 2
+        dynamic_shapes = {
+            "x": {0: torch.export.Dim("batch")},
+            "y": {0: torch.export.Dim("batch")},
+        }
+        graph = CustomTracer().trace(
+            model, concrete_args={"x": x, "y": y}, dynamic_shapes=dynamic_shapes
+        )
+        placeholders = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(placeholders), 2)
+        for p in placeholders:
+            self.assertIn("val", p.meta)
+            # val should be a FakeTensor with a dynamic (symbolic) batch dimension
+            val = p.meta["val"]
+            self.assertIsInstance(val.shape[0], torch.SymInt)
+        mod = torch.fx.GraphModule(model, graph)
+        got = mod(x, y)
+        self.assertEqualArray(model(x, y), got)
+
+    def test_trace_with_concrete_args_pytree_list(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, ys):
+                return x + ys[0] + ys[1]
+
+        model = Model()
+        x = torch.ones((4, 4))
+        ys = [torch.ones((4, 4)), torch.ones((4, 4)) * 2]
+        concrete_args = {"x": x, "ys": ys}
+        dynamic_shapes = {"x": {}, "ys": [{}, {}]}
+        tracer = CustomTracer()
+        graph = tracer.trace(model, concrete_args=concrete_args, dynamic_shapes=dynamic_shapes)
+        # The wrapped model flattens the list input into individual placeholder nodes
+        placeholders = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(placeholders), 3)
+        placeholder_names = [n.name for n in placeholders]
+        self.assertIn("x", placeholder_names)
+        self.assertIn("ys_0", placeholder_names)
+        self.assertIn("ys_1", placeholder_names)
+        # traced_model is set to the wrapped model
+        self.assertIsNotNone(tracer.traced_model)
+        mod = torch.fx.GraphModule(tracer.traced_model, graph)
+        got = mod(x, ys[0], ys[1])
+        self.assertEqualArray(model(x, ys), got)
+
     @skipif_ci_windows("does not work on windows")
     @hide_stdout()
     def test_tracing_with_submodule(self):
