@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Union
 import onnx
-from ..translate_api.translator import Translater
-from ..translate_api.builder_emitter import BuilderEmitter
+from ..translate.translator import Translator
+from ..translate.builder_emitter import BuilderEmitter
 
 
 class CustomBuilderEmitter(BuilderEmitter):
@@ -87,7 +87,7 @@ def to_graph_builder_code(proto: onnx.ModelProto, function_name: str = "build_mo
         )
         print(to_graph_builder_code(model))
     """
-    tr = Translater(proto, emitter=CustomBuilderEmitter())
+    tr = Translator(proto, emitter=CustomBuilderEmitter())
     code = tr.export(as_str=True)
     return "\n".join(
         [

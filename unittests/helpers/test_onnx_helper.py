@@ -16,6 +16,7 @@ from yobx.helpers.onnx_helper import (
     pretty_onnx,
     shadowing_names,
     tensor_dtype_to_np_dtype,
+    same_function_proto,
 )
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -757,6 +758,50 @@ class TestOnnxHelper(ExtTestCase):
         self.assertEqual(len(new_function.node), 4)
         self.assertEqual(new_function.output, ["xm1", "xm2c"])
         self.assertEqual(new_function.input, ["X", "Y", "shape1", "shape2", "un", "zero"])
+
+    def test_same_function_proto(self):
+        f1 = oh.make_function(
+            "custom",
+            "LinearRegression",
+            ["x", "a", "b"],
+            ["y"],
+            [
+                oh.make_node("MatMul", ["x", "a"], ["xa"]),
+                oh.make_node("Add", ["xa", "b"], ["y"]),
+            ],
+            [oh.make_opsetid("", 14)],
+            [],
+        )
+        self.assertEqualTrue(same_function_proto(f1, f1, verbose=1))
+        f2 = oh.make_function(
+            "custom",
+            "LinearRegression",
+            ["x_", "a_", "b_"],
+            ["y_"],
+            [
+                oh.make_node("MatMul", ["x_", "a_"], ["xa_"]),
+                oh.make_node("Add", ["xa_", "b_"], ["y_"]),
+            ],
+            [oh.make_opsetid("", 14)],
+            [],
+        )
+        self.assertEqualTrue(same_function_proto(f1, f2, verbose=1))
+        f3 = oh.make_function(
+            "custom",
+            "LinearRegression",
+            ["x_", "a_", "b_"],
+            ["y_"],
+            [
+                oh.make_node("MatMul", ["x_", "a_"], ["xa_"]),
+                oh.make_node("Add", ["xb_", "a_"], ["y_"]),
+            ],
+            [oh.make_opsetid("", 14)],
+            [],
+        )
+        self.assertEqual(
+            same_function_proto(f1, f3, verbose=1),
+            "different input names at node 1, ['xa', 'b'], ['xb_', 'a_'] != ['xa_', 'b_']",
+        )
 
 
 if __name__ == "__main__":

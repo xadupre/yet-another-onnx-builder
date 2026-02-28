@@ -36,6 +36,8 @@ import onnx.numpy_helper as onh
 from onnx.external_data_helper import uses_external_data
 from onnx.model_container import make_large_tensor_proto
 from onnx.shape_inference import infer_shapes as onnx_infer_shapes
+from ..container.model_container import ExtendedModelContainer, _get_type
+from ..helpers.mini_onnx_builder import proto_from_array
 from ..helpers import make_hash, string_sig, string_signature, string_type
 from ..helpers.helper import size_type
 from ..helpers.onnx_helper import (
@@ -44,6 +46,15 @@ from ..helpers.onnx_helper import (
     onnx_dtype_name,
     make_idn,
     make_idg,
+    _default_OPSET_TO_IR_VERSION,
+    _nice_shape,
+    choose_consistent_domain_opset,
+    compatible_opsets,
+    same_function_proto,
+    element_wise_binary_op_types,
+    element_wise_op_cmp_types,
+    unary_like_op_types,
+    str_tensor_proto_type,
 )
 from ..torch.torch_helper import onnx_dtype_to_torch_dtype, torch_dtype_to_onnx_dtype
 from ..xshape.rename_expressions import rename_dynamic_dimensions, rename_dynamic_expression
@@ -59,27 +70,13 @@ from ..xshape.shape_type_compute import set_shape_type_op_any, set_shape_type_cu
 from ..xshape._builder_runtime import _BuilderRuntime
 from ..xshape._shape_runtime import _ShapeRuntime
 from ..xshape._inference_runtime import _InferenceRuntime
-from ..xshape._onnx_helper import (
-    element_wise_binary_op_types,
-    element_wise_op_cmp_types,
-    unary_like_op_types,
-    str_tensor_proto_type,
-)
 from ..xshape.simplify_expressions import simplify_expression
-from ._onnx_helper import (
-    _default_OPSET_TO_IR_VERSION,
-    _nice_shape,
-    choose_consistent_domain_opset,
-    compatible_opsets,
-    same_function_proto,
-)
-from .model_container import TorchModelContainer, proto_from_array, _get_type
-from .optimization_options import OptimizationOptions
 from ..xshape.rename_expressions import rename_expression, parse_expression_tokens
 from ..xshape.simplify_expressions import simplify_two_expressions
 from ..xshape.expressions_torch import Expression, parse_expression
 from .graph_builder_opset import Opset
 from .virtual_tensor import VirtualTensor
+from .optimization_options import OptimizationOptions
 
 
 # To help finding bugs.
@@ -3962,7 +3959,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             f"is_dimension={is_dimension}"
         )
 
-        elem_type = _get_type(elem_type, False)
+        elem_type = _get_type(elem_type)
         if not self.as_function and not allow_untyped_output and elem_type == 0:
             raise RuntimeError(f"Undefined element type for {name!r}.")
         if shape is not None:
@@ -5814,7 +5811,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         function_options: Optional[FunctionOptions] = None,
         mask_outputs: Optional[List[bool]] = None,
         as_graph_proto: bool = False,
-    ) -> Union[FunctionProto, ModelProto, GraphProto, TorchModelContainer, Dict[str, Any]]:
+    ) -> Union[FunctionProto, ModelProto, GraphProto, ExtendedModelContainer, Dict[str, Any]]:
         """
         Conversion to onnx. Only then the initializers are converted into TensorProto.
 
@@ -6008,7 +6005,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 )
 
         if large_model:
-            lm = TorchModelContainer()
+            lm = ExtendedModelContainer()
             lm.model_proto = model
             if large_initializers:
                 lm.set_large_initializers(large_initializers)
@@ -6714,7 +6711,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         )
                     )
         elif pass_name == "patterns":
-            if self.optimization_options.patterns is not None:
+            if (
+                self.optimization_options.patterns is not None
+                and self.optimization_options.patterns
+            ):
                 n = len(self.nodes)
                 local_stats = self.optimize_with_patterns(recursive=False)
                 if len(self.nodes) < n:
@@ -6900,7 +6900,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         )
 
     def optimize_order(self):
-        from ..xoptim.order_optim import OrderOptimization
+        from .order_optim import OrderOptimization
 
         opt = OrderOptimization(
             self,

@@ -6,7 +6,7 @@ import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_onnx_array_api
+from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder.reverse_graph_builder import (
     to_graph_builder_code,
     to_graph_pattern_matching,
@@ -22,7 +22,6 @@ TINT64 = onnx.TensorProto.INT64
 
 
 class TestReverseGraphBuilder(ExtTestCase):
-    @requires_onnx_array_api("0.3.1")
     def test_constant_of_shape(self):
         model = oh.make_model(
             oh.make_graph(
@@ -100,7 +99,6 @@ class TestReverseGraphBuilder(ExtTestCase):
         self.maxDiff = None
         self.assertEqual(expected, code.strip("\n"))
 
-    @requires_onnx_array_api("0.3.1")
     def test_squeeze(self):
         model = oh.make_model(
             oh.make_graph(
@@ -170,7 +168,6 @@ class TestReverseGraphBuilder(ExtTestCase):
         self.maxDiff = None
         self.assertEqual(expected, code.strip("\n"))
 
-    @requires_onnx_array_api("0.3.2")
     def test_local_function(self):
         new_domain = "custom"
 
