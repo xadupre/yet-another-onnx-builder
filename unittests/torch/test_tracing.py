@@ -168,6 +168,64 @@ class TestCustomTracer(ExtTestCase):
         result = CustomTracer.remove_inplace(graph)
         self.assertEqual(result, 0)
 
+    def test_remove_unnecessary_slices_no_slice(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        tracer = CustomTracer()
+        graph = tracer.trace(Model())
+        # No unnecessary slices to remove
+        result = CustomTracer.remove_unnecessary_slices(graph)
+        self.assertEqual(result, 0)
+
+    def test_remove_unnecessary_slices_with_noop_slice(self):
+        # Build a graph with a full-range no-op slice (start=0, stop=INT64_MAX)
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        sliced = graph.call_function(
+            torch.ops.aten.slice.Tensor,
+            args=(x, 0, 0, 9223372036854775807),
+        )
+        graph.output(sliced)
+
+        nodes_before = len(list(graph.nodes))
+        result = CustomTracer.remove_unnecessary_slices(graph)
+        self.assertEqual(result, 1)
+        self.assertEqual(len(list(graph.nodes)), nodes_before - 1)
+        # Verify the slice node has been removed
+        self.assertNotIn(
+            "aten::slice.Tensor",
+            [node.target.name() for node in graph.nodes if hasattr(node.target, "name")],
+        )
+
+    def test_remove_unnecessary_slices_with_copy(self):
+        # Build a graph with a copy_ where both args have the same shape
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        y = graph.placeholder("y")
+        copy_node = graph.call_function(
+            torch.ops.aten.copy_.default,
+            args=(x, y),
+        )
+        graph.output(copy_node)
+
+        # Set shape meta so the copy_ is recognized as unnecessary
+        shape = torch.Size([4, 4])
+        x.meta["val"] = torch.empty(shape)
+        y.meta["val"] = torch.empty(shape)
+        copy_node.meta["val"] = torch.empty(shape)
+
+        nodes_before = len(list(graph.nodes))
+        result = CustomTracer.remove_unnecessary_slices(graph)
+        self.assertEqual(result, 1)
+        self.assertEqual(len(list(graph.nodes)), nodes_before - 1)
+        # Verify the copy_ node has been removed
+        self.assertNotIn(
+            "aten::copy_",
+            [node.target.name() for node in graph.nodes if hasattr(node.target, "name")],
+        )
+
     def test_trace_setitem(self):
         class Model(torch.nn.Module):
             def forward(self, x):
