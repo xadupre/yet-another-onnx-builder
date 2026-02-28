@@ -47,6 +47,42 @@ def _get_type(elem_type: Any) -> int:
     return dtype_to_tensor_dtype(elem_type)
 
 
+class ModelContainerStats:
+    """
+    Holds timing statistics collected during model export by
+    :class:`ExtendedModelContainer`.
+    """
+
+    _FIELDS = frozenset(
+        {
+            "time_export_write_model",
+            "time_export_byteswap_tobytes",
+            "time_export_tobytes",
+            "time_export_proto_from_array",
+            "time_export_write_tensor_bytes",
+            "time_export_inline_model",
+        }
+    )
+
+    def __init__(self):
+        self.time_export_write_model: float = 0
+        self.time_export_byteswap_tobytes: float = 0
+        self.time_export_tobytes: float = 0
+        self.time_export_proto_from_array: float = 0
+        self.time_export_write_tensor_bytes: float = 0
+        self.time_export_inline_model: float = 0
+
+    def __getitem__(self, key: str) -> float:
+        if key not in self._FIELDS:
+            raise KeyError(f"Unknown stat {key!r}. Expected one of {sorted(self._FIELDS)}.")
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: float) -> None:
+        if key not in self._FIELDS:
+            raise KeyError(f"Unknown stat {key!r}. Expected one of {sorted(self._FIELDS)}.")
+        setattr(self, key, value)
+
+
 class ExtendedModelContainer(ModelContainer):
     """
     Overwrites :class:`onnx.model_container.ModelContainer`
@@ -55,14 +91,7 @@ class ExtendedModelContainer(ModelContainer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._stats = {
-            "time_export_write_model": 0,
-            "time_export_byteswap_tobytes": 0,
-            "time_export_tobytes": 0,
-            "time_export_proto_from_array": 0,
-            "time_export_write_tensor_bytes": 0,
-            "time_export_inline_model": 0,
-        }
+        self._stats = ModelContainerStats()
         self.inline = False
 
     def save(self, file_path: str, all_tensors_to_one_file: bool = True) -> onnx.ModelProto:
