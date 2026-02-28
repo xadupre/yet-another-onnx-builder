@@ -617,7 +617,7 @@ def string_signature(sig: Any) -> str:
     return "\n".join(text)
 
 
-def string_sig(f: Callable, kwargs: Optional[Dict[str, Any]] = None) -> str:
+def string_sig(f: Union[type, Callable], kwargs: Optional[Dict[str, Any]] = None) -> str:
     """
     Displays the signature of a function if the default
     if the given value is different from
