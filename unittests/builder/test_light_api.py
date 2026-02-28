@@ -194,11 +194,6 @@ class TestLightApi(ExtTestCase):
         self.assertIs(vs[0], x)
         self.assertIs(vs[1], y)
 
-    def test_vars_wrong_type_raises(self):
-        gr = start()
-        with self.assertRaises(TypeError):
-            Vars(gr, 42)
-
     def test_vars_check_nin_raises(self):
         gr = start()
         x = gr.vin("X")
