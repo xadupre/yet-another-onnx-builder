@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from onnx import AttributeProto, TensorProto
 from .base_emitter import BaseEmitter
-from .translate import Translator
+from .translator import Translator
 
 # Mapping from ONNX element type integer to name string
 _ELEMENT_TYPE_NAME = {

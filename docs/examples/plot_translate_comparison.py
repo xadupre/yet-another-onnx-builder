@@ -57,8 +57,7 @@ model = oh.make_model(
     ir_version=9,
 )
 
-print(f"Model: {len(model.graph.node)} node(s), "
-      f"{len(model.graph.initializer)} initializer(s)")
+print(f"Model: {len(model.graph.node)} node(s), {len(model.graph.initializer)} initializer(s)")
 
 # %%
 # 1. ``"onnx"`` API — full initializer values
@@ -124,9 +123,9 @@ exec(compile(full_code, "<translate>", "exec"), ns)  # noqa: S102
 recreated = ns["model"]
 
 assert isinstance(recreated, onnx.ModelProto)
-assert len(recreated.graph.node) == len(model.graph.node), (
-    f"Expected {len(model.graph.node)} nodes, got {len(recreated.graph.node)}"
-)
+assert len(recreated.graph.node) == len(
+    model.graph.node
+), f"Expected {len(model.graph.node)} nodes, got {len(recreated.graph.node)}"
 assert len(recreated.graph.initializer) == len(model.graph.initializer), (
     f"Expected {len(model.graph.initializer)} initializers, "
     f"got {len(recreated.graph.initializer)}"
