@@ -607,7 +607,7 @@ def insert_contiguous_between_transpose_and_view(
             if (user.op == "call_method" and user.target == "view") or (
                 user.op == "call_function"
                 and hasattr(node.target, "name")
-                and user.target.name() == "aten::view"
+                and user.target.name() == "aten::view"  # pyrefly: ignore[missing-attribute]
             ):
                 insert = True
                 break

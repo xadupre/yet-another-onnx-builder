@@ -120,7 +120,7 @@ def flattening_functions(
             TRANSFORMERS_CLASSES,
         )
 
-        all_functions.update(dtr)
+        all_functions.update(dtr)  # pyrefly: ignore[no-matching-overload]
         supported_classes |= SUPPORTED_DATACLASSES
         classes.update(TRANSFORMERS_CLASSES)
 
@@ -177,7 +177,7 @@ def register_cache_flattening(
     import packaging.version as pv
 
     wrong: Dict[type, Optional[str]] = {}
-    transformers_version: Optional[str] = None
+    transformers_version = None
     if patch_transformers:
         import transformers
         from .transformers.flatten_class import WRONG_REGISTRATIONS
