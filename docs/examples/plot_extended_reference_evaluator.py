@@ -177,3 +177,29 @@ assert np.allclose(z_s, x_s * 3.0)
 import pprint  # noqa: E402
 
 pprint.pprint(ExtendedReferenceEvaluator.default_ops)
+
+# %%
+# 6. Plot: QuickGelu activation curve
+# ------------------------------------
+#
+# The ``QuickGelu`` function ``x * sigmoid(alpha * x)`` is plotted below
+# alongside a plain sigmoid and the identity line for comparison.
+
+import matplotlib.pyplot as plt  # noqa: E402
+
+alpha = 1.702
+x_plot = np.linspace(-4, 4, 200).astype(np.float32)
+sigmoid = 1.0 / (1.0 + np.exp(-alpha * x_plot))
+quick_gelu_vals = x_plot * sigmoid
+
+fig, ax = plt.subplots(figsize=(6, 4))
+ax.plot(x_plot, quick_gelu_vals, label="QuickGelu (α=1.702)")
+ax.plot(x_plot, sigmoid, linestyle="--", label="sigmoid(α·x)")
+ax.axhline(0, color="k", linewidth=0.5)
+ax.axvline(0, color="k", linewidth=0.5)
+ax.set_xlabel("x")
+ax.set_ylabel("y")
+ax.set_title("QuickGelu activation function")
+ax.legend()
+plt.tight_layout()
+plt.show()

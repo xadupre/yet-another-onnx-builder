@@ -1,5 +1,6 @@
 import enum
 import inspect
+import json
 from dataclasses import is_dataclass, fields
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
@@ -1321,3 +1322,52 @@ def size_type(dtype: Any) -> int:
     if dtype == ml_dtypes.bfloat16:
         return 2
     raise AssertionError(f"Unexpected dtype={dtype}")
+
+
+def string_diff(diff: Dict[str, Any], js: bool = False, ratio: bool = False, **kwargs) -> str:
+    """
+    Renders discrepancies returned by :func:`max_diff` into one string.
+
+    :param diff: differences
+    :param js: json format
+    :param ratio: display mismatch ratio
+    :param kwargs: addition values to add in the json format
+    """
+    if js:
+        if "rep" in diff:
+            rep = diff["rep"]
+            diff = {**{k: v for k, v in diff.items() if k != "rep"}, **rep}
+            if ratio:
+                for k, v in rep.items():
+                    diff[f"%{k}"] = v / diff["n"]
+                diff["mean"] = diff["sum"] / diff["n"]
+            diff.update(kwargs)
+        return json.dumps(diff)
+
+    # dict(abs=, rel=, sum=, n=n_diff, dnan=)
+    if "dev" in diff:
+        ddiff = {k: v for k, v in diff.items() if k != "dev"}
+        return f"{string_diff(ddiff)}, dev={diff['dev']}"
+    suffix = ""
+    if "rep" in diff:
+        rows = []
+        for k, v in diff["rep"].items():
+            if v > 0:
+                rows.append(f"#{v}{k}")
+        suffix = "-".join(rows)
+        if suffix:
+            suffix = f"/{suffix}"
+    if "argm" in diff:
+        sa = (
+            ",".join(map(str, diff["argm"]))
+            if isinstance(diff["argm"], tuple)
+            else str(diff["argm"])
+        )
+        suffix += f",amax={sa}"
+    if diff.get("dnan", None):
+        if diff["abs"] == 0 or diff["rel"] == 0:
+            return f"abs={diff['abs']}, rel={diff['rel']}, dnan={diff['dnan']}{suffix}"
+        return f"abs={diff['abs']}, rel={diff['rel']}, n={diff['n']}, dnan={diff['dnan']}{suffix}"
+    if diff["abs"] == 0 or diff["rel"] == 0:
+        return f"abs={diff['abs']}, rel={diff['rel']}{suffix}"
+    return f"abs={diff['abs']}, rel={diff['rel']}, n={diff['n']}{suffix}"

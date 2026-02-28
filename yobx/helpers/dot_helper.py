@@ -1,3 +1,4 @@
+import subprocess
 from typing import Dict
 import numpy as np
 import onnx
@@ -245,3 +246,30 @@ def to_dot(model: onnx.ModelProto) -> str:
 
     rows.append("}")
     return "\n".join(rows)
+
+
+def to_svg(dot: str) -> str:
+    """
+    Converts a DOT string into an SVG string by calling the *dot* command-line tool.
+
+    :param dot: DOT graph source, e.g. as returned by :func:`to_dot`
+    :return: SVG content as a UTF-8 string
+    :raises FileNotFoundError: if the *dot* executable is not found on ``PATH``
+    :raises RuntimeError: if *dot* exits with a non-zero return code
+    """
+    try:
+        proc = subprocess.run(
+            ["dot", "-Tsvg"],
+            input=dot.encode(),
+            capture_output=True,
+        )
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
+            "The dot executable was not found. "
+            "Please install Graphviz and ensure it is on your PATH."
+        ) from e
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"dot exited with return code {proc.returncode}:\n{proc.stderr.decode()}"
+        )
+    return proc.stdout.decode()

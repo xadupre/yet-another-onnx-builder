@@ -317,7 +317,7 @@ class OpRunFunction(OpRunKernel):
 
     def __init__(
         self,
-        runtime: "yobx.reference.TorchReferenceEvaluator",  # noqa: F821
+        runtime: "yobx.reference.torch_evaluator.TorchReferenceEvaluator",  # noqa: F821
         node: onnx.NodeProto,
         version: Optional[int] = None,
         verbose: int = 0,

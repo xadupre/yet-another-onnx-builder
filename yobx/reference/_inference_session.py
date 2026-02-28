@@ -249,7 +249,9 @@ class InferenceSessionForNumpy(_InferenceSession):
         )
 
     def run(
-        self, output_names: Optional[List[str]], feeds: Dict[str, TensorLike]
+        self,
+        output_names: Optional[List[str]],
+        feeds: Union[Dict[str, np.ndarray], Dict[str, ORTC.OrtValue]],
     ) -> List[Optional[TensorLike]]:
         """Calls :meth:`onnxruntime.InferenceSession.run`."""
         # sess.run does not support bfloat16
@@ -618,7 +620,7 @@ def investigate_onnxruntime_issue(
         import numpy as np
         import onnx
         import onnx.helper as oh
-        from onnx_diagnostic.helpers.ort_session import investigate_onnxruntime_issue
+        from yobx.reference._inference_session import investigate_onnxruntime_issue
 
         TFLOAT = onnx.TensorProto.FLOAT
         model = oh.make_model(
