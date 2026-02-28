@@ -476,29 +476,29 @@ class TorchReferenceEvaluator:
             outputs = self.output_names
 
         # sets constants
-        for k, v in self.constants.items():
-            r = self.runtime_info[k]
+        for kc, vc in self.constants.items():
+            r = self.runtime_info[kc]
             if not r.has_value:
                 r.set_value(
                     torch_ops.OpRunTensor(
-                        v.to(self.CUDA) if not r.is_shape and self.on_cuda else v,
+                        vc.to(self.CUDA) if not r.is_shape and self.on_cuda else vc,
                         is_constant=True,
-                        may_cpu=len(v.shape) == 1 and v.numel() < 8 and v.dtype == torch.int64,
+                        may_cpu=len(vc.shape) == 1 and vc.numel() < 8 and vc.dtype == torch.int64,
                     )
                 )
             if self.verbose:
                 print(f"+C {r.name}: {r.string_type()}")
 
         # inputs
-        for k, v in feeds.items():
-            r = self.runtime_info[k]
+        for kf, vf in feeds.items():
+            r = self.runtime_info[kf]
             r.set_value(
                 torch_ops.OpRunTensor(
                     # pyrefly: ignore[missing-attribute]
-                    v.to(self.CUDA) if not r.is_shape and self.on_cuda else v,
+                    vf.to(self.CUDA) if not r.is_shape and self.on_cuda else vf,
                     is_constant=False,
                     # pyrefly: ignore[missing-attribute]
-                    may_cpu=len(v.shape) == 1 and v.numel() < 8 and v.dtype == torch.int64,
+                    may_cpu=len(vf.shape) == 1 and vf.numel() < 8 and vf.dtype == torch.int64,
                 )
             )
             if self.verbose:

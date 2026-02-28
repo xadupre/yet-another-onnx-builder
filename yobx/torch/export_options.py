@@ -113,7 +113,7 @@ class ExportOptions:
         assert not self.dynamo or not self.jit, "jit and dynamo cannot be true at the same time"
 
     def __repr__(self) -> str:
-        return string_sig(self)
+        return string_sig(self)  # type: ignore[arg-type]
 
     def clone(self, **kwargs) -> "ExportOptions":
         """Makes a copy and updates some of the values."""
@@ -248,7 +248,7 @@ class ExportOptions:
         if prefer_deferred_runtime_asserts_over_guards:
             export_kwargs["prefer_deferred_runtime_asserts_over_guards"] = True
         if backed_size_oblivious is True:
-            with torch.fx.experimental._config.patch(backed_size_oblivious=True):
+            with torch.fx.experimental._config.patch(backed_size_oblivious=True):  # type: ignore[attr-defined]
                 return torch.export.export(
                     mod,
                     args or (),
@@ -331,7 +331,7 @@ class ExportOptions:
             res = torch._dynamo.export(
                 mod,
                 aten_graph=True,
-                tracing_mode=tracing_mode,
+                tracing_mode=tracing_mode,  # type: ignore
                 dynamic_shapes=dynamic_shapes,
                 same_signature=same_signature,
                 decomposition_table=self.get_decomposition_table(),
@@ -344,7 +344,7 @@ class ExportOptions:
                 torch.export.save(res, f"{save_ep}.old_dynamo.pt2")
             if verbose:
                 print(f"[ExportOptions.export] done in {time.perf_counter() - begin}")
-            return res
+            return res  # type: ignore
 
         if self.jit:
             if verbose:
@@ -352,13 +352,13 @@ class ExportOptions:
             from torch._export.converter import TS2EPConverter
 
             jit_model = torch.jit.trace(mod, example_inputs=args, check_trace=False, strict=False)
-            res = TS2EPConverter(jit_model, args, kwargs).convert()
+            res = TS2EPConverter(jit_model, args, kwargs).convert()  # type: ignore
             if self.save_ep:
                 save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
                 with open(f"{save_ep}.jit", "w") as f:
                     f.write(str(res))
-                torch.export.save(res, f"{save_ep}.jit.pt2")
-            dec = apply_decompositions(res, self.decomposition_table, self.backed_size_oblivious)
+                torch.export.save(res, f"{save_ep}.jit.pt2")  # type: ignore
+            dec = apply_decompositions(res, self.decomposition_table, self.backed_size_oblivious)  # type: ignore
             if self.save_ep:
                 save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
                 with open(f"{save_ep}.jit.decomposed", "w") as f:
@@ -472,7 +472,7 @@ class ExportOptions:
         if verbose:
             print(f"[ExportOptions.validate_exported_program] discrepancies: {string_diff(diff)}")
         atol = self.validate_ep if isinstance(self.validate_ep, float) else 1e-5
-        assert diff["abs"] <= atol, (
+        assert isinstance(diff["abs"], float) and diff["abs"] <= atol, (
             f"Discrepancies observed between the model and the exported program "
             f"(atol={atol}) diff={string_diff(diff)}"
         )
@@ -566,7 +566,7 @@ def apply_decompositions(
     if decomposition_table == "all":
         exported_program = insert_contiguous_between_transpose_and_view(exported_program)
         if use_oblivious:
-            with torch.fx.experimental._config.patch(backed_size_oblivious=True):
+            with torch.fx.experimental._config.patch(backed_size_oblivious=True):  # type: ignore[attr-defined]
                 exported_program = exported_program.run_decompositions()
         else:
             exported_program = exported_program.run_decompositions()
@@ -578,7 +578,7 @@ def apply_decompositions(
     if decomposition_table is not None:
         exported_program = insert_contiguous_between_transpose_and_view(exported_program)
         if use_oblivious:
-            with torch.fx.experimental._config.patch(backed_size_oblivious=True):
+            with torch.fx.experimental._config.patch(backed_size_oblivious=True):  # type: ignore[attr-defined]
                 exported_program = exported_program.run_decompositions(decomposition_table)
         else:
             exported_program = exported_program.run_decompositions(decomposition_table)

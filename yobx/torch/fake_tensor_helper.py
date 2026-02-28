@@ -107,9 +107,9 @@ class FakeTensorContext:
         )
         if len(reduced_tensor.shape) == 0 == len(new_shape):
             return fake_tensor
-        return reduced_tensor.expand(*new_shape)
+        return reduced_tensor.expand(*new_shape)  # type: ignore[return-value]
 
-    def make_fake(self, x: Any) -> Optional[FakeTensor]:
+    def make_fake(self, x: Any) -> Optional[Any]:
         """See :func:`yobx.torch.fake_tensor_helper.make_fake`."""
         if x is None:
             return None
