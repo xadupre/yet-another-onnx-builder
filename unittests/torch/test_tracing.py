@@ -12,6 +12,7 @@ from yobx.ext_test_case import (
 from yobx.torch.tracing import (
     CustomTracer,
     CustomProxy,
+    CustomParameterProxy,
     CondCCOp,
     _len,
     _isinstance,
@@ -928,6 +929,92 @@ class TestTracing(ExtTestCase):
         self.assertEqual(len(module_nodes), 2)
         self.assertEqual(module_nodes[0].target, "suba")
         self.assertEqual(module_nodes[1].target, "subb.linear")
+
+
+@requires_torch("2.0")
+class TestCustomParameterProxy(ExtTestCase):
+    def _make_proxy(self, param, name="weight"):
+        graph = torch.fx.Graph()
+        node = graph.create_node("get_attr", name, args=(), kwargs={}, name=name)
+        tracer = CustomTracer()
+        tracer.graph = torch.fx.Graph(tracer_cls=CustomTracer)
+        return CustomParameterProxy(tracer, node, name, param)
+
+    def test_custom_parameter_proxy_repr(self):
+        param = torch.nn.Parameter(torch.randn(3, 4))
+        proxy = self._make_proxy(param, name="weight")
+        self.assertEqual(repr(proxy), "CustomParameterProxy(weight)")
+
+    def test_custom_parameter_proxy_shape(self):
+        param = torch.nn.Parameter(torch.randn(3, 4))
+        proxy = self._make_proxy(param)
+        self.assertEqual(proxy.shape, param.shape)
+        self.assertEqual(proxy.shape, torch.Size([3, 4]))
+
+    def test_custom_parameter_proxy_size(self):
+        param = torch.nn.Parameter(torch.randn(3, 4))
+        proxy = self._make_proxy(param)
+        self.assertEqual(proxy.size(), param.size())
+
+    def test_custom_parameter_proxy_dim(self):
+        param = torch.nn.Parameter(torch.randn(3, 4))
+        proxy = self._make_proxy(param)
+        self.assertEqual(proxy.dim(), 2)
+        self.assertEqual(proxy.dim(), param.dim())
+
+    def test_custom_parameter_proxy_ndim(self):
+        param = torch.nn.Parameter(torch.randn(3, 4))
+        proxy = self._make_proxy(param)
+        self.assertEqual(proxy.ndim, 2)
+        self.assertEqual(proxy.ndim, param.ndim)
+
+    def test_custom_parameter_proxy_numel(self):
+        param = torch.nn.Parameter(torch.randn(3, 4))
+        proxy = self._make_proxy(param)
+        self.assertEqual(proxy.numel(), 12)
+        self.assertEqual(proxy.numel(), param.numel())
+
+    def test_custom_parameter_proxy_nelement(self):
+        param = torch.nn.Parameter(torch.randn(3, 4))
+        proxy = self._make_proxy(param)
+        self.assertEqual(proxy.nelement(), 12)
+        self.assertEqual(proxy.nelement(), param.nelement())
+
+    def test_custom_parameter_proxy_is_instance(self):
+        param = torch.nn.Parameter(torch.randn(3, 4))
+        proxy = self._make_proxy(param)
+        self.assertIsInstance(proxy, CustomParameterProxy)
+        self.assertIsInstance(proxy, CustomProxy)
+
+    def test_custom_parameter_proxy_tracing_param_shapes_constant(self):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.randn(4, 3))
+
+            def forward(self, x):
+                # Access weight.shape during tracing; with param_shapes_constant=True
+                # this should return actual shape values via CustomParameterProxy
+                if self.weight.shape[0] == 4:
+                    return x @ self.weight.T
+                return x
+
+        model = Model()
+        tracer = CustomTracer(param_shapes_constant=True)
+        graph = tracer.trace(model)
+        self.assertIsNotNone(graph)
+        node_ops = [n.op for n in graph.nodes]
+        self.assertIn("get_attr", node_ops)
+
+    def test_custom_parameter_proxy_1d(self):
+        param = torch.nn.Parameter(torch.randn(5))
+        proxy = self._make_proxy(param, name="bias")
+        self.assertEqual(repr(proxy), "CustomParameterProxy(bias)")
+        self.assertEqual(proxy.shape, torch.Size([5]))
+        self.assertEqual(proxy.dim(), 1)
+        self.assertEqual(proxy.ndim, 1)
+        self.assertEqual(proxy.numel(), 5)
+        self.assertEqual(proxy.nelement(), 5)
 
 
 if __name__ == "__main__":
