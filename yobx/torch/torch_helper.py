@@ -150,10 +150,12 @@ def torch_deepcopy(value: Any) -> Any:
         return value.copy()
     if hasattr(value, "clone"):
         return value.clone()
-    if value.__class__ in torch.utils._pytree.SUPPORTED_NODES:
-        args, spec = torch.utils._pytree.tree_flatten(value)
+    import torch.utils._pytree as pytree
+
+    if value.__class__ in pytree.SUPPORTED_NODES:
+        args, spec = pytree.tree_flatten(value)
         new_args = torch_deepcopy(args)
-        return torch.utils._pytree.tree_unflatten(new_args, spec)
+        return pytree.tree_unflatten(new_args, spec)
 
     if hasattr(value, "__nocopy__"):
         return value

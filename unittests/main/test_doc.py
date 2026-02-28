@@ -1,4 +1,5 @@
 import os
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -26,6 +27,8 @@ class TestDocMatplotlib(ExtTestCase):
 
     def test_plot_legend_returns_axes(self):
         from yobx.doc import plot_legend
+
+        self.assertEqual(sys.platform, "linux")
 
         ax = plot_legend("TEST")
         import matplotlib.axes

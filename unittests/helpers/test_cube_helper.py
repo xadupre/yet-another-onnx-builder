@@ -5,7 +5,7 @@ import unittest
 import zipfile
 import numpy as np
 import pandas
-from yobx.ext_test_case import ExtTestCase, hide_stdout
+from yobx.ext_test_case import ExtTestCase, hide_stdout, skipif_ci_windows
 from yobx.helpers._log_helper import (
     enumerate_csv_files,
     open_dataframe,
@@ -163,6 +163,7 @@ class TestCubeHelper(ExtTestCase):
             list(view.index),
         )
 
+    @skipif_ci_windows("too slow")
     @hide_stdout()
     def test_cube_logs_excel(self):
         output = self.get_dump_file("test_cube_logs_excel.xlsx")

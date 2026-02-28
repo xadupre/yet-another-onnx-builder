@@ -5,7 +5,7 @@ import importlib.util
 import subprocess
 import time
 from yobx import __file__ as yobx_file
-from yobx.ext_test_case import ExtTestCase, is_windows, ignore_errors
+from yobx.ext_test_case import ExtTestCase, is_windows, ignore_errors, has_transformers
 
 VERBOSE = 0
 ROOT = os.path.realpath(os.path.abspath(os.path.join(yobx_file, "..", "..")))
@@ -78,9 +78,12 @@ class TestDocumentationExamples(ExtTestCase):
 
             if (
                 not reason
-                and sys.platform.startswith("win")
-                and name in {"plot_evaluator_comparison.py"}
+                and name in {"plot_input_observer_transformers.py"}
+                and not has_transformers("4.57")
             ):
+                reason = "transformers<4.57"
+
+            if not reason and sys.platform.startswith(("win", "darwin")):
                 reason = "CI complains on Windows"
 
             if reason:

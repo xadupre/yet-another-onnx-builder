@@ -428,7 +428,9 @@ def string_type(
             f"cross_attention_cache={cross})"
         )
 
-    if obj.__class__ in torch.utils._pytree.SUPPORTED_NODES:
+    import torch.utils._pytree as pytree
+
+    if obj.__class__ in pytree.SUPPORTED_NODES:
         from ..torch.transformers.cache_helper import flatten_unflatten_for_dynamic_shapes
 
         args = flatten_unflatten_for_dynamic_shapes(obj)
@@ -544,11 +546,7 @@ def string_type(
 
     if isinstance(  # TreeSpec, MappingKey, SequenceKey
         obj,
-        (
-            torch.utils._pytree.TreeSpec,
-            torch.utils._pytree.MappingKey,
-            torch.utils._pytree.SequenceKey,
-        ),
+        (pytree.TreeSpec, pytree.MappingKey, pytree.SequenceKey),
     ):
         return repr(obj).replace(" ", "").replace("\n", " ")
 
@@ -1104,11 +1102,13 @@ def max_diff(
         values = (expected.mean, expected.scale)
         return max_diff(values, got, debug_info=_debug("SquashedNormal"), **_dkws)
 
-    if expected.__class__ in torch.utils._pytree.SUPPORTED_NODES:
-        if got.__class__ not in torch.utils._pytree.SUPPORTED_NODES:
+    import torch.utils._pytree as pytree
+
+    if expected.__class__ in pytree.SUPPORTED_NODES:
+        if got.__class__ not in pytree.SUPPORTED_NODES:
             return dict(abs=np.inf, rel=np.inf, sum=np.inf, n=np.inf, dnan=np.inf)
-        expected_args, _spec = torch.utils._pytree.tree_flatten(expected)
-        got_args, _spec = torch.utils._pytree.tree_flatten(got)
+        expected_args, _spec = pytree.tree_flatten(expected)
+        got_args, _spec = pytree.tree_flatten(got)
         return max_diff(
             expected_args, got_args, debug_info=_debug(expected.__class__.__name__), **_dkws
         )

@@ -9,7 +9,6 @@ from yobx.ext_test_case import (
     statistics_on_folder,
     is_apple,
     is_windows,
-    is_azure,
     is_linux,
     unit_test_going,
     measure_time,
@@ -62,7 +61,6 @@ class TestUnitTest(ExtTestCase):
     def test_is(self):
         is_apple()
         is_windows()
-        is_azure()
         is_linux()
         unit_test_going()
         has_cuda()
