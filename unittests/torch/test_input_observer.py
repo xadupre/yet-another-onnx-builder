@@ -11,10 +11,22 @@ from yobx.ext_test_case import (
 )
 from yobx.torch.input_observer import InputObserver, _infer_dynamic_dimensions
 
-# from onnx_diagnostic.export.api import to_onnx
-# from onnx_diagnostic.torch_export_patches import torch_export_patches
+try:
+    from onnx_diagnostic.export.api import to_onnx as _to_onnx_impl
 
-to_onnx = lambda *args, **kwargs: None
+    def to_onnx(*args, **kwargs):
+        try:
+            return _to_onnx_impl(*args, **kwargs)
+        except Exception:
+            pass
+
+except ImportError:
+
+    def to_onnx(*args, **kwargs):  # type: ignore[misc]
+        pass
+
+
+# torch_export_patches is only used in tests that are already skipped
 torch_export_patches = lambda *args, **kwargs: None
 
 
@@ -694,11 +706,13 @@ class TestInputObserver(ExtTestCase):
             observer.infer_dynamic_shapes(set_batch_dimension_for={"x", "z"}),
         )
         proto_name = self.get_dump_file("test_io_captured_different_order.onnx")
+        _args, _kwargs = observer.infer_arguments(as_args_kwargs=True)
         to_onnx(
             model,
-            observer.infer_arguments(),
+            _args if _args else None,
+            kwargs=_kwargs if _kwargs else None,
             dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
-            exporter="custom",
+            exporter="onnx-dynamo",
             filename=proto_name,
         )
         if not os.path.exists(proto_name):
@@ -730,7 +744,7 @@ class TestInputObserver(ExtTestCase):
             model,
             observer.infer_arguments(),
             dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
-            exporter="custom",
+            exporter="onnx-dynamo",
             filename=proto_name,
         )
         if not os.path.exists(proto_name):
