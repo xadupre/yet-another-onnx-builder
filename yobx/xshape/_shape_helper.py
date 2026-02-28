@@ -27,28 +27,34 @@ def reshape_implementation_with_zero(data: Any, shape: Sequence[int], allowzero:
 
 
 def all_int(seq: Sequence[Any]) -> bool:
+    """Returns True if all elements of *seq* are integers."""
     return all(isinstance(i, int) for i in seq)
 
 
 def all_float(seq: Sequence[Any]) -> bool:
+    """Returns True if all elements of *seq* are floats."""
     return all(isinstance(i, float) for i in seq)
 
 
 def all_int_or_float(seq: Sequence[Any]) -> bool:
+    """Returns True if all elements of *seq* are integers or floats."""
     return all(isinstance(i, (int, float)) for i in seq)
 
 
 def all_int_or_str(seq: Sequence[Any]) -> bool:
+    """Returns True if all elements of *seq* are integers or strings."""
     return all(isinstance(i, (int, str)) for i in seq)
 
 
 def is_static_shape(shape: DYNAMIC_SHAPE) -> bool:
+    """Returns True if all dimensions of *shape* are static integers."""
     if shape is None:
         return False
     return all(map(is_static_dimension, shape))
 
 
 def is_static_dimension(d: Any) -> bool:
+    """Returns True if dimension *d* is a static (plain integer) dimension."""
     import torch
 
     if isinstance(d, torch.export.dynamic_shapes._Dim):

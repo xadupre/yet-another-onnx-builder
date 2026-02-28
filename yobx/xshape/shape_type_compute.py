@@ -495,7 +495,7 @@ def _set_shape_type_op_any_dropout(self: ShapeBuilder, node: NodeProto):
 
 
 def _set_shape_type_op_any_rotary_embedding(self: ShapeBuilder, node: NodeProto):
-    "Sets the output shape for node type Cast."
+    "Sets the output shape for node type RotaryEmbedding."
     return set_type_shape_unary_op(self, node.output[0], node.input[0])
 
 
@@ -1990,12 +1990,13 @@ def set_shape_type_op_any(self: ShapeBuilder, node: NodeProto, exc: bool = False
 
 
 def set_type_shape_fused_matmul(self: ShapeBuilder, node: NodeProto):
-    name = node.output[0]
+    """Sets the output shape for node type FusedMatMul."""
     x, y = node.input[:2]
     transA = self.get_attribute(node, "transA", exc=False)
     transA = transA.i if transA else 0
     transB = self.get_attribute(node, "transB", exc=False)
     transB = transB.i if transB else 0
+    name = node.output[0]
     if transA == 0 and transB == 0:
         return set_type_shape_matmul(self, name, x, y)
     if self.has_device(x) and self.has_device(y) and self.get_device(x) == self.get_device(y):
@@ -2026,6 +2027,7 @@ def set_type_shape_fused_matmul(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_tree_ensemble(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for node types TreeEnsemble and TreeEnsembleRegressor."""
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
     self.set_type(node.output[0], self.get_type(node.input[0]))
@@ -2044,6 +2046,7 @@ def set_type_shape_tree_ensemble(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_to_complex(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for node type ToComplex (converts float to complex)."""
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
@@ -2066,6 +2069,7 @@ def set_type_shape_to_complex(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_complex_module(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for node type ComplexModule (extracts real/imaginary part)."""
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
@@ -2086,6 +2090,7 @@ def set_type_shape_complex_module(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_shared_input(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shapes for nodes with two outputs sharing the same inputs."""
     r1 = set_type_shape_binary_op(self, node.output[0], *node.input[:2])
     r2 = set_type_shape_binary_op(self, node.output[1], *node.input[::2])
     if r1 or r2:
@@ -2093,6 +2098,7 @@ def set_type_shape_shared_input(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_scatter_nd_of_shape(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for node types ScatterNDOfShape and MaskedScatterNDOfShape."""
     if self.has_device(node.input[2]):
         self.set_device(node.output[0], self.get_device(node.input[2]))
     if self.has_type(node.input[2]):
@@ -2104,6 +2110,7 @@ def set_type_shape_scatter_nd_of_shape(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_tri_matrix(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for node type TriMatrix."""
     if self.has_device(node.input[1]):
         self.set_device(node.output[0], self.get_device(node.input[1]))
     if self.has_type(node.input[1]):
@@ -2116,6 +2123,10 @@ def set_type_shape_tri_matrix(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_transpose_2d_cast_fp16(self: ShapeBuilder, node: NodeProto):
+    """
+    Sets the output shape for node type Transpose2DCastFP16
+    (transposes and casts to float16).
+    """
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
     self.set_type(node.output[0], TensorProto.FLOAT16)
@@ -2126,6 +2137,10 @@ def set_type_shape_transpose_2d_cast_fp16(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_transpose_2d_cast_fp32(self: ShapeBuilder, node: NodeProto):
+    """
+    Sets the output shape for node type Transpose2DCastFP32
+    (transposes and casts to float32).
+    """
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
     self.set_type(node.output[0], TensorProto.FLOAT)
@@ -2136,6 +2151,7 @@ def set_type_shape_transpose_2d_cast_fp32(self: ShapeBuilder, node: NodeProto):
 
 
 def set_type_shape_multi_head_attention(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for node type MultiHeadAttention."""
     if self.has_device(node.input[0]):
         for o in node.output:
             if o:
