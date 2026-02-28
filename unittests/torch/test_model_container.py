@@ -60,12 +60,8 @@ class TestGetType(ExtTestCase):
         self.assertEqual(self._get_type(None), onnx.TensorProto.UNDEFINED)
 
     def test_unknown_raises(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(Exception):
             self._get_type("unknown_type")
-
-    def test_unknown_no_exc(self):
-        result = self._get_type("unknown_type", exc=False)
-        self.assertEqual(result, "unknown_type")
 
 
 @requires_torch("2.9")

@@ -17,18 +17,12 @@ STORAGE_TYPE = {
 }
 
 
-def _get_type(elem_type: Any, exc: bool = True) -> int:
+def _get_type(elem_type: Any) -> int:
     if isinstance(elem_type, int):
         return elem_type
     if elem_type is None:
         return TensorProto.UNDEFINED
-    try:
-        return dtype_to_tensor_dtype(elem_type)
-    except (KeyError, TypeError, ValueError, NotImplementedError):
-        pass
-    if exc:
-        raise ValueError(f"Unable to interpret elem_type {elem_type!r}.")
-    return elem_type
+    return dtype_to_tensor_dtype(elem_type)
 
 
 class TorchModelContainer(ModelContainer):
