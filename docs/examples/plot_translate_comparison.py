@@ -13,9 +13,9 @@ recreates the same model.  Four output APIs are available:
 * ``"onnx-short"`` — same as ``"onnx"`` but replaces large initializers with
   random values to keep the snippet compact, via
   :class:`~yobx.translate.inner_emitter.InnerEmitterShortInitializer`.
-* ``"light"`` — fluent chain using ``onnx_array_api.light_api.start()``,
+* ``"light"`` — fluent ``start(…).vin(…).…`` chain,
   via :class:`~yobx.translate.light_emitter.LightEmitter`.
-* ``"builder"`` — uses ``onnx_array_api.graph_api.GraphBuilder``,
+* ``"builder"`` — ``GraphBuilder``-based function wrapper,
   via :class:`~yobx.translate.builder_emitter.BuilderEmitter`.
 
 This example builds a small model, translates it with every API, shows the
@@ -94,9 +94,7 @@ print(f"Short code length : {len(code_short):>6} characters")
 # 3. ``"light"`` API — fluent chain
 # -----------------------------------
 #
-# The output is a single method-chain expression built with
-# ``onnx_array_api.light_api.start()``.  Requires ``onnx-array-api``
-# to be installed.
+# The output is a single method-chain expression (``start(…).vin(…).…``).
 
 code_light = translate(model, api="light")
 print("=== api='light' ===")
@@ -106,8 +104,7 @@ print(code_light)
 # 4. ``"builder"`` API — GraphBuilder
 # -------------------------------------
 #
-# The output uses ``onnx_array_api.graph_api.GraphBuilder``.
-# Requires ``onnx-array-api`` to be installed.
+# The output uses ``GraphBuilder`` to wrap the graph nodes in a Python function.
 
 code_builder = translate(model, api="builder")
 print("=== api='builder' ===")

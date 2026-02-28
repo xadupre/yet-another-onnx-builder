@@ -65,11 +65,11 @@ Four concrete emitters are shipped:
 | InnerEmitterShortInitializer`                    | initializers (> 16 elements) with  |
 |                                                  | ``np.random.randn(…)``             |
 +--------------------------------------------------+------------------------------------+
-| :class:`~yobx.translate.light_emitter.           | ``onnx_array_api.light_api``       |
-| LightEmitter`                                    | fluent chain                       |
+| :class:`~yobx.translate.light_emitter.           | Fluent ``start(…).vin(…).…``       |
+| LightEmitter`                                    | method chain                       |
 +--------------------------------------------------+------------------------------------+
-| :class:`~yobx.translate.builder_emitter.         | ``onnx_array_api.graph_api.        |
-| BuilderEmitter`                                  | GraphBuilder``                     |
+| :class:`~yobx.translate.builder_emitter.         | ``GraphBuilder``-based function    |
+| BuilderEmitter`                                  | wrapper                            |
 +--------------------------------------------------+------------------------------------+
 
 The four APIs are exposed through the single convenience function
@@ -177,7 +177,7 @@ LightEmitter
 ============
 
 :class:`~yobx.translate.light_emitter.LightEmitter` generates a fluent
-method chain for the ``onnx_array_api.light_api`` (``start(…).vin(…).…``).
+method chain (``start(…).vin(…).…``).
 The chain is either written as a multi-line indented block (default) or
 collapsed to a single ``.``-joined line when ``single_line=True``.
 
@@ -204,7 +204,7 @@ BuilderEmitter
 ==============
 
 :class:`~yobx.translate.builder_emitter.BuilderEmitter` generates code that
-uses ``onnx_array_api.graph_api.GraphBuilder``.  The graph body is wrapped
+uses ``GraphBuilder``.  The graph body is wrapped
 in a Python function named after the ONNX graph, and a small driver block
 constructs the ``GraphBuilder``, calls the function, and finalises the model
 with ``g.to_onnx()``.
