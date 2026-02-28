@@ -2,7 +2,6 @@ from typing import Any
 import torch
 from .export_options import ExportOptions
 from .flatten_helper import register_flattening_functions
-from .model_container import TorchModelContainer
 from .tracing import (
     CustomProxy,
     CustomAttribute,
