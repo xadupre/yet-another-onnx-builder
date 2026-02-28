@@ -2,7 +2,6 @@ yobx.builder.light
 ==================
 
 Fluent API for building ONNX graphs using a chainable, builder-style syntax.
-Inspired by `onnx-array-api/light_api <https://github.com/sdpython/onnx-array-api/tree/main/onnx_array_api/light_api>`_.
 
 .. rubric:: Quick Start
 

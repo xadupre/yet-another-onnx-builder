@@ -1,29 +1,3 @@
-"""
-Light API for building ONNX graphs using a fluent, chained syntax.
-
-Inspired by the ``light_api`` module in
-`onnx-array-api <https://github.com/sdpython/onnx-array-api>`_.
-
-Typical usage::
-
-    from yobx.builder.light import start
-
-    # Single-input model: Y = Neg(X)
-    onx = start().vin("X").Neg().rename("Y").vout().to_onnx()
-
-    # Two-input model: Z = Add(X, Y)
-    onx = (
-        start()
-        .vin("X")
-        .vin("Y")
-        .bring("X", "Y")
-        .Add()
-        .rename("Z")
-        .vout()
-        .to_onnx()
-    )
-"""
-
 from typing import Dict, Optional
 from ._graph import OnnxGraph, ProtoType
 from ._var import Var, Vars

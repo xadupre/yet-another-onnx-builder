@@ -1,10 +1,3 @@
-"""
-Implements :class:`CustomTracer` to trace the execution of a PyTorch model
-and converts it into an FX graph.
-
-Source: https://github.com/sdpython/experimental-experiment/blob/main/experimental_experiment/torch_interpreter/tracing.py
-"""
-
 import contextlib
 import inspect
 import math

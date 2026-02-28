@@ -729,17 +729,6 @@ def requires_onnx(version: str, msg: str = "") -> Callable:
     return lambda x: x
 
 
-def requires_yobx(version: str, msg: str = "") -> Callable:
-    """Skips a unit test if :epkg:`onnx-array-api` is not recent enough."""
-    import packaging.version as pv
-    import yobx
-
-    if pv.Version(yobx.__version__) < pv.Version(version):
-        msg = f"onnx-array-api version {yobx.__version__} < {version}: {msg}"
-        return unittest.skip(msg)
-    return lambda x: x
-
-
 def statistics_on_file(filename: str) -> Dict[str, Union[int, float, str]]:
     """
     Computes statistics on a file.

@@ -1268,3 +1268,23 @@ def replace_static_dimensions_by_strings(
         functions=model.functions,
     )
     return model, mapping
+
+
+def make_idn(node: onnx.NodeProto) -> str:
+    """
+    Creates a unique id for a node hoping collision cannot happen.
+    onnx may reuse sometimes the nodes, ``id(node)`` may not be enough sometimes.
+    """
+    # return f"{id(node)}-{node.op_type}-{node.output[0]}-{node.name}"
+    # id(node) should be enough and faster.
+    return id(node)
+
+
+def make_idg(g: onnx.GraphProto) -> str:
+    """
+    Creates a unique id for a graph hoping collision cannot happen.
+    onnx may reuse sometimes the nodes, ``id(node)`` may not be enough sometimes.
+    """
+    # return f"{id(g)}-{len(g.node)}-{len(g.input)}-{len(g.output)}-{g.name}"
+    # id(g) should be enough and faster.
+    return id(g)

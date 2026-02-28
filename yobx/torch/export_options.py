@@ -1,11 +1,3 @@
-"""
-Implements :class:`ExportOptions` to configure how to export a model into a graph.
-
-Adapted from
-`experimental_experiment/torch_interpreter/export_options.py
-<https://github.com/sdpython/experimental-experiment/blob/main/experimental_experiment/torch_interpreter/export_options.py>`_.
-"""
-
 import os
 import time
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
