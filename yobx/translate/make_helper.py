@@ -18,7 +18,8 @@ def make_ref_attribute(
     att = AttributeProto()
     att.name = key
     att.type = attr_type
-    att.ref_attr_name = ref_attr_name
+    if ref_attr_name is not None:
+        att.ref_attr_name = ref_attr_name
     return att
 
 
