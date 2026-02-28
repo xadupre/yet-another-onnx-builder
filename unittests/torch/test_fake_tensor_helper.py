@@ -35,6 +35,32 @@ class TestMakeTensorHelper(ExtTestCase):
                 isinstance(s, torch.SymInt) for s in t.shape
             ), f"Wrong type {[type(s) for s in t.shape]} in {t.shape}"
 
+    @requires_transformers("4.55")
+    def test_fake_inputs_many_caches(self):
+        n_layers = 32
+        inputs, _ = make_fake(
+            dict(
+                input_ids=torch.randint(30360, size=(2, 3), dtype=torch.int64),
+                attention_mask=torch.randint(1, size=(2, 33), dtype=torch.int64),
+                position_ids=torch.randint(32, size=(2, 3), dtype=torch.int64),
+                past_key_values=make_dynamic_cache(
+                    [
+                        (
+                            torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                            torch.rand((2, 32, 30, 96), dtype=torch.float16),
+                        )
+                        for _ in range(n_layers)
+                    ]
+                ),
+            )
+        )
+        flat = flatten_object(inputs, drop_keys=True)
+        for t in flat:
+            self.assertIsInstance(t, torch.Tensor)
+            assert all(
+                isinstance(s, torch.SymInt) for s in t.shape
+            ), f"Wrong type {[type(s) for s in t.shape]} in {t.shape}"
+
     def test_fake_reshape_generic(self):
         t = torch.zeros((2, 3, 4, 5), dtype=torch.float32)
         reshaped = FakeTensorContext().fake_reshape(t, {0: "batch", 2: "seq_length"})
