@@ -337,11 +337,7 @@ class ExportOptions:
                 decomposition_table=self.get_decomposition_table(),
                 assume_static_by_default=dynamic_shapes is None,
             )(*(args or tuple()), **(kwargs or {}))
-            if self.save_ep:
-                save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
-                with open(f"{save_ep}.old_dynamo", "w") as f:
-                    f.write(str(res))
-                torch.export.save(res, f"{save_ep}.old_dynamo.pt2")
+            assert not self.save_ep, f"Unable to save this type {type(res)}"
             if verbose:
                 print(f"[ExportOptions.export] done in {time.perf_counter() - begin}")
             return res  # type: ignore

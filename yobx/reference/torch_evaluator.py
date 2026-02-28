@@ -495,10 +495,10 @@ class TorchReferenceEvaluator:
             r.set_value(
                 torch_ops.OpRunTensor(
                     # pyrefly: ignore[missing-attribute]
-                    vf.to(self.CUDA) if not r.is_shape and self.on_cuda else vf,
+                    vf.to(self.CUDA) if not r.is_shape and self.on_cuda else vf,  # type: ignore[union-attr]
                     is_constant=False,
                     # pyrefly: ignore[missing-attribute]
-                    may_cpu=len(vf.shape) == 1 and vf.numel() < 8 and vf.dtype == torch.int64,
+                    may_cpu=len(vf.shape) == 1 and vf.numel() < 8 and vf.dtype == torch.int64,  # type: ignore[union-attr]
                 )
             )
             if self.verbose:

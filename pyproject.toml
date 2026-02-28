@@ -158,9 +158,9 @@ project-excludes = [
     "yobx/xshape/_builder_runtime.py",
     "yobx/xshape/_inference_runtime.py",
     "yobx/xshape/_shape_runtime.py",
-    "yobx/xshape/evaluate_expressions.py",
     "yobx/xshape/shape_builder.py",
     "yobx/xshape/shape_builder_impl.py",
     "yobx/xshape/shape_type_compute.py",
-    "yobx/xshape/simplify_expressions.py",
+    "yobx/xshape/expressions/evaluate_expressions.py",
+    "yobx/xshape/expressions/simplify_expressions.py",
 ]
