@@ -16,7 +16,7 @@ class Expression:
         self.parsed = parsed
 
     def __repr__(self):
-        "usual"
+        "Returns a string representation of the expression."
         return f"{self.__class__.__name__}({self.expr!r})"
 
     def isidentifier(self):

@@ -74,10 +74,12 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
 
     @property
     def input_names(self) -> List[str]:
+        """Returns the list of input names of the model."""
         return self._input_names
 
     @property
     def output_names(self) -> List[str]:
+        """Returns the list of output names of the model."""
         return self._output_names
 
     def is_constant(self, name: str) -> bool:
@@ -202,7 +204,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         return value
 
     def set_constant(self, name: str, value: Union[onnx.TensorProto, onnx.NodeProto]) -> None:
-        """Tells if a result is a constant."""
+        """Stores a constant (a :class:`onnx.TensorProto` or a :class:`onnx.NodeProto`)."""
         assert (
             name not in self.constants_
         ), f"Constant {name!r} is already defined{self.get_debug_msg()}"
@@ -338,10 +340,12 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         self._known_devices[name] = device
 
     def has_device(self, name) -> bool:
+        """Tells if a result has a device."""
         assert isinstance(name, str), f"Unexpected type {type(name)} for name."
         return name in self._known_devices
 
     def get_device(self, name) -> int:
+        """Returns the device of a result."""
         assert isinstance(name, str), f"Unexpected type {type(name)} for name."
         assert (
             name in self._known_devices
