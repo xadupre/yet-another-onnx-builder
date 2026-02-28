@@ -456,6 +456,84 @@ class TestInsertContiguous(ExtTestCase):
         result = insert_contiguous_between_transpose_and_view(ep)
         self.assertIs(result, ep)
 
+    def test_insert_contiguous_call_method_transpose_view(self):
+        """A contiguous node is inserted between call_method transpose and view nodes."""
+
+        # Build a raw fx.Graph with transpose -> view call_method nodes
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        t = graph.call_method("transpose", args=(x, 0, 1))
+        v = graph.call_method("view", args=(t, -1))
+        graph.output(v)
+        gm = torch.fx.GraphModule({}, graph)
+
+        class _FakeEP:
+            def __init__(self, gm):
+                self.graph_module = gm
+
+        fake_ep = _FakeEP(gm)
+        result = insert_contiguous_between_transpose_and_view(fake_ep)
+
+        contiguous_nodes = [
+            n for n in result.graph_module.graph.nodes
+            if n.op == "call_method" and n.target == "contiguous"
+        ]
+        self.assertEqual(len(contiguous_nodes), 1)
+        # Verify graph structure: contiguous is between transpose and view
+        contiguous_node = contiguous_nodes[0]
+        self.assertEqual(contiguous_node.args[0].target, "transpose")
+        view_users = list(contiguous_node.users)
+        self.assertEqual(len(view_users), 1)
+        self.assertEqual(view_users[0].target, "view")
+
+    def test_insert_contiguous_aten_transpose_view(self):
+        """A contiguous node is inserted between aten::transpose.int and aten::view."""
+
+        class TransposeViewModel(torch.nn.Module):
+            def forward(self, x):
+                return x.transpose(0, 1).view(-1)
+
+        ep = torch.export.export(TransposeViewModel(), (torch.randn(2, 3),))
+
+        # Only run the insertion check when the pattern is present in the graph;
+        # some torch versions normalise .view() to aten::reshape instead.
+        has_pattern = any(
+            n.op == "call_function"
+            and hasattr(n.target, "name")
+            and n.target.name() == "aten::transpose.int"
+            and any(
+                u.op == "call_function"
+                and hasattr(u.target, "name")
+                and u.target.name() == "aten::view"
+                for u in n.users
+            )
+            for n in ep.graph_module.graph.nodes
+        )
+
+        result = insert_contiguous_between_transpose_and_view(ep)
+
+        if has_pattern:
+            contiguous_nodes = [
+                n for n in result.graph_module.graph.nodes
+                if n.op == "call_method" and n.target == "contiguous"
+            ]
+            self.assertGreater(len(contiguous_nodes), 0)
+            # Verify graph structure: contiguous sits between transpose and view
+            contiguous_node = contiguous_nodes[0]
+            self.assertEqual(
+                contiguous_node.args[0].target.name(), "aten::transpose.int"
+            )
+            view_users = [
+                u for u in contiguous_node.users
+                if u.op == "call_function"
+                and hasattr(u.target, "name")
+                and u.target.name() == "aten::view"
+            ]
+            self.assertGreater(len(view_users), 0)
+        else:
+            # Pattern absent: function is a no-op and returns the same object
+            self.assertIs(result, ep)
+
 
 @requires_torch("2.0")
 class TestInplaceFunctions(ExtTestCase):
