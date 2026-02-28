@@ -106,13 +106,14 @@ class ExportOptions:
                 f"it should be in {sorted(k for k in self._allowed if k is not None)}"
             )
             kwargs = self._allowed[strategy]
+            assert isinstance(kwargs, dict)  # type checking
             for k, v in kwargs.items():
                 setattr(self, k, v)
 
         assert not self.dynamo or not self.jit, "jit and dynamo cannot be true at the same time"
 
     def __repr__(self) -> str:
-        return string_sig(self)
+        return string_sig(self)  # type: ignore[arg-type]
 
     def clone(self, **kwargs) -> "ExportOptions":
         """Makes a copy and updates some of the values."""
@@ -150,6 +151,7 @@ class ExportOptions:
         Run decompositions, remove inplace operations.
         The graph is modified inplace.
         """
+        begin = time.perf_counter()  # to avoid many warnings from pyrefly
         if verbose:
             print(
                 f"[ExportOptions.export] post_process_exported_program "
@@ -247,7 +249,7 @@ class ExportOptions:
         if prefer_deferred_runtime_asserts_over_guards:
             export_kwargs["prefer_deferred_runtime_asserts_over_guards"] = True
         if backed_size_oblivious is True:
-            with torch.fx.experimental._config.patch(backed_size_oblivious=True):
+            with torch.fx.experimental._config.patch(backed_size_oblivious=True):  # type: ignore[attr-defined]
                 return torch.export.export(
                     mod,
                     args or (),
@@ -277,6 +279,7 @@ class ExportOptions:
     ) -> Union["torch.export.ExportedProgram", "torch.fx.GraphModule"]:  # noqa: F821
         """Exports the model into an exported program."""
         print_exported_program = os.environ.get("PRINT_EXPORTED_PROGRAM", "0") in (1, "1")
+        begin = time.perf_counter()  # to avoid many warnings from pyrefly
 
         if self.fake:
             assert not (
@@ -330,20 +333,16 @@ class ExportOptions:
             res = torch._dynamo.export(
                 mod,
                 aten_graph=True,
-                tracing_mode=tracing_mode,
+                tracing_mode=tracing_mode,  # type: ignore
                 dynamic_shapes=dynamic_shapes,
                 same_signature=same_signature,
                 decomposition_table=self.get_decomposition_table(),
                 assume_static_by_default=dynamic_shapes is None,
             )(*(args or tuple()), **(kwargs or {}))
-            if self.save_ep:
-                save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
-                with open(f"{save_ep}.old_dynamo", "w") as f:
-                    f.write(str(res))
-                torch.export.save(res, f"{save_ep}.old_dynamo.pt2")
+            assert not self.save_ep, f"Unable to save this type {type(res)}"
             if verbose:
                 print(f"[ExportOptions.export] done in {time.perf_counter() - begin}")
-            return res
+            return res  # type: ignore
 
         if self.jit:
             if verbose:
@@ -351,13 +350,13 @@ class ExportOptions:
             from torch._export.converter import TS2EPConverter
 
             jit_model = torch.jit.trace(mod, example_inputs=args, check_trace=False, strict=False)
-            res = TS2EPConverter(jit_model, args, kwargs).convert()
+            res = TS2EPConverter(jit_model, args, kwargs).convert()  # type: ignore
             if self.save_ep:
                 save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
                 with open(f"{save_ep}.jit", "w") as f:
                     f.write(str(res))
-                torch.export.save(res, f"{save_ep}.jit.pt2")
-            dec = apply_decompositions(res, self.decomposition_table, self.backed_size_oblivious)
+                torch.export.save(res, f"{save_ep}.jit.pt2")  # type: ignore
+            dec = apply_decompositions(res, self.decomposition_table, self.backed_size_oblivious)  # type: ignore
             if self.save_ep:
                 save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
                 with open(f"{save_ep}.jit.decomposed", "w") as f:
@@ -395,7 +394,7 @@ class ExportOptions:
         self._stat_time_torch_export_export_oblivious = time.perf_counter() - begin
 
         if self.strict:
-            args, kwargs = args0, kwargs0
+            args, kwargs = args0, kwargs0  # pyrefly: ignore[unbound-name]
 
         if exported_program is None:
             if verbose:
@@ -471,7 +470,7 @@ class ExportOptions:
         if verbose:
             print(f"[ExportOptions.validate_exported_program] discrepancies: {string_diff(diff)}")
         atol = self.validate_ep if isinstance(self.validate_ep, float) else 1e-5
-        assert diff["abs"] <= atol, (
+        assert isinstance(diff["abs"], float) and diff["abs"] <= atol, (
             f"Discrepancies observed between the model and the exported program "
             f"(atol={atol}) diff={string_diff(diff)}"
         )
@@ -565,7 +564,7 @@ def apply_decompositions(
     if decomposition_table == "all":
         exported_program = insert_contiguous_between_transpose_and_view(exported_program)
         if use_oblivious:
-            with torch.fx.experimental._config.patch(backed_size_oblivious=True):
+            with torch.fx.experimental._config.patch(backed_size_oblivious=True):  # type: ignore[attr-defined]
                 exported_program = exported_program.run_decompositions()
         else:
             exported_program = exported_program.run_decompositions()
@@ -577,7 +576,7 @@ def apply_decompositions(
     if decomposition_table is not None:
         exported_program = insert_contiguous_between_transpose_and_view(exported_program)
         if use_oblivious:
-            with torch.fx.experimental._config.patch(backed_size_oblivious=True):
+            with torch.fx.experimental._config.patch(backed_size_oblivious=True):  # type: ignore[attr-defined]
                 exported_program = exported_program.run_decompositions(decomposition_table)
         else:
             exported_program = exported_program.run_decompositions(decomposition_table)
@@ -608,7 +607,7 @@ def insert_contiguous_between_transpose_and_view(
             if (user.op == "call_method" and user.target == "view") or (
                 user.op == "call_function"
                 and hasattr(node.target, "name")
-                and user.target.name() == "aten::view"
+                and user.target.name() == "aten::view"  # pyrefly: ignore[missing-attribute]
             ):
                 insert = True
                 break

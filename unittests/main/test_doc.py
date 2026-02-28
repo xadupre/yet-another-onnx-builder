@@ -1,11 +1,19 @@
 import os
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_matplotlib
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_matplotlib,
+    skipif_ci_windows,
+    skipif_ci_apple,
+)
 
 
+@skipif_ci_windows("too long")
+@skipif_ci_apple("too long")
 @requires_matplotlib()
 class TestDocMatplotlib(ExtTestCase):
     @classmethod
@@ -19,6 +27,8 @@ class TestDocMatplotlib(ExtTestCase):
 
     def test_plot_legend_returns_axes(self):
         from yobx.doc import plot_legend
+
+        self.assertEqual(sys.platform, "linux")
 
         ax = plot_legend("TEST")
         import matplotlib.axes
@@ -101,6 +111,8 @@ class TestDocMatplotlib(ExtTestCase):
         self.plt.close("all")
 
 
+@skipif_ci_windows("too long")
+@skipif_ci_apple("too long")
 class TestDocVersionHelpers(ExtTestCase):
     def test_update_version_package_same_major(self):
         from yobx.doc import update_version_package

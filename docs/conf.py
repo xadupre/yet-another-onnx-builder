@@ -45,7 +45,7 @@ def linkcode_resolve(domain, info):
 
 
 _linkcode_resolve = make_linkcode_resolve(
-    "onnx_diagnostic",
+    "yobx",
     (
         "https://github.com/xadupre/yet-another-onnx-builder/"
         "blob/{revision}/{package}/"

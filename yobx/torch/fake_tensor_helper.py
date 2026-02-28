@@ -1,14 +1,14 @@
 from typing import Any, Dict, Optional, Set, Tuple
+import torch
+from torch._subclasses.fake_tensor import FakeTensorMode, FakeTensor
+from torch.fx.experimental.symbolic_shapes import ShapeEnv
 
 
 class FakeTensorContext:
     """Stores information used to reuse same dimension for the same dimension names."""
 
-    def __init__(self, fake_mode: Optional["FakeTensorMode"] = None):  # noqa: F821
+    def __init__(self, fake_mode: Optional[FakeTensorMode] = None):
         if fake_mode is None:
-            from torch.fx.experimental.symbolic_shapes import ShapeEnv
-            from torch._subclasses.fake_tensor import FakeTensorMode
-
             shape_env = ShapeEnv()
             self.fake_mode = FakeTensorMode(shape_env=shape_env)
         else:
@@ -42,7 +42,7 @@ class FakeTensorContext:
         self._unique_.add(c)
         return c
 
-    def from_tensor(self, x, static_shapes=False) -> "FakeTensor":  # noqa: F821
+    def from_tensor(self, x, static_shapes=False) -> FakeTensor:
         """
         Returns a fake tensor.
         ``pytorch`` returns the same name for the same dimension.
@@ -58,10 +58,10 @@ class FakeTensorContext:
 
     def fake_reshape(
         self,
-        true_tensor: "torch.Tensor",  # noqa: F821
-        sh: Dict[int, Any],  # noqa: F821
-        fake_tensor: Optional["FakeTensor"] = None,  # noqa: F821
-    ) -> "FakeTensor":  # noqa: F821
+        true_tensor: torch.Tensor,
+        sh: Dict[int, Any],
+        fake_tensor: Optional[FakeTensor] = None,
+    ) -> FakeTensor:
         """
         Changes the shape of a true tensor to make it dynamic.
 
@@ -106,10 +106,10 @@ class FakeTensorContext:
             dim=tuple(sorted(sh)), keepdim=True
         )
         if len(reduced_tensor.shape) == 0 == len(new_shape):
-            return reduced_tensor
-        return reduced_tensor.expand(*new_shape)
+            return fake_tensor
+        return reduced_tensor.expand(*new_shape)  # type: ignore[return-value]
 
-    def make_fake(self, x: Any) -> Optional["FakeTensor"]:  # noqa: F821
+    def make_fake(self, x: Any) -> Optional[Any]:
         """See :func:`yobx.torch.fake_tensor_helper.make_fake`."""
         if x is None:
             return None
@@ -136,7 +136,7 @@ class FakeTensorContext:
             return x
         if hasattr(x, "shape"):
             return self.from_tensor(x, static_shapes=False)
-        from . import string_type
+        from ..helpers import string_type
 
         raise TypeError(
             f"Unexpected type {type(x)} for x, content is {string_type(x, with_shape=True)}"
@@ -262,7 +262,7 @@ class FakeTensorContext:
 
 def make_fake(
     x: Any, context: Optional[FakeTensorContext] = None
-) -> Tuple[Optional["FakeTensor"], Optional[FakeTensorContext]]:  # noqa: F821
+) -> Tuple[Optional[FakeTensor], Optional[FakeTensorContext]]:
     """
     Replaces all tensors by fake tensors.
     This modification happens inplace for caches.
@@ -306,8 +306,8 @@ def make_fake(
 
 
 def make_fake_with_dynamic_dimensions(
-    x: Any, dynamic_shapes: Any, context: Optional["FakeTensorContext"] = None  # noqa: F821
-) -> Tuple[Optional[Any], Optional["FakeTensorContext"]]:  # noqa: F821
+    x: Any, dynamic_shapes: Any, context: Optional[FakeTensorContext] = None
+) -> Tuple[Optional[Any], Optional[FakeTensorContext]]:
     """
     Replaces all tensors by fake tensor respecting the same
     constraints as the following dynamic shapes.

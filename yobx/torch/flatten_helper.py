@@ -3,7 +3,7 @@ import pprint
 import re
 from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
 import optree
-import torch
+import torch.utils._pytree as pytree
 from ..helpers import string_type
 
 PATCH_OF_PATCHES: Set[Any] = set()
@@ -26,19 +26,19 @@ def make_flattening_function_for_dataclass(
     :return: tuple of (flatten, flatten_with_keys, unflatten) callables
     """
 
-    def flatten_cls(obj: cls) -> Tuple[List[Any], torch.utils._pytree.Context]:  # type: ignore[valid-type]
+    def flatten_cls(obj: cls) -> Tuple[List[Any], pytree.Context]:  # type: ignore[valid-type]
         """Serializes a ``%s`` with python objects."""
         return list(obj.values()), list(obj.keys())  # type: ignore[attr-defined]
 
     def flatten_with_keys_cls(
         obj: cls,  # type: ignore[valid-type]
-    ) -> Tuple[List[Tuple[torch.utils._pytree.KeyEntry, Any]], torch.utils._pytree.Context]:
+    ) -> Tuple[List[Any], pytree.Context]:
         """Serializes a ``%s`` with python objects with keys."""
         values, context = list(obj.values()), list(obj.keys())  # type: ignore[attr-defined]
-        return [(torch.utils._pytree.MappingKey(k), v) for k, v in zip(context, values)], context
+        return [(pytree.MappingKey(k), v) for k, v in zip(context, values)], context
 
     def unflatten_cls(
-        values: List[Any], context: torch.utils._pytree.Context, output_type=None
+        values: List[Any], context: pytree.Context, output_type=None
     ) -> cls:  # type: ignore[valid-type]
         """Restores an instance of ``%s`` from python objects."""
         return cls(**dict(zip(context, values)))
@@ -55,7 +55,7 @@ def make_flattening_function_for_dataclass(
 
 
 def register_class_flattening(
-    cls,
+    cls: type,
     f_flatten: Callable,
     f_unflatten: Callable,
     f_flatten_with_keys: Callable,
@@ -68,21 +68,22 @@ def register_class_flattening(
     :func:`yobx.torch.flatten_helper.unregister_class_flattening`.
 
     :param cls: class to register
-    :param f_flatten: see ``torch.utils._pytree.register_pytree_node``
-    :param f_unflatten: see ``torch.utils._pytree.register_pytree_node``
-    :param f_flatten_with_keys: see ``torch.utils._pytree.register_pytree_node``
+    :param f_flatten: see ``pytree.register_pytree_node``
+    :param f_unflatten: see ``pytree.register_pytree_node``
+    :param f_flatten_with_keys: see ``pytree.register_pytree_node``
     :param f_check: called to check the registration was successful
     :param verbose: verbosity
     :return: registered or not
     """
-    if cls is not None and cls in torch.utils._pytree.SUPPORTED_NODES:
-        if verbose and cls is not None:
+    assert cls is not None, "cls=None not allowed here"
+    if cls in pytree.SUPPORTED_NODES:
+        if verbose:
             print(f"[register_class_flattening] already registered {cls.__name__}")
         return False
 
     if verbose:
         print(f"[register_class_flattening] ---------- register {cls.__name__}")
-    torch.utils._pytree.register_pytree_node(
+    pytree.register_pytree_node(
         cls,
         f_flatten,
         f_unflatten,
@@ -93,8 +94,8 @@ def register_class_flattening(
     # check
     if f_check:
         inst = f_check()
-        values, spec = torch.utils._pytree.tree_flatten(inst)
-        restored = torch.utils._pytree.tree_unflatten(values, spec)
+        values, spec = pytree.tree_flatten(inst)
+        restored = pytree.tree_unflatten(values, spec)
         assert string_type(inst, with_shape=True) == string_type(restored, with_shape=True), (
             f"Issue with registration of class {cls} "
             f"inst={string_type(inst, with_shape=True)}, "
@@ -119,7 +120,7 @@ def flattening_functions(
             TRANSFORMERS_CLASSES,
         )
 
-        all_functions.update(dtr)
+        all_functions.update(dtr)  # pyrefly: ignore[no-matching-overload]
         supported_classes |= SUPPORTED_DATACLASSES
         classes.update(TRANSFORMERS_CLASSES)
 
@@ -176,6 +177,7 @@ def register_cache_flattening(
     import packaging.version as pv
 
     wrong: Dict[type, Optional[str]] = {}
+    transformers_version = None
     if patch_transformers:
         import transformers
         from .transformers.flatten_class import WRONG_REGISTRATIONS
@@ -199,10 +201,13 @@ def register_cache_flattening(
     # It does not include dynamic shapes mapping.
     for cls, version in wrong.items():
         if (
-            cls in torch.utils._pytree.SUPPORTED_NODES
+            cls in pytree.SUPPORTED_NODES
             and cls not in PATCH_OF_PATCHES
             # and pv.Version(torch.__version__) < pv.Version("2.7")
-            and (version is None or transformers_version >= pv.Version(version))
+            and (
+                version is None
+                or (transformers_version and transformers_version >= pv.Version(version))
+            )
         ):
             assert cls in registration_functions, (
                 f"{cls} has no registration functions mapped to it, "
@@ -226,21 +231,23 @@ def register_cache_flattening(
 
 def unregister_class_flattening(cls: type, verbose: int = 0):
     """Undo the registration for a class."""
-    # torch.utils._pytree._deregister_pytree_flatten_spec(cls)
-    if cls in torch.fx._pytree.SUPPORTED_NODES:
-        del torch.fx._pytree.SUPPORTED_NODES[cls]
-    if cls in torch.fx._pytree.SUPPORTED_NODES_EXACT_MATCH:
-        del torch.fx._pytree.SUPPORTED_NODES_EXACT_MATCH[cls]
-    torch.utils._pytree._deregister_pytree_node(cls)
+    # pytree._deregister_pytree_flatten_spec(cls)
+    import torch.fx._pytree as fxpytree
+
+    if cls in fxpytree.SUPPORTED_NODES:
+        del fxpytree.SUPPORTED_NODES[cls]
+    if cls in fxpytree.SUPPORTED_NODES_EXACT_MATCH:
+        del fxpytree.SUPPORTED_NODES_EXACT_MATCH[cls]
+    pytree._deregister_pytree_node(cls)
     try:  # noqa: SIM105
         optree.unregister_pytree_node(cls, namespace="torch")
     except ValueError:
         # already unregistered.
         pass
-    assert cls not in torch.utils._pytree.SUPPORTED_NODES, (
+    assert cls not in pytree.SUPPORTED_NODES, (
         f"{cls} was not successful unregistered "
-        f"from torch.utils._pytree.SUPPORTED_NODES="
-        f"{pprint.pformat(list(torch.utils._pytree.SUPPORTED_NODES))}"
+        f"from pytree.SUPPORTED_NODES="
+        f"{pprint.pformat(list(pytree.SUPPORTED_NODES))}"
     )
     if verbose:
         print(f"[unregister_cache_flattening] unregistered {cls.__name__}")
