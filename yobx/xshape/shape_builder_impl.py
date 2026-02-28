@@ -670,7 +670,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         for i in graph.initializer:
             self.set_constant(i.name, i)
         for i in graph.sparse_initializer:
-            self.set_constant(i.name, i)
+            self.set_constant(i.values.name, i)
         for i in graph.input:
             self.run_value_info(i, True)
         for node in graph.node:

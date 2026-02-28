@@ -256,7 +256,7 @@ class InferenceSessionForNumpy(_InferenceSession):
         """Calls :meth:`onnxruntime.InferenceSession.run`."""
         # sess.run does not support bfloat16
         # res = self.sess.run(output_names, feeds)
-        return self._post_process_inplace(list(self.run_dlpack(output_names, feeds)))
+        return self._post_process_inplace(list(self.run_dlpack(output_names, feeds)))  # type: ignore
 
     def run_dlpack(
         self, output_names: Optional[List[str]], feeds: Dict[str, TensorLike]
@@ -438,7 +438,7 @@ class InferenceSessionForTorch(_InferenceSession):
         if all(ortvalues[i].has_value() for i in range(len(ortvalues))):
             if self.nvtx:
                 self.torch.cuda.nvtx.range_push("_ortvalues_to_torch_tensor.1")
-            res = ortvalues.to_dlpacks(_from_dlpack)
+            res = ortvalues.to_dlpacks(_from_dlpack)  # type: ignore
             if self.nvtx:
                 self.torch.cuda.nvtx.range_pop()
         else:

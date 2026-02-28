@@ -114,15 +114,15 @@ print("All three evaluators produce the same result ✓")
 # Summary
 # -------
 #
-# +---------------------------------+--------------------+-----------------------------+
-# | Evaluator                       | Input/output type  | Highlights                  |
-# +=================================+====================+=============================+
-# | ExtendedReferenceEvaluator      | NumPy ndarray      | No ORT required; contrib ops|
-# +---------------------------------+--------------------+-----------------------------+
+# +---------------------------------+--------------------+--------------------------------+
+# | Evaluator                       | Input/output type  | Highlights                     |
+# +=================================+====================+================================+
+# | ExtendedReferenceEvaluator      | NumPy ndarray      | No ORT required; contrib ops   |
+# +---------------------------------+--------------------+--------------------------------+
 # | OnnxruntimeEvaluator            | NumPy or PyTorch   | intermediate=True; ORT backend |
-# +---------------------------------+--------------------+-----------------------------+
-# | TorchReferenceEvaluator         | torch.Tensor       | CUDA support; no round-trip |
-# +---------------------------------+--------------------+-----------------------------+
+# +---------------------------------+--------------------+--------------------------------+
+# | TorchReferenceEvaluator         | torch.Tensor       | CUDA support; no round-trip    |
+# +---------------------------------+--------------------+--------------------------------+
 
 # %%
 # Plot: outputs from all three evaluators

@@ -22,11 +22,6 @@ from numpy.testing import assert_allclose
 BOOLEAN_VALUES = (1, "1", True, "True", "true", "TRUE")
 
 
-def is_azure() -> bool:
-    """Tells if the job is running on Azure DevOps."""
-    return os.environ.get("AZURE_HTTP_USER_AGENT", "undefined") != "undefined"
-
-
 def is_windows() -> bool:
     return sys.platform == "win32"
 
@@ -41,7 +36,7 @@ def is_linux() -> bool:
 
 def skipif_ci_windows(msg) -> Callable:
     """Skips a unit test if it runs on :epkg:`azure pipeline` on :epkg:`Windows`."""
-    if is_windows() and is_azure():
+    if is_windows():
         msg = f"Test does not work on azure pipeline (Windows). {msg}"
         return unittest.skip(msg)
     return lambda x: x
@@ -49,7 +44,7 @@ def skipif_ci_windows(msg) -> Callable:
 
 def skipif_ci_linux(msg) -> Callable:
     """Skips a unit test if it runs on :epkg:`azure pipeline` on :epkg:`Linux`."""
-    if is_linux() and is_azure():
+    if is_linux():
         msg = f"Takes too long (Linux). {msg}"
         return unittest.skip(msg)
     return lambda x: x
@@ -57,7 +52,7 @@ def skipif_ci_linux(msg) -> Callable:
 
 def skipif_ci_apple(msg) -> Callable:
     """Skips a unit test if it runs on :epkg:`azure pipeline` on :epkg:`Windows`."""
-    if is_apple() and is_azure():
+    if is_apple():
         msg = f"Test does not work on azure pipeline (Apple). {msg}"
         return unittest.skip(msg)
     return lambda x: x

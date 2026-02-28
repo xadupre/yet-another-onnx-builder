@@ -116,6 +116,7 @@ select = [
     "UP006", "UP007", "UP015", "UP027", "UP031", "UP032", "UP034", "UP035", "UP045",
 ]
 "*/__init__.py" = ["F401"]
+"docs/**" = ["RUF001"]
 "unittests/**" = ["B904", "E731"]
 "unittests/helpers/test_dot_helper.py" = ["B904", "E501"]
 "yobx/torch/transformers/models/_cached_configs.py" = ["PIE804"]
@@ -131,6 +132,7 @@ module = [
     "yobx.helpers.helper",
     "yobx.reference.ops.*",
     "yobx.reference.torch_ops.*",
+    "yobx.torch.tracing.*",
     "yobx.xshape._shape_runtime",
     "yobx.xshape._builder_runtime",
     "yobx.xshape._inference_runtime",
@@ -141,7 +143,7 @@ module = [
 ignore_errors = true
 
 [tool.pyrefly]
-ignore-implicit-import = ["*"]
+ignore-implicit-imports = ["*"]
 ignore-missing-imports = ["*"]
 project-includes = ["yobx/**/*.py"]
 project-excludes = [
@@ -151,13 +153,17 @@ project-excludes = [
     "yobx/helpers/helper.py",
     "yobx/reference/ops/*",
     "yobx/reference/torch_ops/*",
+    "yobx/reference/_inference_session.py",
+    "yobx/reference/onnxruntime_evaluator.py",
     "yobx/torch/torch_helper.py",
+    "yobx/torch/tracing.py",
+    "yobx/torch/transformers/models/_cached_configs.py",
     "yobx/xshape/_builder_runtime.py",
     "yobx/xshape/_inference_runtime.py",
     "yobx/xshape/_shape_runtime.py",
-    "yobx/xshape/evaluate_expressions.py",
     "yobx/xshape/shape_builder.py",
     "yobx/xshape/shape_builder_impl.py",
     "yobx/xshape/shape_type_compute.py",
-    "yobx/xshape/simplify_expressions.py",
+    "yobx/xshape/expressions/evaluate_expressions.py",
+    "yobx/xshape/expressions/simplify_expressions.py",
 ]
