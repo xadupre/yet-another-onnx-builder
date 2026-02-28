@@ -6,7 +6,7 @@ Inspired by the ``light_api`` module in
 
 Typical usage::
 
-    from yobx.light_api import start
+    from yobx.builder.light import start
 
     # Single-input model: Y = Neg(X)
     onx = start().vin("X").Neg().rename("Y").vout().to_onnx()
@@ -44,7 +44,7 @@ def start(
 
     Example::
 
-        from yobx.light_api import start
+        from yobx.builder.light import start
 
         onx = start().vin("X").Neg().rename("Y").vout().to_onnx()
     """

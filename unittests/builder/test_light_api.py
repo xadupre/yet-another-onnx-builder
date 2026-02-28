@@ -3,7 +3,7 @@ import numpy as np
 import onnx
 from onnx import TensorProto
 from yobx.ext_test_case import ExtTestCase
-from yobx.light_api import start, g, OnnxGraph, ProtoType, Var, Vars
+from yobx.builder.light import start, g, OnnxGraph, ProtoType, Var, Vars
 
 
 class TestLightApi(ExtTestCase):

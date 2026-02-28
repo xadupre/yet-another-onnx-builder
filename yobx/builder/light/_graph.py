@@ -36,7 +36,7 @@ class OnnxGraph:
 
     Simple example::
 
-        from yobx.light_api import start
+        from yobx.builder.light import start
 
         onx = start().vin("X").Neg().rename("Y").vout().to_onnx()
     """
