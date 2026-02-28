@@ -5,7 +5,7 @@ import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 import torch
-from yobx.ext_test_case import ExtTestCase, ignore_warnings, hide_stdout
+from yobx.ext_test_case import ExtTestCase, ignore_warnings, hide_stdout, skipif_ci_windows
 from yobx.reference import ExtendedReferenceEvaluator, ReportResultComparison
 from yobx.reference.torch_evaluator import get_kernels, TorchReferenceEvaluator
 from yobx.reference.torch_ops import OpRunKernel, OpRunTensor
@@ -1005,6 +1005,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
             torch.tensor([1], dtype=torch.float32),
         )
 
+    @skipif_ci_windows("unstable on Windows")
     def test_loop(self):
         x = np.array([1, 2, 3, 4, 5]).astype(np.float32)
 

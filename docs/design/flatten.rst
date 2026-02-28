@@ -31,7 +31,7 @@ registered as a pytree node with:
 * an **unflatten** function — recreates the original object from the flat list
   and the context,
 * a **flatten-with-keys** function — same as flatten but pairs each tensor with
-  a :class:`torch.utils._pytree.KeyEntry` that names it.
+  a :class:`torch.utils._pytree.MappingKey` that names it.
 
 Core helpers
 ============

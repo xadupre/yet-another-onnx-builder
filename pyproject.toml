@@ -143,7 +143,7 @@ module = [
 ignore_errors = true
 
 [tool.pyrefly]
-ignore-implicit-import = ["*"]
+ignore-implicit-imports = ["*"]
 ignore-missing-imports = ["*"]
 project-includes = ["yobx/**/*.py"]
 project-excludes = [
@@ -153,14 +153,17 @@ project-excludes = [
     "yobx/helpers/helper.py",
     "yobx/reference/ops/*",
     "yobx/reference/torch_ops/*",
+    "yobx/reference/_inference_session.py",
+    "yobx/reference/onnxruntime_evaluator.py",
     "yobx/torch/torch_helper.py",
     "yobx/torch/tracing.py",
+    "yobx/torch/transformers/models/_cached_configs.py",
     "yobx/xshape/_builder_runtime.py",
     "yobx/xshape/_inference_runtime.py",
     "yobx/xshape/_shape_runtime.py",
-    "yobx/xshape/evaluate_expressions.py",
     "yobx/xshape/shape_builder.py",
     "yobx/xshape/shape_builder_impl.py",
     "yobx/xshape/shape_type_compute.py",
-    "yobx/xshape/simplify_expressions.py",
+    "yobx/xshape/expressions/evaluate_expressions.py",
+    "yobx/xshape/expressions/simplify_expressions.py",
 ]

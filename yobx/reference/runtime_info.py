@@ -220,7 +220,9 @@ def first_used_last_used(
     for init in initializer:
         values[init.name] = RuntimeValue(init.name, kind=RuntimeValueKind.INITIALIZER, created=-1)
     for init in sparse_initializer:
-        values[init.name] = RuntimeValue(init.name, created=-1, kind=RuntimeValueKind.INITIALIZER)
+        values[init.values.name] = RuntimeValue(
+            init.values.name, created=-1, kind=RuntimeValueKind.INITIALIZER
+        )
     for inp in _input:
         n = inp if isinstance(inp, str) else inp.name
         values[n] = RuntimeValue(n, created=-1, kind=RuntimeValueKind.INPUT)
