@@ -9,7 +9,7 @@ from yobx.ext_test_case import (
     hide_stdout,
     ignore_warnings,
 )
-from yobx.torch.input_observer import InputObserver, _infer_dynamic_dimensions
+from yobx.torch.input_observer import InputCandidate, InputObserver, _infer_dynamic_dimensions
 
 # from onnx_diagnostic.export.api import to_onnx
 # from onnx_diagnostic.torch_export_patches import torch_export_patches
@@ -1307,6 +1307,144 @@ class TestInputObserver(ExtTestCase):
         self.assertNotIn("w", args_after)
         self.assertIn("x", args_after)
         self.assertIn("y", args_after)
+
+    def test_exception_method_not_found(self):
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return x
+
+        model = Model()
+        observer = InputObserver()
+        with self.assertRaisesRegex(ValueError, "does not have a method"):  # noqa: SIM117
+            with observer(model, method_name="nonexistent"):
+                pass
+
+    def test_exception_remove_inputs_no_capture(self):
+        observer = InputObserver()
+        with self.assertRaisesRegex(RuntimeError, "No input was captured"):
+            observer.remove_inputs(["x"])
+
+    def test_exception_infer_arguments_unexpected_type(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        inputs = [(torch.randn((5, 6)), torch.randn((1, 6)))]
+        model = Model()
+        observer = InputObserver()
+        with observer(model):
+            for args in inputs:
+                model(*args)
+        with self.assertRaisesRegex(ValueError, "Unexpected type"):
+            observer.infer_arguments("invalid_string")
+
+    def test_exception_value_if_missing_unknown_string_key(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        model = Model()
+        observer = InputObserver(value_if_missing=dict(nonexistent=torch.empty((0,))))
+        with self.assertRaisesRegex(ValueError, "Unexpected keyword argument"):  # noqa: SIM117
+            with observer(model):
+                model(torch.randn((5, 6)), torch.randn((1, 6)))
+
+    def test_exception_value_if_missing_int_key_out_of_signature(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        model = Model()
+        observer = InputObserver(value_if_missing={10: torch.empty((0,))})
+        with self.assertRaisesRegex(ValueError, "Unexpected keyword argument"):  # noqa: SIM117
+            with observer(model):
+                model(torch.randn((5, 6)), torch.randn((1, 6)))
+
+    def test_exception_value_if_missing_int_key_beyond_args(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y=None):
+                return x
+
+        model = Model()
+        observer = InputObserver(value_if_missing={1: torch.empty((0,))})
+        with self.assertRaisesRegex(  # noqa: SIM117
+            NotImplementedError, "Unexpected keyword argument"
+        ):
+            with observer(model):
+                model(torch.randn((5, 6)))
+
+    def test_exception_value_if_missing_invalid_key_type(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        model = Model()
+        observer = InputObserver(value_if_missing={1.5: torch.empty((0,))})
+        with self.assertRaisesRegex(TypeError, "Unexpected type"):  # noqa: SIM117
+            with observer(model):
+                model(torch.randn((5, 6)), torch.randn((1, 6)))
+
+    def test_exception_remove_variadic_args(self):
+        class Model(torch.nn.Module):
+            def forward(self, a, *args):
+                return a + sum(args)
+
+        inputs = [
+            (torch.randn((5, 6)), torch.randn((5, 6))),
+            (torch.randn((7, 7)), torch.randn((7, 7))),
+        ]
+        model = Model()
+        observer = InputObserver()
+        with observer(model):
+            for args in inputs:
+                model(*args)
+        with self.assertRaisesRegex(ValueError, "Cannot remove variadic"):
+            observer.remove_inputs(["args"])
+
+    def test_exception_remove_variadic_kwargs(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, **kwargs):
+                return x + kwargs["y"]
+
+        inputs = [
+            dict(x=torch.randn((5, 6)), y=torch.randn((5, 6))),
+            dict(x=torch.randn((7, 7)), y=torch.randn((7, 7))),
+        ]
+        model = Model()
+        observer = InputObserver()
+        with observer(model):
+            for kwargs in inputs:
+                model(**kwargs)
+        with self.assertRaisesRegex(ValueError, "Cannot remove variadic"):
+            observer.remove_inputs(["kwargs"])
+
+    def test_exception_different_constant_values(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y, add=True):
+                if add:
+                    return x + y
+                return x - y
+
+        inputs = [
+            dict(x=torch.randn((5, 6)), y=torch.randn((5, 6)), add=True),
+            dict(x=torch.randn((5, 6)), y=torch.randn((5, 6)), add=False),
+        ]
+        model = Model()
+        observer = InputObserver()
+        with observer(model):
+            for kwargs in inputs:
+                model(**kwargs)
+        with self.assertRaisesRegex(
+            RuntimeError, "Two calls were made with different constant values"
+        ):
+            observer.infer_dynamic_shapes()
+
+    def test_exception_n_aligned_tensors_not_aligned(self):
+        candidate = InputCandidate(
+            args=(torch.randn((2, 3)),), kwargs={}, clone=False, cst_kwargs={}
+        )
+        with self.assertRaisesRegex(RuntimeError, "This input was not aligned with the others"):
+            _ = candidate.n_aligned_tensors
 
 
 if __name__ == "__main__":
