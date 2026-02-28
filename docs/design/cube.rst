@@ -288,6 +288,13 @@ Passing a plain string as a view is a shorthand: the cube calls
 :meth:`make_view_def <yobx.helpers.cube_helper.CubeLogs.make_view_def>` to
 produce a sensible default view for that metric.
 
+The resulting workbook contains one sheet per view plus the optional *main*
+(column statistics) and *raw* (full data) sheets:
+
+.. image:: _img_cube_excel.png
+    :alt: Excel workbook produced by CubeLogs.to_excel(), showing the main
+          statistics sheet, a pivot-view sheet, and the raw-data sheet
+
 CubeLogsPerformance
 ===================
 
