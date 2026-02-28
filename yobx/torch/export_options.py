@@ -106,6 +106,7 @@ class ExportOptions:
                 f"it should be in {sorted(k for k in self._allowed if k is not None)}"
             )
             kwargs = self._allowed[strategy]
+            assert isinstance(kwargs, dict)  # type checking
             for k, v in kwargs.items():
                 setattr(self, k, v)
 

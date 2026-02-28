@@ -106,7 +106,7 @@ class FakeTensorContext:
             dim=tuple(sorted(sh)), keepdim=True
         )
         if len(reduced_tensor.shape) == 0 == len(new_shape):
-            return reduced_tensor
+            return fake_tensor
         return reduced_tensor.expand(*new_shape)
 
     def make_fake(self, x: Any) -> Optional[FakeTensor]:
