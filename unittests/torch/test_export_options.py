@@ -490,6 +490,106 @@ class TestInplaceFunctions(ExtTestCase):
         nodes_after = _inplace_nodes(graph)
         self.assertEqual(len(nodes_after), 0)
 
+    def test_remove_inplace_nodes_empty_graph(self):
+        """_remove_inplace_nodes returns 0 when there are no inplace nodes."""
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        graph.output(x)
+
+        n_removed = _remove_inplace_nodes(graph)
+        self.assertEqual(n_removed, 0)
+
+    def test_remove_inplace_nodes_with_users_returns_minus_one(self):
+        """_remove_inplace_nodes returns -1 when an inplace node still has users."""
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+
+        def fake_inplace_(a):
+            return a
+
+        fake_inplace_.__name__ = "fake_"
+        inplace_node = graph.call_function(fake_inplace_, (x,))
+        # Make inplace_node have a user by using it in the output
+        graph.output(inplace_node)
+
+        n_removed = _remove_inplace_nodes(graph)
+        self.assertEqual(n_removed, -1)
+        # The inplace node must still be present in the graph's nodes
+        node_names = [n.op for n in graph.nodes]
+        self.assertIn("call_function", node_names)
+
+    def test_remove_inplace_nodes_mixed(self):
+        """_remove_inplace_nodes returns -1 when some inplace nodes have users."""
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+
+        def fake_inplace_(a):
+            return a
+
+        fake_inplace_.__name__ = "fake_"
+        # One node without users (removable)
+        graph.call_function(fake_inplace_, (x,))
+        # One node with a user (not removable)
+        inplace_node2 = graph.call_function(fake_inplace_, (x,))
+        graph.output(inplace_node2)
+
+        n_removed = _remove_inplace_nodes(graph)
+        self.assertEqual(n_removed, -1)
+
+    def test_remove_inplace_nodes_dot_underscore_pattern(self):
+        """_remove_inplace_nodes handles node names containing '_.'."""
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+
+        def fake_inplace_(a):
+            pass
+
+        # Simulate names like "aten.add_" that contain "_."
+        fake_inplace_.__name__ = "aten.add_"
+        graph.call_function(fake_inplace_, (x,))
+        graph.output(x)
+
+        nodes_before = _inplace_nodes(graph)
+        self.assertEqual(len(nodes_before), 1)
+
+        n_removed = _remove_inplace_nodes(graph)
+        self.assertEqual(n_removed, 1)
+
+        nodes_after = _inplace_nodes(graph)
+        self.assertEqual(len(nodes_after), 0)
+
+    def test_remove_inplace_nodes_call_method(self):
+        """_remove_inplace_nodes handles call_method ops with inplace-style names."""
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        # call_method uses string as target
+        graph.call_method("add_", (x,))
+        graph.output(x)
+
+        nodes_before = _inplace_nodes(graph)
+        self.assertEqual(len(nodes_before), 1)
+
+        n_removed = _remove_inplace_nodes(graph)
+        self.assertEqual(n_removed, 1)
+
+        nodes_after = _inplace_nodes(graph)
+        self.assertEqual(len(nodes_after), 0)
+
+    def test_remove_inplace_nodes_verbose(self):
+        """_remove_inplace_nodes does not crash with verbose=1."""
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+
+        def fake_inplace_(a):
+            pass
+
+        fake_inplace_.__name__ = "fake_"
+        graph.call_function(fake_inplace_, (x,))
+        graph.output(x)
+
+        n_removed = _remove_inplace_nodes(graph, verbose=1)
+        self.assertEqual(n_removed, 1)
+
 
 @requires_torch("2.0")
 class TestGetSigKwargs(ExtTestCase):
