@@ -97,44 +97,17 @@ class TestLightApi(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_add_model(self):
-        onx = (
-            start()
-            .vin("X")
-            .vin("Y")
-            .bring("X", "Y")
-            .Add()
-            .rename("Z")
-            .vout()
-            .to_onnx()
-        )
+        onx = start().vin("X").vin("Y").bring("X", "Y").Add().rename("Z").vout().to_onnx()
         self.assertIsInstance(onx, onnx.ModelProto)
         self.assertEqual(onx.graph.node[0].op_type, "Add")
         self.assertEqual(len(onx.graph.input), 2)
 
     def test_matmul_model(self):
-        onx = (
-            start()
-            .vin("A")
-            .vin("B")
-            .bring("A", "B")
-            .MatMul()
-            .rename("C")
-            .vout()
-            .to_onnx()
-        )
+        onx = start().vin("A").vin("B").bring("A", "B").MatMul().rename("C").vout().to_onnx()
         self.assertEqual(onx.graph.node[0].op_type, "MatMul")
 
     def test_mul_model(self):
-        onx = (
-            start()
-            .vin("X")
-            .vin("Y")
-            .bring("X", "Y")
-            .Mul()
-            .rename("Z")
-            .vout()
-            .to_onnx()
-        )
+        onx = start().vin("X").vin("Y").bring("X", "Y").Mul().rename("Z").vout().to_onnx()
         self.assertEqual(onx.graph.node[0].op_type, "Mul")
 
     # ------------------------------------------------------------------
@@ -263,7 +236,7 @@ class TestLightApi(ExtTestCase):
     def test_bring_multiple(self):
         gr = start()
         x = gr.vin("X")
-        y = gr.vin("Y")
+        gr.vin("Y")
         result = x.bring("X", "Y")
         self.assertIsInstance(result, Vars)
         self.assertEqual(len(result), 2)
@@ -313,16 +286,7 @@ class TestLightApi(ExtTestCase):
     def test_run_add(self):
         from yobx.reference import ExtendedReferenceEvaluator
 
-        onx = (
-            start()
-            .vin("X")
-            .vin("Y")
-            .bring("X", "Y")
-            .Add()
-            .rename("Z")
-            .vout()
-            .to_onnx()
-        )
+        onx = start().vin("X").vin("Y").bring("X", "Y").Add().rename("Z").vout().to_onnx()
         ref = ExtendedReferenceEvaluator(onx)
         x = np.array([1.0, 2.0], dtype=np.float32)
         y = np.array([3.0, 4.0], dtype=np.float32)
@@ -349,7 +313,7 @@ class TestLightApi(ExtTestCase):
     def test_v_helper(self):
         gr = start()
         x = gr.vin("X")
-        y = gr.vin("Y")
+        gr.vin("Y")
         retrieved = x.v("Y")
         self.assertEqual(retrieved.name, "Y")
 
@@ -358,14 +322,7 @@ class TestLightApi(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_reshape(self):
-        onx = (
-            start()
-            .vin("X")
-            .reshape((3, 1))
-            .rename("Y")
-            .vout()
-            .to_onnx()
-        )
+        onx = start().vin("X").reshape((3, 1)).rename("Y").vout().to_onnx()
         self.assertEqual(onx.graph.node[0].op_type, "Reshape")
 
     # ------------------------------------------------------------------
@@ -374,14 +331,7 @@ class TestLightApi(ExtTestCase):
 
     def test_concat(self):
         onx = (
-            start()
-            .vin("X")
-            .vin("Y")
-            .bring("X", "Y")
-            .Concat(axis=0)
-            .rename("Z")
-            .vout()
-            .to_onnx()
+            start().vin("X").vin("Y").bring("X", "Y").Concat(axis=0).rename("Z").vout().to_onnx()
         )
         self.assertEqual(onx.graph.node[0].op_type, "Concat")
 

@@ -8,9 +8,7 @@ class OpsVar:
     Each method calls ``self.make_node`` which is defined in :class:`BaseVar`.
     """
 
-    def ArgMax(
-        self, axis: int = 0, keepdims: int = 1, select_last_index: int = 0
-    ) -> "Var":
+    def ArgMax(self, axis: int = 0, keepdims: int = 1, select_last_index: int = 0) -> "Var":
         return self.make_node(
             "ArgMax",
             self,
@@ -19,9 +17,7 @@ class OpsVar:
             select_last_index=select_last_index,
         )
 
-    def ArgMin(
-        self, axis: int = 0, keepdims: int = 1, select_last_index: int = 0
-    ) -> "Var":
+    def ArgMin(self, axis: int = 0, keepdims: int = 1, select_last_index: int = 0) -> "Var":
         return self.make_node(
             "ArgMin",
             self,
@@ -75,9 +71,7 @@ class OpsVar:
         import numpy as np
         from onnx.numpy_helper import from_array
 
-        return self.make_node(
-            "ConstantOfShape", self, value=from_array(np.array([value]))
-        )
+        return self.make_node("ConstantOfShape", self, value=from_array(np.array([value])))
 
     def DepthToSpace(self, blocksize: int = 0, mode: str = "DCR") -> "Var":
         return self.make_node("DepthToSpace", self, blocksize=blocksize, mode=mode)
@@ -107,9 +101,7 @@ class OpsVar:
             "HannWindow", self, output_datatype=output_datatype, periodic=periodic
         )
 
-    def HardSigmoid(
-        self, alpha: float = 0.20000000298023224, beta: float = 0.5
-    ) -> "Var":
+    def HardSigmoid(self, alpha: float = 0.20000000298023224, beta: float = 0.5) -> "Var":
         return self.make_node("HardSigmoid", self, alpha=alpha, beta=beta)
 
     def Hardmax(self, axis: int = -1) -> "Var":
@@ -166,13 +158,9 @@ class OpsVar:
         return self.make_node("LpPool", self, **attrs)
 
     def MeanVarianceNormalization(self, axes: Optional[List[int]] = None) -> "Var":
-        return self.make_node(
-            "MeanVarianceNormalization", self, axes=axes or [0, 2, 3]
-        )
+        return self.make_node("MeanVarianceNormalization", self, axes=axes or [0, 2, 3])
 
-    def Multinomial(
-        self, dtype: int = 6, sample_size: int = 1, seed: float = 0.0
-    ) -> "Var":
+    def Multinomial(self, dtype: int = 6, sample_size: int = 1, seed: float = 0.0) -> "Var":
         return self.make_node(
             "Multinomial", self, dtype=dtype, sample_size=sample_size, seed=seed
         )
@@ -209,9 +197,7 @@ class OpsVar:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def ReduceLogSumExp(
-        self, keepdims: int = 1, noop_with_empty_axes: int = 0
-    ) -> "Var":
+    def ReduceLogSumExp(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
         return self.make_node(
             "ReduceLogSumExp",
             self,
@@ -244,9 +230,7 @@ class OpsVar:
             "ReduceSum", self, keepdims=keepdims, noop_with_empty_axes=noop_with_empty_axes
         )
 
-    def ReduceSumSquare(
-        self, keepdims: int = 1, noop_with_empty_axes: int = 0
-    ) -> "Var":
+    def ReduceSumSquare(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
         return self.make_node(
             "ReduceSumSquare",
             self,
@@ -254,9 +238,7 @@ class OpsVar:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def Selu(
-        self, alpha: float = 1.6732631921768188, gamma: float = 1.0507010221481323
-    ) -> "Var":
+    def Selu(self, alpha: float = 1.6732631921768188, gamma: float = 1.0507010221481323) -> "Var":
         return self.make_node("Selu", self, alpha=alpha, gamma=gamma)
 
     def Shrink(self, bias: float = 0.0, lambd: float = 0.5) -> "Var":
@@ -385,9 +367,7 @@ class OpsVar:
             reduction=reduction,
         )
 
-    def Unique(
-        self, axis: Optional[int] = None, sorted: int = 1
-    ) -> "Vars":
+    def Unique(self, axis: Optional[int] = None, sorted: int = 1) -> "Vars":
         kwargs: dict = {"sorted": sorted}
         if axis is not None:
             kwargs["axis"] = axis

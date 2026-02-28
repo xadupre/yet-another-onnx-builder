@@ -60,9 +60,7 @@ class OpsVars:
             kwargs["pads"] = pads
         if strides is not None:
             kwargs["strides"] = strides
-        return self.make_node(
-            "Conv", *self.vars_, auto_pad=auto_pad, group=group, **kwargs
-        )
+        return self.make_node("Conv", *self.vars_, auto_pad=auto_pad, group=group, **kwargs)
 
     def ConvInteger(
         self,
@@ -115,14 +113,10 @@ class OpsVars:
         )
 
     def CumSum(self, exclusive: int = 0, reverse: int = 0) -> "Var":
-        return self.make_node(
-            "CumSum", *self.vars_, exclusive=exclusive, reverse=reverse
-        )
+        return self.make_node("CumSum", *self.vars_, exclusive=exclusive, reverse=reverse)
 
     def DFT(self, axis: int = 1, inverse: int = 0, onesided: int = 0) -> "Var":
-        return self.make_node(
-            "DFT", *self.vars_, axis=axis, inverse=inverse, onesided=onesided
-        )
+        return self.make_node("DFT", *self.vars_, axis=axis, inverse=inverse, onesided=onesided)
 
     def DeformConv(
         self,
@@ -198,9 +192,7 @@ class OpsVars:
         kwargs = {}
         if pooled_shape is not None:
             kwargs["pooled_shape"] = pooled_shape
-        return self.make_node(
-            "MaxRoiPool", *self.vars_, spatial_scale=spatial_scale, **kwargs
-        )
+        return self.make_node("MaxRoiPool", *self.vars_, spatial_scale=spatial_scale, **kwargs)
 
     def MaxUnpool(
         self,
@@ -218,16 +210,12 @@ class OpsVars:
         return self.make_node("MaxUnpool", *self.vars_, **kwargs)
 
     def MelWeightMatrix(self, output_datatype: int = 1) -> "Var":
-        return self.make_node(
-            "MelWeightMatrix", *self.vars_, output_datatype=output_datatype
-        )
+        return self.make_node("MelWeightMatrix", *self.vars_, output_datatype=output_datatype)
 
     def Mod(self, fmod: int = 0) -> "Var":
         return self.make_node("Mod", *self.vars_, fmod=fmod)
 
-    def NegativeLogLikelihoodLoss(
-        self, ignore_index: int = 0, reduction: str = "mean"
-    ) -> "Var":
+    def NegativeLogLikelihoodLoss(self, ignore_index: int = 0, reduction: str = "mean") -> "Var":
         return self.make_node(
             "NegativeLogLikelihoodLoss",
             *self.vars_,
@@ -236,9 +224,7 @@ class OpsVars:
         )
 
     def NonMaxSuppression(self, center_point_box: int = 0) -> "Var":
-        return self.make_node(
-            "NonMaxSuppression", *self.vars_, center_point_box=center_point_box
-        )
+        return self.make_node("NonMaxSuppression", *self.vars_, center_point_box=center_point_box)
 
     def OneHot(self, axis: int = -1) -> "Var":
         return self.make_node("OneHot", *self.vars_, axis=axis)
@@ -272,9 +258,7 @@ class OpsVars:
         return self.make_node("QLinearMatMul", *self.vars_)
 
     def QuantizeLinear(self, axis: int = 1, saturate: int = 1) -> "Var":
-        return self.make_node(
-            "QuantizeLinear", *self.vars_, axis=axis, saturate=saturate
-        )
+        return self.make_node("QuantizeLinear", *self.vars_, axis=axis, saturate=saturate)
 
     def Range(self) -> "Var":
         return self.make_node("Range", *self.vars_)
@@ -303,9 +287,7 @@ class OpsVars:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def ReduceLogSumExp(
-        self, keepdims: int = 1, noop_with_empty_axes: int = 0
-    ) -> "Var":
+    def ReduceLogSumExp(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
         return self.make_node(
             "ReduceLogSumExp",
             *self.vars_,
@@ -353,9 +335,7 @@ class OpsVars:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def ReduceSumSquare(
-        self, keepdims: int = 1, noop_with_empty_axes: int = 0
-    ) -> "Var":
+    def ReduceSumSquare(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
         return self.make_node(
             "ReduceSumSquare",
             *self.vars_,
@@ -419,9 +399,7 @@ class OpsVars:
         return self.make_node("Scatter", *self.vars_, axis=axis)
 
     def ScatterElements(self, axis: int = 0, reduction: str = "none") -> "Var":
-        return self.make_node(
-            "ScatterElements", *self.vars_, axis=axis, reduction=reduction
-        )
+        return self.make_node("ScatterElements", *self.vars_, axis=axis, reduction=reduction)
 
     def ScatterND(self, reduction: str = "none") -> "Var":
         return self.make_node("ScatterND", *self.vars_, reduction=reduction)

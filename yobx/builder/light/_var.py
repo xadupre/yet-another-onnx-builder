@@ -119,7 +119,7 @@ class BaseVar:
         return self.parent.to_onnx()
 
     def vout(self, **kwargs: Dict[str, Any]) -> Union["Var", "Vars"]:
-        "Declare outputs – must be overridden in subclasses."
+        "Declare outputs - must be overridden in subclasses."
         raise NotImplementedError(f"vout() not implemented in {type(self).__name__}.")
 
 
@@ -295,9 +295,7 @@ class Vars(BaseVar, OpsVars):
     def _check_nin(self, n_inputs: int) -> "Vars":
         "Asserts the number of variables matches *n_inputs*."
         if len(self) != n_inputs:
-            raise RuntimeError(
-                f"Expected {n_inputs} inputs but got {len(self)}."
-            )
+            raise RuntimeError(f"Expected {n_inputs} inputs but got {len(self)}.")
         return self
 
     def __getitem__(self, index: int) -> Var:
@@ -312,9 +310,7 @@ class Vars(BaseVar, OpsVars):
         :return: ``self``
         """
         if len(new_names) != len(self):
-            raise ValueError(
-                f"Expected {len(self)} names but got {len(new_names)}."
-            )
+            raise ValueError(f"Expected {len(self)} names but got {len(new_names)}.")
         for var, new_name in zip(self.vars_, new_names):
             var.rename(new_name)
         return self

@@ -60,4 +60,4 @@ def g() -> OnnxGraph:
     return OnnxGraph(proto_type=ProtoType.GRAPH)
 
 
-__all__ = ["start", "g", "OnnxGraph", "ProtoType", "Var", "Vars"]
+__all__ = ["OnnxGraph", "ProtoType", "Var", "Vars", "g", "start"]

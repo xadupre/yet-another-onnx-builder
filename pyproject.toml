@@ -119,6 +119,8 @@ select = [
 "docs/**" = ["RUF001"]
 "unittests/**" = ["B904", "E731"]
 "unittests/helpers/test_dot_helper.py" = ["B904", "E501"]
+"yobx/builder/light/*" = ["PYI032"]
+"yobx/builder/light/_op*" = ["F821"]
 "yobx/torch/transformers/models/_cached_configs.py" = ["PIE804"]
 
 [tool.mypy]

@@ -32,7 +32,7 @@ class OnnxGraph:
     :param opset: main opset version (defaults to ``onnx_opset_version() - 1``)
     :param opsets: additional opsets as ``{domain: version}``
     :param ir_version: ONNX IR version; only applied to ModelProto outputs
-    :param proto_type: :class:`ProtoType` – ``MODEL`` (default) or ``GRAPH``
+    :param proto_type: :class:`ProtoType` - ``MODEL`` (default) or ``GRAPH``
 
     Simple example::
 
@@ -52,9 +52,7 @@ class OnnxGraph:
             if opset is None:
                 opset = opsets[""]
             elif opset != opsets[""]:
-                raise ValueError(
-                    "The main opset was specified twice with different values."
-                )
+                raise ValueError("The main opset was specified twice with different values.")
         self.proto_type = proto_type
         self.opsets = opsets
         self.opset = opset
@@ -69,9 +67,7 @@ class OnnxGraph:
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
         els = [
-            repr(getattr(self, o))
-            for o in ["opset", "opsets"]
-            if getattr(self, o) is not None
+            repr(getattr(self, o)) for o in ["opset", "opsets"] if getattr(self, o) is not None
         ]
         parts.append(", ".join(els))
         parts.append(")")
@@ -133,7 +129,7 @@ class OnnxGraph:
         name: str,
         elem_type: int = TensorProto.FLOAT,
         shape: Optional[Any] = None,
-    ) -> "Var":
+    ) -> "Var":  # noqa: F821
         """
         Declares a new graph input and returns a :class:`Var`.
 
@@ -173,9 +169,7 @@ class OnnxGraph:
         self.unique_names_[name] = var
         return var
 
-    def make_constant(
-        self, value: np.ndarray, name: Optional[str] = None
-    ) -> TensorProto:
+    def make_constant(self, value: np.ndarray, name: Optional[str] = None) -> TensorProto:
         """
         Adds a constant initializer.
 
@@ -216,13 +210,10 @@ class OnnxGraph:
         """
         if output_names is None:
             output_names = [
-                self.unique_name(prefix=f"r{len(self.nodes)}_{i}")
-                for i in range(n_outputs)
+                self.unique_name(prefix=f"r{len(self.nodes)}_{i}") for i in range(n_outputs)
             ]
         elif n_outputs != len(output_names):
-            raise ValueError(
-                f"Expected {n_outputs} output names but got {len(output_names)}."
-            )
+            raise ValueError(f"Expected {n_outputs} output names but got {len(output_names)}.")
         input_names = []
         for inp in inputs:
             if hasattr(inp, "name"):
@@ -233,9 +224,7 @@ class OnnxGraph:
             elif inp is None:
                 input_names.append("")
             else:
-                raise TypeError(
-                    f"Unexpected input type {type(inp)}; expected Var or np.ndarray."
-                )
+                raise TypeError(f"Unexpected input type {type(inp)}; expected Var or np.ndarray.")
         node = make_node(op_type, input_names, output_names, domain=domain, **kwargs)
         self.nodes.append(node)
         for out in output_names:
@@ -244,7 +233,7 @@ class OnnxGraph:
             raise RuntimeError(f"No opset version specified for domain {domain!r}.")
         return node
 
-    def cst(self, value: np.ndarray, name: Optional[str] = None) -> "Var":
+    def cst(self, value: np.ndarray, name: Optional[str] = None) -> "Var":  # noqa: F821
         """
         Adds a constant initializer and returns it as a :class:`Var`.
 
@@ -270,7 +259,7 @@ class OnnxGraph:
             name = self.renames_[name]
         return name
 
-    def get_var(self, name: str) -> "Var":
+    def get_var(self, name: str) -> "Var":  # noqa: F821
         """
         Returns the :class:`Var` corresponding to *name*.
 
@@ -342,9 +331,7 @@ class OnnxGraph:
                  :class:`onnx.ModelProto` otherwise
         """
         dense = [
-            self._fix_name_tensor(i)
-            for i in self.initializers
-            if isinstance(i, TensorProto)
+            self._fix_name_tensor(i) for i in self.initializers if isinstance(i, TensorProto)
         ]
         graph = make_graph(
             [self._fix_name_node(n) for n in self.nodes],
