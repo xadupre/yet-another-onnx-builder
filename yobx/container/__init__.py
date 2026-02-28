@@ -1,1 +1,2 @@
-from .model_container import ExtendedModelContainer, ModelContainerStats
+from .model_container import ExtendedModelContainer
+from .model_container_stats import ModelContainerStats

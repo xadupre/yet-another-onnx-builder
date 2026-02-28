@@ -6,3 +6,4 @@ yobx.container
     :caption: modules
 
     model_container
+    model_container_stats
