@@ -2,7 +2,7 @@
 
 import unittest
 import torch
-from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch
+from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings, requires_torch
 from yobx.helpers.helper import get_sig_kwargs
 from yobx.torch.export_options import (
     ExportOptions,
@@ -405,6 +405,33 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
+    @hide_stdout()
+    def test_export_with_verbosity(self):
+        """Export a simple model with verbose=1 to exercise the verbose code paths."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions()
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+            verbose=1,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    @hide_stdout()
+    def test_post_process_with_verbosity(self):
+        """post_process_exported_program with verbose=1 exercises the verbose code paths."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        ep = torch.export.export(model, (x,))
+        opts = ExportOptions(decomposition_table="default")
+        result = opts.post_process_exported_program(ep, verbose=1)
+        self.assertIsInstance(result, torch.export.ExportedProgram)
+
 
 @requires_torch("2.0")
 class TestApplyDecompositions(ExtTestCase):
@@ -527,6 +554,75 @@ class TestGetDecompositionTable(ExtTestCase):
         """_get_decomposition_table_by_name raises ValueError for unknown names."""
         with self.assertRaises(ValueError):
             _get_decomposition_table_by_name("unknown")
+
+
+class TestValidateExportedProgram(ExtTestCase):
+    def test_validate_exported_program_no_discrepancy(self):
+        """validate_exported_program passes when model and exported program agree."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        ep = torch.export.export(model, (x,))
+        opts = ExportOptions(validate_ep=True)
+        # Should not raise
+        opts.validate_exported_program(model, ep, (x,), None)
+
+    def test_validate_exported_program_custom_atol(self):
+        """validate_exported_program passes with a custom float atol."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        ep = torch.export.export(model, (x,))
+        opts = ExportOptions(validate_ep=1e-3)
+        opts.validate_exported_program(model, ep, (x,), None)
+
+    def test_validate_exported_program_raises_on_discrepancy(self):
+        """validate_exported_program raises AssertionError when outputs differ."""
+
+        class ConstantModel(torch.nn.Module):
+            def forward(self, x):
+                return x + 1.0
+
+        class MismatchedModel(torch.nn.Module):
+            def forward(self, x):
+                return x + 100.0
+
+        x = torch.rand(2, 3)
+        ep = torch.export.export(MismatchedModel(), (x,))
+        reference_model = ConstantModel()
+        opts = ExportOptions(validate_ep=True)
+        with self.assertRaises(AssertionError):
+            opts.validate_exported_program(reference_model, ep, (x,), None)
+
+    def test_export_with_validate_ep_true(self):
+        """export() with validate_ep=True runs validate_exported_program internally."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(validate_ep=True)
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+        self.assertTrue(hasattr(opts, "_stat_time_validate_exported_program"))
+
+    def test_export_with_validate_ep_float(self):
+        """export() with validate_ep as float uses it as atol."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(validate_ep=1e-4)
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+        self.assertTrue(hasattr(opts, "_stat_time_validate_exported_program"))
 
 
 @requires_torch("2.0")
