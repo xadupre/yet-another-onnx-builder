@@ -552,6 +552,36 @@ class TestTracing(ExtTestCase):
         self.assertNotEmpty(got)
         self.assertEqualArray(expected, got)
 
+    def test_tracing_clone_copy_(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                xc = x.clone()
+                z = xc + 2
+                xc.copy_(y)
+                return z
+
+        model = Model()
+        x = torch.ones((4, 4))
+        y = torch.zeros((4, 4)) + 2
+        inputs = (x, y)
+        expected = model(*inputs)
+        self.assertNotEmpty(expected)
+        ep = torch.export.export(model, inputs)
+        # copy_ has 0 users: the pattern that triggers _modify_graph_clone_copy_
+        copy_nodes = [
+            n
+            for n in ep.graph.nodes
+            if hasattr(n.target, "name") and n.target.name() == "aten::copy_"
+        ]
+        self.assertEqual(len(copy_nodes), 1)
+        self.assertEqual(len(copy_nodes[0].users), 0)
+        n = CustomTracer.remove_inplace(ep.graph)
+        self.assertGreater(n, 0)
+        inplace = CustomTracer._inplace_nodes(ep.graph)
+        self.assertEmpty(inplace)
+        got = ep.module()(*inputs)
+        self.assertEqualArray(expected, got)
+
     @unittest.skip("TODO: fix it")
     def test_tracing_fixed_list_with_none(self):
         class Model(torch.nn.Module):
