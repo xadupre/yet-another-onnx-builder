@@ -234,8 +234,18 @@ class BuilderEmitter(BaseEmitter):
         return []
 
     def _emit_function_attributes(self, **kwargs: Dict[str, Any]) -> List[str]:
-        raise NotImplementedError("Function attribute are not implemented yet.")
+        """
+        Handle function attribute declarations for the builder emitter.
 
+        For now, we simply record the attribute names so that function
+        translation does not fail when attributes are present. This keeps
+        behavior consistent with the other function-related emitters, which
+        mostly set up state without emitting code at this stage.
+        """
+        name = kwargs.get("name")
+        if name is not None:
+            self.f_attributes.append(name)
+        return []
     def _emit_end_function(self, **kwargs: Dict[str, Any]) -> List[str]:
         self.function_calls.append(f"{self.f_call_name}(g)")
         return [
