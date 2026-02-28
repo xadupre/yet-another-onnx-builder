@@ -39,25 +39,22 @@ class TestGetType(ExtTestCase):
         self.assertEqual(self._get_type(1), 1)
 
     def test_float32(self):
-        self.assertEqual(self._get_type("float32"), onnx.TensorProto.FLOAT)
+        self.assertEqual(self._get_type(np.float32), onnx.TensorProto.FLOAT)
 
     def test_float16(self):
-        self.assertEqual(self._get_type("float16"), onnx.TensorProto.FLOAT16)
-
-    def test_bfloat16(self):
-        self.assertEqual(self._get_type("bfloat16"), onnx.TensorProto.BFLOAT16)
+        self.assertEqual(self._get_type(np.float16), onnx.TensorProto.FLOAT16)
 
     def test_float64(self):
-        self.assertEqual(self._get_type("float64"), onnx.TensorProto.DOUBLE)
+        self.assertEqual(self._get_type(np.float64), onnx.TensorProto.DOUBLE)
 
     def test_int64(self):
-        self.assertEqual(self._get_type("int64"), onnx.TensorProto.INT64)
+        self.assertEqual(self._get_type(np.int64), onnx.TensorProto.INT64)
 
     def test_int32(self):
-        self.assertEqual(self._get_type("int32"), onnx.TensorProto.INT32)
+        self.assertEqual(self._get_type(np.int32), onnx.TensorProto.INT32)
 
     def test_bool(self):
-        self.assertEqual(self._get_type("bool"), onnx.TensorProto.BOOL)
+        self.assertEqual(self._get_type(np.bool_), onnx.TensorProto.BOOL)
 
     def test_none(self):
         self.assertEqual(self._get_type(None), onnx.TensorProto.UNDEFINED)

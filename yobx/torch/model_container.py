@@ -8,7 +8,7 @@ from onnx.model_container import ModelContainer, _set_external_data
 from onnx.external_data_helper import _get_all_tensors, uses_external_data
 from onnx.inliner import inline_local_functions
 from ..helpers.mini_onnx_builder import proto_from_array
-from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
+from ..helpers.onnx_helper import dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
 from .torch_helper import torch_dtype_to_onnx_dtype
 
 STORAGE_TYPE = {
@@ -18,42 +18,16 @@ STORAGE_TYPE = {
 
 
 def _get_type(elem_type: Any, exc: bool = True) -> int:
-    if not isinstance(elem_type, int):
-        st = str(elem_type)
-        if "float32" in st:
-            elem_type = TensorProto.FLOAT
-        elif "float64" in st:
-            elem_type = TensorProto.DOUBLE
-        elif "bfloat16" in st:
-            elem_type = TensorProto.BFLOAT16
-        elif "float16" in st:
-            elem_type = TensorProto.FLOAT16
-        elif "uint64" in st:
-            elem_type = TensorProto.UINT64
-        elif "int64" in st:
-            elem_type = TensorProto.INT64
-        elif "uint32" in st:
-            elem_type = TensorProto.UINT32
-        elif "int32" in st:
-            elem_type = TensorProto.INT32
-        elif "uint16" in st:
-            elem_type = TensorProto.UINT16
-        elif "int16" in st:
-            elem_type = TensorProto.INT16
-        elif "bool" in st:
-            elem_type = TensorProto.BOOL
-        elif "uint8" in st:
-            elem_type = TensorProto.UINT8
-        elif "int8" in st:
-            elem_type = TensorProto.INT8
-        elif "complex64" in st:
-            elem_type = TensorProto.COMPLEX64
-        elif "complex128" in st:
-            elem_type = TensorProto.COMPLEX128
-        elif elem_type is None:
-            elem_type = TensorProto.UNDEFINED
-        elif exc:
-            raise ValueError(f"Unable to interpret elem_type {elem_type!r}.")
+    if isinstance(elem_type, int):
+        return elem_type
+    if elem_type is None:
+        return TensorProto.UNDEFINED
+    try:
+        return dtype_to_tensor_dtype(elem_type)
+    except (KeyError, TypeError, ValueError, NotImplementedError):
+        pass
+    if exc:
+        raise ValueError(f"Unable to interpret elem_type {elem_type!r}.")
     return elem_type
 
 
