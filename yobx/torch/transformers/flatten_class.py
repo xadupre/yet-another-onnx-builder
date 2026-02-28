@@ -232,7 +232,7 @@ def flatten_encoder_decoder_cache(
 
 def flatten_with_keys_encoder_decoder_cache(
     ec_cache: EncoderDecoderCache,
-) -> Tuple[Tuple[List[Any], pytree.Context], pytree.Context]:
+) -> Tuple[List[Any], pytree.Context]:
     """
     Serializes a :class:`transformers.cache_utils.EncoderDecoderCache`
     with python objects.
