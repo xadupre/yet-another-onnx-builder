@@ -230,7 +230,7 @@ class ExtendedModelContainer(ModelContainer):
     def _deserialize_graph(
         self,
         proto: onnx.GraphProto,
-        scoped_values: List[Dict[str, "onnx_ir.Value"]],  # noqa: F821
+        scoped_values: List[Dict[str, "onnx_ir.Value"]],  # type: ignore # noqa: F821
     ) -> "onnx_ir.Graph":  # type: ignore # noqa: F821
         """See :epkg:`onnxscript`."""
         import onnx.numpy_helper as onh
@@ -282,18 +282,18 @@ class ExtendedModelContainer(ModelContainer):
                         metadata_props=oirs.deserialize_metadata_props(tensor.metadata_props),
                     )
             else:
-                t = oirs.deserialize_tensor(tensor)
+                t = oirs.deserialize_tensor(tensor)  # type: ignore
             initializer_tensors.append(t)
         inputs = [oir.Input(info.name) for info in proto.input]
         for info, value in zip(proto.input, inputs):
             oirs.deserialize_value_info_proto(info, value)
             if value.name in quantization_annotations:
                 oirs._deserialize_quantization_annotation(
-                    quantization_annotations[value.name], value
+                    quantization_annotations[value.name], value  # type: ignore
                 )
 
         values = {v.name: v for v in inputs}
-        scoped_values.append(values)
+        scoped_values.append(values)  # type: ignore
 
         initializer_values = []
         for i, tensor in enumerate(initializer_tensors):
@@ -310,7 +310,7 @@ class ExtendedModelContainer(ModelContainer):
             )
             if initializer_value.name in quantization_annotations:
                 oirs._deserialize_quantization_annotation(
-                    quantization_annotations[initializer_value.name], initializer_value
+                    quantization_annotations[initializer_value.name], initializer_value  # type: ignore
                 )
             values[initializer_name] = initializer_value
             initializer_values.append(initializer_value)
@@ -321,13 +321,13 @@ class ExtendedModelContainer(ModelContainer):
                 node,
                 scoped_values[-1],
                 value_info=value_info,
-                quantization_annotations=quantization_annotations,
+                quantization_annotations=quantization_annotations,  # type: ignore
             )
 
         nodes = []
         for node in proto.node:
             nodes.append(
-                oirs._deserialize_node(node, scoped_values, value_info, quantization_annotations)
+                oirs._deserialize_node(node, scoped_values, value_info, quantization_annotations)  # type: ignore
             )
 
         outputs = []

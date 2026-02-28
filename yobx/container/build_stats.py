@@ -19,7 +19,7 @@ class BuildStats:
     def __init__(self):
         self._data: dict[str, float | int | bool | str] = {}
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, float | int | bool | str]:
         """Returns the data in a dictionary, does not ùake a copy."""
         return self._data
 
@@ -35,13 +35,13 @@ class BuildStats:
                 f"Key must start with one of {sorted(self._PREFIXES)}."
             )
 
-    def __getitem__(self, key: str) -> float:
+    def __getitem__(self, key: str) -> float | int | bool | str:
         if len(self):
             raise KeyError(f"No statistics for key={key!r}")
         assert isinstance(key, str), f"Unexpected type {type(key)}"
         return self._data.get(key, 0.0)  # To support +=.
 
-    def __setitem__(self, key: str, value: float) -> None:
+    def __setitem__(self, key: str, value: float | int | bool | str) -> None:
         assert isinstance(key, str), f"Unexpected type {type(key)}"
         self._data[key] = value
 
