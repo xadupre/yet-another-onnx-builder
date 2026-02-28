@@ -1,5 +1,7 @@
 """Tests for ExportOptions in yobx.torch.export_options."""
 
+import os
+import tempfile
 import unittest
 import torch
 from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings, requires_torch
@@ -431,6 +433,50 @@ class TestExportOptions(ExtTestCase):
         opts = ExportOptions(decomposition_table="default")
         result = opts.post_process_exported_program(ep, verbose=1)
         self.assertIsInstance(result, torch.export.ExportedProgram)
+
+    def test_export_with_save_ep_true(self):
+        """export() with save_ep=<str> saves the exported program files to disk."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_path = os.path.join(tmpdir, "model")
+            opts = ExportOptions(save_ep=save_path)
+            ep = opts.export(
+                model,
+                args=(x,),
+                kwargs=None,
+                tracing_mode=False,
+                dynamic_shapes=None,
+                same_signature=True,
+            )
+            self.assertIsInstance(ep, torch.export.ExportedProgram)
+            self.assertTrue(os.path.isfile(f"{save_path}.ep"))
+            self.assertTrue(os.path.isfile(f"{save_path}.ep.graph"))
+            self.assertTrue(os.path.isfile(f"{save_path}.input.pt"))
+            self.assertTrue(os.path.isfile(f"{save_path}.ep.pt2"))
+
+    def test_export_with_save_ep_tuple(self):
+        """export() with save_ep=(str, int) respects the size threshold."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_path = os.path.join(tmpdir, "model")
+            # threshold of 0 means the model is always too large to save .pt files
+            opts = ExportOptions(save_ep=(save_path, 0))
+            ep = opts.export(
+                model,
+                args=(x,),
+                kwargs=None,
+                tracing_mode=False,
+                dynamic_shapes=None,
+                same_signature=True,
+            )
+            self.assertIsInstance(ep, torch.export.ExportedProgram)
+            self.assertTrue(os.path.isfile(f"{save_path}.ep"))
+            self.assertTrue(os.path.isfile(f"{save_path}.ep.graph"))
+            # With threshold=0, model is too big so .pt files should NOT be saved
+            self.assertFalse(os.path.isfile(f"{save_path}.input.pt"))
+            self.assertFalse(os.path.isfile(f"{save_path}.ep.pt2"))
 
 
 @requires_torch("2.0")
