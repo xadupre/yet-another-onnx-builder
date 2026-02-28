@@ -189,3 +189,60 @@ examples = [
 
 for expr in examples:
     print(f"  simplify({expr!r:20s}) = {simplify_expression(expr)!r}")
+
+# %%
+# Plot: symbolic shape expressions summary
+# -----------------------------------------
+#
+# The table below collects all of the symbolic shape expressions computed in
+# this example and their simplified forms side-by-side.
+
+import matplotlib.pyplot as plt  # noqa: E402
+
+rows = [
+    ["Concat (Z, axis=1)", "('batch', 'seq1+seq2')"],
+    ["Reshape (Xr)", "('a', 'b', 2, 'c//2')"],
+    ["Split S1", "('a', 'CeilToInt(b+c,2)')"],
+    ["Split S2", "('a', 'b+c-CeilToInt(b+c,2)')"],
+]
+simplify_rows = [[expr, simplify_expression(expr)] for expr in examples]
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 3))
+
+# Left table: symbolic shapes per operation
+ax = axes[0]
+ax.axis("off")
+tbl = ax.table(
+    cellText=rows,
+    colLabels=["Operation / output", "Symbolic shape"],
+    loc="center",
+    cellLoc="left",
+)
+tbl.auto_set_font_size(False)
+tbl.set_fontsize(8)
+tbl.auto_set_column_width([0, 1])
+for col in range(2):
+    tbl[0, col].set_facecolor("#4c72b0")
+    tbl[0, col].set_text_props(color="white", fontweight="bold")
+ax.set_title("Symbolic shapes by operation", fontsize=9, pad=6)
+
+# Right table: simplification examples
+ax2 = axes[1]
+ax2.axis("off")
+tbl2 = ax2.table(
+    cellText=simplify_rows,
+    colLabels=["Input expression", "Simplified"],
+    loc="center",
+    cellLoc="left",
+)
+tbl2.auto_set_font_size(False)
+tbl2.set_fontsize(8)
+tbl2.auto_set_column_width([0, 1])
+for col in range(2):
+    tbl2[0, col].set_facecolor("#dd8452")
+    tbl2[0, col].set_text_props(color="white", fontweight="bold")
+ax2.set_title("Expression simplification", fontsize=9, pad=6)
+
+plt.suptitle("Shape expression examples", fontsize=10)
+plt.tight_layout()
+plt.show()

@@ -140,3 +140,58 @@ result = builder.compare_with_true_inputs(feeds, outputs)
 print("\n=== shape comparison (expr, expected, computed) ===")
 for name, dims in result.items():
     print(f"  {name}: {dims}")
+
+# %%
+# Plot: symbolic vs inferred shapes
+# -----------------------------------
+#
+# The table below compares the shapes reported by
+# ``onnx.shape_inference.infer_shapes`` (which may leave dimensions as
+# ``None`` for dynamic axes) with the symbolic expressions computed by
+# :class:`BasicShapeBuilder`.
+
+import matplotlib.pyplot as plt  # noqa: E402
+
+tensor_names = ["X", "Y", "added", "concat_out", "Z"]
+
+# Collect onnx.shape_inference shapes as strings
+onnx_shapes = {}
+for vi in (
+    list(inferred.graph.input) + list(inferred.graph.value_info) + list(inferred.graph.output)
+):
+    t = vi.type.tensor_type
+    if t.HasField("shape"):
+        shape = tuple(
+            d.dim_param if d.dim_param else (d.dim_value if d.dim_value else "?")
+            for d in t.shape.dim
+        )
+    else:
+        shape = ("unknown",)
+    onnx_shapes[vi.name] = str(shape)
+
+# Collect BasicShapeBuilder shapes as strings
+builder_shapes = {name: str(builder.get_shape(name)) for name in tensor_names}
+
+col_labels = ["tensor", "onnx.shape_inference", "BasicShapeBuilder"]
+table_data = [
+    [name, onnx_shapes.get(name, "—"), builder_shapes.get(name, "—")] for name in tensor_names
+]
+
+fig, ax = plt.subplots(figsize=(8, 2.5))
+ax.axis("off")
+tbl = ax.table(
+    cellText=table_data,
+    colLabels=col_labels,
+    loc="center",
+    cellLoc="center",
+)
+tbl.auto_set_font_size(False)
+tbl.set_fontsize(9)
+tbl.auto_set_column_width([0, 1, 2])
+# Highlight header
+for col in range(3):
+    tbl[0, col].set_facecolor("#4c72b0")
+    tbl[0, col].set_text_props(color="white", fontweight="bold")
+ax.set_title("Shape inference: onnx vs BasicShapeBuilder", fontsize=10, pad=8)
+plt.tight_layout()
+plt.show()

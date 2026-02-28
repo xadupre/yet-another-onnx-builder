@@ -116,6 +116,7 @@ select = [
     "UP006", "UP007", "UP015", "UP027", "UP031", "UP032", "UP034", "UP035", "UP045",
 ]
 "*/__init__.py" = ["F401"]
+"docs/**" = ["RUF001"]
 "unittests/**" = ["B904", "E731"]
 "unittests/helpers/test_dot_helper.py" = ["B904", "E501"]
 "yobx/torch/transformers/models/_cached_configs.py" = ["PIE804"]

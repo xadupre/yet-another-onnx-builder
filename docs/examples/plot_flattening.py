@@ -192,3 +192,84 @@ unregister_class_flattening(EncoderOutput2)
 print("EncoderOutput and EncoderOutput2 unregistered")
 assert EncoderOutput not in torch.utils._pytree.SUPPORTED_NODES
 assert EncoderOutput2 not in torch.utils._pytree.SUPPORTED_NODES
+
+# %%
+# Plot: pytree flatten / unflatten diagram
+# ------------------------------------------
+#
+# The diagram below illustrates the flatten→leaf-list→unflatten round-trip
+# for an :class:`EncoderOutput` container with two tensor fields.
+
+import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.patches as mpatches  # noqa: E402
+
+fig, ax = plt.subplots(figsize=(7, 3.5))
+ax.set_xlim(0, 10)
+ax.set_ylim(0, 5)
+ax.axis("off")
+ax.set_title("pytree flatten / unflatten round-trip", fontsize=11)
+
+# Container box
+container = mpatches.FancyBboxPatch(
+    (0.3, 1.5),
+    2.6,
+    2.0,
+    boxstyle="round,pad=0.15",
+    linewidth=1.5,
+    edgecolor="#4c72b0",
+    facecolor="#dce9f5",
+)
+ax.add_patch(container)
+ax.text(1.6, 3.7, "EncoderOutput", ha="center", va="center", fontsize=9, fontweight="bold")
+ax.text(1.6, 2.85, "t1: Tensor(2,5,8)", ha="center", va="center", fontsize=8)
+ax.text(1.6, 2.35, "t2: Tensor(2,8)", ha="center", va="center", fontsize=8)
+
+# Flat list box
+flat_box = mpatches.FancyBboxPatch(
+    (3.8, 1.5),
+    2.6,
+    2.0,
+    boxstyle="round,pad=0.15",
+    linewidth=1.5,
+    edgecolor="#dd8452",
+    facecolor="#fde8d8",
+)
+ax.add_patch(flat_box)
+ax.text(5.1, 3.7, "flat list + spec", ha="center", va="center", fontsize=9, fontweight="bold")
+ax.text(5.1, 2.85, "[Tensor(2,5,8),", ha="center", va="center", fontsize=8)
+ax.text(5.1, 2.35, " Tensor(2,8)]", ha="center", va="center", fontsize=8)
+
+# Restored box
+restored_box = mpatches.FancyBboxPatch(
+    (7.3, 1.5),
+    2.4,
+    2.0,
+    boxstyle="round,pad=0.15",
+    linewidth=1.5,
+    edgecolor="#4c72b0",
+    facecolor="#dce9f5",
+)
+ax.add_patch(restored_box)
+ax.text(8.5, 3.7, "Restored", ha="center", va="center", fontsize=9, fontweight="bold")
+ax.text(8.5, 2.85, "t1: Tensor(2,5,8)", ha="center", va="center", fontsize=8)
+ax.text(8.5, 2.35, "t2: Tensor(2,8)", ha="center", va="center", fontsize=8)
+
+# Arrows
+ax.annotate(
+    "",
+    xy=(3.8, 2.5),
+    xytext=(2.9, 2.5),
+    arrowprops=dict(arrowstyle="->", color="#dd8452", lw=1.5),
+)
+ax.text(3.35, 2.75, "flatten", ha="center", va="bottom", fontsize=8, color="#dd8452")
+
+ax.annotate(
+    "",
+    xy=(7.3, 2.5),
+    xytext=(6.4, 2.5),
+    arrowprops=dict(arrowstyle="->", color="#4c72b0", lw=1.5),
+)
+ax.text(6.85, 2.75, "unflatten", ha="center", va="bottom", fontsize=8, color="#4c72b0")
+
+plt.tight_layout()
+plt.show()
