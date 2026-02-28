@@ -237,7 +237,7 @@ class ExtendedModelContainer(ModelContainer):
         self,
         proto: onnx.GraphProto,
         scoped_values: List[Dict[str, "onnx_ir.Value"]],  # noqa: F821
-    ) -> "onnx_ir.Graph":  # noqa: F821
+    ) -> "onnx_ir.Graph":  # type: ignore # noqa: F821
         """See :epkg:`onnxscript`."""
         import onnx.numpy_helper as onh
         import onnx_ir as oir
