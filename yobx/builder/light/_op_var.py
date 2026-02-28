@@ -40,17 +40,20 @@ class OpsVar:
         pads: Optional[List[int]] = None,
         strides: Optional[List[int]] = None,
     ) -> "Var":
-        return self.make_node(
-            "AveragePool",
-            self,
-            auto_pad=auto_pad,
-            ceil_mode=ceil_mode,
-            count_include_pad=count_include_pad,
-            dilations=dilations or [],
-            kernel_shape=kernel_shape or [],
-            pads=pads or [],
-            strides=strides or [],
-        )
+        kwargs = {
+            "auto_pad": auto_pad,
+            "ceil_mode": ceil_mode,
+            "count_include_pad": count_include_pad,
+        }
+        if dilations is not None:
+            kwargs["dilations"] = dilations
+        if kernel_shape is not None:
+            kwargs["kernel_shape"] = kernel_shape
+        if pads is not None:
+            kwargs["pads"] = pads
+        if strides is not None:
+            kwargs["strides"] = strides
+        return self.make_node("AveragePool", self, **kwargs)
 
     def Bernoulli(self, dtype: int = 0, seed: float = 0.0) -> "Var":
         return self.make_node("Bernoulli", self, dtype=dtype, seed=seed)
