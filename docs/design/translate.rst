@@ -29,7 +29,7 @@ The translation is split into two independent layers:
            ▼
         Emitter            ← converts events into code strings
 
-:class:`Translator <yobx.translate.translate.Translator>` knows the
+:class:`Translator <yobx.translate.translator.Translator>` knows the
 structure of ONNX protos; it never emits text directly.  Instead it fires a
 sequence of typed events (``BEGIN_GRAPH``, ``INITIALIZER``, ``NODE``,
 ``END_GRAPH``, …) defined by

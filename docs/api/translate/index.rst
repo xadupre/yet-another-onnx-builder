@@ -5,7 +5,7 @@ yobx.translate
     :maxdepth: 1
     :caption: modules
 
-    translate
+    translator
     base_emitter
     inner_emitter
     light_emitter
@@ -14,10 +14,6 @@ yobx.translate
 
 Top-level helpers
 +++++++++++++++++
-
-.. autofunction:: yobx.translate.translate
-
-.. autofunction:: yobx.translate.translate_header
 
 .. automodule:: yobx.translate
     :members:

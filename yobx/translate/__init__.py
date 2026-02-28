@@ -1,6 +1,6 @@
 import textwrap
 from onnx import ModelProto
-from .translate import Translator
+from .translator import Translator
 from .inner_emitter import InnerEmitter, InnerEmitterShortInitializer
 from .builder_emitter import BuilderEmitter
 from .light_emitter import LightEmitter
