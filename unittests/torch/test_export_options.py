@@ -6,6 +6,7 @@ from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch
 from yobx.helpers.helper import get_sig_kwargs
 from yobx.torch.export_options import (
     ExportOptions,
+    _get_decomposition_table_by_name,
     _inplace_nodes,
     _remove_inplace_nodes,
     apply_decompositions,
@@ -489,6 +490,43 @@ class TestInplaceFunctions(ExtTestCase):
 
         nodes_after = _inplace_nodes(graph)
         self.assertEqual(len(nodes_after), 0)
+
+
+@requires_torch("2.0")
+class TestGetDecompositionTable(ExtTestCase):
+    def test_get_decomposition_table_none(self):
+        """get_decomposition_table returns None when decomposition_table is None."""
+        opts = ExportOptions(decomposition_table=None)
+        self.assertIsNone(opts.get_decomposition_table())
+
+    def test_get_decomposition_table_all(self):
+        """get_decomposition_table returns None when decomposition_table is 'all'."""
+        opts = ExportOptions(decomposition_table="all")
+        self.assertIsNone(opts.get_decomposition_table())
+
+    def test_get_decomposition_table_default(self):
+        """get_decomposition_table returns a dict when decomposition_table is 'default'."""
+        opts = ExportOptions(decomposition_table="default")
+        table = opts.get_decomposition_table()
+        self.assertIsInstance(table, dict)
+        self.assertGreater(len(table), 0)
+
+    def test_get_decomposition_table_dict(self):
+        """get_decomposition_table returns the dict directly when given a dict."""
+        custom = {object(): lambda: None}
+        opts = ExportOptions(decomposition_table=custom)
+        self.assertIs(opts.get_decomposition_table(), custom)
+
+    def test_get_decomposition_table_by_name_default(self):
+        """_get_decomposition_table_by_name('default') returns a non-empty dict."""
+        table = _get_decomposition_table_by_name("default")
+        self.assertIsInstance(table, dict)
+        self.assertGreater(len(table), 0)
+
+    def test_get_decomposition_table_by_name_unknown(self):
+        """_get_decomposition_table_by_name raises ValueError for unknown names."""
+        with self.assertRaises(ValueError):
+            _get_decomposition_table_by_name("unknown")
 
 
 @requires_torch("2.0")
