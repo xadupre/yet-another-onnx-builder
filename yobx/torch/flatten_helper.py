@@ -32,7 +32,7 @@ def make_flattening_function_for_dataclass(
 
     def flatten_with_keys_cls(
         obj: cls,  # type: ignore[valid-type]
-    ) -> Tuple[List[Tuple[pytree.MappingKey, Any]], pytree.Context]:
+    ) -> Tuple[List[Any], pytree.Context]:
         """Serializes a ``%s`` with python objects with keys."""
         values, context = list(obj.values()), list(obj.keys())  # type: ignore[attr-defined]
         return [(pytree.MappingKey(k), v) for k, v in zip(context, values)], context

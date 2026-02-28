@@ -142,7 +142,7 @@ def flatten_dynamic_cache(
 
 def flatten_with_keys_dynamic_cache(
     dynamic_cache: DynamicCache,
-) -> Tuple[List[Tuple[pytree.KeyEntry, Any]], pytree.Context]:
+) -> Tuple[List[Any], pytree.Context]:
     """
     Serializes a :class:`transformers.cache_utils.DynamicCache` with python objects.
 
@@ -190,7 +190,7 @@ def flatten_static_cache(
 
 def flatten_with_keys_static_cache(
     cache: StaticCache,
-) -> Tuple[List[Tuple[pytree.KeyEntry, Any]], pytree.Context]:
+) -> Tuple[List[Any], pytree.Context]:
     """Serializes a :class:`transformers.cache_utils.StaticCache` with python objects."""
     return _flatten_with_keys_cache(cache)
 
@@ -232,10 +232,7 @@ def flatten_encoder_decoder_cache(
 
 def flatten_with_keys_encoder_decoder_cache(
     ec_cache: EncoderDecoderCache,
-) -> Tuple[
-    List[Tuple[pytree.KeyEntry, Any]],
-    pytree.Context,
-]:
+) -> Tuple[Tuple[List[Any], pytree.Context], pytree.Context]:
     """
     Serializes a :class:`transformers.cache_utils.EncoderDecoderCache`
     with python objects.
