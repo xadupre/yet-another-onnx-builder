@@ -1308,7 +1308,6 @@ class TestInputObserver(ExtTestCase):
         self.assertIn("x", args_after)
         self.assertIn("y", args_after)
 
-
     def test_exception_method_not_found(self):
         class Model(torch.nn.Module):
             def forward(self, x):
@@ -1316,7 +1315,7 @@ class TestInputObserver(ExtTestCase):
 
         model = Model()
         observer = InputObserver()
-        with self.assertRaisesRegex(ValueError, "does not have a method"):
+        with self.assertRaisesRegex(ValueError, "does not have a method"):  # noqa: SIM117
             with observer(model, method_name="nonexistent"):
                 pass
 
@@ -1346,7 +1345,7 @@ class TestInputObserver(ExtTestCase):
 
         model = Model()
         observer = InputObserver(value_if_missing=dict(nonexistent=torch.empty((0,))))
-        with self.assertRaisesRegex(ValueError, "Unexpected keyword argument"):
+        with self.assertRaisesRegex(ValueError, "Unexpected keyword argument"):  # noqa: SIM117
             with observer(model):
                 model(torch.randn((5, 6)), torch.randn((1, 6)))
 
@@ -1357,7 +1356,7 @@ class TestInputObserver(ExtTestCase):
 
         model = Model()
         observer = InputObserver(value_if_missing={10: torch.empty((0,))})
-        with self.assertRaisesRegex(ValueError, "Unexpected keyword argument"):
+        with self.assertRaisesRegex(ValueError, "Unexpected keyword argument"):  # noqa: SIM117
             with observer(model):
                 model(torch.randn((5, 6)), torch.randn((1, 6)))
 
@@ -1368,7 +1367,9 @@ class TestInputObserver(ExtTestCase):
 
         model = Model()
         observer = InputObserver(value_if_missing={1: torch.empty((0,))})
-        with self.assertRaisesRegex(NotImplementedError, "Unexpected keyword argument"):
+        with self.assertRaisesRegex(  # noqa: SIM117
+            NotImplementedError, "Unexpected keyword argument"
+        ):
             with observer(model):
                 model(torch.randn((5, 6)))
 
@@ -1379,7 +1380,7 @@ class TestInputObserver(ExtTestCase):
 
         model = Model()
         observer = InputObserver(value_if_missing={1.5: torch.empty((0,))})
-        with self.assertRaisesRegex(TypeError, "Unexpected type"):
+        with self.assertRaisesRegex(TypeError, "Unexpected type"):  # noqa: SIM117
             with observer(model):
                 model(torch.randn((5, 6)), torch.randn((1, 6)))
 
@@ -1433,7 +1434,9 @@ class TestInputObserver(ExtTestCase):
         with observer(model):
             for kwargs in inputs:
                 model(**kwargs)
-        with self.assertRaisesRegex(RuntimeError, "Two calls were made with different constant values"):
+        with self.assertRaisesRegex(
+            RuntimeError, "Two calls were made with different constant values"
+        ):
             observer.infer_dynamic_shapes()
 
     def test_exception_n_aligned_tensors_not_aligned(self):
