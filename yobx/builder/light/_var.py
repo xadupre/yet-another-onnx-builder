@@ -272,16 +272,31 @@ class Vars(BaseVar, OpsVars):
                 # constant Vars via the parent graph when possible. This mirrors
                 # OnnxGraph.make_node(), which already accepts np.ndarray inputs.
                 if isinstance(v, (np.ndarray, np.generic)) or np.isscalar(v):
-                    const_maker = getattr(self.parent, "make_const", None)
+                    # Normalize scalar-like inputs to a numpy array so that the
+                    # constant factory always receives an ndarray.
+                    if isinstance(v, np.ndarray):
+                        value = v
+                    else:
+                        value = np.array(v)
+
+                    # Prefer the current OnnxGraph constant factories, but keep
+                    # backward-compatible fallbacks if they exist.
+                    const_maker = getattr(self.parent, "cst", None)
+                    if const_maker is None:
+                        const_maker = getattr(self.parent, "make_constant", None)
+                    if const_maker is None:
+                        const_maker = getattr(self.parent, "make_const", None)
                     if const_maker is None:
                         const_maker = getattr(self.parent, "const", None)
+
                     if const_maker is None or not callable(const_maker):
                         raise TypeError(
                             f"Expected Var or str, and no suitable constant "
                             f"factory found on parent graph to handle value "
                             f"of type {type(v)}."
                         )
-                    const_var = const_maker(v)
+
+                    const_var = const_maker(value)
                     self.vars_.append(const_var)
                 else:
                     raise TypeError(f"Expected Var or str, got {type(v)}.")
