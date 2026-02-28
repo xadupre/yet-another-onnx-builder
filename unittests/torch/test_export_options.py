@@ -2,7 +2,7 @@
 
 import unittest
 import torch
-from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch
+from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings, requires_torch
 from yobx.helpers.helper import get_sig_kwargs
 from yobx.torch.export_options import (
     ExportOptions,
@@ -403,6 +403,33 @@ class TestExportOptions(ExtTestCase):
             same_signature=True,
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    @hide_stdout()
+    def test_export_with_verbosity(self):
+        """Export a simple model with verbose=1 to exercise the verbose code paths."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions()
+        ep = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+            verbose=1,
+        )
+        self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    @hide_stdout()
+    def test_post_process_with_verbosity(self):
+        """post_process_exported_program with verbose=1 exercises the verbose code paths."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        ep = torch.export.export(model, (x,))
+        opts = ExportOptions(decomposition_table="default")
+        result = opts.post_process_exported_program(ep, verbose=1)
+        self.assertIsInstance(result, torch.export.ExportedProgram)
 
 
 @requires_torch("2.0")
