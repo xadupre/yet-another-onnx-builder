@@ -1496,5 +1496,44 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqualArray(expected, got)
 
 
+    def test_check_two_shapes_are_compatible_same_ints(self):
+        g = GraphBuilder(18)
+        # identical integer shapes: no exception
+        g._check_two_shapes_are_compatible((2, 3), (2, 3), name="x")
+
+    def test_check_two_shapes_are_compatible_rank_mismatch(self):
+        g = GraphBuilder(18)
+        self.assertRaises(
+            AssertionError,
+            lambda: g._check_two_shapes_are_compatible((2, 3), (2, 3, 4), name="x"),
+        )
+
+    def test_check_two_shapes_are_compatible_value_mismatch(self):
+        g = GraphBuilder(18)
+        self.assertRaises(
+            AssertionError,
+            lambda: g._check_two_shapes_are_compatible((2, 3), (2, 5), name="x"),
+        )
+
+    def test_check_two_shapes_are_compatible_same_strings(self):
+        g = GraphBuilder(18)
+        # identical string dimensions: no exception
+        g._check_two_shapes_are_compatible(("batch", "seq"), ("batch", "seq"), name="x")
+
+    def test_check_two_shapes_are_compatible_different_strings(self):
+        g = GraphBuilder(18)
+        # different string dimensions: constraint registered, no exception
+        g._check_two_shapes_are_compatible(("batch", "seq"), ("b", "s"), name="x")
+        constraints = g.get_registered_constraints()
+        self.assertIn("batch", constraints)
+        self.assertIn("b", constraints["batch"])
+
+    def test_check_two_shapes_are_compatible_mixed_int_string(self):
+        g = GraphBuilder(18)
+        # one int, one string: compatible (no exception)
+        g._check_two_shapes_are_compatible((2, "seq"), (2, "seq"), name="x")
+        g._check_two_shapes_are_compatible((2, "seq"), (2, "other"), name="x")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
