@@ -3,7 +3,7 @@ from typing import Dict, List
 import onnx.helper as oh
 import numpy as np
 import onnx.numpy_helper as onh
-from onnx import AttributeProto, FunctionProto, TensorProto
+from onnx import AttributeProto, FunctionProto, GraphProto, TensorProto
 from yobx.ext_test_case import (
     ExtTestCase,
     hide_stdout,
@@ -1494,6 +1494,126 @@ class TestGraphBuilder(ExtTestCase):
         ref2 = self.check_ort(onx)
         got = ref2.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
+
+    @ignore_warnings(DeprecationWarning)
+    def test_rename_op_type_in_local_functions(self):
+        # Build a FunctionProto with MatMul and Add nodes.
+        func = oh.make_function(
+            "custom",
+            "LinearRegression",
+            ["x", "a", "b"],
+            ["y"],
+            [
+                oh.make_node("MatMul", ["x", "a"], ["xa"]),
+                oh.make_node("Add", ["xa", "b"], ["y"]),
+            ],
+            [oh.make_opsetid("", 18)],
+            [],
+        )
+
+        # Build a minimal model so GraphBuilder can be instantiated.
+        graph = oh.make_graph(
+            [oh.make_node("LinearRegression", ["X", "A", "B"], ["Y"], domain="custom")],
+            "test",
+            [
+                oh.make_tensor_value_info("X", TensorProto.FLOAT, [None, None]),
+                oh.make_tensor_value_info("A", TensorProto.FLOAT, [None, None]),
+                oh.make_tensor_value_info("B", TensorProto.FLOAT, [None, None]),
+            ],
+            [oh.make_tensor_value_info("Y", TensorProto.FLOAT, None)],
+        )
+        model = oh.make_model(
+            graph,
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("custom", 1)],
+            functions=[func],
+            ir_version=9,
+        )
+        gr = GraphBuilder(model)
+
+        # Case 1: no op in the proto matches the replacements → same object returned.
+        result = gr._rename_op_type_in_local_functions(func, {("", "Relu"): ("", "Tanh")})
+        self.assertIs(result, func)
+
+        # Case 2: one op matches → a new proto is returned with the renamed op type.
+        result = gr._rename_op_type_in_local_functions(func, {("", "Add"): ("", "Sub")})
+        self.assertIsNot(result, func)
+        self.assertIsInstance(result, FunctionProto)
+        op_types = [(n.domain, n.op_type) for n in result.node]
+        self.assertIn(("", "MatMul"), op_types)
+        self.assertIn(("", "Sub"), op_types)
+        self.assertNotIn(("", "Add"), op_types)
+
+    @ignore_warnings(DeprecationWarning)
+    def test_rename_op_type_in_local_functions_subgraph(self):
+        # Build a FunctionProto whose body contains an If node whose subgraph
+        # branches each contain an Add node that should be renamed to Sub.
+        then_graph = oh.make_graph(
+            [oh.make_node("Add", ["x", "b"], ["y"])],
+            "then_branch",
+            [],
+            [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
+        )
+        else_graph = oh.make_graph(
+            [oh.make_node("Abs", ["x"], ["y"])],
+            "else_branch",
+            [],
+            [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
+        )
+        if_node = oh.make_node(
+            "If",
+            ["cond"],
+            ["y"],
+            then_branch=then_graph,
+            else_branch=else_graph,
+        )
+        func = oh.make_function(
+            "custom",
+            "CondFunc",
+            ["x", "b", "cond"],
+            ["y"],
+            [if_node],
+            [oh.make_opsetid("", 18)],
+            [],
+        )
+
+        graph = oh.make_graph(
+            [oh.make_node("CondFunc", ["X", "B", "C"], ["Y"], domain="custom")],
+            "test",
+            [
+                oh.make_tensor_value_info("X", TensorProto.FLOAT, [None]),
+                oh.make_tensor_value_info("B", TensorProto.FLOAT, [None]),
+                oh.make_tensor_value_info("C", TensorProto.BOOL, []),
+            ],
+            [oh.make_tensor_value_info("Y", TensorProto.FLOAT, None)],
+        )
+        model = oh.make_model(
+            graph,
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("custom", 1)],
+            functions=[func],
+            ir_version=9,
+        )
+        gr = GraphBuilder(model)
+
+        # The Add is inside a subgraph attribute (then_branch), not at the top level.
+        result = gr._rename_op_type_in_local_functions(func, {("", "Add"): ("", "Sub")})
+        self.assertIsNot(result, func)
+        self.assertIsInstance(result, FunctionProto)
+
+        # The If node itself should still be an If.
+        self.assertEqual(len(result.node), 1)
+        self.assertEqual(result.node[0].op_type, "If")
+
+        # Collect the op types from the then-branch subgraph.
+        then_att = next(a for a in result.node[0].attribute if a.name == "then_branch")
+        self.assertIsInstance(then_att.g, GraphProto)
+        then_ops = [(n.domain, n.op_type) for n in then_att.g.node]
+        self.assertIn(("", "Sub"), then_ops)
+        self.assertNotIn(("", "Add"), then_ops)
+
+        # The else-branch should be unchanged (only Abs, no Add).
+        else_att = next(a for a in result.node[0].attribute if a.name == "else_branch")
+        else_ops = [(n.domain, n.op_type) for n in else_att.g.node]
+        self.assertIn(("", "Abs"), else_ops)
 
 
 if __name__ == "__main__":
