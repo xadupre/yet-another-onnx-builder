@@ -1,4 +1,9 @@
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Optional
+
+if TYPE_CHECKING:
+    from ._var import Var, Vars
 
 
 class OpsVars:
