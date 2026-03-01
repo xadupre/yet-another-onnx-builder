@@ -17,13 +17,13 @@ class OptimizationOptions:
     :param remove_duplicated_shape: remove duplicated operator Shape
         if they produce the same output
     :param patterns: list of pattern optimization to apply to the graph,
-        it looks a a specific subsequence of nodes in a graph
+        it looks at a specific subsequence of nodes in a graph
         and do some replacements,
         `'default'` means a default list of optimization patterns are applied,
         see below for the most common values
     :param constant_fusing: similar node Constant and ConstantOfShape are used,
-        this options avoids creating new nodes when they are the same
-    :param max_iter: maximum number of iteration when doing pattern optimizations,
+        this option avoids creating new nodes when they are the same
+    :param max_iter: maximum number of iterations when doing pattern optimizations,
         -1 to let it undefined
     :param recursive: optimizes subgraphs and functions as well
     :param stop_after: for investigation, stop_after this number of applies patterns,
@@ -42,7 +42,7 @@ class OptimizationOptions:
         other attributes defined in this class
 
     It is possible to define a precise of the pattern to apply to a model.
-    The value is interpreter by :func:`experimental_experiment.xoptim.get_pattern_list`.
+    The value is interpreted by :func:`experimental_experiment.xoptim.get_pattern_list`.
 
     * ``patterns=None``: no pattern optimization
     * ``patterns="TransposeTranspose,TransposeMatMul"``: applies two patterns
