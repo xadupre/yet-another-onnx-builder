@@ -1023,5 +1023,46 @@ class TestUnsqueezeAnyOpset(ExtTestCase):
         self.assertEqualArray(np.expand_dims(x, 0), result)
 
 
+class TestDFTAnyOpset(ExtTestCase):
+    def _expected_dft(self, x):
+        """Compute expected DFT output matching ONNX DFT op (real input, axis=1).
+
+        x: shape (batch, signal_dim, 1) - real float input
+        returns: shape (batch, signal_dim, 2) - complex output as real/imag pairs
+        """
+        signal = x[:, :, 0]
+        dft = np.fft.fft(signal, axis=1)
+        real = np.real(dft)[:, :, np.newaxis]
+        imag = np.imag(dft)[:, :, np.newaxis]
+        return np.concatenate([real, imag], axis=-1).astype(np.float32)
+
+    def test_dft_any_opset_opset17(self):
+        """DFTAnyOpset on opset 17 (< 20): axes numpy array is converted to axis attribute."""
+        gr = GraphBuilder(17, ir_version=8)
+        gr.make_tensor_input("X", TFLOAT, ("batch", "signal_dim", "one"), is_dimension=False)
+        axes = np.array([1], dtype=np.int64)
+        out = gr.op.DFTAnyOpset("X", "", axes, outputs=["Y"])
+        gr.make_tensor_output(
+            out, TFLOAT, ("batch", "signal_dim", "two"), indexed=False, is_dimension=False
+        )
+        onx = gr.to_onnx()
+        x = np.arange(8, dtype=np.float32).reshape(1, 8, 1)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(self._expected_dft(x), result, atol=1e-5)
+
+    def test_dft_any_opset_opset20(self):
+        """DFTAnyOpset on opset 20 (>= 20): axis kwarg is converted to scalar tensor input."""
+        gr = GraphBuilder(20, ir_version=9)
+        gr.make_tensor_input("X", TFLOAT, ("batch", "signal_dim", "one"), is_dimension=False)
+        out = gr.op.DFTAnyOpset("X", "", outputs=["Y"], axis=1)
+        gr.make_tensor_output(
+            out, TFLOAT, ("batch", "signal_dim", "two"), indexed=False, is_dimension=False
+        )
+        onx = gr.to_onnx()
+        x = np.arange(8, dtype=np.float32).reshape(1, 8, 1)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(self._expected_dft(x), result, atol=1e-5)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
