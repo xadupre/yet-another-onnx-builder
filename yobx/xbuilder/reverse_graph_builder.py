@@ -8,7 +8,7 @@ class CustomBuilderEmitter(BuilderEmitter):
     """Custom :class:`yobx.translate.builder_emitter.BuilderEmitter`."""
 
     def __init__(self, make_model_function: str = "make_my_model"):
-        super().__init__(make_model_function="make_my_model")
+        super().__init__(make_model_function=make_model_function)
 
     def _emit_node_type(self, op_type, op_domain):
         if op_type in {"Squeeze", "Unsqueeze"} or op_type.startswith("Reduce"):
