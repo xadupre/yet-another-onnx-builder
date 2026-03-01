@@ -1496,5 +1496,27 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqualArray(expected, got)
 
 
+    def test_evaluate_dimension_equality_with_constraints(self):
+        g = GraphBuilder(18)
+
+        # integer: dimension == d1 + d2
+        self.assertTrue(g.evaluate_dimension_equality_with_constraints(5, 2, "+", 3))
+
+        # integer: dimension != d1 + d2
+        self.assertFalse(g.evaluate_dimension_equality_with_constraints(5, 2, "+", 4))
+
+        # string: dimension exactly matches f"{d1}+{d2}"
+        self.assertTrue(g.evaluate_dimension_equality_with_constraints("a+b", "a", "+", "b"))
+
+        # string: dimension matches via registered constraint
+        g.add_to_constraints("batch", "seq1+seq2")
+        self.assertTrue(
+            g.evaluate_dimension_equality_with_constraints("batch", "seq1", "+", "seq2")
+        )
+
+        # string: dimension proved equal via simplify_two_expressions (commutativity)
+        self.assertTrue(g.evaluate_dimension_equality_with_constraints("a+b", "b", "+", "a"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
