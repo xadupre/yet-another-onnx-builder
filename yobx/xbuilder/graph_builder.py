@@ -3700,7 +3700,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 (a if a is not None else b) for a, b in zip(new_dyn_shape, dyn_shape)  # type: ignore[arg-type]
             )
 
-        node = oh.make_tensor_value_info(input_name, elem_type, dyn_shape)
+        node = oh.make_tensor_value_info(input_name, elem_type, dyn_shape)  # type: ignore[arg-type]
         self.inputs.append(node)
         self.set_name(input_name, marker=f"make_tensor_input_{marker}")
         if shape is not None:
@@ -3819,7 +3819,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 (a if a is not None else b) for a, b in zip(new_dyn_shape, dyn_shape)  # type: ignore[arg-type]
             )
 
-        node = oh.make_tensor_sequence_value_info(input_name, elem_type, dyn_shape)
+        node = oh.make_tensor_sequence_value_info(input_name, elem_type, dyn_shape)  # type: ignore[arg-type]
         self.inputs.append(node)
         self.set_name(input_name, marker=f"make_tensor_sequence_input_{marker}")
         if shape is not None:
@@ -8084,9 +8084,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if all(isinstance(s, int) for s in shape) and -1 in shape:
             # Some converters uses -1 to specify a dynamic dimension.
             # We replace the value with a string
-            new_shape = []
+            new_shape: List[Union[int, str]] = []
             for index, s in enumerate(shape):
-                if s >= 0:  # type: ignore[operator]
+                if isinstance(s, int) and s >= 0:
                     new_shape.append(s)
                     continue
                 dyn_name = f"{val.name}_{index}"
@@ -8323,15 +8323,15 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 if all(isinstance(s, int) for s in shape) and -1 in shape:
                     # Some converters uses -1 to specify a dynamic dimension.
                     # We replace the value with a string
-                    new_shape = []
+                    new_shape_with_dyn: List[Union[int, str]] = []
                     for index, s in enumerate(shape):
-                        if s >= 0:  # type: ignore[operator]
-                            new_shape.append(s)
+                        if isinstance(s, int) and s >= 0:
+                            new_shape_with_dyn.append(s)
                             continue
                         dyn_name = f"{i.name}_{index}"
-                        new_shape.append(dyn_name)
-                    shape = tuple(new_shape)
-                new_shape = []
+                        new_shape_with_dyn.append(dyn_name)
+                    shape = tuple(new_shape_with_dyn)
+                new_shape: List[Union[int, str]] = []
                 for axis, sh in enumerate(shape):
                     if isinstance(sh, int):
                         if sh != 0:
