@@ -1006,6 +1006,44 @@ class TestGraphBuilder(ExtTestCase):
         got = ref3.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    def test_set_type_shape_or_rank_with_shape_and_device(self):
+        g = GraphBuilder(18)
+        g.set_type("a", TFLOAT)
+        g.set_shape("a", (2, 3))
+        g.set_device("a", -1)
+
+        g.set_type_shape_or_rank("b", "a")
+
+        self.assertTrue(g.has_type("b"))
+        self.assertEqual(g.get_type("b"), TFLOAT)
+        self.assertTrue(g.has_shape("b"))
+        self.assertEqual(g.get_shape("b"), (2, 3))
+        self.assertTrue(g.has_device("b"))
+        self.assertEqual(g.get_device("b"), -1)
+
+    def test_set_type_shape_or_rank_with_rank_only(self):
+        g = GraphBuilder(18)
+        g.set_type("c", TINT64)
+        g.set_rank("c", 3)
+
+        g.set_type_shape_or_rank("d", "c")
+
+        self.assertTrue(g.has_type("d"))
+        self.assertEqual(g.get_type("d"), TINT64)
+        self.assertTrue(g.has_rank("d"))
+        self.assertEqual(g.get_rank("d"), 3)
+        self.assertFalse(g.has_shape("d"))
+        self.assertFalse(g.has_device("d"))
+
+    def test_set_type_shape_or_rank_no_info(self):
+        g = GraphBuilder(18)
+        # When `like` has no type, shape, rank, or device, nothing should be set.
+        g.set_type_shape_or_rank("e", "f")
+        self.assertFalse(g.has_type("e"))
+        self.assertFalse(g.has_shape("e"))
+        self.assertFalse(g.has_rank("e"))
+        self.assertFalse(g.has_device("e"))
+
     def test__apply_reshape_to_shape(self):
         g = GraphBuilder(18)
         cases = [
