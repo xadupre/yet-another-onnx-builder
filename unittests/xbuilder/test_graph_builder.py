@@ -434,7 +434,7 @@ class TestGraphBuilder(ExtTestCase):
 
         bias3 = g.make_initializer("bias3", np_bias3)
         g.op.Add(
-            g.anyop.RegressionBias("X", *new_inits, name="addd", domain="custom"),
+            g.anyop.RegressionBias("X", *new_inits, name="add_d", domain="custom"),
             bias3,
             outputs=["Y"],
         )

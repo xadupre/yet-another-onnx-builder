@@ -30,7 +30,7 @@ class OptimizationOptions:
         -1 to never stop
     :param verbose: verbosity level (for pattern optimization)
     :param verifies: run verifications to ensure the model is
-        correct everytime it is modifies, it is mostly to find bugs,
+        correct every time it is modifies, it is mostly to find bugs,
         it is very slow
     :param dump_applied_patterns: dump applied patterns in a folder,
         the users can check every pattern dumped as a :epkg:`FunctionProto`

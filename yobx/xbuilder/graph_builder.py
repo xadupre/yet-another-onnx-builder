@@ -163,7 +163,7 @@ class FunctionOptions:
 class InferShapesOptions(IntEnum):
     """
     Defines options when running shape inference on an existing model.
-    Options ``NEW`` means shapes informations is removed by running it again.
+    Options ``NEW`` means shapes information is removed by running it again.
     """
 
     NONE = 0
@@ -213,7 +213,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     - `nodes: List[NodeProto]`: list of nodes
     - `initializers_dict: Dict[str, Any]`: initializers
     - `initializers_dict_sources: Dict[str, InitializerInfo]`:
-      information about where the initiliazers was created
+      information about where the initializers was created
     - `inputs: List[ValueInfoTensorProto]`: inputs
     - `outputs: List[ValueInfoTensorProto]`: outputs
     - `ir_version: int`: ir version
@@ -1768,7 +1768,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         and len(self.dynamic_objects) == 0
                     ):
                         # No dynamic shape as input, so there
-                        # shoud not be any dynamic shape as output.
+                        # should not be any dynamic shape as output.
                         return False
                 if val1 == ("", ""):
                     # Another case where it seems False.
@@ -2154,7 +2154,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         is equal to the existing one.
 
         :param name: name
-        :param dtype: element type (an integer, ONNX), 0 (unknonw is a possible value)
+        :param dtype: element type (an integer, ONNX), 0 (unknown is a possible value)
         :param exc: raises an exception
         """
         if name in (self._debug_stop, self._debug_stop_type):
@@ -2867,7 +2867,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         key = self.make_key(value)
         if key and key in self._values:
-            # exception with obivous names
+            # exception with obvious names
             if name in {"", "ONES", "ZEROS", "ZERO", "ONE"} or name.startswith("ONES"):
                 assert not parameter_name, (
                     f"Empty name cannot be used with parameter_name={parameter_name!r}, "
@@ -3095,7 +3095,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         raise TypeError(f"Unsupported type for a constant {type(value)}")
 
     def constant_is_equal_to(self, name, value):
-        assert name in self.initializers_dict, f"intializer {name!r} not found."
+        assert name in self.initializers_dict, f"initializer {name!r} not found."
         cst = self.initializers_dict[name]
         itype1, size1, shape1 = self._shape_type(cst)
         itype2, size2, shape2 = self._shape_type(value)
@@ -3324,7 +3324,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             self.dynamic_objects[keykey] = wrapped_value
             wrapped_name = wrapped_value.name
             if wrapped_name and wrapped_name not in self.dynamic_objects:
-                # This means this informations is a dynamic dimension
+                # This means this information is a dynamic dimension
                 # used for the first time.
                 self.dynamic_objects[wrapped_name] = wrapped_value
         else:
@@ -4181,14 +4181,14 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         )
         if self.main_opset <= 11:
             assert op_type != "Squeeze" or domain != "" or len(inputs) == 1, (
-                f"Operator Squeeze is not correclty specified for opset "
+                f"Operator Squeeze is not correctly specified for opset "
                 f"{self.main_opset}, inputs={inputs}, kwargs={kwargs}, "
                 f"atts={attributes}{self.get_debug_msg()}"
             )
         else:
             n_entries = len(inputs) + len(attributes or []) + len(kwargs)
             assert op_type != "Squeeze" or domain != "" or n_entries in (1, 2), (
-                f"Operator Squeeze is not correclty specified for opset "
+                f"Operator Squeeze is not correctly specified for opset "
                 f"{self.main_opset}, n_entries={n_entries}, "
                 f"inputs={inputs}, kwargs={kwargs}, "
                 f"atts={attributes}{self.get_debug_msg()}"
@@ -4670,7 +4670,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     f"local_domains={local_domains}, {builder.get_debug_msg()}"
                 )
             for key, f in builder.functions.items():
-                assert key == (f.domain, f.name), f"disrepancy {key} vs {(f.domain, f.name)}"
+                assert key == (f.domain, f.name), f"discrepancy {key} vs {(f.domain, f.name)}"
             builder._check_function_order()
 
         _check_()
@@ -5163,10 +5163,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     def get_debug_msg(self, limit: int = 1000) -> str:
         """
         Returns a string providing as much information as possible
-        to help the developper understand why a conversion failed.
+        to help the developer understand why a conversion failed.
 
         :param limit: limit the string if the model is big
-        :return: many pieces of informations about the on going conversion
+        :return: many pieces of information about the on going conversion
         """
 
         def _align(s, length):
@@ -5658,7 +5658,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     res["functions"] = used_functions
             return res
 
-        # We need to move the initializers as inputs, we sort them by decresing size
+        # We need to move the initializers as inputs, we sort them by decreasing size
         inits, functions = self._extend_local_function_inputs()
         proto.input.extend(inits)
         res = dict(
@@ -5961,7 +5961,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         model.opset_import.extend(opsets)
         model.functions.extend(self.functions.values())
         model.ir_version = ir_version
-        # Rewrites shape informations, operates replacments
+        # Rewrites shape informations, operates replacements
         # to use as much as possible the dynamic dimension given
         # by the user.
         self._add_shape_information(model)
@@ -6045,7 +6045,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if self._debug_dyn_dim:
             print(
                 f"[GraphBuilder-{self._hash()}._improves_dynamic_dimension_naming] "
-                f"{len(self.constraints_)} constaints"
+                f"{len(self.constraints_)} constraints"
             )
             for k, v in sorted(self.constraints_.items()):
                 if k in self._debug_dyn_dim or v & self._debug_dyn_dim:
@@ -6362,7 +6362,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 entry.value = v
 
     def _improve_constraints(self):
-        """Adds more correspondances deduced from self.constraints_."""
+        """Adds more correspondences deduced from self.constraints_."""
 
         update = {}
         it = 0
@@ -6559,7 +6559,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 )
             new_atts.append(oh.make_attribute(att.name, new_g))
 
-            # We need to append functions and initiliazers to the main graph.
+            # We need to append functions and initializers to the main graph.
 
             for k, v in g.initializers_dict.items():
                 assert (
@@ -6618,7 +6618,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     f"options={self.optimization_options!r}"
                 )
             if self.verbose >= 10:
-                print("-- GRAPH BEFORE OPTIMIZATON --")
+                print("-- GRAPH BEFORE OPTIMIZATION --")
                 print(self.pretty_text())
                 print("-- END --")
             else:
@@ -6878,7 +6878,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         Optimizes this graph with patterns.
 
         :param recursive: overwrite the value given by the option if this one is True
-        :return: the method returns informations about the applied processes.
+        :return: the method returns information about the applied processes.
         """
         from ..xoptim import GraphBuilderPatternOptimization
 
@@ -7095,7 +7095,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         node_to_remove = set()
         for k, v in self.constants_.items():
             if v is None:
-                # this is an initiliazer
+                # this is an initializer
                 if self.verbose > 4:
                     print(f"[GraphBuilder-{self._hash()}.constant_folding] initializer: {k}")
                 if self._debug_foldnot and k not in self.initializers_dict:
@@ -7296,14 +7296,14 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         """
         Renames inputs.
         There is a weird case when one of the result defined in the inner context
-        is overriden by the subgraph itself. We should assume this case never happens.
+        is overridden by the subgraph itself. We should assume this case never happens.
         """
         # graph inputs and outputs should not be changed, initializer as well
         to_rename = set(replacements)
         was_copied = False
         if set(i.name for i in graph.input) & to_rename:
             # An input of the graph is overrides one of the replacements.
-            # The replacement should noe take place then.
+            # The replacement should not take place then.
             replacements = replacements.copy()
             for i in graph.input:
                 if i.name in to_rename:
@@ -7557,10 +7557,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         for node in self.nodes:
             if node.op_type != "Identity" or node.domain != "":
                 continue
-            anc = node.input[0]
-            while anc in identity_outputs:
-                anc = identity_outputs[anc]
-            identity_outputs[node.output[0]] = anc
+            ancestor = node.input[0]
+            while ancestor in identity_outputs:
+                ancestor = identity_outputs[ancestor]
+            identity_outputs[node.output[0]] = ancestor
 
         for node in self.nodes:
             new_inputs = []
@@ -8593,7 +8593,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     @classmethod
     def _format_dict(cls, d: Dict[str, Any]) -> str:
-        "Formats a dictionay to avoid a too long string."
+        "Formats a dictionary to avoid a too long string."
         rows = ["{"]
         for k, v in sorted(d.items()):
             sv = str(v)
@@ -9611,7 +9611,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     )
                     known_att = mapatt[att.ref_attr_name]
                     assert known_att.type == att.type, (
-                        f"Type mimatch netween the attribute {att.name!r} "
+                        f"Type mismatch netween the attribute {att.name!r} "
                         f"type {att.type} of the node "
                         f"inside the function and the one "
                         f"{known_att.type} outside the function (name {known_att.name!r})"
@@ -9650,7 +9650,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         Moves initializers as constant nodes.
 
         :param full_parameter_name: keeps the local name or the full name for the parameters
-        :param threshold: only move intializers to constant if their size is below this limit
+        :param threshold: only move initializers to constant if their size is below this limit
         :param verbose: verbosity
         :return: number of moved initializers
         """
@@ -9806,14 +9806,14 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if info is None:
                 return tuple(example_shape)
 
-            # In that case, we need to make sure that dynamic dimmensions
+            # In that case, we need to make sure that dynamic dimension
             # appears at the same position.
             ret_shape = list(example_shape)
             if isinstance(info, dict):
                 for k, v in info.items():
                     assert k < len(ret_shape), (
                         f"name={name!r}, input_index={input_index}, info={info}, "
-                        f"dimension {k} does not extist in shape {ret_shape!r}"
+                        f"dimension {k} does not exist in shape {ret_shape!r}"
                         f"{self.get_debug_msg()}"
                     )
 
@@ -9851,7 +9851,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                             f"{self.get_debug_msg()}"
                         )
                         # example_shape[i] is int but dynamic_shape says otherwise,
-                        # we truct dynamic shape
+                        # we trust dynamic shape
                         ret_shape[i] = v.__name__
                     # v should be None or a dictionary but the signature forward(*args)
                     # is confusing sometimes.
