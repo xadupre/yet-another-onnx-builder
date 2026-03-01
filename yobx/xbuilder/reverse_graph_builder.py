@@ -5,7 +5,7 @@ from ..translate.builder_emitter import BuilderEmitter
 
 
 class CustomBuilderEmitter(BuilderEmitter):
-    """Custom :class:`yobx.translate_api.builder_emitter.BuilderEmitter`."""
+    """Custom :class:`yobx.translate.builder_emitter.BuilderEmitter`."""
 
     def __init__(self, make_model_function: str = "make_my_model"):
         super().__init__(make_model_function="make_my_model")
