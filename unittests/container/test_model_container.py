@@ -253,6 +253,135 @@ class TestExtendedModelContainer(ExtTestCase):
         self.assertIsNotNone(ExtendedModelContainer)
 
 
+def _make_external_init(name: str, data: np.ndarray, location: str) -> onnx.TensorProto:
+    """Helper to create an external TensorProto referencing *location*."""
+    init = onnx.TensorProto()
+    init.data_type = onnx.TensorProto.FLOAT
+    init.name = name
+    init.data_location = onnx.TensorProto.EXTERNAL
+    for d in data.shape:
+        init.dims.append(d)
+    ext = init.external_data.add()
+    ext.key = "location"
+    ext.value = location
+    return init
+
+
+class TestDeserializeGraph(ExtTestCase):
+    """Tests for ExtendedModelContainer._deserialize_graph."""
+
+    def _make_container(self, model: onnx.ModelProto, large_initializers=None):
+        from yobx.container.model_container import ExtendedModelContainer
+
+        c = ExtendedModelContainer()
+        c.model_proto = model
+        c.large_initializers = large_initializers or {}
+        return c
+
+    def test_simple_graph(self):
+        """_deserialize_graph on a graph with inputs, output, and one node but no initializers."""
+        import onnx_ir
+
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Add", ["X", "Y"], ["Z"])],
+                "g",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [2, 3]),
+                    oh.make_tensor_value_info("Y", TFLOAT, [2, 3]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, [2, 3])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        c = self._make_container(model)
+        g = c._deserialize_graph(model.graph, [])
+        self.assertIsInstance(g, onnx_ir.Graph)
+        self.assertEqual(g.name, "g")
+        self.assertEqual([v.name for v in g.inputs], ["X", "Y"])
+        self.assertEqual([v.name for v in g.outputs], ["Z"])
+        self.assertEqual(len(g.initializers), 0)
+        self.assertEqual(len(list(g)), 1)
+
+    def test_graph_with_inline_initializer(self):
+        """_deserialize_graph deserialises a regular (non-external) initializer correctly."""
+        import onnx_ir
+
+        weight = onh.from_array(np.ones((2, 3), dtype=np.float32), name="W")
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Add", ["X", "W"], ["Z"])],
+                "g",
+                [oh.make_tensor_value_info("X", TFLOAT, [2, 3])],
+                [oh.make_tensor_value_info("Z", TFLOAT, [2, 3])],
+                initializer=[weight],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        c = self._make_container(model)
+        g = c._deserialize_graph(model.graph, [])
+        self.assertIsInstance(g, onnx_ir.Graph)
+        self.assertIn("W", g.initializers)
+        initializer_value = g.initializers["W"]
+        self.assertIsNotNone(initializer_value.const_value)
+        np.testing.assert_array_equal(
+            initializer_value.const_value.numpy(), np.ones((2, 3), dtype=np.float32)
+        )
+
+    def test_graph_with_external_numpy_initializer(self):
+        """_deserialize_graph loads an external initializer backed by a numpy array."""
+        import onnx_ir
+
+        data = np.ones((2, 3), dtype=np.float32)
+        init = _make_external_init("W", data, "#W")
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Add", ["X", "W"], ["Z"])],
+                "g",
+                [oh.make_tensor_value_info("X", TFLOAT, [2, 3])],
+                [oh.make_tensor_value_info("Z", TFLOAT, [2, 3])],
+                initializer=[init],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        c = self._make_container(model, large_initializers={"#W": data})
+        g = c._deserialize_graph(model.graph, [])
+        self.assertIsInstance(g, onnx_ir.Graph)
+        self.assertIn("W", g.initializers)
+        np.testing.assert_array_equal(
+            g.initializers["W"].const_value.numpy(), data
+        )
+
+    @requires_torch()
+    def test_graph_with_external_torch_initializer(self):
+        """_deserialize_graph loads an external initializer backed by a torch tensor."""
+        import torch
+        import onnx_ir
+
+        data = torch.ones(2, 3, dtype=torch.float32)
+        np_data = data.numpy()
+        init = _make_external_init("W", np_data, "#W")
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Add", ["X", "W"], ["Z"])],
+                "g",
+                [oh.make_tensor_value_info("X", TFLOAT, [2, 3])],
+                [oh.make_tensor_value_info("Z", TFLOAT, [2, 3])],
+                initializer=[init],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        c = self._make_container(model, large_initializers={"#W": data})
+        g = c._deserialize_graph(model.graph, [])
+        self.assertIsInstance(g, onnx_ir.Graph)
+        self.assertIn("W", g.initializers)
+        np.testing.assert_array_equal(
+            g.initializers["W"].const_value.numpy(), np_data
+        )
 class TestBuildStats(ExtTestCase):
     def test_len_empty(self):
         from yobx.container import BuildStats
