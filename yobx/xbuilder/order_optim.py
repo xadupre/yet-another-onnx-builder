@@ -77,16 +77,18 @@ class OrderOptimization:
                     first_input[name] = i
             for name in node.output:
                 output[name] = i
-        couples = {}
+        couples = []
         N = len(self.builder.nodes)
-        for i, node in enumerate(self.builder.nodes):
+        for node in self.builder.nodes:
             if node is None:
+                couples.append((None, None))
                 continue
-            minp = max(output.get(inp, 0) for inp in node.input) if node.input else 0
-            maxp = (
-                min(first_input.get(out, N) for out in node.output) if node.output else N
+            minp = max(
+                output.get(i, 0),
+                max((first_input.get(i, 0) for i in node.input)) if node.input else 0,
             )
-            couples[i] = (minp, maxp)
+            maxp = min(first_input.get(i, N) for i in node.output)
+            couples.append((minp, maxp))
         return couples
 
     def _check(self, stats, step, build_context=False, context=None):
