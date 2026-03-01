@@ -178,7 +178,7 @@ def compatible_opsets(domain: str, op_type: str, current: int, new_version: int)
     return new_version >= version[pos]
 
 
-def _get_default_opset_for_domain(domain: str, main_opset: Optional[int] = None) -> int:
+def _get_default_opset_for_domain(domain: str, main_opset: Optional[int] = None) -> Optional[int]:
     """
     Returns the associated for a domain given the main opset.
 
