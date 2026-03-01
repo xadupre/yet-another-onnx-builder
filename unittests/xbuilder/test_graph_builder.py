@@ -1496,5 +1496,44 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqualArray(expected, got)
 
 
+    def test_same_shape_static(self):
+        g = GraphBuilder(18)
+        g._known_shapes["X"] = (3, 4)
+        g._known_shapes["Y"] = (3, 4)
+        self.assertTrue(g.same_shape("X", "Y"))
+
+    def test_same_shape_static_different(self):
+        g = GraphBuilder(18)
+        g._known_shapes["X"] = (3, 4)
+        g._known_shapes["Y"] = (3, 5)
+        self.assertFalse(g.same_shape("X", "Y"))
+
+    def test_same_shape_different_rank(self):
+        g = GraphBuilder(18)
+        g._known_shapes["X"] = (3, 4)
+        g._known_shapes["Y"] = (3, 4, 5)
+        self.assertFalse(g.same_shape("X", "Y"))
+
+    def test_same_shape_dynamic_same_dim(self):
+        g = GraphBuilder(18)
+        g._known_shapes["X"] = ("batch", 4)
+        g._known_shapes["Y"] = ("batch", 4)
+        self.assertTrue(g.same_shape("X", "Y"))
+
+    def test_same_shape_dynamic_linked_by_constraints(self):
+        g = GraphBuilder(18)
+        g._known_shapes["X"] = ("a", 4)
+        g._known_shapes["Y"] = ("b", 4)
+        g.add_to_constraints("a", "b")
+        g.add_to_constraints("b", "a")
+        self.assertTrue(g.same_shape("X", "Y"))
+
+    def test_same_shape_dynamic_no_constraints(self):
+        g = GraphBuilder(18)
+        g._known_shapes["X"] = ("a", 4)
+        g._known_shapes["Y"] = ("b", 4)
+        self.assertFalse(g.same_shape("X", "Y"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
