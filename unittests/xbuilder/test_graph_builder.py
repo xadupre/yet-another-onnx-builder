@@ -1496,5 +1496,37 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqualArray(expected, got)
 
 
+    def test_extract_input_names_from_args(self):
+        gr = GraphBuilder(18)
+        gr.make_tensor_input("X", TFLOAT, shape=("batch", "seq"))
+        gr.make_tensor_input("Y", TFLOAT, shape=("batch", "seq"))
+        gr.make_tensor_input("Z", TFLOAT, shape=("batch",))
+
+        # plain string names that exist in the graph
+        self.assertEqual(["X"], gr.extract_input_names_from_args(["X"]))
+        self.assertEqual(["X", "Y"], gr.extract_input_names_from_args(["X", "Y"]))
+
+        # unknown names are ignored
+        self.assertEqual([], gr.extract_input_names_from_args(["unknown"]))
+        self.assertEqual(["X"], gr.extract_input_names_from_args(["X", "unknown"]))
+
+        # non-string values (e.g. int) are ignored
+        self.assertEqual(["X"], gr.extract_input_names_from_args(["X", 42]))
+
+        # nested list / tuple
+        self.assertEqual(["X", "Y"], gr.extract_input_names_from_args([["X", "Y"]]))
+        self.assertEqual(["X", "Y"], gr.extract_input_names_from_args([("X", "Y")]))
+
+        # duplicates are removed while preserving order
+        self.assertEqual(["X", "Y"], gr.extract_input_names_from_args(["X", "Y", "X"]))
+
+        # slice: start/stop/step that are known names
+        self.assertEqual(["X", "Y", "Z"], gr.extract_input_names_from_args([slice("X", "Y", "Z")]))
+        self.assertEqual(["X", "Y"], gr.extract_input_names_from_args([slice("X", "Y", None)]))
+
+        # empty input
+        self.assertEqual([], gr.extract_input_names_from_args([]))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
