@@ -205,7 +205,7 @@ def to_graph_pattern_matching(
             predecessors[i] = node
 
     first_node = True
-    rows = []
+    rows = ["import inspect"]
     stack_names = [*output_names]
     nodes_names = []
     while stack_names:
