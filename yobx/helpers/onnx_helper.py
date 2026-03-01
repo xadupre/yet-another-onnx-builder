@@ -150,14 +150,14 @@ def compatible_opsets(domain: str, op_type: str, current: int, new_version: int)
     if _history is None:
         res = {}
         for schema in get_all_schemas_with_history():
-            domain = schema.domain
+            schema_domain = schema.domain
             version = schema.since_version
             name = schema.name
-            if domain not in res:
-                res[domain] = {}
-            if name not in res[domain]:
-                res[domain][name] = {}
-            res[domain][name][version] = schema
+            if schema_domain not in res:
+                res[schema_domain] = {}
+            if name not in res[schema_domain]:
+                res[schema_domain][name] = {}
+            res[schema_domain][name][version] = schema
         _history = res
 
     assert domain in _history, f"Unable to find domain {domain!r} in {list(sorted(_history))}."
