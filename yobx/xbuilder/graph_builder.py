@@ -2482,31 +2482,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         return name
 
     def elem_size(self, elem_type: int) -> int:
-        "Returns the size in byte of the an element of this size."
-        if elem_type in {TensorProto.FLOAT, TensorProto.INT32, TensorProto.UINT32}:
-            return 4
-        if elem_type in {
-            TensorProto.DOUBLE,
-            TensorProto.INT64,
-            TensorProto.UINT64,
-            TensorProto.COMPLEX64,
-        }:
-            return 8
-        if elem_type in {TensorProto.COMPLEX128}:
-            return 16
-        if elem_type in {
-            TensorProto.INT16,
-            TensorProto.UINT16,
-            TensorProto.FLOAT16,
-            TensorProto.BFLOAT16,
-        }:
-            return 2
-        if elem_type in {TensorProto.BOOL, TensorProto.UINT8, TensorProto.INT8}:
-            return 1
-        raise AssertionError(
-            f"elem_size not implemented for elem_type={elem_type}, "
-            f"among {str_tensor_proto_type()}"
-        )
+        "Returns the size in bytes of an element of this type."
+        return size_type(elem_type)
 
     def make_dynamic_object(
         self,
