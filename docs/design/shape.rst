@@ -380,3 +380,132 @@ In addition, :meth:`get_debug_msg
 detailed text dump of the builder's internal state (known shapes, types,
 constants, ranks, and the sequence of calls) which can be printed or logged
 whenever an assertion fails.
+
+Implementing a new shape function
+==================================
+
+Adding support for a new operator (or overriding an existing one) requires
+writing a small function and registering it in
+:mod:`yobx.xshape.shape_type_compute`.
+
+Shape functions signature
+--------------------------
+
+Every shape function receives two arguments:
+
+* ``g`` — the :class:`ShapeBuilder <yobx.xshape.shape_builder.ShapeBuilder>`
+  instance that holds all currently known shapes, types, ranks, and devices.
+* ``node`` — the :class:`onnx.NodeProto` being processed.
+
+The function must call the appropriate setters on ``g`` for every output of
+the node, then return a truthy value (typically the computed shape or
+``True``) to signal success, or ``None`` to signal that no shape could be
+determined.
+
+Key methods available on ``g``
+--------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Method
+     - Description
+   * - ``g.has_shape(name)``
+     - Returns ``True`` if the shape is known for result ``name``.
+   * - ``g.get_shape(name)``
+     - Returns the shape as a tuple of integers / symbolic strings.
+   * - ``g.set_shape(name, shape)``
+     - Stores the computed shape for result ``name``.
+   * - ``g.has_type(name)``
+     - Returns ``True`` if the element type is known for result ``name``.
+   * - ``g.get_type(name)``
+     - Returns the element type as an ONNX integer
+       (e.g. ``onnx.TensorProto.FLOAT == 1``).
+   * - ``g.set_type(name, itype)``
+     - Stores the element type for result ``name``.
+   * - ``g.has_rank(name)``
+     - Returns ``True`` if the rank (number of dimensions) is known.
+   * - ``g.get_rank(name)``
+     - Returns the rank as an integer.
+   * - ``g.set_rank(name, rank)``
+     - Stores the rank when the full shape is not yet known.
+   * - ``g.has_device(name)``
+     - Returns ``True`` if a device is known for result ``name``.
+   * - ``g.get_device(name)``
+     - Returns the device as an integer (``-1`` for CPU, index for GPU).
+   * - ``g.set_device(name, device)``
+     - Propagates the device to result ``name``.
+   * - ``g.get_attribute_with_default(node, attr, default)``
+     - Convenience helper to read a node attribute with a fallback default.
+
+A minimal shape function should:
+
+1. **Propagate device** — if ``g.has_device(input)`` is true, copy the
+   device to the output with ``set_device``.
+2. **Propagate type** — guard with ``g.has_type(input)`` before calling
+   ``set_type`` on every output; return ``None`` early if the type is not yet
+   known.
+3. **Compute and set the shape** — guard with ``g.has_shape(input)`` before
+   deriving the output shape and calling ``set_shape``.  When the full shape
+   is unavailable, fall back to ``g.has_rank`` / ``set_rank``.
+4. **Return the shape** (or ``True`` if only a rank was set, or ``None`` if
+   nothing could be done).
+
+Example: a custom element-wise scaling operator
+-------------------------------------------------
+
+The following example shows a shape function for a hypothetical ``Scale``
+operator (domain ``"my.domain"``) that multiplies its first input ``X`` by a
+scalar ``scale`` and returns a result with the same shape and type as ``X``.
+
+.. code-block:: python
+
+    from onnx import NodeProto
+    from yobx.xshape.shape_builder import ShapeBuilder
+
+    def _set_shape_type_scale(g: ShapeBuilder, node: NodeProto):
+        "Shape function for the custom Scale operator."
+        x = node.input[0]
+        out = node.output[0]
+
+        # 1. propagate device
+        if g.has_device(x):
+            g.set_device(out, g.get_device(x))
+
+        # 2. propagate element type
+        if not g.has_type(x):
+            return None
+        g.set_type(out, g.get_type(x))
+
+        # 3. compute output shape (same shape as input)
+        if g.has_shape(x):
+            shape = g.get_shape(x)
+            g.set_shape(out, shape)
+            return shape
+
+        # fallback: propagate rank only
+        if g.has_rank(x):
+            g.set_rank(out, g.get_rank(x))
+            return True
+
+        return None
+
+To register the function so that
+:class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+calls it automatically, add it to the appropriate registry dictionary in
+:mod:`yobx.xshape.shape_type_compute`:
+
+* ``_set_shape_type_op_any_known`` — for standard ONNX operators
+  (domain ``""``).
+* ``_set_shape_type_op_any_custom`` — for operators in non-standard domains
+  (e.g. ``"com.microsoft"``).
+
+.. code-block:: python
+
+    # In yobx/xshape/shape_type_compute.py:
+    _set_shape_type_op_any_custom["Scale"] = _set_shape_type_scale
+
+The function will then be called automatically whenever
+:meth:`run_node <yobx.xshape.shape_builder_impl.BasicShapeBuilder.run_node>`
+processes a ``Scale`` node.
