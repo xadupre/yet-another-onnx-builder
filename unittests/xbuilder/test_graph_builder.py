@@ -1496,5 +1496,89 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqualArray(expected, got)
 
 
+    def test_move_node_position_can_move(self):
+        # Node at position 2 (Relu) only uses graph input X,
+        # so it can be moved to position 1 (before Neg which uses a).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Abs", ["X"], ["a"]),   # pos 0: produces 'a'
+                    oh.make_node("Neg", ["a"], ["b"]),   # pos 1: uses 'a' from pos 0
+                    oh.make_node("Relu", ["X"], ["c"]),  # pos 2: uses 'X' (graph input)
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [None])],
+                [
+                    oh.make_tensor_value_info("b", TFLOAT, [None]),
+                    oh.make_tensor_value_info("c", TFLOAT, [None]),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        gr = GraphBuilder(model)
+        # Relu at pos 2: first_at.get('X', 0) == 0, can_be == 1 < 2 => can move
+        new_pos = gr._move_node_position(2)
+        self.assertEqual(new_pos, 1)
+        self.assertEqual(gr.nodes[1].op_type, "Relu")
+        self.assertEqual(gr.nodes[2].op_type, "Neg")
+
+    def test_move_node_position_cannot_move(self):
+        # Node at position 1 (Neg) uses 'a' produced at position 0,
+        # so can_be == 1 == pos => cannot be moved, returns None.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Abs", ["X"], ["a"]),  # pos 0: produces 'a'
+                    oh.make_node("Neg", ["a"], ["b"]),  # pos 1: uses 'a' from pos 0
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [None])],
+                [oh.make_tensor_value_info("b", TFLOAT, [None])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        gr = GraphBuilder(model)
+        # Neg at pos 1: can_be == 0 + 1 == 1 >= 1 => cannot move
+        new_pos = gr._move_node_position(1)
+        self.assertIsNone(new_pos)
+        # nodes order must remain unchanged
+        self.assertEqual(gr.nodes[0].op_type, "Abs")
+        self.assertEqual(gr.nodes[1].op_type, "Neg")
+
+    def test_move_node_position_multiple_inputs(self):
+        # Node at position 3 (Add) uses 'b' from pos 1 and 'c' from pos 2,
+        # can_be == max(1, 2) + 1 == 3 == pos => cannot be moved.
+        # Node at position 4 (Relu) only uses graph input X,
+        # can_be == 0 + 1 == 1 < 4 => can be moved to position 1.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Abs", ["X"], ["a"]),       # pos 0
+                    oh.make_node("Neg", ["a"], ["b"]),       # pos 1
+                    oh.make_node("Sigmoid", ["a"], ["c"]),   # pos 2
+                    oh.make_node("Add", ["b", "c"], ["d"]),  # pos 3
+                    oh.make_node("Relu", ["X"], ["e"]),      # pos 4: uses X only
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [None])],
+                [
+                    oh.make_tensor_value_info("d", TFLOAT, [None]),
+                    oh.make_tensor_value_info("e", TFLOAT, [None]),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        gr = GraphBuilder(model)
+        # Add at pos 3: can_be == max(1, 2) + 1 == 3 >= 3 => cannot move
+        new_pos = gr._move_node_position(3)
+        self.assertIsNone(new_pos)
+        # A new GraphBuilder is needed to test position 4 independently,
+        # since _move_node_position modifies self.nodes in-place.
+        gr2 = GraphBuilder(model)
+        new_pos2 = gr2._move_node_position(4)
+        self.assertEqual(new_pos2, 1)
+        self.assertEqual(gr2.nodes[1].op_type, "Relu")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
