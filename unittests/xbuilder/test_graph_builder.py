@@ -1495,6 +1495,46 @@ class TestGraphBuilder(ExtTestCase):
         got = ref2.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    def test_get_constant_as_shape_false(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TensorProto.FLOAT, (3, 4), False)
+        value = np.array([2, 3, 4], dtype=np.int64)
+        name = g.make_initializer("cst", value)
+        result = g.get_constant(name, exc=True, as_shape=False)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqualArray(value, result)
+
+    def test_get_constant_as_shape_true(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TensorProto.FLOAT, (3, 4), False)
+        value = np.array([2, 3, 4], dtype=np.int64)
+        name = g.make_initializer("cst", value)
+        result = g.get_constant(name, exc=True, as_shape=True)
+        self.assertEqual(result, (2, 3, 4))
+        self.assertIsInstance(result, tuple)
+
+    def test_get_constant_from_parent(self):
+        parent = GraphBuilder(18, ir_version=9)
+        parent.make_tensor_input("X", TensorProto.FLOAT, (3, 4), False)
+        value = np.array([2, 3, 4], dtype=np.int64)
+        cst_name = parent.make_initializer("cst", value)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        result = child.get_constant_from_parent(cst_name, exc=True)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqualArray(value, result)
+
+    def test_get_constant_from_parent_as_shape(self):
+        parent = GraphBuilder(18, ir_version=9)
+        parent.make_tensor_input("X", TensorProto.FLOAT, (3, 4), False)
+        value = np.array([2, 3, 4], dtype=np.int64)
+        cst_name = parent.make_initializer("cst", value)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        result = child.get_constant_from_parent(cst_name, exc=True, as_shape=True)
+        self.assertEqual(result, (2, 3, 4))
+        self.assertIsInstance(result, tuple)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
