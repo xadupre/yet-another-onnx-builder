@@ -2,7 +2,7 @@ from typing import Any, Optional, Tuple, Union
 
 
 class VirtualTensor:
-    """Defines a the type and shape for a tensor without its content."""
+    """Defines the type and shape of a tensor without its content."""
 
     def __init__(
         self,
