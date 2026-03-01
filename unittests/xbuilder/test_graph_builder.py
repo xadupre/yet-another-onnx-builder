@@ -1496,5 +1496,32 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqualArray(expected, got)
 
 
+    def test_make_tensor_value_info_from_name(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+
+        # Case 1: name has both type and shape
+        g.set_type("x", TFLOAT)
+        g.set_shape("x", (2, 3))
+        vi = g.make_tensor_value_info_from_name("x")
+        self.assertEqual(vi.name, "x")
+        self.assertEqual(vi.type.tensor_type.elem_type, TFLOAT)
+        self.assertEqual(
+            [d.dim_value for d in vi.type.tensor_type.shape.dim], [2, 3]
+        )
+
+        # Case 2: name has type and rank but no shape
+        g.set_type("y", TINT64)
+        g.set_rank("y", 3)
+        vi = g.make_tensor_value_info_from_name("y")
+        self.assertEqual(vi.name, "y")
+        self.assertEqual(vi.type.tensor_type.elem_type, TINT64)
+        self.assertEqual(len(vi.type.tensor_type.shape.dim), 3)
+
+        # Case 3: name has no type or rank — returns an empty TypeProto value info
+        vi = g.make_tensor_value_info_from_name("z")
+        self.assertEqual(vi.name, "z")
+        self.assertFalse(vi.type.HasField("tensor_type"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
