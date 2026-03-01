@@ -1802,6 +1802,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             # This is most likely a dimension but not marked as such for the time being.
             return False
         else:
+            if elem_type is None and self.has_type(name):
+                elem_type = self.get_type(name)
             if elem_type in {
                 TensorProto.FLOAT16,
                 TensorProto.FLOAT,
