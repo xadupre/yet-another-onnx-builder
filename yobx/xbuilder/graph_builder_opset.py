@@ -285,15 +285,27 @@ class Opset:
         )
 
     def DFTAnyOpset(self, *args, name: str = "DFTAnyOpset", **kwargs):
-        if self.builder.main_opset < 20 or len(args) == 3:
-            axes = self._iaxes("DFT", args[2])
-            assert isinstance(axes, int), f"Unexpected value for axes={axes}"
-            if self.builder.main_opset < 20:
-                return self.DFT(*args[:2], name=name, axis=axes, **kwargs)
-            return self.DFT(*args, name=name, **kwargs)
+        # For opset < 20, DFT uses a single integer 'axis' attribute.
+        # We convert the axes tensor input to a Python list via _iaxes(),
+        # then extract the single axis value.
+        if self.builder.main_opset < 20:
+            # Expecting input, dft_length, axes_tensor in args for AnyOpset.
+            assert len(args) >= 3, f"DFTAnyOpset for opset < 20 expects at least 3 arguments, got {len(args)}"
+            axes_list = self._iaxes("DFT", args[2])
+            if not isinstance(axes_list, (list, tuple)):
+                raise TypeError(f"Unexpected type for axes={type(axes_list)!r}, expected list or tuple.")
+            if len(axes_list) != 1:
+                raise ValueError(f"DFT with opset < 20 expects a single axis, got {axes_list}.")
+            axis = axes_list[0]
+            return self.DFT(*args[:2], name=name, axis=axis, **kwargs)
+
+        # For opset >= 20, DFT uses an 'axes' tensor input.
         if self.builder.main_opset >= 20:
             if "axis" in kwargs:
+                # Allow callers to pass a scalar or list axis and convert to axes tensor.
                 axes = np.array(kwargs.pop("axis"), dtype=np.int64)
                 return self.DFT(*args, axes, name=name, **kwargs)
             return self.DFT(*args, name=name, **kwargs)
+
+        # Fallback (should not normally be reached, kept for completeness).
         return self.DFT(*args, name=name, **kwargs)
