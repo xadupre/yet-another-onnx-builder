@@ -198,7 +198,7 @@ def _get_default_opset_for_domain(domain: str, main_opset: Optional[int] = None)
         return 1
     if domain == "ai.onnx.training":
         return 1
-    return None
+    raise ValueError(f"Unsupported domain: {domain!r}")
 
 
 def choose_consistent_domain_opset(domain: str, opsets: Optional[Dict[str, int]] = None) -> int:
