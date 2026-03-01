@@ -1,6 +1,6 @@
 import functools
 import re
-from typing import Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
 import ml_dtypes
 import onnx
@@ -148,7 +148,7 @@ def compatible_opsets(domain: str, op_type: str, current: int, new_version: int)
     """
     global _history
     if _history is None:
-        res = {}
+        res: Dict[str, Any] = {}
         for schema in get_all_schemas_with_history():
             schema_domain = schema.domain
             version = schema.since_version
@@ -222,7 +222,7 @@ def choose_consistent_domain_opset(domain: str, opsets: Optional[Dict[str, int]]
         return onnx_opset_version() - 2
     if domain != "ai.onnx.ml":
         return 1
-    return _get_default_opset_for_domain(domain)
+    return _get_default_opset_for_domain(domain) or 1
 
 
 def same_function_proto(
