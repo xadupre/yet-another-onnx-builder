@@ -57,8 +57,8 @@ class TestReverseGraphBuilder(ExtTestCase):
         expected = (
             textwrap.dedent("""
         import numpy as np
-        from onnx import TensorProto
-        from onnx.numpy_helper import from_array
+        import onnx
+        import onnx.numpy_helper as onh
         from yobx.xbuilder import GraphBuilder, FunctionOptions
 
 
@@ -128,8 +128,8 @@ class TestReverseGraphBuilder(ExtTestCase):
         expected = (
             textwrap.dedent("""
         import numpy as np
-        from onnx import TensorProto
-        from onnx.numpy_helper import from_array
+        import onnx
+        import onnx.numpy_helper as onh
         from yobx.xbuilder import GraphBuilder, FunctionOptions
 
 
@@ -208,8 +208,8 @@ class TestReverseGraphBuilder(ExtTestCase):
 
         expected = textwrap.dedent("""
             import numpy as np
-            from onnx import TensorProto
-            from onnx.numpy_helper import from_array
+            import onnx
+            import onnx.numpy_helper as onh
             from yobx.xbuilder import GraphBuilder, FunctionOptions
 
 
