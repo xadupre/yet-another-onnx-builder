@@ -148,7 +148,6 @@ class OptimizationOptions:
         else:
             self.patterns = []
         self.verbose = verbose
-        self.recursive = recursive
         self.verifies = verifies
         self.dump_applied_patterns = dump_applied_patterns
 
