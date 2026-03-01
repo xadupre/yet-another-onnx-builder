@@ -263,7 +263,7 @@ class ExtendedModelContainer(ModelContainer):
                         metadata_props=oirs.deserialize_metadata_props(tensor.metadata_props),
                     )
                 elif hasattr(np_tensor, "shape"):
-                    from .torch_helper import torch_dtype_to_onnx_dtype
+                    from ..torch.torch_helper import torch_dtype_to_onnx_dtype
 
                     t = oir.Tensor(
                         np_tensor.detach(),
