@@ -56,10 +56,8 @@ def translate(proto: ModelProto, single_line: bool = False, api: str = "onnx") -
         ``"onnx-short"`` replaces large initializers with random values
         (handled by
         :class:`~yobx.translate.inner_emitter.InnerEmitterShortInitializer`),
-        ``"light"`` generates code for the ``onnx-array-api`` light API
-        (requires ``onnx-array-api`` to be installed),
-        ``"builder"`` generates code for the ``onnx-array-api`` GraphBuilder
-        (requires ``onnx-array-api`` to be installed)
+        ``"light"`` generates code for the light API,
+        ``"builder"`` generates code for the GraphBuilder
     :return: code as a string
     """
     if api == "onnx":

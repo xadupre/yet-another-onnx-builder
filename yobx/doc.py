@@ -22,7 +22,7 @@ def get_latest_pypi_version(package_name="yet-another-onnx-builder") -> str:  # 
     return version
 
 
-def update_version_package(version: str, package_name="onnx-diagnostic") -> str:
+def update_version_package(version: str, package_name="yet-another-onnx-builder") -> str:
     "Adds dev if the major version is different from the latest published one."
     released = get_latest_pypi_version(package_name)
     shorten_r = ".".join(released.split(".")[:2])

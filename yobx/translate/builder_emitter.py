@@ -24,11 +24,7 @@ def _itype_to_string(itype: int) -> str:
 
 
 class BuilderEmitter(BaseEmitter):
-    """
-    Converts event into code for the onnx-array-api GraphBuilder API.
-
-    The generated code uses ``onnx_array_api.graph_api.GraphBuilder``.
-    """
+    """Converts event into code for GraphBuilder API."""
 
     def __init__(self, make_model_function: str = ""):
         super().__init__()

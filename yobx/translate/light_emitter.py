@@ -12,11 +12,7 @@ _ELEMENT_TYPE_NAME = {
 
 
 class LightEmitter(BaseEmitter):
-    """
-    Converts event into code for the onnx-array-api light API.
-
-    The generated code uses ``onnx_array_api.light_api.start()``.
-    """
+    """Converts event into code for the light API."""
 
     def join(self, rows: List[str], single_line: bool = False) -> str:
         "Join the rows"

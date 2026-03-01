@@ -433,6 +433,25 @@ def requires_cuda(msg: str = "", version: str = "", memory: int = 0):
     return lambda x: x
 
 
+def requires_onnxir(version: str, msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`onnx-ir` is not recent enough."""
+    import packaging.version as pv
+
+    try:
+        import onnx_ir
+    except ImportError:
+        return unittest.skip("onnx-ir missing")
+
+    if not hasattr(onnx_ir, "__version__"):
+        # development version
+        return lambda x: x
+
+    if pv.Version(onnx_ir.__version__) < pv.Version(version):
+        msg = f"onnx_ir version {onnx_ir.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def requires_sklearn(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`scikit-learn` is not recent enough."""
     import packaging.version as pv
@@ -725,17 +744,6 @@ def requires_onnx(version: str, msg: str = "") -> Callable:
 
     if pv.Version(onnx.__version__) < pv.Version(version):
         msg = f"onnx version {onnx.__version__} < {version}: {msg}"
-        return unittest.skip(msg)
-    return lambda x: x
-
-
-def requires_yobx(version: str, msg: str = "") -> Callable:
-    """Skips a unit test if :epkg:`onnx-array-api` is not recent enough."""
-    import packaging.version as pv
-    import yobx
-
-    if pv.Version(yobx.__version__) < pv.Version(version):
-        msg = f"onnx-array-api version {yobx.__version__} < {version}: {msg}"
         return unittest.skip(msg)
     return lambda x: x
 
