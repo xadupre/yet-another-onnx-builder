@@ -198,7 +198,7 @@ class Opset:
         )
 
     @staticmethod
-    def _iaxes(op_type, axes) -> int:
+    def _iaxes(op_type, axes) -> List[int]:
         if isinstance(axes, np.ndarray):
             iaxes = axes.tolist()
         elif isinstance(axes, int):
