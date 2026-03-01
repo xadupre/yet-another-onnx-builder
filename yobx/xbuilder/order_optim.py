@@ -57,8 +57,6 @@ class OrderOptimization:
         if self.algorithm == OrderAlgorithm.NONE:
             pass
         elif self.algorithm == OrderAlgorithm.RANDOM:
-            if self.verbose:
-                print(f"[OrderOptimization.optimize] ALGO-{self.algorithm}")
             stats = self.random_order()
             stats.append(dict(pattern="order", algo=str(self.algorithm)))
         elif self.algorithm == OrderAlgorithm.SHAPE:
