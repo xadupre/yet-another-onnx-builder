@@ -87,7 +87,7 @@ def to_graph_builder_code(proto: onnx.ModelProto, function_name: str = "build_mo
         )
         print(to_graph_builder_code(model))
     """
-    tr = Translator(proto, emitter=CustomBuilderEmitter())
+    tr = Translator(proto, emitter=CustomBuilderEmitter(make_model_function=function_name))
     code = tr.export(as_str=True)
     return "\n".join(
         [
