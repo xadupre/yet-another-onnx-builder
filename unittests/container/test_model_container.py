@@ -201,5 +201,89 @@ class TestExtendedModelContainer(ExtTestCase):
         self.assertIsNotNone(ExtendedModelContainer)
 
 
+class TestBuildStats(ExtTestCase):
+    def test_len_empty(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        self.assertEqual(len(stats), 0)
+
+    def test_len_after_set(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        stats["time_export_write_model"] = 1.0
+        stats["time_export_tobytes"] = 0.5
+        self.assertEqual(len(stats), 2)
+
+    def test_getitem_default(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        self.assertEqual(stats["time_export_write_model"], 0.0)
+
+    def test_setitem_and_getitem(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        stats["time_export_write_model"] += 0.5
+        stats["time_export_tobytes"] += 0.1
+        self.assertAlmostEqual(stats["time_export_write_model"], 0.5)
+        self.assertAlmostEqual(stats["time_export_tobytes"], 0.1)
+
+    def test_to_dict(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        stats["time_export_write_model"] = 1.0
+        d = stats.to_dict()
+        self.assertIsInstance(d, dict)
+        self.assertIn("time_export_write_model", d)
+        self.assertAlmostEqual(d["time_export_write_model"], 1.0)
+
+    def test_to_dict_is_not_a_copy(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        d = stats.to_dict()
+        d["time_export_write_model"] = 99.0
+        self.assertAlmostEqual(stats.to_dict()["time_export_write_model"], 99.0)
+
+    def test_validate_valid_keys(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        stats["time_export_write_model"] = 0.5
+        stats["time_export_tobytes"] = 0.1
+        # Should not raise.
+        stats.validate()
+
+    def test_validate_invalid_key_raises(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        # __setitem__ does not enforce the prefix; validate() does.
+        stats["unknown_key"] = 1.0
+        with self.assertRaises(KeyError):
+            stats.validate()
+
+    def test_repr_empty(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        r = repr(stats)
+        self.assertIn("BuildStats", r)
+        self.assertIn("{}", r)
+
+    def test_repr_with_data(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        stats["time_export_write_model"] = 0.5
+        r = repr(stats)
+        self.assertIn("BuildStats", r)
+        self.assertIn("time_export_write_model", r)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
