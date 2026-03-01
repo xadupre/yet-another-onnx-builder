@@ -1496,5 +1496,86 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqualArray(expected, got)
 
 
+    def test_has_exact_same_constant_in_context_same(self):
+        # Child and parent have identical small constants: should return True.
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst)
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertTrue(result)
+
+    def test_has_exact_same_constant_in_context_different_values(self):
+        # Same shape/type but different values: should return False.
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst1 = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst1)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        np_cst2 = np_cst1 + 1.0
+        child.make_initializer("cst", np_cst2)
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertFalse(result)
+
+    def test_has_exact_same_constant_in_context_different_shape(self):
+        # Same name but different shapes: should return False.
+        parent = GraphBuilder(18, ir_version=9)
+        parent.make_initializer("cst", np.arange(6).reshape((2, 3)).astype(np.float32))
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertFalse(result)
+
+    def test_has_exact_same_constant_in_context_different_type(self):
+        # Same name and shape but different dtypes: should return False.
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst.astype(np.float64))
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertFalse(result)
+
+    def test_has_exact_same_constant_in_context_large(self):
+        # Constants with >= 128 elements: comparison is skipped, should return None.
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(128).reshape((16, 8)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst)
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertIsNone(result)
+
+    def test_has_exact_same_constant_in_context_not_in_child(self):
+        # Name is only a constant in the parent, not in the child: should return False.
+        parent = GraphBuilder(18, ir_version=9)
+        parent.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertFalse(result)
+
+    def test_has_exact_same_constant_in_context_not_in_parent(self):
+        # Name is a constant in the child but not in the parent: should return False.
+        parent = GraphBuilder(18, ir_version=9)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertFalse(result)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
