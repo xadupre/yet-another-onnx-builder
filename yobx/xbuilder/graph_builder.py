@@ -615,7 +615,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     return False
                 if self.get_type(name) != self._parent.get_type(name):
                     return False
-                n_elem = np.prod(shape1)
+                n_elem = np.prod([s for s in shape1 if isinstance(s, int)])
                 if n_elem < 128:
                     # Then the code is not much.
                     cst1 = self.get_constant(name, exc=False, computed_value=True)

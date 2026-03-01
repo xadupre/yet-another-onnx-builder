@@ -166,16 +166,16 @@ def compatible_opsets(domain: str, op_type: str, current: int, new_version: int)
         f"in {list(sorted(_history[domain]))}"
     )
     hist = _history[domain][op_type]
-    version = list(sorted(hist))  # noqa: C413
-    pos = np.searchsorted(version, current, side="right") - 1
+    versions = list(sorted(hist))  # noqa: C413
+    pos = np.searchsorted(versions, current, side="right") - 1
     assert pos >= 0, (
         f"Available version for {op_type!r} from {domain!r}, "
         f"incompatible version is {current}"
     )
-    if pos < len(version) - 1:
-        a, b = version[pos], version[pos + 1]
+    if pos < len(versions) - 1:
+        a, b = versions[pos], versions[pos + 1]
         return a <= new_version < b
-    return new_version >= version[pos]
+    return new_version >= versions[pos]
 
 
 def _get_default_opset_for_domain(domain: str, main_opset: Optional[int] = None) -> Optional[int]:
