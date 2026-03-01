@@ -436,7 +436,11 @@ def requires_cuda(msg: str = "", version: str = "", memory: int = 0):
 def requires_onnxir(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx-ir` is not recent enough."""
     import packaging.version as pv
-    import onnx_ir
+
+    try:
+        import onnx_ir
+    except ImportError:
+        return unittest.skip("onnx-ir missing")
 
     if not hasattr(onnx_ir, "__version__"):
         # development version
