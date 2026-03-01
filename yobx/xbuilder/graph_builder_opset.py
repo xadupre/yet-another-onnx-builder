@@ -220,7 +220,7 @@ class Opset:
     def ReduceMinAnyOpset(self, *args, name: str = "ReduceMinAnyOpset", **kwargs):
         if len(args) == 1:
             return self.ReduceMin(*args, name=name, **kwargs)
-        assert len(args) == 2, f"ReduceMaxAnyOpset expects 2 arguments not {len(args)}"
+        assert len(args) == 2, f"ReduceMinAnyOpset expects 2 arguments not {len(args)}"
         if self.builder.main_opset >= 18:
             return self.ReduceMin(*args, name=name, **kwargs)
         return self.ReduceMin(
