@@ -9,6 +9,7 @@ from yobx.ext_test_case import (
     hide_stdout,
     ignore_warnings,
     requires_onnxir,
+    requires_torch,
 )
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder import GraphBuilder, FunctionOptions
@@ -1494,6 +1495,96 @@ class TestGraphBuilder(ExtTestCase):
         ref2 = self.check_ort(onx)
         got = ref2.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
+
+
+    @requires_torch("2.0")
+    def test_register_dynamic_object_from_dynamic_shapes_dict_wrap_dim(self):
+        # WrapDim (string) case: string is pre-processed to WrapDim
+        g = GraphBuilder(18, ir_version=9, dynamic_shapes={"args_0": {0: "batch"}})
+        self.assertIn("batch", g.dynamic_objects)
+        self.assertIn("batch", g.dynamic_dimensions_source)
+        self.assertEqual(
+            g.dynamic_dimensions_source["batch"],
+            [{"input_name": "args_0", "axis": 0}],
+        )
+
+    @requires_torch("2.0")
+    def test_register_dynamic_object_from_dynamic_shapes_dict_dim(self):
+        import torch
+
+        # _Dim case: torch.export.Dim
+        batch = torch.export.Dim("batch", min=1, max=128)
+        g = GraphBuilder(18, ir_version=9, dynamic_shapes={"args_0": {0: batch}})
+        self.assertIn("batch", g.dynamic_objects)
+        self.assertIn("batch", g.dynamic_dimensions_source)
+        self.assertEqual(
+            g.dynamic_dimensions_source["batch"],
+            [{"input_name": "args_0", "axis": 0}],
+        )
+
+    @requires_torch("2.0")
+    def test_register_dynamic_object_from_dynamic_shapes_dict_derived_dim(self):
+        import torch
+
+        # _DerivedDim case: derived from a base Dim
+        base = torch.export.Dim("base", min=1, max=64)
+        derived = base * 2
+        g = GraphBuilder(18, ir_version=9, dynamic_shapes={"args_0": {0: derived}})
+        self.assertIn("2*base", g.dynamic_objects)
+        self.assertIn("base", g.dynamic_objects)
+        self.assertIn("2*base", g.dynamic_dimensions_source)
+        self.assertEqual(
+            g.dynamic_dimensions_source["2*base"],
+            [{"input_name": "args_0", "axis": 0}],
+        )
+
+    @requires_torch("2.0")
+    def test_register_dynamic_object_from_dynamic_shapes_dict_none(self):
+        # None value: no dynamic object registered for that axis
+        g = GraphBuilder(18, ir_version=9, dynamic_shapes={"args_0": {0: None}})
+        self.assertEqual(g.dynamic_objects, {})
+        self.assertEqual(g.dynamic_dimensions_source, {})
+
+    @requires_torch("2.0")
+    def test_register_dynamic_object_from_dynamic_shapes_dict_invalid_type(self):
+        # Invalid type should raise AssertionError
+        self.assertRaise(
+            lambda: GraphBuilder(18, ir_version=9, dynamic_shapes={"args_0": {0: 123}}),
+            AssertionError,
+        )
+
+    @requires_torch("2.0")
+    def test_register_dynamic_object_from_dynamic_shapes_dict_multiple_axes(self):
+        # Multiple axes for the same input
+        g = GraphBuilder(
+            18,
+            ir_version=9,
+            dynamic_shapes={"args_0": {0: "batch", 1: "seq"}},
+        )
+        self.assertIn("batch", g.dynamic_objects)
+        self.assertIn("seq", g.dynamic_objects)
+        self.assertEqual(
+            g.dynamic_dimensions_source["batch"],
+            [{"input_name": "args_0", "axis": 0}],
+        )
+        self.assertEqual(
+            g.dynamic_dimensions_source["seq"],
+            [{"input_name": "args_0", "axis": 1}],
+        )
+
+    @requires_torch("2.0")
+    def test_register_dynamic_object_from_dynamic_shapes_dict_multiple_inputs(self):
+        # Multiple inputs with dynamic shapes
+        g = GraphBuilder(
+            18,
+            ir_version=9,
+            dynamic_shapes={"args_0": {0: "batch"}, "args_1": {0: "batch", 1: "seq"}},
+        )
+        self.assertIn("batch", g.dynamic_objects)
+        self.assertIn("seq", g.dynamic_objects)
+        # "batch" source should include both inputs
+        sources = g.dynamic_dimensions_source["batch"]
+        self.assertEqual(len(sources), 2)
 
 
 if __name__ == "__main__":
