@@ -225,7 +225,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     - `functions: Dict[Tuple[str,str], FunctionProto]`:
       dictionary of functions to add to the model
     - `value_info: List[ValueInfoProto]`: value info of the original model
-    - `dynamic_shapes: Union[Dict[str, Any], Tuple[Any]]]`: dynamic_shapes informations
+    - `dynamic_shapes: Union[Dict[str, Any], Tuple[Any]]]`: dynamic_shapes information
     - `_parameter_renaming: Dict[str, str]`: to rename parameter and give them
       a name which can be found in ``module.named_parameter``
 
@@ -5961,7 +5961,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         model.opset_import.extend(opsets)
         model.functions.extend(self.functions.values())
         model.ir_version = ir_version
-        # Rewrites shape informations, operates replacements
+        # Rewrites shape information, operates replacements
         # to use as much as possible the dynamic dimension given
         # by the user.
         self._add_shape_information(model)
