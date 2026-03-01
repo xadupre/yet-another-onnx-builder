@@ -7,7 +7,7 @@ import onnx.helper as oh
 import onnx.numpy_helper as onh
 import numpy as np
 from yobx.ext_test_case import ExtTestCase
-from yobx.xbuilder.reverse_graph_builder import (
+from yobx.translate.reverse_graph_builder import (
     to_graph_builder_code,
     to_graph_pattern_matching,
 )
@@ -65,9 +65,9 @@ class TestReverseGraphBuilder(ExtTestCase):
 
         def create_graph(
             op: "GraphBuilder",
-            shape: "INT64[]",
-            indices: "INT64[, ]",
-            updates: "FLOAT[, , ]",
+            shape: "INT64[None]",
+            indices: "INT64[None, None]",
+            updates: "FLOAT[None, None, None]",
         ):
             cst = __LONG__
             Z = op.ScatterND(cst, indices, updates, reduction='add', outputs=['Z'])
@@ -75,18 +75,18 @@ class TestReverseGraphBuilder(ExtTestCase):
             return Z
 
 
-        def make_my_model() -> "ModelProto":
+        def build_model() -> "ModelProto":
             g = GraphBuilder({'': 18}, ir_version=9)
-            g.make_tensor_input("shape", onnx.TensorProto.INT64, ('',))
-            g.make_tensor_input("indices", onnx.TensorProto.INT64, ('', ''))
-            g.make_tensor_input("updates", onnx.TensorProto.FLOAT, ('', '', ''))
+            g.make_tensor_input("shape", onnx.TensorProto.INT64, (None,))
+            g.make_tensor_input("indices", onnx.TensorProto.INT64, (None, None))
+            g.make_tensor_input("updates", onnx.TensorProto.FLOAT, (None, None, None))
             create_graph(g.op, "shape", "indices", "updates")
-            g.make_tensor_output("Z", onnx.TensorProto.FLOAT, ('', '', '')__LONG2__)
+            g.make_tensor_output("Z", onnx.TensorProto.FLOAT, (None, None, None)__LONG2__)
             model = g.to_onnx()
             return model
 
 
-        model = make_my_model()
+        model = build_model()
         """)
             .strip("\n")
             .replace(
@@ -136,8 +136,8 @@ class TestReverseGraphBuilder(ExtTestCase):
 
         def create_graph(
             op: "GraphBuilder",
-            shape: "INT64[]",
-            axes: "INT64[]",
+            shape: "INT64[None]",
+            axes: "INT64[None]",
         ):
             cst = __LONG__
             Z = op.SqueezeAnyOpset(cst, axes, outputs=['Z'])
@@ -145,17 +145,17 @@ class TestReverseGraphBuilder(ExtTestCase):
             return Z
 
 
-        def make_my_model() -> "ModelProto":
+        def build_model() -> "ModelProto":
             g = GraphBuilder({'': 18}, ir_version=9)
-            g.make_tensor_input("shape", onnx.TensorProto.INT64, ('',))
-            g.make_tensor_input("axes", onnx.TensorProto.INT64, ('',))
+            g.make_tensor_input("shape", onnx.TensorProto.INT64, (None,))
+            g.make_tensor_input("axes", onnx.TensorProto.INT64, (None,))
             create_graph(g.op, "shape", "axes")
-            g.make_tensor_output("Z", onnx.TensorProto.FLOAT, ('', '', '')__LONG2__)
+            g.make_tensor_output("Z", onnx.TensorProto.FLOAT, (None, None, None)__LONG2__)
             model = g.to_onnx()
             return model
 
 
-        model = make_my_model()
+        model = build_model()
         """)
             .strip("\n")
             .replace(
@@ -216,9 +216,9 @@ class TestReverseGraphBuilder(ExtTestCase):
 
             def example(
                 op: "GraphBuilder",
-                X: "FLOAT[, ]",
-                A: "FLOAT[, ]",
-                B: "FLOAT[, ]",
+                X: "FLOAT[None, None]",
+                A: "FLOAT[None, None]",
+                B: "FLOAT[None, None]",
             ):
                 Y1 = op.LinearRegression(X, A, B, domain='custom', outputs=['Y1'])
                 Y = op.Abs(Y1, outputs=['Y'])
@@ -244,11 +244,11 @@ class TestReverseGraphBuilder(ExtTestCase):
                 return gr
 
 
-            def make_my_model() -> "ModelProto":
+            def build_model() -> "ModelProto":
                 g = GraphBuilder({'': 14, 'custom': 1}, ir_version=11)
-                g.make_tensor_input("X", onnx.TensorProto.FLOAT, ('', ''))
-                g.make_tensor_input("A", onnx.TensorProto.FLOAT, ('', ''))
-                g.make_tensor_input("B", onnx.TensorProto.FLOAT, ('', ''))
+                g.make_tensor_input("X", onnx.TensorProto.FLOAT, (None, None))
+                g.make_tensor_input("A", onnx.TensorProto.FLOAT, (None, None))
+                g.make_tensor_input("B", onnx.TensorProto.FLOAT, (None, None))
                 example(g.op, "X", "A", "B")
                 g.make_tensor_output("Y", onnx.TensorProto.FLOAT, ()__SUFFIX__)
                 make_custom_LinearRegression(g)
@@ -256,7 +256,7 @@ class TestReverseGraphBuilder(ExtTestCase):
                 return model
 
 
-            model = make_my_model()
+            model = build_model()
         """).strip("\n").replace("__SUFFIX__", ", is_dimension=False, indexed=False")
         self.maxDiff = None
         self.assertEqual(expected, code.strip("\n"))
