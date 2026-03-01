@@ -23,7 +23,7 @@ class OrderOptimization:
     """
     Optimizes the order of computation.
     It tries to minimize the distance between a producer and the consumer
-    or a results. The idea is to reduce the memory usage.
+    or a result. The idea is to reduce the memory usage.
 
     :param builder: GraphBuilder holding the model
     :param algorithm: to apply
