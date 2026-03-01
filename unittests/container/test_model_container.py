@@ -351,9 +351,7 @@ class TestDeserializeGraph(ExtTestCase):
         g = c._deserialize_graph(model.graph, [])
         self.assertIsInstance(g, onnx_ir.Graph)
         self.assertIn("W", g.initializers)
-        np.testing.assert_array_equal(
-            g.initializers["W"].const_value.numpy(), data
-        )
+        np.testing.assert_array_equal(g.initializers["W"].const_value.numpy(), data)
 
     @requires_torch()
     def test_graph_with_external_torch_initializer(self):
@@ -379,9 +377,9 @@ class TestDeserializeGraph(ExtTestCase):
         g = c._deserialize_graph(model.graph, [])
         self.assertIsInstance(g, onnx_ir.Graph)
         self.assertIn("W", g.initializers)
-        np.testing.assert_array_equal(
-            g.initializers["W"].const_value.numpy(), np_data
-        )
+        np.testing.assert_array_equal(g.initializers["W"].const_value.numpy(), np_data)
+
+
 class TestBuildStats(ExtTestCase):
     def test_len_empty(self):
         from yobx.container import BuildStats
