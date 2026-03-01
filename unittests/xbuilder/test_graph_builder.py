@@ -1495,6 +1495,36 @@ class TestGraphBuilder(ExtTestCase):
         got = ref2.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    def test_set_sequence_and_get_sequence(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_sequence_input("seq", TFLOAT, None)
+        self.assertTrue(g.is_sequence("seq"))
+        info = g.get_sequence("seq")
+        self.assertIn("dtype", info)
+        self.assertEqual(info["dtype"], TFLOAT)
+
+    def test_set_sequence_with_shapes(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_sequence_input("seq", TFLOAT, (3, 4))
+        self.assertTrue(g.is_sequence("seq"))
+        info = g.get_sequence("seq")
+        self.assertEqual(info["dtype"], TFLOAT)
+        self.assertIsNotNone(info["shapes"])
+        self.assertEqual(info["ranks"], (2,))
+
+    def test_is_sequence_false_for_non_sequence(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TFLOAT, (3, 4))
+        self.assertFalse(g.is_sequence("X"))
+
+    def test_set_sequence_update_existing(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_sequence_input("seq", TFLOAT, None)
+        # calling set_sequence again with same dtype should not raise
+        g.set_sequence("seq", TFLOAT, shapes=None, ranks=None)
+        info = g.get_sequence("seq")
+        self.assertEqual(info["dtype"], TFLOAT)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
