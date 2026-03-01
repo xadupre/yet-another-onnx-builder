@@ -116,7 +116,7 @@ class Opset:
     def make_node(
         self,
         op_type: str,
-        *inputs: Optional[Union[str, List[str]]],
+        *inputs: Optional[Union[str, np.ndarray]],
         outputs: Optional[Union[int, List[str], str]] = None,
         domain: str = "",
         name: Optional[str] = None,
