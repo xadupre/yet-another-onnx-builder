@@ -240,6 +240,8 @@ class OrderOptimization:
         }
         ordered_nodes = []
         for pos, node in enumerate(self.builder.nodes):
+            if not node:
+                continue
             if node.op_type in ("Shape", "Size") and not node.domain:
                 assert node.input[0] in positions, f"Missing input {node.input[0]!r}"
                 produced = positions[node.input[0]]
