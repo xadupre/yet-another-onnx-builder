@@ -9,6 +9,7 @@ from yobx.ext_test_case import (
     hide_stdout,
     ignore_warnings,
     requires_onnxir,
+    requires_torch,
 )
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder import GraphBuilder, FunctionOptions
@@ -1494,6 +1495,41 @@ class TestGraphBuilder(ExtTestCase):
         ref2 = self.check_ort(onx)
         got = ref2.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
+
+
+@requires_torch()
+class TestGetInputDynamicShape(ExtTestCase):
+    def setUp(self):
+        self.g = GraphBuilder(18, ir_version=9)
+
+    def test_no_dynamic_shapes_returns_static_shape(self):
+        shape = self.g.get_input_dynamic_shape("x", 0, (2, 3), dynamic_shapes=None)
+        self.assertEqual(shape, (2, 3))
+
+    def test_dynamic_shapes_tuple_info_none_returns_static_shape(self):
+        shape = self.g.get_input_dynamic_shape("x", 0, (2, 3), dynamic_shapes=(None,))
+        self.assertEqual(shape, (2, 3))
+
+    def test_dynamic_shapes_tuple_info_dict_with_wrapdim(self):
+        wrap = GraphBuilder.WrapDim("batch")
+        shape = self.g.get_input_dynamic_shape("x", 0, (2, 3), dynamic_shapes=({0: wrap},))
+        self.assertEqual(shape, ("batch", 3))
+
+    def test_dynamic_shapes_dict_info_dict_with_wrapdim(self):
+        wrap = GraphBuilder.WrapDim("batch")
+        shape = self.g.get_input_dynamic_shape(
+            "x", 0, (2, 3), dynamic_shapes={"x": {0: wrap}}
+        )
+        self.assertEqual(shape, ("batch", 3))
+
+    def test_dynamic_shapes_tuple_info_list_with_named_dim(self):
+        class FakeDim:
+            __name__ = "seq"
+
+        shape = self.g.get_input_dynamic_shape(
+            "x", 0, (2, 3), dynamic_shapes=([FakeDim, None],)
+        )
+        self.assertEqual(shape, ("seq", 3))
 
 
 if __name__ == "__main__":
