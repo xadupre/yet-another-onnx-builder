@@ -10,4 +10,5 @@ API Reference
    reference/index
    torch/index
    translate/index
+   xbuilder/index
    xshape/index
