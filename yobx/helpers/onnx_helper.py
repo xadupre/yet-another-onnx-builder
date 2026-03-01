@@ -1506,7 +1506,7 @@ def make_idn(node: onnx.NodeProto) -> str:
     """
     # return f"{id(node)}-{node.op_type}-{node.output[0]}-{node.name}"
     # id(node) should be enough and faster.
-    return id(node)
+    return str(id(node))
 
 
 def make_idg(g: onnx.GraphProto) -> str:
@@ -1516,4 +1516,4 @@ def make_idg(g: onnx.GraphProto) -> str:
     """
     # return f"{id(g)}-{len(g.node)}-{len(g.input)}-{len(g.output)}-{g.name}"
     # id(g) should be enough and faster.
-    return id(g)
+    return str(id(g))
