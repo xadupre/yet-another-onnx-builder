@@ -195,10 +195,146 @@ class TestExtendedModelContainer(ExtTestCase):
             weight = next(iter(loaded.large_initializers.values()))
             self.assertEqual(weight.shape, data.shape)
 
+    def test_save_then_load_all_in_one_file_torch(self):
+        """Round-trip: save a model with a torch.Tensor initializer and reload it."""
+        import torch
+        from yobx.container import ExtendedModelContainer
+
+        data = torch.ones(3, 4, dtype=torch.float32)
+        model = _make_simple_model_with_external("weight", data)
+
+        container = ExtendedModelContainer()
+        container.model_proto = model
+        container.large_initializers = {"#weight": data}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            file_path = os.path.join(tmp, "model.onnx")
+            container.save(file_path, all_tensors_to_one_file=True)
+            self.assertTrue(os.path.exists(file_path))
+            self.assertTrue(os.path.exists(file_path + ".data"))
+
+            loaded = ExtendedModelContainer().load(file_path)
+            self.assertEqual(len(loaded.model_proto.graph.initializer), 1)
+            self.assertIsInstance(loaded.model_proto, onnx.ModelProto)
+            self.assertEqual(loaded.model_proto.graph.node[0].op_type, "Add")
+            self.assertGreater(len(loaded.large_initializers), 0)
+            weight = next(iter(loaded.large_initializers.values()))
+            self.assertEqual(weight.shape, tuple(data.shape))
+
+    def test_save_then_load_one_file_per_tensor_torch(self):
+        """Round-trip: save a model with a torch.Tensor initializer, one file per tensor."""
+        import torch
+        from yobx.container import ExtendedModelContainer
+
+        data = torch.ones(3, 4, dtype=torch.float32)
+        model = _make_simple_model_with_external("weight", data)
+
+        container = ExtendedModelContainer()
+        container.model_proto = model
+        container.large_initializers = {"#weight": data}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            file_path = os.path.join(tmp, "model.onnx")
+            container.save(file_path, all_tensors_to_one_file=False)
+            self.assertTrue(os.path.exists(file_path))
+            weight_files = [f for f in os.listdir(tmp) if f != "model.onnx"]
+            self.assertGreater(len(weight_files), 0)
+
+            loaded = ExtendedModelContainer().load(file_path)
+            self.assertIsInstance(loaded.model_proto, onnx.ModelProto)
+            self.assertEqual(loaded.model_proto.graph.node[0].op_type, "Add")
+            self.assertGreater(len(loaded.large_initializers), 0)
+            weight = next(iter(loaded.large_initializers.values()))
+            self.assertEqual(weight.shape, tuple(data.shape))
+
     def test_exported_from_yobx_torch(self):
         from yobx.container import ExtendedModelContainer
 
         self.assertIsNotNone(ExtendedModelContainer)
+
+
+class TestBuildStats(ExtTestCase):
+    def test_len_empty(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        self.assertEqual(len(stats), 0)
+
+    def test_len_after_set(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        stats["time_export_write_model"] = 1.0
+        stats["time_export_tobytes"] = 0.5
+        self.assertEqual(len(stats), 2)
+
+    def test_getitem_default(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        self.assertEqual(stats["time_export_write_model"], 0.0)
+
+    def test_setitem_and_getitem(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        stats["time_export_write_model"] += 0.5
+        stats["time_export_tobytes"] += 0.1
+        self.assertAlmostEqual(stats["time_export_write_model"], 0.5)
+        self.assertAlmostEqual(stats["time_export_tobytes"], 0.1)
+
+    def test_to_dict(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        stats["time_export_write_model"] = 1.0
+        d = stats.to_dict()
+        self.assertIsInstance(d, dict)
+        self.assertIn("time_export_write_model", d)
+        self.assertAlmostEqual(d["time_export_write_model"], 1.0)
+
+    def test_to_dict_is_not_a_copy(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        d = stats.to_dict()
+        d["time_export_write_model"] = 99.0
+        self.assertAlmostEqual(stats.to_dict()["time_export_write_model"], 99.0)
+
+    def test_validate_valid_keys(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        stats["time_export_write_model"] = 0.5
+        stats["time_export_tobytes"] = 0.1
+        # Should not raise.
+        stats.validate()
+
+    def test_validate_invalid_key_raises(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        # __setitem__ does not enforce the prefix; validate() does.
+        stats["unknown_key"] = 1.0
+        with self.assertRaises(KeyError):
+            stats.validate()
+
+    def test_repr_empty(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        r = repr(stats)
+        self.assertIn("BuildStats", r)
+        self.assertIn("{}", r)
+
+    def test_repr_with_data(self):
+        from yobx.container import BuildStats
+
+        stats = BuildStats()
+        stats["time_export_write_model"] = 0.5
+        r = repr(stats)
+        self.assertIn("BuildStats", r)
+        self.assertIn("time_export_write_model", r)
 
 
 if __name__ == "__main__":
