@@ -101,6 +101,8 @@ class OrderOptimization:
         )
         context = set()
         for node in self.builder.nodes:
+            if node is None:
+                continue
             assert (
                 node.domain in self.builder.opsets
             ), f"Domain {node.domain!r} is not registered in {self.builder.opsets}"
