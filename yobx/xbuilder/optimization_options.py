@@ -49,12 +49,12 @@ class OptimizationOptions:
     * ``patterns=["FusedMatMul"]``: applies one pattern
     * ``patterns=[RotaryEmbeddingPattern(verbose=10)]``: applies one pattern
       with a specific verbosity value
-    * ``patterns="default``: applies all patterns modifying standard onnx
+    * ``patterns="default"``: applies all patterns modifying standard onnx
       operators into other standard onnx operators
-    * ``patterns="default+onnxruntime``: applies all patterns modifying standard onnx
+    * ``patterns="default+onnxruntime"``: applies all patterns modifying standard onnx
       operators into other standard onnx operators as well as patterns fusing nodes into
       custom operators implemented by :epkg:`onnxruntime`
-    * ``patterns="default+onnxruntime+experimental``: applies all patterns
+    * ``patterns="default+onnxruntime+experimental"``: applies all patterns
       modifying standard onnx operators into other standard onnx operators,
       patterns fusing nodes into custom operators implemented by :epkg:`onnxruntime`.
 
