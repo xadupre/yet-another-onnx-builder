@@ -124,7 +124,7 @@ class OptimizationOptions:
         self.constant_fusing = constant_fusing
         self.stop_after = stop_after
         self.processor = processor
-        self.order = order
+        self.order = OrderAlgorithm.from_str(order)
         self.max_iter = max_iter
         self.recursive = recursive
         self.passes = passes

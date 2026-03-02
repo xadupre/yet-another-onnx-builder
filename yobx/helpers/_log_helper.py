@@ -304,8 +304,8 @@ def align_dataframe_with(
     )
     dtypes = set(df[c].dtype for c in df.columns)
     assert all(
-        np.issubdtype(dt, np.number) for dt in dtypes
-    ), (  # pyrefly: ignore[bad-argument-type]
+        np.issubdtype(dt, np.number) for dt in dtypes  # pyrefly: ignore[bad-argument-type]
+    ), (
         f"All columns in the first dataframe are expected to share "
         f"the same type or be at least numerical but got {dtypes}\n{df}"
     )
@@ -313,8 +313,8 @@ def align_dataframe_with(
     cp = pandas.DataFrame(float(fill_value), index=baseline.index, columns=baseline.columns)
     for c in df.columns:
         if c not in cp.columns or not np.issubdtype(
-            df[c].dtype, np.number
-        ):  # pyrefly: ignore[bad-argument-type]
+            df[c].dtype, np.number  # pyrefly: ignore[bad-argument-type]
+        ):
             continue
         cp.loc[common_index, c] = df.loc[common_index, c].astype(cp[c].dtype)
     return cp

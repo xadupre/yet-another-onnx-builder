@@ -1954,8 +1954,11 @@ class CubeLogsPerformance(CubeLogs):
             return lambda df: gdf(df, "mema_gpu_5_after_export") - gdf(df, "mema_gpu_4_reset")
         if formula == "peak_gpu_nvidia":
             return (
-                lambda df: (gdf(df, "memory_gpu0_peak") - gdf(df, "memory_gpu0_begin")) * 2**20
-            )  # pyrefly: ignore[unsupported-operation]
+                lambda df: (  # pyrefly: ignore[unsupported-operation]
+                    gdf(df, "memory_gpu0_peak") - gdf(df, "memory_gpu0_begin")
+                )
+                * 2**20
+            )
         if formula == "time_export_unbiased":
 
             def unbiased_export(df):
@@ -2118,10 +2121,10 @@ class CubeLogsPerformance(CubeLogs):
                 ignore_unique=True,
                 key_agg=["model_name", "task", "model_task"],
                 agg_args=lambda column_name: "sum" if column_name.startswith("n_") else "mean",
-                agg_multi={
+                agg_multi={  # pyrefly: ignore[bad-argument-type]
                     "speedup_weighted": mean_weight,
                     "speedup_geo": mean_geo,
-                },  # pyrefly: ignore[bad-argument-type]
+                },
                 keep_columns_in_index=["suite"],
                 name="agg-suite",
                 order=order,
@@ -2152,10 +2155,10 @@ class CubeLogsPerformance(CubeLogs):
                 ignore_unique=True,
                 key_agg=["model_name", "task", "model_task", "suite"],
                 agg_args=lambda column_name: "sum" if column_name.startswith("n_") else "mean",
-                agg_multi={
+                agg_multi={  # type: ignore
                     "speedup_weighted": mean_weight,
                     "speedup_geo": mean_geo,
-                },  # pyrefly: ignore[unsupported-operation]
+                },
                 name="agg-all",
                 order=order,
                 plots=True,
