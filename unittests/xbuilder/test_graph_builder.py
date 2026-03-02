@@ -1622,6 +1622,94 @@ class TestGraphBuilder(ExtTestCase):
         # "batch" source should include both inputs
         sources = g.dynamic_dimensions_source["batch"]
         self.assertEqual(len(sources), 2)
+    def test_update_model_with_parameter_renaming(self):
+        """Test _update_model_with_parameter_renaming renames initializer in nodes."""
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TFLOAT, (2, 4))
+        np_weights = np.arange(12).reshape((4, 3)).astype(np.float32)
+        w_init = g.make_initializer("p_layer_weight", np_weights, parameter_name="layer.weight")
+        self.assertEqual(g._parameter_renaming, {"p_layer_weight": "layer.weight"})
+        g.op.MatMul("X", w_init, outputs=["Y"])
+        g.make_tensor_output("Y", TFLOAT, (2, 3), is_dimension=False, indexed=False)
+        onx = g.to_onnx()
+        # The initializer must carry the external parameter name.
+        init_names = [i.name for i in onx.graph.initializer]
+        self.assertIn("layer.weight", init_names)
+        self.assertNotIn("p_layer_weight", init_names)
+        # The MatMul node must reference the renamed initializer.
+        matmul_inputs = list(onx.graph.node[0].input)
+        self.assertIn("layer.weight", matmul_inputs)
+        self.assertNotIn("p_layer_weight", matmul_inputs)
+        # Verify numerical correctness.
+        feeds = {"X": np.random.randn(2, 4).astype(np.float32)}
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, feeds)[0]
+        self.assertEqualArray(feeds["X"] @ np_weights, got)
+
+    def test_update_model_with_parameter_renaming_multiple(self):
+        """Test _update_model_with_parameter_renaming with multiple renamed parameters."""
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TFLOAT, (2, 4))
+        np_weights = np.arange(12).reshape((4, 3)).astype(np.float32)
+        np_bias = np.arange(3).reshape((1, 3)).astype(np.float32) + 10.0
+        w_init = g.make_initializer("p_w", np_weights, parameter_name="fc.weight")
+        b_init = g.make_initializer("p_b", np_bias, parameter_name="fc.bias")
+        self.assertEqual(
+            g._parameter_renaming, {"p_w": "fc.weight", "p_b": "fc.bias"}
+        )
+        mm = g.op.MatMul("X", w_init, outputs=["mm"])
+        g.op.Add(mm, b_init, outputs=["Y"])
+        g.make_tensor_output("Y", TFLOAT, (2, 3), is_dimension=False, indexed=False)
+        onx = g.to_onnx()
+        init_names = [i.name for i in onx.graph.initializer]
+        self.assertIn("fc.weight", init_names)
+        self.assertIn("fc.bias", init_names)
+        self.assertNotIn("p_w", init_names)
+        self.assertNotIn("p_b", init_names)
+        # Both nodes must reference the renamed initializers.
+        all_node_inputs = [inp for node in onx.graph.node for inp in node.input]
+        self.assertIn("fc.weight", all_node_inputs)
+        self.assertIn("fc.bias", all_node_inputs)
+        self.assertNotIn("p_w", all_node_inputs)
+        self.assertNotIn("p_b", all_node_inputs)
+        # Verify numerical correctness.
+        feeds = {"X": np.random.randn(2, 4).astype(np.float32)}
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, feeds)[0]
+        self.assertEqualArray(feeds["X"] @ np_weights + np_bias, got)
+@requires_torch()
+class TestGetInputDynamicShape(ExtTestCase):
+    def setUp(self):
+        self.g = GraphBuilder(18, ir_version=9)
+
+    def test_no_dynamic_shapes_returns_static_shape(self):
+        shape = self.g.get_input_dynamic_shape("x", 0, (2, 3), dynamic_shapes=None)
+        self.assertEqual(shape, (2, 3))
+
+    def test_dynamic_shapes_tuple_info_none_returns_static_shape(self):
+        shape = self.g.get_input_dynamic_shape("x", 0, (2, 3), dynamic_shapes=(None,))
+        self.assertEqual(shape, (2, 3))
+
+    def test_dynamic_shapes_tuple_info_dict_with_wrapdim(self):
+        wrap = GraphBuilder.WrapDim("batch")
+        shape = self.g.get_input_dynamic_shape("x", 0, (2, 3), dynamic_shapes=({0: wrap},))
+        self.assertEqual(shape, ("batch", 3))
+
+    def test_dynamic_shapes_dict_info_dict_with_wrapdim(self):
+        wrap = GraphBuilder.WrapDim("batch")
+        shape = self.g.get_input_dynamic_shape(
+            "x", 0, (2, 3), dynamic_shapes={"x": {0: wrap}}
+        )
+        self.assertEqual(shape, ("batch", 3))
+
+    def test_dynamic_shapes_tuple_info_list_with_named_dim(self):
+        class FakeDim:
+            __name__ = "seq"
+
+        shape = self.g.get_input_dynamic_shape(
+            "x", 0, (2, 3), dynamic_shapes=([FakeDim, None],)
+        )
+        self.assertEqual(shape, ("seq", 3))
     def test_check_two_shapes_are_compatible_same_ints(self):
         g = GraphBuilder(18)
         # identical integer shapes: no exception
@@ -1923,6 +2011,7 @@ class TestGraphBuilder(ExtTestCase):
         else_att = next(a for a in result.node[0].attribute if a.name == "else_branch")
         else_ops = [(n.domain, n.op_type) for n in else_att.g.node]
         self.assertIn(("", "Abs"), else_ops)
+
     def test_set_sequence_and_get_sequence(self):
         g = GraphBuilder(18, ir_version=9)
         g.make_tensor_sequence_input("seq", TFLOAT, None)
