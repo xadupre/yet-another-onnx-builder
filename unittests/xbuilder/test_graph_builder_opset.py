@@ -5,6 +5,7 @@ Each test builds a minimal ONNX graph using gr.op.<OpType>(...),
 exports it with gr.to_onnx(), and validates the output with
 onnxruntime.
 """
+
 import unittest
 import numpy as np
 from onnx import TensorProto
@@ -19,9 +20,7 @@ TBOOL = TensorProto.BOOL
 
 def _run(model, feeds):
     """Run an ONNX model through onnxruntime and return the first output."""
-    sess = InferenceSession(
-        model.SerializeToString(), providers=["CPUExecutionProvider"]
-    )
+    sess = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
     return sess.run(None, feeds)
 
 
@@ -478,10 +477,10 @@ class TestOpsetMaxPool(ExtTestCase):
     def test_maxpool(self):
         gr = _builder()
         gr.make_tensor_input("X", TFLOAT, ("n", "c", "h", "w"), is_dimension=False)
-        out, indices = gr.op.MaxPool(
-            "X", kernel_shape=[2, 2], outputs=["Y", "indices"]
+        out, indices = gr.op.MaxPool("X", kernel_shape=[2, 2], outputs=["Y", "indices"])
+        gr.make_tensor_output(
+            out, TFLOAT, ("n", "c", None, None), indexed=False, is_dimension=False
         )
-        gr.make_tensor_output(out, TFLOAT, ("n", "c", None, None), indexed=False, is_dimension=False)
         gr.make_tensor_output(
             indices, TINT64, ("n", "c", None, None), indexed=False, is_dimension=False
         )
@@ -839,7 +838,9 @@ class TestOpsetScatterND(ExtTestCase):
         gr = _builder()
         gr.make_tensor_input("data", TFLOAT, ("a", "b"), is_dimension=False)
         indices = gr.make_initializer("", np.array([[0], [2]], dtype=np.int64))
-        updates = gr.make_initializer("", np.array([[10.0, 20.0], [30.0, 40.0]], dtype=np.float32))
+        updates = gr.make_initializer(
+            "", np.array([[10.0, 20.0], [30.0, 40.0]], dtype=np.float32)
+        )
         out = gr.op.ScatterND("data", indices, updates, outputs=["Y"])
         gr.make_tensor_output(out, TFLOAT, ("a", "b"), indexed=False, is_dimension=False)
         onx = gr.to_onnx()
@@ -1078,7 +1079,9 @@ class TestReduceMaxAnyOpset(ExtTestCase):
     def test_reduce_max_any_opset_opset10(self):
         gr = _builder(opset=10)
         gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
-        out = gr.op.ReduceMaxAnyOpset("X", np.array([1], dtype=np.int64), keepdims=0, outputs=["Y"])
+        out = gr.op.ReduceMaxAnyOpset(
+            "X", np.array([1], dtype=np.int64), keepdims=0, outputs=["Y"]
+        )
         gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
         onx = gr.to_onnx()
         x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
@@ -1112,7 +1115,9 @@ class TestReduceMinAnyOpset(ExtTestCase):
     def test_reduce_min_any_opset_opset10(self):
         gr = _builder(opset=10)
         gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
-        out = gr.op.ReduceMinAnyOpset("X", np.array([1], dtype=np.int64), keepdims=0, outputs=["Y"])
+        out = gr.op.ReduceMinAnyOpset(
+            "X", np.array([1], dtype=np.int64), keepdims=0, outputs=["Y"]
+        )
         gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
         onx = gr.to_onnx()
         x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
@@ -1182,7 +1187,9 @@ class TestReduceSumAnyOpset(ExtTestCase):
     def test_reduce_sum_any_opset_opset10(self):
         gr = _builder(opset=10)
         gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
-        out = gr.op.ReduceSumAnyOpset("X", np.array([1], dtype=np.int64), keepdims=0, outputs=["Y"])
+        out = gr.op.ReduceSumAnyOpset(
+            "X", np.array([1], dtype=np.int64), keepdims=0, outputs=["Y"]
+        )
         gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
         onx = gr.to_onnx()
         x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)

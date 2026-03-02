@@ -480,7 +480,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._context = _context or set()
         self._do_not_turn_constant_initializers = False
 
-        self._parent: Optional["GraphBuilder"]
+        self._parent: Optional[GraphBuilder]
         self._parent_node: Optional[NodeProto]
         if isinstance(_parent, tuple):
             self._parent = _parent[0]
@@ -1879,7 +1879,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             name = name.name
         self._known_torch_value[name] = (where, value)
 
-    def _torch_sym_int_to_str(self, value: "torch.SymInt") -> Union[int, str]:  
+    def _torch_sym_int_to_str(self, value: "torch.SymInt") -> Union[int, str]:
         if isinstance(value, str):
             return value
         if hasattr(value, "node") and isinstance(value.node, str):
@@ -2600,17 +2600,20 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if not self.value_as_shape(name):
                 # Let's mark  this input as a shape
                 self.set_value_shape(name, name)
-            return cast(Optional[str], self.make_tensor_input(
-                self._known_value_shape[name],
-                (
-                    TensorProto.INT64
-                    if isinstance(value, self.torch.SymInt)
-                    else TensorProto.FLOAT
+            return cast(
+                Optional[str],
+                self.make_tensor_input(
+                    self._known_value_shape[name],
+                    (
+                        TensorProto.INT64
+                        if isinstance(value, self.torch.SymInt)
+                        else TensorProto.FLOAT
+                    ),
+                    tuple(),
+                    is_dimension=True,
+                    marker="make_dynamic_object",
                 ),
-                tuple(),
-                is_dimension=True,
-                marker="make_dynamic_object",
-            ))
+            )
         return self._known_value_shape.get(name, name)
 
     def get_dimension_as_result(self, name: str) -> str:
@@ -5616,7 +5619,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             for node in v.node:
                 self._check_constant(node, f"{prefix}-[{k}]")
         if add is not None:
-            assert isinstance(add, (FunctionProto, GraphProto)), f"Not implemented for type {type(add)}"
+            assert isinstance(
+                add, (FunctionProto, GraphProto)
+            ), f"Not implemented for type {type(add)}"
             for node in add.node:
                 self._check_constant(node, f"{prefix}-[add]")
 
@@ -7177,7 +7182,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                             f"{self.get_debug_msg()}"
                         )
                         sources = []
-                        for k in (feeds or {}):
+                        for k in feeds or {}:
                             sources.append(
                                 f"##{k}/"
                                 if k not in self.initializers_dict_sources
@@ -9887,9 +9892,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             f"{self.get_debug_msg()}"
         )
 
-    def make_new_dynamic_shape(
-        self, rank: int, prefix: str = "d"
-    ) -> Tuple["torch.SymInt", ...]:
+    def make_new_dynamic_shape(self, rank: int, prefix: str = "d") -> Tuple["torch.SymInt", ...]:
         """Creates a dynamic shape of a known rank with new dynamic dimension."""
         return tuple(
             self.torch.SymInt(self.make_new_dynamic_name(f"{prefix}_d{i}")) for i in range(rank)
@@ -9906,9 +9909,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             n = f"{prefix}_{i}"
         return n
 
-    def make_torch_tensor_from_np_array(
-        self, np_array: np.ndarray
-    ) -> "torch.Tensor":
+    def make_torch_tensor_from_np_array(self, np_array: np.ndarray) -> "torch.Tensor":
         """Converts a numpy array into a :class:`torch.Tensor`."""
         try:
             import ml_dtypes
