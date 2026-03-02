@@ -3141,5 +3141,63 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertFalse(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
 
 
+class TestPositionMsg(ExtTestCase):
+    def _make_simple_model(self):
+        return oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Abs", ["X"], ["a"], name="n0"),
+                    oh.make_node("Neg", ["a"], ["b"], name="n1"),
+                    oh.make_node("Relu", ["b"], ["Y"], name="n2"),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [None])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [None])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+
+    def test_position_msg_no_around(self):
+        model = self._make_simple_model()
+        gr = GraphBuilder(model)
+        msg = gr._position_msg(gr.nodes)
+        self.assertIsInstance(msg, str)
+        self.assertIn("Abs", msg)
+        self.assertIn("Neg", msg)
+        self.assertIn("Relu", msg)
+        # input/output position lines should appear
+        self.assertIn("pos(", msg)
+
+    def test_position_msg_single_node(self):
+        model = self._make_simple_model()
+        gr = GraphBuilder(model)
+        node = gr.nodes[1]  # Neg node
+        msg = gr._position_msg([node])
+        self.assertIsInstance(msg, str)
+        self.assertIn("Neg", msg)
+        self.assertIn("pos(a)", msg)
+        self.assertIn("pos(b)", msg)
+
+    def test_position_msg_with_around(self):
+        model = self._make_simple_model()
+        gr = GraphBuilder(model)
+        node = gr.nodes[1]  # Neg node
+        msg = gr._position_msg([node], around=(1, 1))
+        self.assertIsInstance(msg, str)
+        self.assertIn("Neg", msg)
+        # context window separator should be present
+        self.assertIn("---", msg)
+        # positional prefix for context nodes
+        self.assertIn("P", msg)
+
+    def test_position_msg_with_none_node(self):
+        model = self._make_simple_model()
+        gr = GraphBuilder(model)
+        # None entries in the list should be skipped without error
+        msg = gr._position_msg([None, gr.nodes[0]])
+        self.assertIsInstance(msg, str)
+        self.assertIn("Abs", msg)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
