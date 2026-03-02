@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Any, Dict
+import copy
+from typing import Any, Dict, Optional
 import torch
 
 
@@ -13,13 +14,38 @@ class ModelData:
     dynamic_shapes: Dict[str, Any]
 
 
-def get_tiny_model(model_id) -> ModelData:
+def _update_config(config: Any, mkwargs: Dict[str, Any]):
+    """Updates a configuration with different values."""
+    for k, v in mkwargs.items():
+        if k == "attn_implementation":
+            config._attn_implementation = v
+            if getattr(config, "_attn_implementation_autoset", False):
+                config._attn_implementation_autoset = False
+            continue
+        if isinstance(v, dict):
+            if not hasattr(config, k) or getattr(config, k) is None:
+                setattr(config, k, v)
+                continue
+            existing = getattr(config, k)
+            if type(existing) is dict:
+                existing.update(v)
+            else:
+                _update_config(getattr(config, k), v)
+            continue
+        if type(config) is dict:
+            config[k] = v
+        else:
+            setattr(config, k, v)
+
+
+def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) -> ModelData:
     """
     Creates a tiny models, usually untrained to write tests.
     The `model_id` refers to what exists on HuggingFace.
     This functions is not expected to have fully coverage of architectures.
 
     :param model_id: model_id
+    :param config_updates: modification to add to the configuration before creating the model
     :return: the necessary information
     """
     if model_id == "arnir0/Tiny-LLM":
@@ -28,6 +54,10 @@ def get_tiny_model(model_id) -> ModelData:
         from .transformers.cache_helper import make_dynamic_cache
 
         config = get_cached_configuration(model_id)
+        if config_updates:
+            config = copy.deepcopy(config)
+            _update_config(config, config_updates)
+
         bsize, nheads, slen, dim = 2, 1, 30, 96
         return ModelData(
             model_id=model_id,

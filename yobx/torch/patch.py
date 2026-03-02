@@ -1,7 +1,7 @@
 import contextlib
 import traceback
-from typing import Iterator, List
-from ..helpers.patch_helper import PatchInfo
+from typing import Iterator
+from ..helpers.patch_helper import PatchDetails
 
 
 def retrieve_stacktrace():
@@ -21,7 +21,7 @@ def retrieve_stacktrace():
 @contextlib.contextmanager
 def apply_patches(
     patch_torch: bool = False, patch_transformers: bool = False, verbose: int = 0
-) -> Iterator[List[PatchInfo]]:
+) -> Iterator[PatchDetails]:
     """
     The context manager apply patches, usually before exporting a model.
 
@@ -32,7 +32,7 @@ def apply_patches(
         with apply_patches(patch_transformers=True):
             # ...
     """
-    patches = []
+    patches = PatchDetails()
     if patch_torch:
         from .torch.patches import PATCHES
 

@@ -3,7 +3,7 @@ import inspect
 import pprint
 import re
 import textwrap
-from typing import Any, Dict, Callable, List, Optional, Tuple, Union
+from typing import Any, Dict, Callable, Iterable, Iterator, List, Optional, Tuple
 
 
 def clean_code_with_black(code: str) -> str:
@@ -97,6 +97,11 @@ class PatchInfo:
 
     def add_dependency(self, patch_info: "PatchInfo"):
         self.depends_on.append(patch_info)
+
+    @property
+    def name(self) -> str:
+        """Returns the name of the patch."""
+        return self.patch.__name__
 
     def __repr__(self) -> str:
         "usual"
@@ -194,30 +199,27 @@ class PatchDetails:
         self.patched = []
         self.find_cache = {}
 
+    def __iter__(self) -> Iterator[PatchInfo]:
+        """Iterates on all patches."""
+        yield from self.patched
+
     def find(self, name: str) -> Optional[PatchInfo]:
-        "Finds a patch by name."
+        """Finds a patch by name."""
         if name in self.find_cache:
             return self.find_cache[name]
         for p in self.patched:
-            if p.patch.__name__ == name:
+            if p.name == name:
                 self.find_cache[name] = p
                 return p
         return None
 
-    def append(
-        self, family: str, function_to_patch: Union[str, Callable], patch: Callable
-    ) -> PatchInfo:
-        """
-        Stores a patch.
+    def append(self, patch: PatchInfo):
+        """Adds a patch to the list of patches."""
+        self.patched.append(patch)
 
-        :param family: a category, anything to classify the patch
-        :param function_to_patch: function to patch
-        :param patch: function patched
-        :return: instance of PatchInfo
-        """
-        p = PatchInfo(function_to_patch, patch, family=family)
-        self.patched.append(p)
-        return p
+    def extend(self, patches: Iterable[PatchInfo]):
+        """Adds a patches to the list of patches."""
+        self.patched.extend(patches)
 
     @property
     def n_patches(self) -> int:

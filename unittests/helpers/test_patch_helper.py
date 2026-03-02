@@ -6,7 +6,8 @@ from yobx.ext_test_case import (
     hide_stdout,
     has_transformers,
 )
-from yobx.torch import register_patches
+from yobx.helpers.patch_helper import PatchDetails
+from yobx.torch import apply_patches
 from yobx.torch import use_dyn_not_str
 from yobx.torch import register_flattening_functions, get_tiny_model
 
@@ -17,9 +18,7 @@ class TestPatchHelper(ExtTestCase):
     def test_patch_details(self):
         with (
             register_flattening_functions(patch_transformers=True),
-            register_patches(
-                patch_transformers=True,
-            ) as details,
+            apply_patches(patch_transformers=True) as details,
         ):
             pass
         self.assertGreater(details.n_patches, 1)
@@ -37,7 +36,7 @@ class TestPatchHelper(ExtTestCase):
         # second time to make every patch was removed
         with (
             register_flattening_functions(patch_transformers=True),
-            register_patches(
+            apply_patches(
                 patch_transformers=True,
                 verbose=10,
                 patch_torch=True,
@@ -48,13 +47,57 @@ class TestPatchHelper(ExtTestCase):
             pass
 
     @requires_transformers("4.57")
-    def test_involved_patches(self):
+    def test_involved_patches_no_patch_applied(self):
         data = get_tiny_model("arnir0/Tiny-LLM")
         model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
-        with register_patches(patch_transformers=True, patch_torch=False) as details:
+        with (
+            apply_patches(patch_transformers=False, patch_torch=False),
+            register_flattening_functions(patch_transformers=True) as details,
+        ):
+            ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=use_dyn_not_str(ds))
+            self.assertIsInstance(details, PatchDetails)
+        patches = details.patches_involved_in_graph(ep.graph)
+        self.assertEqual(len(patches), 0)
+
+    @requires_transformers("4.57")
+    def test_involved_patches_dynamic_rope(self):
+        data = get_tiny_model(
+            "arnir0/Tiny-LLM",
+            config_updates={"rope_parameters": {"rope_theta": 10000.0, "rope_type": "dynamic"}},
+        )
+        model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
+        print(model.config)
+        with (
+            apply_patches(patch_transformers=False, patch_torch=False),
+            register_flattening_functions(patch_transformers=True) as details,
+        ):
             ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=use_dyn_not_str(ds))
         patches = details.patches_involved_in_graph(ep.graph)
+        self.assertEqual(len(patches), 0)
         self.assertNotEmpty(patches)
+
+        report = details.make_report(patches, format="rst")
+        if has_transformers("4.51"):
+            self.assertIn("====", report)
+            self.assertIn("def longrope_frequency_update", report)
+
+    @requires_transformers("4.57")
+    def test_involved_patches_long_rope(self):
+        data = get_tiny_model(
+            "arnir0/Tiny-LLM",
+            config_updates={"rope_parameters": {"rope_theta": 10000.0, "rope_type": "longrope"}},
+        )
+        model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
+        print(model.config)
+        with (
+            apply_patches(patch_transformers=False, patch_torch=False),
+            register_flattening_functions(patch_transformers=True) as details,
+        ):
+            ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=use_dyn_not_str(ds))
+        patches = details.patches_involved_in_graph(ep.graph)
+        self.assertEqual(len(patches), 0)
+        self.assertNotEmpty(patches)
+
         report = details.make_report(patches, format="rst")
         if has_transformers("4.51"):
             self.assertIn("====", report)
