@@ -2989,9 +2989,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         parent = GraphBuilder(18, ir_version=9)
         child = GraphBuilder(18, ir_version=9, _parent=parent)
         child.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
-        self.assertFalse(
-            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
-        )
+        self.assertFalse(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
 
     def test_do_not_turn_constant_initializers_same_constant_in_parent(self):
         # Same constant in both parent and child: has_exact_same_constant_in_context returns True,
@@ -3003,9 +3001,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         child = GraphBuilder(18, ir_version=9, _parent=parent)
         child.make_initializer("cst", np_cst)
 
-        self.assertFalse(
-            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
-        )
+        self.assertFalse(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
 
     def test_do_not_turn_constant_initializers_different_constant_in_parent(self):
         # Different values for same name: has_exact_same_constant_in_context returns False,
@@ -3018,9 +3014,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         np_cst2 = np_cst1 + 1.0
         child.make_initializer("cst", np_cst2)
 
-        self.assertTrue(
-            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
-        )
+        self.assertTrue(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
 
     def test_do_not_turn_constant_initializers_large_constant_recurse_to_parent(self):
         # Large constants (>= 128 elements) cause has_exact_same_constant_in_context to return
@@ -3033,9 +3027,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         child = GraphBuilder(18, ir_version=9, _parent=parent)
         child.make_initializer("cst", np_cst)
 
-        self.assertFalse(
-            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
-        )
+        self.assertFalse(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
 
 
 if __name__ == "__main__":
