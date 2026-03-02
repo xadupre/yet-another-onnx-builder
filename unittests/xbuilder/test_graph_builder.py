@@ -9,6 +9,7 @@ from yobx.ext_test_case import (
     hide_stdout,
     ignore_warnings,
     requires_onnxir,
+    requires_torch,
 )
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder import GraphBuilder, FunctionOptions
@@ -1006,6 +1007,44 @@ class TestGraphBuilder(ExtTestCase):
         got = ref3.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    def test_set_type_shape_or_rank_with_shape_and_device(self):
+        g = GraphBuilder(18)
+        g.set_type("a", TFLOAT)
+        g.set_shape("a", (2, 3))
+        g.set_device("a", -1)
+
+        g.set_type_shape_or_rank("b", "a")
+
+        self.assertTrue(g.has_type("b"))
+        self.assertEqual(g.get_type("b"), TFLOAT)
+        self.assertTrue(g.has_shape("b"))
+        self.assertEqual(g.get_shape("b"), (2, 3))
+        self.assertTrue(g.has_device("b"))
+        self.assertEqual(g.get_device("b"), -1)
+
+    def test_set_type_shape_or_rank_with_rank_only(self):
+        g = GraphBuilder(18)
+        g.set_type("c", TINT64)
+        g.set_rank("c", 3)
+
+        g.set_type_shape_or_rank("d", "c")
+
+        self.assertTrue(g.has_type("d"))
+        self.assertEqual(g.get_type("d"), TINT64)
+        self.assertTrue(g.has_rank("d"))
+        self.assertEqual(g.get_rank("d"), 3)
+        self.assertFalse(g.has_shape("d"))
+        self.assertFalse(g.has_device("d"))
+
+    def test_set_type_shape_or_rank_no_info(self):
+        g = GraphBuilder(18)
+        # When `like` has no type, shape, rank, or device, nothing should be set.
+        g.set_type_shape_or_rank("e", "f")
+        self.assertFalse(g.has_type("e"))
+        self.assertFalse(g.has_shape("e"))
+        self.assertFalse(g.has_rank("e"))
+        self.assertFalse(g.has_device("e"))
+
     def test__apply_reshape_to_shape(self):
         g = GraphBuilder(18)
         cases = [
@@ -1532,6 +1571,133 @@ class TestGraphBuilder(ExtTestCase):
         # one int, one string: compatible (no exception)
         g._check_two_shapes_are_compatible((2, "seq"), (2, "seq"), name="x")
         g._check_two_shapes_are_compatible((2, "seq"), (2, "other"), name="x")
+    def _make_node_with_attrs(self, **attrs):
+        node = oh.make_node("SomeOp", ["X"], ["Y"])
+        for name, value in attrs.items():
+            node.attribute.append(oh.make_attribute(name, value))
+        return node
+
+    @requires_torch()
+    def test_get_attribute_with_default_int(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(axis=2)
+        self.assertEqual(gr.get_attribute_with_default(node, "axis", 0), 2)
+
+    @requires_torch()
+    def test_get_attribute_with_default_ints(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(perm=[0, 2, 1])
+        self.assertEqual(gr.get_attribute_with_default(node, "perm", []), [0, 2, 1])
+
+    @requires_torch()
+    def test_get_attribute_with_default_float(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(alpha=0.5)
+        self.assertAlmostEqual(gr.get_attribute_with_default(node, "alpha", 1.0), 0.5)
+
+    @requires_torch()
+    def test_get_attribute_with_default_floats(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(scales=[1.0, 2.0, 3.0])
+        self.assertEqual(gr.get_attribute_with_default(node, "scales", []), [1.0, 2.0, 3.0])
+
+    @requires_torch()
+    def test_get_attribute_with_default_string(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(mode=b"constant")
+        self.assertEqual(gr.get_attribute_with_default(node, "mode", b""), b"constant")
+
+    @requires_torch()
+    def test_get_attribute_with_default_strings(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(keys=[b"hello", b"world"])
+        self.assertEqual(gr.get_attribute_with_default(node, "keys", []), [b"hello", b"world"])
+
+    @requires_torch()
+    def test_get_attribute_with_default_missing(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(axis=1)
+        self.assertEqual(gr.get_attribute_with_default(node, "missing", 42), 42)
+
+    @requires_torch()
+    def test_get_attribute_with_default_unsupported_type(self):
+        import onnx
+
+        gr = GraphBuilder(18, ir_version=9)
+        node = oh.make_node("SomeOp", ["X"], ["Y"])
+        tensor = onh.from_array(np.array([1.0], dtype=np.float32))
+        att = onnx.AttributeProto()
+        att.name = "value"
+        att.type = onnx.AttributeProto.TENSOR
+        att.t.CopyFrom(tensor)
+        node.attribute.append(att)
+        self.assertRaise(lambda: gr.get_attribute_with_default(node, "value", None), TypeError)
+
+    @requires_torch()
+    def test_get_attributes_with_default_int(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(axis=3)
+        self.assertEqual(gr.get_attributes_with_default(node, axis=0), {"axis": 3})
+
+    @requires_torch()
+    def test_get_attributes_with_default_ints(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(perm=[1, 0, 2])
+        self.assertEqual(gr.get_attributes_with_default(node, perm=[]), {"perm": [1, 0, 2]})
+
+    @requires_torch()
+    def test_get_attributes_with_default_float(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(alpha=0.25)
+        result = gr.get_attributes_with_default(node, alpha=1.0)
+        self.assertAlmostEqual(result["alpha"], 0.25)
+
+    @requires_torch()
+    def test_get_attributes_with_default_floats(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(scales=[1.5, 2.5])
+        self.assertEqual(gr.get_attributes_with_default(node, scales=[]), {"scales": [1.5, 2.5]})
+
+    @requires_torch()
+    def test_get_attributes_with_default_string(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(mode=b"nearest")
+        self.assertEqual(gr.get_attributes_with_default(node, mode=b""), {"mode": b"nearest"})
+
+    @requires_torch()
+    def test_get_attributes_with_default_strings(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = self._make_node_with_attrs(keys=[b"a", b"b", b"c"])
+        self.assertEqual(
+            gr.get_attributes_with_default(node, keys=[]), {"keys": [b"a", b"b", b"c"]}
+        )
+
+    @requires_torch()
+    def test_get_attributes_with_default_uses_default(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = oh.make_node("SomeOp", ["X"], ["Y"])
+        self.assertEqual(gr.get_attributes_with_default(node, axis=5), {"axis": 5})
+
+    @requires_torch()
+    def test_get_attributes_with_default_none_default_excluded(self):
+        gr = GraphBuilder(18, ir_version=9)
+        node = oh.make_node("SomeOp", ["X"], ["Y"])
+        self.assertEqual(gr.get_attributes_with_default(node, axis=None), {})
+
+    @requires_torch()
+    def test_get_attributes_with_default_unsupported_type(self):
+        import onnx
+
+        gr = GraphBuilder(18, ir_version=9)
+        node = oh.make_node("SomeOp", ["X"], ["Y"])
+        tensor = onh.from_array(np.array([1.0], dtype=np.float32))
+        att = onnx.AttributeProto()
+        att.name = "value"
+        att.type = onnx.AttributeProto.TENSOR
+        att.t.CopyFrom(tensor)
+        node.attribute.append(att)
+        self.assertRaise(lambda: gr.get_attributes_with_default(node, value=None), TypeError)
+
 
     def test_get_is_dimension_dynamic_object(self):
         gr = GraphBuilder(18, verbose=0)
