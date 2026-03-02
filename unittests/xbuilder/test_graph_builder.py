@@ -2887,6 +2887,85 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertEqual(vi.name, "z")
         self.assertFalse(vi.type.HasField("tensor_type"))
 
+    def test_empty_copy(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g2 = g.empty_copy()
+        self.assertIsInstance(g2, GraphBuilder)
+        self.assertIsNot(g, g2)
+        self.assertEqual(g.opsets, g2.opsets)
+
+    def test_empty_copy_as_function(self):
+        g = GraphBuilder(18, ir_version=9, as_function=False)
+        g2 = g.empty_copy(as_function=True)
+        self.assertIsInstance(g2, GraphBuilder)
+        self.assertTrue(g2.as_function)
+
+    def test_empty_copy_shapable_false(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g2 = g.empty_copy(_shapable=False)
+        self.assertIsInstance(g2, GraphBuilder)
+        self.assertFalse(g2._debug_shape_missing)
+
+    def test_pretty_tensor_with_shape(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        arr = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        result = g.pretty_tensor(arr)
+        self.assertIn("float32", result)
+        self.assertIn("2", result)
+
+    def test_pretty_tensor_without_shape(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+
+        class NoShape:
+            pass
+
+        result = g.pretty_tensor(NoShape())
+        self.assertIn("no pretty", result)
+
+    def test_pretty_node_shape_op(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        node = oh.make_node("Shape", ["X"], ["shape_out"])
+        result = g.pretty_node(node)
+        self.assertIn("Shape", result)
+        self.assertIn("X", result)
+        self.assertIn("shape_out", result)
+
+    def test_pretty_node_shape_op_with_attributes(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        node = oh.make_node("Shape", ["X"], ["shape_out"], start=1, end=3)
+        result = g.pretty_node(node)
+        self.assertIn("Shape", result)
+        self.assertIn("start=1", result)
+        self.assertIn("end=3", result)
+
+    def test_pretty_node_shape_true(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        node = oh.make_node("Add", ["X", "Y"], ["Z"])
+        g.set_type("X", TFLOAT)
+        g.set_shape("X", (2, 3))
+        g.set_type("Y", TFLOAT)
+        g.set_shape("Y", (2, 3))
+        g.set_type("Z", TFLOAT)
+        g.set_shape("Z", (2, 3))
+        result = g.pretty_node(node, shape=True)
+        self.assertIn("X:1|2x3", result)
+        self.assertIn("Y:1|2x3", result)
+        self.assertIn("Z:1|2x3", result)
+        self.assertIn("->", result)
+
+    def test_pretty_node_shape_op_with_shape_true(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        node = oh.make_node("Shape", ["X"], ["shape_out"])
+        g.set_type("X", TFLOAT)
+        g.set_shape("X", (3, 4))
+        g.set_type("shape_out", TINT64)
+        g.set_shape("shape_out", (2,))
+        result = g.pretty_node(node, shape=True)
+        self.assertIn("Shape", result)
+        self.assertIn("X:1|3x4", result)
+        self.assertIn("shape_out:7|2", result)
+        self.assertIn("->", result)
+
     def test_do_not_turn_constant_initializers_flag_set(self):
         # When _do_not_turn_constant_initializers is True (set by move_initializers_to_constant),
         # the method must return True regardless of name.
