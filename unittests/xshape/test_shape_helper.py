@@ -115,5 +115,68 @@ class TestShapeHelper(ExtTestCase):
         self.assertEqual(result.shape, (0, 3))
 
 
+class TestCheckTwoShapesCompatibility(ExtTestCase):
+    """Tests comparing compatible_shapes and _check_two_shapes_are_compatible."""
+
+    def _make_builder(self):
+        from yobx.xbuilder import GraphBuilder
+
+        return GraphBuilder(18, ir_version=9, as_function=True)
+
+    @requires_torch()
+    def test_compare_both_static_compatible(self):
+        """Both functions agree: identical static shapes are compatible."""
+        self.assertTrue(compatible_shapes((1, 2), (1, 2)))
+        gr = self._make_builder()
+        # Should not raise
+        gr._check_two_shapes_are_compatible((1, 2), (1, 2))
+
+    @requires_torch()
+    def test_compare_both_static_incompatible(self):
+        """Both functions agree: different static shapes are incompatible."""
+        self.assertFalse(compatible_shapes((1, 2), (1, 3)))
+        gr = self._make_builder()
+        self.assertRaises(
+            AssertionError, gr._check_two_shapes_are_compatible, (1, 2), (1, 3)
+        )
+
+    @requires_torch()
+    def test_compare_int_str_compatible(self):
+        """Both functions agree: mixing static and dynamic is compatible."""
+        self.assertTrue(compatible_shapes((1, 2), (1, "D")))
+        gr = self._make_builder()
+        # Should not raise
+        gr._check_two_shapes_are_compatible((1, 2), (1, "D"))
+
+    @requires_torch()
+    def test_compare_same_dynamic_name(self):
+        """Both functions agree: same dynamic name is compatible."""
+        self.assertTrue(compatible_shapes(("D", 2), ("D", 2)))
+        gr = self._make_builder()
+        # Should not raise
+        gr._check_two_shapes_are_compatible(("D", 2), ("D", 2))
+
+    @requires_torch()
+    def test_compare_different_dynamic_names(self):
+        """
+        Key behavioral difference: compatible_shapes returns False for two
+        different string names in the same position, while
+        _check_two_shapes_are_compatible registers constraints and does not raise.
+        """
+        self.assertFalse(compatible_shapes(("D1",), ("D2",)))
+        gr = self._make_builder()
+        # _check_two_shapes_are_compatible does NOT raise; it registers a constraint
+        gr._check_two_shapes_are_compatible(("D1",), ("D2",))
+
+    @requires_torch()
+    def test_compare_rank_mismatch(self):
+        """Both functions agree: rank mismatch is incompatible."""
+        self.assertFalse(compatible_shapes((1, 2), (1, 2, 3)))
+        gr = self._make_builder()
+        self.assertRaises(
+            AssertionError, gr._check_two_shapes_are_compatible, (1, 2), (1, 2, 3)
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -22,6 +22,29 @@ in :class:`_BuilderRuntime <yobx.xshape._builder_runtime._BuilderRuntime>`.
 This is used by :class:`_ShapeRuntime <yobx.xshape._shape_runtime._ShapeRuntime>`
 to deduce some shapes.
 
+Class Hierarchy
+===============
+
+:class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+is the main concrete implementation and is composed of four cooperative
+base classes:
+
+* :class:`ShapeBuilder <yobx.xshape.shape_builder.ShapeBuilder>` — the public
+  API contract: ``get_shape``, ``get_type``, ``get_rank``, ``has_shape``,
+  ``has_type``, ``has_rank``, ``set_shape``, ``set_type``, ``set_rank``,
+  ``evaluate_shape``, ``compare_with_true_inputs``, ``update_shapes``.
+* :class:`_InferenceRuntime <yobx.xshape._inference_runtime._InferenceRuntime>`
+  — walks the graph node by node, dispatching each node to the matching
+  per-operator handler in :mod:`yobx.xshape.shape_type_compute`.
+* :class:`_BuilderRuntime <yobx.xshape._builder_runtime._BuilderRuntime>`
+  — evaluates small constant sub-expressions (e.g. the ``[0, 0, -1]``
+  passed to a ``Reshape`` node) so the builder can resolve ``-1`` to the
+  correct symbolic formula.
+* :class:`_ShapeRuntime <yobx.xshape._shape_runtime._ShapeRuntime>`
+  — handles the special *value-as-shape* tracking needed by operators such
+  as ``Shape``, ``Gather``, ``Concat``, and ``Slice`` when their output
+  feeds directly into a ``Reshape``.
+
 For example, if **X** has shape ``("d1", 2)`` then ``Shape(X, start=1)`` is constant ``[2]``.
 This can be later used to infer the shape after a reshape.
 
@@ -210,3 +233,279 @@ The table below summarises the difference for a model that applies
 
 See :ref:`l-plot-computed-shapes` for a runnable example that demonstrates
 this comparison step by step.
+
+Validating computed shapes
+==========================
+
+Once the model has been run with concrete inputs you can verify that the
+symbolic shapes predicted by
+:class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+agree with the actual tensor shapes using
+:meth:`compare_with_true_inputs <yobx.xshape.ShapeBuilder.compare_with_true_inputs>`.
+The method accepts the concrete input and output dictionaries (or lists) and
+returns, for every output result, the list of ``(symbolic_expr, expected, computed)``
+triples.
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    import onnx
+    import onnx.helper as oh
+    from yobx.reference import ExtendedReferenceEvaluator
+    from yobx.xshape import BasicShapeBuilder
+
+    TFLOAT = onnx.TensorProto.FLOAT
+
+    model = oh.make_model(
+        oh.make_graph(
+            [
+                oh.make_node("Add", ["X", "Y"], ["added"]),
+                oh.make_node("Concat", ["added", "X"], ["Z"], axis=2),
+            ],
+            "add_concat",
+            [
+                oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq", "d_model"]),
+                oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq", "d_model"]),
+            ],
+            [oh.make_tensor_value_info("Z", TFLOAT, [None, None, None])],
+        ),
+        opset_imports=[oh.make_opsetid("", 18)],
+        ir_version=10,
+    )
+
+    builder = BasicShapeBuilder()
+    builder.run_model(model)
+
+    feeds = {
+        "X": np.random.rand(2, 5, 4).astype(np.float32),
+        "Y": np.random.rand(2, 5, 4).astype(np.float32),
+    }
+    session = ExtendedReferenceEvaluator(model)
+    outputs = session.run(None, feeds)
+
+    result = builder.compare_with_true_inputs(feeds, outputs)
+    for name, dims in result.items():
+        print(f"{name}: {dims}")
+
+Each triple ``(expr, expected, computed)`` confirms that evaluating the
+symbolic expression with the concrete dimension values yields the same size as
+the tensor produced by the runtime.
+
+Writing shapes back to a model
+===============================
+
+:meth:`update_shapes <yobx.xshape.ShapeBuilder.update_shapes>` writes the
+inferred shapes and types back into the ``value_info`` section of the
+``onnx.ModelProto``.  Inputs, outputs, and initializers are left untouched;
+only intermediate results (node outputs that are neither inputs, outputs, nor
+initializers) are annotated.
+
+This is useful for visualisation tools and downstream passes that rely on
+``value_info`` being populated.
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    import onnx
+    import onnx.helper as oh
+    import onnx.numpy_helper as onh
+    from yobx.xshape import BasicShapeBuilder
+
+    TFLOAT = onnx.TensorProto.FLOAT
+
+    model = oh.make_model(
+        oh.make_graph(
+            [
+                oh.make_node("Add", ["X", "Y"], ["added"]),
+                oh.make_node("MatMul", ["added", "W"], ["Z"]),
+            ],
+            "add_matmul",
+            [
+                oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq", 64]),
+                oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq", 64]),
+            ],
+            [oh.make_tensor_value_info("Z", TFLOAT, [None, None, None])],
+            [onh.from_array(np.random.randn(64, 32).astype(np.float32), name="W")],
+        ),
+        opset_imports=[oh.make_opsetid("", 18)],
+        ir_version=10,
+    )
+
+    builder = BasicShapeBuilder()
+    builder.run_model(model)
+
+    print("value_info before:", [vi.name for vi in model.graph.value_info])
+    builder.update_shapes(model)
+    print("value_info after :", [vi.name for vi in model.graph.value_info])
+
+    vi = model.graph.value_info[0]
+    t = vi.type.tensor_type
+    shape = tuple(d.dim_param if d.dim_param else d.dim_value for d in t.shape.dim)
+    print(f"  {vi.name}: dtype={t.elem_type}  shape={shape}")
+
+Debugging
+=========
+
+:class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+respects several environment variables that help narrow down shape-inference
+problems:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Environment variable
+     - Effect
+   * - ``ONNXSTOPSHAPE=<name>``
+     - Raises an exception the moment result ``<name>`` receives a shape.
+       Useful for finding the first place where a wrong shape is assigned.
+   * - ``ONNXSTOPTYPE=<name>``
+     - Raises an exception the moment result ``<name>`` receives a type.
+   * - ``ONNXDYNDIM=<name>``
+     - Prints a message every time the dynamic dimension ``<name>`` is
+       encountered during shape propagation.
+   * - ``ONNXCST=1``
+     - Prints which constant value is being requested during inference.
+   * - ``ONNXSHAPECOMPUTE=1``
+     - Raises an exception when a shape is missing for a result that should
+       have one.
+   * - ``ONNXSTOPVALUESHAPE=<name>``
+     - Prints extra information inside the function that tracks shapes of
+       results used as shape arguments (e.g. inputs to ``Reshape``).
+
+In addition, :meth:`get_debug_msg
+<yobx.xshape.shape_builder_impl.BasicShapeBuilder.get_debug_msg>` returns a
+detailed text dump of the builder's internal state (known shapes, types,
+constants, ranks, and the sequence of calls) which can be printed or logged
+whenever an assertion fails.
+
+Implementing a new shape function
+==================================
+
+Adding support for a new operator (or overriding an existing one) requires
+writing a small function and registering it in
+:mod:`yobx.xshape.shape_type_compute`.
+
+Shape functions signature
+--------------------------
+
+Every shape function receives two arguments:
+
+* ``g`` — the :class:`ShapeBuilder <yobx.xshape.shape_builder.ShapeBuilder>`
+  instance that holds all currently known shapes, types, ranks, and devices.
+* ``node`` — the :class:`onnx.NodeProto` being processed.
+
+The function must call the appropriate setters on ``g`` for every output of
+the node, then return a truthy value (typically the computed shape or
+``True``) to signal success, or ``None`` to signal that no shape could be
+determined.
+
+Key methods available on ``g``
+--------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Method
+     - Description
+   * - ``g.has_shape(name)``
+     - Returns ``True`` if the shape is known for result ``name``.
+   * - ``g.get_shape(name)``
+     - Returns the shape as a tuple of integers / symbolic strings.
+   * - ``g.set_shape(name, shape)``
+     - Stores the computed shape for result ``name``.
+   * - ``g.has_type(name)``
+     - Returns ``True`` if the element type is known for result ``name``.
+   * - ``g.get_type(name)``
+     - Returns the element type as an ONNX integer
+       (e.g. ``onnx.TensorProto.FLOAT == 1``).
+   * - ``g.set_type(name, itype)``
+     - Stores the element type for result ``name``.
+   * - ``g.has_rank(name)``
+     - Returns ``True`` if the rank (number of dimensions) is known.
+   * - ``g.get_rank(name)``
+     - Returns the rank as an integer.
+   * - ``g.set_rank(name, rank)``
+     - Stores the rank when the full shape is not yet known.
+   * - ``g.has_device(name)``
+     - Returns ``True`` if a device is known for result ``name``.
+   * - ``g.get_device(name)``
+     - Returns the device as an integer (``-1`` for CPU, index for GPU).
+   * - ``g.set_device(name, device)``
+     - Propagates the device to result ``name``.
+   * - ``g.get_attribute_with_default(node, attr, default)``
+     - Convenience helper to read a node attribute with a fallback default.
+
+A minimal shape function should:
+
+1. **Propagate device** — if ``g.has_device(input)`` is true, copy the
+   device to the output with ``set_device``.
+2. **Propagate type** — guard with ``g.has_type(input)`` before calling
+   ``set_type`` on every output; return ``None`` early if the type is not yet
+   known.
+3. **Compute and set the shape** — guard with ``g.has_shape(input)`` before
+   deriving the output shape and calling ``set_shape``.  When the full shape
+   is unavailable, fall back to ``g.has_rank`` / ``set_rank``.
+4. **Return the shape** (or ``True`` if only a rank was set, or ``None`` if
+   nothing could be done).
+
+Example: a custom element-wise scaling operator
+-------------------------------------------------
+
+The following example shows a shape function for a hypothetical ``Scale``
+operator (domain ``"my.domain"``) that multiplies its first input ``X`` by a
+scalar ``scale`` and returns a result with the same shape and type as ``X``.
+
+.. code-block:: python
+
+    from onnx import NodeProto
+    from yobx.xshape.shape_builder import ShapeBuilder
+
+    def _set_shape_type_scale(g: ShapeBuilder, node: NodeProto):
+        "Shape function for the custom Scale operator."
+        x = node.input[0]
+        out = node.output[0]
+
+        # 1. propagate device
+        if g.has_device(x):
+            g.set_device(out, g.get_device(x))
+
+        # 2. propagate element type
+        if not g.has_type(x):
+            return None
+        g.set_type(out, g.get_type(x))
+
+        # 3. compute output shape (same shape as input)
+        if g.has_shape(x):
+            shape = g.get_shape(x)
+            g.set_shape(out, shape)
+            return shape
+
+        # fallback: propagate rank only
+        if g.has_rank(x):
+            g.set_rank(out, g.get_rank(x))
+            return True
+
+        return None
+
+To register the function so that
+:class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+calls it automatically, add it to the appropriate registry dictionary in
+:mod:`yobx.xshape.shape_type_compute`:
+
+* ``_set_shape_type_op_any_known`` — for standard ONNX operators
+  (domain ``""``).
+* ``_set_shape_type_op_any_custom`` — for operators in non-standard domains
+  (e.g. ``"com.microsoft"``).
+
+.. code-block:: python
+
+    # In yobx/xshape/shape_type_compute.py:
+    _set_shape_type_op_any_custom["Scale"] = _set_shape_type_scale
+
+The function will then be called automatically whenever
+:meth:`run_node <yobx.xshape.shape_builder_impl.BasicShapeBuilder.run_node>`
+processes a ``Scale`` node.
