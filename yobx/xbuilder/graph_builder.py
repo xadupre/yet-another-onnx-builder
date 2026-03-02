@@ -6320,8 +6320,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         update[n2] = {n1}
                     else:
                         update[n2].add(n1)
-                    k2 = rename_expression(k, {n2: n1})
-                    vv2 = rename_expression(v, {n1: n2})
+                    k2 = rename_expression(k, {n1: n2})
+                    vv2 = rename_expression(vv, {n2: n1})
                     assert k != k2 and vv != vv2
                     eq = {k, k2, vv, vv2}
                     for e in eq:
