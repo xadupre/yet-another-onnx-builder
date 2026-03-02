@@ -17,7 +17,7 @@ from yobx.torch.transformers.cache_helper import (
     CacheKeyValue,
 )
 from yobx.torch.torch_helper import torch_deepcopy
-from yobx.torch.flatten_helper import register_flattening_functions, replacement_before_exporting
+from yobx.torch.flatten import register_flattening_functions, replacement_before_exporting
 
 
 @requires_transformers("4.57")

@@ -14,7 +14,7 @@ import transformers.cache_utils
 from transformers.cache_utils import Cache, DynamicCache, EncoderDecoderCache, StaticCache
 from transformers.modeling_outputs import BaseModelOutput
 from .cache_helper import make_dynamic_cache, make_static_cache, CacheKeyValue
-from ..flatten_helper import (
+from ..flatten import (
     make_flattening_function_for_dataclass,
     register_class_flattening,
 )

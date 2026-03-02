@@ -9,7 +9,7 @@ Python object that appears as a model input or output to be **registered** as a
 pytree node.  When a class is not registered, exporting fails with a cryptic
 error.
 
-:mod:`yobx.torch.flatten_helper` provides utilities to register, unregister,
+:mod:`yobx.torch.flatten` provides utilities to register, unregister,
 and compose such registrations cleanly.
 
 Why flattening matters
@@ -39,7 +39,7 @@ Core helpers
 register_class_flattening
 --------------------------
 
-:func:`yobx.torch.flatten_helper.register_class_flattening` is a thin wrapper
+:func:`yobx.torch.flatten.register_class_flattening` is a thin wrapper
 around ``torch.utils._pytree.register_pytree_node`` that:
 
 * skips the registration silently when the class is already registered (avoids
@@ -53,7 +53,7 @@ around ``torch.utils._pytree.register_pytree_node`` that:
     import dataclasses
     from typing import Any, List, Tuple
     import torch
-    from yobx.torch.flatten_helper import (
+    from yobx.torch.flatten import (
         register_class_flattening,
         unregister_class_flattening,
     )
@@ -95,7 +95,7 @@ around ``torch.utils._pytree.register_pytree_node`` that:
 make_flattening_function_for_dataclass
 --------------------------------------
 
-:func:`yobx.torch.flatten_helper.make_flattening_function_for_dataclass`
+:func:`yobx.torch.flatten.make_flattening_function_for_dataclass`
 auto-generates the three required callables for any class that exposes
 ``.keys()`` / ``.values()`` like a mapping (e.g. ``transformers.ModelOutput``
 subclasses).
@@ -104,7 +104,7 @@ subclasses).
     :showcode:
 
     import torch
-    from yobx.torch.flatten_helper import (
+    from yobx.torch.flatten import (
         make_flattening_function_for_dataclass,
         register_class_flattening,
         unregister_class_flattening,
@@ -135,12 +135,12 @@ subclasses).
 register_cache_flattening and the context manager
 --------------------------------------------------
 
-:func:`yobx.torch.flatten_helper.register_cache_flattening` registers a
+:func:`yobx.torch.flatten.register_cache_flattening` registers a
 collection of classes in one call and returns a ``dict`` that can be passed to
-:func:`yobx.torch.flatten_helper.unregister_cache_flattening` to undo every
+:func:`yobx.torch.flatten.unregister_cache_flattening` to undo every
 registration.
 
-:func:`yobx.torch.flatten_helper.register_flattening_functions` wraps both in
+:func:`yobx.torch.flatten.register_flattening_functions` wraps both in
 a :func:`contextlib.contextmanager` so that registrations are automatically
 undone when the ``with`` block exits:
 
@@ -165,8 +165,8 @@ Transformers-specific registrations
 =====================================
 
 When ``patch_transformers=True`` is passed to
-:func:`~yobx.torch.flatten_helper.register_cache_flattening` (or
-:func:`~yobx.torch.flatten_helper.register_flattening_functions`), the
+:func:`~yobx.torch.flatten.register_cache_flattening` (or
+:func:`~yobx.torch.flatten.register_flattening_functions`), the
 following classes from :epkg:`transformers` are registered:
 
 +-----------------------------+-------------------------------------------------------------+
