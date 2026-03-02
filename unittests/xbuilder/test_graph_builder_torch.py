@@ -83,5 +83,37 @@ class TestTorchSymInt(ExtTestCase):
         self.assertIn("s0", result)
 
 
+class TestWrapDimNameAsString(ExtTestCase):
+    @classmethod
+    def setUpClass(cls):
+        import torch
+        from yobx.xbuilder import GraphBuilder
+
+        cls.torch = torch
+        cls.builder = GraphBuilder(18, ir_version=9)
+        cls.WrapDim = GraphBuilder.WrapDim
+
+    def test_str_name(self):
+        """A plain string name is returned as-is."""
+        wd = self.WrapDim("batch")
+        self.assertEqual(wd.name_as_string, "batch")
+
+    def test_torch_dim_name(self):
+        """A torch.export.Dim object returns its __name__ attribute."""
+        dim = self.torch.export.Dim("seq")
+        wd = self.WrapDim(dim)
+        self.assertEqual(wd.name_as_string, "seq")
+
+    def test_unknown_type_raises(self):
+        """An unknown type raises AssertionError."""
+
+        class _Unknown:
+            pass
+
+        wd = self.WrapDim(_Unknown())
+        with self.assertRaises(AssertionError):
+            _ = wd.name_as_string
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
