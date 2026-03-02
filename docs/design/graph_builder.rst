@@ -183,6 +183,13 @@ Key methods:
      - Return the rank as an integer.
    * - ``g.has_rank(name)``
      - Return ``True`` if the rank is known.
+   * - ``g.set_device(name, device)``
+     - Register the device for result ``name``.
+       ``-1`` denotes CPU; non-negative integers are GPU indices.
+   * - ``g.get_device(name)``
+     - Return the device as an integer (``-1`` for CPU).
+   * - ``g.has_device(name)``
+     - Return ``True`` if a device is known for result ``name``.
 
 Dynamic shapes
 ==============
