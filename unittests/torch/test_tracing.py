@@ -20,7 +20,7 @@ from yobx.torch.tracing import (
     setitem_with_transformation,
     tree_unflatten_with_proxy,
 )
-from yobx.torch import register_flattening_functions
+from yobx.torch import register_flattening_functions, apply_patches_for_model
 from yobx.torch.transformers.cache_helper import make_dynamic_cache
 
 
@@ -944,7 +944,7 @@ class TestTracing(ExtTestCase):
         self.assertEqualArray(true_expected, expected)
 
         DYN = torch.export.Dim.DYNAMIC
-        with register_flattening_functions(patch_torch=True):
+        with register_flattening_functions(), apply_patches_for_model(patch_torch=True):
             ep = torch.export.export(model, inputs, dynamic_shapes=({0: DYN}, {0: DYN}, {0: DYN}))
 
         CustomTracer.remove_inplace(ep.graph, recursive=True, verbose=10)

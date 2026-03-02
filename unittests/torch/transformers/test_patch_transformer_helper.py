@@ -1,7 +1,7 @@
 import unittest
 import torch
 import transformers
-from yobx.ext_test_case import ExtTestCase, requires_transformers, has_transformers
+from yobx.ext_test_case import ExtTestCase, requires_transformers, has_transformers, hide_stdout
 from yobx.helpers.patch_helper import PatchDetails
 from yobx.torch import (
     apply_patches_for_model,
@@ -33,7 +33,7 @@ class TestPatchTransformerHelper(ExtTestCase):
             self.assertIsInstance(details, PatchDetails)
             patches = details.patches_involved_in_graph(ep.graph)
             self.assertEqual(len(patches), 0)
-            got = ep.module(**inputs)
+            got = ep.module()(**inputs)
             self.assertEqualAny(expected, got)
 
     @requires_transformers("4.57")
@@ -67,10 +67,11 @@ class TestPatchTransformerHelper(ExtTestCase):
             if has_transformers("4.51"):
                 self.assertIn("====", report)
                 self.assertIn("def dynamic_frequency_update", report)
-            got = ep.module(**inputs)
+            got = ep.module()(**inputs)
             self.assertEqualAny(expected, got)
 
     @requires_transformers("4.57")
+    @hide_stdout()
     def test_involved_patches_long_rope(self):
         data = get_tiny_model(
             "arnir0/Tiny-LLM",
@@ -100,7 +101,7 @@ class TestPatchTransformerHelper(ExtTestCase):
             if has_transformers("4.51"):
                 self.assertIn("====", report)
                 self.assertIn("def longrope_frequency_update", report)
-            got = ep.module(**inputs)
+            got = ep.module()(**inputs)
             self.assertEqualAny(expected, got)
 
 

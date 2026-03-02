@@ -257,6 +257,14 @@ class PatchDetails:
         """Iterates on all patches."""
         yield from self.patched
 
+    def __len__(self) -> int:
+        """Returns the number of applied patches."""
+        return len(self.patched)
+
+    def __getitem__(self, index: int) -> PatchInfo:
+        """Returns a patch from the list at position `index`."""
+        return self.patched[index]
+
     def find(self, name: str) -> Optional[PatchInfo]:
         """Finds a patch by name."""
         if name in self.find_cache:
