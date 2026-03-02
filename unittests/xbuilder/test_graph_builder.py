@@ -1955,5 +1955,39 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertFalse(g.same_shape("X", "Y"))
 
 
+    def test_get_dimension_as_result_already_known(self):
+        gr = GraphBuilder(18)
+        gr.make_tensor_input("X", TFLOAT, ("batch", "seq"))
+        self.assertTrue(gr.has_name("X"))
+        # When the name is already a known result, return it unchanged.
+        result = gr.get_dimension_as_result("X")
+        self.assertEqual(result, "X")
+        # No Shape/Gather nodes should have been created.
+        self.assertEqual(len(gr.nodes), 0)
+
+    def test_get_dimension_as_result_from_source(self):
+        gr = GraphBuilder(18)
+        gr.make_tensor_input("X", TFLOAT, ("batch", "seq"))
+        # Manually register a source for the dynamic dimension.
+        gr.dynamic_dimensions_source["batch"] = [{"input_name": "X", "axis": 0}]
+        self.assertFalse(gr.has_name("batch"))
+        result = gr.get_dimension_as_result("batch")
+        self.assertEqual(result, "batch")
+        # A Shape node and a Gather node should have been added.
+        op_types = [n.op_type for n in gr.nodes]
+        self.assertIn("Shape", op_types)
+        self.assertIn("Gather", op_types)
+        shape_node = next(n for n in gr.nodes if n.op_type == "Shape")
+        self.assertEqual(list(shape_node.input), ["X"])
+        gather_node = next(n for n in gr.nodes if n.op_type == "Gather")
+        self.assertEqual(list(gather_node.output), ["batch"])
+
+    def test_get_dimension_as_result_no_source_raises(self):
+        gr = GraphBuilder(18)
+        gr.make_tensor_input("X", TFLOAT, ("batch", "seq"))
+        # No source registered for "batch" -> AssertionError.
+        self.assertRaises(AssertionError, gr.get_dimension_as_result, "batch")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
