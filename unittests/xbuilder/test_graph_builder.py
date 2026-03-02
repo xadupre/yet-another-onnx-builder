@@ -1722,6 +1722,25 @@ class TestGraphBuilder(ExtTestCase):
         sources = g.dynamic_dimensions_source["batch"]
         self.assertEqual(len(sources), 2)
 
+    @requires_torch("2.0")
+    def test_dynamic_to_str_dim(self):
+        import torch
+
+        batch = torch.export.Dim("batch", min=1, max=128)
+        g = GraphBuilder(18, ir_version=9)
+        result = g._dynamic_to_str(batch)
+        self.assertEqual(result, "batch")
+
+    @requires_torch("2.0")
+    def test_dynamic_to_str_derived_dim(self):
+        import torch
+
+        base = torch.export.Dim("base", min=1, max=64)
+        derived = base * 2
+        g = GraphBuilder(18, ir_version=9)
+        result = g._dynamic_to_str(derived)
+        self.assertEqual(result, derived.__name__)
+
     def test_update_model_with_parameter_renaming(self):
         """Test _update_model_with_parameter_renaming renames initializer in nodes."""
         g = GraphBuilder(18, ir_version=9)
