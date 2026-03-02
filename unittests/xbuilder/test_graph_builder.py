@@ -2696,6 +2696,34 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertIsInstance(result, str)
         self.assertNotEqual(result, "d")
 
+    def test_is_more_precise_both_static_same(self):
+        g = GraphBuilder(18)
+        self.assertTrue(g.is_more_precise((1, 2), (1, 2)))
+
+    def test_is_more_precise_both_static_different(self):
+        g = GraphBuilder(18)
+        self.assertFalse(g.is_more_precise((1, 3), (1, 2)))
+
+    def test_is_more_precise_int_over_string(self):
+        g = GraphBuilder(18)
+        self.assertTrue(g.is_more_precise((1, 2), (1, "d")))
+
+    def test_is_more_precise_string_vs_int(self):
+        g = GraphBuilder(18)
+        self.assertTrue(g.is_more_precise((1, "d"), (1, 2)))
+
+    def test_is_more_precise_both_dynamic_same(self):
+        g = GraphBuilder(18)
+        self.assertTrue(g.is_more_precise(("batch", 4), ("batch", 4)))
+
+    def test_is_more_precise_both_dynamic_different(self):
+        g = GraphBuilder(18)
+        self.assertFalse(g.is_more_precise(("a", 4), ("b", 4)))
+
+    def test_is_more_precise_different_ranks_raises(self):
+        g = GraphBuilder(18)
+        self.assertRaises(AssertionError, g.is_more_precise, (1, 2), (1, 2, 3))
+
     def test_make_tensor_value_info_from_name(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
 
