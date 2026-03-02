@@ -53,26 +53,29 @@ event, so any missing override is caught early.
 Available emitters
 ==================
 
-Four concrete emitters are shipped:
+Five concrete emitters are shipped:
 
-+--------------------------------------------------+------------------------------------+
-| Class                                            | Output API                         |
-+==================================================+====================================+
-| :class:`~yobx.translate.inner_emitter.           | :mod:`onnx.helper` (``oh.make_*``) |
-| InnerEmitter`                                    |                                    |
-+--------------------------------------------------+------------------------------------+
-| :class:`~yobx.translate.inner_emitter.           | Same as above, but replaces large  |
-| InnerEmitterShortInitializer`                    | initializers (> 16 elements) with  |
-|                                                  | ``np.random.randn(…)``             |
-+--------------------------------------------------+------------------------------------+
-| :class:`~yobx.translate.light_emitter.           | Fluent ``start(…).vin(…).…``       |
-| LightEmitter`                                    | method chain                       |
-+--------------------------------------------------+------------------------------------+
-| :class:`~yobx.translate.builder_emitter.         | ``GraphBuilder``-based function    |
-| BuilderEmitter`                                  | wrapper                            |
-+--------------------------------------------------+------------------------------------+
++--------------------------------------------------+--------------------+------------------------------------+
+| Class                                            | Short name         | Output API                         |
++==================================================+====================+====================================+
+| :class:`~yobx.translate.inner_emitter.           | ``"onnx"``         | :mod:`onnx.helper` (``oh.make_*``) |
+| InnerEmitter`                                    |                    |                                    |
++--------------------------------------------------+--------------------+------------------------------------+
+| :class:`~yobx.translate.inner_emitter.           | ``"onnx-short"``   | Same as above, but replaces large  |
+| InnerEmitterShortInitializer`                    |                    | initializers (> 16 elements) with  |
+|                                                  |                    | ``np.random.randn(…)``             |
++--------------------------------------------------+--------------------+------------------------------------+
+| :class:`~yobx.translate.inner_emitter.           | ``"onnx-compact"`` | Compact single nested expression   |
+| InnerEmitterCompact`                             |                    | instead of assembling lists        |
++--------------------------------------------------+--------------------+------------------------------------+
+| :class:`~yobx.translate.light_emitter.           | ``"light"``        | Fluent ``start(…).vin(…).…``       |
+| LightEmitter`                                    |                    | method chain                       |
++--------------------------------------------------+--------------------+------------------------------------+
+| :class:`~yobx.translate.builder_emitter.         | ``"builder"``      | ``GraphBuilder``-based function    |
+| BuilderEmitter`                                  |                    | wrapper                            |
++--------------------------------------------------+--------------------+------------------------------------+
 
-The four APIs are exposed through the single convenience function
+The five APIs are exposed through the single convenience function
 :func:`translate <yobx.translate.translate>`:
 
 .. runpython::
@@ -162,15 +165,39 @@ stays readable for large weight matrices.
         ),
         opset_imports=[oh.make_opsetid("", 17)],
     )
-    full  = translate(model, api="onnx")
     short = translate(model, api="onnx-short")
-    print(f"full  : {len(full):>5} chars")
-    print(f"short : {len(short):>5} chars")
     # Show only the initializer line from the short version
     for line in short.splitlines():
         if "randn" in line or "randint" in line:
             print("short initializer:", line.strip())
             break
+
+
+InnerEmitterCompact
+===================
+
+:class:`~yobx.translate.inner_emitter.InnerEmitterCompact` inherits
+from :class:`~yobx.translate.inner_emitter.InnerEmitter` and produces a
+compact single nested expression instead of assembling separate lists of
+nodes, inputs, and outputs.
+
+.. runpython::
+    :showcode:
+
+    import onnx.helper as oh
+    import onnx
+    from yobx.translate import translate
+
+    model = oh.make_model(
+        oh.make_graph(
+            [oh.make_node("Relu", ["X"], ["Z"])],
+            "relu",
+            [oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [None, 4])],
+            [oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, [None, 4])],
+        ),
+        opset_imports=[oh.make_opsetid("", 17)],
+    )
+    print(translate(model, api="onnx-compact"))
 
 
 LightEmitter
@@ -270,6 +297,6 @@ the original model:
 .. seealso::
 
     :ref:`l-plot-translate-comparison` — sphinx-gallery example that builds
-    a ``Gemm → Relu`` model, translates it with all four APIs, prints the
+    a ``Gemm → Relu`` model, translates it with all five APIs, prints the
     generated snippets, verifies the round-trip, and plots a bar chart of
     generated code sizes.
