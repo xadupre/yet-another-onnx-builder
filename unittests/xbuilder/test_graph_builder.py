@@ -2043,6 +2043,29 @@ class TestGetInputDynamicShape(ExtTestCase):
         info = g.get_sequence("seq")
         self.assertEqual(info["dtype"], TFLOAT)
 
+    @ignore_warnings(DeprecationWarning)
+    def test_make_tensor_sequence_input_builds_valid_model(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_sequence_input("seq", TFLOAT, None)
+        g.make_node("SequenceLength", ["seq"], ["length"], name="seq_len")
+        g.make_tensor_output("length", TensorProto.INT64, shape=[], indexed=False)
+        onx = g.to_onnx()
+
+        # The graph input should be typed as a sequence
+        inp = onx.graph.input[0]
+        self.assertEqual(inp.name, "seq")
+        self.assertTrue(inp.type.HasField("sequence_type"))
+        self.assertEqual(inp.type.sequence_type.elem_type.tensor_type.elem_type, TFLOAT)
+
+        # Running the model should return the number of tensors in the sequence
+        tensors = [
+            np.ones((3, 4), dtype=np.float32),
+            np.zeros((3, 4), dtype=np.float32),
+        ]
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, {"seq": tensors})
+        self.assertEqual(got[0], 2)
+
     def test_get_constant_as_shape_false(self):
         g = GraphBuilder(18, ir_version=9)
         g.make_tensor_input("X", TensorProto.FLOAT, (3, 4), False)
@@ -2723,6 +2746,23 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
     def test_is_more_precise_different_ranks_raises(self):
         g = GraphBuilder(18)
         self.assertRaises(AssertionError, g.is_more_precise, (1, 2), (1, 2, 3))
+
+    def test_add_stat(self):
+        g = GraphBuilder(18, ir_version=9)
+        # First call creates the kind/name entry with value 1
+        g.add_stat("op", "Add")
+        self.assertEqual(g.statistics_["op"]["Add"], 1)
+        # Second call increments the counter
+        g.add_stat("op", "Add")
+        self.assertEqual(g.statistics_["op"]["Add"], 2)
+        # New name under existing kind
+        g.add_stat("op", "Mul")
+        self.assertEqual(g.statistics_["op"]["Mul"], 1)
+        # New kind
+        g.add_stat("pattern", "Reshape")
+        self.assertEqual(g.statistics_["pattern"]["Reshape"], 1)
+        # Existing kind/name counters are unchanged
+        self.assertEqual(g.statistics_["op"]["Add"], 2)
 
     def test_make_tensor_value_info_from_name(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
