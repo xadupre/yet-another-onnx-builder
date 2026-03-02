@@ -1813,5 +1813,62 @@ class TestGraphBuilder(ExtTestCase):
         self.assertFalse(result)
 
 
+    def test_make_subset_builder(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("X", TFLOAT, (2, 4), False)
+        g.make_tensor_input("W", TFLOAT, (4, 3), False)
+
+        sub = g.make_subset_builder(["X", "W"], name="LinearSub", domain="mydom")
+        self.assertEqual(sub.input_names, ["X", "W"])
+        sub.op.MatMul("X", "W", outputs=["Y"])
+        sub.make_tensor_output("Y", is_dimension=False, indexed=False)
+
+        fct = sub.to_onnx(function_options=FunctionOptions(name="LinearSub", domain="mydom"))
+        self.assertIsInstance(fct, FunctionProto)
+        self.assertEqual(list(fct.input), ["X", "W"])
+        self.assertEqual(list(fct.output), ["Y"])
+        self.assertEqual(fct.domain, "mydom")
+        self.assertEqual(fct.name, "LinearSub")
+
+        feeds = dict(
+            X=np.arange(8).reshape((2, 4)).astype(np.float32),
+            W=np.arange(12).reshape((4, 3)).astype(np.float32),
+        )
+        expected = feeds["X"] @ feeds["W"]
+        ref = ExtendedReferenceEvaluator(fct)
+        got = ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_make_subset_builder_add_local_functions(self):
+        gf = GraphBuilder(18, ir_version=9, as_function=True)
+        gf.make_tensor_input("X", TFLOAT, None, False)
+        gf.op.Relu("X", outputs=["Y"])
+        gf.make_tensor_output("Y", is_dimension=False, indexed=False)
+
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("A", TFLOAT, (2, 4), False)
+        g.make_local_function(gf, function_options=FunctionOptions(name="MyRelu", domain="test"))
+        g.anyop.MyRelu("A", outputs=["B"], domain="test")
+        g.make_tensor_output("B", is_dimension=False, indexed=False)
+        self.assertEqual(len(g.functions), 1)
+
+        sub = g.make_subset_builder(
+            ["A"], name="SubFunc", domain="subdom", add_local_functions=True
+        )
+        self.assertEqual(sub.input_names, ["A"])
+        self.assertEqual(len(sub.functions), 1)
+        sub.anyop.MyRelu("A", outputs=["C"], domain="test")
+        sub.make_tensor_output("C", is_dimension=False, indexed=False)
+
+        fct = sub.to_onnx(
+            function_options=FunctionOptions(name="SubFunc", domain="subdom"), inline=False
+        )
+        self.assertIsInstance(fct, FunctionProto)
+        self.assertEqual(list(fct.input), ["A"])
+        self.assertEqual(list(fct.output), ["C"])
+        self.assertEqual(fct.domain, "subdom")
+        self.assertEqual(fct.name, "SubFunc")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
