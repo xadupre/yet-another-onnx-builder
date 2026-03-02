@@ -254,11 +254,17 @@ Default passes (in order):
        fold the result into an initializer.
    * - ``remove_identity``
      - Remove ``Identity`` nodes.
-   * - ``remove_duplicated_shape``
-     - Merge identical ``Shape`` nodes that produce the same result.
+   * - ``remove_duplicated_initializer``
+     - Merge identical constant initializers into a single tensor, removing
+       redundant copies.
    * - ``patterns``
      - Apply user-supplied or built-in fusion patterns (e.g.
        ``"default"`` enables the default set of ONNX-to-ONNX rewrites).
+   * - ``order``
+     - Reorder nodes to reduce peak memory by moving each ``Shape`` / ``Size``
+       node immediately after the node that produces its input
+       (controlled by :class:`OrderAlgorithm <yobx.xbuilder.OrderAlgorithm>`,
+       default ``SHAPE``).
 
 .. runpython::
     :showcode:
