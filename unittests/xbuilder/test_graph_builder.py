@@ -1683,6 +1683,52 @@ class TestGraphBuilder(ExtTestCase):
         self.assertRaise(lambda: gr.get_attributes_with_default(node, value=None), TypeError)
 
 
+class TestGraphBuilderGetTypeKnown(ExtTestCase):
+    @requires_torch()
+    def test_get_type_known_missing(self):
+        import torch
+
+        gr = GraphBuilder(18, ir_version=9)
+        self.assertIsNone(gr.get_type_known("unknown"))
+
+    @requires_torch()
+    def test_get_type_known_valid(self):
+        import torch
+
+        gr = GraphBuilder(18, ir_version=9)
+        # Store a value with the expected structure:
+        # (where, (prefix, (name, dtype, shape)))
+        gr.set_shapes_types("x", "run_node", ("", ("x", torch.float16, torch.Size([2, 3]))))
+        result = gr.get_type_known("x")
+        self.assertEqual(result, TensorProto.FLOAT16)
+
+    @requires_torch()
+    def test_get_type_known_valid_float32(self):
+        import torch
+
+        gr = GraphBuilder(18, ir_version=9)
+        gr.set_shapes_types("y", "run_node", ("", ("y", torch.float32, torch.Size([4]))))
+        result = gr.get_type_known("y")
+        self.assertEqual(result, TensorProto.FLOAT)
+
+    @requires_torch()
+    def test_get_type_known_invalid_no_exc(self):
+        import torch
+
+        gr = GraphBuilder(18, ir_version=9)
+        # Store a value with a structure that does not match the expected tuple pattern
+        gr.set_shapes_types("z", "run_node", "not_a_tuple")
+        result = gr.get_type_known("z", exc=False)
+        self.assertIsNone(result)
+
+    @requires_torch()
+    def test_get_type_known_invalid_with_exc(self):
+        import torch
+
+        gr = GraphBuilder(18, ir_version=9)
+        # Store a value with a structure that does not match; exc=True should raise
+        gr.set_shapes_types("w", "run_node", "not_a_tuple")
+        self.assertRaises(AssertionError, lambda: gr.get_type_known("w", exc=True))
     def test_get_is_dimension_dynamic_object(self):
         gr = GraphBuilder(18, verbose=0)
         gr.dynamic_objects["dim0"] = "wrapped_value"
