@@ -1622,6 +1622,7 @@ class TestGraphBuilder(ExtTestCase):
         # "batch" source should include both inputs
         sources = g.dynamic_dimensions_source["batch"]
         self.assertEqual(len(sources), 2)
+
     def test_update_model_with_parameter_renaming(self):
         """Test _update_model_with_parameter_renaming renames initializer in nodes."""
         g = GraphBuilder(18, ir_version=9)
