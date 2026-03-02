@@ -1746,6 +1746,127 @@ class TestGetInputDynamicShape(ExtTestCase):
         g._check_two_shapes_are_compatible((2, "seq"), (2, "seq"), name="x")
         g._check_two_shapes_are_compatible((2, "seq"), (2, "other"), name="x")
 
+    def test_check_op_type_if_valid(self):
+        g = GraphBuilder(18)
+        then_graph = oh.make_graph(
+            [oh.make_node("Add", ["x", "y"], ["result"])],
+            "then_branch",
+            [],
+            [oh.make_tensor_value_info("result", TensorProto.FLOAT, None)],
+        )
+        else_graph = oh.make_graph(
+            [oh.make_node("Sub", ["x", "y"], ["result"])],
+            "else_branch",
+            [],
+            [oh.make_tensor_value_info("result", TensorProto.FLOAT, None)],
+        )
+        # Should not raise
+        g._check_op_type(
+            "If",
+            ["cond"],
+            ["result"],
+            domain="",
+            name="test_if",
+            then_branch=then_graph,
+            else_branch=else_graph,
+        )
+
+    def test_check_op_type_if_missing_branches(self):
+        g = GraphBuilder(18)
+        self.assertRaises(
+            AssertionError,
+            lambda: g._check_op_type(
+                "If",
+                ["cond"],
+                ["result"],
+                domain="",
+                name="test_if",
+            ),
+        )
+
+    def test_check_op_type_if_mismatched_outputs(self):
+        g = GraphBuilder(18)
+        then_graph = oh.make_graph(
+            [],
+            "then_branch",
+            [],
+            [
+                oh.make_tensor_value_info("r1", TensorProto.FLOAT, None),
+                oh.make_tensor_value_info("r2", TensorProto.FLOAT, None),
+            ],
+        )
+        else_graph = oh.make_graph(
+            [],
+            "else_branch",
+            [],
+            [oh.make_tensor_value_info("result", TensorProto.FLOAT, None)],
+        )
+        self.assertRaises(
+            AssertionError,
+            lambda: g._check_op_type(
+                "If",
+                ["cond"],
+                ["result"],
+                domain="",
+                name="test_if",
+                then_branch=then_graph,
+                else_branch=else_graph,
+            ),
+        )
+
+    def test_check_op_type_scan(self):
+        g = GraphBuilder(18)
+        body = oh.make_graph(
+            [
+                oh.make_node("Add", ["sum_in", "next"], ["sum_out"]),
+                oh.make_node("Identity", ["next"], ["scan_out"]),
+            ],
+            "scan_body",
+            [
+                oh.make_tensor_value_info("sum_in", TensorProto.FLOAT, None),
+                oh.make_tensor_value_info("next", TensorProto.FLOAT, None),
+            ],
+            [
+                oh.make_tensor_value_info("sum_out", TensorProto.FLOAT, None),
+                oh.make_tensor_value_info("scan_out", TensorProto.FLOAT, None),
+            ],
+        )
+        # Should not raise
+        g._check_op_type(
+            "Scan",
+            ["initial", "scan_input"],
+            ["final", "scan_output"],
+            domain="",
+            name="test_scan",
+            body=body,
+            num_scan_inputs=1,
+        )
+
+    def test_check_op_type_loop(self):
+        g = GraphBuilder(18)
+        body = oh.make_graph(
+            [oh.make_node("Identity", ["v"], ["v_out"])],
+            "loop_body",
+            [
+                oh.make_tensor_value_info("iter", TensorProto.INT64, []),
+                oh.make_tensor_value_info("cond_in", TensorProto.BOOL, []),
+                oh.make_tensor_value_info("v", TensorProto.FLOAT, None),
+            ],
+            [
+                oh.make_tensor_value_info("cond_out", TensorProto.BOOL, []),
+                oh.make_tensor_value_info("v_out", TensorProto.FLOAT, None),
+            ],
+        )
+        # Should not raise
+        g._check_op_type(
+            "Loop",
+            ["max_iter", "cond", "v"],
+            ["v_final"],
+            domain="",
+            name="test_loop",
+            body=body,
+        )
+
     @ignore_warnings(DeprecationWarning)
     def test_make_nodes(self):
         np_weights = np.arange(12).reshape((4, 3)).astype(np.float32) / 10
