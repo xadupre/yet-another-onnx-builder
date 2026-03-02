@@ -311,14 +311,14 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     class WrapSym:
         """Wraps a symbolic int (a dimension for example)."""
 
-        def __init__(self, sym: Union["torch.SymInt", "torch.SymFloat"]):
+        def __init__(self, sym: Union["torch.SymInt", "torch.SymFloat", "GraphBuilder.WrapSym"]):
             if isinstance(sym, GraphBuilder.WrapDim):
                 self.sym = sym.name
             else:
                 assert isinstance(sym, str) or hasattr(
                     sym, "node"
                 ), f"Missing attribute node for type {type(sym)}"
-                self.sym = sym
+                self.sym = sym  # type: ignore
 
         def __repr__(self) -> str:
             return f"WrapSym({self._dynamic_to_str(self.sym)})"
@@ -1255,7 +1255,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def compute_constant(
         self, name: str, exc: bool = True, only_array: bool = False, allow_empty: bool = False
-    ) -> Tuple[np.ndarray, Optional[Dict[str, np.ndarray]]]:
+    ) -> Tuple[Optional[np.ndarray], Optional[Dict[str, np.ndarray]]]:
         """
         Computes a constant.
 
@@ -1298,7 +1298,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 assert not self._debug_constant_folding, (
                     f"Unable to compute constant because value is a FakeTensor"
                     f"{string_type(value, with_shape=True)}"
-                    f"in node {self.pretty_node(v)}{self.get_debug_msg()}"
+                    f"for name {name!r}{self.get_debug_msg()}"
                 )
                 return None, None
             return value, None
@@ -1313,7 +1313,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         computed_value: bool = False,
         as_shape: bool = False,
         multiple_outputs: bool = False,
-    ) -> Union[np.ndarray, NodeProto]:
+    ) -> Optional[
+        Union[np.ndarray, NodeProto, Tuple[Optional[Union[np.ndarray, NodeProto]], ...]]
+    ]:
         """
         The method returns the constant *name*. It is a tensor (numpy array)
         or a NodeProto which must be evaluated.
@@ -1325,7 +1327,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         :param computed_value: compute the value if not a constant
         :param as_shape: returns a tuple for a shape
         :param multiple_outputs: allow multiple outputs
-        :return: value
+        :return: value or a list of values if the node has multiple outputs
         """
         if self._debug_get_constant:
             print(
@@ -1930,7 +1932,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if isinstance(d2, self.torch.SymInt):
                 d2 = self._torch_sym_int_to_str(d2)
             elif isinstance(d2, self.torch.export.dynamic_shapes._Dim):
-                d2 = self._torch_sym_int_to_str(d2)
+                d2 = self._torch_sym_int_to_str(d2)  # type: ignore
 
             if isinstance(d1, (int, str)) and isinstance(d2, (int, str)):
                 if d1 == d2:
@@ -2108,7 +2110,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     def set_device(
         self,
         name: str,
-        device: Union[int, "torch.dtype"],
+        device: Union[int, str],
         exc: bool = True,
         keep_this_device: bool = False,
     ):
@@ -2644,7 +2646,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             elif isinstance(d, self.torch.SymInt):
                 value = self._torch_sym_int(d)
                 key.append(value)
-            elif isinstance(d, (str, self.torch.SymInt)):
+            elif isinstance(d, str):
                 assert self._debug_quiet or (
                     self.has_shape(d) or (self.has_rank(d) and self.get_rank(d) == 0)
                 ), (
@@ -3260,9 +3262,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             f"sources={list(self.dynamic_dimensions_source)}"
             f"{self.get_debug_msg()}"
         )
-        raise NotImplementedError(
-            f"Source is available for {dim!r}, source={self.dynamic_dimensions_source[dim]}"
-        )
+        raise NotImplementedError(f"Source is available for {dim!r}, name={name!r}")
 
     def _get_dynamic_dimension(self, name: str, dim: int) -> Optional[Union[str, "WrapDim"]]:
         if self.dynamic_shapes is None:
@@ -3997,7 +3997,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             old_name = None
 
         if elem_type != 0:
-            node = oh.make_tensor_value_info(name, elem_type, dyn_shape, doc_string=doc_string)
+            node = oh.make_tensor_value_info(name, elem_type, dyn_shape, doc_string=doc_string)  # type: ignore
         else:
             # We skip the shape as well.
             node = ValueInfoProto()

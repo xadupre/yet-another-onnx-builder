@@ -71,7 +71,7 @@ class OrderOptimization:
 
     def _position(self) -> List[Tuple[Optional[int], Optional[int]]]:
         output: Dict[str, int] = {}
-        first_input = {}
+        first_input: Dict[str, int] = {}
         for i, node in enumerate(self.builder.nodes):
             if node is None:
                 continue
