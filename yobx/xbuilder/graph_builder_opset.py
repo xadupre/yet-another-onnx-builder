@@ -1,6 +1,9 @@
 from functools import partial
-from typing import List, Optional, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 import numpy as np
+
+if TYPE_CHECKING:
+    from .graph_builder import GraphBuilder
 
 
 class Opset:
@@ -85,7 +88,7 @@ class Opset:
 
     def __init__(
         self,
-        builder: "GraphBuilder",  # noqa: F821
+        builder: "GraphBuilder",
         allow_unknown: bool = False,
     ):
         self.builder = builder
@@ -116,7 +119,7 @@ class Opset:
     def make_node(
         self,
         op_type: str,
-        *inputs: Optional[Union[str, np.ndarray]],
+        *inputs: Any,
         outputs: Optional[Union[int, List[str], str]] = None,
         domain: str = "",
         name: Optional[str] = None,
