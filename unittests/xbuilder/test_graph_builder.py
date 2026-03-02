@@ -2043,6 +2043,29 @@ class TestGetInputDynamicShape(ExtTestCase):
         info = g.get_sequence("seq")
         self.assertEqual(info["dtype"], TFLOAT)
 
+    @ignore_warnings(DeprecationWarning)
+    def test_make_tensor_sequence_input_builds_valid_model(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_sequence_input("seq", TFLOAT, None)
+        g.make_node("SequenceLength", ["seq"], ["length"], name="seq_len")
+        g.make_tensor_output("length", TensorProto.INT64, shape=[], indexed=False)
+        onx = g.to_onnx()
+
+        # The graph input should be typed as a sequence
+        inp = onx.graph.input[0]
+        self.assertEqual(inp.name, "seq")
+        self.assertTrue(inp.type.HasField("sequence_type"))
+        self.assertEqual(inp.type.sequence_type.elem_type.tensor_type.elem_type, TFLOAT)
+
+        # Running the model should return the number of tensors in the sequence
+        tensors = [
+            np.ones((3, 4), dtype=np.float32),
+            np.zeros((3, 4), dtype=np.float32),
+        ]
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, {"seq": tensors})
+        self.assertEqual(got[0], 2)
+
     def test_get_constant_as_shape_false(self):
         g = GraphBuilder(18, ir_version=9)
         g.make_tensor_input("X", TensorProto.FLOAT, (3, 4), False)
@@ -2696,6 +2719,23 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertIsInstance(result, str)
         self.assertNotEqual(result, "d")
 
+    def test_add_stat(self):
+        g = GraphBuilder(18, ir_version=9)
+        # First call creates the kind/name entry with value 1
+        g.add_stat("op", "Add")
+        self.assertEqual(g.statistics_["op"]["Add"], 1)
+        # Second call increments the counter
+        g.add_stat("op", "Add")
+        self.assertEqual(g.statistics_["op"]["Add"], 2)
+        # New name under existing kind
+        g.add_stat("op", "Mul")
+        self.assertEqual(g.statistics_["op"]["Mul"], 1)
+        # New kind
+        g.add_stat("pattern", "Reshape")
+        self.assertEqual(g.statistics_["pattern"]["Reshape"], 1)
+        # Existing kind/name counters are unchanged
+        self.assertEqual(g.statistics_["op"]["Add"], 2)
+
     def test_make_tensor_value_info_from_name(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
 
@@ -2798,6 +2838,77 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertIn("X:1|3x4", result)
         self.assertIn("shape_out:7|2", result)
         self.assertIn("->", result)
+
+    def test_do_not_turn_constant_initializers_flag_set(self):
+        # When _do_not_turn_constant_initializers is True (set by move_initializers_to_constant),
+        # the method must return True regardless of name.
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("X", TFLOAT, (2, 4), False)
+        np_weights = np.ones((4, 3), dtype=np.float32)
+        g.make_initializer("weights", np_weights)
+        g.move_initializers_to_constant(full_parameter_name=False)
+        self.assertTrue(g.do_not_turn_constant_initializers_maybe_because_of_showing("weights"))
+        self.assertTrue(g.do_not_turn_constant_initializers_maybe_because_of_showing("unknown"))
+
+    def test_do_not_turn_constant_initializers_no_parent(self):
+        # Without a parent the method always returns False.
+        g = GraphBuilder(18, ir_version=9)
+        g.make_initializer("cst", np.ones((2, 2), dtype=np.float32))
+        self.assertFalse(g.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
+        self.assertFalse(g.do_not_turn_constant_initializers_maybe_because_of_showing("other"))
+
+    def test_do_not_turn_constant_initializers_parent_does_not_have_name(self):
+        # Parent does not know the name at all: returns False.
+        parent = GraphBuilder(18, ir_version=9)
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
+        self.assertFalse(
+            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
+        )
+
+    def test_do_not_turn_constant_initializers_same_constant_in_parent(self):
+        # Same constant in both parent and child: has_exact_same_constant_in_context returns True,
+        # so the method returns not True = False (safe to share with parent).
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst)
+
+        self.assertFalse(
+            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
+        )
+
+    def test_do_not_turn_constant_initializers_different_constant_in_parent(self):
+        # Different values for same name: has_exact_same_constant_in_context returns False,
+        # so the method returns not False = True (shadowing would occur).
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst1 = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst1)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        np_cst2 = np_cst1 + 1.0
+        child.make_initializer("cst", np_cst2)
+
+        self.assertTrue(
+            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
+        )
+
+    def test_do_not_turn_constant_initializers_large_constant_recurse_to_parent(self):
+        # Large constants (>= 128 elements) cause has_exact_same_constant_in_context to return
+        # None, so the method recurses to the parent. The parent has no parent, so it returns
+        # False.
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(128).reshape((16, 8)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst)
+
+        self.assertFalse(
+            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
+        )
 
 
 if __name__ == "__main__":
