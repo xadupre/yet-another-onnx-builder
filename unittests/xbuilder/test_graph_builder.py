@@ -12,7 +12,7 @@ from yobx.ext_test_case import (
     requires_torch,
 )
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.xbuilder import GraphBuilder, FunctionOptions
+from yobx.xbuilder import GraphBuilder, FunctionOptions, OptimizationOptions
 from yobx.container import ExtendedModelContainer
 
 TFLOAT = TensorProto.FLOAT
@@ -2111,6 +2111,75 @@ class TestGetInputDynamicShape(ExtTestCase):
         else_att = next(a for a in result.node[0].attribute if a.name == "else_branch")
         else_ops = [(n.domain, n.op_type) for n in else_att.g.node]
         self.assertIn(("", "Abs"), else_ops)
+
+    def test_optimize_node_subgraphs_inplace(self):
+        # Build a model with an If node whose branches each contain an Identity
+        # node.  After calling optimize_node_subgraphs_inplace the Identity node
+        # should be eliminated from both branches.
+
+        # then_branch: Add(x, x) -> tmp; Identity(tmp) -> y
+        then_graph = oh.make_graph(
+            [
+                oh.make_node("Add", ["x", "x"], ["tmp"]),
+                oh.make_node("Identity", ["tmp"], ["y"]),
+            ],
+            "then_branch",
+            [],
+            [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
+        )
+        # else_branch: Abs(x) -> tmp; Identity(tmp) -> y
+        else_graph = oh.make_graph(
+            [
+                oh.make_node("Abs", ["x"], ["tmp"]),
+                oh.make_node("Identity", ["tmp"], ["y"]),
+            ],
+            "else_branch",
+            [],
+            [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
+        )
+        if_node = oh.make_node(
+            "If",
+            ["cond"],
+            ["y"],
+            then_branch=then_graph,
+            else_branch=else_graph,
+        )
+        graph = oh.make_graph(
+            [if_node],
+            "test",
+            [
+                oh.make_tensor_value_info("x", TensorProto.FLOAT, [None]),
+                oh.make_tensor_value_info("cond", TensorProto.BOOL, []),
+            ],
+            [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
+        )
+        model = oh.make_model(
+            graph,
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        gr = GraphBuilder(
+            model, optimization_options=OptimizationOptions(recursive=True)
+        )
+        node = gr.nodes[0]
+        self.assertEqual(node.op_type, "If")
+
+        # Both branches start with 2 nodes each.
+        then_att = next(a for a in node.attribute if a.name == "then_branch")
+        else_att = next(a for a in node.attribute if a.name == "else_branch")
+        self.assertEqual(len(then_att.g.node), 2)
+        self.assertEqual(len(else_att.g.node), 2)
+
+        context = set(i.name for i in gr.inputs)
+        gr.optimize_node_subgraphs_inplace(node, context)
+
+        # After optimization the Identity nodes must have been removed.
+        then_att = next(a for a in node.attribute if a.name == "then_branch")
+        else_att = next(a for a in node.attribute if a.name == "else_branch")
+        then_ops = [n.op_type for n in then_att.g.node]
+        else_ops = [n.op_type for n in else_att.g.node]
+        self.assertNotIn("Identity", then_ops)
+        self.assertNotIn("Identity", else_ops)
 
     def test_set_sequence_and_get_sequence(self):
         g = GraphBuilder(18, ir_version=9)
