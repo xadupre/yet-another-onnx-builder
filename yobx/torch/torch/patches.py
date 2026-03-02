@@ -27,19 +27,11 @@ class patched_DynamicDimConstraintPrinter:
 
 
 PATCHES.append(
-    PatchInfo(
-        patch=patched_DynamicDimConstraintPrinter._print_Symbol,
+    PatchInfo.make(
+        patched_DynamicDimConstraintPrinter._print_Symbol,
+        torch.fx.experimental.symbolic_shapes.DynamicDimConstraintPrinter,
+        "_print_Symbol",
         family="torch",
-        do=lambda: PatchInfo._setattr(
-            torch.fx.experimental.symbolic_shapes.DynamicDimConstraintPrinter,
-            "_print_Symbol",
-            patched_DynamicDimConstraintPrinter._print_Symbol,
-        ),
-        undo=lambda original: PatchInfo._setattr(
-            torch.fx.experimental.symbolic_shapes.DynamicDimConstraintPrinter,
-            "_print_Symbol",
-            original,
-        ),
     )
 )
 
@@ -88,6 +80,11 @@ def patched_infer_size(a, b):
             # PATCHED: generic case, the dimension is known, no need to assert
             expandedSizes[i] = torch.sym_max(sizeA, sizeB)
     return tuple(expandedSizes)
+
+
+PATCHES.append(
+    PatchInfo.make(patched_infer_size, torch._subclasses.fake_impls, "infer_size", family="torch")
+)
 
 
 def patched__broadcast_shapes(*_shapes):
@@ -141,6 +138,11 @@ def patched__broadcast_shapes(*_shapes):
                 common_shape[idx] = torch.sym_max(common_shape[idx], shape[idx])
 
     return common_shape
+
+
+PATCHES.append(
+    PatchInfo.make(patched__broadcast_shapes, torch._refs, "_broadcast_shapes", family="torch")
+)
 
 
 def _combine_args(f, args, kwargs, preserve_order: bool = False) -> dict[str, Any]:
@@ -221,3 +223,13 @@ def patched__get_range_constraints(
         fake_mode, gm, combined_args, dynamic_shapes, num_lifted
     )
     return range_constraints
+
+
+PATCHES.append(
+    PatchInfo.make(
+        patched__get_range_constraints,
+        torch.export._trace,
+        "_get_range_constraints",
+        family="torch",
+    )
+)

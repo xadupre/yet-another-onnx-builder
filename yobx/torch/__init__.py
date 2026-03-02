@@ -2,7 +2,7 @@ from typing import Any
 import torch
 from .export_options import ExportOptions
 from .flatten import register_flattening_functions
-from .patch import apply_patches
+from .patch import apply_patches_for_model
 from .tracing import (
     CustomProxy,
     CustomAttribute,

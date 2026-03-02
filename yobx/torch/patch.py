@@ -1,6 +1,7 @@
 import contextlib
 import traceback
-from typing import Iterator
+from typing import Iterator, Optional
+import torch
 from ..helpers.patch_helper import PatchDetails
 
 
@@ -19,24 +20,36 @@ def retrieve_stacktrace():
 
 
 @contextlib.contextmanager
-def apply_patches(
-    patch_torch: bool = False, patch_transformers: bool = False, verbose: int = 0
+def apply_patches_for_model(
+    patch_torch: bool = False,
+    patch_transformers: bool = False,
+    verbose: int = 0,
+    model: Optional[torch.nn.Module] = None,
 ) -> Iterator[PatchDetails]:
     """
     The context manager apply patches, usually before exporting a model.
 
     .. code-block:: python
 
-        from yobx.torch import apply_patches
+        from yobx.torch import apply_patches_for_model
 
-        with apply_patches(patch_transformers=True):
+        with apply_patches_for_model(patch_transformers=True, model=model):
             # ...
+    :param patch_torch: applies patches for :epkg:`torch`
+    :param patch_transformers: applies patch for transformers
+    :param verbose: prints out which patch is applies
+    :param model: modifies the list of patches for a particular model,
+        it is recommended to fill it the used rope is not the default one
     """
     patches = PatchDetails()
     if patch_torch:
         from .torch.patches import PATCHES
 
         patches.extend(PATCHES)
+    if patch_transformers:
+        from .transformers.patches import get_patches_for
+
+        patches.extend(get_patches_for(model))
     for patch in patches:
         if verbose:
             print(f"[register_patch_functions] apply {patch}")

@@ -52,9 +52,19 @@ class PatchInfo:
     :param family: a category, anything to classify the patch
     :param do: applies the patch, this function returns the patched function
     :param undo: remove the patch
+    :param _last_patched_function: this is used for patches applied when another
+        is used
     """
 
-    __slots__ = ("_do", "_undo", "depends_on", "family", "function_to_patch", "patch")
+    __slots__ = (
+        "_do",
+        "_last_patched_function",
+        "_undo",
+        "depends_on",
+        "family",
+        "function_to_patch",
+        "patch",
+    )
 
     @classmethod
     def _setattr(cls, to_patch, function_or_method: "str", new_value: Callable) -> Callable:
@@ -62,12 +72,49 @@ class PatchInfo:
         setattr(to_patch, function_or_method, new_value)
         return previous
 
+    @classmethod
+    def make(
+        cls,
+        patch: Callable,
+        module_or_class: Any,
+        method_or_function_name: str,
+        family: str,
+        _last_patched_function: Optional[Callable] = None,
+    ) -> "PatchInfo":
+        """
+        Creates a patch with the given information.
+
+        :param patch: the patched method or function
+        :param module_or_class: the module or the class to patch
+        :param method_or_function_name: method or function name to patch
+        :param family: category of the patch
+        :param _last_patched_function: this is used for patches applied when another
+            is used
+        :return: the patch
+        """
+        return PatchInfo(
+            patch=patch,
+            family=family,
+            do=lambda: PatchInfo._setattr(
+                module_or_class,
+                method_or_function_name,
+                patch,
+            ),
+            undo=lambda original: PatchInfo._setattr(
+                module_or_class,
+                method_or_function_name,
+                original,
+            ),
+            _last_patched_function=_last_patched_function,
+        )
+
     def __init__(
         self,
         patch: Callable,
         do: Callable[[], None],
         undo: Callable[[Callable], None],
         family: str = "",
+        _last_patched_function: Optional[Callable] = None,
     ):
         assert callable(patch), (
             f"function_to_patch is not a function but {type(patch)} - {patch!r}, "
@@ -79,11 +126,13 @@ class PatchInfo:
         self.depends_on: List[PatchInfo] = []
         self._do = do
         self._undo = undo
+        self._last_patched_function = _last_patched_function
 
     def do(self):
         """Applies the patch."""
         assert self.function_to_patch is None, f"The patch {self.patch} is already applied."
         self.function_to_patch = self._do()
+        self._last_patched_function = self.function_to_patch
         assert self.function_to_patch is not None, f"The patch {self.patch} is not applied."
         assert not self.function_to_patch.__name__.startswith(
             "patch_"
@@ -123,7 +172,12 @@ class PatchInfo:
         """Returns a diff as a string."""
         if isinstance(self.function_to_patch, str):
             return clean_code_with_black(inspect.getsource(self.patch))
-        src1 = clean_code_with_black(inspect.getsource(self.function_to_patch))
+        f = self.function_to_patch or self._last_patched_function
+        assert f is not None, (
+            f"The patch {self.name!r} was never applied "
+            f"{self.function_to_patch=}, {self._last_patched_function=}."
+        )
+        src1 = clean_code_with_black(inspect.getsource(f))
         src2 = clean_code_with_black(inspect.getsource(self.patch))
         diff = make_diff_code(src1, src2)
         if not self.depends_on:
@@ -250,7 +304,7 @@ class PatchDetails:
             interval = [lineno, lineno + len(lines)]
             patches.append((patch, f, source, interval))
 
-        cst = "onnx_diagnostic"
+        cst = "yobx"
         node_stack = []
         for node in graph.nodes:
             meta = node.meta
