@@ -263,19 +263,21 @@ def open_dataframe(
         return data
     if isinstance(data, str):
         df = pandas.read_csv(data, low_memory=False)
-        df["RAWFILENAME"] = data
-        return df
+        return pandas.concat([df, pandas.DataFrame({"RAWFILENAME": [data] * len(df)})], axis=1)
     if isinstance(data, tuple):
         if not data[-1]:
             df = pandas.read_csv(data[2], low_memory=False)
-            df["RAWFILENAME"] = data[2]
-            return df
+            return pandas.concat(
+                [df, pandas.DataFrame({"RAWFILENAME": [data[2]] * len(df)})], axis=1
+            )
         zf = zipfile.ZipFile(data[-1])
         with zf.open(data[2]) as f:
             df = pandas.read_csv(f, low_memory=False)
-            df["RAWFILENAME"] = f"{data[-1]}/{data[2]}"
+            rawfilename = f"{data[-1]}/{data[2]}"
         zf.close()
-        return df
+        return pandas.concat(
+            [df, pandas.DataFrame({"RAWFILENAME": [rawfilename] * len(df)})], axis=1
+        )
 
     raise ValueError(f"Unexpected value for data: {data!r}")
 
