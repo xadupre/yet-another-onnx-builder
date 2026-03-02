@@ -55,6 +55,34 @@ class TestTorchSymIntToStr(ExtTestCase):
 
 
 @requires_torch("2.0")
+class TestTorchSymInt(ExtTestCase):
+    @classmethod
+    def setUpClass(cls):
+        import torch
+        from yobx.xbuilder import GraphBuilder
+
+        cls.torch = torch
+        cls.builder = GraphBuilder(18, ir_version=9)
+
+    def test_sym_int_str_node(self):
+        """A SymInt with a string node returns that string."""
+        sym = self.torch.SymInt("s0")
+        result = self.builder._torch_sym_int(sym)
+        self.assertEqual(result, "s0")
+
+    def test_sym_int_symnode(self):
+        """A SymInt backed by a SymNode returns the expression string."""
+        import sympy
+        from torch.fx.experimental.symbolic_shapes import ShapeEnv
+        import torch.fx.experimental.sym_node as sym_node_module
+
+        node = sym_node_module.SymNode(sympy.Symbol("s0"), ShapeEnv(), int, 0)  # hint=0
+        sym = self.torch.SymInt(node)
+        result = self.builder._torch_sym_int(sym)
+        self.assertIsInstance(result, str)
+        self.assertIn("s0", result)
+
+
 class TestWrapDimNameAsString(ExtTestCase):
     @classmethod
     def setUpClass(cls):
@@ -62,6 +90,7 @@ class TestWrapDimNameAsString(ExtTestCase):
         from yobx.xbuilder import GraphBuilder
 
         cls.torch = torch
+        cls.builder = GraphBuilder(18, ir_version=9)
         cls.WrapDim = GraphBuilder.WrapDim
 
     def test_str_name(self):
