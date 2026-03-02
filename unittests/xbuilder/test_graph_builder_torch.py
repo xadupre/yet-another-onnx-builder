@@ -54,5 +54,60 @@ class TestTorchSymIntToStr(ExtTestCase):
             self.builder._torch_sym_int_to_str(_Unconvertible())
 
 
+@requires_torch("2.0")
+class TestImproveConstraints(ExtTestCase):
+    @classmethod
+    def setUpClass(cls):
+        from yobx.xbuilder import GraphBuilder
+
+        cls.GraphBuilder = GraphBuilder
+
+    def test_improve_constraints_deduces_equivalence(self):
+        """_improve_constraints should deduce that seq_length == s70 from
+        the constraint s52+seq_length == s52+s70."""
+        gr = self.GraphBuilder(18, ir_version=9)
+        gr.add_to_constraints("s52+seq_length", "s52+s70")
+        gr._improve_constraints()
+        constraints = gr.get_registered_constraints()
+        # The method should have deduced that seq_length and s70 are equivalent
+        self.assertIn("seq_length", constraints)
+        self.assertIn("s70", constraints["seq_length"])
+        self.assertIn("s70", constraints)
+        self.assertIn("seq_length", constraints["s70"])
+
+    def test_improve_constraints_adds_renamed_expressions(self):
+        """_improve_constraints should also link the renamed expressions."""
+        gr = self.GraphBuilder(18, ir_version=9)
+        gr.add_to_constraints("s52+seq_length", "s52+s70")
+        gr._improve_constraints()
+        constraints = gr.get_registered_constraints()
+        # s52+s70 and s52+seq_length should be linked to each other
+        self.assertIn("s52+seq_length", constraints)
+        self.assertIn("s52+s70", constraints["s52+seq_length"])
+        self.assertIn("s52+s70", constraints)
+        self.assertIn("s52+seq_length", constraints["s52+s70"])
+
+    def test_improve_constraints_integer_values_skipped(self):
+        """_improve_constraints should skip constraints containing integers."""
+        gr = self.GraphBuilder(18, ir_version=9)
+        gr.add_to_constraints("batch", 4)
+        gr._improve_constraints()
+        constraints = gr.get_registered_constraints()
+        # Integer constraint should remain unchanged
+        self.assertIn("batch", constraints)
+        self.assertIn(4, constraints["batch"])
+
+    def test_improve_constraints_skips_equal_expressions(self):
+        """_improve_constraints should not add constraints when simplification
+        does not yield exactly two terms."""
+        gr = self.GraphBuilder(18, ir_version=9)
+        # e*2 == e+e simplifies to {} (equal expressions), so no new constraints
+        gr.add_to_constraints("e*2", "e+e")
+        gr._improve_constraints()
+        constraints = gr.get_registered_constraints()
+        # No new equivalences should be deduced
+        self.assertNotIn("e", constraints)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
