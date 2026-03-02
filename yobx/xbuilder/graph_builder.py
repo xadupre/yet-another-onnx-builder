@@ -308,20 +308,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     # MAXINT for int64, means a slice goes up to the last element
     END = np.array([9223372036854775807], dtype=np.int64)
 
-    class ShapeConstant:
-        """Wraps a constant shape even if the input producing the shape is not."""
-
-        def __init__(self, name: str, shape: Tuple[int, ...], node: NodeProto):
-            self.name = name
-            self.shape = shape
-            self.node = node
-
-        def __repr__(self) -> str:
-            return (
-                f"{self.__class__.__name__}({self.name!r}, shape={self.shape!r}, "
-                f"node=<{self.node.op_type})"
-            )
-
     class WrapSym:
         """Wraps a symbolic int (a dimension for example)."""
 
@@ -8815,7 +8801,13 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if new_domain not in self.opsets:
             self.opsets[new_domain] = 1
         locf = self.get_local_function(new_name, new_domain)
+        assert isinstance(
+            locf, FunctionProto
+        ), f"unexpected type {type(locf)} for function {new_name!r} from domain {new_domain!r}"
         b = self.get_local_function(new_name, new_domain, builder=True)
+        assert isinstance(
+            b, GraphBuilder
+        ), f"unexpected type {type(b)} for function {new_name!r} from domain {new_domain!r}"
         if self._debug_local_function:
             print(
                 f"[GraphBuilder-{self._hash()}.make_local_function] "
@@ -8849,7 +8841,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         replacements: Dict[Tuple[str, str], Tuple[str, str]],
         list_keys: Optional[List[Tuple[str, str]]] = None,
         proto: Optional[Union[FunctionProto, List[FunctionProto]]] = None,
-    ) -> Union[FunctionProto, List[FunctionProto]]:
+    ) -> Optional[Union[FunctionProto, List[FunctionProto]]]:
         """
         Renames local function in a given list of local functions.
 
@@ -8877,7 +8869,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             self.functions[key] = new_f
             if key in replacements:
                 new_f.domain, new_f.name = replacements[key]
-                self.functions[replacements[key]] = new_f
+                self.functions[replacements[key]] = (
+                    new_f  # pyrefly: ignore[unsupported-operation]
+                )
             if key in self.functions_builder:
                 self.functions_builder[key].rename_local_functions(replacements)
                 if key in replacements:
@@ -9100,13 +9094,13 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def get_local_function(
         self, name: str, domain: str = "", builder: bool = False
-    ) -> FunctionProto:
+    ) -> Union[FunctionProto, "GraphBuilder"]:
         """Returns a local function."""
         if builder:
             return self.functions_builder[domain, name]
         return self.functions[domain, name]
 
-    def get_local_function_outputs(self, name: str, domain: str = "") -> List[str]:
+    def get_local_function_outputs(self, name: str, domain: str = "") -> Sequence[str]:
         """Returns the outputs of a local function."""
         return self.functions[domain, name].output
 
@@ -9240,7 +9234,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     f"(AttributeProto.GRAPHS)"
                 )
                 if att.type == AttributeProto.GRAPH:
-                    if self.has_local_function(att.g):
+                    if self.local_functions_found(att.g):
                         return True
         return False
 
@@ -9564,7 +9558,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 )
             return g
         g2 = oh.make_graph(
-            new_nodes, g.name, g.input, g.output, g.initializer, g.sparse_initializer
+            new_nodes,
+            g.name,
+            g.input,
+            g.output,
+            g.initializer,
+            sparse_initializer=g.sparse_initializer,
         )
         if self.verbose >= 5:
             print(f"[GraphBuilder-{self._hash()}._rename_results_in_subgraph] done {g2.name!r}")
@@ -9572,8 +9571,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def _convert_function(
         self,
-        inputs: List[str],
-        outputs: List[str],
+        inputs: Sequence[str],
+        outputs: Sequence[str],
         proto: FunctionProto,
         attributes: Optional[Sequence[AttributeProto]] = None,
     ) -> List[NodeProto]:
@@ -9776,7 +9775,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if self.input_args is not None and input_index < len(self.input_args):
                 v = self.input_args[input_index]
                 if isinstance(v, VirtualTensor):
-                    example_shape = v.shape
+                    example_shape = v.shape  # pyrefly: ignore[bad-assignment]
                 else:
                     raise NotImplementedError(
                         f"example_shape is None, example_value as well, "
@@ -9909,7 +9908,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             n = f"{prefix}_{i}"
         return n
 
-    def make_torch_tensor_from_np_array(self, np_array: np.ndarray) -> "torch.Tensor":
+    def make_torch_tensor_from_np_array(  # pyrefly: ignore[bad-param-name-override]
+        self, np_array: np.ndarray
+    ) -> "torch.Tensor":
         """Converts a numpy array into a :class:`torch.Tensor`."""
         try:
             import ml_dtypes
@@ -10042,7 +10043,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     g = att.g
                     shadow |= set(i.name for i in g.input) & shadow_context
                     shadow |= set(i.name for i in g.initializer) & shadow_context
-                    shadow |= set(i.name for i in g.sparse_initializer) & shadow_context
+                    shadow |= set(i.values.name for i in g.sparse_initializer) & shadow_context
                     shadow |= self.shadowing_names(g.node, existing, existing)
 
             not_empty = set(n for n in node.output if n)

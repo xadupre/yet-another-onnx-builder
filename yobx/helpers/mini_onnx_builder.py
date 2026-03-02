@@ -601,7 +601,7 @@ def _unflatten(
                     key = tuple(_tryint(s) for s in spl)
                 else:
                     key = _tryint(k)
-                d[key] = v
+                d[key] = v  # type: ignore
             return d
         return ty(res)
 

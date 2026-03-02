@@ -1,7 +1,7 @@
 import random
 import time
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from ..helpers.onnx_helper import make_idn
 
 if TYPE_CHECKING:
@@ -69,8 +69,8 @@ class OrderOptimization:
             raise AssertionError(f"Unsupported algorithm {self.algorithm}.")
         return stats
 
-    def _position(self):
-        output = {}
+    def _position(self) -> List[Tuple[Optional[int], Optional[int]]]:
+        output: Dict[str, int] = {}
         first_input = {}
         for i, node in enumerate(self.builder.nodes):
             if node is None:
@@ -80,7 +80,7 @@ class OrderOptimization:
                     first_input[name] = i
             for name in node.output:
                 output[name] = i
-        couples = []
+        couples: List[Tuple[Optional[int], Optional[int]]] = []
         N = len(self.builder.nodes)
         for node in self.builder.nodes:
             if node is None:
@@ -162,6 +162,7 @@ class OrderOptimization:
                     i += 1
                     continue
                 mi, ma = couples[i]
+                assert mi is not None and ma is not None, f"node is not None but {mi=} and {ma=}"
                 if self.verbose >= 10:
                     print(
                         f"[OrderOptimization.random_order] iter={n_iter} i={i} "

@@ -132,7 +132,7 @@ class Opset:
         if outputs is None:
             outputs = self._implemented[op_type]
         if inputs is None:
-            inputs = []
+            inputs = []  # pyrefly: ignore[bad-assignment]
         assert (
             op_type != "Reshape"
             or len(inputs) != 2

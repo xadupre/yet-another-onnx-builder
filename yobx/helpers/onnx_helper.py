@@ -56,7 +56,7 @@ def enumerate_subgraphs_builder(
             yield this
             for no in att.g.node:
                 for tu in enumerate_subgraphs(no):
-                    yield this + tu
+                    yield this + tu  # type: ignore
 
 
 def enumerate_subgraphs(graph: onnx.GraphProto) -> Iterator[onnx.GraphProto]:
@@ -166,7 +166,7 @@ def compatible_opsets(domain: str, op_type: str, current: int, new_version: int)
         f"in {list(sorted(_history[domain]))}"
     )
     hist = _history[domain][op_type]
-    versions = list(sorted(hist))  # noqa: C413
+    versions: List[int] = list(sorted(hist))  # noqa: C413
     pos = np.searchsorted(versions, current, side="right") - 1
     assert pos >= 0, (
         f"Available version for {op_type!r} from {domain!r}, "
