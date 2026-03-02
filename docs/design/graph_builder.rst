@@ -116,7 +116,7 @@ re-optimized.
 
     g = GraphBuilder(model)
     print("input  shapes:", {n: g.get_shape(n) for n in g.input_names})
-    print("nodes        :", [nd.op_type for nd in g.nodes])
+    print("nodes        :", [node.op_type for node in g.nodes])
 
 Initializers
 ============
