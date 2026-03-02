@@ -2887,6 +2887,117 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertEqual(vi.name, "z")
         self.assertFalse(vi.type.HasField("tensor_type"))
 
+    def test_rename_results_basic(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        nodes = [oh.make_node("Add", ["x", "y"], ["z"], name="n0")]
+        replacements = {"x": "x", "y": "y"}
+        new_nodes = g._rename_results(nodes, replacements)
+        self.assertEqual(len(new_nodes), 1)
+        self.assertEqual(list(new_nodes[0].input), ["x", "y"])
+        self.assertEqual(list(new_nodes[0].output), ["z"])
+        self.assertIn("z", replacements)
+        self.assertEqual(replacements["z"], "z")
+
+    def test_rename_results_renamed_inputs(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        nodes = [oh.make_node("Add", ["x", "y"], ["z"], name="n0")]
+        replacements = {"x": "new_x", "y": "new_y"}
+        new_nodes = g._rename_results(nodes, replacements)
+        self.assertEqual(list(new_nodes[0].input), ["new_x", "new_y"])
+        self.assertEqual(list(new_nodes[0].output), ["z"])
+
+    def test_rename_results_output_already_in_replacements(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        # Output 'z' is already in replacements with the same value (final output)
+        nodes = [oh.make_node("Relu", ["x"], ["z"], name="n0")]
+        replacements = {"x": "x", "z": "z"}
+        new_nodes = g._rename_results(nodes, replacements)
+        self.assertEqual(list(new_nodes[0].output), ["z"])
+
+    def test_rename_results_multiple_nodes(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        # Add(x, y) -> tmp; Relu(tmp) -> out
+        nodes = [
+            oh.make_node("Add", ["x", "y"], ["tmp"], name="n0"),
+            oh.make_node("Relu", ["tmp"], ["out"], name="n1"),
+        ]
+        replacements = {"x": "new_x", "y": "new_y", "out": "out"}
+        new_nodes = g._rename_results(nodes, replacements)
+        self.assertEqual(len(new_nodes), 2)
+        # Inputs of first node are renamed
+        self.assertEqual(list(new_nodes[0].input), ["new_x", "new_y"])
+        # Output of first node becomes the input of the second node
+        first_out = new_nodes[0].output[0]
+        self.assertEqual(list(new_nodes[1].input), [first_out])
+        # Final output is preserved
+        self.assertEqual(list(new_nodes[1].output), ["out"])
+
+    def test_rename_results_with_graph_attribute(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        # Build a minimal If node with a then_branch subgraph
+        then_graph = oh.make_graph(
+            [oh.make_node("Add", ["outer_x", "outer_y"], ["branch_out"])],
+            "then_branch",
+            [],
+            [oh.make_tensor_value_info("branch_out", TensorProto.FLOAT, [])],
+        )
+        if_node = oh.make_node("If", ["cond"], ["result"], name="n0")
+        if_node.attribute.append(oh.make_attribute("then_branch", then_graph))
+        replacements = {"cond": "cond", "result": "result"}
+        new_nodes = g._rename_results([if_node], replacements)
+        self.assertEqual(len(new_nodes), 1)
+        self.assertEqual(new_nodes[0].op_type, "If")
+
+    def test_rename_results_in_subgraph_no_replacement_needed(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        subgraph = oh.make_graph(
+            [oh.make_node("Add", ["a", "b"], ["c"])],
+            "sub",
+            [],
+            [oh.make_tensor_value_info("c", TensorProto.FLOAT, [])],
+        )
+        # No actual substitution: replacements map each name to itself
+        replacements = {"a": "a", "b": "b"}
+        result = g._rename_results_in_subgraph(subgraph, replacements=replacements)
+        # When nothing changes the original graph object is returned
+        self.assertIs(result, subgraph)
+
+    def test_rename_results_in_subgraph_with_replacement(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        subgraph = oh.make_graph(
+            [oh.make_node("Add", ["a", "b"], ["c"])],
+            "sub",
+            [],
+            [oh.make_tensor_value_info("c", TensorProto.FLOAT, [])],
+        )
+        replacements = {"a": "new_a", "b": "b"}
+        result = g._rename_results_in_subgraph(subgraph, replacements=replacements)
+        self.assertEqual(result.name, "sub")
+        self.assertEqual(len(result.node), 1)
+        self.assertEqual(list(result.node[0].input), ["new_a", "b"])
+        self.assertEqual(list(result.node[0].output), ["c"])
+
+    def test_rename_results_in_subgraph_shadowing(self):
+        # Verify that once a node re-defines a name that was being replaced,
+        # the replacement stops applying to subsequent nodes.
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        subgraph = oh.make_graph(
+            [
+                oh.make_node("Add", ["a", "b"], ["a"]),  # shadows 'a'
+                oh.make_node("Relu", ["a"], ["c"]),
+            ],
+            "sub",
+            [],
+            [oh.make_tensor_value_info("c", TensorProto.FLOAT, [])],
+        )
+        # 'a' should be renamed to 'new_a' only in the first node's inputs
+        replacements = {"a": "new_a", "b": "b"}
+        result = g._rename_results_in_subgraph(subgraph, replacements=replacements)
+        # First node input uses the replacement; output keeps 'a'
+        self.assertEqual(list(result.node[0].input), ["new_a", "b"])
+        # Second node input must use the local 'a' (shadowed), not 'new_a'
+        self.assertEqual(list(result.node[1].input), ["a"])
+
     def test_empty_copy(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
         g2 = g.empty_copy()
