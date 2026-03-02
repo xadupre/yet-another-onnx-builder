@@ -218,6 +218,95 @@ class TestTranslate(ExtTestCase):
         code = translate(model, api="light")
         self.assertIsInstance(code, str)
 
+    def test_translate_compact_basic(self):
+        """Compact emitter should produce a single oh.make_model(...) expression."""
+        model = _make_simple_model()
+        code = translate(model, api="onnx-compact")
+        self.assertIsInstance(code, str)
+        self.assertIn("oh.make_model(", code)
+        self.assertIn("oh.make_graph(", code)
+        self.assertIn("oh.make_node(", code)
+        # Should NOT use intermediate list variables
+        self.assertNotIn("nodes = []", code)
+        self.assertNotIn("inputs = []", code)
+        self.assertNotIn("nodes.append(", code)
+        self.assertNotIn("inputs.append(", code)
+
+    def test_translate_compact_executable(self):
+        """Generated compact code should be executable and reproduce the model."""
+        model = _make_simple_model()
+        model.ir_version = 8
+        code = translate(model, api="onnx-compact")
+        header = translate_header("onnx-compact")
+        full_code = header + "\n" + code
+        ns = {}
+        exec(compile(full_code, "<string>", "exec"), ns)  # noqa: S102
+        recreated = ns["model"]
+        self.assertIsInstance(recreated, onnx.ModelProto)
+        self.assertEqual(len(model.graph.node), len(recreated.graph.node))
+        self.assertEqual(recreated.ir_version, 8)
+
+    def test_translate_compact_with_function_executable(self):
+        """Compact code for a model with functions should be executable."""
+        model = _make_model_with_function()
+        code = translate(model, api="onnx-compact")
+        self.assertIn("oh.make_function(", code)
+        self.assertIn("functions=[_function_0]", code)
+        header = translate_header("onnx-compact")
+        full_code = header + "\n" + code
+        ns = {}
+        exec(compile(full_code, "<string>", "exec"), ns)  # noqa: S102
+        recreated = ns["model"]
+        self.assertIsInstance(recreated, onnx.ModelProto)
+        self.assertEqual(len(recreated.functions), 1)
+
+    def test_translate_compact_is_more_compact(self):
+        """Compact code should be shorter than the standard onnx code."""
+        model = _make_simple_model()
+        code_standard = translate(model, api="onnx")
+        code_compact = translate(model, api="onnx-compact")
+        self.assertLess(len(code_compact), len(code_standard))
+
+    def test_translate_compact_model_equivalent(self):
+        """Compact-generated model must be structurally equivalent to the original."""
+        model = _make_simple_model()
+        model.ir_version = 8
+        code = translate(model, api="onnx-compact")
+        header = translate_header("onnx-compact")
+        full_code = header + "\n" + code
+        ns = {}
+        exec(compile(full_code, "<string>", "exec"), ns)  # noqa: S102
+        recreated = ns["model"]
+        # Validate the recreated model is well-formed
+        onnx.checker.check_model(recreated)
+        # Same number of nodes, same op_types and connectivity
+        self.assertEqual(len(recreated.graph.node), len(model.graph.node))
+        for orig_node, new_node in zip(model.graph.node, recreated.graph.node):
+            self.assertEqual(new_node.op_type, orig_node.op_type)
+            self.assertEqual(list(new_node.input), list(orig_node.input))
+            self.assertEqual(list(new_node.output), list(orig_node.output))
+        # Same initializer names and values
+        orig_inits = {i.name: onh.to_array(i) for i in model.graph.initializer}
+        new_inits = {i.name: onh.to_array(i) for i in recreated.graph.initializer}
+        self.assertEqual(set(orig_inits), set(new_inits))
+        for name in orig_inits:
+            np.testing.assert_array_equal(new_inits[name], orig_inits[name])
+        # Same graph inputs and outputs (names and types)
+        self.assertEqual(
+            [(inp.name, inp.type.tensor_type.elem_type) for inp in recreated.graph.input],
+            [(inp.name, inp.type.tensor_type.elem_type) for inp in model.graph.input],
+        )
+        self.assertEqual(
+            [(out.name, out.type.tensor_type.elem_type) for out in recreated.graph.output],
+            [(out.name, out.type.tensor_type.elem_type) for out in model.graph.output],
+        )
+
+        """translate_header('onnx-compact') should return valid import header."""
+        header = translate_header("onnx-compact")
+        self.assertIn("import onnx", header)
+        self.assertIn("import onnx.helper as oh", header)
+        self.assertIn("import onnx.numpy_helper as onh", header)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -215,6 +215,62 @@ correct layer class and its kwargs are recreated on unflatten:
 | ``StaticSlidingWindowLayer``  | X    |
 +-------------------------------+------+
 
+The following example builds a cache whose first layer is a plain
+``DynamicLayer`` and whose second layer is a ``DynamicSlidingWindowLayer``.
+It then round-trips the cache through
+:func:`~yobx.torch.transformers.flatten_class.flatten_dynamic_cache` /
+:func:`~yobx.torch.transformers.flatten_class.unflatten_dynamic_cache` and
+shows that the layer types **and** the ``sliding_window`` parameter are
+preserved:
+
+.. runpython::
+    :showcode:
+
+    import torch
+    import transformers
+    from yobx.helpers import string_type
+    from yobx.torch.transformers.cache_helper import make_dynamic_cache
+    from yobx.torch.transformers.flatten_class import (
+        flatten_dynamic_cache,
+        unflatten_dynamic_cache,
+    )
+
+    # DynamicSlidingWindowLayer was added in transformers >= 4.50.
+    if not hasattr(transformers.cache_utils, "DynamicSlidingWindowLayer"):
+        print("DynamicSlidingWindowLayer not available, skipping example.")
+    else:
+        bsize, nheads, slen, dim = 2, 4, 3, 7
+        sliding_window = slen  # sliding_window must be >= the sequence length
+
+        # Build a DynamicCache with two different layer types.
+        cache = make_dynamic_cache(
+            [
+                (
+                    torch.randn(bsize, nheads, slen, dim),
+                    torch.randn(bsize, nheads, slen, dim),
+                ),
+                (
+                    torch.randn(bsize, nheads, slen, dim),
+                    torch.randn(bsize, nheads, slen, dim),
+                ),
+            ],
+            cls_layers=[
+                transformers.cache_utils.DynamicLayer,
+                transformers.cache_utils.DynamicSlidingWindowLayer,
+            ],
+            cls_kwargs=[{}, {"sliding_window": sliding_window}],
+        )
+        print("cache:", string_type(cache, with_shape=True))
+
+        # Flatten (serialize) the cache — the context encodes each layer's type.
+        flat, context = flatten_dynamic_cache(cache)
+        print("context keys:", context)
+
+        # Unflatten (deserialize) the cache — layer types are restored from the context.
+        rebuilt = unflatten_dynamic_cache(flat, context)
+        print("layer types:", [type(layer).__name__ for layer in rebuilt.layers])
+        print("sliding_window:", rebuilt.layers[1].sliding_window)
+
 .. seealso::
 
     :ref:`l-plot-flattening` — sphinx-gallery example demonstrating
