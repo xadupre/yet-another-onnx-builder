@@ -1495,7 +1495,6 @@ class TestGraphBuilder(ExtTestCase):
         got = ref2.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
-
     def test_check_two_shapes_are_compatible_same_ints(self):
         g = GraphBuilder(18)
         # identical integer shapes: no exception
@@ -1533,6 +1532,54 @@ class TestGraphBuilder(ExtTestCase):
         # one int, one string: compatible (no exception)
         g._check_two_shapes_are_compatible((2, "seq"), (2, "seq"), name="x")
         g._check_two_shapes_are_compatible((2, "seq"), (2, "other"), name="x")
+
+    def test_get_is_dimension_dynamic_object(self):
+        gr = GraphBuilder(18, verbose=0)
+        gr.dynamic_objects["dim0"] = "wrapped_value"
+        self.assertTrue(gr.get_is_dimension("dim0"))
+
+    def test_get_is_dimension_int_in_name(self):
+        gr = GraphBuilder(18, verbose=0)
+        self.assertFalse(gr.get_is_dimension("result_INT_op"))
+
+    def test_get_is_dimension_float_elem_type(self):
+        gr = GraphBuilder(18, verbose=0)
+        self.assertFalse(gr.get_is_dimension("unknown", elem_type=TensorProto.FLOAT))
+        self.assertFalse(gr.get_is_dimension("unknown", elem_type=TensorProto.FLOAT16))
+        self.assertFalse(gr.get_is_dimension("unknown", elem_type=TensorProto.DOUBLE))
+
+    def test_get_is_dimension_exc_false(self):
+        gr = GraphBuilder(18, verbose=0)
+        self.assertFalse(gr.get_is_dimension("unknown", exc=False))
+
+    def test_get_is_dimension_exc_true(self):
+        gr = GraphBuilder(18, verbose=0)
+        self.assertRaises(RuntimeError, gr.get_is_dimension, "unknown")
+
+    def test_get_is_dimension_run_node_float(self):
+        import torch
+
+        gr = GraphBuilder(18, verbose=0)
+        gr.set_shapes_types("x", "run_node", (("",), ("op", torch.float32, (2, 3))))
+        self.assertFalse(gr.get_is_dimension("x"))
+        gr.set_shapes_types("y", "run_node", (("",), ("op", torch.float16, (1,))))
+        self.assertFalse(gr.get_is_dimension("y"))
+        gr.set_shapes_types("z", "run_node", (("",), ("op", torch.float64, ())))
+        self.assertFalse(gr.get_is_dimension("z"))
+
+    def test_get_is_dimension_run_node_scalar_int64(self):
+        import torch
+
+        gr = GraphBuilder(18, verbose=0)
+        gr.set_shapes_types("x", "run_node", (("",), ("op", torch.int64, ())))
+        self.assertTrue(gr.get_is_dimension("x"))
+
+    def test_get_is_dimension_run_node_multidim_int64(self):
+        import torch
+
+        gr = GraphBuilder(18, verbose=0)
+        gr.set_shapes_types("x", "run_node", (("",), ("op", torch.int64, (2, 3))))
+        self.assertFalse(gr.get_is_dimension("x"))
 
 
 if __name__ == "__main__":
