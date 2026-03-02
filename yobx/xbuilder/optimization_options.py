@@ -1,5 +1,6 @@
-from typing import List, Optional, Set, Tuple, Union
+from typing import Any, List, Optional, Set, Tuple, Union
 from ..helpers import string_sig
+from .order_optim import OrderAlgorithm
 
 
 class OptimizationOptions:
@@ -89,7 +90,7 @@ class OptimizationOptions:
         remove_identity: bool = True,
         remove_duplicated_shape: bool = True,
         patterns: Optional[
-            Union[str, List[Union[type, "PatternOptimization"]]]  # noqa: F821
+            Union[str, List[Any]]
         ] = None,  # "default",
         max_iter: int = -1,
         recursive: bool = True,
@@ -98,7 +99,7 @@ class OptimizationOptions:
         verifies: bool = False,
         dump_applied_patterns: Optional[str] = None,
         processor: str = "CPU",
-        order: Optional[Union["OrderAlgorithm", str]] = "SHAPE",  # noqa: F821
+        order: Optional[Union[OrderAlgorithm, str]] = "SHAPE",
         passes: Tuple[str, ...] = (
             "remove_identity",
             "remove_unused",
