@@ -1534,6 +1534,105 @@ class TestGraphBuilder(ExtTestCase):
         got = ref2.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @ignore_warnings(DeprecationWarning)
+    @hide_stdout()
+    def test_inline_functions_subgraph(self):
+        """Test that _inline_functions_subgraph inlines functions called inside a subgraph."""
+        new_domain = "custom"
+
+        linear_regression = oh.make_function(
+            new_domain,
+            "LinearRegression",
+            ["x", "a", "b"],
+            ["y"],
+            [
+                oh.make_node("MatMul", ["x", "a"], ["xa"]),
+                oh.make_node("Add", ["xa", "b"], ["y"]),
+            ],
+            [oh.make_opsetid("", 18)],
+            [],
+        )
+
+        # Build the then_branch: calls the custom function inside
+        then_branch = oh.make_graph(
+            [
+                oh.make_node(
+                    "LinearRegression", ["X", "A", "B"], ["Y_then"], domain=new_domain
+                ),
+            ],
+            "then_branch",
+            [],
+            [oh.make_tensor_value_info("Y_then", TensorProto.FLOAT, None)],
+        )
+
+        # Build the else_branch: returns Abs(X)
+        else_branch = oh.make_graph(
+            [
+                oh.make_node("Abs", ["X"], ["Y_else"]),
+            ],
+            "else_branch",
+            [],
+            [oh.make_tensor_value_info("Y_else", TensorProto.FLOAT, None)],
+        )
+
+        onnx_model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "If",
+                        ["Cond"],
+                        ["Y"],
+                        then_branch=then_branch,
+                        else_branch=else_branch,
+                    ),
+                ],
+                "main_graph",
+                [
+                    oh.make_tensor_value_info("Cond", TensorProto.BOOL, []),
+                    oh.make_tensor_value_info("X", TensorProto.FLOAT, [None, None]),
+                    oh.make_tensor_value_info("A", TensorProto.FLOAT, [None, None]),
+                    oh.make_tensor_value_info("B", TensorProto.FLOAT, [None, None]),
+                ],
+                [oh.make_tensor_value_info("Y", TensorProto.FLOAT, None)],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid(new_domain, 1)],
+            functions=[linear_regression],
+            ir_version=10,
+        )
+
+        feeds_true = dict(
+            Cond=np.array(True),
+            X=np.arange(9).reshape((3, 3)).astype(np.float32),
+            A=np.eye(3).astype(np.float32),
+            B=np.ones((3, 3), dtype=np.float32),
+        )
+        feeds_false = dict(
+            Cond=np.array(False),
+            X=np.arange(9).reshape((3, 3)).astype(np.float32),
+            A=np.eye(3).astype(np.float32),
+            B=np.ones((3, 3), dtype=np.float32),
+        )
+
+        ref = self.check_ort(onnx_model)
+        expected_true = ref.run(None, feeds_true)[0]
+        expected_false = ref.run(None, feeds_false)[0]
+
+        gr = GraphBuilder(onnx_model, verbose=5)
+        self.assertEqual(len(gr.functions), 1)
+        # inline_functions triggers _inline_functions_subgraph on the If subgraphs
+        gr.inline_functions(verbose=1)
+
+        onx = gr.to_onnx(inline=False)
+        self.dump_onnx("test_inline_functions_subgraph.onnx", onx)
+        self.assertEqual(len(gr.functions), 0)
+        self.assertEqual(len(onx.functions), 0)
+
+        ref2 = self.check_ort(onx)
+        got_true = ref2.run(None, feeds_true)[0]
+        got_false = ref2.run(None, feeds_false)[0]
+        self.assertEqualArray(expected_true, got_true)
+        self.assertEqualArray(expected_false, got_false)
+
     @requires_torch("2.0")
     def test_register_dynamic_object_from_dynamic_shapes_dict_wrap_dim(self):
         # WrapDim (string) case: string is pre-processed to WrapDim
@@ -2042,6 +2141,29 @@ class TestGetInputDynamicShape(ExtTestCase):
         g.set_sequence("seq", TFLOAT, shapes=None, ranks=None)
         info = g.get_sequence("seq")
         self.assertEqual(info["dtype"], TFLOAT)
+
+    @ignore_warnings(DeprecationWarning)
+    def test_make_tensor_sequence_input_builds_valid_model(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_sequence_input("seq", TFLOAT, None)
+        g.make_node("SequenceLength", ["seq"], ["length"], name="seq_len")
+        g.make_tensor_output("length", TensorProto.INT64, shape=[], indexed=False)
+        onx = g.to_onnx()
+
+        # The graph input should be typed as a sequence
+        inp = onx.graph.input[0]
+        self.assertEqual(inp.name, "seq")
+        self.assertTrue(inp.type.HasField("sequence_type"))
+        self.assertEqual(inp.type.sequence_type.elem_type.tensor_type.elem_type, TFLOAT)
+
+        # Running the model should return the number of tensors in the sequence
+        tensors = [
+            np.ones((3, 4), dtype=np.float32),
+            np.zeros((3, 4), dtype=np.float32),
+        ]
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, {"seq": tensors})
+        self.assertEqual(got[0], 2)
 
     def test_get_constant_as_shape_false(self):
         g = GraphBuilder(18, ir_version=9)
@@ -2696,6 +2818,51 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertIsInstance(result, str)
         self.assertNotEqual(result, "d")
 
+    def test_is_more_precise_both_static_same(self):
+        g = GraphBuilder(18)
+        self.assertTrue(g.is_more_precise((1, 2), (1, 2)))
+
+    def test_is_more_precise_both_static_different(self):
+        g = GraphBuilder(18)
+        self.assertFalse(g.is_more_precise((1, 3), (1, 2)))
+
+    def test_is_more_precise_int_over_string(self):
+        g = GraphBuilder(18)
+        self.assertTrue(g.is_more_precise((1, 2), (1, "d")))
+
+    def test_is_more_precise_string_vs_int(self):
+        g = GraphBuilder(18)
+        self.assertTrue(g.is_more_precise((1, "d"), (1, 2)))
+
+    def test_is_more_precise_both_dynamic_same(self):
+        g = GraphBuilder(18)
+        self.assertTrue(g.is_more_precise(("batch", 4), ("batch", 4)))
+
+    def test_is_more_precise_both_dynamic_different(self):
+        g = GraphBuilder(18)
+        self.assertFalse(g.is_more_precise(("a", 4), ("b", 4)))
+
+    def test_is_more_precise_different_ranks_raises(self):
+        g = GraphBuilder(18)
+        self.assertRaises(AssertionError, g.is_more_precise, (1, 2), (1, 2, 3))
+
+    def test_add_stat(self):
+        g = GraphBuilder(18, ir_version=9)
+        # First call creates the kind/name entry with value 1
+        g.add_stat("op", "Add")
+        self.assertEqual(g.statistics_["op"]["Add"], 1)
+        # Second call increments the counter
+        g.add_stat("op", "Add")
+        self.assertEqual(g.statistics_["op"]["Add"], 2)
+        # New name under existing kind
+        g.add_stat("op", "Mul")
+        self.assertEqual(g.statistics_["op"]["Mul"], 1)
+        # New kind
+        g.add_stat("pattern", "Reshape")
+        self.assertEqual(g.statistics_["pattern"]["Reshape"], 1)
+        # Existing kind/name counters are unchanged
+        self.assertEqual(g.statistics_["op"]["Add"], 2)
+
     def test_make_tensor_value_info_from_name(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
 
@@ -2830,6 +2997,156 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertEqual(list(result.node[0].input), ["new_a", "b"])
         # Second node input must use the local 'a' (shadowed), not 'new_a'
         self.assertEqual(list(result.node[1].input), ["a"])
+
+    def test_empty_copy(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g2 = g.empty_copy()
+        self.assertIsInstance(g2, GraphBuilder)
+        self.assertIsNot(g, g2)
+        self.assertEqual(g.opsets, g2.opsets)
+
+    def test_empty_copy_as_function(self):
+        g = GraphBuilder(18, ir_version=9, as_function=False)
+        g2 = g.empty_copy(as_function=True)
+        self.assertIsInstance(g2, GraphBuilder)
+        self.assertTrue(g2.as_function)
+
+    def test_empty_copy_shapable_false(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g2 = g.empty_copy(_shapable=False)
+        self.assertIsInstance(g2, GraphBuilder)
+        self.assertFalse(g2._debug_shape_missing)
+
+    def test_pretty_tensor_with_shape(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        arr = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        result = g.pretty_tensor(arr)
+        self.assertIn("float32", result)
+        self.assertIn("2", result)
+
+    def test_pretty_tensor_without_shape(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+
+        class NoShape:
+            pass
+
+        result = g.pretty_tensor(NoShape())
+        self.assertIn("no pretty", result)
+
+    def test_pretty_node_shape_op(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        node = oh.make_node("Shape", ["X"], ["shape_out"])
+        result = g.pretty_node(node)
+        self.assertIn("Shape", result)
+        self.assertIn("X", result)
+        self.assertIn("shape_out", result)
+
+    def test_pretty_node_shape_op_with_attributes(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        node = oh.make_node("Shape", ["X"], ["shape_out"], start=1, end=3)
+        result = g.pretty_node(node)
+        self.assertIn("Shape", result)
+        self.assertIn("start=1", result)
+        self.assertIn("end=3", result)
+
+    def test_pretty_node_shape_true(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        node = oh.make_node("Add", ["X", "Y"], ["Z"])
+        g.set_type("X", TFLOAT)
+        g.set_shape("X", (2, 3))
+        g.set_type("Y", TFLOAT)
+        g.set_shape("Y", (2, 3))
+        g.set_type("Z", TFLOAT)
+        g.set_shape("Z", (2, 3))
+        result = g.pretty_node(node, shape=True)
+        self.assertIn("X:1|2x3", result)
+        self.assertIn("Y:1|2x3", result)
+        self.assertIn("Z:1|2x3", result)
+        self.assertIn("->", result)
+
+    def test_pretty_node_shape_op_with_shape_true(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        node = oh.make_node("Shape", ["X"], ["shape_out"])
+        g.set_type("X", TFLOAT)
+        g.set_shape("X", (3, 4))
+        g.set_type("shape_out", TINT64)
+        g.set_shape("shape_out", (2,))
+        result = g.pretty_node(node, shape=True)
+        self.assertIn("Shape", result)
+        self.assertIn("X:1|3x4", result)
+        self.assertIn("shape_out:7|2", result)
+        self.assertIn("->", result)
+
+    def test_do_not_turn_constant_initializers_flag_set(self):
+        # When _do_not_turn_constant_initializers is True (set by move_initializers_to_constant),
+        # the method must return True regardless of name.
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("X", TFLOAT, (2, 4), False)
+        np_weights = np.ones((4, 3), dtype=np.float32)
+        g.make_initializer("weights", np_weights)
+        g.move_initializers_to_constant(full_parameter_name=False)
+        self.assertTrue(g.do_not_turn_constant_initializers_maybe_because_of_showing("weights"))
+        self.assertTrue(g.do_not_turn_constant_initializers_maybe_because_of_showing("unknown"))
+
+    def test_do_not_turn_constant_initializers_no_parent(self):
+        # Without a parent the method always returns False.
+        g = GraphBuilder(18, ir_version=9)
+        g.make_initializer("cst", np.ones((2, 2), dtype=np.float32))
+        self.assertFalse(g.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
+        self.assertFalse(g.do_not_turn_constant_initializers_maybe_because_of_showing("other"))
+
+    def test_do_not_turn_constant_initializers_parent_does_not_have_name(self):
+        # Parent does not know the name at all: returns False.
+        parent = GraphBuilder(18, ir_version=9)
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
+        self.assertFalse(
+            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
+        )
+
+    def test_do_not_turn_constant_initializers_same_constant_in_parent(self):
+        # Same constant in both parent and child: has_exact_same_constant_in_context returns True,
+        # so the method returns not True = False (safe to share with parent).
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst)
+
+        self.assertFalse(
+            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
+        )
+
+    def test_do_not_turn_constant_initializers_different_constant_in_parent(self):
+        # Different values for same name: has_exact_same_constant_in_context returns False,
+        # so the method returns not False = True (shadowing would occur).
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst1 = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst1)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        np_cst2 = np_cst1 + 1.0
+        child.make_initializer("cst", np_cst2)
+
+        self.assertTrue(
+            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
+        )
+
+    def test_do_not_turn_constant_initializers_large_constant_recurse_to_parent(self):
+        # Large constants (>= 128 elements) cause has_exact_same_constant_in_context to return
+        # None, so the method recurses to the parent. The parent has no parent, so it returns
+        # False.
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(128).reshape((16, 8)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst)
+
+        self.assertFalse(
+            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
+        )
 
 
 if __name__ == "__main__":
