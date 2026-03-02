@@ -9,10 +9,10 @@ import numpy as np
 import pandas
 from pandas.api.types import is_numeric_dtype, is_datetime64_any_dtype
 from .helper import string_sig
+from ._excel_helper import apply_excel_style
 from ._log_helper import (
     BUCKET_SCALES,
     breaking_last_point,
-    apply_excel_style,
     align_dataframe_with,
     open_dataframe,
     enumerate_csv_files,
@@ -596,7 +596,7 @@ class CubeLogs:
                 # when formula functions return Series with a default integer index
                 new_df = pandas.DataFrame(
                     {
-                        k: v.to_numpy() if hasattr(v, "to_numpy") else v
+                        k: v.to_numpy() if hasattr(v, "to_numpy") else v  # type: ignore[union-attr]
                         for k, v in new_cols.items()
                     },
                     index=self.data.index,
@@ -1953,7 +1953,12 @@ class CubeLogsPerformance(CubeLogs):
         if formula == "peak_gpu_torch":
             return lambda df: gdf(df, "mema_gpu_5_after_export") - gdf(df, "mema_gpu_4_reset")
         if formula == "peak_gpu_nvidia":
-            return lambda df: (gdf(df, "memory_gpu0_peak") - gdf(df, "memory_gpu0_begin")) * 2**20
+            return (
+                lambda df: (  # pyrefly: ignore[unsupported-operation]
+                    gdf(df, "memory_gpu0_peak") - gdf(df, "memory_gpu0_begin")
+                )
+                * 2**20
+            )
         if formula == "time_export_unbiased":
 
             def unbiased_export(df):
@@ -2116,7 +2121,10 @@ class CubeLogsPerformance(CubeLogs):
                 ignore_unique=True,
                 key_agg=["model_name", "task", "model_task"],
                 agg_args=lambda column_name: "sum" if column_name.startswith("n_") else "mean",
-                agg_multi={"speedup_weighted": mean_weight, "speedup_geo": mean_geo},
+                agg_multi={  # pyrefly: ignore[bad-argument-type]
+                    "speedup_weighted": mean_weight,
+                    "speedup_geo": mean_geo,
+                },
                 keep_columns_in_index=["suite"],
                 name="agg-suite",
                 order=order,
@@ -2147,7 +2155,10 @@ class CubeLogsPerformance(CubeLogs):
                 ignore_unique=True,
                 key_agg=["model_name", "task", "model_task", "suite"],
                 agg_args=lambda column_name: "sum" if column_name.startswith("n_") else "mean",
-                agg_multi={"speedup_weighted": mean_weight, "speedup_geo": mean_geo},
+                agg_multi={  # type: ignore
+                    "speedup_weighted": mean_weight,
+                    "speedup_geo": mean_geo,
+                },
                 name="agg-all",
                 order=order,
                 plots=True,

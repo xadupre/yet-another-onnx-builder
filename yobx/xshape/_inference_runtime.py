@@ -10,6 +10,7 @@ from ._shape_helper import (
     _reshape_shape,
     is_static_shape,
     reshape_implementation_with_zero,
+    STATIC_SHAPE,
 )
 from .shape_type_compute import set_shape_type_op_any, set_shape_type_custom
 
@@ -39,37 +40,46 @@ class _InferenceRuntime:
                 f"node=<{self.node.op_type})"
             )
 
-    def _get_tensor_shape(self, node: onnx.NodeProto) -> Tuple[int, ...]:
-        """Returns the shape of the tensor produced by a Constant node."""
-        if not node.attribute:
-            return ()
-        attr = node.attribute[0]
-        if attr.name == "value":
-            return tuple(attr.t.dims)
-        if attr.name in ("value_float", "value_int", "value_string"):
-            return ()
-        if attr.name == "value_floats":
-            return (len(attr.floats),)
-        if attr.name == "value_ints":
-            return (len(attr.ints),)
-        if attr.name == "value_strings":
-            return (len(attr.strings),)
-        return ()
+    def _get_tensor_shape(self, proto: Union[onnx.NodeProto, onnx.TensorProto]) -> STATIC_SHAPE:
+        if isinstance(proto, onnx.TensorProto):
+            return tuple(proto.dims)
+        if isinstance(proto, onnx.NodeProto):
+            for att in proto.attribute:
+                assert att.type != onnx.AttributeProto.GRAPH, (
+                    f"Unexpected attribute type for attribute {att.name!r} "
+                    f"attribute list is {[a.name for a in proto.attribute]} "
+                    f"in node type {proto.op_type!r}, name={proto.name!r}, "
+                    f"doc_string={proto.doc_string!r}"
+                )
+                if att.name in ("value_float", "value_int"):
+                    return tuple()
+                if att.name == "value_floats":
+                    return (len(att.floats),)
+                if att.name == "value_ints":
+                    return (len(att.ints),)
+                if att.name == "value":
+                    return tuple(att.t.dims)
+        raise TypeError(
+            f"Unexpected or unsupported scenario type {type(proto)}: "
+            f"{proto}, attribute={proto.attribute}."
+        )
 
-    def _get_tensor_type(self, node: onnx.NodeProto) -> int:
-        """Returns the element type of the tensor produced by a Constant node."""
-        if not node.attribute:
-            return onnx.TensorProto.FLOAT
-        attr = node.attribute[0]
-        if attr.name == "value":
-            return attr.t.data_type
-        if attr.name in ("value_float", "value_floats"):
-            return onnx.TensorProto.FLOAT
-        if attr.name in ("value_int", "value_ints"):
-            return onnx.TensorProto.INT64
-        if attr.name in ("value_string", "value_strings"):
-            return onnx.TensorProto.STRING
-        return onnx.TensorProto.FLOAT
+    def _get_tensor_type(self, proto: Union[onnx.NodeProto, onnx.TensorProto]) -> int:
+        if isinstance(proto, onnx.TensorProto):
+            return proto.data_type
+        if isinstance(proto, onnx.NodeProto):
+            for att in proto.attribute:
+                if att.name == "value_float":
+                    return onnx.TensorProto.FLOAT
+                if att.name == "value_int":
+                    return onnx.TensorProto.INT64
+                if att.name == "value_floats":
+                    return onnx.TensorProto.FLOAT
+                if att.name == "value_ints":
+                    return onnx.TensorProto.INT64
+                if att.name == "value":
+                    return att.t.data_type
+        raise ValueError(f"Unexpected type or value {type(proto)}: {proto}.")
 
     def make_dimension_name_if_necessary(
         self, a: Union[int, str], b: Union[int, str], op: str
@@ -357,7 +367,7 @@ class _InferenceRuntime:
 
     def compute_constant(
         self, name: str, exc: bool = True, only_array: bool = False, allow_empty: bool = False
-    ) -> Tuple[np.ndarray, Optional[Dict[str, np.ndarray]]]:
+    ) -> Tuple[Optional[np.ndarray], Optional[Dict[str, np.ndarray]]]:
         """
         Computes a constant.
 

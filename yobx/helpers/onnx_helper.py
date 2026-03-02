@@ -50,13 +50,14 @@ def enumerate_subgraphs_builder(
     node: onnx.NodeProto, recursive: bool = True
 ) -> Iterator[Tuple[Tuple[onnx.NodeProto, str, onnx.GraphProto], ...]]:
     """Returns the subgraphs inside a graph."""
+    assert recursive, "not implemented when recursive is False"
     for att in node.attribute:
         if att.type == onnx.AttributeProto.GRAPH and att.g:
             this = node, att.name, att.g
-            yield this
+            yield this  # type: ignore
             for no in att.g.node:
-                for tu in enumerate_subgraphs(no):
-                    yield this + tu
+                for tu in enumerate_subgraphs(no):  # type: ignore
+                    yield this + tu  # type: ignore
 
 
 def enumerate_subgraphs(graph: onnx.GraphProto) -> Iterator[onnx.GraphProto]:
@@ -166,7 +167,7 @@ def compatible_opsets(domain: str, op_type: str, current: int, new_version: int)
         f"in {list(sorted(_history[domain]))}"
     )
     hist = _history[domain][op_type]
-    versions = list(sorted(hist))  # noqa: C413
+    versions: List[int] = list(sorted(hist))  # noqa: C413
     pos = np.searchsorted(versions, current, side="right") - 1
     assert pos >= 0, (
         f"Available version for {op_type!r} from {domain!r}, "
@@ -666,7 +667,9 @@ def enumerate_results(
 
 
 def shadowing_names(
-    proto: Union[onnx.FunctionProto, onnx.GraphProto, onnx.ModelProto, Sequence[onnx.NodeProto]],
+    proto: Union[
+        onnx.FunctionProto, onnx.GraphProto, onnx.ModelProto, Sequence[Optional[onnx.NodeProto]]
+    ],
     verbose: int = 0,
     existing: Optional[Set[str]] = None,
     shadow_context: Optional[Set[str]] = None,
@@ -712,6 +715,8 @@ def shadowing_names(
     created = set()
     post_shadow = set()
     for node in proto:
+        if not node:
+            continue
         not_empty = set(n for n in node.input if n)
         intersection = not_empty & existing
         assert len(intersection) == len(

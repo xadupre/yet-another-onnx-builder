@@ -81,6 +81,8 @@ class ShapeBuilder:
     _op_type_element_wise_cmp_types = element_wise_op_cmp_types()
     _op_type_unary_like = unary_like_op_types()
 
+    _debug_shape_missing = False
+
     @property
     def input_names(self) -> List[str]:
         """Returns the list of input names of the model."""
@@ -89,6 +91,20 @@ class ShapeBuilder:
     @property
     def output_names(self) -> List[str]:
         """Returns the list of output names of the model."""
+        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+
+    def get_debug_msg(self, limit: int = 1000) -> str:
+        """
+        Returns a string providing as much information as possible
+        to help the developer understand why a conversion failed.
+
+        :param limit: limit the string if the model is big
+        :return: many pieces of information about the on going conversion
+        """
+        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+
+    def has_shape(self, name: str) -> bool:
+        """Tells if `name` has a shape."""
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
     def get_shape(self, name: str) -> DYNAMIC_SHAPE:
@@ -108,6 +124,10 @@ class ShapeBuilder:
         :param name: result name
         :param shape: tuple of integers and/or strings (symbolic dimensions)
         """
+        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+
+    def has_type(self, name: str) -> bool:
+        """Tells if `name` has a type."""
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
     def get_type(self, name: str) -> int:
@@ -130,6 +150,10 @@ class ShapeBuilder:
         """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
+    def has_rank(self, name: str) -> bool:
+        """Tells if `name` has a rank."""
+        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+
     def get_rank(self, name: str) -> int:
         """
         Returns the rank (number of dimensions) of result *name*.
@@ -140,6 +164,28 @@ class ShapeBuilder:
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
     def set_rank(self, name: str, rank: int):
+        """
+        Sets the rank (number of dimensions) for result *name*.
+
+        :param name: result name
+        :param rank: rank as an integer
+        """
+        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+
+    def has_device(self, name: str) -> bool:
+        """Tells if `name` has a device."""
+        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+
+    def get_device(self, name: str) -> int:
+        """
+        Returns the device of result *name*.
+
+        :param name: result name
+        :return: rank as an integer
+        """
+        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+
+    def set_device(self, name: str, rank: int):
         """
         Sets the rank (number of dimensions) for result *name*.
 

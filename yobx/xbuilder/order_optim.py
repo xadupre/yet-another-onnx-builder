@@ -1,7 +1,7 @@
 import random
 import time
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 from ..helpers.onnx_helper import make_idn
 
 if TYPE_CHECKING:
@@ -20,6 +20,20 @@ class OrderAlgorithm(IntEnum):
     NONE = 0
     RANDOM = 1
     SHAPE = 2
+
+    @classmethod
+    def from_str(
+        cls, value: Optional[Union[str, "OrderAlgortihm"]]  # type: ignore # noqa: F821
+    ) -> "OrderAlgorithm":
+        if isinstance(value, OrderAlgorithm):
+            return value
+        if not value or value == "NONE":
+            return OrderAlgorithm.NONE
+        if value == "RANDOM":
+            return OrderAlgorithm.RANDOM
+        if value == "SHAPE":
+            return OrderAlgorithm.SHAPE
+        raise ValueError(f"Unsupported value {value!r}")
 
 
 class OrderOptimization:
@@ -69,9 +83,9 @@ class OrderOptimization:
             raise AssertionError(f"Unsupported algorithm {self.algorithm}.")
         return stats
 
-    def _position(self):
-        output = {}
-        first_input = {}
+    def _position(self) -> List[Tuple[Optional[int], Optional[int]]]:
+        output: Dict[str, int] = {}
+        first_input: Dict[str, int] = {}
         for i, node in enumerate(self.builder.nodes):
             if node is None:
                 continue
@@ -80,14 +94,14 @@ class OrderOptimization:
                     first_input[name] = i
             for name in node.output:
                 output[name] = i
-        couples = []
+        couples: List[Tuple[Optional[int], Optional[int]]] = []
         N = len(self.builder.nodes)
         for node in self.builder.nodes:
             if node is None:
                 couples.append((None, None))
                 continue
             minp = max(
-                output.get(i, 0),
+                output.get(i, 0),  # type: ignore
                 max((first_input.get(i, 0) for i in node.input)) if node.input else 0,
             )
             maxp = min(first_input.get(i, N) for i in node.output)
@@ -162,6 +176,7 @@ class OrderOptimization:
                     i += 1
                     continue
                 mi, ma = couples[i]
+                assert mi is not None and ma is not None, f"node is not None but {mi=} and {ma=}"
                 if self.verbose >= 10:
                     print(
                         f"[OrderOptimization.random_order] iter={n_iter} i={i} "
