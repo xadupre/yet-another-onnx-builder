@@ -12,7 +12,7 @@ from yobx.ext_test_case import (
     requires_torch,
 )
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.xbuilder import GraphBuilder, FunctionOptions
+from yobx.xbuilder import GraphBuilder, FunctionOptions, OptimizationOptions
 from yobx.container import ExtendedModelContainer
 
 TFLOAT = TensorProto.FLOAT
@@ -1534,6 +1534,105 @@ class TestGraphBuilder(ExtTestCase):
         got = ref2.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @ignore_warnings(DeprecationWarning)
+    @hide_stdout()
+    def test_inline_functions_subgraph(self):
+        """Test that _inline_functions_subgraph inlines functions called inside a subgraph."""
+        new_domain = "custom"
+
+        linear_regression = oh.make_function(
+            new_domain,
+            "LinearRegression",
+            ["x", "a", "b"],
+            ["y"],
+            [
+                oh.make_node("MatMul", ["x", "a"], ["xa"]),
+                oh.make_node("Add", ["xa", "b"], ["y"]),
+            ],
+            [oh.make_opsetid("", 18)],
+            [],
+        )
+
+        # Build the then_branch: calls the custom function inside
+        then_branch = oh.make_graph(
+            [
+                oh.make_node(
+                    "LinearRegression", ["X", "A", "B"], ["Y_then"], domain=new_domain
+                ),
+            ],
+            "then_branch",
+            [],
+            [oh.make_tensor_value_info("Y_then", TensorProto.FLOAT, None)],
+        )
+
+        # Build the else_branch: returns Abs(X)
+        else_branch = oh.make_graph(
+            [
+                oh.make_node("Abs", ["X"], ["Y_else"]),
+            ],
+            "else_branch",
+            [],
+            [oh.make_tensor_value_info("Y_else", TensorProto.FLOAT, None)],
+        )
+
+        onnx_model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "If",
+                        ["Cond"],
+                        ["Y"],
+                        then_branch=then_branch,
+                        else_branch=else_branch,
+                    ),
+                ],
+                "main_graph",
+                [
+                    oh.make_tensor_value_info("Cond", TensorProto.BOOL, []),
+                    oh.make_tensor_value_info("X", TensorProto.FLOAT, [None, None]),
+                    oh.make_tensor_value_info("A", TensorProto.FLOAT, [None, None]),
+                    oh.make_tensor_value_info("B", TensorProto.FLOAT, [None, None]),
+                ],
+                [oh.make_tensor_value_info("Y", TensorProto.FLOAT, None)],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid(new_domain, 1)],
+            functions=[linear_regression],
+            ir_version=10,
+        )
+
+        feeds_true = dict(
+            Cond=np.array(True),
+            X=np.arange(9).reshape((3, 3)).astype(np.float32),
+            A=np.eye(3).astype(np.float32),
+            B=np.ones((3, 3), dtype=np.float32),
+        )
+        feeds_false = dict(
+            Cond=np.array(False),
+            X=np.arange(9).reshape((3, 3)).astype(np.float32),
+            A=np.eye(3).astype(np.float32),
+            B=np.ones((3, 3), dtype=np.float32),
+        )
+
+        ref = self.check_ort(onnx_model)
+        expected_true = ref.run(None, feeds_true)[0]
+        expected_false = ref.run(None, feeds_false)[0]
+
+        gr = GraphBuilder(onnx_model, verbose=5)
+        self.assertEqual(len(gr.functions), 1)
+        # inline_functions triggers _inline_functions_subgraph on the If subgraphs
+        gr.inline_functions(verbose=1)
+
+        onx = gr.to_onnx(inline=False)
+        self.dump_onnx("test_inline_functions_subgraph.onnx", onx)
+        self.assertEqual(len(gr.functions), 0)
+        self.assertEqual(len(onx.functions), 0)
+
+        ref2 = self.check_ort(onx)
+        got_true = ref2.run(None, feeds_true)[0]
+        got_false = ref2.run(None, feeds_false)[0]
+        self.assertEqualArray(expected_true, got_true)
+        self.assertEqualArray(expected_false, got_false)
+
     @requires_torch("2.0")
     def test_register_dynamic_object_from_dynamic_shapes_dict_wrap_dim(self):
         # WrapDim (string) case: string is pre-processed to WrapDim
@@ -1745,6 +1844,127 @@ class TestGetInputDynamicShape(ExtTestCase):
         # one int, one string: compatible (no exception)
         g._check_two_shapes_are_compatible((2, "seq"), (2, "seq"), name="x")
         g._check_two_shapes_are_compatible((2, "seq"), (2, "other"), name="x")
+
+    def test_check_op_type_if_valid(self):
+        g = GraphBuilder(18)
+        then_graph = oh.make_graph(
+            [oh.make_node("Add", ["x", "y"], ["result"])],
+            "then_branch",
+            [],
+            [oh.make_tensor_value_info("result", TensorProto.FLOAT, None)],
+        )
+        else_graph = oh.make_graph(
+            [oh.make_node("Sub", ["x", "y"], ["result"])],
+            "else_branch",
+            [],
+            [oh.make_tensor_value_info("result", TensorProto.FLOAT, None)],
+        )
+        # Should not raise
+        g._check_op_type(
+            "If",
+            ["cond"],
+            ["result"],
+            domain="",
+            name="test_if",
+            then_branch=then_graph,
+            else_branch=else_graph,
+        )
+
+    def test_check_op_type_if_missing_branches(self):
+        g = GraphBuilder(18)
+        self.assertRaises(
+            AssertionError,
+            lambda: g._check_op_type(
+                "If",
+                ["cond"],
+                ["result"],
+                domain="",
+                name="test_if",
+            ),
+        )
+
+    def test_check_op_type_if_mismatched_outputs(self):
+        g = GraphBuilder(18)
+        then_graph = oh.make_graph(
+            [],
+            "then_branch",
+            [],
+            [
+                oh.make_tensor_value_info("r1", TensorProto.FLOAT, None),
+                oh.make_tensor_value_info("r2", TensorProto.FLOAT, None),
+            ],
+        )
+        else_graph = oh.make_graph(
+            [],
+            "else_branch",
+            [],
+            [oh.make_tensor_value_info("result", TensorProto.FLOAT, None)],
+        )
+        self.assertRaises(
+            AssertionError,
+            lambda: g._check_op_type(
+                "If",
+                ["cond"],
+                ["result"],
+                domain="",
+                name="test_if",
+                then_branch=then_graph,
+                else_branch=else_graph,
+            ),
+        )
+
+    def test_check_op_type_scan(self):
+        g = GraphBuilder(18)
+        body = oh.make_graph(
+            [
+                oh.make_node("Add", ["sum_in", "next"], ["sum_out"]),
+                oh.make_node("Identity", ["next"], ["scan_out"]),
+            ],
+            "scan_body",
+            [
+                oh.make_tensor_value_info("sum_in", TensorProto.FLOAT, None),
+                oh.make_tensor_value_info("next", TensorProto.FLOAT, None),
+            ],
+            [
+                oh.make_tensor_value_info("sum_out", TensorProto.FLOAT, None),
+                oh.make_tensor_value_info("scan_out", TensorProto.FLOAT, None),
+            ],
+        )
+        # Should not raise
+        g._check_op_type(
+            "Scan",
+            ["initial", "scan_input"],
+            ["final", "scan_output"],
+            domain="",
+            name="test_scan",
+            body=body,
+            num_scan_inputs=1,
+        )
+
+    def test_check_op_type_loop(self):
+        g = GraphBuilder(18)
+        body = oh.make_graph(
+            [oh.make_node("Identity", ["v"], ["v_out"])],
+            "loop_body",
+            [
+                oh.make_tensor_value_info("iter", TensorProto.INT64, []),
+                oh.make_tensor_value_info("cond_in", TensorProto.BOOL, []),
+                oh.make_tensor_value_info("v", TensorProto.FLOAT, None),
+            ],
+            [
+                oh.make_tensor_value_info("cond_out", TensorProto.BOOL, []),
+                oh.make_tensor_value_info("v_out", TensorProto.FLOAT, None),
+            ],
+        )
+        # Should not raise
+        g._check_op_type(
+            "Loop",
+            ["max_iter", "cond", "v"],
+            ["v_final"],
+            domain="",
+            name="test_loop",
+            body=body,
+        )
 
     @ignore_warnings(DeprecationWarning)
     def test_make_nodes(self):
@@ -2013,6 +2233,75 @@ class TestGetInputDynamicShape(ExtTestCase):
         else_ops = [(n.domain, n.op_type) for n in else_att.g.node]
         self.assertIn(("", "Abs"), else_ops)
 
+    def test_optimize_node_subgraphs_inplace(self):
+        # Build a model with an If node whose branches each contain an Identity
+        # node.  After calling optimize_node_subgraphs_inplace the Identity node
+        # should be eliminated from both branches.
+
+        # then_branch: Add(x, x) -> tmp; Identity(tmp) -> y
+        then_graph = oh.make_graph(
+            [
+                oh.make_node("Add", ["x", "x"], ["tmp"]),
+                oh.make_node("Identity", ["tmp"], ["y"]),
+            ],
+            "then_branch",
+            [],
+            [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
+        )
+        # else_branch: Abs(x) -> tmp; Identity(tmp) -> y
+        else_graph = oh.make_graph(
+            [
+                oh.make_node("Abs", ["x"], ["tmp"]),
+                oh.make_node("Identity", ["tmp"], ["y"]),
+            ],
+            "else_branch",
+            [],
+            [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
+        )
+        if_node = oh.make_node(
+            "If",
+            ["cond"],
+            ["y"],
+            then_branch=then_graph,
+            else_branch=else_graph,
+        )
+        graph = oh.make_graph(
+            [if_node],
+            "test",
+            [
+                oh.make_tensor_value_info("x", TensorProto.FLOAT, [None]),
+                oh.make_tensor_value_info("cond", TensorProto.BOOL, []),
+            ],
+            [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
+        )
+        model = oh.make_model(
+            graph,
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        gr = GraphBuilder(
+            model, optimization_options=OptimizationOptions(recursive=True)
+        )
+        node = gr.nodes[0]
+        self.assertEqual(node.op_type, "If")
+
+        # Both branches start with 2 nodes each.
+        then_att = next(a for a in node.attribute if a.name == "then_branch")
+        else_att = next(a for a in node.attribute if a.name == "else_branch")
+        self.assertEqual(len(then_att.g.node), 2)
+        self.assertEqual(len(else_att.g.node), 2)
+
+        context = set(i.name for i in gr.inputs)
+        gr.optimize_node_subgraphs_inplace(node, context)
+
+        # After optimization the Identity nodes must have been removed.
+        then_att = next(a for a in node.attribute if a.name == "then_branch")
+        else_att = next(a for a in node.attribute if a.name == "else_branch")
+        then_ops = [n.op_type for n in then_att.g.node]
+        else_ops = [n.op_type for n in else_att.g.node]
+        self.assertNotIn("Identity", then_ops)
+        self.assertNotIn("Identity", else_ops)
+
     def test_set_sequence_and_get_sequence(self):
         g = GraphBuilder(18, ir_version=9)
         g.make_tensor_sequence_input("seq", TFLOAT, None)
@@ -2042,6 +2331,29 @@ class TestGetInputDynamicShape(ExtTestCase):
         g.set_sequence("seq", TFLOAT, shapes=None, ranks=None)
         info = g.get_sequence("seq")
         self.assertEqual(info["dtype"], TFLOAT)
+
+    @ignore_warnings(DeprecationWarning)
+    def test_make_tensor_sequence_input_builds_valid_model(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_sequence_input("seq", TFLOAT, None)
+        g.make_node("SequenceLength", ["seq"], ["length"], name="seq_len")
+        g.make_tensor_output("length", TensorProto.INT64, shape=[], indexed=False)
+        onx = g.to_onnx()
+
+        # The graph input should be typed as a sequence
+        inp = onx.graph.input[0]
+        self.assertEqual(inp.name, "seq")
+        self.assertTrue(inp.type.HasField("sequence_type"))
+        self.assertEqual(inp.type.sequence_type.elem_type.tensor_type.elem_type, TFLOAT)
+
+        # Running the model should return the number of tensors in the sequence
+        tensors = [
+            np.ones((3, 4), dtype=np.float32),
+            np.zeros((3, 4), dtype=np.float32),
+        ]
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, {"seq": tensors})
+        self.assertEqual(got[0], 2)
 
     def test_get_constant_as_shape_false(self):
         g = GraphBuilder(18, ir_version=9)
@@ -2696,6 +3008,51 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertIsInstance(result, str)
         self.assertNotEqual(result, "d")
 
+    def test_is_more_precise_both_static_same(self):
+        g = GraphBuilder(18)
+        self.assertTrue(g.is_more_precise((1, 2), (1, 2)))
+
+    def test_is_more_precise_both_static_different(self):
+        g = GraphBuilder(18)
+        self.assertFalse(g.is_more_precise((1, 3), (1, 2)))
+
+    def test_is_more_precise_int_over_string(self):
+        g = GraphBuilder(18)
+        self.assertTrue(g.is_more_precise((1, 2), (1, "d")))
+
+    def test_is_more_precise_string_vs_int(self):
+        g = GraphBuilder(18)
+        self.assertTrue(g.is_more_precise((1, "d"), (1, 2)))
+
+    def test_is_more_precise_both_dynamic_same(self):
+        g = GraphBuilder(18)
+        self.assertTrue(g.is_more_precise(("batch", 4), ("batch", 4)))
+
+    def test_is_more_precise_both_dynamic_different(self):
+        g = GraphBuilder(18)
+        self.assertFalse(g.is_more_precise(("a", 4), ("b", 4)))
+
+    def test_is_more_precise_different_ranks_raises(self):
+        g = GraphBuilder(18)
+        self.assertRaises(AssertionError, g.is_more_precise, (1, 2), (1, 2, 3))
+
+    def test_add_stat(self):
+        g = GraphBuilder(18, ir_version=9)
+        # First call creates the kind/name entry with value 1
+        g.add_stat("op", "Add")
+        self.assertEqual(g.statistics_["op"]["Add"], 1)
+        # Second call increments the counter
+        g.add_stat("op", "Add")
+        self.assertEqual(g.statistics_["op"]["Add"], 2)
+        # New name under existing kind
+        g.add_stat("op", "Mul")
+        self.assertEqual(g.statistics_["op"]["Mul"], 1)
+        # New kind
+        g.add_stat("pattern", "Reshape")
+        self.assertEqual(g.statistics_["pattern"]["Reshape"], 1)
+        # Existing kind/name counters are unchanged
+        self.assertEqual(g.statistics_["op"]["Add"], 2)
+
     def test_make_tensor_value_info_from_name(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
 
@@ -2719,6 +3076,317 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         vi = g.make_tensor_value_info_from_name("z")
         self.assertEqual(vi.name, "z")
         self.assertFalse(vi.type.HasField("tensor_type"))
+
+    def test_rename_results_basic(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        nodes = [oh.make_node("Add", ["x", "y"], ["z"], name="n0")]
+        replacements = {"x": "x", "y": "y"}
+        new_nodes = g._rename_results(nodes, replacements)
+        self.assertEqual(len(new_nodes), 1)
+        self.assertEqual(list(new_nodes[0].input), ["x", "y"])
+        self.assertEqual(list(new_nodes[0].output), ["z"])
+        self.assertIn("z", replacements)
+        self.assertEqual(replacements["z"], "z")
+
+    def test_rename_results_renamed_inputs(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        nodes = [oh.make_node("Add", ["x", "y"], ["z"], name="n0")]
+        replacements = {"x": "new_x", "y": "new_y"}
+        new_nodes = g._rename_results(nodes, replacements)
+        self.assertEqual(list(new_nodes[0].input), ["new_x", "new_y"])
+        self.assertEqual(list(new_nodes[0].output), ["z"])
+
+    def test_rename_results_output_already_in_replacements(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        # Output 'z' is already in replacements with the same value (final output)
+        nodes = [oh.make_node("Relu", ["x"], ["z"], name="n0")]
+        replacements = {"x": "x", "z": "z"}
+        new_nodes = g._rename_results(nodes, replacements)
+        self.assertEqual(list(new_nodes[0].output), ["z"])
+
+    def test_rename_results_multiple_nodes(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        # Add(x, y) -> tmp; Relu(tmp) -> out
+        nodes = [
+            oh.make_node("Add", ["x", "y"], ["tmp"], name="n0"),
+            oh.make_node("Relu", ["tmp"], ["out"], name="n1"),
+        ]
+        replacements = {"x": "new_x", "y": "new_y", "out": "out"}
+        new_nodes = g._rename_results(nodes, replacements)
+        self.assertEqual(len(new_nodes), 2)
+        # Inputs of first node are renamed
+        self.assertEqual(list(new_nodes[0].input), ["new_x", "new_y"])
+        # Output of first node becomes the input of the second node
+        first_out = new_nodes[0].output[0]
+        self.assertEqual(list(new_nodes[1].input), [first_out])
+        # Final output is preserved
+        self.assertEqual(list(new_nodes[1].output), ["out"])
+
+    def test_rename_results_with_graph_attribute(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        # Build a minimal If node with a then_branch subgraph
+        then_graph = oh.make_graph(
+            [oh.make_node("Add", ["outer_x", "outer_y"], ["branch_out"])],
+            "then_branch",
+            [],
+            [oh.make_tensor_value_info("branch_out", TensorProto.FLOAT, [])],
+        )
+        if_node = oh.make_node("If", ["cond"], ["result"], name="n0")
+        if_node.attribute.append(oh.make_attribute("then_branch", then_graph))
+        replacements = {"cond": "cond", "result": "result"}
+        new_nodes = g._rename_results([if_node], replacements)
+        self.assertEqual(len(new_nodes), 1)
+        self.assertEqual(new_nodes[0].op_type, "If")
+
+    def test_rename_results_in_subgraph_no_replacement_needed(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        subgraph = oh.make_graph(
+            [oh.make_node("Add", ["a", "b"], ["c"])],
+            "sub",
+            [],
+            [oh.make_tensor_value_info("c", TensorProto.FLOAT, [])],
+        )
+        # No actual substitution: replacements map each name to itself
+        replacements = {"a": "a", "b": "b"}
+        result = g._rename_results_in_subgraph(subgraph, replacements=replacements)
+        # When nothing changes the original graph object is returned
+        self.assertIs(result, subgraph)
+
+    def test_rename_results_in_subgraph_with_replacement(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        subgraph = oh.make_graph(
+            [oh.make_node("Add", ["a", "b"], ["c"])],
+            "sub",
+            [],
+            [oh.make_tensor_value_info("c", TensorProto.FLOAT, [])],
+        )
+        replacements = {"a": "new_a", "b": "b"}
+        result = g._rename_results_in_subgraph(subgraph, replacements=replacements)
+        self.assertEqual(result.name, "sub")
+        self.assertEqual(len(result.node), 1)
+        self.assertEqual(list(result.node[0].input), ["new_a", "b"])
+        self.assertEqual(list(result.node[0].output), ["c"])
+
+    def test_rename_results_in_subgraph_shadowing(self):
+        # Verify that once a node re-defines a name that was being replaced,
+        # the replacement stops applying to subsequent nodes.
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        subgraph = oh.make_graph(
+            [
+                oh.make_node("Add", ["a", "b"], ["a"]),  # shadows 'a'
+                oh.make_node("Relu", ["a"], ["c"]),
+            ],
+            "sub",
+            [],
+            [oh.make_tensor_value_info("c", TensorProto.FLOAT, [])],
+        )
+        # 'a' should be renamed to 'new_a' only in the first node's inputs
+        replacements = {"a": "new_a", "b": "b"}
+        result = g._rename_results_in_subgraph(subgraph, replacements=replacements)
+        # First node input uses the replacement; output keeps 'a'
+        self.assertEqual(list(result.node[0].input), ["new_a", "b"])
+        # Second node input must use the local 'a' (shadowed), not 'new_a'
+        self.assertEqual(list(result.node[1].input), ["a"])
+
+    def test_empty_copy(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g2 = g.empty_copy()
+        self.assertIsInstance(g2, GraphBuilder)
+        self.assertIsNot(g, g2)
+        self.assertEqual(g.opsets, g2.opsets)
+
+    def test_empty_copy_as_function(self):
+        g = GraphBuilder(18, ir_version=9, as_function=False)
+        g2 = g.empty_copy(as_function=True)
+        self.assertIsInstance(g2, GraphBuilder)
+        self.assertTrue(g2.as_function)
+
+    def test_empty_copy_shapable_false(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g2 = g.empty_copy(_shapable=False)
+        self.assertIsInstance(g2, GraphBuilder)
+        self.assertFalse(g2._debug_shape_missing)
+
+    def test_pretty_tensor_with_shape(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        arr = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        result = g.pretty_tensor(arr)
+        self.assertIn("float32", result)
+        self.assertIn("2", result)
+
+    def test_pretty_tensor_without_shape(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+
+        class NoShape:
+            pass
+
+        result = g.pretty_tensor(NoShape())
+        self.assertIn("no pretty", result)
+
+    def test_pretty_node_shape_op(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        node = oh.make_node("Shape", ["X"], ["shape_out"])
+        result = g.pretty_node(node)
+        self.assertIn("Shape", result)
+        self.assertIn("X", result)
+        self.assertIn("shape_out", result)
+
+    def test_pretty_node_shape_op_with_attributes(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        node = oh.make_node("Shape", ["X"], ["shape_out"], start=1, end=3)
+        result = g.pretty_node(node)
+        self.assertIn("Shape", result)
+        self.assertIn("start=1", result)
+        self.assertIn("end=3", result)
+
+    def test_pretty_node_shape_true(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        node = oh.make_node("Add", ["X", "Y"], ["Z"])
+        g.set_type("X", TFLOAT)
+        g.set_shape("X", (2, 3))
+        g.set_type("Y", TFLOAT)
+        g.set_shape("Y", (2, 3))
+        g.set_type("Z", TFLOAT)
+        g.set_shape("Z", (2, 3))
+        result = g.pretty_node(node, shape=True)
+        self.assertIn("X:1|2x3", result)
+        self.assertIn("Y:1|2x3", result)
+        self.assertIn("Z:1|2x3", result)
+        self.assertIn("->", result)
+
+    def test_pretty_node_shape_op_with_shape_true(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        node = oh.make_node("Shape", ["X"], ["shape_out"])
+        g.set_type("X", TFLOAT)
+        g.set_shape("X", (3, 4))
+        g.set_type("shape_out", TINT64)
+        g.set_shape("shape_out", (2,))
+        result = g.pretty_node(node, shape=True)
+        self.assertIn("Shape", result)
+        self.assertIn("X:1|3x4", result)
+        self.assertIn("shape_out:7|2", result)
+        self.assertIn("->", result)
+
+    def test_do_not_turn_constant_initializers_flag_set(self):
+        # When _do_not_turn_constant_initializers is True (set by move_initializers_to_constant),
+        # the method must return True regardless of name.
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("X", TFLOAT, (2, 4), False)
+        np_weights = np.ones((4, 3), dtype=np.float32)
+        g.make_initializer("weights", np_weights)
+        g.move_initializers_to_constant(full_parameter_name=False)
+        self.assertTrue(g.do_not_turn_constant_initializers_maybe_because_of_showing("weights"))
+        self.assertTrue(g.do_not_turn_constant_initializers_maybe_because_of_showing("unknown"))
+
+    def test_do_not_turn_constant_initializers_no_parent(self):
+        # Without a parent the method always returns False.
+        g = GraphBuilder(18, ir_version=9)
+        g.make_initializer("cst", np.ones((2, 2), dtype=np.float32))
+        self.assertFalse(g.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
+        self.assertFalse(g.do_not_turn_constant_initializers_maybe_because_of_showing("other"))
+
+    def test_do_not_turn_constant_initializers_parent_does_not_have_name(self):
+        # Parent does not know the name at all: returns False.
+        parent = GraphBuilder(18, ir_version=9)
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
+        self.assertFalse(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
+
+    def test_do_not_turn_constant_initializers_same_constant_in_parent(self):
+        # Same constant in both parent and child: has_exact_same_constant_in_context returns True,
+        # so the method returns not True = False (safe to share with parent).
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst)
+
+        self.assertFalse(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
+
+    def test_do_not_turn_constant_initializers_different_constant_in_parent(self):
+        # Different values for same name: has_exact_same_constant_in_context returns False,
+        # so the method returns not False = True (shadowing would occur).
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst1 = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst1)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        np_cst2 = np_cst1 + 1.0
+        child.make_initializer("cst", np_cst2)
+
+        self.assertTrue(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
+
+    def test_do_not_turn_constant_initializers_large_constant_recurse_to_parent(self):
+        # Large constants (>= 128 elements) cause has_exact_same_constant_in_context to return
+        # None, so the method recurses to the parent. The parent has no parent, so it returns
+        # False.
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(128).reshape((16, 8)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst)
+
+        self.assertFalse(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
+
+
+class TestPositionMsg(ExtTestCase):
+    def _make_simple_model(self):
+        return oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Abs", ["X"], ["a"], name="n0"),
+                    oh.make_node("Neg", ["a"], ["b"], name="n1"),
+                    oh.make_node("Relu", ["b"], ["Y"], name="n2"),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [None])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [None])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+
+    def test_position_msg_no_around(self):
+        model = self._make_simple_model()
+        gr = GraphBuilder(model)
+        msg = gr._position_msg(gr.nodes)
+        self.assertIsInstance(msg, str)
+        self.assertIn("Abs", msg)
+        self.assertIn("Neg", msg)
+        self.assertIn("Relu", msg)
+        # input/output position lines should appear
+        self.assertIn("pos(", msg)
+
+    def test_position_msg_single_node(self):
+        model = self._make_simple_model()
+        gr = GraphBuilder(model)
+        node = gr.nodes[1]  # Neg node
+        msg = gr._position_msg([node])
+        self.assertIsInstance(msg, str)
+        self.assertIn("Neg", msg)
+        self.assertIn("pos(a)", msg)
+        self.assertIn("pos(b)", msg)
+
+    def test_position_msg_with_around(self):
+        model = self._make_simple_model()
+        gr = GraphBuilder(model)
+        node = gr.nodes[1]  # Neg node
+        msg = gr._position_msg([node], around=(1, 1))
+        self.assertIsInstance(msg, str)
+        self.assertIn("Neg", msg)
+        # context window separator should be present
+        self.assertIn("---", msg)
+        # positional prefix for context nodes
+        self.assertIn("P", msg)
+
+    def test_position_msg_with_none_node(self):
+        model = self._make_simple_model()
+        gr = GraphBuilder(model)
+        # None entries in the list should be skipped without error
+        msg = gr._position_msg([None, gr.nodes[0]])
+        self.assertIsInstance(msg, str)
+        self.assertIn("Abs", msg)
 
 
 if __name__ == "__main__":
