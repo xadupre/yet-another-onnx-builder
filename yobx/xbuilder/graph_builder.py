@@ -3916,10 +3916,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         :param device: device if known
         :return: output name
         """
-        assert self.as_function or is_dimension is not None, (
-            f"is_dimension must be specified for output name={name!r}, "
-            f"elem_type={elem_type}, shape={shape!r}."
-        )
         if isinstance(name, list):
             assert not is_dimension, f"name={name!r} not compatible with is_dimension=True"
             res: List[str] = []

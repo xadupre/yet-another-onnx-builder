@@ -57,6 +57,7 @@ The simplest workflow is:
 
     import numpy as np
     import onnx
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.xbuilder import GraphBuilder
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -73,11 +74,12 @@ The simplest workflow is:
 
     # 4. declare the output and export
     g.make_tensor_output(result, elem_type=TFLOAT, shape=("batch", "seq", 32),
-                         indexed=False)
+                            indexed=False)
     model = g.to_onnx()
     print(f"nodes  : {len(model.graph.node)}")
     print(f"opset  : {model.opset_import[0].version}")
     print(f"output : {model.graph.output[0].name}")
+    print(pretty_onnx(model))
 
 Loading an existing model
 =========================
