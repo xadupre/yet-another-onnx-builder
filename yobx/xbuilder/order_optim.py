@@ -101,7 +101,7 @@ class OrderOptimization:
                 couples.append((None, None))
                 continue
             minp = max(
-                output.get(i, 0),  # pyrefly: ignore[no-matching-overload]
+                output.get(i, 0),  # type: ignore
                 max((first_input.get(i, 0) for i in node.input)) if node.input else 0,
             )
             maxp = min(first_input.get(i, N) for i in node.output)

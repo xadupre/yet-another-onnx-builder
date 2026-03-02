@@ -596,7 +596,7 @@ class CubeLogs:
                 # when formula functions return Series with a default integer index
                 new_df = pandas.DataFrame(
                     {
-                        k: v.to_numpy() if hasattr(v, "to_numpy") else v
+                        k: v.to_numpy() if hasattr(v, "to_numpy") else v  # type: ignore[union-attr]
                         for k, v in new_cols.items()
                     },
                     index=self.data.index,

@@ -1486,9 +1486,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 if self._debug_get_constant:
                     print("[GraphBuilder.get_constant]   M: None")
                 return None
-            v = onh.to_array(value)
+            v = onh.to_array(value)  # type: ignore
             assert not multiple_outputs, f"Multiple output is not allowed for name={name!r}"
-            self.constants_computed_[name] = v
+            self.constants_computed_[name] = v  # type: ignore
             if self._debug_get_constant:
                 print("[GraphBuilder.get_constant]   O: TensorProto")
             return v
@@ -5585,7 +5585,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     def _check_constants(self, prefix="before-inline", add: Optional[Any] = None):
         for v in self.constants_node_.values():
             self._check_constant(v, prefix)
-        for v in self.nodes:
+        for v in self.nodes:  # type: ignore
             if not v:
                 continue
             self._check_constant(v, prefix)
@@ -7104,7 +7104,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             otherwise, just evaluates it
         :return: dictionary of statistics
         """
-        begin_ = 0
+        begin_ = 0.0
         if self.verbose > 1:
             begin_ = time.perf_counter()
             print(
@@ -7173,7 +7173,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 if convert_into_initializer:
                     node_to_remove.add(tuple(v.output))
                 if not isinstance(output, tuple):
-                    output = (output,)
+                    output = (output,)  # type: ignore
                 for name, value in zip(v.output, output):
                     updates[name] = None
                     if convert_into_initializer:
@@ -7233,7 +7233,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if tuple(node.output) in node_to_remove:
                 continue
             new_nodes.append(node)
-        self.nodes = new_nodes  # pyrefly: ignore[bad-assignment]
+        self.nodes = new_nodes  # type: ignore
         if self.verbose > 1:
             print(
                 f"[GraphBuilder-{self._hash()}.constant_folding] ends with "
@@ -8453,7 +8453,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 if seq["ranks"] is None:
                     new_nodes.append(node)
                     continue
-                rank = seq["ranks"][int(position)]
+                rank = seq["ranks"][int(position)]  # type: ignore
                 self.set_rank(node.output[0], rank)
                 new_nodes.append(node)
                 continue
@@ -9981,7 +9981,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         try:
             import ml_dtypes
         except ImportError:
-            ml_dtypes = None
+            ml_dtypes = None  # type: ignore
         if ml_dtypes is not None:
             dt = np_array.dtype
             if dt == ml_dtypes.bfloat16:
