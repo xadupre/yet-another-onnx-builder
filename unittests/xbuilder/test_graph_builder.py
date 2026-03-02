@@ -2719,6 +2719,23 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertIsInstance(result, str)
         self.assertNotEqual(result, "d")
 
+    def test_add_stat(self):
+        g = GraphBuilder(18, ir_version=9)
+        # First call creates the kind/name entry with value 1
+        g.add_stat("op", "Add")
+        self.assertEqual(g.statistics_["op"]["Add"], 1)
+        # Second call increments the counter
+        g.add_stat("op", "Add")
+        self.assertEqual(g.statistics_["op"]["Add"], 2)
+        # New name under existing kind
+        g.add_stat("op", "Mul")
+        self.assertEqual(g.statistics_["op"]["Mul"], 1)
+        # New kind
+        g.add_stat("pattern", "Reshape")
+        self.assertEqual(g.statistics_["pattern"]["Reshape"], 1)
+        # Existing kind/name counters are unchanged
+        self.assertEqual(g.statistics_["op"]["Add"], 2)
+
     def test_make_tensor_value_info_from_name(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
 
