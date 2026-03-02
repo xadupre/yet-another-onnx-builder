@@ -1534,6 +1534,41 @@ class TestGraphBuilder(ExtTestCase):
         got = ref2.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+<<<<<<< copilot/add-test-case-for-get-input-dynamic-shape
+@requires_torch()
+class TestGetInputDynamicShape(ExtTestCase):
+    def setUp(self):
+        self.g = GraphBuilder(18, ir_version=9)
+
+    def test_no_dynamic_shapes_returns_static_shape(self):
+        shape = self.g.get_input_dynamic_shape("x", 0, (2, 3), dynamic_shapes=None)
+        self.assertEqual(shape, (2, 3))
+
+    def test_dynamic_shapes_tuple_info_none_returns_static_shape(self):
+        shape = self.g.get_input_dynamic_shape("x", 0, (2, 3), dynamic_shapes=(None,))
+        self.assertEqual(shape, (2, 3))
+
+    def test_dynamic_shapes_tuple_info_dict_with_wrapdim(self):
+        wrap = GraphBuilder.WrapDim("batch")
+        shape = self.g.get_input_dynamic_shape("x", 0, (2, 3), dynamic_shapes=({0: wrap},))
+        self.assertEqual(shape, ("batch", 3))
+
+    def test_dynamic_shapes_dict_info_dict_with_wrapdim(self):
+        wrap = GraphBuilder.WrapDim("batch")
+        shape = self.g.get_input_dynamic_shape(
+            "x", 0, (2, 3), dynamic_shapes={"x": {0: wrap}}
+        )
+        self.assertEqual(shape, ("batch", 3))
+
+    def test_dynamic_shapes_tuple_info_list_with_named_dim(self):
+        class FakeDim:
+            __name__ = "seq"
+
+        shape = self.g.get_input_dynamic_shape(
+            "x", 0, (2, 3), dynamic_shapes=([FakeDim, None],)
+        )
+        self.assertEqual(shape, ("seq", 3))
+=======
     def test_check_two_shapes_are_compatible_same_ints(self):
         g = GraphBuilder(18)
         # identical integer shapes: no exception
@@ -1835,6 +1870,7 @@ class TestGraphBuilder(ExtTestCase):
         else_att = next(a for a in result.node[0].attribute if a.name == "else_branch")
         else_ops = [(n.domain, n.op_type) for n in else_att.g.node]
         self.assertIn(("", "Abs"), else_ops)
+>>>>>>> main
     def test_set_sequence_and_get_sequence(self):
         g = GraphBuilder(18, ir_version=9)
         g.make_tensor_sequence_input("seq", TFLOAT, None)
