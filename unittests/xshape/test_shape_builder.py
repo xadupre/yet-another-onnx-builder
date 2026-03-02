@@ -586,6 +586,127 @@ class TestShapeBuilder(ExtTestCase):
         result = b.pretty_node(node, short=False)
         self.assertIn("relu_node", result)
 
+    def test_pretty_node_shape_op(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Shape", ["X"], ["shape_out"])
+        result = b.pretty_node(node)
+        self.assertIn("Shape", result)
+        self.assertIn("X", result)
+        self.assertIn("shape_out", result)
+
+    def test_pretty_node_shape_op_with_attributes(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Shape", ["X"], ["shape_out"], start=1, end=3)
+        result = b.pretty_node(node)
+        self.assertIn("Shape", result)
+        self.assertIn("X", result)
+        self.assertIn("shape_out", result)
+
+    def test_pretty_node_reshape_op(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Reshape", ["data", "shape"], ["reshaped"])
+        result = b.pretty_node(node)
+        self.assertIn("Reshape", result)
+        self.assertIn("data", result)
+        self.assertIn("reshaped", result)
+
+    def test_pretty_node_unsqueeze_op(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Unsqueeze", ["X", "axes"], ["Y"])
+        result = b.pretty_node(node)
+        self.assertIn("Unsqueeze", result)
+        self.assertIn("X", result)
+        self.assertIn("Y", result)
+
+    def test_pretty_node_squeeze_op(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Squeeze", ["X"], ["Y"])
+        result = b.pretty_node(node)
+        self.assertIn("Squeeze", result)
+        self.assertIn("X", result)
+        self.assertIn("Y", result)
+
+    def test_pretty_node_cast_op(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Cast", ["X"], ["Y"], to=TFLOAT)
+        result = b.pretty_node(node)
+        self.assertIn("Cast", result)
+        self.assertIn("X", result)
+        self.assertIn("Y", result)
+
+    def test_pretty_node_transpose_op(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Transpose", ["X"], ["Y"], perm=[0, 2, 1])
+        result = b.pretty_node(node)
+        self.assertIn("Transpose", result)
+        self.assertIn("X", result)
+        self.assertIn("Y", result)
+
+    def test_pretty_node_shape_op_with_shape_info(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Shape", ["X"], ["shape_out"])
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (3, 4))
+        b.set_type("shape_out", TINT64)
+        b.set_shape("shape_out", (2,))
+        result = b.pretty_node(node, shape=True)
+        self.assertIn("X:1|3x4", result)
+        self.assertIn("shape_out:7|2", result)
+        self.assertIn("->", result)
+
+    def test_pretty_node_cast_op_with_shape_info(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Cast", ["X"], ["Y"], to=TFLOAT16)
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (2, 3))
+        b.set_type("Y", TFLOAT16)
+        b.set_shape("Y", (2, 3))
+        result = b.pretty_node(node, shape=True)
+        self.assertIn("X:1|2x3", result)
+        self.assertIn("->", result)
+
+    def test_pretty_node_transpose_op_with_shape_info(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Transpose", ["X"], ["Y"], perm=[1, 0])
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (2, 3))
+        b.set_type("Y", TFLOAT)
+        b.set_shape("Y", (3, 2))
+        result = b.pretty_node(node, shape=True)
+        self.assertIn("X:1|2x3", result)
+        self.assertIn("Y:1|3x2", result)
+        self.assertIn("->", result)
+
+    def test_pretty_node_reshape_op_short_false(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Reshape", ["data", "shape"], ["reshaped"])
+        b.set_type("reshaped", TFLOAT)
+        b.set_shape("reshaped", (6,))
+        result = b.pretty_node(node, short=False)
+        self.assertIn("Reshape", result)
+        self.assertIn("T1", result)
+        self.assertIn("6", result)
+
+    def test_pretty_node_unsqueeze_op_short_false(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Unsqueeze", ["X", "axes"], ["Y"])
+        b.set_type("Y", TFLOAT)
+        b.set_shape("Y", (1, 4))
+        result = b.pretty_node(node, short=False)
+        self.assertIn("Unsqueeze", result)
+        self.assertIn("T1", result)
+        self.assertIn("1 x 4", result)
+
+    def test_pretty_node_squeeze_op_short_false(self):
+        b = BasicShapeBuilder()
+        node = oh.make_node("Squeeze", ["X"], ["Y"])
+        b.set_type("Y", TFLOAT)
+        b.set_shape("Y", (4,))
+        result = b.pretty_node(node, short=False)
+        self.assertIn("Squeeze", result)
+        self.assertIn("T1", result)
+        self.assertIn("4", result)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

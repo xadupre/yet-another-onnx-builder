@@ -594,10 +594,52 @@ class TestOpsetReduceMax(ExtTestCase):
         (result,) = _run(onx, {"X": x})
         self.assertEqualArray(x.max(axis=1), result)
 
+    def test_reduce_max_opset10(self):
+        gr = _builder(opset=10)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        out = gr.op.ReduceMax("X", axes=[1], keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.max(axis=1), result)
+
+    def test_reduce_max_opset20(self):
+        gr = _builder(opset=20)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceMax("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.max(axis=1), result)
+
 
 class TestOpsetReduceMean(ExtTestCase):
     def test_reduce_mean(self):
         gr = _builder()
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceMean("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.mean(axis=1), result, atol=1e-6)
+
+    def test_reduce_mean_opset10(self):
+        gr = _builder(opset=10)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        out = gr.op.ReduceMean("X", axes=[1], keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.mean(axis=1), result, atol=1e-6)
+
+    def test_reduce_mean_opset20(self):
+        gr = _builder(opset=20)
         gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
         axes = gr.make_initializer("", np.array([1], dtype=np.int64))
         out = gr.op.ReduceMean("X", axes, keepdims=0, outputs=["Y"])
@@ -620,6 +662,27 @@ class TestOpsetReduceMin(ExtTestCase):
         (result,) = _run(onx, {"X": x})
         self.assertEqualArray(x.min(axis=1), result)
 
+    def test_reduce_min_opset10(self):
+        gr = _builder(opset=10)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        out = gr.op.ReduceMin("X", axes=[1], keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.min(axis=1), result)
+
+    def test_reduce_min_opset20(self):
+        gr = _builder(opset=20)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceMin("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.min(axis=1), result)
+
 
 class TestOpsetReduceSum(ExtTestCase):
     def test_reduce_sum(self):
@@ -632,6 +695,98 @@ class TestOpsetReduceSum(ExtTestCase):
         x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
         (result,) = _run(onx, {"X": x})
         self.assertEqualArray(x.sum(axis=1), result)
+
+    def test_reduce_sum_opset10(self):
+        gr = _builder(opset=10)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        out = gr.op.ReduceSum("X", axes=[1], keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.sum(axis=1), result)
+
+    def test_reduce_sum_opset20(self):
+        gr = _builder(opset=20)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceSum("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.sum(axis=1), result)
+
+
+class TestOpsetReduceProd(ExtTestCase):
+    def test_reduce_prod(self):
+        gr = _builder()
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceProd("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.5, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.prod(axis=1), result, atol=1e-6)
+
+    def test_reduce_prod_opset10(self):
+        gr = _builder(opset=10)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        out = gr.op.ReduceProd("X", axes=[1], keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.5, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.prod(axis=1), result, atol=1e-6)
+
+    def test_reduce_prod_opset20(self):
+        gr = _builder(opset=20)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceProd("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.5, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.prod(axis=1), result, atol=1e-6)
+
+
+class TestOpsetReduceLogSumExp(ExtTestCase):
+    def test_reduce_log_sum_exp(self):
+        gr = _builder()
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceLogSumExp("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        expected = np.log(np.sum(np.exp(x), axis=1))
+        self.assertEqualArray(expected, result, atol=1e-4)
+
+    def test_reduce_log_sum_exp_opset10(self):
+        gr = _builder(opset=10)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        out = gr.op.ReduceLogSumExp("X", axes=[1], keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        expected = np.log(np.sum(np.exp(x), axis=1))
+        self.assertEqualArray(expected, result, atol=1e-4)
+
+    def test_reduce_log_sum_exp_opset20(self):
+        gr = _builder(opset=20)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceLogSumExp("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        expected = np.log(np.sum(np.exp(x), axis=1))
+        self.assertEqualArray(expected, result, atol=1e-4)
 
 
 class TestOpsetRelu(ExtTestCase):
@@ -920,10 +1075,52 @@ class TestReduceMaxAnyOpset(ExtTestCase):
         (result,) = _run(onx, {"X": x})
         self.assertEqualArray(np.array(x.max(), dtype=np.float32), result)
 
+    def test_reduce_max_any_opset_opset10(self):
+        gr = _builder(opset=10)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        out = gr.op.ReduceMaxAnyOpset("X", np.array([1], dtype=np.int64), keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.max(axis=1), result)
+
+    def test_reduce_max_any_opset_opset20(self):
+        gr = _builder(opset=20)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceMaxAnyOpset("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.max(axis=1), result)
+
 
 class TestReduceMinAnyOpset(ExtTestCase):
     def test_reduce_min_any_opset_two_inputs(self):
         gr = _builder()
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceMinAnyOpset("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.min(axis=1), result)
+
+    def test_reduce_min_any_opset_opset10(self):
+        gr = _builder(opset=10)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        out = gr.op.ReduceMinAnyOpset("X", np.array([1], dtype=np.int64), keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.min(axis=1), result)
+
+    def test_reduce_min_any_opset_opset20(self):
+        gr = _builder(opset=20)
         gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
         axes = gr.make_initializer("", np.array([1], dtype=np.int64))
         out = gr.op.ReduceMinAnyOpset("X", axes, keepdims=0, outputs=["Y"])
@@ -946,10 +1143,54 @@ class TestReduceMeanAnyOpset(ExtTestCase):
         (result,) = _run(onx, {"X": x})
         self.assertEqualArray(x.mean(axis=1), result, atol=1e-6)
 
+    def test_reduce_mean_any_opset_opset10(self):
+        gr = _builder(opset=10)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        out = gr.op.ReduceMeanAnyOpset(
+            "X", np.array([1], dtype=np.int64), keepdims=0, outputs=["Y"]
+        )
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.mean(axis=1), result, atol=1e-6)
+
+    def test_reduce_mean_any_opset_opset20(self):
+        gr = _builder(opset=20)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceMeanAnyOpset("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.mean(axis=1), result, atol=1e-6)
+
 
 class TestReduceSumAnyOpset(ExtTestCase):
     def test_reduce_sum_any_opset_two_inputs(self):
         gr = _builder()
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceSumAnyOpset("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.sum(axis=1), result)
+
+    def test_reduce_sum_any_opset_opset10(self):
+        gr = _builder(opset=10)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        out = gr.op.ReduceSumAnyOpset("X", np.array([1], dtype=np.int64), keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.sum(axis=1), result)
+
+    def test_reduce_sum_any_opset_opset20(self):
+        gr = _builder(opset=20)
         gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
         axes = gr.make_initializer("", np.array([1], dtype=np.int64))
         out = gr.op.ReduceSumAnyOpset("X", axes, keepdims=0, outputs=["Y"])
@@ -972,10 +1213,58 @@ class TestReduceProdAnyOpset(ExtTestCase):
         (result,) = _run(onx, {"X": x})
         self.assertEqualArray(x.prod(axis=1), result, atol=1e-6)
 
+    def test_reduce_prod_any_opset_opset10(self):
+        gr = _builder(opset=10)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        out = gr.op.ReduceProdAnyOpset(
+            "X", np.array([1], dtype=np.int64), keepdims=0, outputs=["Y"]
+        )
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.5, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.prod(axis=1), result, atol=1e-6)
+
+    def test_reduce_prod_any_opset_opset20(self):
+        gr = _builder(opset=20)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceProdAnyOpset("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.5, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(x.prod(axis=1), result, atol=1e-6)
+
 
 class TestReduceLogSumExpAnyOpset(ExtTestCase):
     def test_reduce_log_sum_exp_any_opset_two_inputs(self):
         gr = _builder()
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        axes = gr.make_initializer("", np.array([1], dtype=np.int64))
+        out = gr.op.ReduceLogSumExpAnyOpset("X", axes, keepdims=0, outputs=["Y"])
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        expected = np.log(np.sum(np.exp(x), axis=1))
+        self.assertEqualArray(expected, result, atol=1e-4)
+
+    def test_reduce_log_sum_exp_any_opset_opset10(self):
+        gr = _builder(opset=10)
+        gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
+        out = gr.op.ReduceLogSumExpAnyOpset(
+            "X", np.array([1], dtype=np.int64), keepdims=0, outputs=["Y"]
+        )
+        gr.make_tensor_output(out, TFLOAT, ("a",), indexed=False, is_dimension=False)
+        onx = gr.to_onnx()
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 5.0]], dtype=np.float32)
+        (result,) = _run(onx, {"X": x})
+        expected = np.log(np.sum(np.exp(x), axis=1))
+        self.assertEqualArray(expected, result, atol=1e-4)
+
+    def test_reduce_log_sum_exp_any_opset_opset20(self):
+        gr = _builder(opset=20)
         gr.make_tensor_input("X", TFLOAT, ("a", "b"), is_dimension=False)
         axes = gr.make_initializer("", np.array([1], dtype=np.int64))
         out = gr.op.ReduceLogSumExpAnyOpset("X", axes, keepdims=0, outputs=["Y"])
@@ -1021,6 +1310,47 @@ class TestUnsqueezeAnyOpset(ExtTestCase):
         x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         (result,) = _run(onx, {"X": x})
         self.assertEqualArray(np.expand_dims(x, 0), result)
+
+
+class TestDFTAnyOpset(ExtTestCase):
+    def _expected_dft(self, x):
+        """Compute expected DFT output matching ONNX DFT op (real input, axis=1).
+
+        x: shape (batch, signal_dim, 1) - real float input
+        returns: shape (batch, signal_dim, 2) - complex output as real/imag pairs
+        """
+        signal = x[:, :, 0]
+        dft = np.fft.fft(signal, axis=1)
+        real = np.real(dft)[:, :, np.newaxis]
+        imag = np.imag(dft)[:, :, np.newaxis]
+        return np.concatenate([real, imag], axis=-1).astype(np.float32)
+
+    def test_dft_any_opset_opset17(self):
+        """DFTAnyOpset on opset 17 (< 20): axes numpy array is converted to axis attribute."""
+        gr = GraphBuilder(17, ir_version=8)
+        gr.make_tensor_input("X", TFLOAT, ("batch", "signal_dim", "one"), is_dimension=False)
+        axes = np.array([1], dtype=np.int64)
+        out = gr.op.DFTAnyOpset("X", "", axes, outputs=["Y"])
+        gr.make_tensor_output(
+            out, TFLOAT, ("batch", "signal_dim", "two"), indexed=False, is_dimension=False
+        )
+        onx = gr.to_onnx()
+        x = np.arange(8, dtype=np.float32).reshape(1, 8, 1)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(self._expected_dft(x), result, atol=1e-5)
+
+    def test_dft_any_opset_opset20(self):
+        """DFTAnyOpset on opset 20 (>= 20): axis kwarg is converted to scalar tensor input."""
+        gr = GraphBuilder(20, ir_version=9)
+        gr.make_tensor_input("X", TFLOAT, ("batch", "signal_dim", "one"), is_dimension=False)
+        out = gr.op.DFTAnyOpset("X", "", outputs=["Y"], axis=1)
+        gr.make_tensor_output(
+            out, TFLOAT, ("batch", "signal_dim", "two"), indexed=False, is_dimension=False
+        )
+        onx = gr.to_onnx()
+        x = np.arange(8, dtype=np.float32).reshape(1, 8, 1)
+        (result,) = _run(onx, {"X": x})
+        self.assertEqualArray(self._expected_dft(x), result, atol=1e-5)
 
 
 if __name__ == "__main__":

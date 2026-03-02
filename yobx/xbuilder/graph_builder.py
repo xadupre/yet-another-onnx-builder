@@ -1802,6 +1802,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             # This is most likely a dimension but not marked as such for the time being.
             return False
         else:
+            if elem_type is None and self.has_type(name):
+                elem_type = self.get_type(name)
             if elem_type in {
                 TensorProto.FLOAT16,
                 TensorProto.FLOAT,
@@ -2482,31 +2484,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         return name
 
     def elem_size(self, elem_type: int) -> int:
-        "Returns the size in byte of the an element of this size."
-        if elem_type in {TensorProto.FLOAT, TensorProto.INT32, TensorProto.UINT32}:
-            return 4
-        if elem_type in {
-            TensorProto.DOUBLE,
-            TensorProto.INT64,
-            TensorProto.UINT64,
-            TensorProto.COMPLEX64,
-        }:
-            return 8
-        if elem_type in {TensorProto.COMPLEX128}:
-            return 16
-        if elem_type in {
-            TensorProto.INT16,
-            TensorProto.UINT16,
-            TensorProto.FLOAT16,
-            TensorProto.BFLOAT16,
-        }:
-            return 2
-        if elem_type in {TensorProto.BOOL, TensorProto.UINT8, TensorProto.INT8}:
-            return 1
-        raise AssertionError(
-            f"elem_size not implemented for elem_type={elem_type}, "
-            f"among {str_tensor_proto_type()}"
-        )
+        "Returns the size in bytes of an element of this type."
+        return size_type(elem_type)
 
     def make_dynamic_object(
         self,
@@ -4618,6 +4597,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     return list(att.floats)
                 if att.type == AttributeProto.STRING:
                     return att.s
+                if att.type == AttributeProto.STRINGS:
+                    return list(att.strings)
                 raise TypeError(
                     f"Not implemented for attribute name {att.name!r}, attribute={att}"
                 )
@@ -4644,6 +4625,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     res[att.name] = list(att.floats)
                 elif att.type == AttributeProto.STRING:
                     res[att.name] = att.s
+                elif att.type == AttributeProto.STRINGS:
+                    res[att.name] = list(att.strings)
                 else:
                     raise TypeError(
                         f"Not implemented for attribute name {att.name!r}, attribute={att}"
