@@ -2035,5 +2035,33 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertTrue(g.constant_is_equal_to("large", large_different))
 
 
+    def test_get_dynamic_dimension_int_keep_const(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        result = g.get_dynamic_dimension(5, keep_const=True)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqualArray(result, np.array([5], dtype=np.int64))
+
+    def test_get_dynamic_dimension_int_no_keep_const(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        result = g.get_dynamic_dimension(5, keep_const=False)
+        self.assertIsInstance(result, str)
+        self.assertIn(result, g.initializers_dict)
+        self.assertEqualArray(g.initializers_dict[result], np.array([5], dtype=np.int64))
+
+    def test_get_dynamic_dimension_str_rank1(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("X", TensorProto.FLOAT, (3,), False)
+        result = g.get_dynamic_dimension("X", keep_const=True)
+        self.assertEqual(result, "X")
+
+    def test_get_dynamic_dimension_str_rank0(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("d", TensorProto.INT64, tuple(), False)
+        result = g.get_dynamic_dimension("d", keep_const=True)
+        # rank-0 scalar is unsqueezed to rank-1
+        self.assertIsInstance(result, str)
+        self.assertNotEqual(result, "d")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
