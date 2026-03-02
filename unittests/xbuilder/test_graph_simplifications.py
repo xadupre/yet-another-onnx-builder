@@ -454,5 +454,37 @@ class TestGraphSimplification(ExtTestCase):
         self.assertEqualAny(expected2, got2)
 
 
+    def test_remove_duplicated_shape_nodes(self):
+        opset_imports = [oh.make_opsetid("", 18)]
+        nodes = [
+            oh.make_node("Shape", ["X"], ["s1"]),
+            oh.make_node("Shape", ["X"], ["s2"]),
+            oh.make_node("Add", ["s1", "s2"], ["z"]),
+        ]
+        graph = oh.make_graph(
+            nodes,
+            "test",
+            [oh.make_tensor_value_info("X", TensorProto.FLOAT, ["N", "M"])],
+            [oh.make_tensor_value_info("z", TensorProto.INT64, [2])],
+        )
+        model = oh.make_model(graph, opset_imports=opset_imports)
+        self.assertEqual(["Shape", "Shape", "Add"], [n.op_type for n in model.graph.node])
+
+        gr = GraphBuilder(model, infer_shapes_options=True)
+        n_removed, _ = gr.remove_duplicated_shape_nodes()
+        self.assertEqual(1, n_removed)
+        self.assertEqual(
+            ["Shape", "Identity", "Add"], [n.op_type for n in gr.nodes]
+        )
+
+        onx = gr.to_onnx()
+        oc.check_model(onx)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        x = np.zeros((4, 5), dtype=np.float32)
+        (z,) = ref.run(None, {"X": x})
+        self.assertEqualArray(np.array([8, 10], dtype=np.int64), z)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
