@@ -5616,7 +5616,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             for node in v.node:
                 self._check_constant(node, f"{prefix}-[{k}]")
         if add is not None:
-            assert isinstance(add, FunctionProto), f"Not implemented for type {type(add)}"
+            assert isinstance(add, (FunctionProto, GraphProto)), f"Not implemented for type {type(add)}"
             for node in add.node:
                 self._check_constant(node, f"{prefix}-[add]")
 
