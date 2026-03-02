@@ -79,8 +79,8 @@ from ..xshape.expressions_torch import Expression, parse_expression
 from .graph_builder_opset import Opset
 from .virtual_tensor import VirtualTensor
 from .optimization_options import OptimizationOptions
-from ._function_options import FunctionOptions
-from ._infer_shapes_options import InferShapesOptions
+from .function_options import FunctionOptions
+from .infer_shapes_options import InferShapesOptions
 
 if TYPE_CHECKING:
     import torch
