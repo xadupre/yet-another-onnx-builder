@@ -574,6 +574,7 @@ class CubeLogs:
                 else self._formulas
             )
             cols = set(self.values)
+            new_cols = {}
             for k, ff in forms.items():
                 f = self._process_formula(ff)
                 if k in cols or f is None:
@@ -582,9 +583,25 @@ class CubeLogs:
                 else:
                     if verbose:
                         print(f"[CubeLogs.load] apply formula {k!r}")
-                    self.data[k] = f(self.data)
+                    new_cols[k] = f(self.data)
                     self.values.append(k)
                     cols.add(k)
+            if new_cols:
+                # Drop columns that will be overwritten (already exist in self.data)
+                existing = set(self.data.columns)
+                cols_to_drop = [k for k in new_cols if k in existing]
+                if cols_to_drop:
+                    self.data = self.data.drop(columns=cols_to_drop)
+                # Use positional values (.to_numpy()) to avoid index-alignment issues
+                # when formula functions return Series with a default integer index
+                new_df = pandas.DataFrame(
+                    {
+                        k: v.to_numpy() if hasattr(v, "to_numpy") else v
+                        for k, v in new_cols.items()
+                    },
+                    index=self.data.index,
+                )
+                self.data = pandas.concat([self.data, new_df], axis=1)
         self.values_for_key = {k: set(self.data[k].dropna()) for k in self.keys_time}
         for k in self.keys_no_time:
             if self.data[k].isna().max():
