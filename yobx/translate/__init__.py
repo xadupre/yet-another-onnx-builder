@@ -1,7 +1,7 @@
 import textwrap
 from onnx import ModelProto
 from .translator import Translator
-from .inner_emitter import InnerEmitter, InnerEmitterShortInitializer
+from .inner_emitter import InnerEmitter, InnerEmitterCompact, InnerEmitterShortInitializer
 from .builder_emitter import BuilderEmitter
 from .light_emitter import LightEmitter
 
@@ -17,7 +17,7 @@ def translate_header(api: str = "onnx"):
             import onnx.numpy_helper as onh
             from yobx.translate.make_helper import make_ref_attribute
             """)
-    if api == "onnx-short":
+    if api in ("onnx-short", "onnx-compact"):
         return textwrap.dedent("""
             import numpy as np
             import ml_dtypes
@@ -56,6 +56,9 @@ def translate(proto: ModelProto, single_line: bool = False, api: str = "onnx") -
         ``"onnx-short"`` replaces large initializers with random values
         (handled by
         :class:`~yobx.translate.inner_emitter.InnerEmitterShortInitializer`),
+        ``"onnx-compact"`` generates a compact single-expression form
+        (handled by
+        :class:`~yobx.translate.inner_emitter.InnerEmitterCompact`),
         ``"light"`` generates code for the light API,
         ``"builder"`` generates code for the GraphBuilder
     :return: code as a string
@@ -65,6 +68,9 @@ def translate(proto: ModelProto, single_line: bool = False, api: str = "onnx") -
         return tr.export(as_str=True)
     if api == "onnx-short":
         tr = Translator(proto, emitter=InnerEmitterShortInitializer())
+        return tr.export(as_str=True)
+    if api == "onnx-compact":
+        tr = Translator(proto, emitter=InnerEmitterCompact())
         return tr.export(as_str=True)
     if api == "light":
         tr = Translator(proto, emitter=LightEmitter())
