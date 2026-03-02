@@ -40,7 +40,7 @@ from onnx.model_container import make_large_tensor_proto
 from onnx.shape_inference import infer_shapes as onnx_infer_shapes
 from ..container.model_container import ExtendedModelContainer, _get_type
 from ..helpers.mini_onnx_builder import proto_from_array
-from ..helpers import make_hash, string_sig, string_signature, string_type
+from ..helpers import make_hash, string_signature, string_type
 from ..helpers.helper import size_type
 from ..helpers.onnx_helper import (
     dtype_to_tensor_dtype,
