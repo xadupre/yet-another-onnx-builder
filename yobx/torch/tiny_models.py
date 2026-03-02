@@ -5,9 +5,7 @@ import torch
 
 @dataclass
 class ModelData:
-    """
-    Contains all the necessary informations to export a model.
-    """
+    """Contains all the necessary information to export a model."""
 
     model_id: str
     model: torch.nn.Module
