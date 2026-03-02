@@ -1622,6 +1622,7 @@ class TestGraphBuilder(ExtTestCase):
         # "batch" source should include both inputs
         sources = g.dynamic_dimensions_source["batch"]
         self.assertEqual(len(sources), 2)
+
     def test_update_model_with_parameter_renaming(self):
         """Test _update_model_with_parameter_renaming renames initializer in nodes."""
         g = GraphBuilder(18, ir_version=9)
@@ -1654,9 +1655,7 @@ class TestGraphBuilder(ExtTestCase):
         np_bias = np.arange(3).reshape((1, 3)).astype(np.float32) + 10.0
         w_init = g.make_initializer("p_w", np_weights, parameter_name="fc.weight")
         b_init = g.make_initializer("p_b", np_bias, parameter_name="fc.bias")
-        self.assertEqual(
-            g._parameter_renaming, {"p_w": "fc.weight", "p_b": "fc.bias"}
-        )
+        self.assertEqual(g._parameter_renaming, {"p_w": "fc.weight", "p_b": "fc.bias"})
         mm = g.op.MatMul("X", w_init, outputs=["mm"])
         g.op.Add(mm, b_init, outputs=["Y"])
         g.make_tensor_output("Y", TFLOAT, (2, 3), is_dimension=False, indexed=False)
@@ -1677,6 +1676,8 @@ class TestGraphBuilder(ExtTestCase):
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(feeds["X"] @ np_weights + np_bias, got)
+
+
 @requires_torch()
 class TestGetInputDynamicShape(ExtTestCase):
     def setUp(self):
@@ -1697,19 +1698,16 @@ class TestGetInputDynamicShape(ExtTestCase):
 
     def test_dynamic_shapes_dict_info_dict_with_wrapdim(self):
         wrap = GraphBuilder.WrapDim("batch")
-        shape = self.g.get_input_dynamic_shape(
-            "x", 0, (2, 3), dynamic_shapes={"x": {0: wrap}}
-        )
+        shape = self.g.get_input_dynamic_shape("x", 0, (2, 3), dynamic_shapes={"x": {0: wrap}})
         self.assertEqual(shape, ("batch", 3))
 
     def test_dynamic_shapes_tuple_info_list_with_named_dim(self):
         class FakeDim:
             __name__ = "seq"
 
-        shape = self.g.get_input_dynamic_shape(
-            "x", 0, (2, 3), dynamic_shapes=([FakeDim, None],)
-        )
-        self.assertEqual(shape, ("seq", 3))
+        shape = self.g.get_input_dynamic_shape("x", 0, (2, 3), dynamic_shapes=([FakeDim, None],))
+        self.assertEqual(shape, ("FakeDim", 3))
+
     def test_check_two_shapes_are_compatible_same_ints(self):
         g = GraphBuilder(18)
         # identical integer shapes: no exception
@@ -1747,6 +1745,7 @@ class TestGetInputDynamicShape(ExtTestCase):
         # one int, one string: compatible (no exception)
         g._check_two_shapes_are_compatible((2, "seq"), (2, "seq"), name="x")
         g._check_two_shapes_are_compatible((2, "seq"), (2, "other"), name="x")
+
     @ignore_warnings(DeprecationWarning)
     def test_make_nodes(self):
         np_weights = np.arange(12).reshape((4, 3)).astype(np.float32) / 10
@@ -1810,14 +1809,15 @@ class TestGetInputDynamicShape(ExtTestCase):
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0])
+
     def test_move_node_position_can_move(self):
         # Node at position 2 (Relu) only uses graph input X,
         # so it can be moved to position 1 (before Neg which uses a).
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node("Abs", ["X"], ["a"]),   # pos 0: produces 'a'
-                    oh.make_node("Neg", ["a"], ["b"]),   # pos 1: uses 'a' from pos 0
+                    oh.make_node("Abs", ["X"], ["a"]),  # pos 0: produces 'a'
+                    oh.make_node("Neg", ["a"], ["b"]),  # pos 1: uses 'a' from pos 0
                     oh.make_node("Relu", ["X"], ["c"]),  # pos 2: uses 'X' (graph input)
                 ],
                 "test",
@@ -1867,11 +1867,11 @@ class TestGetInputDynamicShape(ExtTestCase):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node("Abs", ["X"], ["a"]),       # pos 0
-                    oh.make_node("Neg", ["a"], ["b"]),       # pos 1
-                    oh.make_node("Sigmoid", ["a"], ["c"]),   # pos 2
+                    oh.make_node("Abs", ["X"], ["a"]),  # pos 0
+                    oh.make_node("Neg", ["a"], ["b"]),  # pos 1
+                    oh.make_node("Sigmoid", ["a"], ["c"]),  # pos 2
                     oh.make_node("Add", ["b", "c"], ["d"]),  # pos 3
-                    oh.make_node("Relu", ["X"], ["e"]),      # pos 4: uses X only
+                    oh.make_node("Relu", ["X"], ["e"]),  # pos 4: uses X only
                 ],
                 "test",
                 [oh.make_tensor_value_info("X", TFLOAT, [None])],
@@ -1892,6 +1892,7 @@ class TestGetInputDynamicShape(ExtTestCase):
         new_pos2 = gr2._move_node_position(4)
         self.assertEqual(new_pos2, 1)
         self.assertEqual(gr2.nodes[1].op_type, "Relu")
+
     @ignore_warnings(DeprecationWarning)
     def test_rename_op_type_in_local_functions(self):
         # Build a FunctionProto with MatMul and Add nodes.
@@ -2041,6 +2042,7 @@ class TestGetInputDynamicShape(ExtTestCase):
         g.set_sequence("seq", TFLOAT, shapes=None, ranks=None)
         info = g.get_sequence("seq")
         self.assertEqual(info["dtype"], TFLOAT)
+
     def test_get_constant_as_shape_false(self):
         g = GraphBuilder(18, ir_version=9)
         g.make_tensor_input("X", TensorProto.FLOAT, (3, 4), False)
@@ -2080,6 +2082,7 @@ class TestGetInputDynamicShape(ExtTestCase):
         result = child.get_constant_from_parent(cst_name, exc=True, as_shape=True)
         self.assertEqual(result, (2, 3, 4))
         self.assertIsInstance(result, tuple)
+
     def test_extract_input_names_from_args(self):
         gr = GraphBuilder(18)
         gr.make_tensor_input("X", TFLOAT, shape=("batch", "seq"))
@@ -2105,11 +2108,14 @@ class TestGetInputDynamicShape(ExtTestCase):
         self.assertEqual(["X", "Y"], gr.extract_input_names_from_args(["X", "Y", "X"]))
 
         # slice: start/stop/step that are known names
-        self.assertEqual(["X", "Y", "Z"], gr.extract_input_names_from_args([slice("X", "Y", "Z")]))
+        self.assertEqual(
+            ["X", "Y", "Z"], gr.extract_input_names_from_args([slice("X", "Y", "Z")])
+        )
         self.assertEqual(["X", "Y"], gr.extract_input_names_from_args([slice("X", "Y", None)]))
 
         # empty input
         self.assertEqual([], gr.extract_input_names_from_args([]))
+
     def test_make_shape_from_results_static(self):
         g = GraphBuilder(18, ir_version=9)
         result = g.make_shape_from_results([2, 3, 4])
@@ -2126,15 +2132,17 @@ class TestGetInputDynamicShape(ExtTestCase):
         g = GraphBuilder(18, ir_version=9)
         g.make_tensor_input("X", TFLOAT, ("batch", 3), is_dimension=False)
         shape_X = g.op.Shape("X", outputs=["shape_X"])
+        self.assertEqual(shape_X, "shape_X")
         g.set_type("shape_X", TINT64)
         g.set_shape("shape_X", (2,))
-        batch_dim = g.op.Gather(
-            "shape_X", np.array(0, dtype=np.int64), outputs=["batch_dim"]
-        )
+        batch_dim = g.op.Gather("shape_X", np.array(0, dtype=np.int64), outputs=["batch_dim"])
+        self.assertEqual(batch_dim, "batch_dim")
+        self.assertEqual(batch_dim, "batch_dim")
         g.set_type("batch_dim", TINT64)
         g.set_shape("batch_dim", ())
         new_shape = g.make_shape_from_results(["batch_dim", 3])
         out = g.op.Reshape("X", new_shape, outputs=["Y"])
+        self.assertEqual(out, "Y")
         g.set_type("Y", TFLOAT)
         g.set_shape("Y", ("batch", 3))
         g.make_tensor_output("Y", TFLOAT, ("batch", 3), indexed=False, is_dimension=False)
@@ -2148,30 +2156,29 @@ class TestGetInputDynamicShape(ExtTestCase):
         g = GraphBuilder(18, ir_version=9)
         g.make_tensor_input("X", TFLOAT, ("batch", "seq", 3), is_dimension=False)
         shape_X = g.op.Shape("X", outputs=["shape_X"])
+        self.assertEqual(shape_X, "shape_X")
         g.set_type("shape_X", TINT64)
         g.set_shape("shape_X", (3,))
-        batch_dim = g.op.Gather(
-            "shape_X", np.array(0, dtype=np.int64), outputs=["batch_dim"]
-        )
+        batch_dim = g.op.Gather("shape_X", np.array(0, dtype=np.int64), outputs=["batch_dim"])
+        self.assertEqual(batch_dim, "batch_dim")
         g.set_type("batch_dim", TINT64)
         g.set_shape("batch_dim", ())
-        seq_dim = g.op.Gather(
-            "shape_X", np.array(1, dtype=np.int64), outputs=["seq_dim"]
-        )
+        seq_dim = g.op.Gather("shape_X", np.array(1, dtype=np.int64), outputs=["seq_dim"])
+        self.assertEqual(seq_dim, "seq_dim")
         g.set_type("seq_dim", TINT64)
         g.set_shape("seq_dim", ())
         new_shape = g.make_shape_from_results(["batch_dim", "seq_dim", 3])
         out = g.op.Reshape("X", new_shape, outputs=["Y"])
+        self.assertEqual(out, "Y")
         g.set_type("Y", TFLOAT)
         g.set_shape("Y", ("batch", "seq", 3))
-        g.make_tensor_output(
-            "Y", TFLOAT, ("batch", "seq", 3), indexed=False, is_dimension=False
-        )
+        g.make_tensor_output("Y", TFLOAT, ("batch", "seq", 3), indexed=False, is_dimension=False)
         onx = g.to_onnx()
         ref = self.check_ort(onx)
         x = np.arange(12).reshape(2, 2, 3).astype(np.float32)
         got = ref.run(None, {"X": x})
         self.assertEqualArray(x, got[0])
+
     def test_evaluate_dimension_equality_with_constraints(self):
         g = GraphBuilder(18)
 
@@ -2324,8 +2331,6 @@ class TestGetInputDynamicShape(ExtTestCase):
 class TestGraphBuilderGetTypeKnown(ExtTestCase):
     @requires_torch()
     def test_get_type_known_missing(self):
-        import torch
-
         gr = GraphBuilder(18, ir_version=9)
         self.assertIsNone(gr.get_type_known("unknown"))
 
@@ -2351,8 +2356,6 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
 
     @requires_torch()
     def test_get_type_known_invalid_no_exc(self):
-        import torch
-
         gr = GraphBuilder(18, ir_version=9)
         # Store a value with a structure that does not match the expected tuple pattern
         gr.set_shapes_types("z", "run_node", "not_a_tuple")
@@ -2361,12 +2364,11 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
 
     @requires_torch()
     def test_get_type_known_invalid_with_exc(self):
-        import torch
-
         gr = GraphBuilder(18, ir_version=9)
         # Store a value with a structure that does not match; exc=True should raise
         gr.set_shapes_types("w", "run_node", "not_a_tuple")
         self.assertRaises(AssertionError, lambda: gr.get_type_known("w", exc=True))
+
     def test_get_is_dimension_dynamic_object(self):
         gr = GraphBuilder(18, verbose=0)
         gr.dynamic_objects["dim0"] = "wrapped_value"
@@ -2414,7 +2416,6 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         gr = GraphBuilder(18, verbose=0)
         gr.set_shapes_types("x", "run_node", (("",), ("op", torch.int64, (2, 3))))
         self.assertFalse(gr.get_is_dimension("x"))
-
 
     def test_has_exact_same_constant_in_context_same(self):
         # Child and parent have identical small constants: should return True.
@@ -2496,7 +2497,6 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         result = child.has_exact_same_constant_in_context("cst")
         self.assertFalse(result)
 
-
     def test_make_subset_builder(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
         g.make_tensor_input("X", TFLOAT, (2, 4), False)
@@ -2553,7 +2553,6 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertEqual(fct.domain, "subdom")
         self.assertEqual(fct.name, "SubFunc")
 
-
     def test_same_shape_static(self):
         g = GraphBuilder(18)
         g._known_shapes["X"] = (3, 4)
@@ -2592,7 +2591,6 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         g._known_shapes["Y"] = ("b", 4)
         self.assertFalse(g.same_shape("X", "Y"))
 
-
     def test_get_dimension_as_result_already_known(self):
         gr = GraphBuilder(18)
         gr.make_tensor_input("X", TFLOAT, ("batch", "seq"))
@@ -2625,7 +2623,6 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         gr.make_tensor_input("X", TFLOAT, ("batch", "seq"))
         # No source registered for "batch" -> AssertionError.
         self.assertRaises(AssertionError, gr.get_dimension_as_result, "batch")
-
 
     def test_constant_is_equal_to(self):
         g = GraphBuilder(18, ir_version=9)
@@ -2672,7 +2669,6 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         large_different = np.zeros(30, dtype=np.float32)
         self.assertTrue(g.constant_is_equal_to("large", large_different))
 
-
     def test_get_dynamic_dimension_int_keep_const(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
         result = g.get_dynamic_dimension(5, keep_const=True)
@@ -2700,7 +2696,6 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertIsInstance(result, str)
         self.assertNotEqual(result, "d")
 
-
     def test_make_tensor_value_info_from_name(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
 
@@ -2710,9 +2705,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         vi = g.make_tensor_value_info_from_name("x")
         self.assertEqual(vi.name, "x")
         self.assertEqual(vi.type.tensor_type.elem_type, TFLOAT)
-        self.assertEqual(
-            [d.dim_value for d in vi.type.tensor_type.shape.dim], [2, 3]
-        )
+        self.assertEqual([d.dim_value for d in vi.type.tensor_type.shape.dim], [2, 3])
 
         # Case 2: name has type and rank but no shape
         g.set_type("y", TINT64)

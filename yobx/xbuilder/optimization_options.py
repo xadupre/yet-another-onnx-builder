@@ -89,9 +89,7 @@ class OptimizationOptions:
         constant_fusing: bool = True,
         remove_identity: bool = True,
         remove_duplicated_shape: bool = True,
-        patterns: Optional[
-            Union[str, List[Any]]
-        ] = None,  # "default",
+        patterns: Optional[Union[str, List[Any]]] = None,  # "default",
         max_iter: int = -1,
         recursive: bool = True,
         stop_after: int = -1,

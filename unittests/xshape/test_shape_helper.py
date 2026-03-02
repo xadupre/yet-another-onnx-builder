@@ -136,9 +136,7 @@ class TestCheckTwoShapesCompatibility(ExtTestCase):
         """Both functions agree: different static shapes are incompatible."""
         self.assertFalse(compatible_shapes((1, 2), (1, 3)))
         gr = self._make_builder()
-        self.assertRaises(
-            AssertionError, gr._check_two_shapes_are_compatible, (1, 2), (1, 3)
-        )
+        self.assertRaises(AssertionError, gr._check_two_shapes_are_compatible, (1, 2), (1, 3))
 
     @requires_torch()
     def test_compare_int_str_compatible(self):
@@ -173,9 +171,7 @@ class TestCheckTwoShapesCompatibility(ExtTestCase):
         """Both functions agree: rank mismatch is incompatible."""
         self.assertFalse(compatible_shapes((1, 2), (1, 2, 3)))
         gr = self._make_builder()
-        self.assertRaises(
-            AssertionError, gr._check_two_shapes_are_compatible, (1, 2), (1, 2, 3)
-        )
+        self.assertRaises(AssertionError, gr._check_two_shapes_are_compatible, (1, 2), (1, 2, 3))
 
 
 if __name__ == "__main__":

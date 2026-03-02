@@ -453,7 +453,6 @@ class TestGraphSimplification(ExtTestCase):
         got2 = ref2.run(None, feeds2)[0]
         self.assertEqualAny(expected2, got2)
 
-
     def test_remove_duplicated_shape_nodes(self):
         opset_imports = [oh.make_opsetid("", 18)]
         nodes = [
@@ -473,9 +472,7 @@ class TestGraphSimplification(ExtTestCase):
         gr = GraphBuilder(model, infer_shapes_options=True)
         n_removed, _ = gr.remove_duplicated_shape_nodes()
         self.assertEqual(1, n_removed)
-        self.assertEqual(
-            ["Shape", "Identity", "Add"], [n.op_type for n in gr.nodes]
-        )
+        self.assertEqual(["Shape", "Identity", "Add"], [n.op_type for n in gr.nodes])
 
         onx = gr.to_onnx()
         oc.check_model(onx)

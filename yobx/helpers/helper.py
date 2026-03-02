@@ -2,7 +2,7 @@ import enum
 import inspect
 import json
 from dataclasses import is_dataclass, fields
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 
 
