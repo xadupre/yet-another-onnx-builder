@@ -5,7 +5,7 @@ yobx.torch
     :maxdepth: 1
     :caption: modules
 
-    flatten_helper
+    flatten
     input_observer
     torch_helper
     transformers/index

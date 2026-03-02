@@ -22,7 +22,7 @@ The example below shows three progressively richer scenarios:
    :class:`transformers.cache_utils.DynamicCache` (key-value cache), which requires
    registering custom pytree flattening rules via
    :func:`register_flattening_functions
-   <yobx.torch.flatten_helper.register_flattening_functions>`.
+   <yobx.torch.flatten.register_flattening_functions>`.
 3. **Multimodal model** — a model that receives ``pixel_values`` only on the very first
    call (the *prefill* step).  The ``value_if_missing`` argument tells the observer what
    to substitute when the input is absent, so that the dynamic shape analysis remains
