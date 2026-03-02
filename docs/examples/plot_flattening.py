@@ -17,10 +17,10 @@ This example walks through the three steps:
    custom dict-like class.
 2. Registering the class with
    :func:`register_class_flattening
-   <yobx.torch.flatten_helper.register_class_flattening>`.
+   <yobx.torch.flatten.register_class_flattening>`.
 3. Verifying the round-trip and then cleaning up with
    :func:`unregister_class_flattening
-   <yobx.torch.flatten_helper.unregister_class_flattening>`.
+   <yobx.torch.flatten.unregister_class_flattening>`.
 
 See :ref:`l-design-flatten` for a full description of the flattening design
 including the :epkg:`transformers` cache registrations.
@@ -29,7 +29,7 @@ including the :epkg:`transformers` cache registrations.
 from dataclasses import dataclass
 import torch
 import torch.utils._pytree
-from yobx.torch.flatten_helper import (
+from yobx.torch.flatten import (
     make_flattening_function_for_dataclass,
     register_class_flattening,
     unregister_class_flattening,
@@ -80,7 +80,7 @@ def unflatten_encoder_output(values, context, output_type=None):
 # ----------------------
 #
 # :func:`register_class_flattening
-# <yobx.torch.flatten_helper.register_class_flattening>` wraps
+# <yobx.torch.flatten.register_class_flattening>` wraps
 # ``torch.utils._pytree.register_pytree_node`` and returns ``True`` when the
 # registration succeeds (``False`` when the class is already registered).
 
@@ -129,7 +129,7 @@ print("round-trip OK")
 # For classes that already expose ``.keys()`` / ``.values()`` (all
 # :class:`transformers.modeling_outputs.ModelOutput` subclasses do),
 # :func:`make_flattening_function_for_dataclass
-# <yobx.torch.flatten_helper.make_flattening_function_for_dataclass>`
+# <yobx.torch.flatten.make_flattening_function_for_dataclass>`
 # generates the three required callables automatically.
 
 
@@ -182,7 +182,7 @@ print("round-trip OK again")
 #
 # After exporting (or when running inside a test) call
 # :func:`unregister_class_flattening
-# <yobx.torch.flatten_helper.unregister_class_flattening>` to undo the
+# <yobx.torch.flatten.unregister_class_flattening>` to undo the
 # registration and leave ``torch.utils._pytree.SUPPORTED_NODES`` exactly as
 # it was before.
 assert EncoderOutput in torch.utils._pytree.SUPPORTED_NODES

@@ -1,7 +1,7 @@
 from typing import Any
 import torch
 from .export_options import ExportOptions
-from .flatten_helper import register_flattening_functions
+from .flatten import register_flattening_functions
 from .patch import apply_patches
 from .tracing import (
     CustomProxy,
