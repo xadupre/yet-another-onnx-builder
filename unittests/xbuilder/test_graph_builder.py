@@ -1589,6 +1589,106 @@ class TestGraphBuilder(ExtTestCase):
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(feeds["X"] @ np_weights + np_bias, got)
+    def test_check_two_shapes_are_compatible_same_ints(self):
+        g = GraphBuilder(18)
+        # identical integer shapes: no exception
+        g._check_two_shapes_are_compatible((2, 3), (2, 3), name="x")
+
+    def test_check_two_shapes_are_compatible_rank_mismatch(self):
+        g = GraphBuilder(18)
+        self.assertRaises(
+            AssertionError,
+            lambda: g._check_two_shapes_are_compatible((2, 3), (2, 3, 4), name="x"),
+        )
+
+    def test_check_two_shapes_are_compatible_value_mismatch(self):
+        g = GraphBuilder(18)
+        self.assertRaises(
+            AssertionError,
+            lambda: g._check_two_shapes_are_compatible((2, 3), (2, 5), name="x"),
+        )
+
+    def test_check_two_shapes_are_compatible_same_strings(self):
+        g = GraphBuilder(18)
+        # identical string dimensions: no exception
+        g._check_two_shapes_are_compatible(("batch", "seq"), ("batch", "seq"), name="x")
+
+    def test_check_two_shapes_are_compatible_different_strings(self):
+        g = GraphBuilder(18)
+        # different string dimensions: constraint registered, no exception
+        g._check_two_shapes_are_compatible(("batch", "seq"), ("b", "s"), name="x")
+        constraints = g.get_registered_constraints()
+        self.assertIn("batch", constraints)
+        self.assertIn("b", constraints["batch"])
+
+    def test_check_two_shapes_are_compatible_mixed_int_string(self):
+        g = GraphBuilder(18)
+        # one int, one string: compatible (no exception)
+        g._check_two_shapes_are_compatible((2, "seq"), (2, "seq"), name="x")
+        g._check_two_shapes_are_compatible((2, "seq"), (2, "other"), name="x")
+    @ignore_warnings(DeprecationWarning)
+    def test_make_nodes(self):
+        np_weights = np.arange(12).reshape((4, 3)).astype(np.float32) / 10
+        np_bias = np.arange(3).reshape((1, 3)).astype(np.float32) + 10
+
+        # Sub-builder: X -> MatMul(X, weights) + bias -> Y
+        sub = GraphBuilder(18, ir_version=9, as_function=True)
+        sub.make_tensor_input("X", TFLOAT, (2, 4), False)
+        init_w = sub.make_initializer("weights", np_weights)
+        init_b = sub.make_initializer("bias", np_bias)
+        sub.op.Add(sub.op.MatMul("X", init_w, name="mm"), init_b, name="add", outputs=["Y"])
+        sub.make_tensor_output("Y", TFLOAT, (2, 3), is_dimension=False, indexed=False)
+
+        # Main builder: uses make_nodes to incorporate the sub-builder's computation
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TFLOAT, (2, 4))
+        result = g.make_nodes(sub, input_names=["X"], output_names=["output_0"], prefix="sub_")
+        self.assertEqual(result, "output_0")
+        g.make_tensor_output("output_0", TFLOAT, (2, 3), is_dimension=False)
+        onx = g.to_onnx()
+
+        feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
+        expected = feeds["X"] @ np_weights + np_bias
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, feeds)
+        self.assertEqualArray(expected, got[0])
+
+    @ignore_warnings(DeprecationWarning)
+    def test_make_nodes_as_function(self):
+        np_weights = np.arange(12).reshape((4, 3)).astype(np.float32) / 10
+        np_bias = np.arange(3).reshape((1, 3)).astype(np.float32) + 10
+
+        # Sub-builder: X -> MatMul(X, weights) + bias -> Y
+        sub = GraphBuilder(18, ir_version=9, as_function=True)
+        sub.make_tensor_input("X", TFLOAT, (2, 4), False)
+        init_w = sub.make_initializer("weights", np_weights)
+        init_b = sub.make_initializer("bias", np_bias)
+        sub.op.Add(sub.op.MatMul("X", init_w, name="mm"), init_b, name="add", outputs=["Y"])
+        sub.make_tensor_output("Y", TFLOAT, (2, 3), is_dimension=False, indexed=False)
+
+        # Main builder: uses make_nodes with function_options to export as a local function
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TFLOAT, (2, 4))
+        result = g.make_nodes(
+            sub,
+            input_names=["X"],
+            output_names=["output_0"],
+            function_options=FunctionOptions(
+                name="LinearRegression",
+                domain="custom",
+                move_initializer_to_constant=True,
+            ),
+        )
+        self.assertEqual(result, "output_0")
+        g.make_tensor_output("output_0", TFLOAT, (2, 3), is_dimension=False)
+        onx = g.to_onnx(inline=False)
+        self.assertEqual(len(onx.functions), 1)
+
+        feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
+        expected = feeds["X"] @ np_weights + np_bias
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, feeds)
+        self.assertEqualArray(expected, got[0])
     def test_move_node_position_can_move(self):
         # Node at position 2 (Relu) only uses graph input X,
         # so it can be moved to position 1 (before Neg which uses a).
