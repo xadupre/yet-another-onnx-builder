@@ -1556,9 +1556,7 @@ class TestGraphBuilder(ExtTestCase):
         # Build the then_branch: calls the custom function inside
         then_branch = oh.make_graph(
             [
-                oh.make_node(
-                    "LinearRegression", ["X", "A", "B"], ["Y_then"], domain=new_domain
-                ),
+                oh.make_node("LinearRegression", ["X", "A", "B"], ["Y_then"], domain=new_domain),
             ],
             "then_branch",
             [],
@@ -2298,9 +2296,7 @@ class TestGetInputDynamicShape(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
-        gr = GraphBuilder(
-            model, optimization_options=OptimizationOptions(recursive=True)
-        )
+        gr = GraphBuilder(model, optimization_options=OptimizationOptions(recursive=True))
         node = gr.nodes[0]
         self.assertEqual(node.op_type, "If")
 

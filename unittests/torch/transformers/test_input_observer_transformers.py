@@ -2,15 +2,13 @@ import unittest
 import pandas
 import torch
 from yobx.ext_test_case import ExtTestCase, requires_transformers
-from yobx.torch import register_flattening_functions
+from yobx.torch import register_flattening_functions, get_tiny_model
 from yobx.torch.input_observer import InputObserver
 from yobx.torch.transformers.cache_helper import make_dynamic_cache, make_encoder_decoder_cache
 
 # from onnx_diagnostic.export.api import to_onnx
-# from onnx_diagnostic.torch_models.hghub import get_untrained_model_with_inputs
 # from onnx_diagnostic.helpers.rt_helper import onnx_generate
 
-get_untrained_model_with_inputs = lambda *args, **kwargs: None
 onnx_generate = lambda *args, **kwargs: None
 to_onnx = lambda *args, **kwargs: None
 torch_export_patches = lambda *args, **kwargs: None
@@ -20,10 +18,8 @@ class TestInputObserverTransformers(ExtTestCase):
     @requires_transformers("4.57")
     def test_input_observer_onnx_generate_tiny_llm(self):
         mid = "arnir0/Tiny-LLM"
-        data = get_untrained_model_with_inputs(mid)
-        if data is None:
-            self.skipTest("not implemented yet")
-        model, inputs, _ds = data["model"], data["inputs"], data["dynamic_shapes"]
+        data = get_tiny_model(mid)
+        model, inputs, _ds = data.model, data.export_inputs, data.dynamic_shapes
         input_ids = inputs["input_ids"][:1]
 
         observer = InputObserver()
