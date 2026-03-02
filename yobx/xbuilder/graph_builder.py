@@ -4186,9 +4186,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     elif att.name == "else_branch":
                         else_branch = att.g
             if "then_branch" in kwargs and not then_branch:
-                then_branch = kwargs["then_branch"]
+                then_branch = kwargs["then_branch"]  # type: ignore
             if "else_branch" in kwargs and not else_branch:
-                else_branch = kwargs["else_branch"]
+                else_branch = kwargs["else_branch"]  # type: ignore
             assert (
                 then_branch
                 and else_branch
@@ -8563,7 +8563,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 #     f"if self.has_type(o) else ':0') for o in node.output)}"
                 # )
 
-        self.nodes = new_nodes  # pyrefly: ignore[bad-assignment]
+        self.nodes = new_nodes  # type: ignore
 
         if need_identity_removal:
             self.remove_identity_nodes()
