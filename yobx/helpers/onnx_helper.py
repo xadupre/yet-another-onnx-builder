@@ -1,6 +1,6 @@
 import functools
 import re
-from typing import Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
 import ml_dtypes
 import onnx
@@ -148,7 +148,7 @@ def compatible_opsets(domain: str, op_type: str, current: int, new_version: int)
     """
     global _history
     if _history is None:
-        res = {}
+        res: Dict[str, Any] = {}
         for schema in get_all_schemas_with_history():
             schema_domain = schema.domain
             version = schema.since_version
@@ -166,16 +166,16 @@ def compatible_opsets(domain: str, op_type: str, current: int, new_version: int)
         f"in {list(sorted(_history[domain]))}"
     )
     hist = _history[domain][op_type]
-    version = list(sorted(hist))  # noqa: C413
-    pos = np.searchsorted(version, current, side="right") - 1
+    versions = list(sorted(hist))  # noqa: C413
+    pos = np.searchsorted(versions, current, side="right") - 1
     assert pos >= 0, (
         f"Available version for {op_type!r} from {domain!r}, "
         f"incompatible version is {current}"
     )
-    if pos < len(version) - 1:
-        a, b = version[pos], version[pos + 1]
+    if pos < len(versions) - 1:
+        a, b = versions[pos], versions[pos + 1]
         return a <= new_version < b
-    return new_version >= version[pos]
+    return new_version >= versions[pos]
 
 
 def _get_default_opset_for_domain(domain: str, main_opset: Optional[int] = None) -> Optional[int]:
@@ -222,7 +222,7 @@ def choose_consistent_domain_opset(domain: str, opsets: Optional[Dict[str, int]]
         return onnx_opset_version() - 2
     if domain != "ai.onnx.ml":
         return 1
-    return _get_default_opset_for_domain(domain)
+    return _get_default_opset_for_domain(domain) or 1
 
 
 def same_function_proto(
