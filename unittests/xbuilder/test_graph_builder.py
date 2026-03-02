@@ -1567,6 +1567,27 @@ class TestGetInputDynamicShape(ExtTestCase):
             "x", 0, (2, 3), dynamic_shapes=([FakeDim, None],)
         )
         self.assertEqual(shape, ("seq", 3))
+    def test_evaluate_dimension_equality_with_constraints(self):
+        g = GraphBuilder(18)
+
+        # integer: dimension == d1 + d2
+        self.assertTrue(g.evaluate_dimension_equality_with_constraints(5, 2, "+", 3))
+
+        # integer: dimension != d1 + d2
+        self.assertFalse(g.evaluate_dimension_equality_with_constraints(5, 2, "+", 4))
+
+        # string: dimension exactly matches f"{d1}+{d2}"
+        self.assertTrue(g.evaluate_dimension_equality_with_constraints("a+b", "a", "+", "b"))
+
+        # string: dimension matches via registered constraint
+        g.add_to_constraints("batch", "seq1+seq2")
+        self.assertTrue(
+            g.evaluate_dimension_equality_with_constraints("batch", "seq1", "+", "seq2")
+        )
+
+        # string: dimension proved equal via simplify_two_expressions (commutativity)
+        self.assertTrue(g.evaluate_dimension_equality_with_constraints("a+b", "b", "+", "a"))
+
     def _make_node_with_attrs(self, **attrs):
         node = oh.make_node("SomeOp", ["X"], ["Y"])
         for name, value in attrs.items():
@@ -1695,6 +1716,52 @@ class TestGetInputDynamicShape(ExtTestCase):
         self.assertRaise(lambda: gr.get_attributes_with_default(node, value=None), TypeError)
 
 
+class TestGraphBuilderGetTypeKnown(ExtTestCase):
+    @requires_torch()
+    def test_get_type_known_missing(self):
+        import torch
+
+        gr = GraphBuilder(18, ir_version=9)
+        self.assertIsNone(gr.get_type_known("unknown"))
+
+    @requires_torch()
+    def test_get_type_known_valid(self):
+        import torch
+
+        gr = GraphBuilder(18, ir_version=9)
+        # Store a value with the expected structure:
+        # (where, (prefix, (name, dtype, shape)))
+        gr.set_shapes_types("x", "run_node", ("", ("x", torch.float16, torch.Size([2, 3]))))
+        result = gr.get_type_known("x")
+        self.assertEqual(result, TensorProto.FLOAT16)
+
+    @requires_torch()
+    def test_get_type_known_valid_float32(self):
+        import torch
+
+        gr = GraphBuilder(18, ir_version=9)
+        gr.set_shapes_types("y", "run_node", ("", ("y", torch.float32, torch.Size([4]))))
+        result = gr.get_type_known("y")
+        self.assertEqual(result, TensorProto.FLOAT)
+
+    @requires_torch()
+    def test_get_type_known_invalid_no_exc(self):
+        import torch
+
+        gr = GraphBuilder(18, ir_version=9)
+        # Store a value with a structure that does not match the expected tuple pattern
+        gr.set_shapes_types("z", "run_node", "not_a_tuple")
+        result = gr.get_type_known("z", exc=False)
+        self.assertIsNone(result)
+
+    @requires_torch()
+    def test_get_type_known_invalid_with_exc(self):
+        import torch
+
+        gr = GraphBuilder(18, ir_version=9)
+        # Store a value with a structure that does not match; exc=True should raise
+        gr.set_shapes_types("w", "run_node", "not_a_tuple")
+        self.assertRaises(AssertionError, lambda: gr.get_type_known("w", exc=True))
     def test_get_is_dimension_dynamic_object(self):
         gr = GraphBuilder(18, verbose=0)
         gr.dynamic_objects["dim0"] = "wrapped_value"
@@ -1742,6 +1809,318 @@ class TestGetInputDynamicShape(ExtTestCase):
         gr = GraphBuilder(18, verbose=0)
         gr.set_shapes_types("x", "run_node", (("",), ("op", torch.int64, (2, 3))))
         self.assertFalse(gr.get_is_dimension("x"))
+
+
+    def test_has_exact_same_constant_in_context_same(self):
+        # Child and parent have identical small constants: should return True.
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst)
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertTrue(result)
+
+    def test_has_exact_same_constant_in_context_different_values(self):
+        # Same shape/type but different values: should return False.
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst1 = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst1)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        np_cst2 = np_cst1 + 1.0
+        child.make_initializer("cst", np_cst2)
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertFalse(result)
+
+    def test_has_exact_same_constant_in_context_different_shape(self):
+        # Same name but different shapes: should return False.
+        parent = GraphBuilder(18, ir_version=9)
+        parent.make_initializer("cst", np.arange(6).reshape((2, 3)).astype(np.float32))
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertFalse(result)
+
+    def test_has_exact_same_constant_in_context_different_type(self):
+        # Same name and shape but different dtypes: should return False.
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst.astype(np.float64))
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertFalse(result)
+
+    def test_has_exact_same_constant_in_context_large(self):
+        # Constants with >= 128 elements: comparison is skipped, should return None.
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(128).reshape((16, 8)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst)
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertIsNone(result)
+
+    def test_has_exact_same_constant_in_context_not_in_child(self):
+        # Name is only a constant in the parent, not in the child: should return False.
+        parent = GraphBuilder(18, ir_version=9)
+        parent.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertFalse(result)
+
+    def test_has_exact_same_constant_in_context_not_in_parent(self):
+        # Name is a constant in the child but not in the parent: should return False.
+        parent = GraphBuilder(18, ir_version=9)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
+
+        result = child.has_exact_same_constant_in_context("cst")
+        self.assertFalse(result)
+
+
+    def test_make_subset_builder(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("X", TFLOAT, (2, 4), False)
+        g.make_tensor_input("W", TFLOAT, (4, 3), False)
+
+        sub = g.make_subset_builder(["X", "W"], name="LinearSub", domain="mydom")
+        self.assertEqual(sub.input_names, ["X", "W"])
+        sub.op.MatMul("X", "W", outputs=["Y"])
+        sub.make_tensor_output("Y", is_dimension=False, indexed=False)
+
+        fct = sub.to_onnx(function_options=FunctionOptions(name="LinearSub", domain="mydom"))
+        self.assertIsInstance(fct, FunctionProto)
+        self.assertEqual(list(fct.input), ["X", "W"])
+        self.assertEqual(list(fct.output), ["Y"])
+        self.assertEqual(fct.domain, "mydom")
+        self.assertEqual(fct.name, "LinearSub")
+
+        feeds = dict(
+            X=np.arange(8).reshape((2, 4)).astype(np.float32),
+            W=np.arange(12).reshape((4, 3)).astype(np.float32),
+        )
+        expected = feeds["X"] @ feeds["W"]
+        ref = ExtendedReferenceEvaluator(fct)
+        got = ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_make_subset_builder_add_local_functions(self):
+        gf = GraphBuilder(18, ir_version=9, as_function=True)
+        gf.make_tensor_input("X", TFLOAT, None, False)
+        gf.op.Relu("X", outputs=["Y"])
+        gf.make_tensor_output("Y", is_dimension=False, indexed=False)
+
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("A", TFLOAT, (2, 4), False)
+        g.make_local_function(gf, function_options=FunctionOptions(name="MyRelu", domain="test"))
+        g.anyop.MyRelu("A", outputs=["B"], domain="test")
+        g.make_tensor_output("B", is_dimension=False, indexed=False)
+        self.assertEqual(len(g.functions), 1)
+
+        sub = g.make_subset_builder(
+            ["A"], name="SubFunc", domain="subdom", add_local_functions=True
+        )
+        self.assertEqual(sub.input_names, ["A"])
+        self.assertEqual(len(sub.functions), 1)
+        sub.anyop.MyRelu("A", outputs=["C"], domain="test")
+        sub.make_tensor_output("C", is_dimension=False, indexed=False)
+
+        fct = sub.to_onnx(
+            function_options=FunctionOptions(name="SubFunc", domain="subdom"), inline=False
+        )
+        self.assertIsInstance(fct, FunctionProto)
+        self.assertEqual(list(fct.input), ["A"])
+        self.assertEqual(list(fct.output), ["C"])
+        self.assertEqual(fct.domain, "subdom")
+        self.assertEqual(fct.name, "SubFunc")
+
+
+    def test_same_shape_static(self):
+        g = GraphBuilder(18)
+        g._known_shapes["X"] = (3, 4)
+        g._known_shapes["Y"] = (3, 4)
+        self.assertTrue(g.same_shape("X", "Y"))
+
+    def test_same_shape_static_different(self):
+        g = GraphBuilder(18)
+        g._known_shapes["X"] = (3, 4)
+        g._known_shapes["Y"] = (3, 5)
+        self.assertFalse(g.same_shape("X", "Y"))
+
+    def test_same_shape_different_rank(self):
+        g = GraphBuilder(18)
+        g._known_shapes["X"] = (3, 4)
+        g._known_shapes["Y"] = (3, 4, 5)
+        self.assertFalse(g.same_shape("X", "Y"))
+
+    def test_same_shape_dynamic_same_dim(self):
+        g = GraphBuilder(18)
+        g._known_shapes["X"] = ("batch", 4)
+        g._known_shapes["Y"] = ("batch", 4)
+        self.assertTrue(g.same_shape("X", "Y"))
+
+    def test_same_shape_dynamic_linked_by_constraints(self):
+        g = GraphBuilder(18)
+        g._known_shapes["X"] = ("a", 4)
+        g._known_shapes["Y"] = ("b", 4)
+        g.add_to_constraints("a", "b")
+        g.add_to_constraints("b", "a")
+        self.assertTrue(g.same_shape("X", "Y"))
+
+    def test_same_shape_dynamic_no_constraints(self):
+        g = GraphBuilder(18)
+        g._known_shapes["X"] = ("a", 4)
+        g._known_shapes["Y"] = ("b", 4)
+        self.assertFalse(g.same_shape("X", "Y"))
+
+
+    def test_get_dimension_as_result_already_known(self):
+        gr = GraphBuilder(18)
+        gr.make_tensor_input("X", TFLOAT, ("batch", "seq"))
+        self.assertTrue(gr.has_name("X"))
+        # When the name is already a known result, return it unchanged.
+        result = gr.get_dimension_as_result("X")
+        self.assertEqual(result, "X")
+        # No Shape/Gather nodes should have been created.
+        self.assertEqual(len(gr.nodes), 0)
+
+    def test_get_dimension_as_result_from_source(self):
+        gr = GraphBuilder(18)
+        gr.make_tensor_input("X", TFLOAT, ("batch", "seq"))
+        # Manually register a source for the dynamic dimension.
+        gr.dynamic_dimensions_source["batch"] = [{"input_name": "X", "axis": 0}]
+        self.assertFalse(gr.has_name("batch"))
+        result = gr.get_dimension_as_result("batch")
+        self.assertEqual(result, "batch")
+        # A Shape node and a Gather node should have been added.
+        op_types = [n.op_type for n in gr.nodes]
+        self.assertIn("Shape", op_types)
+        self.assertIn("Gather", op_types)
+        shape_node = next(n for n in gr.nodes if n.op_type == "Shape")
+        self.assertEqual(list(shape_node.input), ["X"])
+        gather_node = next(n for n in gr.nodes if n.op_type == "Gather")
+        self.assertEqual(list(gather_node.output), ["batch"])
+
+    def test_get_dimension_as_result_no_source_raises(self):
+        gr = GraphBuilder(18)
+        gr.make_tensor_input("X", TFLOAT, ("batch", "seq"))
+        # No source registered for "batch" -> AssertionError.
+        self.assertRaises(AssertionError, gr.get_dimension_as_result, "batch")
+
+
+    def test_constant_is_equal_to(self):
+        g = GraphBuilder(18, ir_version=9)
+
+        # equal arrays
+        arr = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        g.make_initializer("w", arr)
+        self.assertTrue(g.constant_is_equal_to("w", arr.copy()))
+
+        # different values
+        arr2 = np.array([1.0, 2.0, 4.0], dtype=np.float32)
+        self.assertFalse(g.constant_is_equal_to("w", arr2))
+
+        # dtype mismatch
+        arr3 = arr.astype(np.float64)
+        self.assertFalse(g.constant_is_equal_to("w", arr3))
+
+        # shape mismatch
+        arr4 = arr.reshape((3, 1))
+        self.assertFalse(g.constant_is_equal_to("w", arr4))
+
+        # empty array (shape (0,))
+        empty = np.array([], dtype=np.float32)
+        g.make_initializer("empty", empty, allow_empty=True)
+        self.assertTrue(g.constant_is_equal_to("empty", empty.copy()))
+
+        # scalar array
+        scalar = np.array(5.0, dtype=np.float32)
+        g.make_initializer("scalar", scalar)
+        self.assertTrue(g.constant_is_equal_to("scalar", np.array(5.0, dtype=np.float32)))
+        self.assertFalse(g.constant_is_equal_to("scalar", np.array(6.0, dtype=np.float32)))
+
+        # TensorProto value
+        arr_tp = np.array([10.0, 20.0, 30.0], dtype=np.float32)
+        tp = onh.from_array(arr_tp, name="w_tp")
+        g.make_initializer("w_tp", arr_tp)
+        self.assertTrue(g.constant_is_equal_to("w_tp", tp))
+
+        # large array (size >= 30) always returns True regardless of values
+        large = np.arange(30, dtype=np.float32)
+        g.make_initializer("large", large)
+        large_same = large.copy()
+        self.assertTrue(g.constant_is_equal_to("large", large_same))
+        large_different = np.zeros(30, dtype=np.float32)
+        self.assertTrue(g.constant_is_equal_to("large", large_different))
+
+
+    def test_get_dynamic_dimension_int_keep_const(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        result = g.get_dynamic_dimension(5, keep_const=True)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqualArray(result, np.array([5], dtype=np.int64))
+
+    def test_get_dynamic_dimension_int_no_keep_const(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        result = g.get_dynamic_dimension(5, keep_const=False)
+        self.assertIsInstance(result, str)
+        self.assertIn(result, g.initializers_dict)
+        self.assertEqualArray(g.initializers_dict[result], np.array([5], dtype=np.int64))
+
+    def test_get_dynamic_dimension_str_rank1(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("X", TensorProto.FLOAT, (3,), False)
+        result = g.get_dynamic_dimension("X", keep_const=True)
+        self.assertEqual(result, "X")
+
+    def test_get_dynamic_dimension_str_rank0(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("d", TensorProto.INT64, tuple(), False)
+        result = g.get_dynamic_dimension("d", keep_const=True)
+        # rank-0 scalar is unsqueezed to rank-1
+        self.assertIsInstance(result, str)
+        self.assertNotEqual(result, "d")
+
+
+    def test_make_tensor_value_info_from_name(self):
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+
+        # Case 1: name has both type and shape
+        g.set_type("x", TFLOAT)
+        g.set_shape("x", (2, 3))
+        vi = g.make_tensor_value_info_from_name("x")
+        self.assertEqual(vi.name, "x")
+        self.assertEqual(vi.type.tensor_type.elem_type, TFLOAT)
+        self.assertEqual(
+            [d.dim_value for d in vi.type.tensor_type.shape.dim], [2, 3]
+        )
+
+        # Case 2: name has type and rank but no shape
+        g.set_type("y", TINT64)
+        g.set_rank("y", 3)
+        vi = g.make_tensor_value_info_from_name("y")
+        self.assertEqual(vi.name, "y")
+        self.assertEqual(vi.type.tensor_type.elem_type, TINT64)
+        self.assertEqual(len(vi.type.tensor_type.shape.dim), 3)
+
+        # Case 3: name has no type or rank — returns an empty TypeProto value info
+        vi = g.make_tensor_value_info_from_name("z")
+        self.assertEqual(vi.name, "z")
+        self.assertFalse(vi.type.HasField("tensor_type"))
 
 
 if __name__ == "__main__":
