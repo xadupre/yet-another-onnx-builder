@@ -1,8 +1,11 @@
 import random
 import time
 from enum import IntEnum
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List
 from ..helpers.onnx_helper import make_idn
+
+if TYPE_CHECKING:
+    from .graph_builder import GraphBuilder
 
 
 class OrderAlgorithm(IntEnum):
@@ -32,7 +35,7 @@ class OrderOptimization:
 
     def __init__(
         self,
-        builder: "GraphBuilder",  # noqa: F821
+        builder: "GraphBuilder",
         algorithm: OrderAlgorithm = OrderAlgorithm.NONE,
         verbose: int = 0,
     ):

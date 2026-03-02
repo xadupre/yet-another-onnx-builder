@@ -3,7 +3,7 @@ from typing import Dict, List
 import onnx.helper as oh
 import numpy as np
 import onnx.numpy_helper as onh
-from onnx import AttributeProto, FunctionProto, TensorProto
+from onnx import AttributeProto, FunctionProto, GraphProto, TensorProto
 from yobx.ext_test_case import (
     ExtTestCase,
     hide_stdout,
@@ -1589,6 +1589,367 @@ class TestGraphBuilder(ExtTestCase):
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(feeds["X"] @ np_weights + np_bias, got)
+    def test_move_node_position_can_move(self):
+        # Node at position 2 (Relu) only uses graph input X,
+        # so it can be moved to position 1 (before Neg which uses a).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Abs", ["X"], ["a"]),   # pos 0: produces 'a'
+                    oh.make_node("Neg", ["a"], ["b"]),   # pos 1: uses 'a' from pos 0
+                    oh.make_node("Relu", ["X"], ["c"]),  # pos 2: uses 'X' (graph input)
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [None])],
+                [
+                    oh.make_tensor_value_info("b", TFLOAT, [None]),
+                    oh.make_tensor_value_info("c", TFLOAT, [None]),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        gr = GraphBuilder(model)
+        # Relu at pos 2: first_at.get('X', 0) == 0, can_be == 1 < 2 => can move
+        new_pos = gr._move_node_position(2)
+        self.assertEqual(new_pos, 1)
+        self.assertEqual(gr.nodes[1].op_type, "Relu")
+        self.assertEqual(gr.nodes[2].op_type, "Neg")
+
+    def test_move_node_position_cannot_move(self):
+        # Node at position 1 (Neg) uses 'a' produced at position 0,
+        # so can_be == 1 == pos => cannot be moved, returns None.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Abs", ["X"], ["a"]),  # pos 0: produces 'a'
+                    oh.make_node("Neg", ["a"], ["b"]),  # pos 1: uses 'a' from pos 0
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [None])],
+                [oh.make_tensor_value_info("b", TFLOAT, [None])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        gr = GraphBuilder(model)
+        # Neg at pos 1: can_be == 0 + 1 == 1 >= 1 => cannot move
+        new_pos = gr._move_node_position(1)
+        self.assertIsNone(new_pos)
+        # nodes order must remain unchanged
+        self.assertEqual(gr.nodes[0].op_type, "Abs")
+        self.assertEqual(gr.nodes[1].op_type, "Neg")
+
+    def test_move_node_position_multiple_inputs(self):
+        # Node at position 3 (Add) uses 'b' from pos 1 and 'c' from pos 2,
+        # can_be == max(1, 2) + 1 == 3 == pos => cannot be moved.
+        # Node at position 4 (Relu) only uses graph input X,
+        # can_be == 0 + 1 == 1 < 4 => can be moved to position 1.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Abs", ["X"], ["a"]),       # pos 0
+                    oh.make_node("Neg", ["a"], ["b"]),       # pos 1
+                    oh.make_node("Sigmoid", ["a"], ["c"]),   # pos 2
+                    oh.make_node("Add", ["b", "c"], ["d"]),  # pos 3
+                    oh.make_node("Relu", ["X"], ["e"]),      # pos 4: uses X only
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [None])],
+                [
+                    oh.make_tensor_value_info("d", TFLOAT, [None]),
+                    oh.make_tensor_value_info("e", TFLOAT, [None]),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        gr = GraphBuilder(model)
+        # Add at pos 3: can_be == max(1, 2) + 1 == 3 >= 3 => cannot move
+        new_pos = gr._move_node_position(3)
+        self.assertIsNone(new_pos)
+        # A new GraphBuilder is needed to test position 4 independently,
+        # since _move_node_position modifies self.nodes in-place.
+        gr2 = GraphBuilder(model)
+        new_pos2 = gr2._move_node_position(4)
+        self.assertEqual(new_pos2, 1)
+        self.assertEqual(gr2.nodes[1].op_type, "Relu")
+    @ignore_warnings(DeprecationWarning)
+    def test_rename_op_type_in_local_functions(self):
+        # Build a FunctionProto with MatMul and Add nodes.
+        func = oh.make_function(
+            "custom",
+            "LinearRegression",
+            ["x", "a", "b"],
+            ["y"],
+            [
+                oh.make_node("MatMul", ["x", "a"], ["xa"]),
+                oh.make_node("Add", ["xa", "b"], ["y"]),
+            ],
+            [oh.make_opsetid("", 18)],
+            [],
+        )
+
+        # Build a minimal model so GraphBuilder can be instantiated.
+        graph = oh.make_graph(
+            [oh.make_node("LinearRegression", ["X", "A", "B"], ["Y"], domain="custom")],
+            "test",
+            [
+                oh.make_tensor_value_info("X", TensorProto.FLOAT, [None, None]),
+                oh.make_tensor_value_info("A", TensorProto.FLOAT, [None, None]),
+                oh.make_tensor_value_info("B", TensorProto.FLOAT, [None, None]),
+            ],
+            [oh.make_tensor_value_info("Y", TensorProto.FLOAT, None)],
+        )
+        model = oh.make_model(
+            graph,
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("custom", 1)],
+            functions=[func],
+            ir_version=9,
+        )
+        gr = GraphBuilder(model)
+
+        # Case 1: no op in the proto matches the replacements → same object returned.
+        result = gr._rename_op_type_in_local_functions(func, {("", "Relu"): ("", "Tanh")})
+        self.assertIs(result, func)
+
+        # Case 2: one op matches → a new proto is returned with the renamed op type.
+        result = gr._rename_op_type_in_local_functions(func, {("", "Add"): ("", "Sub")})
+        self.assertIsNot(result, func)
+        self.assertIsInstance(result, FunctionProto)
+        op_types = [(n.domain, n.op_type) for n in result.node]
+        self.assertIn(("", "MatMul"), op_types)
+        self.assertIn(("", "Sub"), op_types)
+        self.assertNotIn(("", "Add"), op_types)
+
+    @ignore_warnings(DeprecationWarning)
+    def test_rename_op_type_in_local_functions_subgraph(self):
+        # Build a FunctionProto whose body contains an If node whose subgraph
+        # branches each contain an Add node that should be renamed to Sub.
+        then_graph = oh.make_graph(
+            [oh.make_node("Add", ["x", "b"], ["y"])],
+            "then_branch",
+            [],
+            [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
+        )
+        else_graph = oh.make_graph(
+            [oh.make_node("Abs", ["x"], ["y"])],
+            "else_branch",
+            [],
+            [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
+        )
+        if_node = oh.make_node(
+            "If",
+            ["cond"],
+            ["y"],
+            then_branch=then_graph,
+            else_branch=else_graph,
+        )
+        func = oh.make_function(
+            "custom",
+            "CondFunc",
+            ["x", "b", "cond"],
+            ["y"],
+            [if_node],
+            [oh.make_opsetid("", 18)],
+            [],
+        )
+
+        graph = oh.make_graph(
+            [oh.make_node("CondFunc", ["X", "B", "C"], ["Y"], domain="custom")],
+            "test",
+            [
+                oh.make_tensor_value_info("X", TensorProto.FLOAT, [None]),
+                oh.make_tensor_value_info("B", TensorProto.FLOAT, [None]),
+                oh.make_tensor_value_info("C", TensorProto.BOOL, []),
+            ],
+            [oh.make_tensor_value_info("Y", TensorProto.FLOAT, None)],
+        )
+        model = oh.make_model(
+            graph,
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("custom", 1)],
+            functions=[func],
+            ir_version=9,
+        )
+        gr = GraphBuilder(model)
+
+        # The Add is inside a subgraph attribute (then_branch), not at the top level.
+        result = gr._rename_op_type_in_local_functions(func, {("", "Add"): ("", "Sub")})
+        self.assertIsNot(result, func)
+        self.assertIsInstance(result, FunctionProto)
+
+        # The If node itself should still be an If.
+        self.assertEqual(len(result.node), 1)
+        self.assertEqual(result.node[0].op_type, "If")
+
+        # Collect the op types from the then-branch subgraph.
+        then_att = next(a for a in result.node[0].attribute if a.name == "then_branch")
+        self.assertIsInstance(then_att.g, GraphProto)
+        then_ops = [(n.domain, n.op_type) for n in then_att.g.node]
+        self.assertIn(("", "Sub"), then_ops)
+        self.assertNotIn(("", "Add"), then_ops)
+
+        # The else-branch should be unchanged (only Abs, no Add).
+        else_att = next(a for a in result.node[0].attribute if a.name == "else_branch")
+        else_ops = [(n.domain, n.op_type) for n in else_att.g.node]
+        self.assertIn(("", "Abs"), else_ops)
+    def test_set_sequence_and_get_sequence(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_sequence_input("seq", TFLOAT, None)
+        self.assertTrue(g.is_sequence("seq"))
+        info = g.get_sequence("seq")
+        self.assertIn("dtype", info)
+        self.assertEqual(info["dtype"], TFLOAT)
+
+    def test_set_sequence_with_shapes(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_sequence_input("seq", TFLOAT, (3, 4))
+        self.assertTrue(g.is_sequence("seq"))
+        info = g.get_sequence("seq")
+        self.assertEqual(info["dtype"], TFLOAT)
+        self.assertIsNotNone(info["shapes"])
+        self.assertEqual(info["ranks"], (2,))
+
+    def test_is_sequence_false_for_non_sequence(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TFLOAT, (3, 4))
+        self.assertFalse(g.is_sequence("X"))
+
+    def test_set_sequence_update_existing(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_sequence_input("seq", TFLOAT, None)
+        # calling set_sequence again with same dtype should not raise
+        g.set_sequence("seq", TFLOAT, shapes=None, ranks=None)
+        info = g.get_sequence("seq")
+        self.assertEqual(info["dtype"], TFLOAT)
+    def test_get_constant_as_shape_false(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TensorProto.FLOAT, (3, 4), False)
+        value = np.array([2, 3, 4], dtype=np.int64)
+        name = g.make_initializer("cst", value)
+        result = g.get_constant(name, exc=True, as_shape=False)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqualArray(value, result)
+
+    def test_get_constant_as_shape_true(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TensorProto.FLOAT, (3, 4), False)
+        value = np.array([2, 3, 4], dtype=np.int64)
+        name = g.make_initializer("cst", value)
+        result = g.get_constant(name, exc=True, as_shape=True)
+        self.assertEqual(result, (2, 3, 4))
+        self.assertIsInstance(result, tuple)
+
+    def test_get_constant_from_parent(self):
+        parent = GraphBuilder(18, ir_version=9)
+        parent.make_tensor_input("X", TensorProto.FLOAT, (3, 4), False)
+        value = np.array([2, 3, 4], dtype=np.int64)
+        cst_name = parent.make_initializer("cst", value)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        result = child.get_constant_from_parent(cst_name, exc=True)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqualArray(value, result)
+
+    def test_get_constant_from_parent_as_shape(self):
+        parent = GraphBuilder(18, ir_version=9)
+        parent.make_tensor_input("X", TensorProto.FLOAT, (3, 4), False)
+        value = np.array([2, 3, 4], dtype=np.int64)
+        cst_name = parent.make_initializer("cst", value)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        result = child.get_constant_from_parent(cst_name, exc=True, as_shape=True)
+        self.assertEqual(result, (2, 3, 4))
+        self.assertIsInstance(result, tuple)
+    def test_extract_input_names_from_args(self):
+        gr = GraphBuilder(18)
+        gr.make_tensor_input("X", TFLOAT, shape=("batch", "seq"))
+        gr.make_tensor_input("Y", TFLOAT, shape=("batch", "seq"))
+        gr.make_tensor_input("Z", TFLOAT, shape=("batch",))
+
+        # plain string names that exist in the graph
+        self.assertEqual(["X"], gr.extract_input_names_from_args(["X"]))
+        self.assertEqual(["X", "Y"], gr.extract_input_names_from_args(["X", "Y"]))
+
+        # unknown names are ignored
+        self.assertEqual([], gr.extract_input_names_from_args(["unknown"]))
+        self.assertEqual(["X"], gr.extract_input_names_from_args(["X", "unknown"]))
+
+        # non-string values (e.g. int) are ignored
+        self.assertEqual(["X"], gr.extract_input_names_from_args(["X", 42]))
+
+        # nested list / tuple
+        self.assertEqual(["X", "Y"], gr.extract_input_names_from_args([["X", "Y"]]))
+        self.assertEqual(["X", "Y"], gr.extract_input_names_from_args([("X", "Y")]))
+
+        # duplicates are removed while preserving order
+        self.assertEqual(["X", "Y"], gr.extract_input_names_from_args(["X", "Y", "X"]))
+
+        # slice: start/stop/step that are known names
+        self.assertEqual(["X", "Y", "Z"], gr.extract_input_names_from_args([slice("X", "Y", "Z")]))
+        self.assertEqual(["X", "Y"], gr.extract_input_names_from_args([slice("X", "Y", None)]))
+
+        # empty input
+        self.assertEqual([], gr.extract_input_names_from_args([]))
+    def test_make_shape_from_results_static(self):
+        g = GraphBuilder(18, ir_version=9)
+        result = g.make_shape_from_results([2, 3, 4])
+        self.assertIsInstance(result, str)
+        self.assertEqualArray(np.array([2, 3, 4], dtype=np.int64), g.initializers_dict[result])
+
+    def test_make_shape_from_results_static_cached(self):
+        g = GraphBuilder(18, ir_version=9)
+        result1 = g.make_shape_from_results([2, 3, 4])
+        result2 = g.make_shape_from_results([2, 3, 4])
+        self.assertEqual(result1, result2)
+
+    def test_make_shape_from_results_dynamic_scalar(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TFLOAT, ("batch", 3), is_dimension=False)
+        shape_X = g.op.Shape("X", outputs=["shape_X"])
+        g.set_type("shape_X", TINT64)
+        g.set_shape("shape_X", (2,))
+        batch_dim = g.op.Gather(
+            "shape_X", np.array(0, dtype=np.int64), outputs=["batch_dim"]
+        )
+        g.set_type("batch_dim", TINT64)
+        g.set_shape("batch_dim", ())
+        new_shape = g.make_shape_from_results(["batch_dim", 3])
+        out = g.op.Reshape("X", new_shape, outputs=["Y"])
+        g.set_type("Y", TFLOAT)
+        g.set_shape("Y", ("batch", 3))
+        g.make_tensor_output("Y", TFLOAT, ("batch", 3), indexed=False, is_dimension=False)
+        onx = g.to_onnx()
+        ref = self.check_ort(onx)
+        x = np.arange(6).reshape(2, 3).astype(np.float32)
+        got = ref.run(None, {"X": x})
+        self.assertEqualArray(x, got[0])
+
+    def test_make_shape_from_results_all_dynamic(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TFLOAT, ("batch", "seq", 3), is_dimension=False)
+        shape_X = g.op.Shape("X", outputs=["shape_X"])
+        g.set_type("shape_X", TINT64)
+        g.set_shape("shape_X", (3,))
+        batch_dim = g.op.Gather(
+            "shape_X", np.array(0, dtype=np.int64), outputs=["batch_dim"]
+        )
+        g.set_type("batch_dim", TINT64)
+        g.set_shape("batch_dim", ())
+        seq_dim = g.op.Gather(
+            "shape_X", np.array(1, dtype=np.int64), outputs=["seq_dim"]
+        )
+        g.set_type("seq_dim", TINT64)
+        g.set_shape("seq_dim", ())
+        new_shape = g.make_shape_from_results(["batch_dim", "seq_dim", 3])
+        out = g.op.Reshape("X", new_shape, outputs=["Y"])
+        g.set_type("Y", TFLOAT)
+        g.set_shape("Y", ("batch", "seq", 3))
+        g.make_tensor_output(
+            "Y", TFLOAT, ("batch", "seq", 3), indexed=False, is_dimension=False
+        )
+        onx = g.to_onnx()
+        ref = self.check_ort(onx)
+        x = np.arange(12).reshape(2, 2, 3).astype(np.float32)
+        got = ref.run(None, {"X": x})
+        self.assertEqualArray(x, got[0])
     def test_evaluate_dimension_equality_with_constraints(self):
         g = GraphBuilder(18)
 
