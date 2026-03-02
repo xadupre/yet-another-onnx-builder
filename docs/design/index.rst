@@ -7,6 +7,7 @@ Elements of Design
    cube
    evaluator
    flatten
+   graph_builder
    helpers
    shape
    translate
