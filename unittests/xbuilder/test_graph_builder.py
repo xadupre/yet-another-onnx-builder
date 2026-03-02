@@ -2760,6 +2760,77 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertEqual(vi.name, "z")
         self.assertFalse(vi.type.HasField("tensor_type"))
 
+    def test_do_not_turn_constant_initializers_flag_set(self):
+        # When _do_not_turn_constant_initializers is True (set by move_initializers_to_constant),
+        # the method must return True regardless of name.
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("X", TFLOAT, (2, 4), False)
+        np_weights = np.ones((4, 3), dtype=np.float32)
+        g.make_initializer("weights", np_weights)
+        g.move_initializers_to_constant(full_parameter_name=False)
+        self.assertTrue(g.do_not_turn_constant_initializers_maybe_because_of_showing("weights"))
+        self.assertTrue(g.do_not_turn_constant_initializers_maybe_because_of_showing("unknown"))
+
+    def test_do_not_turn_constant_initializers_no_parent(self):
+        # Without a parent the method always returns False.
+        g = GraphBuilder(18, ir_version=9)
+        g.make_initializer("cst", np.ones((2, 2), dtype=np.float32))
+        self.assertFalse(g.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
+        self.assertFalse(g.do_not_turn_constant_initializers_maybe_because_of_showing("other"))
+
+    def test_do_not_turn_constant_initializers_parent_does_not_have_name(self):
+        # Parent does not know the name at all: returns False.
+        parent = GraphBuilder(18, ir_version=9)
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
+        self.assertFalse(
+            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
+        )
+
+    def test_do_not_turn_constant_initializers_same_constant_in_parent(self):
+        # Same constant in both parent and child: has_exact_same_constant_in_context returns True,
+        # so the method returns not True = False (safe to share with parent).
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst)
+
+        self.assertFalse(
+            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
+        )
+
+    def test_do_not_turn_constant_initializers_different_constant_in_parent(self):
+        # Different values for same name: has_exact_same_constant_in_context returns False,
+        # so the method returns not False = True (shadowing would occur).
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst1 = np.arange(4).reshape((2, 2)).astype(np.float32)
+        parent.make_initializer("cst", np_cst1)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        np_cst2 = np_cst1 + 1.0
+        child.make_initializer("cst", np_cst2)
+
+        self.assertTrue(
+            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
+        )
+
+    def test_do_not_turn_constant_initializers_large_constant_recurse_to_parent(self):
+        # Large constants (>= 128 elements) cause has_exact_same_constant_in_context to return
+        # None, so the method recurses to the parent. The parent has no parent, so it returns
+        # False.
+        parent = GraphBuilder(18, ir_version=9)
+        np_cst = np.arange(128).reshape((16, 8)).astype(np.float32)
+        parent.make_initializer("cst", np_cst)
+
+        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child.make_initializer("cst", np_cst)
+
+        self.assertFalse(
+            child.do_not_turn_constant_initializers_maybe_because_of_showing("cst")
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
