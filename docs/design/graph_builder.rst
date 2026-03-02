@@ -65,15 +65,15 @@ The simplest workflow is:
     g = GraphBuilder(18, ir_version=10)
 
     # 2. declare inputs
-    g.make_tensor_input("X", TFLOAT, ("batch", "seq", 64), is_dimension=False)
-    g.make_tensor_input("W", TFLOAT, (64, 32), is_dimension=False)
+    g.make_tensor_input("X", TFLOAT, ("batch", "seq", 64))
+    g.make_tensor_input("W", TFLOAT, (64, 32))
 
     # 3. add a MatMul node via the short-hand op accessor
     result = g.op.MatMul("X", "W")
 
     # 4. declare the output and export
     g.make_tensor_output(result, elem_type=TFLOAT, shape=("batch", "seq", 32),
-                         indexed=False, is_dimension=False)
+                         indexed=False)
     model = g.to_onnx()
     print(f"nodes  : {len(model.graph.node)}")
     print(f"opset  : {model.opset_import[0].version}")
@@ -135,7 +135,7 @@ creating a duplicate node.
     TFLOAT = onnx.TensorProto.FLOAT
 
     g = GraphBuilder(18, ir_version=10)
-    g.make_tensor_input("X", TFLOAT, ("batch", 64), is_dimension=False)
+    g.make_tensor_input("X", TFLOAT, ("batch", 64))
 
     # Add a weight matrix as an initializer
     W = np.random.randn(64, 32).astype(np.float32)
@@ -143,7 +143,7 @@ creating a duplicate node.
 
     result = g.op.MatMul("X", w_name)
     g.make_tensor_output(result, elem_type=TFLOAT, shape=("batch", 32),
-                         indexed=False, is_dimension=False)
+                         indexed=False)
     model = g.to_onnx()
     print("initializer name :", list(g.initializers_dict)[0])
     print("initializer shape:", list(g.initializers_dict.values())[0].shape)
@@ -215,13 +215,13 @@ tracked as symbolic dimensions.
     TFLOAT = onnx.TensorProto.FLOAT
 
     g = GraphBuilder(18, ir_version=10)
-    g.make_tensor_input("X", TFLOAT, ("batch", "seq", 64), is_dimension=False)
-    g.make_tensor_input("Y", TFLOAT, ("batch", "seq", 64), is_dimension=False)
+    g.make_tensor_input("X", TFLOAT, ("batch", "seq", 64))
+    g.make_tensor_input("Y", TFLOAT, ("batch", "seq", 64))
 
     # symbolic dimensions are tracked automatically once shapes are set
     result = g.op.Add("X", "Y")
     g.make_tensor_output(result, elem_type=TFLOAT, shape=("batch", "seq", 64),
-                         indexed=False, is_dimension=False)
+                         indexed=False)
     model = g.to_onnx()
 
     out = model.graph.output[0]
@@ -306,9 +306,9 @@ A sub-graph can be exported as a reusable ONNX local function (a
     TFLOAT = onnx.TensorProto.FLOAT
 
     g = GraphBuilder(18, ir_version=10, as_function=True)
-    g.make_tensor_input("X", TFLOAT, ("batch", 64), is_dimension=False)
+    g.make_tensor_input("X", TFLOAT, ("batch", 64))
     r = g.op.Relu("X")
-    g.make_tensor_output(r, is_dimension=False, indexed=False)
+    g.make_tensor_output(r, indexed=False)
 
     func = g.to_onnx(
         function_options=FunctionOptions(
