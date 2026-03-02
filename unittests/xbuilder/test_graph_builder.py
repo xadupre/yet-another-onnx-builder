@@ -1989,5 +1989,51 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertRaises(AssertionError, gr.get_dimension_as_result, "batch")
 
 
+    def test_constant_is_equal_to(self):
+        g = GraphBuilder(18, ir_version=9)
+
+        # equal arrays
+        arr = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        g.make_initializer("w", arr)
+        self.assertTrue(g.constant_is_equal_to("w", arr.copy()))
+
+        # different values
+        arr2 = np.array([1.0, 2.0, 4.0], dtype=np.float32)
+        self.assertFalse(g.constant_is_equal_to("w", arr2))
+
+        # dtype mismatch
+        arr3 = arr.astype(np.float64)
+        self.assertFalse(g.constant_is_equal_to("w", arr3))
+
+        # shape mismatch
+        arr4 = arr.reshape((3, 1))
+        self.assertFalse(g.constant_is_equal_to("w", arr4))
+
+        # empty array (shape (0,))
+        empty = np.array([], dtype=np.float32)
+        g.make_initializer("empty", empty, allow_empty=True)
+        self.assertTrue(g.constant_is_equal_to("empty", empty.copy()))
+
+        # scalar array
+        scalar = np.array(5.0, dtype=np.float32)
+        g.make_initializer("scalar", scalar)
+        self.assertTrue(g.constant_is_equal_to("scalar", np.array(5.0, dtype=np.float32)))
+        self.assertFalse(g.constant_is_equal_to("scalar", np.array(6.0, dtype=np.float32)))
+
+        # TensorProto value
+        arr_tp = np.array([10.0, 20.0, 30.0], dtype=np.float32)
+        tp = onh.from_array(arr_tp, name="w_tp")
+        g.make_initializer("w_tp", arr_tp)
+        self.assertTrue(g.constant_is_equal_to("w_tp", tp))
+
+        # large array (size >= 30) always returns True regardless of values
+        large = np.arange(30, dtype=np.float32)
+        g.make_initializer("large", large)
+        large_same = large.copy()
+        self.assertTrue(g.constant_is_equal_to("large", large_same))
+        large_different = np.zeros(30, dtype=np.float32)
+        self.assertTrue(g.constant_is_equal_to("large", large_different))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
