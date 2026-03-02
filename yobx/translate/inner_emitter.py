@@ -433,9 +433,7 @@ class InnerEmitterCompact(InnerEmitter):
             before_lines.extend(bl)
             node_exprs.append(expr)
 
-        opset_exprs = [
-            f"oh.make_opsetid({k!r}, {v!r})" for k, v in self._c_func_opsets.items()
-        ]
+        opset_exprs = [f"oh.make_opsetid({k!r}, {v!r})" for k, v in self._c_func_opsets.items()]
         opsets_str = "[" + ", ".join(opset_exprs) + "]"
 
         var_name = f"_function_{self._c_function_count}"

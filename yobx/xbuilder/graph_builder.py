@@ -1318,7 +1318,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             ), f"Multiple output is not allowed but type is {type(res)} for name={name!r}"
             new_res = []
             with self.maybe_disable_fake_tensor_mode():
-                for i in res:# type: ignore
+                for i in res:  # type: ignore
                     new_res.append(i if isinstance(i, str) else int(i))  # type: ignore
             if self._debug_get_constant:
                 print(f"[GraphBuilder-{self._hash()}.get_constant]   SHAPE: {tuple(new_res)}")
