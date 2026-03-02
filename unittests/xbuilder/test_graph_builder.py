@@ -1534,6 +1534,105 @@ class TestGraphBuilder(ExtTestCase):
         got = ref2.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @ignore_warnings(DeprecationWarning)
+    @hide_stdout()
+    def test_inline_functions_subgraph(self):
+        """Test that _inline_functions_subgraph inlines functions called inside a subgraph."""
+        new_domain = "custom"
+
+        linear_regression = oh.make_function(
+            new_domain,
+            "LinearRegression",
+            ["x", "a", "b"],
+            ["y"],
+            [
+                oh.make_node("MatMul", ["x", "a"], ["xa"]),
+                oh.make_node("Add", ["xa", "b"], ["y"]),
+            ],
+            [oh.make_opsetid("", 18)],
+            [],
+        )
+
+        # Build the then_branch: calls the custom function inside
+        then_branch = oh.make_graph(
+            [
+                oh.make_node(
+                    "LinearRegression", ["X", "A", "B"], ["Y_then"], domain=new_domain
+                ),
+            ],
+            "then_branch",
+            [],
+            [oh.make_tensor_value_info("Y_then", TensorProto.FLOAT, None)],
+        )
+
+        # Build the else_branch: returns Abs(X)
+        else_branch = oh.make_graph(
+            [
+                oh.make_node("Abs", ["X"], ["Y_else"]),
+            ],
+            "else_branch",
+            [],
+            [oh.make_tensor_value_info("Y_else", TensorProto.FLOAT, None)],
+        )
+
+        onnx_model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "If",
+                        ["Cond"],
+                        ["Y"],
+                        then_branch=then_branch,
+                        else_branch=else_branch,
+                    ),
+                ],
+                "main_graph",
+                [
+                    oh.make_tensor_value_info("Cond", TensorProto.BOOL, []),
+                    oh.make_tensor_value_info("X", TensorProto.FLOAT, [None, None]),
+                    oh.make_tensor_value_info("A", TensorProto.FLOAT, [None, None]),
+                    oh.make_tensor_value_info("B", TensorProto.FLOAT, [None, None]),
+                ],
+                [oh.make_tensor_value_info("Y", TensorProto.FLOAT, None)],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid(new_domain, 1)],
+            functions=[linear_regression],
+            ir_version=10,
+        )
+
+        feeds_true = dict(
+            Cond=np.array(True),
+            X=np.arange(9).reshape((3, 3)).astype(np.float32),
+            A=np.eye(3).astype(np.float32),
+            B=np.ones((3, 3), dtype=np.float32),
+        )
+        feeds_false = dict(
+            Cond=np.array(False),
+            X=np.arange(9).reshape((3, 3)).astype(np.float32),
+            A=np.eye(3).astype(np.float32),
+            B=np.ones((3, 3), dtype=np.float32),
+        )
+
+        ref = self.check_ort(onnx_model)
+        expected_true = ref.run(None, feeds_true)[0]
+        expected_false = ref.run(None, feeds_false)[0]
+
+        gr = GraphBuilder(onnx_model, verbose=5)
+        self.assertEqual(len(gr.functions), 1)
+        # inline_functions triggers _inline_functions_subgraph on the If subgraphs
+        gr.inline_functions(verbose=1)
+
+        onx = gr.to_onnx(inline=False)
+        self.dump_onnx("test_inline_functions_subgraph.onnx", onx)
+        self.assertEqual(len(gr.functions), 0)
+        self.assertEqual(len(onx.functions), 0)
+
+        ref2 = self.check_ort(onx)
+        got_true = ref2.run(None, feeds_true)[0]
+        got_false = ref2.run(None, feeds_false)[0]
+        self.assertEqualArray(expected_true, got_true)
+        self.assertEqualArray(expected_false, got_false)
+
     @requires_torch("2.0")
     def test_register_dynamic_object_from_dynamic_shapes_dict_wrap_dim(self):
         # WrapDim (string) case: string is pre-processed to WrapDim
