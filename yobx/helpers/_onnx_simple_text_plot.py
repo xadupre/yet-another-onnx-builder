@@ -444,7 +444,7 @@ def onnx_simple_text_plot(
         import numpy
         from sklearn.cluster import KMeans
         from skl2onnx import to_onnx
-        from onnx_array_api.plotting.text_plot import onnx_simple_text_plot
+        from yobx.helpers.onnx_helper import pretty_onnx
 
         x = np.random.randn(10, 3)
         y = np.random.randn(10)
@@ -452,7 +452,7 @@ def onnx_simple_text_plot(
         model.fit(x, y)
         onx = to_onnx(model, x.astype(np.float32),
                       target_opset=15)
-        text = onnx_simple_text_plot(onx, verbose=False)
+        text = pretty_onnx(onx)
         print(text)
 
     The same graphs with links.
@@ -464,7 +464,7 @@ def onnx_simple_text_plot(
         import numpy
         from sklearn.cluster import KMeans
         from skl2onnx import to_onnx
-        from onnx_array_api.plotting.text_plot import onnx_simple_text_plot
+        from yobx.helpers.onnx_helper import pretty_onnx
 
         x = np.random.randn(10, 3)
         y = np.random.randn(10)
@@ -472,7 +472,7 @@ def onnx_simple_text_plot(
         model.fit(x, y)
         onx = to_onnx(model, x.astype(np.float32),
                       target_opset=15)
-        text = onnx_simple_text_plot(onx, verbose=False, add_links=True)
+        text = pretty_onnx(onx, add_links=True)
         print(text)
 
     Visually, it looks like the following:
@@ -484,7 +484,7 @@ def onnx_simple_text_plot(
         import numpy
         from sklearn.cluster import KMeans
         from skl2onnx import to_onnx
-        from onnx_array_api.plotting.dot_plot import to_dot
+        from yobx.helpers.dot_helper import to_dot
 
         x = np.random.randn(10, 3)
         y = np.random.randn(10)

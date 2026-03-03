@@ -1,0 +1,91 @@
+from typing import List
+
+
+def get_onnxruntime_patterns(
+    verbose: int = 0,
+) -> List["PatternOptimization"]:  # noqa: F821
+    """
+    Returns a default list of optimization patterns for :epkg:`onnxruntime`.
+    It is equal to the following list.
+
+    .. runpython::
+        :showcode:
+        :rst:
+
+        from yobx.xoptim.patterns_api import pattern_table_doc
+        from yobx.xoptim.patterns_ort import get_onnxruntime_patterns
+
+        print(pattern_table_doc(get_onnxruntime_patterns(), as_rst=True))
+    """
+    from .activation import (
+        BiasGeluPattern,
+        BiasSoftmaxPattern,
+        FastGeluPattern,
+        GeluOrtPattern,
+        GeluErfPattern,
+        QuickGeluPattern,
+    )
+    from .batch_normalization import OrtBatchNormalizationTrainingPattern
+    from .fused_conv import FusedConvPattern
+    from .fused_matmul import (
+        FusedMatMulDivPattern,
+        FusedMatMulPattern,
+        FusedMatMulx2Pattern,
+        FusedMatMulTransposePattern,
+        ReshapeGemmPattern,
+        ReshapeGemmReshapePattern,
+        TransposeFusedMatMulBPattern,
+    )
+    from .llm_optim import (
+        Attention3DPattern,
+        ContribRotaryEmbeddingPattern,
+        ContribRotaryEmbedding3DPattern,
+        GroupQueryAttention3DPattern,
+        MultiHeadAttention3DPattern,
+    )
+    from .missing_kernels import (
+        MissingCosSinPattern,
+        MissingRangePattern,
+        MissingReduceMaxPattern,
+        MissingTopKPattern,
+    )
+
+    from .simplified_layer_normalization import (
+        SimplifiedLayerNormalizationPattern,
+        SimplifiedLayerNormalizationMulPattern,
+        SkipLayerNormalizationPattern,
+        SkipSimplifiedLayerNormalizationPattern,
+        SkipSimplifiedLayerNormalizationMulPattern,
+    )
+
+    return [
+        Attention3DPattern(verbose=verbose),
+        BiasGeluPattern(verbose=verbose),
+        BiasSoftmaxPattern(verbose=verbose),
+        ContribRotaryEmbeddingPattern(verbose=verbose),
+        ContribRotaryEmbedding3DPattern(verbose=verbose),
+        GeluOrtPattern(verbose=verbose),
+        GeluErfPattern(verbose=verbose),
+        GroupQueryAttention3DPattern(verbose=verbose),
+        FusedConvPattern(verbose=verbose),
+        FastGeluPattern(verbose=verbose),
+        FusedMatMulPattern(verbose=verbose),
+        FusedMatMulx2Pattern(verbose=verbose),
+        FusedMatMulDivPattern(verbose=verbose),
+        FusedMatMulTransposePattern(verbose=verbose),
+        MissingCosSinPattern(verbose=verbose),
+        MissingRangePattern(verbose=verbose),
+        MissingReduceMaxPattern(verbose=verbose),
+        MissingTopKPattern(verbose=verbose),
+        MultiHeadAttention3DPattern(verbose=verbose),
+        OrtBatchNormalizationTrainingPattern(verbose=verbose),
+        QuickGeluPattern(verbose=verbose),
+        ReshapeGemmPattern(verbose=verbose),
+        ReshapeGemmReshapePattern(verbose=verbose),
+        SimplifiedLayerNormalizationPattern(verbose=verbose),
+        SimplifiedLayerNormalizationMulPattern(verbose=verbose),
+        SkipLayerNormalizationPattern(verbose=verbose),
+        SkipSimplifiedLayerNormalizationPattern(verbose=verbose),
+        SkipSimplifiedLayerNormalizationMulPattern(verbose=verbose),
+        TransposeFusedMatMulBPattern(verbose=verbose),
+    ]

@@ -3,6 +3,23 @@ from onnx import FunctionProto, ModelProto, NodeProto, TypeProto
 from onnx.defs import get_schema
 from onnx.reference import ReferenceEvaluator
 from onnx.reference.op_run import OpRun
+from .ops.op__extended_add_add_mul_mul import (
+    AddAdd,
+    AddMul,
+    AddSharedInput,
+    MulAdd,
+    MulMul,
+    MulSharedInput,
+    MulSub,
+    SubMul,
+)
+from .ops.op__extended_mul_sigmoid import MulSigmoid
+from .ops.op__extended_negxplus1 import NegXplus1
+from .ops.op__extended_replace_zero import ReplaceZero
+from .ops.op__extended_rotary import Rotary
+from .ops.op__extended_scatternd_of_shape import MaskedScatterNDOfShape, ScatterNDOfShape
+from .ops.op__extended_transpose_cast import Transpose2DCastFP16, Transpose2DCastFP32
+from .ops.op__extended_tri_matrix import TriMatrix
 from .ops.op_attention import Attention
 from .ops.op_bias_softmax import BiasSoftmax
 from .ops.op_complex import ComplexModule, ToComplex
@@ -12,6 +29,7 @@ from .ops.op_qlinear_average_pool import QLinearAveragePool
 from .ops.op_qlinear_conv import QLinearConv
 from .ops.op_quick_gelu import QuickGelu
 from .ops.op_skip_layer_normalization import SkipLayerNormalization
+from .ops.op_simplified_layer_normalization import SimplifiedLayerNormalization
 
 
 class ExtendedReferenceEvaluator(ReferenceEvaluator):
@@ -131,6 +149,7 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
     """
 
     default_ops: List[type[OpRun]] = [
+        # com.microsoft
         Attention,
         BiasSoftmax,
         ComplexModule,
@@ -140,8 +159,27 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         QLinearConv,
         QLinearAveragePool,
         QuickGelu,
+        SimplifiedLayerNormalization,
         SkipLayerNormalization,
         ToComplex,
+        # onnx_extended.ortops.optim.cuda
+        AddAdd,
+        AddMul,
+        AddSharedInput,
+        MaskedScatterNDOfShape,
+        MulAdd,
+        MulMul,
+        MulSharedInput,
+        MulSigmoid,
+        MulSub,
+        NegXplus1,
+        ReplaceZero,
+        Rotary,
+        ScatterNDOfShape,
+        SubMul,
+        Transpose2DCastFP16,
+        Transpose2DCastFP32,
+        TriMatrix,
     ]
 
     @staticmethod

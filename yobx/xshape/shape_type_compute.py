@@ -1127,8 +1127,11 @@ def _set_shape_type_op_any_reshape(self: ShapeBuilder, node: NodeProto):
 
     if self.has_shape(node.input[1]):
         rk = self.get_shape(node.input[1])
-        self.set_rank(k, len(rk))
-        return True
+        assert len(rk) == 1, f"A shape must have a rank==1 but it is {rk}{self.get_debug_msg()}"
+        if isinstance(rk[0], int):
+            self.set_rank(k, rk[0])
+            return True
+        return False
     assert not self._debug_shape_missing, (
         f"Unable to compute shape for node: "
         f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
@@ -2317,7 +2320,7 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             self.set_rank(node.output[0], self.get_rank(node.input[0]))
         return None
 
-    assert node.op_type in {"GatherGrad", "SoftmaxGrad", "ConcatTraining"} or node.domain not in {
+    assert node.domain not in {
         "ai.onnx.ml",
         "intermediate",
         "ai.onnx.complex",

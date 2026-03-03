@@ -31,7 +31,7 @@ def translate_header(api: str = "onnx"):
             import numpy as np
             import ml_dtypes
             import onnx
-            from onnx_array_api.light_api import start
+            from yobx.builder.light import start
             from yobx.translate import translate
             """)
     if api == "builder":
@@ -39,7 +39,7 @@ def translate_header(api: str = "onnx"):
             import numpy as np
             import ml_dtypes
             import onnx
-            from onnx_array_api.graph_api import GraphBuilder
+            from yobx.xbuilder import GraphBuilder
             """)
     raise ValueError(f"Unexpected value {api!r} for api.")
 

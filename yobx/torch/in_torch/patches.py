@@ -167,7 +167,9 @@ def _combine_args(f, args, kwargs, preserve_order: bool = False) -> dict[str, An
     #    1
     #    for p in signature.parameters.values()
     #    if p.default == inspect.Parameter.empty
-    #    and p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    #    and p.kind in (
+    #       inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD
+    #    )
     # )
     # if len(args) < positional_only:
     #    raise RuntimeError(

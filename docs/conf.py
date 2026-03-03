@@ -131,7 +131,6 @@ epkg_dictionary = {
     "onnxruntime-genai": "https://github.com/microsoft/onnxruntime-genai",
     "onnxruntime-training": "https://onnxruntime.ai/docs/get-started/training-on-device.html",
     "onnxruntime kernels": "https://onnxruntime.ai/docs/reference/operators/OperatorKernels.html",
-    "onnx-array-api": "https://sdpython.github.io/doc/onnx-array-api/dev/",
     "onnx-diagnostic": "https://sdpython.github.io/doc/onnx-diagnostic/dev/",
     "onnx-extended": "https://sdpython.github.io/doc/onnx-extended/dev/",
     "onnx-script": "https://github.com/microsoft/onnxscript",
