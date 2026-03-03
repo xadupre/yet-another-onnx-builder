@@ -135,11 +135,10 @@ An iteration is:
 
         for all nodes n:
 
-            r = p.match(n) 
+            r = p.match(n)
             if r:
                 if no node already scheduled to be rewritten by another match:
                     matches.append(r)
-    
     # Step 2: apply
 
     for all matches r:
