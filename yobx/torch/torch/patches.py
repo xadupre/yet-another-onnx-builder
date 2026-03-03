@@ -42,8 +42,6 @@ PATCHES.append(
 
 def patched_infer_size(a, b):
     """Patches ``torch._subclasses.fake_impls.infer_size``."""
-    from fx_dynamic_shapes import guard_or_false
-
     dimsA = len(a)
     dimsB = len(b)
     ndim = max(dimsA, dimsB)
@@ -67,19 +65,19 @@ def patched_infer_size(a, b):
         # were not the case, we'd need to write this using torch.sym_or() or
         # something like that).
         try:
-            b1 = guard_or_false(sizeA == 1)
+            b1 = fx_symbolic_shapes.guard_or_false(sizeA == 1)
         except fx_symbolic_shapes.GuardOnDataDependentSymNode:
             b1 = False
         try:
-            b2 = guard_or_false(sizeB == 1)
+            b2 = fx_symbolic_shapes.guard_or_false(sizeB == 1)
         except fx_symbolic_shapes.GuardOnDataDependentSymNode:
             b2 = False
         try:
-            b3 = guard_or_false(sizeA == sizeB)
+            b3 = fx_symbolic_shapes.guard_or_false(sizeA == sizeB)
         except fx_symbolic_shapes.GuardOnDataDependentSymNode:
             b3 = False
         if b1 or b2 or b3:
-            expandedSizes[i] = sizeB if guard_or_false(sizeA == 1) else sizeA
+            expandedSizes[i] = sizeB if fx_symbolic_shapes.guard_or_false(sizeA == 1) else sizeA
         else:
             # PATCHED: generic case, the dimension is known, no need to assert
             expandedSizes[i] = torch.sym_max(sizeA, sizeB)  # type: ignore

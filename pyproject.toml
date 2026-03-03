@@ -138,7 +138,7 @@ module = [
     "yobx.reference.ops.*",
     "yobx.reference.torch_ops.*",
     "yobx.torch.tracing.*",
-    "yobx.torch.transformers._patches_model_rope_utils.py",
+    "yobx.torch.transformers._patches_model_rope_utils",
     "yobx.translate.*",
     "yobx.xshape._shape_runtime",
     "yobx.xshape._builder_runtime",
