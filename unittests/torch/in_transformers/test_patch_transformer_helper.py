@@ -21,6 +21,7 @@ from yobx.torch.torch_helper import torch_deepcopy
 
 class TestPatchTransformerHelper(ExtTestCase):
     @requires_python((3, 11), "wraps is not captured the same way in __wrapped__")
+    @requires_transformers("4.55")
     def test_is_wrapped(self):
         llama = transformers.models.llama.modeling_llama.LlamaRotaryEmbedding
         self.assertTrue(hasattr(llama.forward, "__wrapped__"))
