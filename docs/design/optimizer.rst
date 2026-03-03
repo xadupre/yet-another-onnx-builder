@@ -156,9 +156,6 @@ not altered by another one.
 Adding a pattern
 ================
 
-Example
--------
-
 Simple API
 ++++++++++
 
