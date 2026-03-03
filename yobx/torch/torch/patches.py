@@ -2,7 +2,11 @@ import inspect
 from typing import Any, List, Sequence
 import sympy
 import torch
+import torch._export.non_strict_utils
+import torch._refs
+import torch._subclasses.fake_impls
 import torch.export._trace
+import torch.fx.experimental.symbolic_shapes as fx_symbolic_shapes
 from torch._subclasses.fake_tensor import FakeTensorMode
 from ...helpers.patch_helper import PatchInfo
 
@@ -16,20 +20,20 @@ class patched_DynamicDimConstraintPrinter:
     Valid for ``torch>=2.10``.
     """
 
-    __CLASS__ = torch.fx.experimental.symbolic_shapes.DynamicDimConstraintPrinter
+    __CLASS__ = fx_symbolic_shapes.DynamicDimConstraintPrinter
     __METHODS__ = ["_print_Symbol"]
 
     def _print_Symbol(self, expr: sympy.Symbol) -> str:
         assert isinstance(expr, sympy.Symbol), str(type(expr))
-        if self.symbol_to_source.get(expr):
-            return self.symbol_to_source[expr][0].name
+        if self.symbol_to_source.get(expr):  # type: ignore
+            return self.symbol_to_source[expr][0].name  # type: ignore
         return str(expr)
 
 
 PATCHES.append(
     PatchInfo.make(
         patched_DynamicDimConstraintPrinter._print_Symbol,
-        torch.fx.experimental.symbolic_shapes.DynamicDimConstraintPrinter,
+        fx_symbolic_shapes.DynamicDimConstraintPrinter,
         "_print_Symbol",
         family="torch",
     )
@@ -38,7 +42,7 @@ PATCHES.append(
 
 def patched_infer_size(a, b):
     """Patches ``torch._subclasses.fake_impls.infer_size``."""
-    from torch.fx.experimental.symbolic_shapes import guard_or_false
+    from fx_dynamic_shapes import guard_or_false
 
     dimsA = len(a)
     dimsB = len(b)
@@ -64,21 +68,21 @@ def patched_infer_size(a, b):
         # something like that).
         try:
             b1 = guard_or_false(sizeA == 1)
-        except torch.fx.experimental.symbolic_shapes.GuardOnDataDependentSymNode:
+        except fx_symbolic_shapes.GuardOnDataDependentSymNode:
             b1 = False
         try:
             b2 = guard_or_false(sizeB == 1)
-        except torch.fx.experimental.symbolic_shapes.GuardOnDataDependentSymNode:
+        except fx_symbolic_shapes.GuardOnDataDependentSymNode:
             b2 = False
         try:
             b3 = guard_or_false(sizeA == sizeB)
-        except torch.fx.experimental.symbolic_shapes.GuardOnDataDependentSymNode:
+        except fx_symbolic_shapes.GuardOnDataDependentSymNode:
             b3 = False
         if b1 or b2 or b3:
             expandedSizes[i] = sizeB if guard_or_false(sizeA == 1) else sizeA
         else:
             # PATCHED: generic case, the dimension is known, no need to assert
-            expandedSizes[i] = torch.sym_max(sizeA, sizeB)
+            expandedSizes[i] = torch.sym_max(sizeA, sizeB)  # type: ignore
     return tuple(expandedSizes)
 
 
@@ -91,7 +95,7 @@ def patched__broadcast_shapes(*_shapes):
     """Patches ``torch._refs._broadcast_shapes``."""
     from functools import reduce
     from torch._prims_common import IntLike
-    from torch.fx.experimental.symbolic_shapes import (
+    from torch.fx.experimental import (
         guard_or_false,
         is_nested_int,
     )
@@ -133,9 +137,9 @@ def patched__broadcast_shapes(*_shapes):
             elif guard_or_false(common_shape[idx] == 1) or guard_or_false(shape[idx] != 1):
                 if shape[idx] < 0:
                     raise ValueError("Attempting to broadcast a dimension with negative length!")
-                common_shape[idx] = shape[idx]
+                common_shape[idx] = shape[idx]  # type: ignore
             else:
-                common_shape[idx] = torch.sym_max(common_shape[idx], shape[idx])
+                common_shape[idx] = torch.sym_max(common_shape[idx], shape[idx])  # type: ignore
 
     return common_shape
 

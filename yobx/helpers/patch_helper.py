@@ -95,12 +95,12 @@ class PatchInfo:
         return PatchInfo(
             patch=patch,
             family=family,
-            do=lambda: PatchInfo._setattr(
+            do=lambda: PatchInfo._setattr(  # type: ignore
                 module_or_class,
                 method_or_function_name,
                 patch,
             ),
-            undo=lambda original: PatchInfo._setattr(
+            undo=lambda original: PatchInfo._setattr(  # type: ignore
                 module_or_class,
                 method_or_function_name,
                 original,
@@ -160,10 +160,6 @@ class PatchInfo:
             else f"{self.__class__.__name__}({self.patch!r})"
         )
 
-    def to_tuple(self) -> Tuple[str, Callable, Callable]:
-        "usual"
-        return (self.family, self.function_to_patch, self.patch)
-
     def to_dict(self) -> Dict[str, Any]:
         "usual"
         return {k: getattr(self, k) for k in self.__slots__}
@@ -215,11 +211,9 @@ class PatchInfo:
         kind = self.family or ""
         if kind:
             kind = f"{kind}: "
-        function_to_pach_name = (
-            f"{self.function_to_patch!r}"
-            if isinstance(self.function_to_patch, str)
-            else self.function_name(self.function_to_patch)
-        )
+        f = self.function_to_patch or self._last_patched_function
+        assert f, f"f is None for patch {self.name!r}"
+        function_to_pach_name = f"{f!r}" if isinstance(f, str) else self.function_name(f)
         patch_name = self.function_name(self.patch)
         kind = kind.replace("_PATCHED_", "")
         title = f"{kind}{function_to_pach_name} -> {patch_name}"
@@ -293,9 +287,7 @@ class PatchDetails:
         """Returns the data for a dataframe."""
         return [p.to_dict() for p in self.patched]
 
-    def patches_involved_in_graph(
-        self, graph: "torch.fx.Graph"  # noqa: F821
-    ) -> List[Tuple[PatchInfo, List["torch.fx.Node"]]]:  # noqa: F821
+    def patches_involved_in_graph(self, graph: Any) -> List[Tuple[PatchInfo, List[Any]]]:
         """
         Enumerates all patches impacting a graph.
         The function goes through the graph node (only the main graph) and
@@ -312,9 +304,12 @@ class PatchDetails:
             interval = [lineno, lineno + len(lines)]
             patches.append((patch, f, source, interval))
 
+        assert hasattr(graph, "nodes"), "graph has no attribute 'nodes'"
         cst = "yobx"
         node_stack = []
         for node in graph.nodes:
+            assert hasattr(node, "meta"), "node has no attribute 'meta'"
+            assert isinstance(node.meta, dict), "node.meta is not a dictionary"
             meta = node.meta
             if "stack_trace" not in meta:
                 continue
@@ -334,9 +329,9 @@ class PatchDetails:
                 if not occ:
                     continue
                 for filename, line_number in occ:
-                    if source.replace("\\", "/").strip("/") != filename.replace("\\", "/").strip(
-                        "/"
-                    ):
+                    if source and source.replace("\\", "/").strip("/") != filename.replace(
+                        "\\", "/"
+                    ).strip("/"):
                         continue
                     line = int(line_number)
                     if (
@@ -349,6 +344,10 @@ class PatchDetails:
 
         # checks all patches were discovered
         for node, _ in node_stack:
+            assert hasattr(node, "meta"), "node has no attribute 'meta'"
+            assert hasattr(node, "target"), "node has no attribute 'meta'"
+            assert hasattr(node, "name"), "node has no attribute 'meta'"
+            assert hasattr(node, "args"), "node has no attribute 'meta'"
             assert id(node) in patched_nodes, (
                 f"One node was patched but no patch was found:\n"
                 f"node: {node.target}({','.join(map(str, node.args))}) -> {node.name}"
@@ -362,19 +361,21 @@ class PatchDetails:
             res[patch].append(node)
         return list(res.items())
 
-    def matching_pair(cls, patch: PatchInfo, node: "torch.fx.Node") -> bool:  # noqa: F821
+    def matching_pair(cls, patch: PatchInfo, node: "torch.fx.Node") -> bool:  # type: ignore # noqa: F821
         """
         Last validation for a pair. RotaryEmbedding has many rewriting
         and they all end up in the same code line.
         """
-        cls_name = patch.function_to_patch.__qualname__.split(".")[0]
+        f = patch.function_to_patch or patch._last_patched_function
+        assert f is not None, f"The patch {patch.name!r} was never applied."
+        cls_name = f.__qualname__.split(".")[0]
         if not cls_name.endswith("RotaryEmbedding"):
             return True
         return cls_name in str(node.meta)
 
     def make_report(
         cls,
-        patches: List[Tuple[PatchInfo, List["torch.fx.Node"]]],  # noqa: F821
+        patches: List[Tuple[PatchInfo, List["torch.fx.Node"]]],  # type: ignore # noqa: F821
         format: str = "raw",
     ) -> str:
         """
