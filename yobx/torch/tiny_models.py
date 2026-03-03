@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import copy
 from typing import Any, Dict, Optional
 import torch
+import torch.nn as nn
 
 
 @dataclass
@@ -38,6 +39,19 @@ def _update_config(config: Any, mkwargs: Dict[str, Any]):
             setattr(config, k, v)
 
 
+class _BroadcastAddModel(nn.Module):
+    """
+    A model where one output dynamic dimension becomes ``max(d1, d2)`` after a broadcast.
+
+    Inputs ``x`` (shape ``(batch, d1)``) and ``y`` (shape ``(batch, d2)``) are added
+    element-wise. Broadcasting rules require that ``d1 == d2`` or one of them equals
+    ``1`` at runtime; the symbolic output shape is ``(batch, max(d1, d2))``.
+    """
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        return x + y
+
+
 def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) -> ModelData:
     """
     Creates a tiny models, usually untrained to write tests.
@@ -48,6 +62,8 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
 
     * ``"arnir0/Tiny-LLM"`` — a tiny LLaMA-based causal language model with a
       :class:`transformers.cache_utils.DynamicCache` past-key-value cache.
+    * ``"local/BroadcastAdd"`` — a minimal two-input model whose output has the
+      symbolic shape ``(batch, max(d1, d2))`` due to broadcasting.
 
     :param model_id: model id, see the list of supported values above
     :param config_updates: modification to add to the configuration before creating the model
@@ -70,6 +86,20 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
             dynamic_shapes=model_data.dynamic_shapes,
         )
     """
+    if model_id == "local/BroadcastAdd":
+        return ModelData(
+            model_id=model_id,
+            model=_BroadcastAddModel(),
+            export_inputs=dict(
+                x=torch.randn(2, 5),
+                y=torch.randn(2, 1),
+            ),
+            dynamic_shapes=dict(
+                x={0: "batch", 1: "d1"},
+                y={0: "batch", 1: "d2"},
+            ),
+        )
+
     if model_id == "arnir0/Tiny-LLM":
         import transformers
         from .in_transformers.models import get_cached_configuration

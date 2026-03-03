@@ -9,8 +9,14 @@ from yobx.torch.torch_helper import torch_deepcopy
 
 
 @requires_torch("2.0")
-@requires_transformers("5.0")
 class TestTinyModels(ExtTestCase):
+    def test_broadcast_add(self):
+        model_data = get_tiny_model("local/BroadcastAdd")
+        result = model_data.model(**model_data.export_inputs)
+        # x: (2, 5), y: (2, 1) → broadcast output: (2, max(5, 1)) = (2, 5)
+        self.assertEqual((2, 5), tuple(result.shape))
+
+    @requires_transformers("5.0")
     def test_tiny_llm(self):
         model_data = get_tiny_model("arnir0/Tiny-LLM")
         expected = model_data.model(**torch_deepcopy(model_data.export_inputs))
