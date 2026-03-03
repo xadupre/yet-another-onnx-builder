@@ -2,6 +2,7 @@ from typing import Any
 import torch
 from .export_options import ExportOptions
 from .flatten import register_flattening_functions
+from .patch import apply_patches_for_model
 from .tracing import (
     CustomProxy,
     CustomAttribute,
@@ -9,14 +10,8 @@ from .tracing import (
     CustomProxyInt,
     CustomProxyFloat,
     CustomTracer,
-    CondCCOp,
-    LEAVE_INPLACE,
-    _len,
-    _isinstance,
-    replace_problematic_function_before_tracing,
-    setitem_with_transformation,
-    tree_unflatten_with_proxy,
 )
+from .tiny_models import get_tiny_model
 
 
 def use_dyn_not_str(dynamic_shapes: Any, default_value=None) -> Any:

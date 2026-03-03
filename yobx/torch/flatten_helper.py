@@ -1,4 +1,5 @@
 """Backward-compatibility shim. Use :mod:`yobx.torch.flatten` instead."""
+
 from .flatten import (  # noqa: F401
     PATCH_OF_PATCHES,
     flattening_functions,

@@ -10,12 +10,11 @@ from yobx.ext_test_case import (
     ignore_warnings,
 )
 from yobx.torch.input_observer import InputCandidate, InputObserver, _infer_dynamic_dimensions
+from yobx.torch import apply_patches_for_model
 
 # from onnx_diagnostic.export.api import to_onnx
-# from onnx_diagnostic.torch_export_patches import torch_export_patches
 
 to_onnx = lambda *args, **kwargs: None
-torch_export_patches = lambda *args, **kwargs: None
 
 
 class TestInputObserver(ExtTestCase):
@@ -1117,8 +1116,7 @@ class TestInputObserver(ExtTestCase):
         self.assertEqual({"x": (cst, cst), "kwargs": {"y": (None, cst)}}, dss)
 
         # _get_range_constraints
-        self.skipTest("not implemented yet")
-        with torch_export_patches(patch_torch=True):
+        with apply_patches_for_model(patch_torch=True):
             torch.export.export(
                 model,
                 (),
@@ -1189,7 +1187,7 @@ class TestInputObserver(ExtTestCase):
 
         # _get_range_constraints
         self.skipTest("not implemented yet")
-        with torch_export_patches(patch_torch=True):
+        with apply_patches_for_model(patch_torch=True):
             torch.export.export(
                 model,
                 args,

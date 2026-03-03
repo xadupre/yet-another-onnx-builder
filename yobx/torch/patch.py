@@ -1,0 +1,63 @@
+import contextlib
+import traceback
+from typing import Iterator, Optional
+import torch
+from ..helpers.patch_helper import PatchDetails
+
+
+def retrieve_stacktrace():
+    """Retrieves and prints the current stack trace, avoids every torch file."""
+    rows = []
+    stack_frames = traceback.extract_stack()
+    for frame in stack_frames:
+        filename, lineno, function_name, code_line = frame
+        if "/torch/" in filename:
+            continue
+        rows.append(f"File: {filename}, Line {lineno}, in {function_name}")
+        if code_line:
+            rows.append(f"    {code_line}")
+    return "\n".join(rows)
+
+
+@contextlib.contextmanager
+def apply_patches_for_model(
+    patch_torch: bool = False,
+    patch_transformers: bool = False,
+    verbose: int = 0,
+    model: Optional[torch.nn.Module] = None,
+) -> Iterator[PatchDetails]:
+    """
+    The context manager apply patches, usually before exporting a model.
+
+    .. code-block:: python
+
+        from yobx.torch import apply_patches_for_model
+
+        with apply_patches_for_model(patch_transformers=True, model=model):
+            # ...
+    :param patch_torch: applies patches for :epkg:`torch`
+    :param patch_transformers: applies patch for transformers
+    :param verbose: prints out which patch is applies
+    :param model: modifies the list of patches for a particular model,
+        it is recommended to fill it the used rope is not the default one
+    """
+    patches = PatchDetails()
+    if patch_torch:
+        from .torch.patches import PATCHES
+
+        patches.extend(PATCHES)
+    if patch_transformers:
+        from .transformers.patches import get_patches_for
+
+        patches.extend(get_patches_for(model))
+    for patch in patches:
+        if verbose:
+            print(f"[register_patch_functions] apply {patch}")
+        patch.do()
+    try:
+        yield patches
+    finally:
+        for patch in patches:
+            if verbose:
+                print(f"[register_patch_functions] remove {patch!r}")
+            patch.undo()
