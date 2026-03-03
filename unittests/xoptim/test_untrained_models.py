@@ -7,7 +7,7 @@ from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
 from yobx.torch.tiny_models import get_tiny_model
 from yobx.torch import register_flattening_functions, apply_patches_for_model
 from yobx.torch.torch_helper import torch_deepcopy
-from yobx.ext_test_case import ExtTestCase, hide_stdout, requires_onnx_diagnostic
+from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.xbuilder import OptimizationOptions
 
 # from yobx.torch_interpreter import to_onnx
@@ -16,7 +16,6 @@ to_onnx = None
 
 class TestOptimizationUntrainedModel(ExtTestCase):
     @hide_stdout()
-    @requires_onnx_diagnostic("0.7.17")
     @unittest.skipIf(to_onnx is None, "not implement yet")
     def test_tiny_llm_to_onnx_24(self):
         import onnxruntime
@@ -113,7 +112,6 @@ class TestOptimizationUntrainedModel(ExtTestCase):
         assert diff["abs"] <= 1e-5, f"diff={diff}"
 
     @hide_stdout()
-    @requires_onnx_diagnostic("0.7.17")
     @unittest.skipIf(to_onnx is None, "not implement yet")
     def test_tiny_llm_to_onnx_ort_22(self):
         import onnxruntime

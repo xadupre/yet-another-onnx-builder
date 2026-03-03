@@ -11,7 +11,7 @@ Default Patterns
     :showcode:
     :rst:
 
-    from experimental_experiment.xoptim import get_pattern_list
+    from yobx.xoptim import get_pattern_list
 
     names = sorted([(pat.__class__.__name__, pat.__module__)
                     for pat in get_pattern_list("default")])
@@ -25,7 +25,7 @@ Patterns specific to onnxruntime
     :showcode:
     :rst:
 
-    from experimental_experiment.xoptim import get_pattern_list
+    from yobx.xoptim import get_pattern_list
 
     names = sorted([(pat.__class__.__name__, pat.__module__)
                     for pat in get_pattern_list("onnxruntime")])
@@ -39,7 +39,7 @@ Patterns specific to ai.onnx.ml
     :showcode:
     :rst:
 
-    from experimental_experiment.xoptim import get_pattern_list
+    from yobx.xoptim import get_pattern_list
 
     names = sorted([(pat.__class__.__name__, pat.__module__)
                     for pat in get_pattern_list("ml")])
@@ -55,7 +55,7 @@ This works on CUDA with :epkg:`onnx-extended`.
     :showcode:
     :rst:
 
-    from experimental_experiment.xoptim import get_pattern_list
+    from yobx.xoptim import get_pattern_list
 
     names = sorted([(pat.__class__.__name__, pat.__module__)
                     for pat in get_pattern_list("experimental")])
