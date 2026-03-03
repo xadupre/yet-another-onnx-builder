@@ -1392,6 +1392,7 @@ def pattern_table_doc(
     """
     data = []
     for pat in pattern_list:
+        print(pat)
         data.append(
             dict(
                 name=pat.__class__.__name__,

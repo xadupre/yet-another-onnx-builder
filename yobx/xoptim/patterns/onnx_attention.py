@@ -545,7 +545,7 @@ class FunctionAttentionPattern(PatternOptimization):
                 "Constant",
                 [],
                 ["minfty"],
-                value=onh.from_array(np.array([-inf], dtype=np.float32), name="value"),
+                value=onh.from_array(np.array([-np.inf], dtype=np.float32), name="value"),
             )
         )
         nodes.append(
@@ -766,7 +766,7 @@ class FunctionAttentionPattern(PatternOptimization):
             if mat_qk is None or mat_qk.op_type not in ("MatMul", "FusedMatMul"):
                 return self.none(node, inspect.currentframe().f_lineno)
         elif node_before.op_type == "Where":
-            # Where(mask, -inf, X)
+            # Where(mask, -np.inf, X)
             add_node = None
             where_node = node_before
             if not g.is_constant_scalar(where_node.input[1]) and not g.is_constant_scalar(
