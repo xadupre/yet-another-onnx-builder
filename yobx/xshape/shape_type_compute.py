@@ -2320,7 +2320,7 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             self.set_rank(node.output[0], self.get_rank(node.input[0]))
         return None
 
-    assert node.op_type in {"GatherGrad", "SoftmaxGrad", "ConcatTraining"} or node.domain not in {
+    assert node.domain not in {
         "ai.onnx.ml",
         "intermediate",
         "ai.onnx.complex",

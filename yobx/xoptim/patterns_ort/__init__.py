@@ -25,7 +25,6 @@ def get_onnxruntime_patterns(
         GeluErfPattern,
         QuickGeluPattern,
     )
-    from .activation_grad import SoftmaxGradPattern
     from .batch_normalization import OrtBatchNormalizationTrainingPattern
     from .fused_conv import FusedConvPattern
     from .fused_matmul import (
@@ -51,7 +50,6 @@ def get_onnxruntime_patterns(
         MissingTopKPattern,
     )
 
-    # from .gather_grad import GatherGradPattern
     from .simplified_layer_normalization import (
         SimplifiedLayerNormalizationPattern,
         SimplifiedLayerNormalizationMulPattern,
@@ -82,7 +80,6 @@ def get_onnxruntime_patterns(
         MultiHeadAttention3DPattern(verbose=verbose),
         OrtBatchNormalizationTrainingPattern(verbose=verbose),
         QuickGeluPattern(verbose=verbose),
-        # GatherGradPattern(verbose=verbose),
         ReshapeGemmPattern(verbose=verbose),
         ReshapeGemmReshapePattern(verbose=verbose),
         SimplifiedLayerNormalizationPattern(verbose=verbose),
@@ -90,6 +87,5 @@ def get_onnxruntime_patterns(
         SkipLayerNormalizationPattern(verbose=verbose),
         SkipSimplifiedLayerNormalizationPattern(verbose=verbose),
         SkipSimplifiedLayerNormalizationMulPattern(verbose=verbose),
-        SoftmaxGradPattern(verbose=verbose),
         TransposeFusedMatMulBPattern(verbose=verbose),
     ]

@@ -563,7 +563,6 @@ class CastOpCastPattern(PatternOptimization):
 
     _unary_ops = {"MulSigmoid", "Neg", "Sigmoid", "Softmax"}
     _binary_ops = {"Add", "Sub", "Mul", "Div"}
-    _other_ops = {"SoftmaxGrad"}
 
     def match(
         self,
@@ -572,10 +571,8 @@ class CastOpCastPattern(PatternOptimization):
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
         if (
-            (node.op_type not in self._binary_ops or node.domain != "")
-            and node.op_type not in self._other_ops
-            and node.op_type not in self._unary_ops
-        ):
+            node.op_type not in self._binary_ops or node.domain != ""
+        ) and node.op_type not in self._unary_ops:
             return self.none()
         if "ComputationCastOpCastPattern--" in node.name:
             return self.none(node, inspect.currentframe().f_lineno)
