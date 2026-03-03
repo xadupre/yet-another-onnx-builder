@@ -81,6 +81,9 @@ from .virtual_tensor import VirtualTensor
 from .optimization_options import OptimizationOptions
 from .function_options import FunctionOptions
 from .infer_shapes_options import InferShapesOptions
+from .wrap_dim import WrapDim as _WrapDim
+from .wrap_sym import WrapSym as _WrapSym
+from .initializer_info import InitializerInfo as _InitializerInfo
 
 if TYPE_CHECKING:
     import torch
@@ -235,89 +238,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     # MAXINT for int64, means a slice goes up to the last element
     END = np.array([9223372036854775807], dtype=np.int64)
 
-    class WrapSym:
-        """Wraps a symbolic int (a dimension for example)."""
-
-        def __init__(self, sym: Union["torch.SymInt", "torch.SymFloat", "GraphBuilder.WrapSym"]):
-            if isinstance(sym, GraphBuilder.WrapDim):
-                self.sym = sym.name
-            else:
-                assert isinstance(sym, str) or hasattr(
-                    sym, "node"
-                ), f"Missing attribute node for type {type(sym)}"
-                self.sym = sym  # type: ignore
-
-        def __repr__(self) -> str:
-            return f"WrapSym({self._dynamic_to_str(self.sym)})"
-
-        @property
-        def name(self):
-            return self._dynamic_to_str(self.sym)
-
-        def _dynamic_to_str(self, obj: Any) -> Optional[str]:
-            if isinstance(obj, str):
-                return obj
-            import torch
-
-            if isinstance(obj, torch.export.dynamic_shapes._DerivedDim):
-                return obj.__name__
-            if isinstance(obj, torch.export.dynamic_shapes._Dim):
-                return obj.__name__
-            if isinstance(obj, (torch.SymInt, torch.SymFloat)):
-                if isinstance(obj.node, str):
-                    return obj.node
-                i = obj.node._expr
-                if "sympy" in str(type(i)):
-                    return str(i).replace(" ", "")
-                return None
-            raise AssertionError(f"Unexpected type {type(obj)} to convert into string")
-
-    class WrapDim:
-        """Wraps a string considered as a ``torch.export.Dim``."""
-
-        def __init__(self, name: str):
-            self.name = name
-
-        def __repr__(self) -> str:
-            return f"WrapDim({self.name!r})"
-
-        @property
-        def name_as_string(self):
-            if isinstance(self.name, str):
-                return self.name
-            if self.name.__class__.__name__ == "Dim":
-                # It should be torch.export.dynamic_shapes.Dim
-                return self.name.__name__
-            raise AssertionError(
-                f"Unable to return the dimension as a string type is "
-                f"{type(self.name)}, name={self.name!r}"
-            )
-
-    class InitializerInfo:
-        """
-        Tracks the location where the initializer was created.
-
-        :param name: initializer name
-        :param source: information
-        :param same_as: same as an existing initializers
-        """
-
-        def __init__(self, name: str, source: str, same_as: Optional[str] = None):
-            self.name = name
-            self.source = source
-            self.same_as = same_as
-
-        def __repr__(self) -> str:
-            if self.same_as:
-                return (
-                    f"InitializerInfo({self.name!r}, source={self.source!r}, "
-                    f"same_as={self.same_as!r})"
-                )
-            return f"InitializerInfo({self.name!r}, source={self.source!r})"
-
-        def add_source(self, source: str):
-            """Adds other sources."""
-            self.source += f"##{source}"
+    WrapSym = _WrapSym
+    WrapDim = _WrapDim
+    InitializerInfo = _InitializerInfo
 
     # Size of a tensor kept in the onnx file and not stored as exrternal weight.
     SMALL_TENSOR = 1024
