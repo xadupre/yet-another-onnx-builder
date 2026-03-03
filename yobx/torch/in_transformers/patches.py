@@ -57,6 +57,7 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
                 warnings.warn(
                     "RotaryEmbedding.forward cannot be patched with python<3.11.", UserWarning
                 )
+                continue
             else:
                 raise NotImplementedError(
                     f"Wrapped {submodule.__class__.__name__} is not implemented yet."

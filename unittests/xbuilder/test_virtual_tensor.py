@@ -1,7 +1,7 @@
 import unittest
 from onnx import TensorProto
 from yobx.ext_test_case import ExtTestCase
-from yobx.xbuilder import VirtualTensor
+from yobx.xbuilder._virtual_tensor import VirtualTensor
 
 TFLOAT = TensorProto.FLOAT
 TINT64 = TensorProto.INT64

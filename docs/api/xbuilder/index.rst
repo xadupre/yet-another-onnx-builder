@@ -11,12 +11,8 @@ API for the graph builder used to construct and optimize ONNX graphs.
     graph_builder
     graph_builder_opset
     infer_shapes_options
-    initializer_info
     optimization_options
     order_optim
-    virtual_tensor
-    wrap_dim
-    wrap_sym
 
 GraphBuilder
 ++++++++++++
@@ -24,6 +20,7 @@ GraphBuilder
 .. autoclass:: yobx.xbuilder.GraphBuilder
     :members:
     :no-undoc-members:
+    :exclude-members: WrapSym, WrapDim, VirtualTensor
 
 FunctionOptions
 +++++++++++++++
@@ -36,13 +33,6 @@ InferShapesOptions
 ++++++++++++++++++
 
 .. autoclass:: yobx.xbuilder.InferShapesOptions
-    :members:
-    :no-undoc-members:
-
-InitializerInfo
-+++++++++++++++
-
-.. autoclass:: yobx.xbuilder.InitializerInfo
     :members:
     :no-undoc-members:
 
@@ -60,30 +50,33 @@ OrderAlgorithm
     :members:
     :no-undoc-members:
 
-OrderOptimization
-+++++++++++++++++
+Intermediate Classes
+++++++++++++++++++++
 
-.. autoclass:: yobx.xbuilder.OrderOptimization
+InitializerInfo
+---------------
+
+.. autoclass:: yobx.xbuilder._initializer_info.InitializerInfo
     :members:
     :no-undoc-members:
 
 VirtualTensor
-+++++++++++++
+-------------
 
-.. autoclass:: yobx.xbuilder.VirtualTensor
+.. autoclass:: yobx.xbuilder._virtual_tensor.VirtualTensor
     :members:
     :no-undoc-members:
 
 WrapDim
-+++++++
+-------
 
-.. autoclass:: yobx.xbuilder.WrapDim
+.. autoclass:: yobx.xbuilder._wrap_dim.WrapDim
     :members:
     :no-undoc-members:
 
 WrapSym
-+++++++
+-------
 
-.. autoclass:: yobx.xbuilder.WrapSym
+.. autoclass:: yobx.xbuilder._wrap_sym.WrapSym
     :members:
     :no-undoc-members:

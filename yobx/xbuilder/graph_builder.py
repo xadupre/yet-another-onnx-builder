@@ -77,13 +77,13 @@ from ..xshape.rename_expressions import rename_expression, parse_expression_toke
 from ..xshape.simplify_expressions import simplify_two_expressions
 from ..xshape.expressions_torch import Expression, parse_expression
 from .graph_builder_opset import Opset
-from .virtual_tensor import VirtualTensor
 from .optimization_options import OptimizationOptions
 from .function_options import FunctionOptions
 from .infer_shapes_options import InferShapesOptions
-from .wrap_dim import WrapDim as _WrapDim
-from .wrap_sym import WrapSym as _WrapSym
-from .initializer_info import InitializerInfo as _InitializerInfo
+from ._virtual_tensor import VirtualTensor
+from ._wrap_dim import WrapDim as _WrapDim
+from ._wrap_sym import WrapSym as _WrapSym
+from ._initializer_info import InitializerInfo as _InitializerInfo
 
 if TYPE_CHECKING:
     import torch
@@ -3088,7 +3088,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         )
         raise NotImplementedError(f"Source is available for {dim!r}, name={name!r}")
 
-    def _get_dynamic_dimension(self, name: str, dim: int) -> Optional[Union[str, "WrapDim"]]:
+    def _get_dynamic_dimension(self, name: str, dim: int) -> Optional[Union[str, "_WrapDim"]]:
         if self.dynamic_shapes is None:
             return None
         if not self.dynamic_shapes or name not in self.dynamic_shapes:

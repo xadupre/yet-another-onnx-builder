@@ -131,6 +131,7 @@ sub-function and miss the reason a particular graph node was introduced:
 
 .. runpython::
     :showcode:
+    :process:
 
     import torch
     import torch._refs
@@ -228,33 +229,33 @@ torch patches
 The following patches are registered in :mod:`yobx.torch.in_torch.patches`
 (family ``"torch"``):
 
-+--------------------------------------------------+---------------------------------------------+
-| Patch function                                   | What it fixes                               |
-+==================================================+=============================================+
-| ``patched_DynamicDimConstraintPrinter``          | ``DynamicDimConstraintPrinter._print_Symbol``|
-| ``._print_Symbol``                               | returns the source name for a symbol rather |
-|                                                  | than crashing when ``symbol_to_source`` does |
-|                                                  | not contain the symbol.                     |
-+--------------------------------------------------+---------------------------------------------+
-| ``patched_infer_size``                           | ``torch._subclasses.fake_impls.infer_size`` —|
-|                                                  | uses ``torch.sym_max`` in the generic case  |
-|                                                  | instead of asserting equality, allowing     |
-|                                                  | symbolic dimensions to broadcast correctly. |
-+--------------------------------------------------+---------------------------------------------+
-| ``patched__broadcast_shapes``                    | ``torch._refs._broadcast_shapes`` — replaces|
-|                                                  | hard equality guards with ``sym_max`` so    |
-|                                                  | that shapes with unknown symbolic dimensions|
-|                                                  | can be broadcast without raising            |
-|                                                  | ``GuardOnDataDependentSymNode``.            |
-+--------------------------------------------------+---------------------------------------------+
++--------------------------------------------------+-----------------------------------------------+
+| Patch function                                   | What it fixes                                 |
++==================================================+===============================================+
+| ``patched_DynamicDimConstraintPrinter``          | ``DynamicDimConstraintPrinter._print_Symbol`` |
+| ``._print_Symbol``                               | returns the source name for a symbol rather   |
+|                                                  | than crashing when ``symbol_to_source`` does  |
+|                                                  | not contain the symbol.                       |
++--------------------------------------------------+-----------------------------------------------+
+| ``patched_infer_size``                           | ``torch._subclasses.fake_impls.infer_size`` — |
+|                                                  | uses ``torch.sym_max`` in the generic case    |
+|                                                  | instead of asserting equality, allowing       |
+|                                                  | symbolic dimensions to broadcast correctly.   |
++--------------------------------------------------+-----------------------------------------------+
+| ``patched__broadcast_shapes``                    | ``torch._refs._broadcast_shapes`` — replaces  |
+|                                                  | hard equality guards with ``sym_max`` so      |
+|                                                  | that shapes with unknown symbolic dimensions  |
+|                                                  | can be broadcast without raising              |
+|                                                  | ``GuardOnDataDependentSymNode``.              |
++--------------------------------------------------+-----------------------------------------------+
 | ``patched__get_range_constraints``               | ``torch.export._trace._get_range_constraints``|
-|                                                  | — passes ``preserve_order=True`` to         |
-|                                                  | ``_combine_args`` so that dynamic-shape     |
-|                                                  | constraints are matched to the correct      |
-|                                                  | arguments (see `pytorch/pytorch#174593      |
-|                                                  | <https://github.com/pytorch/pytorch/pull/   |
-|                                                  | 174593>`_).                                 |
-+--------------------------------------------------+---------------------------------------------+
+|                                                  | — passes ``preserve_order=True`` to           |
+|                                                  | ``_combine_args`` so that dynamic-shape       |
+|                                                  | constraints are matched to the correct        |
+|                                                  | arguments (see `pytorch/pytorch#174593        |
+|                                                  | <https://github.com/pytorch/pytorch/pull/     |
+|                                                  | 174593>`_).                                   |
++--------------------------------------------------+-----------------------------------------------+
 
 transformers patches
 --------------------

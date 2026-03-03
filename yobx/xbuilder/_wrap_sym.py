@@ -1,12 +1,14 @@
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, TYPE_CHECKING
+from ._wrap_dim import WrapDim
 
-from .wrap_dim import WrapDim
+if TYPE_CHECKING:
+    import torch
 
 
 class WrapSym:
     """Wraps a symbolic int (a dimension for example)."""
 
-    def __init__(self, sym: Union["torch.SymInt", "torch.SymFloat", "WrapSym"]):  # noqa: F821
+    def __init__(self, sym: Union["torch.SymInt", "torch.SymFloat", "WrapSym"]):
         if isinstance(sym, WrapDim):
             self.sym = sym.name
         else:

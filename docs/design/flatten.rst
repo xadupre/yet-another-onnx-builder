@@ -1,8 +1,8 @@
 .. _l-design-flatten:
 
-================================
+==================================
 Flattening Functionalities (torch)
-================================
+==================================
 
 .. note::
     This section covers functionality that is **specific to PyTorch**.

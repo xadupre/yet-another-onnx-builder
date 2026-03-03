@@ -36,6 +36,7 @@ docs = [
     "openpyxl",
     "pandas",
     "sphinx>=7",
+    "sphinx-copybutton",
     "sphinx-gallery",
     "sphinx-issues",
     "sphinx-runpython",
