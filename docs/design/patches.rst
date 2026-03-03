@@ -69,6 +69,16 @@ Other common failure modes
 
 Rather than forking torch or transformers, patches swap in corrected
 implementations only for the duration of the export, then restore the originals.
+On that particular topic, :class:`yobx.torch.tiny_models.TinyBroadcastAddModel`
+illustrates what problem a user can run into.
+The exporter makes a strong assumption when it comes to infer
+shapes after a broadcast. Two dimensions are broadcastable
+if they are equal or one of them is equal to 1. But sometimes,
+this assumption cannot be verified in a sense the result is not known.
+In that condition, it is reasonable to assume the model is correct
+and the final dimension is the maximum of the two broadcasted dimensions.
+The patches enables that to be possible as the example
+:class:`yobx.torch.tiny_models.TinyBroadcastAddModel` demonstrates.
 
 Core data structures
 ====================
