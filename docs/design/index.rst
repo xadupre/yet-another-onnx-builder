@@ -14,7 +14,7 @@ Elements of Design
    :caption: builders
 
    graph_builder
-   optimizers
+   optimizer
    optimizer_patterns
    shape
 
