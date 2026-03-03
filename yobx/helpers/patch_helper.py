@@ -355,9 +355,6 @@ class PatchDetails:
         # checks all patches were discovered
         for node, _ in node_stack:
             assert hasattr(node, "meta"), "node has no attribute 'meta'"
-            assert hasattr(node, "target"), "node has no attribute 'meta'"
-            assert hasattr(node, "name"), "node has no attribute 'meta'"
-            assert hasattr(node, "args"), "node has no attribute 'meta'"
             assert id(node) in patched_nodes, (
                 f"One node was patched but no patch was found:\n"
                 f"node: {node.target}({','.join(map(str, node.args))}) -> {node.name}"
