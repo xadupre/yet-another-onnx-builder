@@ -10,7 +10,7 @@ on:
 
 jobs:
   transformers_dev:
-    name: transformers dev (ubuntu-latest, py3.12)
+    name: transformers dev (ubuntu-latest, py3.12, torch-nightly, transformers-dev)
     runs-on: ubuntu-latest
     permissions:
       contents: read
