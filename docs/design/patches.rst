@@ -167,9 +167,18 @@ Useful methods:
 * :meth:`~yobx.helpers.patch_helper.PatchDetails.find` — look up a patch by
   function name.
 * :meth:`~yobx.helpers.patch_helper.PatchDetails.patches_involved_in_graph`
-  — given an :class:`torch.fx.Graph`, identify which patches contributed nodes
-  to the graph by cross-referencing ``node.meta["stack_trace"]`` with each
-  patch's source location.
+  — identify which patches contributed nodes to a graph by
+  cross-referencing ``node.meta["stack_trace"]`` with each patch's source
+  location.  The method is designed for :class:`torch.fx.Graph` but accepts
+  any object that provides:
+
+  * ``graph.nodes`` — an iterable of node objects;
+  * ``node.meta`` — a :class:`dict` on each node;
+  * ``node.meta["stack_trace"]`` — the call-stack string captured when the
+    node was created.
+
+  Any custom graph representation that exposes these three attributes works
+  equally well.
 * :meth:`~yobx.helpers.patch_helper.PatchDetails.make_report` — render a
   human-readable report (raw text or RST) listing each involved patch together
   with its diff and the affected graph nodes.

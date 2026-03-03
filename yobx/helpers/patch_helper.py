@@ -293,7 +293,17 @@ class PatchDetails:
         The function goes through the graph node (only the main graph) and
         looks into the metadata to determine if a listed patch was involved.
 
-        :param graph: fx graph
+        :param graph: a graph object whose nodes can be iterated.
+            The method is designed for :class:`torch.fx.Graph` but works with
+            any object that satisfies the following minimal contract:
+
+            * ``graph.nodes`` — iterable of node objects.
+            * ``node.meta`` — a :class:`dict` attached to each node.
+            * ``node.meta["stack_trace"]`` — a string containing the
+              call-stack captured when the node was created.
+
+            Any custom graph representation that provides these three
+            attributes will work just as well as a native ``fx.Graph``.
         :return: list of nodes impacted by a patch
         """
         patches = []
