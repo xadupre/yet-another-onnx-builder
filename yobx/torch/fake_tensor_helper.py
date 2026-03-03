@@ -275,7 +275,7 @@ def make_fake(
         import pprint
         import torch
         from yobx.torch.fake_tensor_helper import make_fake
-        from yobx.torch.transformers.cache_helper import make_dynamic_cache
+        from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
 
         inputs, _ = make_fake(
             dict(
@@ -322,7 +322,7 @@ def make_fake_with_dynamic_dimensions(
         :showcode:
 
         import torch
-        from yobx.torch.transformers.cache_helper import make_dynamic_cache
+        from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
         from yobx.torch.fake_tensor_helper import make_fake_with_dynamic_dimensions
 
         inputs, _ = make_fake_with_dynamic_dimensions(
@@ -337,7 +337,7 @@ def make_fake_with_dynamic_dimensions(
         :showcode:
 
         import torch
-        from yobx.torch.transformers.cache_helper import make_dynamic_cache
+        from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
         from yobx.torch.fake_tensor_helper import make_fake_with_dynamic_dimensions
 
         inputs, _ = make_fake_with_dynamic_dimensions(
@@ -356,7 +356,7 @@ def make_fake_with_dynamic_dimensions(
 
         import pprint
         import torch
-        from yobx.torch.transformers.cache_helper import make_dynamic_cache
+        from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
         from yobx.torch.fake_tensor_helper import make_fake_with_dynamic_dimensions
 
         inputs, _ = make_fake_with_dynamic_dimensions(

@@ -1,4 +1,4 @@
-yobx.torch.transformers.models
+yobx.torch.in_transformers.models
 ==============================
 
 .. toctree::

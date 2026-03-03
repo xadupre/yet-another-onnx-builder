@@ -547,7 +547,7 @@ class CustomTracer(torch.fx.Tracer):
             and concrete_args["cache"].__class__.__name__ == "DynamicCache"
         ):
             # this is a not generic case to check one unit test
-            from .transformers.cache_helper import make_dynamic_cache
+            from .in_transformers.cache_helper import make_dynamic_cache
 
             def make_method(args_names):
                 args = ", ".join(args_names)

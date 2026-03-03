@@ -50,8 +50,8 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
     """
     if model_id == "arnir0/Tiny-LLM":
         import transformers
-        from .transformers.models import get_cached_configuration
-        from .transformers.cache_helper import make_dynamic_cache
+        from .in_transformers.models import get_cached_configuration
+        from .in_transformers.cache_helper import make_dynamic_cache
 
         config = get_cached_configuration(model_id)
         if config_updates:

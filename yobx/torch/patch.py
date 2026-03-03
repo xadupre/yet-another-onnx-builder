@@ -43,11 +43,11 @@ def apply_patches_for_model(
     """
     patches = PatchDetails()
     if patch_torch:
-        from .torch.patches import PATCHES
+        from .in_torch.patches import PATCHES
 
         patches.extend(PATCHES)
     if patch_transformers:
-        from .transformers.patches import get_patches_for
+        from .in_transformers.patches import get_patches_for
 
         patches.extend(get_patches_for(model))
     for patch in patches:

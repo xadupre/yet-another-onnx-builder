@@ -483,7 +483,7 @@ class TestMaxDiffDynamicCache(ExtTestCase):
     def test_cache_key_value_vs_cache_key_value(self):
         import torch
         from transformers.cache_utils import DynamicCache
-        from yobx.torch.transformers.cache_helper import CacheKeyValue
+        from yobx.torch.in_transformers.cache_helper import CacheKeyValue
 
         cache = DynamicCache()
         key = torch.rand(1, 4, 2, 8)
@@ -496,7 +496,7 @@ class TestMaxDiffDynamicCache(ExtTestCase):
     def test_cache_key_value_vs_tuple(self):
         import torch
         from transformers.cache_utils import DynamicCache
-        from yobx.torch.transformers.cache_helper import CacheKeyValue
+        from yobx.torch.in_transformers.cache_helper import CacheKeyValue
 
         cache = DynamicCache()
         key = torch.rand(1, 4, 2, 8)
@@ -508,7 +508,7 @@ class TestMaxDiffDynamicCache(ExtTestCase):
 
     def test_cache_key_value_different(self):
         import torch
-        from yobx.torch.transformers.cache_helper import CacheKeyValue
+        from yobx.torch.in_transformers.cache_helper import CacheKeyValue
 
         key1 = torch.rand(1, 4, 2, 8)
         value1 = torch.rand(1, 4, 2, 8)

@@ -372,7 +372,7 @@ def string_type(
         "StaticCache",
         "HybridCache",
     }:
-        from ..torch.transformers.cache_helper import CacheKeyValue
+        from ..torch.in_transformers.cache_helper import CacheKeyValue
 
         ca = CacheKeyValue(obj)
         kc = string_type(
@@ -431,7 +431,7 @@ def string_type(
     import torch.utils._pytree as pytree
 
     if obj.__class__ in pytree.SUPPORTED_NODES:
-        from ..torch.transformers.cache_helper import flatten_unflatten_for_dynamic_shapes
+        from ..torch.in_transformers.cache_helper import flatten_unflatten_for_dynamic_shapes
 
         args = flatten_unflatten_for_dynamic_shapes(obj)
         att = string_type(
@@ -705,7 +705,7 @@ def flatten_object(x: Any, drop_keys: bool = False) -> Any:
         return flatten_object(list(x.items()), drop_keys=drop_keys)
 
     if x.__class__.__name__ in {"DynamicCache", "StaticCache", "HybridCache"}:
-        from ..torch.transformers.cache_helper import CacheKeyValue
+        from ..torch.in_transformers.cache_helper import CacheKeyValue
 
         return CacheKeyValue(x).aslist()
 
@@ -1116,7 +1116,7 @@ def max_diff(
     # backup function in case pytorch does not know how to serialize.
     if expected.__class__.__name__ == "DynamicCache":
         if got.__class__.__name__ == "DynamicCache":
-            from ..torch.transformers.cache_helper import CacheKeyValue
+            from ..torch.in_transformers.cache_helper import CacheKeyValue
 
             expected = CacheKeyValue(expected)
             got = CacheKeyValue(got)
@@ -1126,7 +1126,7 @@ def max_diff(
                 hist=hist,
             )
         if isinstance(got, tuple) and len(got) == 2:
-            from ..torch.transformers.cache_helper import CacheKeyValue
+            from ..torch.in_transformers.cache_helper import CacheKeyValue
 
             if not isinstance(expected, CacheKeyValue):
                 expected = CacheKeyValue(expected)
@@ -1145,7 +1145,7 @@ def max_diff(
 
     if expected.__class__.__name__ == "StaticCache":
         if got.__class__.__name__ == "StaticCache":
-            from ..torch.transformers.cache_helper import CacheKeyValue
+            from ..torch.in_transformers.cache_helper import CacheKeyValue
 
             cae = CacheKeyValue(expected)
             cag = CacheKeyValue(got)
@@ -1155,7 +1155,7 @@ def max_diff(
                 hist=hist,
             )
         if isinstance(got, tuple) and len(got) == 2:
-            from ..torch.transformers.cache_helper import CacheKeyValue
+            from ..torch.in_transformers.cache_helper import CacheKeyValue
 
             cae = CacheKeyValue(expected)
             return max_diff(
@@ -1172,7 +1172,7 @@ def max_diff(
         )
 
     if expected.__class__.__name__ == "CacheKeyValue":
-        from ..torch.transformers.cache_helper import CacheKeyValue
+        from ..torch.in_transformers.cache_helper import CacheKeyValue
 
         if got.__class__.__name__ == "CacheKeyValue":
             return max_diff(

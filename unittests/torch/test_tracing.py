@@ -21,7 +21,7 @@ from yobx.torch.tracing import (
     tree_unflatten_with_proxy,
 )
 from yobx.torch import register_flattening_functions, apply_patches_for_model
-from yobx.torch.transformers.cache_helper import make_dynamic_cache
+from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
 
 
 @requires_torch("2.0")

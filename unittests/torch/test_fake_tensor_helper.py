@@ -2,7 +2,7 @@ import unittest
 import torch
 from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.helpers import flatten_object
-from yobx.torch.transformers.cache_helper import (
+from yobx.torch.in_transformers.cache_helper import (
     make_dynamic_cache,
     make_encoder_decoder_cache,
     make_static_cache,
