@@ -29,10 +29,10 @@ jobs:
         uses: ts-graphviz/setup-graphviz@v2
       - name: Install pandoc
         run: sudo apt-get install -y pandoc
-      - name: Install dependencies
-        run: pip install -e ".[docs,torch]"
       - name: Install nightly version
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+      - name: Install dependencies
+        run: pip install -e ".[docs,torch]"
       - name: pip freeze
         run: pip freeze
       - name: Build documentation
