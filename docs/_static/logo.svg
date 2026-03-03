@@ -56,9 +56,6 @@
   <circle cx="30" cy="80" r="10" fill="url(#nOnnx)" stroke="#fff" stroke-width="1.5"/>
   <!-- Bottom-right: ort (green) -->
   <circle cx="90" cy="80" r="10" fill="url(#nOrt)" stroke="#fff" stroke-width="1.5"/>
-  <!-- Node labels -->
-  <text x="30" y="98" font-family="monospace" font-size="6.5" fill="#93c5fd" text-anchor="middle" font-weight="bold">onnx</text>
-  <text x="90" y="98" font-family="monospace" font-size="6.5" fill="#6ee7b7" text-anchor="middle" font-weight="bold">ort</text>
-  <!-- Center label: yobx -->
-  <text x="60" y="60" font-family="monospace" font-size="13" fill="url(#lblGrad)" font-weight="bold" text-anchor="middle">yobx</text>
+  <!-- Center label: yobx (centroid of triangle at ~62.7, adjusted for text baseline) -->
+  <text x="60" y="67" font-family="monospace" font-size="13" fill="url(#lblGrad)" font-weight="bold" text-anchor="middle">yobx</text>
 </svg>
