@@ -1,4 +1,4 @@
-name: Torch Transfoemrs Tests
+name: Torch Transformers Tests
 
 on:
   push:
@@ -18,13 +18,12 @@ jobs:
       fail-fast: false
       matrix:
         torch-version: ["2.10"]
-        transformers-version: ["4.49", "4.55", "4.57", "5.2"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
       - name: Install pytorch 2.10
         if: matrix.torch-version == '2.10'
@@ -33,16 +32,25 @@ jobs:
         if: matrix.torch-version == 'nightly'
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
 
-      - name: Install transformers ${{ matrix.transformers-version }} (versioned)
-        if: matrix.transformers-version != 'main'
-        run: pip install transformers==${{ matrix.transformers-version }}
-      - name: Install transformers from main branch
-        if: matrix.transformers-version == 'main'
-        run: pip install git+https://github.com/huggingface/transformers.git
-
       - name: Install dependencies
         run: pip install -e ".[dev,docs,torch]"
-      - name: pip freeze
-        run: pip freeze
-      - name: Run tests
+
+      - name: install transformers==4.49
+        run: pip install transformers==4.49 && pip freeze
+      - name: Run tests with transformers==4.49
+        run: pytest unittests/torch --durations=10
+
+      - name: install transformers==4.55
+        run: pip install transformers==4.55 && pip freeze
+      - name: Run tests with transformers==4.55
+        run: pytest unittests/torch --durations=10
+
+      - name: install transformers==4.57
+        run: pip install transformers==4.57 && pip freeze
+      - name: Run tests with transformers==4.57
+        run: pytest unittests/torch --durations=10
+
+      - name: install transformers==5.2
+        run: pip install transformers==5.2 && pip freeze
+      - name: Run tests with transformers==5.2
         run: pytest unittests/torch --durations=10
