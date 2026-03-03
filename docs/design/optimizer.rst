@@ -47,7 +47,7 @@ PatternOptimization.match
   are part of set of nodes this pattern optimizer can rewrite.
   From there, the function explores wherever it needs,
   checking any condition it needs.
-* ``matched``: usually unused, it returns of nodes already matching
+* ``matched``: usually unused, it contains the list of nodes already matching
   a pattern
 
 The method must not modify the graph.
