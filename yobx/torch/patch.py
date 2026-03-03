@@ -35,11 +35,25 @@ def apply_patches_for_model(
 
         with apply_patches_for_model(patch_transformers=True, model=model):
             # ...
+
     :param patch_torch: applies patches for :epkg:`torch`
     :param patch_transformers: applies patch for transformers
     :param verbose: prints out which patch is applies
     :param model: modifies the list of patches for a particular model,
         it is recommended to fill it the used rope is not the default one
+
+    The following shows how to use the output of this function to display
+    information about the patches applied to the model.
+
+    .. code-block:: python
+
+        from yobx.torch import apply_patches_for_model
+
+        with apply_patches_for_model(patch_transformers=True, model=model) as details:
+            for patch in details:
+                diff = patch.make_diff()
+                print(f"-- patch {patch!r}")
+                print(diff)
     """
     patches = PatchDetails()
     if patch_torch:
