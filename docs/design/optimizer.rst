@@ -19,7 +19,7 @@ case where *N* is the number of nodes, *P* is the number of patterns,
 
 It is difficult to foresee what a pattern needs in order to rewrite a part
 of the graph. This API tries to give as much freedom as it can without
-leaving too much to do to the developper which tries to add a new pattern.
+leaving too much to do to the developer which tries to add a new pattern.
 
 Patterns
 ========
