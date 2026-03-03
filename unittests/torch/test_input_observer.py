@@ -1078,128 +1078,6 @@ class TestInputObserver(ExtTestCase):
         self.assertEqual((0, 3, 112, 112), kwargs["pixel_values"][0].shape)
         self.assertEqual((0, 3, 112, 112), kwargs["pixel_values"][1].shape)
 
-    def test_io_captured_kwargs_kwargs(self):
-        class Model(torch.nn.Module):
-            def forward(self, x, **kwargs):
-                return x + kwargs["y"]
-
-        inputs = [
-            dict(x=torch.randn((5, 6)), y=torch.randn((1, 6))),
-            dict(x=torch.randn((7, 7)), y=torch.randn((1, 7))),
-            dict(x=torch.randn((7, 8)), y=torch.randn((1, 8))),
-            dict(x=torch.randn((7, 9)), y=torch.randn((1, 9))),
-        ]
-
-        model = Model()
-        expected = [model(**kwargs) for kwargs in inputs]
-        observer = InputObserver()
-        with observer(model):
-            for kwargs in inputs:
-                model(**kwargs)
-        self.assertEqual(len(observer.info), 3)
-        for i in range(3):
-            self.assertEqual(len(observer.info.flat_outputs[i]), 1)
-            torch.testing.assert_close(expected[i], observer.info.flat_outputs[i][0])
-
-        cst = torch.export.Dim.DYNAMIC
-        ds = observer.infer_dynamic_shapes()
-        self.assertEqual(dict(x={0: cst, 1: cst}, kwargs=dict(y={1: cst})), ds)
-        args = observer.infer_arguments()
-        self.assertIsInstance(args, dict)
-        self.assertEqual(2, len(args))
-        self.assertEqual(["x", "y"], list(args))
-
-        dynamic_shapes = torch.export.AdditionalInputs()
-        for kwargs in inputs:
-            dynamic_shapes.add((), kwargs)
-        dss = dynamic_shapes.dynamic_shapes(model, (), inputs[0])
-        self.assertEqual({"x": (cst, cst), "kwargs": {"y": (None, cst)}}, dss)
-
-        # _get_range_constraints
-        with apply_patches_for_model(patch_torch=True):
-            torch.export.export(
-                model,
-                (),
-                kwargs=args,
-                dynamic_shapes={"x": {0: cst, 1: cst}, "kwargs": {"y": {1: cst}}},
-            )
-            torch.export.export(model, (), kwargs=args, dynamic_shapes=ds)
-
-    def test_io_captured_kwargs_kwargs_with_args(self):
-        class Model(torch.nn.Module):
-            def forward(self, a, *args, **kwargs):
-                return a - args[0] * args[1] + kwargs["x"] - kwargs["y"]
-
-        inputs = [
-            (
-                (torch.randn((5, 6)), torch.randn((5, 6)), torch.randn((5, 6))),
-                dict(x=torch.randn((5, 6)), y=torch.randn((1, 6))),
-            ),
-            (
-                (torch.randn((7, 7)), torch.randn((7, 7)), torch.randn((7, 7))),
-                dict(x=torch.randn((7, 7)), y=torch.randn((1, 7))),
-            ),
-        ]
-
-        model = Model()
-        expected = [model(*args, **kwargs) for args, kwargs in inputs]
-        observer = InputObserver()
-        with observer(model):
-            for args, kwargs in inputs:
-                model(*args, **kwargs)
-        self.assertEqual(len(observer.info), 2)
-        for i in range(2):
-            self.assertEqual(len(observer.info.flat_outputs[i]), 1)
-            torch.testing.assert_close(expected[i], observer.info.flat_outputs[i][0])
-
-        cst = torch.export.Dim.DYNAMIC
-        ds = observer.infer_dynamic_shapes()
-        self.assertEqual(
-            {
-                "a": {0: cst, 1: cst},
-                "args": ({0: cst, 1: cst}, {0: cst, 1: cst}),
-                "kwargs": {"x": {0: cst, 1: cst}, "y": {1: cst}},
-            },
-            ds,
-        )
-
-        dynamic_shapes = torch.export.AdditionalInputs()
-        for args, kwargs in inputs:
-            dynamic_shapes.add(args, kwargs)
-        dss = dynamic_shapes.dynamic_shapes(model, *inputs[0])
-        self.assertEqual(
-            {
-                "a": (cst, cst),
-                "args": ((cst, cst), (cst, cst)),
-                "kwargs": {"x": (cst, cst), "y": (None, cst)},
-            },
-            dss,
-        )
-
-        with self.assertRaises(RuntimeError):
-            observer.infer_arguments()
-
-        args, kwargs = observer.infer_arguments(as_args_kwargs=True)
-        self.assertIsInstance(kwargs, dict)
-        self.assertEqual(["x", "y"], list(kwargs))
-        self.assertIsInstance(args, tuple)
-        self.assertEqual(len(args), 3)
-
-        # _get_range_constraints
-        self.skipTest("not implemented yet")
-        with apply_patches_for_model(patch_torch=True):
-            torch.export.export(
-                model,
-                args,
-                kwargs=kwargs,
-                dynamic_shapes={
-                    "a": {0: cst, 1: cst},
-                    "args": ({0: cst, 1: cst}, {0: cst, 1: cst}),
-                    "kwargs": {"x": {0: cst, 1: cst}, "y": {1: cst}},
-                },
-            )
-            torch.export.export(model, args, kwargs=kwargs, dynamic_shapes=ds)
-
     def test_remove_inputs_kwargs(self):
         """Test that remove_inputs removes a kwarg from the observer info."""
 
@@ -1443,6 +1321,146 @@ class TestInputObserver(ExtTestCase):
         )
         with self.assertRaisesRegex(RuntimeError, "This input was not aligned with the others"):
             _ = candidate.n_aligned_tensors
+
+    @requires_torch("2.12")
+    def test_mixed_named_and_unnamed_kwargs(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, **kwargs):
+                return x + kwargs["y"]
+
+        kwargs = dict(x=torch.randn((5, 6)), y=torch.randn((1, 6)))
+        model = Model()
+        with self.assertRaisesRegex(ValueError, "There are 1 mandatory positional arguments"):
+            torch.export.export(
+                model,
+                (),
+                kwargs=kwargs,
+                dynamic_shapes={
+                    "x": {0: torch.export.Dim.DYNAMIC, 1: torch.export.Dim.DYNAMIC},
+                    "kwargs": {"y": {1: torch.export.Dim.DYNAMIC}},
+                },
+            )
+
+    def test_io_captured_kwargs_kwargs_patch(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, **kwargs):
+                return x + kwargs["y"]
+
+        inputs = [
+            dict(x=torch.randn((5, 6)), y=torch.randn((1, 6))),
+            dict(x=torch.randn((7, 7)), y=torch.randn((1, 7))),
+            dict(x=torch.randn((7, 8)), y=torch.randn((1, 8))),
+            dict(x=torch.randn((7, 9)), y=torch.randn((1, 9))),
+        ]
+
+        model = Model()
+        expected = [model(**kwargs) for kwargs in inputs]
+        observer = InputObserver()
+        with observer(model):
+            for kwargs in inputs:
+                model(**kwargs)
+        self.assertEqual(len(observer.info), 3)
+        for i in range(3):
+            self.assertEqual(len(observer.info.flat_outputs[i]), 1)
+            torch.testing.assert_close(expected[i], observer.info.flat_outputs[i][0])
+
+        cst = torch.export.Dim.DYNAMIC
+        ds = observer.infer_dynamic_shapes()
+        self.assertEqual(dict(x={0: cst, 1: cst}, kwargs=dict(y={1: cst})), ds)
+        args = observer.infer_arguments()
+        self.assertIsInstance(args, dict)
+        self.assertEqual(2, len(args))
+        self.assertEqual(["x", "y"], list(args))
+
+        dynamic_shapes = torch.export.AdditionalInputs()
+        for kwargs in inputs:
+            dynamic_shapes.add((), kwargs)
+        dss = dynamic_shapes.dynamic_shapes(model, (), inputs[0])
+        self.assertEqual({"x": (cst, cst), "kwargs": {"y": (None, cst)}}, dss)
+
+        # _get_range_constraints does not allow this case, let's support it.
+        with apply_patches_for_model(patch_torch=True):
+            torch.export.export(
+                model,
+                (),
+                kwargs=args,
+                dynamic_shapes={"x": {0: cst, 1: cst}, "kwargs": {"y": {1: cst}}},
+            )
+            torch.export.export(model, (), kwargs=args, dynamic_shapes=ds)
+
+    def test_io_captured_kwargs_kwargs_with_args_patch(self):
+        class Model(torch.nn.Module):
+            def forward(self, a, *args, **kwargs):
+                return a - args[0] * args[1] + kwargs["x"] - kwargs["y"]
+
+        inputs = [
+            (
+                (torch.randn((5, 6)), torch.randn((5, 6)), torch.randn((5, 6))),
+                dict(x=torch.randn((5, 6)), y=torch.randn((1, 6))),
+            ),
+            (
+                (torch.randn((7, 7)), torch.randn((7, 7)), torch.randn((7, 7))),
+                dict(x=torch.randn((7, 7)), y=torch.randn((1, 7))),
+            ),
+        ]
+
+        model = Model()
+        expected = [model(*args, **kwargs) for args, kwargs in inputs]
+        observer = InputObserver()
+        with observer(model):
+            for args, kwargs in inputs:
+                model(*args, **kwargs)
+        self.assertEqual(len(observer.info), 2)
+        for i in range(2):
+            self.assertEqual(len(observer.info.flat_outputs[i]), 1)
+            torch.testing.assert_close(expected[i], observer.info.flat_outputs[i][0])
+
+        cst = torch.export.Dim.DYNAMIC
+        ds = observer.infer_dynamic_shapes()
+        self.assertEqual(
+            {
+                "a": {0: cst, 1: cst},
+                "args": ({0: cst, 1: cst}, {0: cst, 1: cst}),
+                "kwargs": {"x": {0: cst, 1: cst}, "y": {1: cst}},
+            },
+            ds,
+        )
+
+        dynamic_shapes = torch.export.AdditionalInputs()
+        for args, kwargs in inputs:
+            dynamic_shapes.add(args, kwargs)
+        dss = dynamic_shapes.dynamic_shapes(model, *inputs[0])
+        self.assertEqual(
+            {
+                "a": (cst, cst),
+                "args": ((cst, cst), (cst, cst)),
+                "kwargs": {"x": (cst, cst), "y": (None, cst)},
+            },
+            dss,
+        )
+
+        with self.assertRaises(RuntimeError):
+            observer.infer_arguments()
+
+        args, kwargs = observer.infer_arguments(as_args_kwargs=True)
+        self.assertIsInstance(kwargs, dict)
+        self.assertEqual(["x", "y"], list(kwargs))
+        self.assertIsInstance(args, tuple)
+        self.assertEqual(len(args), 3)
+
+        # _get_range_constraints
+        with apply_patches_for_model(patch_torch=True):
+            torch.export.export(
+                model,
+                args,
+                kwargs=kwargs,
+                dynamic_shapes={
+                    "a": {0: cst, 1: cst},
+                    "args": ({0: cst, 1: cst}, {0: cst, 1: cst}),
+                    "kwargs": {"x": {0: cst, 1: cst}, "y": {1: cst}},
+                },
+            )
+            torch.export.export(model, args, kwargs=kwargs, dynamic_shapes=ds)
 
 
 if __name__ == "__main__":
