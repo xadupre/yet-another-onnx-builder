@@ -116,7 +116,7 @@ class ConstantToInitializerPattern(PatternOptimization):
         cst = g.get_computed_constant(node.output[0])
         assert (
             cst is not None
-        ), f"Node {g.pretty_node(cst)} is a constant, it must be possible to evaluate it."
+        ), f"Node {g.pretty_node(node)} is a constant, it must be possible to evaluate it."
         # if not g.has_exact_same_constant_in_context(node.output[0]):
         init = g.make_initializer(f"{node.output[0]}_cst2init", cst)
         return [
