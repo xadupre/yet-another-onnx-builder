@@ -26,7 +26,35 @@ sizes.  Several low-level torch and transformers helpers were not written to
 cope with symbolic dimensions and raise exceptions or silently return wrong
 results when they encounter them.
 
-Common failure modes include:
+Control flow is the primary source of failures
+-----------------------------------------------
+
+The most fundamental issue is **Python control flow** inside traced functions.
+During symbolic tracing, dimension values are :class:`torch.SymInt` objects
+rather than plain integers.  Any code written as:
+
+.. code-block:: python
+
+    if condition_on_size:
+        raise SomeError(...)
+
+will crash the exporter because evaluating the ``if`` forces the symbolic
+integer to a concrete boolean — a :class:`~torch.SymBool` — which cannot be
+resolved at trace time, raising ``GuardOnDataDependentSymNode``.
+
+The fix is to replace such guards with :func:`torch._check`:
+
+.. code-block:: python
+
+    torch._check(condition_on_size)
+
+:func:`torch._check` is understood by the exporter and recorded as a
+constraint on the symbolic value instead of executing a branch.  The patches
+shipped with this library systematically replace ``if ... : raise`` patterns
+in torch and transformers internals with ``torch._check(...)`` equivalents so
+that symbolic tracing can proceed without crashing.
+
+Other common failure modes include:
 
 * ``GuardOnDataDependentSymNode`` — a symbolic size cannot be evaluated to a
   concrete boolean at trace time, crashing broadcasting helpers such as
