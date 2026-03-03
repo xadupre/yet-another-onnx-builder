@@ -2169,7 +2169,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             cst = self.get_constant(name, exc=False, computed_value=True)
             if cst is not None and len(cst.shape) == 1 and cst.dtype == np.int64:  # type: ignore
                 value = tuple(map(int, cst))  # type: ignore
-                self._known_value_shape[name] = value
+                self._set_known_value_shape(name, value)
                 return value
         return None
 
@@ -2223,7 +2223,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     and len(existing) == len(value) == 1
                     and isinstance(existing[0], str)
                 ):
-                    self.register_constraint_dimension("existing", value)
+                    self.register_constraint_dimension(existing[0], value[0])
                     return
             assert (
                 name not in self._known_value_shape or self._known_value_shape[name] == value
@@ -2235,7 +2235,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             )
             if self.verbose > 2:
                 print(f"[GraphBuilder-{self._hash()}.set_value_shape] {name}:{value}")
-            self._known_value_shape[name] = value
+            self._set_known_value_shape(name, value)
             return
 
         assert (
@@ -2258,7 +2258,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         new_value = self._known_value_shape[equal_to[0]]
         for n in equal_to:
             if n not in self._known_value_shape:
-                self._known_value_shape[n] = new_value
+                self._set_known_value_shape(n, new_value)
+
+    def _set_known_value_shape(self, name: str, value: DYNAMIC_SHAPE):
+        self._known_value_shape[name] = value
 
     def unique_dimension_name(self, prefix: str) -> str:
         """
@@ -5142,7 +5145,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         rows.append(f"_known_devices={pprint.pformat(self._known_devices)[:10000]}")
         rows.append(f"_context={pprint.pformat(sorted(self._context))[:10000]}")
         short_sh = {
-            k: (v if (isinstance(v, tuple) and len(v) < 10) else string_type(v, with_shape=True))
+            k: (
+                v
+                if isinstance(v, (int, str)) or (isinstance(v, tuple) and len(v) < 10)
+                else string_type(v, with_shape=True)
+            )
             for k, v in self._known_value_shape.items()
         }
         rows.append(f"_known_value_shape={pprint.pformat(short_sh)[:10000]}")
@@ -6227,6 +6234,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 for vv in v:
                     if isinstance(k, int) or isinstance(vv, int):
                         continue
+                    assert isinstance(k, str), f"Unexpected type for {k!r}{self.get_debug_msg()}"
+                    assert isinstance(
+                        vv, str
+                    ), f"Unexpected type for {vv!r}{self.get_debug_msg()}"
                     simpl = simplify_two_expressions(k, vv)
                     if len(simpl) != 2:
                         continue
@@ -6372,7 +6383,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if parent_name in g.constants_node_:
             self.constants_node_[name] = g.constants_node_[parent_name]  # type: ignore[index]
         if parent_name in g._known_value_shape:
-            self._known_value_shape[name] = g._known_value_shape[parent_name]
+            self._set_known_value_shape(name, g._known_value_shape[parent_name])
         if parent_name in g._parameter_norename:
             self._parameter_norename.add(name)
 
@@ -9018,8 +9029,14 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if dim_name not in self.constraints_:
             self.constraints_[dim_name] = set()
         if isinstance(value, set):
+            assert all(
+                isinstance(v, (int, str)) for v in value
+            ), f"Unexpected type for one value in {value!r}{self.get_debug_msg()}"
             self.constraints_[dim_name] |= value
         else:
+            assert isinstance(
+                value, (int, str)
+            ), f"Unexpected type for value {value!r}{self.get_debug_msg()}"
             self.constraints_[dim_name].add(value)
 
     def register_constraint_dimension(self, dim_name: str, value: Any):
@@ -9891,7 +9908,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     self._known_sequences[v] = self._known_sequences[k]
                     del self._known_sequences[k]
                 if k in self._known_value_shape:
-                    self._known_value_shape[v] = self._known_value_shape[k]
+                    self._set_known_value_shape(v, self._known_value_shape[k])
                     del self._known_value_shape[k]
                 if k in self._registered_users:
                     self._registered_users[v] = self._registered_users[k]

@@ -41,7 +41,11 @@ PATCHES.append(
 
 
 def patched_infer_size(a, b):
-    """Patches ``torch._subclasses.fake_impls.infer_size``."""
+    """
+    Patches ``torch._subclasses.fake_impls.infer_size``.
+    This patch is needed to export
+    :class:`yobx.torch.tiny_models.TinyBroadcastAddModel`.
+    """
     dimsA = len(a)
     dimsB = len(b)
     ndim = max(dimsA, dimsB)
@@ -90,7 +94,11 @@ PATCHES.append(
 
 
 def patched__broadcast_shapes(*_shapes):
-    """Patches ``torch._refs._broadcast_shapes``."""
+    """
+    Patches ``torch._refs._broadcast_shapes``.
+    This patch is needed to export
+    :class:`yobx.torch.tiny_models.TinyBroadcastAddModel`.
+    """
     from functools import reduce
     from torch._prims_common import IntLike
 
@@ -167,7 +175,9 @@ def _combine_args(f, args, kwargs, preserve_order: bool = False) -> dict[str, An
     #    1
     #    for p in signature.parameters.values()
     #    if p.default == inspect.Parameter.empty
-    #    and p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    #    and p.kind in (
+    #       inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD
+    #    )
     # )
     # if len(args) < positional_only:
     #    raise RuntimeError(
@@ -245,6 +255,85 @@ PATCHES.append(
         patched__get_range_constraints,
         torch.export._trace,
         "_get_range_constraints",
+        family="torch",
+    )
+)
+
+
+def patched__maybe_broadcast(*args, preserve_cpu_scalar_tensors=True):
+    """
+    Patches ``torch._refs._maybe_broadcast``.
+    This patch is needed to export
+    :class:`yobx.torch.tiny_models.TinyBroadcastAddModel`.
+    """
+    from torch._prims_common import ShapeType, TensorLike, Number
+
+    # Computes common shape
+    common_shape = patched__broadcast_shapes(
+        *(t.shape if isinstance(t, TensorLike) else None for t in args)
+    )
+
+    def should_expand(a: ShapeType, b: ShapeType) -> bool:
+        from torch.fx.experimental.symbolic_shapes import (
+            guard_or_false,
+            sym_and,
+            sym_or,
+        )
+
+        if len(a) != len(b):
+            return True
+
+        for x, y in zip(a, b):
+            if guard_or_false(x != y):
+                # We know they are not the same.
+                return True
+
+            # They are the same or we do not know if they are the same or not.
+            # 1==1 no-broadcast
+            # u0==1 and 1==u0 cases. We broadcast!
+            if guard_or_false(sym_and(x == 1, y == 1)):
+                pass
+            elif guard_or_false(sym_or(x == 1, y == 1)):
+                # assume broadcasting.
+                return True
+
+            # u0==u1 assume the same, no broadcasting!
+            # PATCHED: avoid errors
+            return True  # guard_or_true(x != y)
+            # torch._check(
+            #    x == y,
+            #    lambda x=x, y=y: (
+            #        f"sizes assumed to be the same due to unbacked "
+            #        f"broadcasting semantics x={x!r}, y={y!r}"
+            #    ),
+            # )
+
+        return False
+
+    def __maybe_broadcast(x, shape):
+        if x is None:
+            return None
+        elif isinstance(x, Number):
+            return x
+        elif isinstance(x, TensorLike):
+            if preserve_cpu_scalar_tensors and torch._prims_common.is_cpu_scalar_tensor(x):
+                return x
+
+            if should_expand(x.shape, common_shape):
+                return x.expand(common_shape)
+
+            return x
+        else:
+            raise RuntimeError(f"Unexpected type when broadcasting: {str(type(x))}!")
+
+    return tuple(__maybe_broadcast(x, common_shape) for x in args)
+
+
+PATCHES.append(
+    PatchInfo.make(
+        patched__maybe_broadcast,
+        torch._refs,
+        "_maybe_broadcast",
         family="torch",
     )
 )

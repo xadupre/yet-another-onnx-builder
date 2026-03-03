@@ -2473,7 +2473,31 @@ class TestGetInputDynamicShape(ExtTestCase):
         g.set_type("Y", TFLOAT)
         g.set_shape("Y", ("batch", 3))
         g.make_tensor_output("Y", TFLOAT, ("batch", 3), indexed=False, is_dimension=False)
-        onx = g.to_onnx()
+        onx = g.to_onnx(optimize=False)
+        ref = self.check_ort(onx)
+        x = np.arange(6).reshape(2, 3).astype(np.float32)
+        got = ref.run(None, {"X": x})
+        self.assertEqualArray(x, got[0])
+
+    def test_make_shape_from_results_dynamic_scalar_optimize(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TFLOAT, ("batch", 3), is_dimension=False)
+        shape_X = g.op.Shape("X", outputs=["shape_X"])
+        self.assertEqual(shape_X, "shape_X")
+        g.set_type("shape_X", TINT64)
+        g.set_shape("shape_X", (2,))
+        batch_dim = g.op.Gather("shape_X", np.array(0, dtype=np.int64), outputs=["batch_dim"])
+        self.assertEqual(batch_dim, "batch_dim")
+        self.assertEqual(batch_dim, "batch_dim")
+        g.set_type("batch_dim", TINT64)
+        g.set_shape("batch_dim", ())
+        new_shape = g.make_shape_from_results(["batch_dim", 3])
+        out = g.op.Reshape("X", new_shape, outputs=["Y"])
+        self.assertEqual(out, "Y")
+        g.set_type("Y", TFLOAT)
+        g.set_shape("Y", ("batch", 3))
+        g.make_tensor_output("Y", TFLOAT, ("batch", 3), indexed=False, is_dimension=False)
+        onx = g.to_onnx(optimize=True)
         ref = self.check_ort(onx)
         x = np.arange(6).reshape(2, 3).astype(np.float32)
         got = ref.run(None, {"X": x})
@@ -2500,7 +2524,7 @@ class TestGetInputDynamicShape(ExtTestCase):
         g.set_type("Y", TFLOAT)
         g.set_shape("Y", ("batch", "seq", 3))
         g.make_tensor_output("Y", TFLOAT, ("batch", "seq", 3), indexed=False, is_dimension=False)
-        onx = g.to_onnx()
+        onx = g.to_onnx(optimize=False)
         ref = self.check_ort(onx)
         x = np.arange(12).reshape(2, 2, 3).astype(np.float32)
         got = ref.run(None, {"X": x})
@@ -2917,6 +2941,20 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         g._known_shapes["X"] = ("a", 4)
         g._known_shapes["Y"] = ("b", 4)
         self.assertFalse(g.same_shape("X", "Y"))
+
+    def test_set_value_shape_constraint_dim_registration(self):
+        # When a name already has a symbolic (string) value shape like ("batch",)
+        # and set_value_shape is called with a concrete (int,) tuple,
+        # the constraint should be registered for the symbolic dim name ("batch"),
+        # not for the literal string "existing".
+        g = GraphBuilder(18)
+        g.make_tensor_input("X", TFLOAT, ("batch",))
+        g._known_value_shape["batch_value"] = ("batch",)
+        g._known_ranks["batch_value"] = 1
+        g.set_value_shape("batch_value", (5,))
+        self.assertIn("batch", g.constraints_)
+        self.assertIn(5, g.constraints_["batch"])
+        self.assertNotIn("existing", g.constraints_)
 
     def test_get_dimension_as_result_already_known(self):
         gr = GraphBuilder(18)

@@ -33,14 +33,12 @@ graphviz_dot_args = ["-Gbgcolor=transparent"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build"]
-html_theme = "furo"
+html_theme = "piccolo_theme"
 html_static_path = ["_static"]
 html_logo = "_static/logo.svg"
 html_favicon = "_static/logo.svg"
 html_theme_options = {
-    "source_repository": "https://github.com/xadupre/yet-another-onnx-builder",
-    "source_branch": "main",
-    "source_directory": "docs/",
+    "source_url": "https://github.com/xadupre/yet-another-onnx-builder",
 }
 
 
@@ -131,7 +129,6 @@ epkg_dictionary = {
     "onnxruntime-genai": "https://github.com/microsoft/onnxruntime-genai",
     "onnxruntime-training": "https://onnxruntime.ai/docs/get-started/training-on-device.html",
     "onnxruntime kernels": "https://onnxruntime.ai/docs/reference/operators/OperatorKernels.html",
-    "onnx-array-api": "https://sdpython.github.io/doc/onnx-array-api/dev/",
     "onnx-diagnostic": "https://sdpython.github.io/doc/onnx-diagnostic/dev/",
     "onnx-extended": "https://sdpython.github.io/doc/onnx-extended/dev/",
     "onnx-script": "https://github.com/microsoft/onnxscript",

@@ -542,7 +542,7 @@ class TestReferenceOps(ExtTestCase):
 
     def _get_model_attention(self) -> onnx.ModelProto:
         # Obtained with:
-        # python -m onnx_array_api translate -a onnx-short -m <model.onnx>
+        # python -m yobx translate -a onnx-short -m <model.onnx>
         opset_imports = [
             oh.make_opsetid("pkg.onnxscript.torch_lib.common", 1),
             oh.make_opsetid("", 18),
