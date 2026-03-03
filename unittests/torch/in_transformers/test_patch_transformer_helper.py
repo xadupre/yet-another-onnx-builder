@@ -25,9 +25,9 @@ class TestPatchTransformerHelper(ExtTestCase):
         llama = transformers.models.llama.modeling_llama.LlamaRotaryEmbedding
         self.assertTrue(hasattr(llama.forward, "__wrapped__"))
         self.assertTrue(hasattr(llama.forward.__wrapped__, "__code__"))
-        s = str(llama.forward.__wrapped__.__code__)
-        self.assertIn(
-            ("transformers/modeling_rope_utils.py", "transformers\\modeling_rope_utils.py"), s
+        self.assertInOr(
+            ("transformers/modeling_rope_utils.py", "transformers\\modeling_rope_utils.py"),
+            str(llama.forward.__wrapped__.__code__),
         )
 
     @requires_transformers("4.57")
