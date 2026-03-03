@@ -380,7 +380,7 @@ same results. If it is missing, some patterns cannot match for sure
 and they will not match.
 
 This information can be built by running shape inference
-on the onnx models. That's what is done is the previous examples.
+on the onnx models. That's what is done in the previous examples.
 However, the best case is when this information comes from torch.
 
 Function :func:`to_onnx <yobx.torch_interpreter.to_onnx>`
