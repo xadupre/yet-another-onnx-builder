@@ -267,7 +267,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         local_domain: str = "local_function",
         signature: Optional[Any] = None,
         check_empty_source: bool = False,
-        graph_module: Optional["torch.fx.GraphModule"] = None,
+        graph_module: Optional[torch.fx.GraphModule] = None,
         exe_path: str = "",
         output_names: Optional[List[str]] = None,
         output_dynamic_shapes: Optional[Union[Dict[str, Any], Tuple[Any]]] = None,
@@ -1127,9 +1127,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     ) -> Optional[
         Union[
             np.ndarray,
-            "torch.Tensor",
+            torch.Tensor,
             NodeProto,
-            Tuple[Optional[Union["torch.Tensor", np.ndarray, NodeProto]], ...],
+            Tuple[Optional[Union[torch.Tensor, np.ndarray, NodeProto]], ...],
         ]
     ]:
         """
@@ -1675,7 +1675,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def set_shapes_types(
         self,
-        name: Union[str, "torch.fx.Node"],
+        name: Union[str, torch.fx.Node],
         where: str,
         value: Any,
     ):
@@ -1683,7 +1683,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             name = name.name
         self._known_torch_value[name] = (where, value)  # type: ignore
 
-    def _torch_sym_int_to_str(self, value: "torch.SymInt") -> Union[int, str]:
+    def _torch_sym_int_to_str(self, value: torch.SymInt) -> Union[int, str]:
         if isinstance(value, str):
             return value
         if hasattr(value, "node") and isinstance(value.node, str):
@@ -5621,7 +5621,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if values:
             oh.set_metadata_props(model, values)
 
-    def _get_size(self, t: Union["torch.Tensor", np.ndarray, TensorProto]) -> int:
+    def _get_size(self, t: Union[torch.Tensor, np.ndarray, TensorProto]) -> int:
         if hasattr(t, "shape"):
             return int(np.prod(t.shape)) * size_type(t.dtype)  # type: ignore
         assert isinstance(t, TensorProto), f"Unexpected type {type(t)}"
@@ -9040,7 +9040,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         """Returns the constraints registered so far."""
         return self.constraints_
 
-    def _to_torch_tensor(self, a: Any) -> "torch.Tensor":
+    def _to_torch_tensor(self, a: Any) -> torch.Tensor:
         """Torch does not convert numpy dtype very well."""
         if isinstance(a, self.torch.Tensor):
             return a
@@ -9803,7 +9803,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             f"{self.get_debug_msg()}"
         )
 
-    def make_new_dynamic_shape(self, rank: int, prefix: str = "d") -> Tuple["torch.SymInt", ...]:
+    def make_new_dynamic_shape(self, rank: int, prefix: str = "d") -> Tuple[torch.SymInt, ...]:
         """Creates a dynamic shape of a known rank with new dynamic dimension."""
         return tuple(
             self.torch.SymInt(self.make_new_dynamic_name(f"{prefix}_d{i}")) for i in range(rank)
@@ -9822,7 +9822,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def make_torch_tensor_from_np_array(  # pyrefly: ignore[bad-param-name-override]
         self, np_array: np.ndarray
-    ) -> "torch.Tensor":
+    ) -> torch.Tensor:
         """Converts a numpy array into a :class:`torch.Tensor`."""
         try:
             import ml_dtypes
