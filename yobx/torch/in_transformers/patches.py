@@ -47,7 +47,7 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
                         _last_patched_function=transformers.modeling_rope_utils.dynamic_rope_update,
                     )
                 )
-            elif submodule.__class__.__name__.endswith("RotaryEmbedding") and sys.version_info()[
+            elif submodule.__class__.__name__.endswith("RotaryEmbedding") and sys.version_info[
                 :2
             ] < (3, 11):
                 warnings.warn(
