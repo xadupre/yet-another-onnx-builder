@@ -145,7 +145,21 @@ class ConcatGatherPattern(PatternOptimization):
         )
 
 
-class ConcatEmptyPattern(PatternOptimization):
+class _CommonConcatPattern(PatternOptimization):
+    def remove_set(self, g, node):
+        att = g.get_attribute(node, "axis")
+        axis = att.i
+        rem = set()
+        for idi, i in enumerate(node.input):
+            if not g.has_shape(i):
+                continue
+            shape = g.get_shape(i)
+            if axis < len(shape) and shape[axis] == 0:
+                rem.add(idi)
+        return rem
+
+
+class ConcatEmptyPattern(_CommonConcatPattern):
     """
     Checks if one of the concatenated values is empty.
 
@@ -247,18 +261,6 @@ class ConcatEmptyPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def remove_set(self, g, node):
-        att = g.get_attribute(node, "axis")
-        axis = att.i
-        rem = set()
-        for idi, i in enumerate(node.input):
-            if not g.has_shape(i):
-                continue
-            shape = g.get_shape(i)
-            if axis < len(shape) and shape[axis] == 0:
-                rem.add(idi)
-        return rem
-
     def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         rem = self.remove_set(g, node)
         assert rem, f"rem is empty for node={node}"
@@ -285,7 +287,7 @@ class ConcatEmptyPattern(PatternOptimization):
         return [new_node]
 
 
-class ConcatTwiceUnaryPattern(PatternOptimization):
+class ConcatTwiceUnaryPattern(_CommonConcatPattern):
     """
     Sin(Concat(x,x)) -> Concat(Sin(x), Sin(x)).
 
@@ -412,18 +414,6 @@ class ConcatTwiceUnaryPattern(PatternOptimization):
         if nodes:
             return MatchResult(self, [node, nodes[0]], self.apply)
         return self.none(node, inspect.currentframe().f_lineno)
-
-    def remove_set(self, g, node):
-        att = g.get_attribute(node, "axis")
-        axis = att.i
-        rem = set()
-        for idi, i in enumerate(node.input):
-            if not g.has_shape(i):
-                continue
-            shape = g.get_shape(i)
-            if axis < len(shape) and shape[axis] == 0:
-                rem.add(idi)
-        return rem
 
     def apply(
         self, g: "GraphBuilder", concat: NodeProto, unary: NodeProto  # noqa: F821

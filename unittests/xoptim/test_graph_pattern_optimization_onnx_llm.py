@@ -4,7 +4,13 @@ import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, has_onnxruntime, hide_stdout, ignore_warnings
+from yobx.ext_test_case import (
+    ExtTestCase,
+    has_onnxruntime,
+    hide_stdout,
+    ignore_warnings,
+    requires_onnxruntime,
+)
 from yobx.xbuilder.graph_builder import GraphBuilder, InferShapesOptions, OptimizationOptions
 from yobx.reference import ExtendedReferenceEvaluator
 
@@ -1066,6 +1072,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         self.assertEqualArray(expected, got[0], 1e-5)
 
     @unittest.skipIf(to_onnx is None, "not implemented yet")
+    @requires_onnxruntime("1.24")
     @ignore_warnings((UserWarning, FutureWarning))
     @hide_stdout()
     def test_attention_gqa_default_24(self):
@@ -1086,6 +1093,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         got = ort.run(None, feeds)
         self.assertEqualArray(expected, got[0], 1e-5)
 
+    @requires_onnxruntime("1.24")
     def test_attention_gqa_bool(self):
         model = oh.make_model(
             oh.make_graph(
@@ -1165,6 +1173,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         self.assertEqualArray(expected[2], got[2])
         self.assertEqualArray(expected[0], got[0])
 
+    @requires_onnxruntime("1.24")
     def test_attention_gqa_bool_not_one(self):
         model = oh.make_model(
             oh.make_graph(
@@ -1245,6 +1254,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         self.assertEqualArray(expected[2], got[2])
         self.assertEqualArray(expected[0], got[0])
 
+    @requires_onnxruntime("1.24")
     def test_attention_gqa_float(self):
         model = oh.make_model(
             oh.make_graph(

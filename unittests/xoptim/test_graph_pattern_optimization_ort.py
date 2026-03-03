@@ -17,6 +17,7 @@ from yobx.ext_test_case import (
     ignore_warnings,
     skipif_ci_windows,
     requires_cuda,
+    requires_onnxruntime,
     hide_stdout,
 )
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions, InferShapesOptions
@@ -2542,6 +2543,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         self.assertEqualArray(got[2], got[5], atol=1e-5)
         self.assertEqualArray(got[0], got[3], atol=1e-5)
 
+    @requires_onnxruntime("1.24")
     def test_onnx_gqa_no_rotary_packed_3D(self):
         _mkv_ = oh.make_tensor_value_info
 

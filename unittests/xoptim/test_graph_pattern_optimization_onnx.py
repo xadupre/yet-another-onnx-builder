@@ -3294,6 +3294,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         self.assertEqualArray(expected, got, atol=1e-2)
         self._check_with_ort(opt_onx)
 
+    @requires_onnxruntime("1.24")
     def test_cast_rms_normalization_cast(self):
         model = oh.make_model(
             oh.make_graph(
