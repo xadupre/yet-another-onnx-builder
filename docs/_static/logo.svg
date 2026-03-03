@@ -2,83 +2,77 @@
   <defs>
     <!-- Background gradient -->
     <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#1e2a45"/>
-      <stop offset="100%" stop-color="#0d0d1a"/>
+      <stop offset="0%" stop-color="#1a2438"/>
+      <stop offset="100%" stop-color="#0a0a14"/>
     </radialGradient>
-    <!-- Node gradients: 5 distinct colors -->
-    <radialGradient id="n1" cx="40%" cy="35%" r="60%">
-      <stop offset="0%" stop-color="#74b9ff"/>
-      <stop offset="100%" stop-color="#0984e3"/>
+    <!-- ONNX nodes: blue / purple -->
+    <radialGradient id="nO1" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#93c5fd"/>
+      <stop offset="100%" stop-color="#2563eb"/>
     </radialGradient>
-    <radialGradient id="n2" cx="40%" cy="35%" r="60%">
-      <stop offset="0%" stop-color="#ffdd57"/>
-      <stop offset="100%" stop-color="#f0a500"/>
+    <radialGradient id="nO2" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#c4b5fd"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
     </radialGradient>
-    <radialGradient id="n3" cx="40%" cy="35%" r="60%">
-      <stop offset="0%" stop-color="#ff9f43"/>
-      <stop offset="100%" stop-color="#e67e22"/>
+    <!-- Hub (yobx) node: amber -->
+    <radialGradient id="nC" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#fcd34d"/>
+      <stop offset="100%" stop-color="#d97706"/>
     </radialGradient>
-    <radialGradient id="n4" cx="40%" cy="35%" r="60%">
-      <stop offset="0%" stop-color="#55efc4"/>
-      <stop offset="100%" stop-color="#00b894"/>
+    <!-- ORT nodes: green -->
+    <radialGradient id="nR1" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#6ee7b7"/>
+      <stop offset="100%" stop-color="#059669"/>
     </radialGradient>
-    <radialGradient id="n5" cx="40%" cy="35%" r="60%">
-      <stop offset="0%" stop-color="#fd79a8"/>
-      <stop offset="100%" stop-color="#e84393"/>
+    <radialGradient id="nR2" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#86efac"/>
+      <stop offset="100%" stop-color="#16a34a"/>
     </radialGradient>
-    <!-- Edge gradients between connected nodes -->
-    <linearGradient id="e12" x1="20" y1="55" x2="52" y2="24" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#74b9ff"/>
-      <stop offset="100%" stop-color="#ffdd57"/>
+    <!-- Edge gradients -->
+    <linearGradient id="eO1C" x1="24" y1="40" x2="60" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#93c5fd"/>
+      <stop offset="100%" stop-color="#fcd34d"/>
     </linearGradient>
-    <linearGradient id="e13" x1="20" y1="55" x2="52" y2="80" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#74b9ff"/>
-      <stop offset="100%" stop-color="#ff9f43"/>
+    <linearGradient id="eO2C" x1="24" y1="72" x2="60" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#c4b5fd"/>
+      <stop offset="100%" stop-color="#fcd34d"/>
     </linearGradient>
-    <linearGradient id="e24" x1="52" y1="24" x2="90" y2="32" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#ffdd57"/>
-      <stop offset="100%" stop-color="#55efc4"/>
+    <linearGradient id="eCR1" x1="60" y1="56" x2="96" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fcd34d"/>
+      <stop offset="100%" stop-color="#6ee7b7"/>
     </linearGradient>
-    <linearGradient id="e25" x1="52" y1="24" x2="90" y2="78" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#ffdd57"/>
-      <stop offset="100%" stop-color="#fd79a8"/>
+    <linearGradient id="eCR2" x1="60" y1="56" x2="96" y2="72" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fcd34d"/>
+      <stop offset="100%" stop-color="#86efac"/>
     </linearGradient>
-    <linearGradient id="e35" x1="52" y1="80" x2="90" y2="78" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#ff9f43"/>
-      <stop offset="100%" stop-color="#fd79a8"/>
-    </linearGradient>
-    <!-- Text gradient -->
-    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#74b9ff"/>
-      <stop offset="33%" stop-color="#ffdd57"/>
-      <stop offset="66%" stop-color="#55efc4"/>
-      <stop offset="100%" stop-color="#fd79a8"/>
+    <!-- yobx label gradient -->
+    <linearGradient id="yobxGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#93c5fd"/>
+      <stop offset="50%" stop-color="#fcd34d"/>
+      <stop offset="100%" stop-color="#6ee7b7"/>
     </linearGradient>
   </defs>
-  <!-- Background circle -->
-  <circle cx="60" cy="60" r="58" fill="url(#bgGrad)" stroke="#4fa3e0" stroke-width="2"/>
-  <!-- Edges (drawn before nodes so nodes render on top) -->
-  <!-- input → upper-mid -->
-  <line x1="20" y1="55" x2="52" y2="24" stroke="url(#e12)" stroke-width="2.5" stroke-linecap="round"/>
-  <!-- input → lower-mid -->
-  <line x1="20" y1="55" x2="52" y2="80" stroke="url(#e13)" stroke-width="2.5" stroke-linecap="round"/>
-  <!-- upper-mid → upper-out -->
-  <line x1="52" y1="24" x2="90" y2="32" stroke="url(#e24)" stroke-width="2.5" stroke-linecap="round"/>
-  <!-- upper-mid → lower-out (cross edge) -->
-  <line x1="52" y1="24" x2="90" y2="78" stroke="url(#e25)" stroke-width="2.5" stroke-linecap="round"/>
-  <!-- lower-mid → lower-out -->
-  <line x1="52" y1="80" x2="90" y2="78" stroke="url(#e35)" stroke-width="2.5" stroke-linecap="round"/>
-  <!-- Nodes: 5-node DAG flowing left-to-right -->
-  <!-- Input node (blue) -->
-  <circle cx="20" cy="55" r="9" fill="url(#n1)" stroke="#fff" stroke-width="1.5"/>
-  <!-- Upper-middle node (yellow) -->
-  <circle cx="52" cy="24" r="9" fill="url(#n2)" stroke="#fff" stroke-width="1.5"/>
-  <!-- Lower-middle node (orange) -->
-  <circle cx="52" cy="80" r="9" fill="url(#n3)" stroke="#fff" stroke-width="1.5"/>
-  <!-- Upper-output node (green) -->
-  <circle cx="90" cy="32" r="9" fill="url(#n4)" stroke="#fff" stroke-width="1.5"/>
-  <!-- Lower-output node (pink) -->
-  <circle cx="90" cy="78" r="9" fill="url(#n5)" stroke="#fff" stroke-width="1.5"/>
-  <!-- Label -->
-  <text x="60" y="108" font-family="monospace" font-size="14" fill="url(#textGrad)" font-weight="bold" text-anchor="middle">yobx</text>
+  <!-- Background -->
+  <circle cx="60" cy="60" r="58" fill="url(#bgGrad)" stroke="#3b82f6" stroke-width="1.5"/>
+  <!-- Subtle vertical dividers -->
+  <line x1="44" y1="14" x2="44" y2="94" stroke="#ffffff" stroke-width="0.3" stroke-opacity="0.12" stroke-dasharray="3,4"/>
+  <line x1="76" y1="14" x2="76" y2="94" stroke="#ffffff" stroke-width="0.3" stroke-opacity="0.12" stroke-dasharray="3,4"/>
+  <!-- Edges (behind nodes) -->
+  <line x1="24" y1="40" x2="60" y2="56" stroke="url(#eO1C)" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="24" y1="72" x2="60" y2="56" stroke="url(#eO2C)" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="60" y1="56" x2="96" y2="40" stroke="url(#eCR1)" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="60" y1="56" x2="96" y2="72" stroke="url(#eCR2)" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- ONNX nodes (left, blue/purple) -->
+  <circle cx="24" cy="40" r="9" fill="url(#nO1)" stroke="#fff" stroke-width="1.5"/>
+  <circle cx="24" cy="72" r="9" fill="url(#nO2)" stroke="#fff" stroke-width="1.5"/>
+  <!-- Hub node (center, amber = yobx) -->
+  <circle cx="60" cy="56" r="11" fill="url(#nC)" stroke="#fff" stroke-width="1.5"/>
+  <!-- ORT nodes (right, green) -->
+  <circle cx="96" cy="40" r="9" fill="url(#nR1)" stroke="#fff" stroke-width="1.5"/>
+  <circle cx="96" cy="72" r="9" fill="url(#nR2)" stroke="#fff" stroke-width="1.5"/>
+  <!-- Cluster labels -->
+  <text x="24" y="22" font-family="monospace" font-size="7" fill="#93c5fd" text-anchor="middle" font-weight="bold">onnx</text>
+  <text x="96" y="22" font-family="monospace" font-size="7" fill="#6ee7b7" text-anchor="middle" font-weight="bold">ort</text>
+  <!-- Main label -->
+  <text x="60" y="107" font-family="monospace" font-size="13" fill="url(#yobxGrad)" font-weight="bold" text-anchor="middle">yobx</text>
 </svg>
