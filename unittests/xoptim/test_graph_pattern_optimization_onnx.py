@@ -7238,6 +7238,312 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-6)
 
+    def test_not_not_no_match(self):
+        # Single Not - NotNotPattern requires two consecutive Nots
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Not", ["X"], ["Y"])],
+                "dummy",
+                [_mkv_("X", TBOOL, ["a", 2])],
+                [_mkv_("Y", TBOOL, ["a", 2])],
+            ),
+            opset_imports=[oh.make_opsetid("", 23)],
+            ir_version=10,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["NotNot"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Not"], [n.op_type for n in opt_onx.graph.node])
+
+    def test_not_where_no_match(self):
+        # Not followed by And instead of Where - NotWherePattern requires Not -> Where
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Not", ["X"], ["nx"]),
+                    oh.make_node("And", ["nx", "X"], ["Y"]),
+                ],
+                "dummy",
+                [_mkv_("X", TBOOL, ["a", "b"])],
+                [_mkv_("Y", TBOOL, ["a", "b"])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["NotWhere"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Not", "And"], [n.op_type for n in opt_onx.graph.node])
+
+    def test_where_add_no_match(self):
+        # Where with non-zero true-value - WhereAddPattern requires cst1 == 0
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Where", ["mask", "one", "inf"], ["fmask"]),
+                    oh.make_node("Add", ["fmask", "X"], ["Y"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b"]), _mkv_("mask", TensorProto.BOOL, ["a", "b"])],
+                [_mkv_("Y", TFLOAT, ["a", "b"])],
+                [
+                    onh.from_array(np.array([1.0], dtype=np.float32), name="one"),
+                    onh.from_array(np.array([-np.inf], dtype=np.float32), name="inf"),
+                ],
+            )
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["WhereAdd"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Where", "Add"], [n.op_type for n in opt_onx.graph.node])
+
+    def test_swap_range_add_no_match(self):
+        # Range -> Add where constant is a scalar (shape=[]) not (shape=[1])
+        # SwapRangeAddScalarPattern requires add constant shape == (1,)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Range", ["zero", "END", "one"], ["arange"]),
+                    oh.make_node("Add", ["arange", "PLUS"], ["Y"]),
+                ],
+                "dummy",
+                [_mkv_("END", TINT64, []), _mkv_("PLUS", TINT64, [])],
+                [_mkv_("Y", TINT64, [])],
+                [
+                    onh.from_array(np.array(1, dtype=np.int64), name="one"),
+                    onh.from_array(np.array(0, dtype=np.int64), name="zero"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["SwapRangeAddScalar"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Range", "Add"], [n.op_type for n in opt_onx.graph.node])
+
+    def test_reduce_arg_topk_no_match(self):
+        # ArgMin(axis=0) and ReduceMin(axes=[1]) - different axes, pattern won't fire
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("ReduceMin", ["X", "one"], ["Y1"], keepdims=0),
+                    oh.make_node("ArgMin", ["X"], ["Y2"], axis=0, keepdims=0),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b"])],
+                [
+                    _mkv_("Y1", TFLOAT, ["b"]),
+                    _mkv_("Y2", TINT64, ["b"]),
+                ],
+                [onh.from_array(np.array([1], dtype=np.int64), name="one")],
+            ),
+            opset_imports=[oh.make_opsetid("", 22)],
+            ir_version=11,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ReduceArgTopK"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["ReduceMin", "ArgMin"], [n.op_type for n in opt_onx.graph.node])
+
+    def test_cast_cast_no_match(self):
+        # Cast(FLOAT16->FLOAT) followed by Cast(FLOAT->INT64): _one_cast returns 0
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Cast", ["X"], ["x2"], to=TensorProto.FLOAT),
+                    oh.make_node("Cast", ["x2"], ["Y"], to=TensorProto.INT64),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT16, ["b", "c"])],
+                [oh.make_tensor_value_info("Y", TINT64, ["b", "c"])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=False,
+            optimization_options=OptimizationOptions(patterns="CastCast", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Cast", "Cast"], [n.op_type for n in opt_onx.graph.node])
+
+    def test_rms_normalization_mul_no_match(self):
+        # RMSNormalization followed by Add instead of Mul - pattern won't fire
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("RMSNormalization", ["X", "scale"], ["xs"]),
+                    oh.make_node("Add", ["xs", "bias"], ["Y"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", 2])],
+                [_mkv_("Y", TFLOAT, ["a", 2])],
+                [
+                    onh.from_array(np.array([3, 4], dtype=np.float32), name="scale"),
+                    onh.from_array(np.array([1, 2], dtype=np.float32), name="bias"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 23)],
+            ir_version=10,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["RMSNormalizationMul"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["RMSNormalization", "Add"], [n.op_type for n in opt_onx.graph.node])
+
+    def test_transpose_transpose_no_match(self):
+        # Two transposes where composition != identity AND intermediate is used more than once
+        # perm1=[1,2,0] o perm2=[1,2,0] => [2,0,1] != identity; r1 is also a graph output
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Transpose", ["X"], ["r1"], perm=[1, 2, 0]),
+                    oh.make_node("Transpose", ["r1"], ["Y"], perm=[1, 2, 0]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, [2, 3, 4])],
+                [
+                    _mkv_("r1", TFLOAT, [3, 4, 2]),
+                    _mkv_("Y", TFLOAT, [4, 2, 3]),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["TransposeTranspose"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Transpose", "Transpose"], [n.op_type for n in opt_onx.graph.node])
+
+    def test_dropout_no_match(self):
+        # Dropout whose mask output is consumed - DropoutPattern skips when mask is used
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Dropout", ["X", "ratio"], ["Y", "mask"]),
+                    oh.make_node("Cast", ["mask"], ["mask_f"], to=TensorProto.FLOAT),
+                    oh.make_node("Mul", ["Y", "mask_f"], ["Z"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b"])],
+                [_mkv_("Z", TFLOAT, ["a", "b"])],
+                [onh.from_array(np.array(0.5, dtype=np.float32), name="ratio")],
+            ),
+            opset_imports=[oh.make_opsetid("", 13)],
+            ir_version=10,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["Dropout"], verbose=0, constant_folding=False
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertIn("Dropout", [n.op_type for n in opt_onx.graph.node])
+
+    def test_unsqueeze_unsqueeze_no_match(self):
+        # Two Unsqueezes with dynamic axes - pattern requires constant axes
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "axes1"], ["x1"]),
+                    oh.make_node("Unsqueeze", ["x1", "axes2"], ["Y"]),
+                ],
+                "dummy",
+                [
+                    _mkv_("X", TFLOAT, ["a", "b"]),
+                    _mkv_("axes1", TINT64, [1]),
+                    _mkv_("axes2", TINT64, [1]),
+                ],
+                [_mkv_("Y", TFLOAT, [1, 1, "a", "b"])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        gr = GraphBuilder(
+            model,
+            optimization_options=OptimizationOptions(
+                patterns=["UnsqueezeUnsqueeze"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx()
+        self.assertEqual(["Unsqueeze", "Unsqueeze"], [n.op_type for n in opt_onx.graph.node])
+
+    def test_cast_cast_binary_no_match(self):
+        # Cast(INT64->FLOAT16) + Cast(INT64->FLOAT16) -> Add: original types not in _dtypes_allowed
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Cast", ["X"], ["xc"], to=TensorProto.FLOAT16),
+                    oh.make_node("Cast", ["Y"], ["yc"], to=TensorProto.FLOAT16),
+                    oh.make_node("Add", ["xc", "yc"], ["Z"]),
+                ],
+                "dummy",
+                [_mkv_("X", TINT64, ["a", 4]), _mkv_("Y", TINT64, ["a", 4])],
+                [_mkv_("Z", TFLOAT16, ["a", 4])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["CastCastBinary"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Cast", "Cast", "Add"], [n.op_type for n in opt_onx.graph.node])
+
+    def test_cast_op_cast_no_match(self):
+        # Add(X, Y) -> Cast(result): no Cast before the op, pattern requires Cast-in or Cast-out
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Add", ["X", "Y"], ["zc"]),
+                    oh.make_node("Cast", ["zc"], ["Z"], to=TensorProto.FLOAT16),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b"]), _mkv_("Y", TFLOAT, ["a", "b"])],
+                [_mkv_("Z", TFLOAT16, ["a", "b"])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["CastOpCast"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Add", "Cast"], [n.op_type for n in opt_onx.graph.node])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
