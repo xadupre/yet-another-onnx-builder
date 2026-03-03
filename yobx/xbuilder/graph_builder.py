@@ -1,4 +1,3 @@
-import contextlib
 import os
 import pprint
 import textwrap
@@ -10,7 +9,6 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Generator,
     Iterable,
     Iterator,
     List,
@@ -69,7 +67,7 @@ from ..xshape._shape_helper import (
     is_static_shape,
 )
 from ..xshape.shape_type_compute import set_shape_type_op_any, set_shape_type_custom
-from ..xshape._builder_runtime import _BuilderRuntime
+from ..xshape._builder_runtime import _BuilderRuntime, _unset_fake_temporarily
 from ..xshape._shape_runtime import _ShapeRuntime
 from ..xshape._inference_runtime import _InferenceRuntime
 from ..xshape.simplify_expressions import simplify_expression
@@ -95,18 +93,6 @@ def assert_sorted(inputs):
         return sorted(inputs)
     except TypeError:
         return list(inputs)
-
-
-@contextlib.contextmanager
-def _unset_fake_temporarily() -> Generator:
-    import torch
-
-    old = torch._C._unset_dispatch_mode(torch._C._TorchDispatchModeKey.FAKE)
-    try:
-        yield old
-    finally:
-        if old is not None:
-            torch._C._set_dispatch_mode(old)
 
 
 class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
