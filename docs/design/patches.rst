@@ -119,7 +119,14 @@ covers the common pattern of replacing an attribute on a module or class:
     print("after undo:", torch._refs._broadcast_shapes.__name__)
 
 :meth:`~yobx.helpers.patch_helper.PatchInfo.make_diff` produces a unified diff
-between the original function and the patched replacement:
+between the original function and the patched replacement.  Calling this for
+every active patch (or via
+:meth:`~yobx.helpers.patch_helper.PatchDetails.make_report`) is important
+because it gives an **exhaustive** picture of what changed — including patches
+that are only reachable through a module method (e.g. a ``RotaryEmbedding``
+variant whose ``forward`` is called indirectly from the top-level
+``nn.Module``).  Without the full diff it is easy to overlook a patched
+sub-function and miss the reason a particular graph node was introduced:
 
 .. runpython::
     :showcode:
