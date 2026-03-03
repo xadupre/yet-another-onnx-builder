@@ -119,7 +119,7 @@ It is implemented in method :meth:`optimize
     ) -> List[Dict[str, Any]]:
 
 
-The algorithm runs multiple iteration until the graph is not evolving
+The algorithm runs multiple iterations until the graph is not evolving
 or `max_iter` is reached. By default, it is equal to the number of nodes.
 An iteration is:
 
