@@ -192,7 +192,7 @@ class GeluPattern(EasyPatternOptimization):
         cpi = deleted_nodes[3].input[1]
         assert deleted_nodes[5].op_type == "Add", f"-- {deleted_nodes[5]}"
         one = deleted_nodes[5].input[1]
-        assert deleted_nodes[6].op_type == "Mul", f"-- {deleted_nodes[5]}"
+        assert deleted_nodes[6].op_type == "Mul", f"-- {deleted_nodes[6]}"
         c2 = deleted_nodes[6].input[1]
 
         node = deleted_nodes[0]
