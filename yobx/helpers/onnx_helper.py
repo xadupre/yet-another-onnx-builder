@@ -1536,8 +1536,8 @@ def is_float_type(itype: int) -> bool:
 
 def enumerate_nodes(graph: onnx.GraphProto) -> Iterator[onnx.NodeProto]:
     """
-    Enumerates all inputs from a node including all the hidden inputs
-    from subgraphs.
+    Enumerates all nodes in a graph, including nodes contained in
+    subgraphs (e.g. bodies of Loop, Scan, If, SequenceMap operators).
     """
     for node in graph.node:
         yield node
