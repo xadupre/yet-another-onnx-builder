@@ -9031,12 +9031,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if isinstance(value, set):
             assert all(
                 isinstance(v, (int, str)) for v in value
-            ), f"Unxpected type for one value in {value!r}{self.get_debug_msg()}"
+            ), f"Unexpected type for one value in {value!r}{self.get_debug_msg()}"
             self.constraints_[dim_name] |= value
         else:
             assert isinstance(
                 value, (int, str)
-            ), f"Unxpected type for value {value!r}{self.get_debug_msg()}"
+            ), f"Unexpected type for value {value!r}{self.get_debug_msg()}"
             self.constraints_[dim_name].add(value)
 
     def register_constraint_dimension(self, dim_name: str, value: Any):
