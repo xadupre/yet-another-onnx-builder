@@ -357,8 +357,7 @@ class PatchDetails:
             assert hasattr(node, "meta"), "node has no attribute 'meta'"
             assert id(node) in patched_nodes, (
                 f"One node was patched but no patch was found:\n"
-                f"node: {node.target}({','.join(map(str, node.args))}) -> {node.name}"
-                f"\n--\n{pprint.pformat(node.meta)}"
+                f"node.meta={pprint.pformat(node.meta)}"
             )
 
         res = {}  # type: ignore[var-annotated]
