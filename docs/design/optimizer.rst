@@ -391,8 +391,7 @@ on the onnx model it generates before optimizing it.
 Available Patterns and API
 ==========================
 
-All patterns may be found at :ref:`l-pattern-optimization-onnx`
-and :ref:`l-pattern-optimization-ort`.
+All patterns are documented in :ref:`l-design-pattern-optimizer-patterns`.
 
 When writing a pattern, walking along the graph or checking the shape
 is very common. Class :class:`GraphBuilderPatternOptimization
