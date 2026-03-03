@@ -5,6 +5,8 @@ yobx.torch.in_transformers
     :maxdepth: 1
     :caption: modules
 
+    _patches_model_rope_utils
     cache_helper
     flatten_class
+    patches
     models/index

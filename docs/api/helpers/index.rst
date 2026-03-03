@@ -10,6 +10,7 @@ yobx.helpers
     helper
     mini_onnx_builder
     onnx_helper
+    patch_helper
 
 Other functions
 +++++++++++++++
