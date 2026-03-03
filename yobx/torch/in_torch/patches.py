@@ -93,10 +93,6 @@ def patched__broadcast_shapes(*_shapes):
     """Patches ``torch._refs._broadcast_shapes``."""
     from functools import reduce
     from torch._prims_common import IntLike
-    from torch.fx.experimental import (
-        guard_or_false,
-        is_nested_int,
-    )
 
     shapes = tuple(
         (x,) if isinstance(x, IntLike) else x for x in filter(lambda x: x is not None, _shapes)
@@ -118,21 +114,23 @@ def patched__broadcast_shapes(*_shapes):
     common_shape = [1] * reduce(max, (len(shape) for shape in shapes))
     for _arg_idx, shape in enumerate(shapes):
         for idx in range(-1, -1 - len(shape), -1):
-            if is_nested_int(shape[idx]):
+            if fx_symbolic_shapes.is_nested_int(shape[idx]):
                 # Broadcasting is allowed for (j0, 1) or (j0, j0);
                 # not (j0, j1), (j0, 5), etc.
-                if is_nested_int(common_shape[idx]) and guard_or_false(
-                    shape[idx] == common_shape[idx]
-                ):
+                if fx_symbolic_shapes.is_nested_int(
+                    common_shape[idx]
+                ) and fx_symbolic_shapes.guard_or_false(shape[idx] == common_shape[idx]):
                     continue
             else:
-                if guard_or_false(shape[idx] == common_shape[idx]):
+                if fx_symbolic_shapes.guard_or_false(shape[idx] == common_shape[idx]):
                     continue
             # PATCHED: two cases, if == for sure, no broadcast,
             # otherwise maybe broadcast with max(dimensions)
-            if guard_or_false(common_shape[idx] != 1):
+            if fx_symbolic_shapes.guard_or_false(common_shape[idx] != 1):
                 pass
-            elif guard_or_false(common_shape[idx] == 1) or guard_or_false(shape[idx] != 1):
+            elif fx_symbolic_shapes.guard_or_false(
+                common_shape[idx] == 1
+            ) or fx_symbolic_shapes.guard_or_false(shape[idx] != 1):
                 if shape[idx] < 0:
                     raise ValueError("Attempting to broadcast a dimension with negative length!")
                 common_shape[idx] = shape[idx]  # type: ignore

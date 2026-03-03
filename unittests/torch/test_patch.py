@@ -13,7 +13,13 @@ class TestPatch(ExtTestCase):
             self.assertGreater(len(details), 1)
             patch0 = details[0]
             diff = patch0.make_diff()
-            self.assertIn("-    if not self.symbol_to_source.get(expr):", diff)
+            self.assertInOr(
+                (
+                    "-    if not self.symbol_to_source.get(expr):",
+                    "-    assert self.symbol_to_source.get(expr)",
+                ),
+                diff,
+            )
 
 
 if __name__ == "__main__":
