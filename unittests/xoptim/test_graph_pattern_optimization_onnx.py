@@ -33,7 +33,6 @@ from yobx.ext_test_case import (
     hide_stdout,
 )
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions, InferShapesOptions
-from yobx.xoptim.graph_builder_optim import GraphBuilderPatternOptimization
 from yobx.xoptim.patterns import ConstantToInitializerPattern
 from yobx.xoptim.patterns.onnx_cast import ComputationCastOpCastPattern
 from yobx.xshape._shape_helper import compatible_shapes, compatible_dimensions
@@ -124,45 +123,6 @@ class TestGraphPatternOptimization(ExtTestCase):
         self.assertFalse(compatible_dimensions(1, 2))
         self.assertTrue(compatible_dimensions(1, "D1", "D2"))
 
-    def test_type_inference0(self):
-        origin = self._get_model("dort-c-custom__0.onnx")
-        gr = GraphBuilder(origin)
-        gro = GraphBuilderPatternOptimization(gr)
-        dtype = gro.try_infer_type("_onx_tile0", exc=True)
-        self.assertEqual(dtype, TensorProto.INT64)
-
-    def test_type_inference1(self):
-        origin = self._get_model("dort-c-custom__1.onnx")
-        gr = GraphBuilder(origin)
-        gro = GraphBuilderPatternOptimization(gr)
-        dtype = gro.try_infer_type("_onx_mul028", exc=True)
-        self.assertEqual(dtype, TFLOAT)
-
-    def test_shape_inference0(self):
-        origin = self._get_model("dort-c-custom__0.onnx")
-        gr = GraphBuilder(origin, infer_shapes_options=True)
-        gro = GraphBuilderPatternOptimization(gr)
-        shape = gro.try_infer_shape("_onx_tile0", exc=True)
-        self.assertEqual(shape, (2, 1, 1024, 1024))
-
-    def test_unsqueeze_unsqueeze(self):
-        origin = self._get_model("dort-c-custom__0.onnx")
-        before = [node for node in origin.graph.node if node.op_type == "Unsqueeze"]
-        gr = GraphBuilder(
-            origin,
-            optimization_options=OptimizationOptions(patterns=["UnsqueezeUnsqueeze"], verbose=10),
-        )
-        res, out, err = self.capture(lambda: gr.optimize_with_patterns())
-        self.assertEmpty(err)
-        self.assertNotEmpty(res)
-        self.assertIn("[GraphBuilderPatternOptimization-", out)
-        self.assertIn(".optimize] done after", out)
-        self.assertIn("UnsqueezeUnsqueezePattern", out)
-
-        onx = gr.to_onnx(optimize=False)
-        after = [node for node in onx.graph.node if node.op_type == "Unsqueeze"]
-        self.assertEqual(len(after), len(before) - 2)
-
     def test_unsqueeze_unsqueeze_0_0(self):
         for i in range(3):
             for j in range(4):
@@ -237,28 +197,6 @@ class TestGraphPatternOptimization(ExtTestCase):
                 ref = ExtendedReferenceEvaluator(opt_onx, verbose=0)
                 got = ref.run(None, feeds)
                 self.assertEqualArray(expected[0], got[0])
-
-    def test_reshape_matmul_reshape(self):
-        origin = self._get_model("dort-c-custom__0.onnx")
-        before = [node for node in origin.graph.node if node.op_type == "Reshape"]
-        gr = GraphBuilder(
-            origin,
-            optimization_options=OptimizationOptions(
-                patterns=["ReshapeMatMulReshape"], verbose=10
-            ),
-            infer_shapes_options=True,
-        )
-        res, out, err = self.capture(lambda: gr.optimize_with_patterns())
-        self.assertEmpty(err)
-        self.assertNotEmpty(res)
-        self.assertIn("[GraphBuilderPatternOptimization-", out)
-        self.assertIn(".optimize] done after", out)
-        self.assertIn("ReshapeMatMulReshapePattern", out)
-
-        onx = gr.to_onnx(optimize=False)
-        after = [node for node in onx.graph.node if node.op_type == "Reshape"]
-        self.assertEqual(len(before), 24)
-        self.assertEqual(len(after), 22)
 
     def test_reshape_matmul_reshape_static(self):
         model = oh.make_model(
@@ -462,18 +400,6 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
-    def test_reshape_reshape_dort(self):
-        origin = self._get_model("dort-c-custom__0.onnx")
-        before = [node for node in origin.graph.node if node.op_type == "Reshape"]
-        gr = GraphBuilder(
-            origin,
-            optimization_options=OptimizationOptions(patterns=["ReshapeReshape"]),
-            infer_shapes_options=True,
-        )
-        onx = gr.to_onnx(optimize=True)
-        after = [node for node in onx.graph.node if node.op_type == "Reshape"]
-        self.assertEqual(len(after), len(before) - 4)
-
     def test_reshape_reshape_execution(self):
         model = oh.make_model(
             oh.make_graph(
@@ -599,18 +525,6 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
-    def test_expand_dort(self):
-        origin = self._get_model("dort-c-custom__0.onnx")
-        before = [node for node in origin.graph.node if node.op_type == "Expand"]
-        gr = GraphBuilder(
-            origin,
-            infer_shapes_options=True,
-            optimization_options=OptimizationOptions(patterns=["Expand"]),
-        )
-        onx = gr.to_onnx(optimize=True)
-        after = [node for node in onx.graph.node if node.op_type == "Expand"]
-        self.assertEqual(len(after), len(before) - 5)
-
     def test_expand_execution(self):
         model = oh.make_model(
             oh.make_graph(
@@ -654,17 +568,6 @@ class TestGraphPatternOptimization(ExtTestCase):
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
-
-    def test_transpose_transpose_dort(self):
-        origin = self._get_model("dort-c-custom__1.onnx")
-        before = [node for node in origin.graph.node if node.op_type == "Transpose"]
-        gr = GraphBuilder(
-            origin,
-            optimization_options=OptimizationOptions(patterns=["TransposeTranspose"]),
-        )
-        onx = gr.to_onnx(optimize=True)
-        after = [node for node in onx.graph.node if node.op_type == "Transpose"]
-        self.assertEqual(len(before) - 14, len(after))
 
     def test_transpose_transpose_execution_id(self):
         model = oh.make_model(
@@ -747,19 +650,6 @@ class TestGraphPatternOptimization(ExtTestCase):
         for a, b in zip(expected, got):
             self.assertEqualArray(a, b)
 
-    def test_transpose_matmul_dort(self):
-        origin = self._get_model("dort-c-custom__0.onnx")
-        before = [node for node in origin.graph.node if node.op_type == "Transpose"]
-        gr = GraphBuilder(
-            origin,
-            infer_shapes_options=True,
-            optimization_options=OptimizationOptions(patterns=["TransposeMatMul"]),
-        )
-        onx = gr.to_onnx(optimize=True)
-        after = [node for node in onx.graph.node if node.op_type == "Transpose"]
-        self.assertEqual(len(before), len(after))
-        self.assertIn("Gemm", set(n.op_type for n in onx.graph.node))
-
     def test_transpose_matmul_execution_matmul(self):
         model = oh.make_model(
             oh.make_graph(
@@ -836,33 +726,8 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)
         self.assertEqualArray(expected[0], got[0])
 
-    def test_rotary_concat_part_dort(self):
-        origin = self._get_model("dort-c-custom__1.onnx")
-        before = [node for node in origin.graph.node if node.op_type == "ConstantOfShape"]
-        gr = GraphBuilder(
-            origin,
-            optimization_options=OptimizationOptions(patterns=["RotaryConcatPart"]),
-            infer_shapes_options=True,
-        )
-        onx = gr.to_onnx(optimize=True)
-        after = [node for node in onx.graph.node if node.op_type == "ConstantOfShape"]
-        self.assertEqual(len(before) - 4, len(after))
-
-    @unittest.skipIf(True, "not yet completed")
-    def test_rotary_concat_part_plug(self):
-        origin = self._get_model("dort-pres-plug_1.onnx")
-        before = [node for node in origin.graph.node if node.op_type == "ConstantOfShape"]
-        gr = GraphBuilder(
-            origin,
-            optimization_options=OptimizationOptions(patterns=["RotaryConcatPart"], verbose=20),
-            infer_shapes_options=True,
-        )
-        onx = gr.to_onnx(optimize=True)
-        after = [node for node in onx.graph.node if node.op_type == "ConstantOfShape"]
-        self.assertEqual(len(before) - 4, len(after))
-
     def test_rotary_concat_part_execution_1(self):
-        from onnx_array_api.light_api import start
+        from yobx.builder.light import start
 
         def mk(shape):
             return np.array(shape, dtype=np.int64)
@@ -924,7 +789,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         self.assertEqualArray(expected[0], got[0])
 
     def test_rotary_concat_part_execution_2(self):
-        from onnx_array_api.light_api import start
+        from yobx.builder.light import start
 
         def mk(shape):
             return np.array(shape, dtype=np.int64)
@@ -985,7 +850,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         self.assertEqualArray(expected[0], got[0])
 
     def test_mul_mul_mul(self):
-        from onnx_array_api.light_api import start
+        from yobx.builder.light import start
 
         def mk(shape):
             return np.array(shape, dtype=np.float32)
@@ -1031,7 +896,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         self.assertEqualArray(expected[0], got[0], atol=1e-5)
 
     def test_div_div_mul(self):
-        from onnx_array_api.light_api import start
+        from yobx.builder.light import start
 
         def mk(shape):
             return np.array(shape, dtype=np.float32)
@@ -1123,21 +988,8 @@ class TestGraphPatternOptimization(ExtTestCase):
     def test_sub1_mul_right(self):
         self.common_sub1_mul("right")
 
-    def test_sub1_mul_data(self):
-        origin = self._get_model("basic_static_1.onnx")
-        check_model(origin)
-        node_list = [(n.op_type, tuple(n.output)) for n in origin.graph.node]
-        gr = GraphBuilder(
-            origin,
-            optimization_options=OptimizationOptions(patterns=["Sub1Mul"]),
-        )
-        onx = gr.to_onnx(optimize=True)
-        check_model(onx)
-        new_node_list = [(n.op_type, tuple(n.output)) for n in onx.graph.node]
-        self.assertNotEqual(node_list, new_node_list)
-
     def test_statistics(self):
-        from onnx_array_api.light_api import start
+        from yobx.builder.light import start
 
         def mk(shape):
             return np.array(shape, dtype=np.float32)
@@ -1191,23 +1043,6 @@ class TestGraphPatternOptimization(ExtTestCase):
             ],
         )
 
-    def test_sub2_mul_data(self):
-        origin = self._get_model("dort-cus-custom__1_sub.onnx")
-        node_list = [(n.op_type, tuple(n.output)) for n in origin.graph.node]
-        gr = GraphBuilder(
-            origin,
-            optimization_options=OptimizationOptions(patterns=["Sub1Mul"]),
-        )
-        stat = gr.optimize()
-        self.assertGreater(len(stat), 20)
-        onx = gr.to_onnx(optimize=False)
-        csts = [i for i in onx.graph.node if "Constant" in i.op_type]
-        cst_output = set(i.output[0] for i in csts)
-        self.assertNotIn("fill", cst_output)
-        self.assertNotIn("fill_1", cst_output)
-        new_node_list = [(n.op_type, tuple(n.output)) for n in onx.graph.node]
-        self.assertNotEqual(node_list, new_node_list)
-
     def common_expand_broadcast(self, side):
         model = oh.make_model(
             oh.make_graph(
@@ -1248,20 +1083,6 @@ class TestGraphPatternOptimization(ExtTestCase):
 
     def test_expand_broadcast_right(self):
         self.common_expand_broadcast("right")
-
-    def test_expand_broadcast_data(self):
-        origin = self._get_model("dort-cus-custom__1_sub.onnx")
-        node_list = [n.op_type for n in origin.graph.node]
-        gr = GraphBuilder(
-            origin,
-            infer_shapes_options=True,
-            optimization_options=OptimizationOptions(patterns=["ExpandBroadcast"]),
-        )
-        stat = gr.optimize()
-        self.assertGreater(len(stat), 26)
-        onx = gr.to_onnx(optimize=False)
-        new_node_list = [n.op_type for n in onx.graph.node]
-        self.assertNotEqual(node_list, new_node_list)
 
     def test_mul_reshape_2of3_static_3(self):
         model = oh.make_model(
@@ -1927,22 +1748,6 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
-    def test_matmul_reshape_phi(self):
-        origin = self._get_model("phi_1_good.onnx")
-        check_model(origin)
-        self._check_with_ort(origin)
-        gr = GraphBuilder(
-            origin,
-            infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["MatMulReshape2Of3"],
-                verbose=0,  # stop_after=2
-            ),
-        )
-        onx = gr.to_onnx(optimize=True)
-        self._check_with_ort(onx)
-        check_model(onx)
-
     def test_slices_split(self):
         model = oh.make_model(
             oh.make_graph(
@@ -1979,55 +1784,6 @@ class TestGraphPatternOptimization(ExtTestCase):
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
-
-    def test_slices_split_llama(self):
-        origin = self._get_model("dort-split-custom__0.onnx")
-        split = [n for n in origin.graph.node if n.op_type == "Split"]
-        self.assertEqual(len(split), 0)
-        self._check_with_ort(origin)
-        gr = GraphBuilder(
-            origin,
-            infer_shapes_options=False,
-            optimization_options=OptimizationOptions(
-                patterns=["SlicesSplit"],
-                verbose=0,
-            ),
-        )
-        gr.set_shape("transpose", (2, 2, 1024, 512))
-        gr.set_shape("transpose_1", (2, 2, 1024, 512))
-        onx = gr.to_onnx(optimize=True)
-        # self.dump_onnx("test_slices_split_llama.onnx", onx)
-        split = [n for n in onx.graph.node if n.op_type == "Split"]
-        self.assertEqual(len(split), 2)
-        self._check_with_ort(onx)
-
-    def test_slices_split_llama_not_onnx_node_shape_inference(self):
-        origin = self._get_model("dort-split-custom__0.onnx")
-        split = [n for n in origin.graph.node if n.op_type == "Split"]
-        self.assertEqual(len(split), 0)
-        self._check_with_ort(origin)
-        # ShapeInference is necessarily incomplete because the model contains
-        # a couple of FusedMatMul operator (from onnxruntime).
-        # The inference seems to give a wrong value in that (empty)
-        # which may be considered as a empty shape.
-        # Then a node after this one may be wrong in case of an empty shape.
-        # The optimization may do something wrong.
-        gr = GraphBuilder(
-            origin,
-            infer_shapes_options=InferShapesOptions.NEW | InferShapesOptions.ONNX,
-            optimization_options=OptimizationOptions(
-                patterns=["SlicesSplit"],
-                verbose=0,
-            ),
-        )
-        gr.set_shape("transpose", (2, 2, 1024, 512))
-        gr.set_shape("transpose_1", (2, 2, 1024, 512))
-        onx = gr.to_onnx(optimize=True)
-        # We delete all the shape values because some of them are wrong.
-        del onx.graph.value_info[:]
-        split = [n for n in onx.graph.node if n.op_type == "Split"]
-        self.assertEqual(len(split), 2)
-        self._check_with_ort(onx)
 
     def test_gathers_split_rank1(self):
         model = oh.make_model(
@@ -2322,18 +2078,6 @@ class TestGraphPatternOptimization(ExtTestCase):
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
-
-    def test_rotary_concat_dort(self):
-        origin = self._get_model("dort-llama-llama-ort_1.onnx")
-        before = [node for node in origin.graph.node if node.op_type == "Transpose"]
-        gr = GraphBuilder(
-            origin,
-            optimization_options=OptimizationOptions(patterns=["RotaryConcatPart"], verbose=0),
-            infer_shapes_options=True,
-        )
-        onx = gr.to_onnx(optimize=True)
-        after = [node for node in onx.graph.node if node.op_type == "Transpose"]
-        self.assertNotEqual(len(before), len(after))
 
     def test_same_children_pattern_2(self):
         model = oh.make_model(

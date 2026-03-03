@@ -28,13 +28,6 @@ def _count(matches):
 class GraphBuilderPatternOptimization:
     """
     Implements optimization after the conversion is done.
-    The differences between the two models can be display with a
-    command line such as:
-
-    ::
-
-        python -m onnx_array_api compare -m1 <model.onnx> -m2 <optimized.onnx> -m nodes -c 80
-
     This class assumes a pattern cannot reuse an existing name.
 
     :param builder: GraphBuilder
@@ -1031,10 +1024,7 @@ class GraphBuilderPatternOptimization:
                 f"saved {fullname!r}"
             )
 
-        try:
-            from onnx_array_api.translate_api import translate, translate_header
-        except ImportError:
-            return
+        from ..translate import translate, translate_header
 
         try:
             import black
@@ -1044,7 +1034,7 @@ class GraphBuilderPatternOptimization:
             # No black formatting.
             _format = lambda code: code  # noqa: E731
 
-        fmt = "onnx"
+        fmt = "onnx-compact"
         code1 = _format(translate_header(fmt) + translate(model, api=fmt))
         code2 = _format(translate_header(fmt) + translate(model_apply, api=fmt))
         with open(f"{fullname}.py", "w") as f:

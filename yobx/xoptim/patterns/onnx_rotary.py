@@ -12,12 +12,12 @@ class RotaryConcatPartPattern(PatternOptimization):
     """
     Optimizes the following pattern
 
-    .. plot::
+    .. gdot::
+        :script: DOT-SECTION
 
         import numpy as np
         from onnx import TensorProto
-        from onnx_array_api.light_api import start
-        from onnx_array_api.plotting.graphviz_helper import plot_dot
+        from yobx.builder.light import start
 
         def mk(shape):
             return np.array(shape, dtype=np.int64)
@@ -55,10 +55,8 @@ class RotaryConcatPartPattern(PatternOptimization):
             .vout(TensorProto.FLOAT, ("a", "b", "c", "d"))
             .to_onnx()
         )
-        ax = plot_dot(model)
-        ax.set_title("Dummy graph")
-        plt.show()
-
+        dot = to_dot(model)
+        print("DOT-SECTION", dot)
 
     Model with nodes to be fused:
 

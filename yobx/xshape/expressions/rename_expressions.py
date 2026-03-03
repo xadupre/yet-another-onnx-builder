@@ -48,7 +48,7 @@ def rename_expression(expr: str, mapping: Dict[str, str]) -> str:
     try:
         tree = ast.parse(expr, mode="eval")
     except TypeError as e:
-        raise TypeError(f"Unable to parse expresssion {expr!r}.") from e
+        raise TypeError(f"Unable to parse expression {expr!r}.") from e
     transformer = RenameTransformer(mapping)
     new_tree = transformer.visit(tree)
     ast.fix_missing_locations(new_tree)

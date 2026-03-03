@@ -57,7 +57,7 @@ class TestTranslate(ExtTestCase):
 
     def test_translate_header_light(self):
         header = translate_header("light")
-        self.assertIn("onnx_array_api", header)
+        self.assertIn("yobx", header)
 
     def test_translate_header_builder(self):
         header = translate_header("builder")
