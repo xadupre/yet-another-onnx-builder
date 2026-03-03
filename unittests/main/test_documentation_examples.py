@@ -78,7 +78,7 @@ class TestDocumentationExamples(ExtTestCase):
 
             if (
                 not reason
-                and name in {"plot_input_observer_transformers.py"}
+                and name in {"plot_input_observer_transformers.py", "plot_patch_model.py"}
                 and not has_transformers("4.57")
             ):
                 reason = "transformers<4.57"

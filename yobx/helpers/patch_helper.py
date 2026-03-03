@@ -293,7 +293,17 @@ class PatchDetails:
         The function goes through the graph node (only the main graph) and
         looks into the metadata to determine if a listed patch was involved.
 
-        :param graph: fx graph
+        :param graph: a graph object whose nodes can be iterated.
+            The method is designed for :class:`torch.fx.Graph` but works with
+            any object that satisfies the following minimal contract:
+
+            * ``graph.nodes`` — iterable of node objects.
+            * ``node.meta`` — a :class:`dict` attached to each node.
+            * ``node.meta["stack_trace"]`` — a string containing the
+              call-stack captured when the node was created.
+
+            Any custom graph representation that provides these three
+            attributes will work just as well as a native ``fx.Graph``.
         :return: list of nodes impacted by a patch
         """
         patches = []
@@ -345,13 +355,9 @@ class PatchDetails:
         # checks all patches were discovered
         for node, _ in node_stack:
             assert hasattr(node, "meta"), "node has no attribute 'meta'"
-            assert hasattr(node, "target"), "node has no attribute 'meta'"
-            assert hasattr(node, "name"), "node has no attribute 'meta'"
-            assert hasattr(node, "args"), "node has no attribute 'meta'"
             assert id(node) in patched_nodes, (
                 f"One node was patched but no patch was found:\n"
-                f"node: {node.target}({','.join(map(str, node.args))}) -> {node.name}"
-                f"\n--\n{pprint.pformat(node.meta)}"
+                f"node.meta={pprint.pformat(node.meta)}"
             )
 
         res = {}  # type: ignore[var-annotated]
