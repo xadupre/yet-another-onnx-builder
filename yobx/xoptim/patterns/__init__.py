@@ -124,7 +124,7 @@ class AlmostDoNothingPattern(PatternOptimization):
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
-        if self.n_count >= 0:
+        if self.n_count > 0:
             return self.none()
         if node.op_type != "Pow" or node.domain != "":
             return self.none()
