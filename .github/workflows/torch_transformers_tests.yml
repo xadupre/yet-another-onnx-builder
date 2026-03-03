@@ -1,0 +1,56 @@
+name: Torch Transformers Tests
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 4 * * *"
+
+jobs:
+  torch_tests:
+    name: torch transformers tests (ubuntu-latest, py3.12, torch-${{ matrix.torch-version }}, transformers-${{ matrix.transformers-version }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        torch-version: ["2.10"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install pytorch 2.10
+        if: matrix.torch-version == '2.10'
+        run: pip install torch==2.10.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - name: Install nightly pytorch
+        if: matrix.torch-version == 'nightly'
+        run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,docs,torch]"
+
+      - name: install transformers==4.49
+        run: pip install transformers==4.49 && pip freeze
+      - name: Run tests with transformers==4.49
+        run: pytest unittests/torch --durations=10
+
+      - name: install transformers==4.55
+        run: pip install transformers==4.55 && pip freeze
+      - name: Run tests with transformers==4.55
+        run: pytest unittests/torch --durations=10
+
+      - name: install transformers==4.57
+        run: pip install transformers==4.57 && pip freeze
+      - name: Run tests with transformers==4.57
+        run: pytest unittests/torch --durations=10
+
+      - name: install transformers==5.2
+        run: pip install transformers==5.2 && pip freeze
+      - name: Run tests with transformers==5.2
+        run: pytest unittests/torch --durations=10
