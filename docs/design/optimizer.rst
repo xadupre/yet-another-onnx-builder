@@ -219,7 +219,7 @@ We then apply the optimizations by writing the following code:
     onx = onnx.load("temp_doc_mlp.onnx")
 
     # The model is placed in a GraphBuilder.
-    # It creates dictionnaires to store shapes, ranks, types
+    # It creates dictionaries to store shapes, ranks, types
     # to make it easier to the optimizers to find the information
     # they need. It still uses NodeProto to store nodes
     gr = GraphBuilder(onx, infer_shapes_options=True)
