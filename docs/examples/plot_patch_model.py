@@ -1,154 +1,115 @@
 """
 .. _l-plot-patch-model:
 
-Patching an ONNX model and displaying the diff
-===============================================
+Applying patches to a model and displaying the diff
+=====================================================
 
-This example shows how to **patch** an existing ONNX model — replacing one
-operator with another — and then visualise exactly what changed using
-:func:`make_diff_code <yobx.helpers.patch_helper.make_diff_code>` combined
-with :func:`translate <yobx.translate.translate>`.
+Before exporting a PyTorch model with :func:`torch.export.export`, a set of
+**patches** must be applied to work around limitations in the PyTorch exporter.
+This example shows how to:
 
-Workflow:
+1. Apply those patches with
+   :func:`apply_patches_for_model <yobx.torch.patch.apply_patches_for_model>`.
+2. Inspect the registered
+   :class:`PatchDetails <yobx.helpers.patch_helper.PatchDetails>` object that
+   is yielded by the context manager.
+3. Display a unified diff for each
+   :class:`PatchInfo <yobx.helpers.patch_helper.PatchInfo>` so you can see
+   exactly what changed in the original PyTorch internals.
 
-1. Build an original model.
-2. Patch it (replace ``Relu`` with ``LeakyRelu``).
-3. Translate both models to Python source code with ``translate()``.
-4. Call ``make_diff_code()`` to produce a unified diff of the two code strings.
-
-The diff immediately shows what changed in the model at the code level, which
-is useful when reviewing optimisation passes or debugging graph transformations.
+The context manager both **applies** the patches on entry and **removes** them
+on exit, so the original functions are restored once the ``with`` block ends.
 """
 
-import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-
-from yobx.helpers.patch_helper import make_diff_code
-from yobx.translate import translate
-
-TFLOAT = onnx.TensorProto.FLOAT
+import matplotlib.pyplot as plt
+import torch
+from yobx.helpers.patch_helper import PatchDetails
+from yobx.torch import apply_patches_for_model
 
 # %%
-# 1. Build the original model
-# ----------------------------
-#
-# The graph computes ``Y = Relu(X @ W + b)`` — a single linear layer followed
-# by a ReLU activation.
-
-W = onh.from_array(np.random.randn(8, 4).astype(np.float32), name="W")
-b = onh.from_array(np.zeros(4, dtype=np.float32), name="b")
-
-original = oh.make_model(
-    oh.make_graph(
-        [
-            oh.make_node("Gemm", ["X", "W", "b"], ["Z"]),
-            oh.make_node("Relu", ["Z"], ["Y"]),
-        ],
-        "linear_relu",
-        [oh.make_tensor_value_info("X", TFLOAT, [None, 8])],
-        [oh.make_tensor_value_info("Y", TFLOAT, [None, 4])],
-        [W, b],
-    ),
-    opset_imports=[oh.make_opsetid("", 17)],
-    ir_version=9,
-)
-onnx.checker.check_model(original)
-print(f"Original model: {[n.op_type for n in original.graph.node]}")
-
-# %%
-# 2. Patch the model
-# -------------------
-#
-# Replace the ``Relu`` node with a ``LeakyRelu`` node (``alpha=0.01``).
-# We rebuild the graph from scratch, keeping everything the same except for
-# the activation node.
-
-patched = oh.make_model(
-    oh.make_graph(
-        [
-            oh.make_node("Gemm", ["X", "W", "b"], ["Z"]),
-            oh.make_node("LeakyRelu", ["Z"], ["Y"], alpha=0.01),
-        ],
-        "linear_relu",
-        [oh.make_tensor_value_info("X", TFLOAT, [None, 8])],
-        [oh.make_tensor_value_info("Y", TFLOAT, [None, 4])],
-        [W, b],
-    ),
-    opset_imports=[oh.make_opsetid("", 17)],
-    ir_version=9,
-)
-onnx.checker.check_model(patched)
-print(f"Patched  model: {[n.op_type for n in patched.graph.node]}")
-
-# %%
-# 3. Translate both models to Python source
+# 1. Apply patches and inspect PatchDetails
 # ------------------------------------------
 #
-# :func:`translate <yobx.translate.translate>` converts each
-# :class:`onnx.ModelProto` into a self-contained Python snippet.
-# We use the ``"onnx-short"`` API so that large initialisers are replaced
-# by compact ``np.random.randn(…)`` calls, keeping the diff readable.
+# :func:`apply_patches_for_model` accepts two boolean flags:
+#
+# * ``patch_torch=True``  — patches several internal PyTorch functions that
+#   prevent successful dynamic-shape export.
+# * ``patch_transformers=True`` — adds extra patches for 🤗 Transformers models.
+#
+# The context manager yields a :class:`PatchDetails` instance that lists every
+# :class:`PatchInfo` that was applied.
 
-code_original = translate(original, api="onnx-short")
-code_patched = translate(patched, api="onnx-short")
-
-print("=== original ===")
-print(code_original)
+with apply_patches_for_model(patch_torch=True) as details:
+    assert isinstance(details, PatchDetails)
+    print(f"Number of patches applied: {details.n_patches}")
+    for patch in details:
+        print(f"  [{patch.family}] {patch.name}")
 
 # %%
-# 4. Display the diff
-# --------------------
+# 2. Display the diff for each patch
+# ------------------------------------
 #
-# :func:`make_diff_code <yobx.helpers.patch_helper.make_diff_code>` produces
-# a standard unified diff between two source strings.  Lines starting with
-# ``-`` were removed; lines starting with ``+`` were added.
+# After the ``with`` block the patches have been removed, but
+# :meth:`PatchInfo.format_diff` still works because the original function
+# reference is retained internally.
+#
+# Each diff is a standard ``unified diff`` — lines starting with ``-`` were
+# in the original function; lines starting with ``+`` are in the patched
+# version.
 
-diff = make_diff_code(code_original, code_patched)
-print("=== diff (original -> patched) ===")
-print(diff)
-
-assert "Relu" in diff, "expected 'Relu' to appear in the diff"
-assert "LeakyRelu" in diff, "expected 'LeakyRelu' to appear in the diff"
-assert "-" in diff and "+" in diff, "expected both additions and removals in the diff"
+for patch in details:
+    print(patch.format_diff(format="raw"))
+    print()
 
 # %%
-# 5. Visualise the diff as a bar chart
-# -------------------------------------
+# 3. Verify the patches are removed after the context exits
+# ----------------------------------------------------------
 #
-# The chart below counts how many lines were added, removed, or unchanged in
-# the diff.  For a single-node replacement the numbers are small, but the same
-# approach scales to complex graph rewrites.
+# Applying the same patches a second time succeeds, which proves the first
+# ``with`` block cleanly removed them.
 
-import matplotlib.pyplot as plt  # noqa: E402
+with apply_patches_for_model(patch_torch=True) as details2:
+    assert details2.n_patches == details.n_patches, (
+        f"Expected {details.n_patches} patches, got {details2.n_patches}"
+    )
+print("Patches removed and re-applied successfully.")
 
-added = sum(1 for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++"))
-removed = sum(
-    1 for line in diff.splitlines() if line.startswith("-") and not line.startswith("---")
-)
-context = sum(
-    1
-    for line in diff.splitlines()
-    if line and not line.startswith(("+", "-", "@", "\\"))
-)
+# %%
+# 4. Visualise patch sizes
+# -------------------------
+#
+# The chart below shows the total number of changed lines (additions +
+# removals) for each patch, giving a quick sense of how invasive each
+# rewrite is.
 
-fig, ax = plt.subplots(figsize=(5, 4))
-bars = ax.bar(
-    ["added", "removed", "context"],
-    [added, removed, context],
-    color=["#55a868", "#c44e52", "#4c72b0"],
-)
-ax.set_ylabel("Number of lines")
-ax.set_title("Unified diff: Relu → LeakyRelu")
-for bar, val in zip(bars, [added, removed, context]):
+patch_names = []
+diff_sizes = []
+
+for patch in details:
+    diff = patch.make_diff()
+    added = sum(
+        1 for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++")
+    )
+    removed = sum(
+        1 for line in diff.splitlines() if line.startswith("-") and not line.startswith("---")
+    )
+    patch_names.append(patch.name)
+    diff_sizes.append(added + removed)
+
+fig, ax = plt.subplots(figsize=(max(6, len(patch_names) * 1.5), 4))
+bars = ax.bar(range(len(patch_names)), diff_sizes, color="#4c72b0")
+ax.set_xticks(range(len(patch_names)))
+ax.set_xticklabels(patch_names, rotation=45, ha="right", fontsize=8)
+ax.set_ylabel("Changed lines (added + removed)")
+ax.set_title("Size of each torch patch")
+for bar, val in zip(bars, diff_sizes):
     ax.text(
         bar.get_x() + bar.get_width() / 2,
-        bar.get_height() + 0.05,
+        bar.get_height() + 0.1,
         str(val),
         ha="center",
         va="bottom",
-        fontsize=10,
+        fontsize=9,
     )
 plt.tight_layout()
 plt.show()
