@@ -93,7 +93,7 @@ def get_pattern(
         return []
     raise RuntimeError(
         f"Unable to find pattern for {obj!r} among {len(mapping)} "
-        f"pattenrs\n{pprint.pformat(mapping)}."
+        f"patterns\n{pprint.pformat(mapping)}."
     )
 
 
