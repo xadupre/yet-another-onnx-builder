@@ -60,6 +60,8 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
         from yobx.torch.torch_helper import torch_deepcopy
 
         model_data = get_tiny_model("arnir0/Tiny-LLM")
+        # torch_deepcopy is needed because the cache (past_key_values) is modified in-place
+        # during the forward pass; reusing the same object would corrupt subsequent calls.
         result = model_data.model(**torch_deepcopy(model_data.export_inputs))
         ep = torch.export.export(
             model_data.model,
