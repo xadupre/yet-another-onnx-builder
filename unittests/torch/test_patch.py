@@ -46,17 +46,26 @@ class TestPatch(ExtTestCase):
         expected = data.model(**data.export_inputs)
         self.assertTrue(torch.allclose(got, expected))
 
-    def test_broadcast_multiply_model_forward(self):
-        """get_tiny_model('broadcast_multiply') can run a forward pass."""
-        data = get_tiny_model("broadcast_multiply")
+    def test_broadcast_add_model_forward(self):
+        """get_tiny_model('broadcast_add') runs a forward pass.
+
+        x:(batch,1,hidden) + y:(1,seq,hidden) -> (batch,seq,hidden) verifies
+        that the model correctly broadcasts across two independently-dynamic dims.
+        """
+        data = get_tiny_model("broadcast_add")
         result = data.model(**data.export_inputs)
-        expected = data.export_inputs["x"] * data.export_inputs["w"]
+        expected = data.export_inputs["x"] + data.export_inputs["y"]
         self.assertTrue(torch.allclose(result, expected))
 
-    def test_broadcast_multiply_model_export_with_patch(self):
-        """'broadcast_multiply' model exports successfully under patch_torch=True (tests
-        patched_infer_size and patched__broadcast_shapes)."""
-        data = get_tiny_model("broadcast_multiply")
+    def test_broadcast_add_model_export_with_patch(self):
+        """'broadcast_add' exports under patch_torch=True.
+
+        The two inputs have *different* dynamic dims — batch on x, seq on y —
+        so the export tracer must broadcast two independent symbolic sizes.
+        This specifically exercises the ``sym_max`` else-branch in
+        :func:`torch._refs._broadcast_shapes` (patched__broadcast_shapes).
+        """
+        data = get_tiny_model("broadcast_add")
         with apply_patches_for_model(patch_torch=True) as details:
             ep = torch.export.export(
                 data.model,

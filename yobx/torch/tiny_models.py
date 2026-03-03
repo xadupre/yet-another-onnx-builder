@@ -11,13 +11,15 @@ class _AddModel(torch.nn.Module):
         return x + y
 
 
-class _ScaledBroadcastModel(torch.nn.Module):
-    """A model that multiplies a ``(batch, seq, hidden)`` tensor by a
-    ``(1, 1, hidden)`` scale vector, exercising shape-broadcasting paths
-    through the torch fake-tensor machinery."""
+class _BroadcastAddModel(torch.nn.Module):
+    """Adds a ``(batch, 1, hidden)`` tensor to a ``(1, seq, hidden)`` tensor,
+    producing a ``(batch, seq, hidden)`` result.  Both dynamic dimensions come
+    from *different* inputs, so the shape computation must broadcast across two
+    independent symbolic sizes — exercising the ``sym_max`` else-branch inside
+    :func:`torch._refs._broadcast_shapes`."""
 
-    def forward(self, x, w):
-        return x * w
+    def forward(self, x, y):
+        return x + y
 
 
 @dataclass
@@ -67,10 +69,12 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
       patch) and :class:`torch.fx.experimental.symbolic_shapes.DynamicDimConstraintPrinter`
       (constraint-printing patch).  Requires only :epkg:`torch`, no *transformers*.
 
-    * ``"broadcast_multiply"`` — multiplies a ``(batch, seq, hidden)`` tensor by a
-      ``(1, 1, hidden)`` scale vector.  Exercises
-      :func:`torch._subclasses.fake_impls.infer_size` and
-      :func:`torch._refs._broadcast_shapes` (broadcasting-shape patches).
+    * ``"broadcast_add"`` — adds a ``(batch, 1, hidden)`` tensor to a
+      ``(1, seq, hidden)`` tensor, producing ``(batch, seq, hidden)``.  The
+      two dynamic dimensions come from *different* inputs, forcing the export
+      tracer to broadcast across two independent symbolic sizes and specifically
+      exercising the ``sym_max`` else-branch inside
+      :func:`torch._refs._broadcast_shapes`.
       Requires only :epkg:`torch`, no *transformers*.
 
     * ``"arnir0/Tiny-LLM"`` — a tiny LLaMA-based causal language model with a
@@ -128,19 +132,19 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
             ),
         )
 
-    if model_id == "broadcast_multiply":
+    if model_id == "broadcast_add":
         batch = torch.export.Dim("batch", min=1, max=1024)
         seq = torch.export.Dim("seq", min=1, max=4096)
         return ModelData(
             model_id=model_id,
-            model=_ScaledBroadcastModel(),
+            model=_BroadcastAddModel(),
             export_inputs=dict(
-                x=torch.randn(2, 5, 8, dtype=torch.float32),
-                w=torch.randn(1, 1, 8, dtype=torch.float32),
+                x=torch.randn(2, 1, 8, dtype=torch.float32),
+                y=torch.randn(1, 5, 8, dtype=torch.float32),
             ),
             dynamic_shapes=dict(
-                x={0: batch, 1: seq},
-                w={},
+                x={0: batch},
+                y={1: seq},
             ),
         )
 
