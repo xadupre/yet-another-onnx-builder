@@ -1136,7 +1136,7 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
         # If there is not broadcast involved then it is ok.
         # At this stage, we know shapes are equal before the reshaped operators
         # and the same reshape is applied. So checking the output shape
-        # is not necesssary.
+        # is not necessary.
         return MatchResult(self, [left, right, node], self.apply, insert_at=node)
 
     def apply(
@@ -1318,7 +1318,7 @@ class ConcatReshapePattern(PatternOptimization):
                 op_types[p.op_type] = op_types.get(p.op_type, 0) + 1
 
         if len(op_types) == 1:
-            # only ony operator
+            # only one operator
             op_type = list(op_types)[0]  # noqa: RUF015
             if op_type != "Shape":
                 return self.none(node, inspect.currentframe().f_lineno)
@@ -1758,7 +1758,7 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
         path.append(last)
 
         new_shape = []
-        mone = 0
+        m_one = 0
         for di, dj, pi, pj in reversed(path):
             sh1, sh2 = s1[pi : pi + di], s2[pj : pj + dj]
             if all(isinstance(_, int) for _ in sh2):
@@ -1774,16 +1774,16 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
                     new_shape.append(0)
                 else:
                     new_shape.append(-1)
-                    mone += 1
+                    m_one += 1
             else:
                 for i in sh2:
                     if isinstance(i, str):
                         new_shape.append(-1)
-                        mone += 1
+                        m_one += 1
                     else:
                         new_shape.append(i)
 
-        if mone > 1:
+        if m_one > 1:
             return None
         assert (
             None not in new_shape

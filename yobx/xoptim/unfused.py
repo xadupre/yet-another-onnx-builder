@@ -33,7 +33,7 @@ def unfused_nodes(
         from yobx.helpers import pretty_onnx
 
 
-        print("-- load optmized model")
+        print("-- load optimized model")
         optimized = onnx.load("<optimized_model.onnx>")
 
         print("-- loading not optimized model")
@@ -150,7 +150,7 @@ def unfused_nodes(
     )
     assert (
         not large_inits
-    ), f"Not yet implemeted with large initializers large_inits={set(large_inits)}"
+    ), f"Not yet implemented with large initializers large_inits={set(large_inits)}"
 
     # We convert constants to initializers.
     init_names = set(i.name for i in inits)

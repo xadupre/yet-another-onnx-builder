@@ -193,7 +193,7 @@ class MatMulAddPattern(PatternOptimization):
             if (sh1 is None or not isinstance(sh1[-1], int)) and (
                 sh2 is None or not isinstance(sh2[0], int)
             ):
-                # unkown k for the matrix multiplication
+                # unknown k for the matrix multiplication
                 return self.none(node, inspect.currentframe().f_lineno)
 
         next_nodes = g.next_nodes(node.output[0])
@@ -1901,7 +1901,7 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
 
 class SwitchReshapeActivationPattern(PatternOptimization):
     """
-    Swiches Gelu and Reshape after a Gemm or a MatMul.
+    Switches Gelu and Reshape after a Gemm or a MatMul.
     Gelu can also be Gelu, Exp, Elu, Relu, Tan,
     Tanh, Cos, Cosh, Sin, Sinh, Erf, LeakyRelu, PRelu,
     Selu, Softmax, Softplus.

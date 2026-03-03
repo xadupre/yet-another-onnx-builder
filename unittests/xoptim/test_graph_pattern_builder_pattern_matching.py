@@ -562,7 +562,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                     oh.make_node("Mul", ["Y", "sy"], ["ysy"]),
                     oh.make_node("Mul", ["X", "ysy"], ["final"]),
                 ],
-                "nd",
+                "and",
                 [
                     oh.make_tensor_value_info("X", TensorProto.FLOAT, [1, "b", "c"]),
                     oh.make_tensor_value_info("Y", TensorProto.FLOAT, ["a", "b", "c"]),

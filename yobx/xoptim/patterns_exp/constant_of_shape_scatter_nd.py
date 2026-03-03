@@ -250,7 +250,7 @@ class MaskedShapeScatterNDPattern(PatternOptimization):
             oh.make_node(
                 "Constant",
                 [],
-                ["mone"],
+                ["m_one"],
                 value=onh.from_array(np.array([-1], dtype=np.int64), name="value"),
             )
         )
@@ -269,7 +269,7 @@ class MaskedShapeScatterNDPattern(PatternOptimization):
                 "Where", ["masked_indices", "zero", "updates"], ["masked_updates"]
             )
         )
-        nodes.append(oh.make_node("Equal", ["indices", "mone"], ["masked_indices"]))
+        nodes.append(oh.make_node("Equal", ["indices", "m_one"], ["masked_indices"]))
         outputs.append(
             oh.make_tensor_value_info(
                 "y", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM6", "UNKNOWNDIM7")

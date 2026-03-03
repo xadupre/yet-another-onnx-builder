@@ -204,7 +204,7 @@ class MulMulMulScalarPattern(PatternOptimization):
 class SwitchOrderBinaryPattern(PatternOptimization):
     """
     If it makes sense, switches the order of two multiplications
-    or two addtions if the broadcasting reduces one operator to
+    or two additions if the broadcasting reduces one operator to
     a an insignificant number.
 
     Model with nodes to be fused:

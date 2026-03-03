@@ -417,7 +417,7 @@ class _GraphPatterns(_GraphPredecessorSuccessors):
             )
             if p.cursor >= 0:
                 if p.cursor in bug:
-                    # This means one input is shared accross multiple patterns.
+                    # This means one input is shared across multiple patterns.
                     # This cannot be possible.
                     p.cursor = -1
                 else:

@@ -1251,7 +1251,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                     oh.make_graph(
                         [
                             oh.make_node("Shape", ["A"], ["shapeA"], start=0, end=-1),
-                            oh.make_node("Concat", ["shapeA", "mone"], ["shapey"], axis=0),
+                            oh.make_node("Concat", ["shapeA", "m_one"], ["shapey"], axis=0),
                             oh.make_node("Reshape", ["A", "shape"], ["xr"]),
                             oh.make_node("Gemm", ["xr", "B"], ["y2"], transB=transB),
                             oh.make_node("Reshape", ["y2", "shapey"], ["yy"]),
@@ -1265,7 +1265,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                         [oh.make_tensor_value_info("Y", TFLOAT, ["a", "b", "c"])],
                         [
                             onh.from_array(np.array([-1, 8], dtype=np.int64), name="shape"),
-                            onh.from_array(np.array([-1], dtype=np.int64), name="mone"),
+                            onh.from_array(np.array([-1], dtype=np.int64), name="m_one"),
                         ],
                     ),
                     opset_imports=[oh.make_opsetid("", 18)],

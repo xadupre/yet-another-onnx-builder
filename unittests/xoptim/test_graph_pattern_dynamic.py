@@ -33,7 +33,7 @@ class TestGraphPatternDynamic(ExtTestCase):
             dynamic_model,
             patterns,
             False,
-            # Remaining cases if constrainsts are not handled properly
+            # Remaining cases if constraints are not handled properly
             exceptions=["Reshape2Of3Pattern", "MatMulReshape2Of3Pattern"],
         )
 

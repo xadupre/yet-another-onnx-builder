@@ -722,7 +722,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                         ["data"],
                         value=onh.from_array(np.array([0], dtype=np.float32)),
                     ),
-                    oh.make_node("Equal", ["indices", "mone"], ["masked_indices"]),
+                    oh.make_node("Equal", ["indices", "m_one"], ["masked_indices"]),
                     oh.make_node(
                         "Where",
                         ["masked_indices", "zero", "updates"],
@@ -735,7 +735,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                         reduction=reduction,
                     ),
                 ],
-                "nd",
+                "and",
                 [
                     oh.make_tensor_value_info("shape", TensorProto.INT64, [None]),
                     oh.make_tensor_value_info("indices", TensorProto.INT64, [None, None, 1]),
@@ -743,7 +743,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                 ],
                 [oh.make_tensor_value_info("y", itype, [None, None])],
                 [
-                    onh.from_array(np.array([-1], dtype=np.int64), name="mone"),
+                    onh.from_array(np.array([-1], dtype=np.int64), name="m_one"),
                     onh.from_array(np.array([0], dtype=dtype), name="zero"),
                 ],
             ),

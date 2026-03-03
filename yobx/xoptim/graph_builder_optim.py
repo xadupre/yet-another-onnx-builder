@@ -1431,7 +1431,7 @@ class GraphBuilderPatternOptimization:
                         )
                     break
 
-            # matches contains all the matchs
+            # matches contains all the matches
             d = time.perf_counter() - begin
             statistics.append(
                 dict(
@@ -1564,7 +1564,7 @@ class GraphBuilderPatternOptimization:
         :param sopt_after: stop after this number of replacements (to debug),
             -1 not to stop
         :param recursive: to overwrites the value provided by the options
-        :return: the method returns informations about the applied processes.
+        :return: the method returns information about the applied processes.
 
         The algorithm runs multiple iteration until the graph is not evolving
         or `max_iter` is reached. By default, it is equal to the number of nodes.
@@ -1848,7 +1848,7 @@ class GraphBuilderPatternOptimization:
                         time_in=time.perf_counter() - begin,
                     )
                 )
-                self._check_graph(statistics, "remove_unused", it, "BU", self.verifies)
+                self._check_graph(statistics, "remove_unused", it, "BUS", self.verifies)
                 if id_removed > 0:
                     continue_optimization = True
                 if self.verbose >= 10 or self._debug_step:
@@ -2049,7 +2049,7 @@ class GraphBuilderPatternOptimization:
                 )
             new_atts.append(oh.make_attribute(att.name, new_g))
 
-            # We need to append functions and initiliazers to the main graph.
+            # We need to append functions and initializers to the main graph.
 
             for k, v in g.initializers_dict.items():
                 assert (

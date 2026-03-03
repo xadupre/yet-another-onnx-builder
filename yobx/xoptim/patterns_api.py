@@ -109,7 +109,7 @@ class PatternOptimization:
     An environment variable equal to the class name can be set as well to
     track this specific pattern.
 
-    :param verbose: determine the verbosity, this can be also dermine by setting up
+    :param verbose: determine the verbosity, this can be also determine by setting up
         environment variable ``LOG_PATTERN_OPTIMIZE=10``
     :param priority: at each iteration,
         all patterns whose priority is below one threshold
@@ -167,7 +167,7 @@ class PatternOptimization:
             if subset_nodes is None:
                 subset_nodes = g.builder.nodes
             for node in subset_nodes:
-                # This expression seems awkard but it saves 10% just by looking into
+                # This expression seems awkward but it saves 10% just by looking into
                 # the first item of the list and then, if necessary, walking through the
                 # rest of the outputs.
                 if g.is_used(node.output[0]) or any(g.is_used(o) for o in node.output[1:]):
@@ -202,7 +202,7 @@ class PatternOptimization:
             it holds all the existing nodes, is able to return any information
             about type, shape, the node before, the node after another one.
         :param node: the matching must determine if some nodes around this one
-            are part of set of nodes this pattern optmizer can rewrite.
+            are part of set of nodes this pattern optimizer can rewrite.
             From there, the function explores wherever it needs,
             checking any condition it needs.
         :param matched: usually unused, it returns of nodes already matching
@@ -383,7 +383,7 @@ class EasyPatternOptimization(PatternOptimization):
 
     def add_local_functions_to_builder(self, g2: "GraphBuilder"):  # noqa: F821
         """
-        Adds missing local functions ot understand the applied pattern.
+        Adds missing local functions to understand the applied pattern.
         There is none by default but there some pattern may need to overwrite this.
         """
 
@@ -784,7 +784,7 @@ class EasyPatternOptimization(PatternOptimization):
             if not missing:
                 continue
 
-            # At this stage, there are mutiple options for matching. We can:
+            # At this stage, there are multiple options for matching. We can:
             # 1. make assumptions and continue
             # 2. mark the node as incomplete matching, we could end up stuck anyway.
             assert True, (

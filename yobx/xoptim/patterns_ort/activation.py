@@ -196,10 +196,10 @@ class BiasGeluPattern(PatternOptimization):
         if set(mul.input) != {add.output[0], add_1.output[0]}:
             return self.none(node, inspect.currentframe().f_lineno)
 
-        halfs = g.next_nodes(mul.output[0])
-        if len(halfs) != 1:
+        halves = g.next_nodes(mul.output[0])
+        if len(halves) != 1:
             return self.none(node, inspect.currentframe().f_lineno)
-        half = halfs[0]
+        half = halves[0]
         if half.op_type != "Mul" or half.domain != "":
             return self.none(node, inspect.currentframe().f_lineno)
         index = 1 if half.input[0] == mul.output[0] else 0

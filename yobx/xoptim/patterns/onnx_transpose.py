@@ -398,12 +398,12 @@ class TransposeReshapeTransposePattern(PatternOptimization):
             while s1 != s2 and i < len(shape) and j < len(new_shape):
                 if s1 < s2:
                     i += 1
-                    assert i < len(shape), f"Unxpected index i={i}, shape={shape}"
+                    assert i < len(shape), f"Unexpected index i={i}, shape={shape}"
                     s1 *= shape[i]
                     ii.append(i)
                 else:
                     j += 1
-                    assert j < len(new_shape), f"Unxpected index i={j}, shape={new_shape}"
+                    assert j < len(new_shape), f"Unexpected index i={j}, shape={new_shape}"
                     s2 *= new_shape[j]
                     jj.append(j)
 

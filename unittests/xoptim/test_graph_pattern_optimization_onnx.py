@@ -2970,7 +2970,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             oh.make_graph(
                 [
                     oh.make_node("Unsqueeze", ["X", "axis"], ["Y"]),
-                    oh.make_node("Equal", ["X", "mone"], ["xe"]),
+                    oh.make_node("Equal", ["X", "m_one"], ["xe"]),
                     oh.make_node("Unsqueeze", ["xe", "axis"], ["Z"]),
                 ],
                 "dummy",
@@ -2981,7 +2981,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 ],
                 [
                     onh.from_array(np.array([1], dtype=np.int64), name="axis"),
-                    onh.from_array(np.array([-1], dtype=np.float32), name="mone"),
+                    onh.from_array(np.array([-1], dtype=np.float32), name="m_one"),
                 ],
             )
         )
