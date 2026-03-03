@@ -104,7 +104,7 @@ returned by method *match*. Since it is a list of arguments, method
 *match* can include None values. The method returns the new nodes.
 The optimizer considers that any node given to this function is removed
 from the graph, and any node returned by it are added.
-If a received node must be kept, it must be added to the list of returned node.
+If a received node must be kept, it must be added to the list of returned nodes.
 
 Optimization Algorithm
 ======================
