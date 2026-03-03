@@ -28,8 +28,8 @@ class BinaryInvestigation(PatternOptimization):
             print(f"[{self.__class__.__name__}] {self.report(g, *nodes)}")
         return self.none()
 
-    def _str(cls, g, node):
-        if node.op_type in cls._ops:
+    def _str(self, g, node):
+        if node.op_type in self._ops:
             sh1 = g.get_shape(node.input[0]) if g.has_shape(node.input[0]) else ("?",)
             sh2 = g.get_shape(node.input[1]) if g.has_shape(node.input[1]) else ("?",)
             if len(sh1) == 0:
@@ -43,13 +43,13 @@ class BinaryInvestigation(PatternOptimization):
         return f"{node.op_type}(...)"
 
     def report(
-        cls,
+        self,
         g: "GraphBuilder",  # noqa: F821
         node: NodeProto,
         left: Optional[NodeProto],
         right: Optional[NodeProto],
     ):
-        rows = [cls._str(g, node)]
-        rows.append(f"[{cls._str(g, left)}]" if left is not None else "[?]")
-        rows.append(f"[{cls._str(g, right)}]" if right is not None else "[?]")
+        rows = [self._str(g, node)]
+        rows.append(f"[{self._str(g, left)}]" if left is not None else "[?]")
+        rows.append(f"[{self._str(g, right)}]" if right is not None else "[?]")
         return " --- ".join(rows)
