@@ -2,13 +2,24 @@ Elements of Design
 ==================
 
 .. toctree::
+   :caption: helpers
 
    container
    cube
    evaluator
-   flatten
-   graph_builder
    helpers
-   patches
-   shape
    translate
+
+.. toctree::
+   :caption: builders
+
+   graph_builder
+   optimizers
+   optimizer_patterns
+   shape
+
+.. toctree::
+   :caption: torch
+
+   flatten
+   patches
