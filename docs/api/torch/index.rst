@@ -8,6 +8,7 @@ yobx.torch
     flatten
     input_observer
     patch
+    tiny_models
     torch_helper
     in_torch/index
     in_transformers/index
