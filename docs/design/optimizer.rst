@@ -195,7 +195,7 @@ We consider the following simple model:
         f.write(onx.SerializeToString())
     print(pretty_onnx(onx))
 
-Which we can renders as follows:
+Which we can render as follows:
 
 .. gdot::
     :script: DOT-SECTION
