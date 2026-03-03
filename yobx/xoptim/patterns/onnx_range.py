@@ -1,7 +1,11 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class SwapRangeAddScalarPattern(PatternOptimization):
@@ -136,16 +140,16 @@ class SwapRangeAddScalarPattern(PatternOptimization):
 
         node_add = g.next_nodes(node.output[0])
         if len(node_add) != 1 or node_add[0].op_type != "Add" or node_add[0].domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cst = node_add[0].input[1]
         if not g.has_shape(cst) or g.get_shape(cst) != (1,):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node, node_add[0]], self.apply, insert_at=node_add[0])
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_range: NodeProto,
         node_add: NodeProto,
     ) -> List[NodeProto]:

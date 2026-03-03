@@ -1,8 +1,12 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 import numpy as np
 from onnx import NodeProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class SliceSlicePattern(PatternOptimization):
@@ -144,30 +148,30 @@ class SliceSlicePattern(PatternOptimization):
             or before.op_type != "Slice"
             or before.domain != ""
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         axis2 = None if len(node.input) < 3 else node.input[3]
         axis1 = None if len(before.input) < 3 else before.input[3]
         if axis1 is None or axis2 is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.is_constant(axis1) or not g.is_constant(axis2):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cst1 = g.get_computed_constant(axis1)
         cst2 = g.get_computed_constant(axis2)
         if cst1 is None or cst2 is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         set1 = set(map(int, cst1))
         set2 = set(map(int, cst2))
         if set1 & set2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [before, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         before: NodeProto,
         node: NodeProto,
     ) -> List[NodeProto]:

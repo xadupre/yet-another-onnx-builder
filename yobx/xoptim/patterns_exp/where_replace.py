@@ -1,7 +1,11 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto, TensorProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class ReplaceZeroPattern(PatternOptimization):
@@ -133,27 +137,27 @@ class ReplaceZeroPattern(PatternOptimization):
             return self.none()
 
         if not g.is_constant(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cast_node = g.node_before(node.input[0])
         if cast_node is None or cast_node.op_type != "Cast" or node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         to = g.get_attribute(cast_node, "to").i
         if to != TensorProto.BOOL:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if node.input[2] != cast_node.input[0]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [cast_node, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         cast_node: NodeProto,
         where_node: NodeProto,
     ) -> List[NodeProto]:

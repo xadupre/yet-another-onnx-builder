@@ -1,9 +1,13 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 import numpy as np
 from onnx import NodeProto
 from ...xshape._shape_helper import all_int
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class FusedMatMulDivPattern(PatternOptimization):
@@ -142,20 +146,20 @@ class FusedMatMulDivPattern(PatternOptimization):
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         op_type = next_nodes[0].op_type
         if op_type not in ("Mul", "Div"):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.is_constant_scalar(next_nodes[0].input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, next_nodes[0]], self.apply, insert_at=next_nodes[0])
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         node_div: NodeProto,
     ) -> List[NodeProto]:
@@ -314,15 +318,15 @@ class FusedMatMulPattern(PatternOptimization):
             transB = g.get_attribute(node, "transB", exc=False) or 0
             if transA != transB:
                 # one side is already transposed.
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         if not g.has_rank(node.input[0]) or not g.has_rank(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_rank(node.input[0]) < 2 or g.get_rank(node.input[1]) < 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_rank(node.input[0]) <= 2 and g.get_rank(node.input[1]) <= 2:
             # Regular Gemm.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         nodes_before = [g.node_before(node.input[0]), g.node_before(node.input[1])]
         ns = [
@@ -330,7 +334,7 @@ class FusedMatMulPattern(PatternOptimization):
             for n in nodes_before
         ]
         if len([_ for _ in ns if _ is not None]) == 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.has_processor("CUDA"):
             nns = []
@@ -343,7 +347,7 @@ class FusedMatMulPattern(PatternOptimization):
                     continue
                 nns.append(n)
             if len([_ for _ in ns if _ is not None]) == 0:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             ns = nns
 
         hints = []
@@ -366,7 +370,7 @@ class FusedMatMulPattern(PatternOptimization):
         ns = nns
         if not found:
             # unexpected transpose
-            return self.none(node, inspect.currentframe().f_lineno, lambda: f"hints={hints}")
+            return self.none(node, _get_lineno(), lambda: f"hints={hints}")
 
         # At this stage, one or two inputs are transposed before being used.
         # MatMul or Gemm are operating on 2D tensors.
@@ -388,7 +392,7 @@ class FusedMatMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_before_left: Optional[NodeProto],
         node_before_right: Optional[NodeProto],
         node: NodeProto,
@@ -633,18 +637,18 @@ class FusedMatMulx2Pattern(PatternOptimization):
             break
 
         if div_node is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(div_node.output[0])
         op_types = [n.op_type for n in next_nodes]
         if any(t not in {"FusedMatMul", "MatMul"} for t in op_types):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [div_node, *next_nodes], self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         div_node: Optional[NodeProto],
         *mnodes: Optional[NodeProto],
     ) -> List[NodeProto]:
@@ -813,28 +817,28 @@ class FusedMatMulTransposePattern(PatternOptimization):
             return self.none()
 
         if g.is_used_more_than_once(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_nodes = g.next_nodes(node.output[0])
         if (
             len(next_nodes) != 1
             or next_nodes[0].op_type != "Transpose"
             or next_nodes[0].domain != ""
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         transpose_node = next_nodes[0]
         perm = list(g.get_attribute(transpose_node, "perm").ints)
         if len(perm) > 2:
             if perm[:-2] != list(range(len(perm) - 2)):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         if perm[-2:] != [len(perm) - 1, len(perm) - 2]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, transpose_node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         transpose_node: NodeProto,
     ) -> List[NodeProto]:
@@ -987,26 +991,26 @@ class ReshapeGemmPattern(PatternOptimization):
 
         transA = g.get_attributes_with_default(node, transA=0)["transA"]
         if transA != 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         node_before = g.node_before(node.input[0])
         if node_before is None or node_before.op_type != "Reshape" or node_before.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape = g.get_shape(node.input[1])
         if not all_int(shape):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(node_before.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         shape = g.get_computed_constant(node_before.input[1])
         if shape.shape != (2,) or shape[0] != -1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node_before, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         reshape_node: NodeProto,
         gemm_node: NodeProto,
     ) -> List[NodeProto]:
@@ -1157,34 +1161,34 @@ class ReshapeGemmReshapePattern(PatternOptimization):
             return self.none()
         transA = g.get_attributes_with_default(node, transA=0)["transA"]
         if transA != 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         node_before = g.node_before(node.input[0])
         if node_before is None or node_before.op_type != "Reshape" or node_before.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_computed_constant(node_before.input[1])
         if cst is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if cst[0] != -1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_nodes = g.next_nodes(node.output[0])
         if (
             len(next_nodes) != 1
             or next_nodes[0].op_type != "Reshape"
             or next_nodes[0].domain != ""
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node_before.input[0]) or not g.has_shape(next_nodes[0].output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape_final = g.get_shape(next_nodes[0].output[0])[:-1]
         if g.get_shape(node_before.input[0])[: len(shape_final)] != shape_final:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node_before, node, next_nodes[0]], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         reshape_before: NodeProto,
         gemm_node: NodeProto,
         reshape_after: NodeProto,
@@ -1329,10 +1333,10 @@ class TransposeFusedMatMulBPattern(PatternOptimization):
         ):
             return self.none()
         if g.is_used_more_than_once(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         transB = g.get_attributes_with_default(node, transB=0)["transB"]
         if transB != 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         transpose_node = g.node_before(node.input[1])
         if (
@@ -1340,15 +1344,15 @@ class TransposeFusedMatMulBPattern(PatternOptimization):
             or transpose_node.op_type != "Transpose"
             or transpose_node.domain != ""
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         perm = list(g.get_attribute(transpose_node, "perm").ints)
         if perm != [0, 2, 3, 1]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [transpose_node, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         transpose_node: NodeProto,
         node: NodeProto,
     ) -> List[NodeProto]:

@@ -1,5 +1,4 @@
-import inspect
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 import numpy as np
 from onnx import NodeProto
 from ...xshape._shape_helper import (
@@ -8,7 +7,12 @@ from ...xshape._shape_helper import (
     is_static_shape,
     all_int,
 )
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class MatMulAddPattern(PatternOptimization):
@@ -176,17 +180,17 @@ class MatMulAddPattern(PatternOptimization):
         if node.op_type not in {"MatMul", "Gemm"} or node.domain != "":
             return self.none()
         if not g.has_rank(node.input[0]) or not g.has_rank(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_rank(node.input[0]) < 2 or g.get_rank(node.input[1]) != 2:
             # If node.op_type is Gemm, this condition is useless,
             # if node.op_type is MatMul we reshape the matrix if
             # it the rank is > 2 and the last dimension known,
             # but then no bias should be allowed a Gemm does not support
             # broadcast.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not self.allow_reshape and g.get_rank(node.input[0]) != 2:
             # No reshape is allowed.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_rank(node.input[0]) > 2:
             sh1 = g.get_shape(node.input[0]) if g.has_shape(node.input[0]) else None
             sh2 = g.get_shape(node.input[1]) if g.has_shape(node.input[1]) else None
@@ -194,19 +198,19 @@ class MatMulAddPattern(PatternOptimization):
                 sh2 is None or not isinstance(sh2[0], int)
             ):
                 # unknown k for the matrix multiplication
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         add_node = next_nodes[0]
         if add_node.op_type != "Add":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # Gemm does not allow broadcasting.
         bias2 = add_node.input[0 if add_node.input[1] == node.output[0] else 1]
         if not g.has_shape(node.input[1]) or not g.has_shape(bias2):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         transB = (
             g.get_attributes_with_default(node, transB=0).get("transB", 0)
             if node.op_type == "Gemm"
@@ -216,19 +220,19 @@ class MatMulAddPattern(PatternOptimization):
         last_dim = shape_2[-1 - transB]
         shape_bias = g.get_shape(bias2)
         if last_dim != shape_bias[-1]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if len(shape_bias) > 1:
             shape_node_out = g.get_shape(node.output[0]) if g.has_shape(node.output[0]) else None
             if shape_node_out is not None:
                 if len(shape_node_out) != len(shape_bias):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 elif shape_node_out != shape_bias:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
             elif min(shape_bias[:-1]) <= 1:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         if add_node.input[0] == add_node.input[1]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if node.op_type == "MatMul" or len(node.input) == 2:
             return MatchResult(self, [node, add_node], self.apply, insert_at=add_node)
@@ -239,7 +243,7 @@ class MatMulAddPattern(PatternOptimization):
             or not g.has_shape(bias2)
             or g.get_shape(bias) != g.get_shape(bias2)
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, add_node], self.apply, insert_at=add_node)
 
@@ -387,7 +391,7 @@ class MatMulAddPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         matmul_node: NodeProto,
         add_node: NodeProto,
     ) -> List[NodeProto]:
@@ -527,18 +531,18 @@ class GemmTransposePattern(PatternOptimization):
         if node.op_type != "Gemm" or node.domain != "":
             return self.none()
         if not g.is_constant(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if node.op_type == "Gemm":
             atts = g.get_attributes_with_default(node, transA=0, transB=0, beta=1.0)
             if atts.get("beta", 1) != 1:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if atts.get("transB", 0) or atts.get("transA", 0):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         tr = g.unique_name(f"{self.__class__.__name__}--{node.input[1]}")
@@ -724,10 +728,10 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
         if node.op_type == "FusedMatMul":
             tA = g.get_attribute(node, "transBatchA", exc=False)
             if tA is not None and tA.i != 0:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             tB = g.get_attribute(node, "transBatchB", exc=False)
             if tB is not None and tB.i != 0:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         if (
             not g.has_shape(node.output[0])
@@ -735,11 +739,11 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
             or not g.has_shape(node.input[1])
         ):
             # Shapes are missing. They should be populated as much as possible.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) > 1 or (len(next_nodes) == 0 and not g.is_output(node.output[0])):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_node = None if len(next_nodes) == 0 else next_nodes[0]
         node_left = g.node_before(node.input[0])
         node_right = g.node_before(node.input[1])
@@ -751,7 +755,7 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
         types = [type_left, type_right, type_out]
         n_reshape = len([_ for _ in types if _ == "Reshape"])
         if n_reshape < 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if node_left is not None and node_left.op_type != "Reshape":
             node_left = None
@@ -761,9 +765,9 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
             next_node = None
 
         if node_left is not None and not g.has_shape(node_left.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if node_right is not None and not g.has_shape(node_right.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         shape_left_left = None if node_left is None else g.get_shape(node_left.input[0])
         shape_right_right = None if node_right is None else g.get_shape(node_right.input[0])
@@ -783,17 +787,17 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
             )
         ):
             # last dimension are the same
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         the_shape_left = shape_left_left or shape_left
         the_shape_right = shape_right_right or shape_right
         if not is_static_shape(the_shape_left) or not is_static_shape(the_shape_right):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not self.same_size(
             g, the_shape_left[:-2], the_shape_right[:-2], g.get_registered_constraints()
         ):
             # first dimension are the same
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if next_node is not None:
             next_shape = g.get_shape(next_node.output[0])
@@ -801,22 +805,22 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
             if matmul_shape[-2:] != next_shape[-2:] and not self.same_size(
                 g, matmul_shape[:-2], next_shape[:-2], g.get_registered_constraints()
             ):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             first_dims = {next_shape[:-2], the_shape_left[:-2], the_shape_right[:-2]}
             if len(first_dims) == 3:
                 # All shapes are different. It is not worth it.
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             if len(next_shape) != len(the_shape_left) and len(next_shape) != len(the_shape_right):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             if matmul_shape[-1] != next_shape[-1]:
                 # 1x9x64, 1x64x9 -> 1x9x9 -> 1x81
                 # The last dimension changed.
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         else:
             if len(the_shape_left) != len(the_shape_right):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         # The pattern is not handling the reshape after the matmul,
         # ReshapeReshapePattern will do it.
@@ -826,7 +830,7 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_left: Optional[NodeProto],
         node_right: Optional[NodeProto],
         node: NodeProto,
@@ -1170,19 +1174,19 @@ class MulMulMatMulPattern(PatternOptimization):
 
         node_before = [g.node_before(i) for i in node.input]
         if None in node_before:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         types = set(_.op_type for _ in node_before)
         if types != {"Mul"}:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = [i for i in [*node_before[0].input, *node_before[1].input] if g.is_constant(i)]
         if len(cst) != 2 or not all(g.is_constant_scalar(c) for c in cst):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [*node_before, node], self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         mul1: NodeProto,
         mul2: NodeProto,
         node: NodeProto,
@@ -1342,26 +1346,26 @@ class ReshapeMatMulReshapePattern(PatternOptimization):
         if node.op_type != "MatMul" or node.domain != "":
             return self.none()
         if g.is_used_more_than_once(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) == 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_node = next_nodes[0]
         if next_node.op_type != "Reshape" or node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         node_before_left = g.node_before(node.input[0])
         node_before_right = g.node_before(node.input[1])
         if node_before_left is None or node_before_right is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if (
             node_before_left.op_type != "Reshape"
             or node_before_left.domain != ""
             or node_before_right.op_type != "Reshape"
             or node_before_right.domain != ""
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # condition on shapes
         if not g.is_constant(node_before_left.input[1]):
@@ -1374,15 +1378,15 @@ class ReshapeMatMulReshapePattern(PatternOptimization):
             return
         shape_final = tuple(int(i) for i in g.get_computed_constant(next_node.input[1]))
         if len(shape_final) < 4:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         ndim = len(shape_final)
         if len(shape_left) != 3 or len(shape_right) != 3:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         mshape_left = g.get_shape(node_before_left.input[0])
         mshape_right = g.get_shape(node_before_right.input[0])
         if len(mshape_left) != ndim or len(mshape_right) != ndim:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if (
             not compatible_shapes(mshape_left[-2:], shape_left[-2:])
             or not compatible_shapes(mshape_right[-2:], shape_right[-2:])
@@ -1390,7 +1394,7 @@ class ReshapeMatMulReshapePattern(PatternOptimization):
                 mshape_left[-1], shape_left[-1], mshape_right[-2], shape_right[-2]
             )
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # At this stage, both Reshape before MatMul reduces the rank by 1
         # without changing the two last dimensions
@@ -1411,7 +1415,7 @@ class ReshapeMatMulReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_before_left: NodeProto,
         node_before_right: NodeProto,
         node: NodeProto,
@@ -1524,9 +1528,9 @@ class TransposeMatMulPattern(PatternOptimization):
         if node.op_type not in {"MatMul", "Gemm"} or node.domain != "":
             return self.none()
         if not g.has_rank(node.input[0]) or not g.has_rank(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_rank(node.input[0]) != 2 or g.get_rank(node.input[1]) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         nodes_before = [g.node_before(node.input[0]), g.node_before(node.input[1])]
         ns = [
@@ -1534,7 +1538,7 @@ class TransposeMatMulPattern(PatternOptimization):
             for n in nodes_before
         ]
         if len([_ for _ in ns if _ is not None]) == 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.has_processor("CUDA"):
             nns = []
@@ -1547,7 +1551,7 @@ class TransposeMatMulPattern(PatternOptimization):
                     continue
                 nns.append(n)
             if len([_ for _ in ns if _ is not None]) == 0:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             ns = nns
 
         for n in ns:
@@ -1556,10 +1560,10 @@ class TransposeMatMulPattern(PatternOptimization):
             perm = tuple(g.get_attribute(n, "perm").ints)
             if perm != (1, 0):
                 # unexpected transpose
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         if len([_ for _ in ns if _ is not None]) == 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # At this stage, one or two inputs are transposed before being used.
         # MatMul or Gemm are operating on 2D tensors.
@@ -1572,20 +1576,20 @@ class TransposeMatMulPattern(PatternOptimization):
                     node.input[1]
                 ):
                     # it is better to do constant folding rather than changing transB
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
             if nodes[0] is not None:  # nodes_before_left
                 atts = g.get_attributes_with_default(node, transA=0, transB=0)
                 if atts.get("transB", 0) != atts.get("transA", 0) and g.is_constant(
                     node.input[0]
                 ):
                     # it is better to do constant folding rather than changing transB
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
 
         return MatchResult(self, nodes, self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_before_left: Optional[NodeProto],
         node_before_right: Optional[NodeProto],
         node: NodeProto,
@@ -1799,7 +1803,7 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
         elif right:
             side = "right"
         else:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if side == "left":
             node_left = g.node_before(node.input[0])
@@ -1817,7 +1821,7 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
         if not g.is_constant(shape_name):
             if left_first and right:
                 return self.match(g, node, matched, left_first=False)
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         shape_before = g.get_shape((node_left or node_right).input[0])
         shape_after = g.get_shape((node_left or node_right).output[0])
@@ -1825,7 +1829,7 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
             # the two last dimension are not modified by the reshape
             if left_first and right:
                 return self.match(g, node, matched, left_first=False)
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(
             self,
@@ -1836,7 +1840,7 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         node_left: Optional[NodeProto],
         node_left_tr: Optional[NodeProto],
@@ -2043,19 +2047,19 @@ class SwitchReshapeActivationPattern(PatternOptimization):
         ):
             return self.none()
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         before = g.node_before(node.input[0])
         if before is None or g.is_used_more_than_once(before.input[0]):
-            return self.none(before, inspect.currentframe().f_lineno)
+            return self.none(before, _get_lineno())
         if before.op_type not in {"Reshape", "Transpose"} or node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         before_before = g.node_before(before.input[0])
         if (
             before_before is None
             or before_before.op_type not in {"Gemm", "MatMul"}
             or before_before.domain != ""
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(
             self,
             [before_before, before, node],
@@ -2065,7 +2069,7 @@ class SwitchReshapeActivationPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         mm_node: NodeProto,
         tr_node: NodeProto,
         f_node: NodeProto,
@@ -2224,15 +2228,15 @@ class ShapeBasedMatMulToMulPattern(PatternOptimization):
         if node.op_type != "MatMul" or node.domain != "":
             return self.none()
         if not g.has_shape(node.input[0]) or not g.has_shape(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape1 = g.get_shape(node.input[0])
         shape2 = g.get_shape(node.input[1])
         if len(shape1) < 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if len(shape2) < 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if shape1[-1] != 1 or shape2[-2] != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_node = g.next_nodes(node.output[0])
         if len(next_node) == 1 and next_node[0].op_type == "Transpose":
@@ -2253,7 +2257,7 @@ class ShapeBasedMatMulToMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         mm_node: NodeProto,
         transpose: Optional[NodeProto],
     ) -> List[NodeProto]:

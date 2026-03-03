@@ -1,9 +1,13 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 import numpy as np
 from onnx import NodeProto
 from ...helpers.onnx_helper import unary_like_op_types
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class ConcatGatherPattern(PatternOptimization):
@@ -107,17 +111,17 @@ class ConcatGatherPattern(PatternOptimization):
         if node.op_type != "Gather" or node.domain != "":
             return self.none()
         if not g.is_constant(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_computed_constant(node.input[1])
         if cst is None or cst.dtype != np.int64 or cst.shape != (1,):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         before = g.node_before(node.input[0])
         if not before or before.op_type != "Concat":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if any(not g.has_shape(i) for i in before.input):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if any(g.get_shape(i) != (1,) for i in before.input):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         assert cst[0] < len(before.input), (
             f"Concat concatenates many dimensions into one but "
             f"cst={cst} and before.input={before.input}"
@@ -126,7 +130,7 @@ class ConcatGatherPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         concat_node: NodeProto,
         gather_node: NodeProto,
     ) -> List[NodeProto]:
@@ -258,10 +262,10 @@ class ConcatEmptyPattern(_CommonConcatPattern):
             return self.none()
         rem = self.remove_set(g, node)
         if not rem:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
+    def apply(self, g: "GraphBuilderPatternOptimization", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         rem = self.remove_set(g, node)
         assert rem, f"rem is empty for node={node}"
         new_inputs = [n for i, n in enumerate(node.input) if i not in rem]
@@ -413,10 +417,10 @@ class ConcatTwiceUnaryPattern(_CommonConcatPattern):
         nodes = [n for n in g.next_nodes(node.output[0]) if self._valid_node(g, node, n)]
         if nodes:
             return MatchResult(self, [node, nodes[0]], self.apply)
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
-        self, g: "GraphBuilder", concat: NodeProto, unary: NodeProto  # noqa: F821
+        self, g: "GraphBuilderPatternOptimization", concat: NodeProto, unary: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         new_name = g.unique_name(f"u{unary.output[0]}")
         nodes = [

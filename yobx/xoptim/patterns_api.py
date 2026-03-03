@@ -3,10 +3,25 @@ import os
 import pprint
 import textwrap
 from collections import Counter
-from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 import numpy as np
 from onnx import AttributeProto, FunctionProto, ModelProto, NodeProto, TensorProto
 from ..helpers.onnx_helper import make_idn
+
+if TYPE_CHECKING:
+    from ..xbuilder.graph_builder import GraphBuilder
+    from .graph_builder_optim import GraphBuilderPatternOptimization
+
+
+
+def _get_lineno() -> int:
+    """Returns the line number of the caller (used with ``self.none(node, _get_lineno())``)."""
+    frame = inspect.currentframe()
+    if frame is not None:
+        back = frame.f_back
+        if back is not None:
+            return back.f_lineno
+    return 0
 
 
 def string_to_elem_type(name: str) -> int:
@@ -103,7 +118,7 @@ class PatternOptimization:
     """
     Defines an optimization pattern.
     Function match should return None if the match does not happen
-    or better ``self.none(node, inspect.currentframe().f_lineno)``.
+    or better ``self.none(node, _get_lineno())``.
     That allows the user to know which line rejected a specific pattern
     by setting environment variable ``LOG_PATTERN_OPTIMIZE=10``.
     An environment variable equal to the class name can be set as well to
@@ -235,7 +250,7 @@ class PatternOptimization:
 
         ::
 
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         By setting the verbosity (see next Section), the user may then know
         which lines in the code returned None and which condition failed.
@@ -266,7 +281,7 @@ class PatternOptimization:
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         *nodes: Sequence[NodeProto],
     ) -> List[NodeProto]:
         """
@@ -286,7 +301,7 @@ class PatternOptimization:
             f"This function must be overloaded in class {self.__class__.__name__!r}."
         )
 
-    def _pattern_to_string(self, _g: "GraphBuilder"):  # noqa: F821
+    def _pattern_to_string(self, _g: "GraphBuilderPatternOptimization"):  # noqa: F821
         return "Pattern cannot be constructed without the matched nodes."
 
 
@@ -459,7 +474,7 @@ class EasyPatternOptimization(PatternOptimization):
                 "-- model",
                 n,
             )
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         pattern_input_names = set(pat.input_names)
         for nr, pnr in zip(n.input, pn.input):
@@ -485,7 +500,7 @@ class EasyPatternOptimization(PatternOptimization):
                     *g.next_nodes(nr),
                     type(n),
                 )
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         for i, pi in zip(n.input, pn.input):
             ppred = pat.node_before(pi)
@@ -502,7 +517,7 @@ class EasyPatternOptimization(PatternOptimization):
                     "-- ppred",
                     ppred,
                 )
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if pred.op_type != ppred.op_type or len(pred.input) != len(ppred.input):
                 # Distinct type
                 self._hint(
@@ -512,7 +527,7 @@ class EasyPatternOptimization(PatternOptimization):
                     "-- ppred",
                     ppred,
                 )
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             # matching backward
             key = make_idn(ppred)
@@ -530,7 +545,7 @@ class EasyPatternOptimization(PatternOptimization):
                         "-- pattern",
                         self._pattern_to_string(g),
                     )
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
 
                 self._update_ambiguities(pair_results_names, pred, ppred)
 
@@ -586,7 +601,7 @@ class EasyPatternOptimization(PatternOptimization):
                     "-- model",
                     n,
                 )
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             matched_results = list(zip(n.output, pn.output))
         elif isinstance(n, str) and isinstance(pn, str):
             matched_results = [(n, pn)]
@@ -613,7 +628,7 @@ class EasyPatternOptimization(PatternOptimization):
                     "-- len(pns)",
                     len(pns),
                 )
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             # Here comes the fun part, there is the same number of successors or more
             # nodes in the graph to match with the pattern.
@@ -630,7 +645,7 @@ class EasyPatternOptimization(PatternOptimization):
                         "-- ppred",
                         pns[0],
                     )
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 amb = self._has_ambiguities(pair_results_names, ns[0], pns[0])
                 if amb:
                     self._hint(
@@ -652,7 +667,7 @@ class EasyPatternOptimization(PatternOptimization):
                             f"{self._pattern_to_string(g)}\n-- graph --\n"
                             f"{g.builder.pretty_text()}"
                         )
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
 
                 key = make_idn(pns[0])
                 if key not in marked:
@@ -681,7 +696,7 @@ class EasyPatternOptimization(PatternOptimization):
                 continue
             if len(free) < len(p_marked):
                 # Not enough successors to match the remaining patterns.
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if len(p_marked) == len(free) == 1:
                 # Only one option again.
                 if p_marked[0].op_type != free[0].op_type or len(p_marked[0].input) != len(
@@ -694,7 +709,7 @@ class EasyPatternOptimization(PatternOptimization):
                         "-- ppred",
                         free[0],
                     )
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 amb = self._has_ambiguities(pair_results_names, free[0], p_marked[0])
                 if amb:
                     self._hint(
@@ -714,7 +729,7 @@ class EasyPatternOptimization(PatternOptimization):
                             f"{self._pattern_to_string(g)}\n-- graph --\n"
                             f"{g.builder.pretty_text()}"
                         )
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
 
                 key = make_idn(p_marked[0])
                 if key not in marked:
@@ -750,11 +765,11 @@ class EasyPatternOptimization(PatternOptimization):
                     "-- model-marked",
                     id_marked,
                 )
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             for k, v in ec.items():
                 if gc[k] < v:
                     # Not enough types to match.
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
 
             # At this stage, we know matching the types is possible.
             # We first mark whatever is possible.
@@ -982,7 +997,7 @@ class EasyPatternOptimization(PatternOptimization):
                 return True
         return False
 
-    def _pattern_to_string(self, g: "GraphBuilder"):  # noqa: F821
+    def _pattern_to_string(self, g: "GraphBuilderPatternOptimization"):  # noqa: F821
         return textwrap.indent(self.display_pattern(g, self.match_pattern), "    ")
 
     def pretty_matched_pairs(self, pairs: List[Tuple[NodeProto, NodeProto]]) -> str:
@@ -1009,7 +1024,7 @@ class EasyPatternOptimization(PatternOptimization):
             # The first node does not have the same type.
             return self.none()
         if len(node.input) != len(p_node.input):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         check_ids = set(make_idn(n) for n in pat.nodes)
         if self.verbose > 5:
@@ -1113,7 +1128,7 @@ class EasyPatternOptimization(PatternOptimization):
 
         if iteration >= max_iter and stacked:
             self.hint("reached {iteration}>={max_iter} iterations")
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # At this point, the pattern is matched but let's make sure.
         assert len(stacked) == 0, f"There are still {len(stacked)} nodes to explore."
@@ -1127,7 +1142,7 @@ class EasyPatternOptimization(PatternOptimization):
                 "-- len(pat.nodes)",
                 len(pat.nodes),
             )
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # We order the matched nodes in the same order than the pattern
         # to let next functions to be able to build the matching again.
@@ -1173,7 +1188,7 @@ class EasyPatternOptimization(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         *nodes: Sequence[NodeProto],
     ) -> List[NodeProto]:
         # Why build the pattern gain

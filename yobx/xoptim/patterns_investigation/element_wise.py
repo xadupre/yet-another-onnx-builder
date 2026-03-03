@@ -1,6 +1,11 @@
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto
 from ..patterns_api import MatchResult, PatternOptimization
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class BinaryInvestigation(PatternOptimization):

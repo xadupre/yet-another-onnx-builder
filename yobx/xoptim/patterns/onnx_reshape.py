@@ -1,10 +1,14 @@
-import inspect
-from typing import List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 import numpy as np
 from onnx import NodeProto
 from ...helpers.onnx_helper import element_wise_binary_op_types
 from ...xshape._shape_helper import all_int, DYNAMIC_SHAPE, STATIC_SHAPE
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class ReshapePattern(PatternOptimization):
@@ -22,24 +26,24 @@ class ReshapePattern(PatternOptimization):
         if node.op_type != "Reshape" or node.domain != "":
             return self.none()
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape = g.get_shape(node.input[0])
         if not all_int(shape):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(node.input[1]):
             # It may be a symbolic shape.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         value = g.get_computed_constant(node.input[1])
         if value is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         new_shape = tuple(int(i) for i in value)
         if shape != new_shape:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         new_node = g.make_node(
@@ -161,15 +165,15 @@ class ShapedBasedReshapePattern(ReshapePattern):
         if node.op_type != "Reshape" or node.domain != "":
             return self.none()
         if not g.is_constant(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_computed_constant(node.input[1])
         if cst is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = tuple(cst)
         if cst[-1] == 0 or set(cst[:-1]) != {0}:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_rank(node.input[0]) or g.get_rank(node.input[0]) != len(cst):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
 
@@ -272,51 +276,51 @@ class ReduceReshapePattern(PatternOptimization):
             return self.none()
 
         if g.is_used_more_than_once(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         att = g.get_attribute(node, "keepdims", exc=False)
         keepdims = 1 if att is None else att.i
         if keepdims == 0:
             # not keeping the dimension so Reshape means to restore them.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if len(node.input) == 2:
             if not g.is_constant(node.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             axes = tuple(g.get_computed_constant(node.input[1]))
         else:
             if not g.has_rank(node.input[0]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             att = g.get_attribute(node, "axes", exc=False)
             axes = tuple(range(g.get_rank(node.input[0]))) if att is None else tuple(att.ints)
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_node = next_nodes[0]
         if next_node.op_type != "Reshape" or node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if next_node.input[0] != node.output[0]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.get_rank(node.input[0]) != g.get_rank(next_node.output[0]) + len(axes):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.get_rank(next_node.output[0]) > 1:
             if not g.has_shape(node.input[0]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             set_axes = set(axes)
             shape = g.get_shape(node.input[0])
             reduced_shape = [s for i, s in enumerate(shape) if i not in set_axes]
             reshaped_shape = g.get_shape(next_node.output[0])
             if reduced_shape != reshaped_shape:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, next_node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         next_node: NodeProto,
     ) -> List[NodeProto]:
@@ -464,15 +468,15 @@ class ReshapeReshapePattern(PatternOptimization):
             return self.none()
 
         if g.is_used_more_than_once(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_node = next_nodes[0]
         if next_node.op_type != "Reshape" or node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if next_node.input[0] != node.output[0]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.is_constant(next_node.input[1]):
             cst2 = g.get_computed_constant(next_node.input[1])
@@ -485,7 +489,7 @@ class ReshapeReshapePattern(PatternOptimization):
             cst1 = g.get_computed_constant(node.input[1])
             cst2 = g.get_computed_constant(next_node.input[1])
             if cst1 is None or cst2 is None:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             cst1 = tuple(map(int, cst1))
             cst2 = tuple(map(int, cst2))
             if all(d > 0 for d in cst2):
@@ -505,22 +509,22 @@ class ReshapeReshapePattern(PatternOptimization):
             if -1 in cst.tolist():
                 # Then we only allow it the shape is static.
                 if not g.is_constant(next_node.input[1]):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 cst = g.get_computed_constant(next_node.input[1])
                 if cst.min() <= 0:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
 
         if (
             not g.has_rank(node.input[0])
             or not g.has_rank(next_node.output[0])
             or not g.has_rank(node.output[0])
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         sh1 = g.builder.value_as_shape(node.input[1])
         sh2 = g.builder.value_as_shape(next_node.input[1])
         if (sh2 is None or (-1 in sh2 and 0 not in sh2)) and (sh1 is None or -1 in sh1):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # If g.get_rank(node.input[0]) != g.get_rank(next_node.output[0]),
         # the bet is, when the shape is not a constant, then using 0 is not really
@@ -528,7 +532,7 @@ class ReshapeReshapePattern(PatternOptimization):
         # in a non constant shape used to reshape.
         # If it is a constant that should be ok too.
         if not g.has_shape(node.input[0]) or not g.has_shape(next_node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if (
             g.is_constant(next_node.input[1])
@@ -542,7 +546,7 @@ class ReshapeReshapePattern(PatternOptimization):
                 or g.get_rank(node.output[0]) != g.get_rank(next_node.output[0])
             )
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node, next_node], self.apply, insert_at=next_node)
 
     @classmethod
@@ -579,7 +583,7 @@ class ReshapeReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         next_node: NodeProto,
     ) -> List[NodeProto]:
@@ -827,17 +831,17 @@ class Reshape2Of3Pattern(PatternOptimization):
             or not g.has_shape(node.input[1])
         ):
             # Shapes are missing. They should be populated as much as possible.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         shape_out = g.get_shape(node.output[0])
         shape_in = g.get_shape(node.input[0]), g.get_shape(node.input[1])
         if not (shape_out == shape_in[0] == shape_in[1]):
             # Broadcasting is involved.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) > 1 or (len(next_nodes) == 0 and not g.is_output(node.output[0])):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_node = None if len(next_nodes) == 0 else next_nodes[0]
         type_out = None if next_node is None else next_node.op_type
 
@@ -849,7 +853,7 @@ class Reshape2Of3Pattern(PatternOptimization):
         types = [type_left, type_right, type_out, node.op_type]
         n_reshape = len([_ for _ in types if _ == "Reshape"])
         if n_reshape < 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if node_left is not None and node_left.op_type != "Reshape":
             node_left = None
@@ -897,14 +901,14 @@ class Reshape2Of3Pattern(PatternOptimization):
         all_ranks = [_ for _ in ranks if _ is not None]
         if len(set(all_shapes)) != 1 or len(set(all_ranks)) != 1 or len(all_shapes) < 2:
             # Not the same shapes.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         nodes = [node_left, node_right, next_node, node]
         return MatchResult(self, nodes, self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_left: NodeProto,
         node_right: NodeProto,
         next_node: NodeProto,
@@ -1110,28 +1114,28 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
             return self.none()
 
         if g.is_used_more_than_once(node.input[0]) or g.is_used_more_than_once(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         left, right = g.node_before(node.input[0]), g.node_before(node.input[1])
         if left is None or left.op_type != "Reshape" or left.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if right is None or right.op_type != "Reshape" or right.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(left.input[1]) or not g.is_constant(right.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.has_shape(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cst_left = g.get_computed_constant(left.input[1]).tolist()
         cst_right = g.get_computed_constant(right.input[1]).tolist()
         if cst_left != cst_right:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         shape1 = g.get_shape(left.input[0]) if g.has_shape(left.input[0]) else None
         shape2 = g.get_shape(right.input[0]) if g.has_shape(right.input[0]) else None
         if shape1 is None or shape2 is None or shape1 != shape2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # If there is not broadcast involved then it is ok.
         # At this stage, we know shapes are equal before the reshaped operators
@@ -1141,7 +1145,7 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         left: NodeProto,
         right: NodeProto,
         node: NodeProto,
@@ -1300,35 +1304,35 @@ class ConcatReshapePattern(PatternOptimization):
             return self.none()
         gen = g.node_before(node.input[1])
         if gen is None or gen.op_type != "Concat":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         op_types = {}
         for i in gen.input:
             if g.is_constant(i):
                 cst = g.get_computed_constant(i)
                 if cst is None:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 li = cst.tolist()
                 if -1 in li:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
             else:
                 p = g.node_before(i)
                 if p is None:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 op_types[p.op_type] = op_types.get(p.op_type, 0) + 1
 
         if len(op_types) == 1:
             # only one operator
             op_type = list(op_types)[0]  # noqa: RUF015
             if op_type != "Shape":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             # Then we can replace any of the node by -1.
         elif len(op_types) == 2:
             if "Shape" not in set(op_types):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             total = sum(op_types.values())
             if op_types["Shape"] != total - 1:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         if g.is_used_more_than_once(node.input[1]):
             # Not really safe to do the replacement.
@@ -1337,7 +1341,7 @@ class ConcatReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         concat: NodeProto,
         reshape: NodeProto,
     ) -> List[NodeProto]:
@@ -1507,24 +1511,24 @@ class StaticConcatReshapePattern(PatternOptimization):
             return self.none()
         gen = g.node_before(node.input[1])
         if gen is None or gen.op_type != "Concat":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         not_cst = []
         for i in gen.input:
             if g.is_constant(i):
                 cst = g.get_computed_constant(i)
                 if cst is None:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 li = cst.tolist()
                 if -1 in li:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
             elif g.has_shape(i) and g.get_shape(i) == (1,):
                 not_cst.append(i)
             else:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         if len(not_cst) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(node.input[1]):
             # Not really safe to do the replacement.
             return MatchResult(self, [gen, node], self.apply)
@@ -1532,7 +1536,7 @@ class StaticConcatReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         concat: NodeProto,
         reshape: NodeProto,
     ) -> List[NodeProto]:
@@ -1799,27 +1803,27 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
         if node.op_type != "Reshape" or node.domain != "":
             return self.none()
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         sh1 = g.get_shape_renamed(node.input[0])
         sh2 = g.get_shape_renamed(node.output[0])
         aligned_reshape = self._align_shapes(sh1, sh2)
         if aligned_reshape is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         assert len(aligned_reshape) == g.get_rank(node.output[0]), (
             f"Issue with input shape {sh1}, output shape={sh2}, "
             f"proposed new_shape {aligned_reshape}"
         )
         gen = g.node_before(node.input[1])
         if gen is None or gen.op_type != "Concat":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         reshape: NodeProto,
     ) -> List[NodeProto]:
         aligned_reshape = self._align_shapes(
@@ -1981,30 +1985,30 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
             return self.none()
         if node.op_type == "Expand":
             if not g.is_constant(node.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             cst = g.get_computed_constant(node.input[1])
             if cst is None:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if cst.min() != cst.max():
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if cst[0] != 1:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         sh1 = g.get_shape_renamed(node.input[0])
         sh2 = g.get_shape_renamed(node.output[0])
         op_type, _axes = self._squeeze_axes(sh1, sh2)
         if op_type is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         reshape: NodeProto,
     ) -> List[NodeProto]:
         op_type, axes = self._squeeze_axes(
@@ -2150,27 +2154,27 @@ class UnsqueezeReshapePattern(PatternOptimization):
         if node.op_type != "Reshape" or node.domain != "":
             return self.none()
         if not g.is_constant(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_computed_constant(node.input[1])
         if cst is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         unsq = g.node_before(node.input[0])
         if unsq is None or unsq.op_type != "Unsqueeze" or unsq.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_rank(unsq.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_rank(unsq.input[0]) != len(cst) - 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(unsq.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         axes = g.get_computed_constant(unsq.input[1])
         if axes is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         new_axes = self.compute_new_axes(tuple(map(int, axes)), tuple(map(int, cst)))
         if new_axes is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [unsq, node], self.apply, insert_at=node)
 
     def compute_new_axes(self, axes: Tuple[int, ...], shape: Tuple[int, ...]) -> Tuple[int, ...]:
@@ -2180,7 +2184,7 @@ class UnsqueezeReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         unsqueeze: NodeProto,
         reshape: NodeProto,
     ) -> List[NodeProto]:
@@ -2322,38 +2326,38 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
         if node.op_type != "Reshape" or node.domain != "":
             return self.none()
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         node_before = g.node_before(node.input[0])
         if node_before is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if node_before.op_type not in {"Squeeze", "Unsqueeze"} or node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst2 = g.get_computed_constant(node.input[1])
         if cst2 is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if 0 in cst2:
             # It may still be possible if the squeezed axis is beyond the last 0.
             if not g.is_constant(node_before.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             axis = g.get_computed_constant(node_before.input[1])
             if axis is None:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             index_zero = max([i for i, z in enumerate(cst2) if z == 0])
             min_axis = min(axis)
             if min_axis < 0:
                 if not g.has_rank(node_before.input[0]):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 min_axis += g.get_rank(node_before.input[0])
             if index_zero >= min(axis):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         # The second shape wins it all.
         return MatchResult(self, [node_before, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_before: NodeProto,
         reshape_node: NodeProto,
     ) -> List[NodeProto]:

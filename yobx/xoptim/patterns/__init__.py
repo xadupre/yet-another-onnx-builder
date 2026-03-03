@@ -1,7 +1,6 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto
-from ..patterns_api import PatternOptimization, MatchResult
+from ..patterns_api import PatternOptimization, MatchResult, _get_lineno
 
 # onnx patterns
 from .onnx_any import (
@@ -112,6 +111,11 @@ from .onnx_unsqueeze import (
 )
 from .onnx_where import NotWherePattern, WhereAddPattern
 
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
+
 
 class AlmostDoNothingPattern(PatternOptimization):
     """Checks that a Expand is really needed."""
@@ -129,13 +133,13 @@ class AlmostDoNothingPattern(PatternOptimization):
         if node.op_type != "Pow" or node.domain != "":
             return self.none()
         if node.name is not None and "AlmostDoNothing" in node.name:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         self.n_count += 1
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         return [

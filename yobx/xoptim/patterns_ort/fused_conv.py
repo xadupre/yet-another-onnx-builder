@@ -1,7 +1,11 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto, TensorProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class FusedConvPattern(PatternOptimization):
@@ -138,22 +142,22 @@ class FusedConvPattern(PatternOptimization):
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         op_type = next_nodes[0].op_type
         if op_type != "Relu":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # FusedConv only exists for float32.
         dtypes = [(g.get_type(i) if g.has_type(i) else None) for i in node.input]
         if TensorProto.FLOAT not in dtypes:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, next_nodes[0]], self.apply, insert_at=next_nodes[0])
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         node_act: NodeProto,
     ) -> List[NodeProto]:

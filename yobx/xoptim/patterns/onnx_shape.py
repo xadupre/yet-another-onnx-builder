@@ -1,7 +1,11 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class ShapeBasedShapeShapeAddPattern(PatternOptimization):
@@ -22,10 +26,10 @@ class ShapeBasedShapeShapeAddPattern(PatternOptimization):
             return self.none()
         shape1 = g.node_before(node.input[0])
         if shape1 is None or shape1.op_type != "Shape" or shape1.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape2 = g.node_before(node.input[1])
         if shape2 is None or shape2.op_type != "Shape" or shape2.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         # ishape1 = g.get_shape_renamed(shape1.input[0])
         # ishape2 = g.get_shape_renamed(shape2.input[0])
         # value1 = g.builder.value_as_shape(node.input[0])
@@ -34,12 +38,12 @@ class ShapeBasedShapeShapeAddPattern(PatternOptimization):
         # g.builder._known_value_shape
         # g.builder.constraints_)
         # g.builder.replacements_dimensions_
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
         # return MatchResult(self, [shape1, shape2, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         shape1_node: NodeProto,
         shape2_node: NodeProto,
         add_node: NodeProto,

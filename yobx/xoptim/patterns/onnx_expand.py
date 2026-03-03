@@ -1,5 +1,4 @@
-import inspect
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
 import numpy as np
 from onnx import NodeProto
 from ...helpers.onnx_helper import (
@@ -8,7 +7,12 @@ from ...helpers.onnx_helper import (
     unary_like_op_types,
 )
 from ...xshape._shape_helper import all_int, DYNAMIC_SHAPE
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class ExpandPattern(PatternOptimization):
@@ -124,25 +128,25 @@ class ExpandPattern(PatternOptimization):
         if node.op_type != "Expand" or node.domain != "":
             return self.none()
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape = g.get_shape(node.input[0])
         if not all_int(shape):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(node.input[1]):
             # It may be a symbolic shape.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         value = g.get_computed_constant(node.input[1])
         if value is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         with g.builder.maybe_disable_fake_tensor_mode():
             new_shape = tuple(int(i) for i in value)
         if shape != new_shape:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         new_node = g.make_node(
@@ -280,22 +284,22 @@ class ExpandBroadcastPattern(PatternOptimization):
         if node.op_type != "Expand" or node.domain != "":
             return self.none()
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape = g.get_shape(node.input[0])
         if not all_int(shape):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(node.input[1]):
             # It may be a symbolic shape.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         value = g.get_computed_constant(node.input[1])
         if value is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         with g.builder.maybe_disable_fake_tensor_mode():
             new_shape = tuple(int(i) for i in value)
 
         if g.is_used_more_than_once(node.output[0]):
             # More than one output, not handled right now.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(node.output[0])
         assert len(next_nodes) == 1, "The previous test should have cleared out this case."
@@ -303,29 +307,29 @@ class ExpandBroadcastPattern(PatternOptimization):
 
         if next_node.op_type not in self._op_types or next_node.domain != "":
             # Not an element wise operator.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         other = next_node.input[1 if next_node.input[0] == node.output[0] else 0]
 
         if not g.has_shape(other):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         other_shape = g.get_shape(other)
         if new_shape != other_shape:
             # Expand does not expand to the shape of the other element.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if len(shape) != len(other_shape):
             # Different ranks.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         for a, b in zip(shape, other_shape):
             if not (a == b or a == 1 or b == 1):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, next_node], self.apply, insert_at=next_node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         next_node: NodeProto,
     ) -> List[NodeProto]:
@@ -426,7 +430,7 @@ class ShapeBasedExpandBroadcastPattern(PatternOptimization):
             or not g.has_shape(node.input[0])
             or not g.has_shape(node.input[1])
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         node_left = g.node_before(node.input[0])
         node_right = g.node_before(node.input[1])
@@ -434,7 +438,7 @@ class ShapeBasedExpandBroadcastPattern(PatternOptimization):
             None if n is None or n.op_type != "Expand" else n for n in [node_left, node_right]
         ]
         if before == [None, None]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # At least one expand.
         node_left, node_right = before
@@ -458,11 +462,11 @@ class ShapeBasedExpandBroadcastPattern(PatternOptimization):
         # shape_right  = (1, 1, 'seq_length', 'cache_length + seq_length')
         # output_shape = ('batch', 1, 'seq_length', 'cache_length + seq_length')
         # When this happes, it could also be caught by another pattern.
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         expand_left: NodeProto,
         expand_right: NodeProto,
         binary_node: NodeProto,
@@ -605,7 +609,7 @@ class ExpandSwapPattern(PatternOptimization):
         if node.op_type != "Expand" or node.domain != "":
             return self.none()
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         assert g.is_used(node.output[0]), (
             f"The match should not even begin, {node.output[0]!r} "
@@ -613,7 +617,7 @@ class ExpandSwapPattern(PatternOptimization):
         )
         if g.is_used_more_than_once(node.output[0]):
             # More than one output so it probably must be done.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(node.output[0])
         assert len(next_nodes) == 1, "The previous test should have cleared out this case."
@@ -623,13 +627,13 @@ class ExpandSwapPattern(PatternOptimization):
             next_node.op_type not in self._op_types or next_node.domain != ""
         ):
             # Not an unary wise operator.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, next_node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         next_node: NodeProto,
     ) -> List[NodeProto]:
@@ -779,25 +783,25 @@ class ShapeBasedStaticExpandPattern(PatternOptimization):
             return self.none()
         if g.is_constant(node.input[1]):
             # already done
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         sh1 = g.get_shape_renamed(node.input[0])
         sh2 = g.get_shape_renamed(node.output[0])
         if len(sh1) != len(sh2):
             # We ignore that case for the time being.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         expand_shape = self._find_expand_shape(sh1, sh2)
         if expand_shape is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         reshape: NodeProto,
     ) -> List[NodeProto]:
         expand_shape = self._find_expand_shape(
@@ -1036,7 +1040,7 @@ class ShapeBasedExpandSwapPattern(PatternOptimization):
             or not g.has_shape(node.input[0])
             or not g.has_shape(node.input[1])
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         node_left = g.node_before(node.input[0])
         node_right = g.node_before(node.input[1])
@@ -1044,7 +1048,7 @@ class ShapeBasedExpandSwapPattern(PatternOptimization):
             None if n is None or n.op_type != "Expand" else n for n in [node_left, node_right]
         ]
         if before == [None, None]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if None in before:
             # Only one expand
@@ -1072,14 +1076,14 @@ class ShapeBasedExpandSwapPattern(PatternOptimization):
                         f"{node.op_type} {shape_right} -> {output_shape}"
                     )
                 return MatchResult(self, [node_left, node_right, node], self.apply)
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # Both expand.
         node_left, node_right = before
         if node_left.input[1] != node_right.input[1]:
             # It could work in that case if both expand have different
             # shape argument but the code to make sure it is is not implemented.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         shape_left = g.get_shape_renamed(node_left.input[0])
         shape_right = g.get_shape_renamed(node_right.input[0])
@@ -1100,11 +1104,11 @@ class ShapeBasedExpandSwapPattern(PatternOptimization):
                 )
             return MatchResult(self, [node_left, node_right, node], self.apply)
 
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         expand_left: NodeProto,
         expand_right: NodeProto,
         binary_node: NodeProto,
@@ -1273,11 +1277,11 @@ class ShapeBasedExpandBroadcastMatMulPattern(PatternOptimization):
         if node.op_type != "MatMul" or node.domain != "":
             return self.none()
         if not g.has_shape(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         node_left = g.node_before(node.input[0])
         node_right = g.node_before(node.input[1])
@@ -1285,7 +1289,7 @@ class ShapeBasedExpandBroadcastMatMulPattern(PatternOptimization):
             None if n is None or n.op_type != "Expand" else n for n in [node_left, node_right]
         ]
         if before == [None, None]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # At least one expand.
         node_left, node_right = before
@@ -1309,11 +1313,11 @@ class ShapeBasedExpandBroadcastMatMulPattern(PatternOptimization):
         # shape_right  = (1, 1, 'seq_length', 'cache_length + seq_length')
         # output_shape = ('batch', 1, 'seq_length', 'cache_length + seq_length')
         # When this happes, it could also be caught by another pattern.
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         expand_left: NodeProto,
         expand_right: NodeProto,
         binary_node: NodeProto,
@@ -1485,26 +1489,26 @@ class ShapeBasedExpandCastWhereSwapPattern(PatternOptimization):
             return self.none()
         cast_node = g.node_before(node.input[0])
         if cast_node is None or cast_node.op_type != "Cast" or cast_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if cast_node.input[0] not in node.input[1:]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         expand_node = g.node_before(cast_node.input[0])
         if expand_node is None or expand_node.op_type != "Expand" or expand_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         nodes = g.next_nodes(cast_node.input[0])
         if len(nodes) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.has_shape(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.input[2]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(expand_node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         same_index = list(node.input).index(cast_node.input[0])
         if self._compatible_shapes(
@@ -1514,11 +1518,11 @@ class ShapeBasedExpandCastWhereSwapPattern(PatternOptimization):
             g.get_shape_renamed(expand_node.input[0]),
         ):
             return MatchResult(self, [expand_node, cast_node, node], self.apply)
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         expand_node: NodeProto,
         cast_node: NodeProto,
         where_node: NodeProto,
@@ -1686,33 +1690,33 @@ class ShapeBasedConcatExpandPattern(PatternOptimization):
         if node.op_type != "Expand" or node.domain != "":
             return self.none()
         if g.is_used_more_than_once(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_constant(node.input[1]):
             # no need
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         concat_node = g.node_before(node.input[1])
         if concat_node is None or concat_node.op_type != "Concat" or concat_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.has_shape(node.input[0]) or not g.has_shape(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape1 = g.get_shape_renamed(node.input[0])
         shape2 = g.get_shape_renamed(node.output[0])
         index = self._compatible_shapes(g, shape1, shape2, concat_node.input)
         if index is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         # checking the other values are not 1
         if all(
             (i == index or (g.is_constant(name) and g.get_constant_scalar(name) == 1))
             for i, name in enumerate(concat_node.input)
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [concat_node, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         concat_node: NodeProto,
         expand_node: NodeProto,
     ) -> List[NodeProto]:
@@ -1868,28 +1872,28 @@ class SwapExpandReshapePattern(PatternOptimization):
         if node.op_type != "Reshape" or node.domain != "":
             return self.none()
         if not g.is_constant(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         expand_node = g.node_before(node.input[0])
         if expand_node is None or expand_node.op_type != "Expand" or expand_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_rank(expand_node.input[0]) or g.get_rank(expand_node.input[0]) != 3:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cst = g.get_computed_constant(node.input[1])
         if cst is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape = g.builder.value_as_shape(expand_node.input[1])
         if shape is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if tuple(cst) != (0, 1, -1) or shape[1:] != (1, 1):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [expand_node, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         expand_node: NodeProto,
         reshape_node: NodeProto,
     ) -> List[NodeProto]:

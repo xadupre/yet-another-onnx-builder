@@ -1,8 +1,12 @@
 import collections
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto, TensorProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class _common:
@@ -163,7 +167,7 @@ class AddAddMulMulPattern(PatternOptimization, _common):
         if g.get_type(node.input[0]) in {TensorProto.INT64, TensorProto.INT32}:
             return self.none()
         if not self._same_shape(g, *node.input, broadcast=self.broadcast):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         node_left = g.node_before(node.input[0])
         if (
@@ -183,11 +187,11 @@ class AddAddMulMulPattern(PatternOptimization, _common):
         ):
             return MatchResult(self, [None, node_right, node], self.apply, insert_at=node)
 
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_left: NodeProto,
         node_right: NodeProto,
         node: NodeProto,
@@ -343,7 +347,7 @@ class AddMulPattern(PatternOptimization, _common):
         if g.get_type(node.input[0]) in {TensorProto.INT64, TensorProto.INT32}:
             return self.none()
         if not self._same_shape(g, *node.input, broadcast=self.broadcast):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         node_left = g.node_before(node.input[0])
         if (
@@ -365,11 +369,11 @@ class AddMulPattern(PatternOptimization, _common):
         ):
             return MatchResult(self, [None, node_right, node], self.apply, insert_at=node)
 
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_left: NodeProto,
         node_right: NodeProto,
         node: NodeProto,
@@ -525,22 +529,22 @@ class MulSigmoidPattern(PatternOptimization):
         if g.get_type(node.input[0]) in {TensorProto.INT64, TensorProto.INT32}:
             return self.none()
         if g.is_used_more_than_once(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_node = g.next_node(node.output[0])
         if next_node.op_type != "Mul" or node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         index = list(next_node.input).index(node.output[0])
         other_index = 1 - index
         if next_node.input[other_index] != node.input[0]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, next_node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_sigmoid: NodeProto,
         node_mul: NodeProto,
     ) -> List[NodeProto]:
@@ -678,18 +682,18 @@ class NegXplus1Pattern(PatternOptimization):
             return self.none()
 
         if not g.is_constant(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_constant_scalar(node.input[0])
         if cst != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         new_node = g.make_node(
@@ -814,7 +818,7 @@ class SubMulPattern(PatternOptimization, _common):
         if g.get_type(node.input[0]) in {TensorProto.INT64, TensorProto.INT32}:
             return self.none()
         if not self._same_shape(g, *node.input, broadcast=self.broadcast):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         node_left = g.node_before(node.input[0])
         if (
@@ -836,11 +840,11 @@ class SubMulPattern(PatternOptimization, _common):
         ):
             return MatchResult(self, [None, node_right, node], self.apply, insert_at=node)
 
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_left: NodeProto,
         node_right: NodeProto,
         node: NodeProto,
@@ -1031,7 +1035,7 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
         if g.get_type(node.input[0]) in {TensorProto.INT64, TensorProto.INT32}:
             return self.none()
         if not self._same_shape(g, *node.input, broadcast=self.broadcast):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cons_left = [n for n in g.next_nodes(node.input[0]) if n.op_type == node.op_type]
         if len(cons_left) == 2:
@@ -1053,11 +1057,11 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
             if ok and self.can_fuse(g, cons_right):
                 return MatchResult(self, cons_right, self.apply)
 
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         *nodes: NodeProto,
     ) -> List[NodeProto]:
         assert len(nodes) == 2, f"not implemented for {len(nodes)} nodes"
@@ -1228,24 +1232,24 @@ class AddMulTransposePattern(PatternOptimization):
         ):
             return self.none()
         if g.is_used_more_than_once(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_node = g.next_nodes(node.output[0])[0]
         if next_node.op_type != "Transpose" or next_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         perm = g.get_attribute(next_node, "perm").ints
         if len(perm) != 4:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if list(perm) != [0, 2, 1, 3]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, next_node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         transpose_node: NodeProto,
     ) -> List[NodeProto]:

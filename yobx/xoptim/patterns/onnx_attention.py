@@ -1,10 +1,13 @@
-import inspect
-from typing import List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 import numpy as np
 from onnx import NodeProto, TensorProto
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ...xbuilder import FunctionOptions, GraphBuilder
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class FunctionAttentionPattern(PatternOptimization):
@@ -740,7 +743,7 @@ class FunctionAttentionPattern(PatternOptimization):
             return self.none()
         axis = g.get_attribute(node, "axis").i
         if axis != -1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         node_before = g.node_before(node.input[0])
         if node_before.op_type == "Add":
@@ -748,23 +751,23 @@ class FunctionAttentionPattern(PatternOptimization):
             add_node = node_before
             where_node = g.node_before(add_node.input[1])
             if where_node is None or where_node.op_type != "Where":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             if not g.is_constant_scalar(where_node.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if not g.is_constant_scalar(where_node.input[2]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             cst_zero = g.get_constant_scalar(where_node.input[1])
             if cst_zero != 0:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             cst_inf = g.get_constant_scalar(where_node.input[2])
             if not np.isinf(cst_inf):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             mat_qk = g.node_before(add_node.input[0])
             if mat_qk is None or mat_qk.op_type not in ("MatMul", "FusedMatMul"):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         elif node_before.op_type == "Where":
             # Where(mask, -np.inf, X)
             add_node = None
@@ -772,79 +775,79 @@ class FunctionAttentionPattern(PatternOptimization):
             if not g.is_constant_scalar(where_node.input[1]) and not g.is_constant_scalar(
                 where_node.input[2]
             ):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             cst_zero = None
             inf_index = 1 if g.is_constant_scalar(where_node.input[1]) else 2
             dtype = g.get_computed_constant(where_node.input[inf_index]).dtype
             cst_inf = g.get_constant_scalar(where_node.input[inf_index])
             if (not np.isinf(cst_inf) and cst_inf != np.finfo(dtype).min) or cst_inf > 0:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             mat_qk = g.node_before(where_node.input[3 - inf_index])
             if mat_qk is None or mat_qk.op_type not in ("MatMul", "FusedMatMul"):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         else:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         mul1 = g.node_before(mat_qk.input[0])
         if mul1 is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if mul1.op_type == "Transpose":
             transpose_mul1 = mul1
             reshape_mul1 = g.node_before(mul1.input[0])
             perm = tuple(g.get_attribute(transpose_mul1, "perm").ints)
             if perm != (0, 2, 1, 3):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if reshape_mul1 is None:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             mul1 = g.node_before(reshape_mul1.input[0])
         else:
             reshape_mul1 = None
             transpose_mul1 = None
         if mul1 is None or mul1.op_type != "Mul":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.is_constant_scalar(mul1.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if mat_qk.op_type == "MatMul":
             transpose = g.node_before(mat_qk.input[1])
             if transpose is None or transpose.op_type != "Transpose":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             perm = g.get_attribute(transpose, "perm").ints
             if transpose_mul1 is None:
                 if tuple(perm) != (0, 1, 3, 2):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 mul2 = g.node_before(transpose.input[0])
                 reshape_mul2 = None
             else:
                 if tuple(perm) != (0, 2, 3, 1):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 reshape_mul2 = g.node_before(transpose.input[0])
                 if reshape_mul2 is None:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 mul2 = g.node_before(reshape_mul2.input[0])
                 if not g.is_constant(reshape_mul1.input[1]) or not g.is_constant(
                     reshape_mul2.input[1]
                 ):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 shapem1 = g.get_computed_constant(reshape_mul1.input[1])
                 shapem2 = g.get_computed_constant(reshape_mul2.input[1])
                 if shapem1 is None or shapem2 is None:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 if shapem1.tolist() != shapem2.tolist():
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
         else:
             # FusedMatMul
             transA = g.get_attribute_with_default(mat_qk, "transA", 0)
             transB = g.get_attribute_with_default(mat_qk, "transB", 1)
             if transA != 0 or transB != 1:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             transpose = None
             mul2 = g.node_before(mat_qk.input[1])
             reshape_mul2 = None
 
         if mul2 is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if mul2.op_type == "Mul":
             # This condition is verified for Attention or MultiHeadAttention.
@@ -855,102 +858,102 @@ class FunctionAttentionPattern(PatternOptimization):
             mul2 = None
             gqa_expand = g.node_before(gqa_reshape.input[0])
             if gqa_expand.op_type != "Expand":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             mul2 = g.node_before(gqa_expand.input[0])
             if mul2.op_type != "Mul":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             gqa_unsqueeze = g.node_before(mul2.input[0])
             if gqa_unsqueeze.op_type != "Unsqueeze":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             #
             if not g.is_constant(gqa_expand.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             exp_shape = g.get_computed_constant(gqa_expand.input[1])
             if tuple(exp_shape[:2]) != (1, 1) or tuple(exp_shape[3:]) != (1, 1):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if not g.is_constant(gqa_unsqueeze.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             unsq_shape = g.get_computed_constant(gqa_unsqueeze.input[1])
             if tuple(unsq_shape) != (2,):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if not g.is_constant(gqa_reshape.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             resh_shape = g.get_computed_constant(gqa_reshape.input[1])
             if resh_shape.size != 4:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if not g.has_shape(gqa_unsqueeze.input[0]) or not g.has_shape(gqa_reshape.output[0]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             shape1 = g.get_shape_renamed(gqa_unsqueeze.input[0])
             shape2 = g.get_shape_renamed(gqa_reshape.output[0])
             if shape1[0] != shape2[0] or shape1[2] != shape2[2] or shape1[3] != shape2[3]:
                 return self.none(
                     node,
-                    inspect.currentframe().f_lineno,
+                    _get_lineno(),
                     msg=lambda: f"Shape mismatch {shape1=}, {shape2=}",
                 )
         else:
             # No Attention, no MultiHeadAttention, no GroupQueryAttention
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if mul2.input[1] != mul1.input[1]:
             if not g.is_constant_scalar(mul1.input[1]) or not g.is_constant_scalar(mul2.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             cst1 = g.get_constant_scalar(mul1.input[1])
             cst2 = g.get_constant_scalar(mul2.input[1])
             if cst1 != cst2:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         # after softmax
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if {n.op_type for n in next_nodes} != {"Where", "IsNaN"}:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         isnan, where2 = next_nodes[:: (1 if next_nodes[0].op_type == "IsNaN" else -1)]
         if where2.input[0] != isnan.output[0]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if where2.input[2] != node.output[0]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(where2.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_constant_scalar(where2.input[1])
         if cst != 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         mat_qkvs = g.next_nodes(where2.output[0])
         if len(mat_qkvs) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         mat_qkv = mat_qkvs[0]
         if mat_qkv.op_type != "MatMul":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if gqa_reshape:
             # We need to include the nodes repeating values,
             # the same one which repeated the keys.
             gqa_reshape_v = g.node_before(mat_qkv.input[1])
             if gqa_reshape_v.op_type != "Reshape":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             gqa_expand_v = g.node_before(gqa_reshape_v.input[0])
             if gqa_expand_v.op_type != "Expand":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             gqa_unsqueeze_v = g.node_before(gqa_expand_v.input[0])
             if gqa_unsqueeze_v.op_type != "Unsqueeze":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             #
             if not g.is_constant(gqa_expand.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             exp_shape_v = g.get_computed_constant(gqa_expand_v.input[1])
             if tuple(exp_shape) != tuple(exp_shape_v):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if not g.is_constant(gqa_unsqueeze_v.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             unsq_shape_v = g.get_computed_constant(gqa_unsqueeze_v.input[1])
             if tuple(unsq_shape_v) != tuple(unsq_shape):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if not g.is_constant(gqa_reshape_v.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             resh_shape_v = g.get_computed_constant(gqa_reshape_v.input[1])
             if tuple(resh_shape_v) != tuple(resh_shape):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         else:
             gqa_expand_v = gqa_reshape_v = gqa_unsqueeze_v = None
 
@@ -984,16 +987,16 @@ class FunctionAttentionPattern(PatternOptimization):
                 continue
             if n.op_type == "Softmax":
                 if len(g.next_nodes(n.output[0])) != 2:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 continue
             if g.is_used_more_than_once(n.output[0]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         return MatchResult(self, nodes, self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         mul1: NodeProto,
         transpose_mul1: Optional[NodeProto],
         reshape_mul1: Optional[NodeProto],
@@ -1207,43 +1210,43 @@ class _CommonGQAMethods:
             or gqa_reshape.domain != ""
             or g.main_opset < 18
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         gqa_expand = g.node_before(gqa_reshape.input[0])
         if gqa_expand.op_type != "Expand":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         gqa_unsqueeze = g.node_before(gqa_expand.input[0])
         if gqa_unsqueeze.op_type != "Unsqueeze":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         #
         if not g.is_constant(gqa_expand.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         exp_shape = g.get_computed_constant(gqa_expand.input[1])
         if tuple(exp_shape[:2]) != (1, 1) or tuple(exp_shape[3:]) != (1, 1):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(gqa_unsqueeze.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         unsq_shape = g.get_computed_constant(gqa_unsqueeze.input[1])
         if tuple(unsq_shape) != (2,):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(gqa_reshape.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         resh_shape = g.get_computed_constant(gqa_reshape.input[1])
         if gqa_reshape.op_type == "Reshape":
             if resh_shape.size != 4:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         elif gqa_reshape.op_type == "Squeeze":
             if resh_shape.size != 1:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         if not g.has_shape(gqa_unsqueeze.input[0]) or not g.has_shape(gqa_reshape.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape1 = g.get_shape_renamed(gqa_unsqueeze.input[0])
         shape2 = g.get_shape_renamed(gqa_reshape.output[0])
         if shape1[0] != shape2[0] or shape1[2] != shape2[2] or shape1[3] != shape2[3]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return (
             gqa_unsqueeze,
@@ -1504,11 +1507,11 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
 
         matched_keys = self._match_keys_or_values(g, node, keys)
         if not matched_keys:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         matched_values = self._match_keys_or_values(g, node, values)
         if not matched_values:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         gqa_unsqueeze, gqa_expand, gqa_reshape, shapes = matched_keys
         gqa_unsqueeze_v, gqa_expand_v, gqa_reshape_v, _shapes_v = matched_values
@@ -1517,11 +1520,11 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
         unsq_shape_v, exp_shape_v, resh_shape_v = shapes
 
         if unsq_shape_v != unsq_shape:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if exp_shape != exp_shape_v:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if resh_shape_v != resh_shape:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # Final verification, let's check none the nodes is used outside the pattern.
         nodes = [
@@ -1535,12 +1538,12 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
         ]
         for n in nodes[:-1]:
             if n and g.is_used_more_than_once(n.output[0]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         return MatchResult(self, nodes, self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         gqa_unsqueeze: NodeProto,
         gqa_expand: NodeProto,
         gqa_reshape: NodeProto,
@@ -1808,30 +1811,30 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
             not g.has_rank(node.input[3]) or g.get_rank(node.input[3]) < 2
         ):
             # Only 2D ranks allowed.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if node.op_type == "Attention":
             if not g.has_rank(node.input[0]) and g.get_rank(node.input[0]) != 4:
                 # Only 4D Attention
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             # Node Attention, we still need to check if there is some GQA node.
             gqa_keys = self._match_keys_or_values(g, node, node.input[1])
             if not gqa_keys:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             gqa_values = self._match_keys_or_values(g, node, node.input[2])
             if not gqa_values:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             gqa_unsqueeze, gqa_expand, gqa_reshape, shapes = gqa_keys
             gqa_unsqueeze_v, gqa_expand_v, gqa_reshape_v, shapes_v = gqa_values
             unsq_shape, exp_shape, resh_shape = shapes
             unsq_shape_v, exp_shape_v, resh_shape_v = shapes_v
 
             if unsq_shape_v != unsq_shape:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if exp_shape != exp_shape_v:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if resh_shape_v != resh_shape:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             gqa_nodes = [
                 gqa_unsqueeze,
                 gqa_expand,
@@ -1845,70 +1848,70 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
                 gqa_unsqueeze_v.input[0]
             )
             if None in concats:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if len(concats[0].input) != 2 or len(concats[1].input) != 2:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if concats[0].op_type != "Concat" or concats[1].op_type != "Concat":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if g.get_attribute_with_default(
                 concats[0], "axis", 0
             ) != g.get_attribute_with_default(concats[1], "axis", 0):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         else:
             keys, values = node.input[1:3]
             concats = g.node_before(keys), g.node_before(values)
             if None in concats:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if len(concats[0].input) != 2 or len(concats[1].input) != 2:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if concats[0].op_type != "Concat" or concats[1].op_type != "Concat":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if g.get_attribute_with_default(
                 concats[0], "axis", 0
             ) != g.get_attribute_with_default(concats[1], "axis", 0):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             # Local function
             if not g.is_constant_scalar(node.input[4]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             if not g.is_constant(node.input[5]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             cst = g.get_computed_constant(node.input[5])
             if cst is None:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             cst = tuple(cst)
             if len(cst) < 4:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if cst[:2] != cst[3:] or cst[:2] != (1, 1):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if not g.is_constant(node.input[6]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             shape_or_axis = g.get_computed_constant(node.input[6])
             if shape_or_axis is None:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if "sQ_to" in node.op_type:
                 # This is an axis for a Squeeze node.
                 if not g.get_shape(node.input[1]):
                     # We need that shape to get kv_num_heads.
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
             else:
                 # This is a shape for a Reshape node.
                 if shape_or_axis[1] <= 0:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
             gqa_nodes = [None for _ in range(6)]
 
         # Final verification, let's check none the nodes is used outside the pattern.
         nodes = [*concats, *gqa_nodes, node]
         for n in nodes[2:-1]:
             if n and g.is_used_more_than_once(n.output[0]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         return MatchResult(self, nodes, self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         keys_concat_node: NodeProto,
         values_concat_node: NodeProto,
         gqa_unsqueeze: Optional[NodeProto],

@@ -1,9 +1,13 @@
-import inspect
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import numpy as np
 import onnx.numpy_helper as onh
 from onnx import AttributeProto, NodeProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class TreeEnsembleRegressorMulPattern(PatternOptimization):
@@ -223,16 +227,16 @@ class TreeEnsembleRegressorMulPattern(PatternOptimization):
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if next_nodes[0].op_type != "Mul" or next_nodes[0].domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(next_nodes[0].input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node, next_nodes[0]], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         tree_node: NodeProto,
         mul_node: NodeProto,
     ) -> List[NodeProto]:
@@ -589,19 +593,19 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         concat_node = next_nodes[0]
         if concat_node.op_type not in ("Sigmoid", "Concat") or concat_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if concat_node.op_type == "Sigmoid":
             next_nodes = g.next_nodes(concat_node.output[0])
             if len(next_nodes) != 1:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             concat_node = next_nodes[0]
 
         axis = g.get_attribute(concat_node, "axis", exc=False)
         if axis is None or axis.i not in (0, 1):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         sigmoid = []
         trees = []
@@ -611,46 +615,46 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
 
         for treeo_or_sigmoid in concat_node.input:
             if g.is_used_more_than_once(treeo_or_sigmoid):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             t = g.node_before(treeo_or_sigmoid)
             if t.op_type == "Sigmoid":
                 if g.is_used_more_than_once(t.input[0]):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 sigmoid.append(t)
                 t = g.node_before(t.input[0])
 
             if t.op_type != "TreeEnsembleRegressor" or t.domain != "ai.onnx.ml":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             if inputs is None:
                 inputs = list(t.input)
             elif inputs != list(t.input):
                 # not the same input
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             n_targets = g.get_attribute(t, "n_targets", exc=False)
             if n_targets is None or n_targets.i != 1:
                 # It could be implemented in that case as well.
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             # only SUM is allowed
             agg = g.get_attribute(t, "aggregate_function", exc=False)
             if agg is not None and agg.s != b"SUM":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             # one unique post_transform is allowed
             post = g.get_attribute(t, "post_transform", exc=False)
             if post is None:
                 if post_transform is not None and post_transform != post:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 post_transform = b"NONE"
             elif post_transform is None:
                 post_transform = post.s
             elif post_transform != post.s:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             if len(sigmoid) > 0 and post_transform != b"NONE":
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             # specific rule for base_values: all none or all filled
             bb = (
@@ -660,12 +664,12 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
             if base_values_none is None:
                 base_values_none = bb
             elif bb != base_values_none:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             trees.append(t)
 
             if len(sigmoid) != 0 and len(sigmoid) != len(trees):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         return MatchResult(
             self, [concat_node, *sigmoid, *trees], self.apply, insert_at=concat_node
@@ -707,7 +711,7 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
     @classmethod
     def _merge(
         cls,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         trees: List[NodeProto],
         name: str,
         as_tensor: Optional[str] = None,
@@ -782,7 +786,7 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         concat_node: NodeProto,
         *trees_or_sigmoid: NodeProto,
     ) -> List[NodeProto]:

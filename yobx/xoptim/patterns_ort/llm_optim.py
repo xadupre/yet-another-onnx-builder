@@ -1,11 +1,15 @@
-import inspect
-from typing import List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple
 import numpy as np
 from onnx import NodeProto, TensorProto
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
 from ..patterns.onnx_attention import FunctionAttentionPattern, FunctionAttentionGQAPattern
 from ..patterns.onnx_rotary import FunctionHalfRotaryEmbeddingPattern
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class ContribRotaryEmbeddingPattern(PatternOptimization):
@@ -231,49 +235,49 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
         if node.op_type != self._operator_name or node.domain != self._domain_name:
             return self.none()
         if not g.has_shape(node.input[0]) or g.get_rank(node.input[0]) != 4:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.input[1]) or not g.has_shape(node.input[2]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape_cos = g.get_shape(node.input[1])
         shape_sin = g.get_shape(node.input[2])
         if shape_cos != shape_sin:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if len(shape_cos) != 4:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if shape_cos[1] != 1 or shape_sin[1] != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         # if shape_cos[0] != 1 or shape_sin[0] != 1:
-        #    return self.none(node, inspect.currentframe().f_lineno)
+        #    return self.none(node, _get_lineno())
         # if shape_cos[0] != 1 or shape_sin[0] != 1:
         # batch size is not 1 because position_ids was involved in the
         # computation of cos/sin caches.
-        #    return self.none(node, inspect.currentframe().f_lineno)
+        #    return self.none(node, _get_lineno())
 
         concat_cos = g.node_before(node.input[1])
         if concat_cos is None or concat_cos.op_type != "Concat" or concat_cos.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if concat_cos.input[0] != concat_cos.input[1]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_attribute(concat_cos, "axis").i != -1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         concat_sin = g.node_before(node.input[2])
         if concat_sin is None or concat_sin.op_type != "Concat" or concat_sin.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if concat_sin.input[0] != concat_sin.input[1]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_attribute(concat_sin, "axis").i != -1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # If cos_cache[-1] + sin_cache[-1] == X.shape[-1],
         # then there is no split before.
         split_node = g.node_before(node.input[0])
         if split_node is None or split_node.op_type != "Split" or split_node.domain != "":
             if not g.has_shape(concat_cos.input[0]) or not g.has_shape(concat_sin.input[0]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             cos_shape = g.get_shape(concat_cos.input[0])
             sin_shape = g.get_shape(concat_sin.input[0])
             input_shape = g.get_shape(node.input[0])
@@ -284,7 +288,7 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
                 self._info.append((node.input[0], shape))
                 if not isinstance(shape[1], int):
                     # Number of heads is not fixed"
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 # No split before, no concat after but there could be still position ids
                 return self._match_last_part(
                     g,
@@ -297,37 +301,37 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
                 )
 
         if split_node is None or split_node.op_type != "Split" or split_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(split_node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape_input = g.get_shape(split_node.input[0])
         if not isinstance(shape_input[1], int):
             # Not a fixed number of heads.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(split_node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_computed_constant(split_node.input[1])
         if cst.shape != (2,):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         concat_node = next_nodes[0]
         if concat_node.op_type != "Concat" or concat_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if split_node.output[1] != concat_node.input[1]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         axis = g.get_attribute(concat_node, "axis").i
         if axis != -1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         input_name = node.input[0] if split_node is None else split_node.input[0]
         shape = g.get_shape(input_name)
         self._info.append((input_name, shape))
         if not isinstance(shape[1], int):
             # Number of heads is not fixed"
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return self._match_last_part(
             g,
@@ -354,14 +358,14 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
         common = self._find_common_ancestor(g, concat_cos, concat_sin)
         if common is not None and not common:
             # cos/sin are switched. The pattern cannot match.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if (
             common
             and common[0].op_type == "Mul"
             and {"Sin", "Cos"} & set(n.op_type for n in common)
         ):
             # pattern FunctionCosSinCache has yet to be triggered first.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if (
             common
@@ -373,7 +377,7 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
             # a default value.
             cos_sin = common[0]
             if not g.has_shape(cos_sin.input[0]) or not g.has_shape(cos_sin.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             expand_node = g.node_before(cos_sin.input[1])
             if expand_node is not None:
                 # position_ids is expanded first
@@ -382,17 +386,17 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
                     # maybe position_ids is not given
                     return self.none(
                         node,
-                        inspect.currentframe().f_lineno,
+                        _get_lineno(),
                         msg=lambda: (
                             f"op_type={expand_node.op_type!r} name={expand_node.input[1]!r} "
                             f"shape_expand={shape_expand}"
                         ),
                     )
                 if not g.has_shape(expand_node.input[0]):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 wei_shape = g.get_shape(expand_node.input[0])
                 if wei_shape[0] != 1:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
 
             position_ids_shape = g.get_shape_renamed(cos_sin.input[0])
             weights_shape = g.get_shape_renamed(cos_sin.input[1])
@@ -401,7 +405,7 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
                 or len(weights_shape) != 3
                 or (position_ids_shape[0] != weights_shape[0] and weights_shape[0] != 1)
             ):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             # Then we need to add those nodes to the matched nodes.
             return MatchResult(
@@ -432,7 +436,7 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
             anc_cos = g.node_before(cos_name)
             anc_sin = g.node_before(sin_name)
             if anc_cos is None or anc_sin is None:
-                return self.none(concat_cos, inspect.currentframe().f_lineno)
+                return self.none(concat_cos, _get_lineno())
             if anc_cos.input[0] == anc_sin.input[0] and id(anc_cos) == id(anc_sin):
                 if len(anc_cos.output) == 2:
                     if (
@@ -447,11 +451,11 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
                 # cos/sin are not produced the usual way (CosSinCache)
                 return []
             nodes.extend([anc_cos, anc_sin])
-        return self.none(concat_cos, inspect.currentframe().f_lineno)
+        return self.none(concat_cos, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         expand_node: Optional[NodeProto],
         concat_cos: NodeProto,
         concat_sin: NodeProto,
@@ -787,16 +791,16 @@ class ContribRotaryEmbedding3DPattern(PatternOptimization):
             return self.none()
         transpose = g.node_before(node.input[0])
         if transpose is None or transpose.op_type != "Transpose" or transpose.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         perm = tuple(g.get_attribute(transpose, "perm").ints)
         if perm != (0, 2, 1, 3):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [transpose, node], self.apply, insert_at=node)
 
     def apply(
-        self, g: "GraphBuilder", transpose: NodeProto, rotary: NodeProto  # noqa: F821
+        self, g: "GraphBuilderPatternOptimization", transpose: NodeProto, rotary: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         last_dim = g.unique_name(f"{transpose.input[0]}::Shape3")
         new_shape2 = g.unique_name(f"{transpose.input[0]}::Shape+1")
@@ -1125,7 +1129,7 @@ class MultiHeadAttention3DPattern(PatternOptimization):
         ):
             return self.none()
         if not g.is_constant_scalar(node.input[4]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         q_transpose = g.node_before(node.input[0])
         expected_perm = (0, 2, 1, 3)
@@ -1134,12 +1138,12 @@ class MultiHeadAttention3DPattern(PatternOptimization):
             or q_transpose.op_type != "Transpose"
             or tuple(g.get_attribute(q_transpose, "perm").ints) != expected_perm
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(q_transpose.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape = g.get_shape(q_transpose.input[0])
         if not isinstance(shape[2], int):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         k_concat = g.node_before(node.input[1])
         if (
@@ -1148,14 +1152,14 @@ class MultiHeadAttention3DPattern(PatternOptimization):
             or g.get_attribute(k_concat, "axis").i != -2
             or len(k_concat.input) != 2
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         k_transpose = g.node_before(k_concat.input[1])
         if (
             k_transpose is None
             or k_transpose.op_type != "Transpose"
             or tuple(g.get_attribute(k_transpose, "perm").ints) != expected_perm
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         v_concat = g.node_before(node.input[2])
         if (
@@ -1164,35 +1168,35 @@ class MultiHeadAttention3DPattern(PatternOptimization):
             or g.get_attribute(v_concat, "axis").i != -2
             or len(v_concat.input) != 2
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         v_transpose = g.node_before(v_concat.input[1])
         if (
             v_transpose is None
             or v_transpose.op_type != "Transpose"
             or tuple(g.get_attribute(v_transpose, "perm").ints) != expected_perm
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         transposes = g.next_nodes(node.output[0])
         if len(transposes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         transpose = transposes[0]
         if (
             transpose is None
             or transpose.op_type != "Transpose"
             or tuple(g.get_attribute(transpose, "perm").ints) != expected_perm
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if (
             not g.has_shape(q_transpose.input[0])
             or g.get_rank(q_transpose.input[0]) != 4
             or not isinstance(g.get_shape(q_transpose.input[0])[-1], int)
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         for n in [q_transpose, k_transpose, v_transpose, node]:
             if n and g.is_used_more_than_once(n.output[0]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         return MatchResult(
             self,
@@ -1202,7 +1206,7 @@ class MultiHeadAttention3DPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         q_transpose: NodeProto,
         k_transpose: NodeProto,
         k_concat: NodeProto,
@@ -1690,13 +1694,13 @@ class GroupQueryAttention3DPattern(PatternOptimization):
         keys, values = node.input[1:3]
         concats = g.node_before(keys), g.node_before(values)
         if None in concats:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if len(concats[0].input) != 2 or len(concats[1].input) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_attribute_with_default(concats[0], "axis", 0) != g.get_attribute_with_default(
             concats[1], "axis", 0
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if len(node.input) > 3 and node.input[3] and g.has_processor("CUDA"):
             # GroupQueryAttention does not work with a bias.
@@ -1706,39 +1710,39 @@ class GroupQueryAttention3DPattern(PatternOptimization):
             not g.has_rank(node.input[3]) or g.get_rank(node.input[3]) < 2
         ):
             # Only 2D ranks allowed.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.is_constant_scalar(node.input[4]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(node.input[5]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_computed_constant(node.input[5])
         if cst is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = tuple(cst)
         if len(cst) < 4:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if cst[:2] != cst[3:] or cst[:2] != (1, 1):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(node.input[6]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape_or_axis = g.get_computed_constant(node.input[6])
         if shape_or_axis is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if "sQ_to" in node.op_type:
             # This is an axis for a Squeeze node.
             if not g.get_shape(node.input[1]):
                 # We need that shape to get kv_num_heads.
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         else:
             # This is a shape for a Reshape node.
             if shape_or_axis[1] <= 0:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         return MatchResult(self, [*concats, node], self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         keys_concat_node: NodeProto,
         values_concat_node: NodeProto,
         local_attention_gqa: NodeProto,
@@ -1903,20 +1907,20 @@ class Attention3DPattern(PatternOptimization):
     ) -> Optional[Tuple[NodeProto, NodeProto, NodeProto]]:
         transpose = g.node_before(name)
         if not transpose or transpose.op_type != "Transpose":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if tuple(g.get_attribute(transpose, "perm").ints) != (0, 2, 1, 3):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         reshape = g.node_before(transpose.input[0])
         if not reshape or reshape.op_type != "Reshape":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(reshape.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_computed_constant(reshape.input[1])
         if cst is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         matmul = g.node_before(reshape.input[0])
         if matmul is None or matmul.op_type != "MatMul":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return matmul, reshape, transpose
 
     def match(
@@ -1933,62 +1937,62 @@ class Attention3DPattern(PatternOptimization):
             return self.none()
         if len(node.input) > 3 and node.input[3] and not g.has_type(node.input[3]):
             # mask type is unknown
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(node.input[4]):
             # scale is expected to be a constant scalar; otherwise apply() will fail
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         query, keys, values = node.input[:3]
 
         before_query = self._match_above(g, node, query)
         if before_query is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         before_keys = self._match_above(g, node, keys)
         if before_keys is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         before_values = self._match_above(g, node, values)
         if before_values is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         mm_q, re_q, tr_q = before_query
         mm_k, re_k, tr_k = before_keys
         mm_v, re_v, tr_v = before_values
 
         if mm_q.input[0] != mm_k.input[0] or mm_q.input[0] != mm_v.input[0]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cst_q = g.get_computed_constant(re_q.input[1])
         cst_k = g.get_computed_constant(re_k.input[1])
         cst_v = g.get_computed_constant(re_v.input[1])
         if tuple(cst_q) != tuple(cst_k) or tuple(cst_q) != tuple(cst_v):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         transposes = g.next_nodes(node.output[0])
         if len(transposes) != 1 or transposes[0].op_type != "Transpose":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         transpose = transposes[0]
         if tuple(g.get_attribute(transpose, "perm").ints) != (0, 2, 1, 3):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         reshapes = g.next_nodes(transpose.output[0])
         if len(reshapes) != 1 or reshapes[0].op_type != "Reshape":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         reshape = reshapes[0]
         if not g.is_constant(reshape.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_computed_constant(reshape.input[1])
         if cst is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         nodes = [mm_q, re_q, tr_q, mm_k, re_k, tr_k, mm_v, re_v, tr_v, node, transpose, reshape]
         for n in nodes[:-1]:
             if g.is_used_more_than_once(n.output[0]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         return MatchResult(self, nodes, self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         mm_q: NodeProto,
         re_q: NodeProto,
         tr_q: NodeProto,

@@ -1,8 +1,12 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 import numpy as np
 from onnx import NodeProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class ReduceSumNormalizePattern(PatternOptimization):
@@ -132,25 +136,25 @@ class ReduceSumNormalizePattern(PatternOptimization):
 
         cast_node = g.node_before(node.input[0])
         if cast_node is None or cast_node.op_type != "Cast":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         mul_node = g.next_nodes(node.output[0])
         if len(mul_node) != 1 or mul_node[0].op_type != "Mul":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         sub_node = g.next_nodes(mul_node[0].output[0])
         if len(sub_node) != 1 or sub_node[0].op_type != "Sub":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cast2_node = g.next_nodes(sub_node[0].output[0])
         if len(cast2_node) != 1 or cast2_node[0].op_type != "Cast":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not (set(sub_node[0].input) & set(node.input)):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.get_type(cast_node.input[0]) != g.get_type(cast2_node[0].output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(
             self, [cast_node, node, mul_node[0], sub_node[0], cast2_node[0]], self.apply
@@ -158,7 +162,7 @@ class ReduceSumNormalizePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         cast_node: NodeProto,
         node: NodeProto,
         mul_node: NodeProto,
@@ -321,39 +325,39 @@ class ReduceArgTopKPattern(PatternOptimization):
 
         next_nodes = g.next_nodes(node.input[0])
         if len(next_nodes) < 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         look_for = f"Reduce{node.op_type[3:]}"
         reduce = [n for n in next_nodes if n.op_type == look_for]
         if len(reduce) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         reduce_node = reduce[0]
 
         if not g.is_constant(reduce_node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_computed_constant(reduce_node.input[1])
         if not cst:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         axes = tuple(cst)
         if len(axes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         axis = g.get_attribute_with_default(node, "axis", 0)
         if axis != cst[0]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.get_attribute_with_default(node, "keepdims", 1) != g.get_attribute_with_default(
             reduce_node, "keepdims", 1
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_attribute_with_default(reduce_node, "noop_with_empty_axes", 0):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_attribute_with_default(reduce_node, "select_last_index", 0) == 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [reduce_node, node], self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         reduce_node: NodeProto,
         arg_node: NodeProto,
     ) -> List[NodeProto]:

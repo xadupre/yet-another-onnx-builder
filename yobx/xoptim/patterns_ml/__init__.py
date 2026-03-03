@@ -1,4 +1,7 @@
-from typing import List
+from typing import TYPE_CHECKING, List
+
+if TYPE_CHECKING:
+    from ..patterns_api import PatternOptimization
 
 
 def get_ml_patterns(

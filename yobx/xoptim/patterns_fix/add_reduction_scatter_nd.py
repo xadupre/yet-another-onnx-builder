@@ -1,8 +1,12 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto
 from onnx.numpy_helper import to_array
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class AddReductionScatterND(PatternOptimization):
@@ -19,13 +23,13 @@ class AddReductionScatterND(PatternOptimization):
         if node.op_type != "ScatterND" or node.domain != "":
             return self.none()
         if g.get_attribute(node, "reduction", exc=False) is not None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         before = g.node_before(node.input[0])
         if before.op_type != "ConstantOfShape" or before.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         att = g.get_attribute(before, "value", exc=False)
         if att is None:
@@ -34,13 +38,13 @@ class AddReductionScatterND(PatternOptimization):
             t = to_array(att.t)
             value = t[0] if t.shape == (1,) else t
         if value != 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         new_node = g.make_node(

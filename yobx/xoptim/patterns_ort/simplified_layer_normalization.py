@@ -1,10 +1,14 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 import numpy as np
 import onnx.numpy_helper as onh
 from onnx import NodeProto, TensorProto
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class SimplifiedLayerNormalizationPattern(PatternOptimization):
@@ -157,50 +161,50 @@ class SimplifiedLayerNormalizationPattern(PatternOptimization):
         if node.op_type != "ReduceMean" or node.domain != "":
             return self.none()
         if len(node.input) < 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         axis = g.get_constant_or_attribute(node, "axes", input_index=1, cvt=tuple)
         assert isinstance(axis, tuple), f"unexpected type {type(axis)} for axis"
         if len(axis) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         node_pow = g.node_before(node.input[0])
         if node_pow is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if node_pow.op_type != "Pow" or node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(node_pow.input[1], 2):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         nodes_add = g.next_nodes(node.output[0])
         if len(nodes_add) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         node_add = nodes_add[0]
         if node_add.op_type != "Add" or node_add.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.is_constant_scalar(node_add.input[0]) and not g.is_constant_scalar(
             node_add.input[1]
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         node_sqrt = g.next_node(node_add.output[0])
         if node_sqrt.op_type != "Sqrt" or node_sqrt.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         node_reciprocal = g.next_node(node_sqrt.output[0])
         if node_reciprocal.op_type not in ("Reciprocal", "Div") or node_reciprocal.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if node_reciprocal.op_type == "Div":
             if node_reciprocal.input[1] != node_sqrt.output[0]:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if not g.is_constant_scalar(node_reciprocal.input[0], 1):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         node_mul = g.next_node(node_reciprocal.output[0])
         if node_mul.op_type != "Mul" or node_mul.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if (
             g.is_used_more_than_once(node_pow.output[0])
@@ -209,21 +213,21 @@ class SimplifiedLayerNormalizationPattern(PatternOptimization):
             or g.is_used_more_than_once(node_sqrt.output[0])
         ):
             # intermediate results are used
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         mul_i = set(node_mul.input)
         cmp = {node_pow.input[0], node_reciprocal.output[0]}
         if mul_i != cmp:
             # We check the multiplication node takes the output of the div node
             # and the input of the pow node.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         nodes = [node_pow, node, node_add, node_sqrt, node_reciprocal, node_mul]
         return MatchResult(self, nodes, self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_pow: NodeProto,
         node_reduce: NodeProto,
         node_add: NodeProto,
@@ -417,30 +421,30 @@ class SkipLayerNormalizationPattern(PatternOptimization):
         if node.op_type != "LayerNormalization" or node.domain != "":
             return self.none()
         if not g.has_rank(node.input[0]) or g.get_rank(node.input[0]) not in (2, 3):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if len(node.input) > 1 and (
             not g.has_rank(node.input[1]) or g.get_rank(node.input[1]) != 1
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if len(node.input) > 2 and (
             not g.has_rank(node.input[2]) or g.get_rank(node.input[2]) != 1
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         axis = g.get_attribute(node, "axis", exc=False)
         axis = 0 if axis is None else axis.i
         if axis != -1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         before = g.node_before(node.input[0])
         if before is None or before.op_type != "Add":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_rank(before.input[1]) or g.get_rank(before.input[1]) not in (2, 3):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         nodes = [before, node]
         return MatchResult(self, nodes, self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         add_node: NodeProto,
         norm_node: NodeProto,
     ) -> List[NodeProto]:
@@ -824,7 +828,7 @@ class SkipSimplifiedLayerNormalizationPattern(PatternOptimization):
             return self.none()
         if len(node.output) > 1 and (len(node.output) != 2 or g.is_used(node.output[1])):
             # second output is used
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # axis
         axis = g.get_attribute(node, "axis", exc=False)
@@ -832,28 +836,28 @@ class SkipSimplifiedLayerNormalizationPattern(PatternOptimization):
         if axis != -1 and (
             not g.has_rank(node.input[0]) or axis != g.get_rank(node.input[0]) - 1
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # stash_type
         stash_type = g.get_attribute(node, "stash_type", exc=False)
         stash_type = TensorProto.FLOAT if stash_type is None else stash_type.i
         if stash_type != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         add = g.node_before(node.input[0])
         if add.op_type != "Add" or add.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if (
             not g.has_shape(add.input[0])
             or not g.has_shape(add.input[1])
             or g.get_shape(add.input[0]) != g.get_shape(add.input[1])
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [add, node], self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_add: NodeProto,
         node_simplified: NodeProto,
     ) -> List[NodeProto]:
@@ -1436,34 +1440,34 @@ class SkipSimplifiedLayerNormalizationMulPattern(PatternOptimization):
         if (node.op_type, node.domain) != ("SkipSimplifiedLayerNormalization", "com.microsoft"):
             return self.none()
         if (len(node.output) > 1 and node.output[1]) or (len(node.output) > 2 and node.output[2]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if len(node.input) != 3:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(node.input[2]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         mul_nodes = g.next_nodes(node.output[0])
         if len(mul_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         mul_node = mul_nodes[0]
         if mul_node.op_type != "Mul" or mul_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.input[2]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         index_cst = 1 if mul_node.input[0] == node.output[0] else 0
         if not g.has_shape(mul_node.input[index_cst]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_shape_renamed(node.input[2]) != g.get_shape_renamed(mul_node.input[index_cst]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(mul_node.input[index_cst]):
             # not supported yet
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node, mul_node], self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         skip_simp_node: NodeProto,
         mul_node: NodeProto,
     ) -> List[NodeProto]:
@@ -2032,35 +2036,35 @@ class SimplifiedLayerNormalizationMulPattern(PatternOptimization):
         if (node.op_type, node.domain) != ("SimplifiedLayerNormalization", ""):
             return self.none()
         if len(node.input) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst_skip = g.get_computed_constant(node.input[1])
         if cst_skip is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         mul_nodes = g.next_nodes(node.output[0])
         if len(mul_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         mul_node = mul_nodes[0]
         if mul_node.op_type != "Mul" or mul_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         index_cst = 1 if mul_node.input[0] == node.output[0] else 0
         if not g.has_shape(mul_node.input[index_cst]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_shape_renamed(node.input[1]) != g.get_shape_renamed(mul_node.input[index_cst]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(mul_node.input[index_cst]):
             # not supported yet
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node, mul_node], self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         simp_node: NodeProto,
         mul_node: NodeProto,
     ) -> List[NodeProto]:

@@ -1,8 +1,12 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto
 from onnx.numpy_helper import to_array
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class ConstantOfShapeScatterNDPattern(PatternOptimization):
@@ -156,30 +160,30 @@ class ConstantOfShapeScatterNDPattern(PatternOptimization):
 
         reduction = g.get_attribute(node, "reduction", exc=False)
         if reduction is None or reduction.s == b"none":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.has_type(node.input[2]):
             itype = g.try_infer_type(node.input[2])
             if itype == 0:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         else:
             itype = g.get_type(node.input[2])
 
         node_before = g.node_before(node.input[0])
         if node_before is None or node_before.op_type != "ConstantOfShape" or node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         att = g.get_attribute(node_before, "value", False)
         if att is not None:
             arr = to_array(att.t)
             if arr[0] != 0:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         return MatchResult(self, [node_before, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_before: NodeProto,
         node: NodeProto,
     ) -> List[NodeProto]:
@@ -364,57 +368,57 @@ class MaskedShapeScatterNDPattern(PatternOptimization):
 
         reduction = g.get_attribute(node, "reduction", exc=False)
         if reduction is None or reduction.s != b"add":
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
 
         if g.is_used_more_than_once(node.input[1]):
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
 
         indices = node.input[1]
 
         where_node = g.node_before(node.input[2])
         if where_node.op_type != "Where" or where_node.domain != "":
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
 
         if not g.is_constant_scalar(where_node.input[1]):
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
         cst = g.get_constant_scalar(where_node.input[1])
         if cst != 0:
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
 
         equal_node = g.node_before(where_node.input[0])
         if equal_node.op_type != "Equal" or equal_node.domain != "":
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
 
         indices_again = equal_node.input[0]
         if indices_again != indices:
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
         if g.is_used_more_than_once(equal_node.output[0]):
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
 
         if not g.is_constant_scalar(equal_node.input[1]):
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
 
         rank = g.get_rank(indices)
         if rank != 3:
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
         if not g.has_shape(indices):
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
         shape = g.get_shape(indices)
         if shape[-1] != -1:
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
 
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         shape_shape = g.get_shape(node.input[0])
         if shape_shape != (2,):
-            self.none(node, inspect.currentframe().f_lineno)
+            self.none(node, _get_lineno())
 
         return MatchResult(self, [node, where_node, equal_node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         scatter_node: NodeProto,
         where_node: NodeProto,
         equal_node: NodeProto,

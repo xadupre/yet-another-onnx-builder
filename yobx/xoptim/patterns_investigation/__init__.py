@@ -1,7 +1,10 @@
 import inspect
-from typing import List
+from typing import TYPE_CHECKING, List
 from ...xbuilder import GraphBuilder, FunctionOptions
 from ..patterns_api import EasyPatternOptimization
+
+if TYPE_CHECKING:
+    from ..patterns_api import PatternOptimization
 
 
 def get_investigation_patterns(verbose: int = 0) -> List["PatternOptimization"]:  # noqa: F821

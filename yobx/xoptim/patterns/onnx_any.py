@@ -1,8 +1,12 @@
-import inspect
-from typing import Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Dict, List, Optional, Set
 from onnx import AttributeProto, NodeProto, TensorProto
 from ...helpers.onnx_helper import make_idn, unary_like_op_types
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class SameChildrenPattern(PatternOptimization):
@@ -264,7 +268,7 @@ class SameChildrenPattern(PatternOptimization):
             if n1.op_type != n2.op_type or n1.op_type == "Identity":
                 return self.none()
             if not self._cmp(n1, n2):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             nodes = [n1, n2]
         else:
             cp = {}
@@ -295,7 +299,7 @@ class SameChildrenPattern(PatternOptimization):
                     if enough:
                         break
             if len(nodes) == 0:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         for i in range(0, len(nodes), 2):
             n1, n2 = nodes[i : i + 2]
@@ -318,7 +322,7 @@ class SameChildrenPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         *nodes: NodeProto,
     ) -> List[NodeProto]:
         """
@@ -612,11 +616,11 @@ class ShapeBasedSameChildrenPattern(PatternOptimization):
                 shapes = [g.get_shape(n.output[0]) for n in selected]
                 if len(set(shapes)) == 1:
                     return MatchResult(self, selected, self.apply)
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         *nodes: NodeProto,
     ) -> List[NodeProto]:
         """
@@ -778,70 +782,70 @@ class IdentityPattern(PatternOptimization):
                     or g.get_computed_constant(steps) is None
                     or set(g.get_computed_constant(steps)) != {1}
                 ):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
             starts, ends = node.input[1:3]
             if (
                 not g.is_constant(starts)
                 or g.get_computed_constant(starts) is None
                 or set(g.get_computed_constant(starts)) != {0}
             ):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if (
                 not g.is_constant(ends)
                 or g.get_computed_constant(ends) is None
                 or set(g.get_computed_constant(ends))
                 != {9223372036854775807}  # this a value used by torch
             ):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             return MatchResult(self, [node], self.apply, insert_at=node)
 
         if node.op_type == "Transpose":
             perm = list(g.get_attribute(node, "perm").ints)
             expected = list(range(len(perm)))
             if perm != expected:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             return MatchResult(self, [node], self.apply, insert_at=node)
 
         if node.op_type == "Expand":
             if not g.is_constant(node.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             value = g.get_computed_constant(node.input[1])
             if value is None:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if not g.has_rank(node.input[0]) or value.shape[0] != g.get_rank(node.input[0]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             with g.builder.maybe_disable_fake_tensor_mode():
                 unique = set(value)
             if unique != {1}:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             return MatchResult(self, [node], self.apply, insert_at=node)
 
         if node.op_type == "BatchNormalization":
             if not g.has_type(node.input[0]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if g.get_type(node.input[0]) not in {TensorProto.FLOAT16, TensorProto.BFLOAT16}:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             training_mode = g.get_attribute_with_default(node, "training_mode", 0)
             epsilon = g.get_attribute_with_default(node, "epsilon", 1e-5)
             if training_mode != 0 or epsilon > 1e-5:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if (
                 not g.is_constant(node.input[1])
                 or not g.is_constant(node.input[2])
                 or not g.is_constant(node.input[3])
                 or not g.is_constant(node.input[4])
             ):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             csts = [g.get_computed_constant(i) for i in node.input[1:]]
             if any(c is None for c in csts):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             with g.builder.maybe_disable_fake_tensor_mode():
                 minis = [float(c.min()) for c in csts]
                 maxis = [float(c.max()) for c in csts]
             if any(mi != ma for mi, ma in zip(minis, maxis)):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if minis != [1, 0, 0, 1]:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             return MatchResult(self, [node], self.apply, insert_at=node)
 
         assert len(node.input) == 2, (
@@ -852,14 +856,14 @@ class IdentityPattern(PatternOptimization):
         if g.is_constant(node.input[1]):
             if g.has_rank(node.input[1]) and g.get_rank(node.input[1]) > 1:
                 # No need to go further.
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             shape = g.get_constant_shape(node.input[1], exc=False)
             if shape is None:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if shape in (tuple(), (1,)):
                 # simple case
                 if not g.is_constant_scalar(node.input[1]):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 cst = g.get_constant_scalar(node.input[1])
                 val = self._any_value_to_scalar(cst)
                 if val == 0:
@@ -878,35 +882,35 @@ class IdentityPattern(PatternOptimization):
                 # less simple case, the tensor is multiplied on its last dimension.
                 cst = g.get_computed_constant(node.input[1])
                 if cst is None:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 if not self._has_unique_value(cst):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 unique = cst[0]
                 if not g.has_shape(node.input[0]):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 shape = g.get_shape(node.input[0])
                 if shape[-1] != cst.shape[0]:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 if node.op_type in {"Add", "Sub", "And"} and unique != 0:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 if node.op_type in {"And"} and unique is not True:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 if node.op_type in {"Mul", "Div", "Or"} and unique != 1:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 if node.op_type in {"Or"} and unique is not False:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 return MatchResult(self, [node], self.apply, insert_at=node)
         elif g.is_constant(node.input[0]):
             if g.has_rank(node.input[0]) and g.get_rank(node.input[0]) > 1:
                 # No need to go further.
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             shape = g.get_constant_shape(node.input[0], exc=False)
             if shape is None:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if shape in (tuple(), (1,)):
                 # simple case
                 if not g.is_constant_scalar(node.input[0]):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 cst = g.get_constant_scalar(node.input[0])
                 val = self._any_value_to_scalar(cst)
                 if val == 0:
@@ -922,11 +926,11 @@ class IdentityPattern(PatternOptimization):
                     if node.op_type in {"And"}:
                         return MatchResult(self, [node], self.apply, insert_at=node)
 
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         name = node.input[
@@ -1066,21 +1070,21 @@ class ShapeBasedIdentityPattern(PatternOptimization):
                     or g.get_computed_constant(steps) is None
                     or set(g.get_computed_constant(steps)) != {1}
                 ):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
 
             if not g.has_shape(node.input[0]) or not g.has_shape(node.output[0]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             shape_i = g.get_shape_renamed(node.input[0])
             shape_o = g.get_shape_renamed(node.output[0])
             if shape_i == shape_o:
                 return MatchResult(self, [node], self.apply, insert_at=node)
 
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         return [
@@ -1214,21 +1218,21 @@ class SwapUnaryPattern(PatternOptimization):
             return self.none()
         if not g.has_rank(node.input[0]) or g.get_rank(node.input[0]) == 0:
             # the unary or binary op changes the shape
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(node.output[0]) or node.op_type in {"Squeeze", "Unsqueeze"}:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_node = g.next_node(node.output[0])
         if next_node.op_type not in self._unary_types and (
             next_node.op_type not in self._binary_types_scalar_cst
             or not g.has_shape(next_node.input[1])
             or g.get_shape(next_node.input[1]) != (1,)
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, next_node], self.apply)
 
     def apply(
-        self, g: "GraphBuilder", node: NodeProto, unary_node: NodeProto  # noqa: F821
+        self, g: "GraphBuilderPatternOptimization", node: NodeProto, unary_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         temp_name = g.unique_name(f"{self.__class__.__name__}--{node.output[0]}")
         res = [
@@ -1343,11 +1347,11 @@ class NotNotPattern(PatternOptimization):
 
         not_before = g.node_before(node.input[0])
         if not not_before or not_before.op_type != "Not" or not_before.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [not_before, node], self.apply, insert_at=node)
 
     def apply(
-        self, g: "GraphBuilder", not_before: NodeProto, not_after: NodeProto  # noqa: F821
+        self, g: "GraphBuilderPatternOptimization", not_before: NodeProto, not_after: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         pre_nodes = []
         if g.is_used_more_than_once(not_before.output[0]):

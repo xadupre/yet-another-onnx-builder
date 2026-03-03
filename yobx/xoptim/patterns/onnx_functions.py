@@ -1,7 +1,11 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto, TensorProto
-from ..patterns_api import EasyPatternOptimization
+from ..patterns_api import EasyPatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class GeluPattern(EasyPatternOptimization):
@@ -198,18 +202,18 @@ class GeluPattern(EasyPatternOptimization):
         node = deleted_nodes[0]
 
         if not g.is_constant_scalar(c3) or g.get_constant_scalar(c3) != 3:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(cx3) or g.get_constant_scalar(cx3) not in (
             0.044715,
             0.044708251953125,
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(cpi) or g.get_constant_scalar(cpi) != 0.7978515625:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(one) or g.get_constant_scalar(one) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(c2) or g.get_constant_scalar(c2) != 0.5:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return True
 
 
@@ -345,9 +349,9 @@ class LeakyReluPattern(EasyPatternOptimization):
         slope = mul.input[1]
 
         if not g.is_constant_scalar(zero) or g.get_constant_scalar(zero) != 0:
-            return self.none(greater, inspect.currentframe().f_lineno)
+            return self.none(greater, _get_lineno())
         if not g.is_constant_scalar(slope):
-            return self.none(mul, inspect.currentframe().f_lineno)
+            return self.none(mul, _get_lineno())
         self.add_validate_param("slope", g.get_constant_scalar(slope))
         return True
 
@@ -563,11 +567,11 @@ class SoftmaxCrossEntropyLossCastPattern(EasyPatternOptimization):
             if n.op_type in {"Squeeze", "Unsqueeze"}:
                 c = n.input[1]
                 if not g.is_constant_scalar(c) or g.get_constant_scalar(c) != 1:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 continue
             if n.op_type in {"Equal"}:
                 c = n.input[1]
                 if not g.is_constant_scalar(c) or g.get_constant_scalar(c) != -100:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 continue
         return True

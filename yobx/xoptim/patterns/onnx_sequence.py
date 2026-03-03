@@ -1,7 +1,11 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class SequenceConstructAtPattern(PatternOptimization):
@@ -126,23 +130,23 @@ class SequenceConstructAtPattern(PatternOptimization):
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != len(node.input):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if any(n.op_type != "SequenceAt" for n in next_nodes):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         ats = [n.input[1] for n in next_nodes]
         if any(not g.is_constant_scalar(a) for a in ats):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cst = [g.get_constant_scalar(a) for a in ats]
         if set(cst) != set(range(len(ats))):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, *next_nodes], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_seq: NodeProto,
         *node_ats: NodeProto,
     ) -> List[NodeProto]:

@@ -1,9 +1,13 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto, TensorProto
 from ...helpers.helper import size_type
 from ...helpers.onnx_helper import is_float_type
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class CastPattern(PatternOptimization):
@@ -112,20 +116,20 @@ class CastPattern(PatternOptimization):
         if not g.has_type(node.input[0]):
             itype = g.try_infer_type(node.input[0], exc=False)
             if itype == 0:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         else:
             itype = g.get_type(node.input[0])
 
         att = g.get_attribute(node, "to")
 
         if att.i != itype:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         new_node = g.make_node(
@@ -248,14 +252,14 @@ class CastCastPattern(PatternOptimization):
             return self.none()
         cast_before = g.node_before(node.input[0])
         if cast_before is None or cast_before.op_type != "Cast" or cast_before.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_type(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         itype = g.get_type(cast_before.input[0])
         middle_type = g.get_attribute(cast_before, "to").i
         final_type = g.get_attribute(node, "to").i
         if not self._one_cast(itype, middle_type, final_type):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(
             self,
             [cast_before, node],
@@ -265,7 +269,7 @@ class CastCastPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         cast1: NodeProto,
         cast2: NodeProto,
     ) -> List[NodeProto]:
@@ -400,19 +404,19 @@ class CastCastBinaryPattern(PatternOptimization):
             return self.none()
 
         if g.is_used_more_than_once(node.input[0]) or g.is_used_more_than_once(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.has_type(node.input[0]) or not g.has_type(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         dtype_left, dtype_right = g.get_type(node.input[0]), g.get_type(node.input[1])
         if dtype_left not in self._dtypes_allowed or dtype_right not in self._dtypes_allowed:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         left, right = g.node_before(node.input[0]), g.node_before(node.input[1])
         if left is None or left.op_type != "Cast" or left.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if right is None or right.op_type != "Cast" or right.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         itype = (
             g.get_type(left.input[0])
@@ -420,26 +424,26 @@ class CastCastBinaryPattern(PatternOptimization):
             else (g.get_type(right.input[0]) if g.has_type(right.input[0]) else 0)
         )
         if itype == 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         dtype_left, dtype_right = g.get_type(left.input[0]), g.get_type(right.input[0])
         if dtype_left not in self._dtypes_allowed or dtype_right not in self._dtypes_allowed:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # We also need to check the precision is not lowered.
         # At this stage dtype_left == dtype_right otherwise ONNX would complain.
         if size_type(dtype_left) > size_type(itype):
             # The precision is higher for the computation. Let's not do that.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if is_float_type(dtype_left) != is_float_type(itype):
             # float, int changes, let's avoid that as well
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [left, right, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         left: NodeProto,
         right: NodeProto,
         node: NodeProto,
@@ -575,19 +579,19 @@ class CastOpCastPattern(PatternOptimization):
         ) and node.op_type not in self._unary_ops:
             return self.none()
         if "ComputationCastOpCastPattern--" in node.name:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.is_used_more_than_once(node.input[0]) or (
             len(node.input) > 1 and g.is_used_more_than_once(node.input[1])
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cast_out_node = next_nodes[0]
         if cast_out_node.op_type != "Cast" or cast_out_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cast_in_left = g.node_before(node.input[0])
         cast_in_right = g.node_before(node.input[1]) if len(node.input) > 1 else None
@@ -595,7 +599,7 @@ class CastOpCastPattern(PatternOptimization):
             "" if cast_in_left is None else cast_in_left.op_type,
             "" if cast_in_right is None else cast_in_right.op_type,
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if cast_out_node is None and (
             cast_in_left is None
@@ -610,10 +614,10 @@ class CastOpCastPattern(PatternOptimization):
                 compute_type == TensorProto.FLOAT
                 and before_type in (TensorProto.FLOAT16, TensorProto.BFLOAT16)
             ):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if not is_float_type(compute_type) and is_float_type(before_type):
                 # The intent is something else.
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         else:
             compute_type = g.get_type(node.output[0])
             other_type = (
@@ -623,7 +627,7 @@ class CastOpCastPattern(PatternOptimization):
             )
             if not is_float_type(compute_type) and is_float_type(other_type):
                 # The intent is something else.
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         return MatchResult(
             self,
@@ -647,7 +651,7 @@ class CastOpCastPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         cast_in_left: NodeProto,
         cast_in_right: NodeProto,
         node: NodeProto,
@@ -834,7 +838,7 @@ class ComputationCastOpCastPattern(PatternOptimization):
         type_right = "" if node_right is None else node_right.op_type
         if not ((type_left == "Cast") ^ (type_right == "Cast")):
             # only one cast allowed
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if type_left == "Cast":
             node_right = None
@@ -842,22 +846,22 @@ class ComputationCastOpCastPattern(PatternOptimization):
             node_left = None
         node_before = node_left or node_right
         if not g.has_type(node.output[0]) or not g.has_type(node_before.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         output_type = g.get_type(node.output[0])
         before_type = g.get_type(node_before.input[0])
         if not (
             output_type == TensorProto.FLOAT
             and before_type in (TensorProto.FLOAT16, TensorProto.BFLOAT16)
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.is_used_more_than_once(node_before.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(node.output[0])
         op_types = [n.op_type for n in next_nodes]
         if "Cast" in op_types:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # At this stage, we know the computation type is float and one input
         # has a lower type precision. Let's change it.
@@ -865,7 +869,7 @@ class ComputationCastOpCastPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_left: Optional[NodeProto],
         node_right: Optional[NodeProto],
         node: NodeProto,

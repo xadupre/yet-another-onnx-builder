@@ -11,8 +11,10 @@ from .patterns_api import (
 
 
 def get_pattern(
-    obj: Union[PatternOptimization, str], as_list: bool = False, verbose: int = 0
-) -> PatternOptimization:
+    obj: Union[PatternOptimization, str, List],
+    as_list: bool = False,
+    verbose: int = 0,
+) -> Union[PatternOptimization, List[PatternOptimization]]:
     """
     Returns an optimization pattern based on its name.
     """
@@ -98,10 +100,10 @@ def get_pattern(
 
 
 def get_pattern_list(
-    positive_list: Optional[Union[str, List[Union[str, type]]]] = "default",
-    negative_list: Optional[Union[str, List[Union[str, type]]]] = None,
+    positive_list: Optional[Union[str, List[Union[str, type, PatternOptimization]]]] = "default",
+    negative_list: Optional[Union[str, List[Union[str, type, PatternOptimization]]]] = None,
     verbose: int = 0,
-):
+) -> List[PatternOptimization]:
     """
     Builds a list of patterns based on two lists, negative and positive.
 
@@ -134,10 +136,11 @@ def remove_constants_for_initializers(model: ModelProto, verbose: int = 0):
     """Replaces nodes Constant by initializers."""
     from .patterns import ConstantToInitializerPattern
     from ..xbuilder import GraphBuilder, OptimizationOptions
+    from ..xbuilder.infer_shapes_options import InferShapesOptions
 
     gr = GraphBuilder(
         model,
-        infer_shapes_options=False,
+        infer_shapes_options=InferShapesOptions.NONE,
         optimization_options=OptimizationOptions(
             patterns=[ConstantToInitializerPattern()], verbose=verbose, recursive=True
         ),

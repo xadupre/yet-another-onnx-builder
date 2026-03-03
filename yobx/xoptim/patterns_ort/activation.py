@@ -1,8 +1,12 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto
-from ..patterns_api import MatchResult, PatternOptimization, EasyPatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, EasyPatternOptimization, _get_lineno
 from ..patterns.onnx_functions import GeluPattern
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class BiasGeluPattern(PatternOptimization):
@@ -160,60 +164,60 @@ class BiasGeluPattern(PatternOptimization):
         if node.op_type != "Erf" or node.domain != "":
             return self.none()
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         div = g.node_before(node.input[0])
         if (
             not g.is_constant_scalar(div.input[1])
             or g.get_constant_scalar(div.input[1]) != 1.4140625
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         add = g.node_before(div.input[0])
         if add.op_type != "Add" or add.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(add.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         add1_nexts = g.next_nodes(add.output[0])
         if len(add1_nexts) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         add_next = g.next_nodes(node.output[0])
         if len(add_next) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         add_1 = add_next[0]
         if add_1.op_type != "Add" or add_1.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(add_1.input[1]) or g.get_constant_scalar(add_1.input[1]) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         muls = g.next_nodes(add_1.output[0])
         if len(muls) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         mul = muls[0]
         if mul.op_type != "Mul" or mul.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if set(mul.input) != {add.output[0], add_1.output[0]}:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         halves = g.next_nodes(mul.output[0])
         if len(halves) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         half = halves[0]
         if half.op_type != "Mul" or half.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         index = 1 if half.input[0] == mul.output[0] else 0
         if (
             not g.is_constant_scalar(half.input[index])
             or g.get_constant_scalar(half.input[index]) != 0.5
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [add, div, node, add_1, mul, half], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         add_node: NodeProto,
         div_node: NodeProto,
         erf_node: NodeProto,
@@ -541,11 +545,11 @@ class GeluErfPattern(EasyPatternOptimization):
 
         node = deleted_nodes[1]
         if not g.is_constant_scalar(cst2) or g.get_constant_scalar(cst2) != 1.4140625:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(one) or g.get_constant_scalar(one) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(c05) or g.get_constant_scalar(c05) != 0.5:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return True
 
 
@@ -656,7 +660,7 @@ class FastGeluPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         gelu_node: NodeProto,
     ) -> List[NodeProto]:
         return [
@@ -787,18 +791,18 @@ class BiasSoftmaxPattern(PatternOptimization):
         if node.op_type != "Softmax" or node.domain != "":
             return self.none()
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         atts = g.get_attributes_with_default(node, axis=-1)
         if atts["axis"] != -1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         before = g.node_before(node.input[0])
         if before is None or before.op_type != "Add":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [before, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         add_node: NodeProto,
         softmax_node: NodeProto,
     ) -> List[NodeProto]:
@@ -917,18 +921,18 @@ class QuickGeluPattern(PatternOptimization):
         if node.op_type != "Sigmoid" or node.domain != "":
             return self.none()
         if g.is_used_more_than_once(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         after = g.next_nodes(node.output[0])
         if not after or after[0].op_type != "Mul":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         mul_node = after[0]
         if node.input[0] not in mul_node.input:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node, mul_node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         sigmoid: NodeProto,
         mul_node: NodeProto,
     ) -> List[NodeProto]:

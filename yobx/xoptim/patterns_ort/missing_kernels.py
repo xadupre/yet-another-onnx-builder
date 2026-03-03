@@ -1,7 +1,11 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto, TensorProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class MissingRangePattern(PatternOptimization):
@@ -20,12 +24,12 @@ class MissingRangePattern(PatternOptimization):
             TensorProto.INT64,
             TensorProto.FLOAT,
         }:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         to = g.get_type(node.input[0])
@@ -78,12 +82,12 @@ class MissingCosSinPattern(PatternOptimization):
             TensorProto.FLOAT16,
             TensorProto.FLOAT,
         }:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         to = g.get_type(node.input[0])
@@ -129,12 +133,12 @@ class MissingReduceMaxPattern(PatternOptimization):
         if not g.has_type(node.input[0]) or g.get_type(node.input[0]) not in {
             TensorProto.BFLOAT16
         }:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         to = g.get_type(node.input[0])
@@ -182,12 +186,12 @@ class MissingTopKPattern(PatternOptimization):
         if not g.has_type(node.input[0]) or g.get_type(node.input[0]) not in {
             TensorProto.BFLOAT16
         }:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
     ) -> List[NodeProto]:
         to = g.get_type(node.input[0])

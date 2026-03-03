@@ -1,8 +1,12 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 import numpy as np
 from onnx import NodeProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class SqueezeUnsqueezePattern(PatternOptimization):
@@ -137,16 +141,16 @@ class SqueezeUnsqueezePattern(PatternOptimization):
             axes2 = tuple(i for i, a in enumerate(g.get_shape(second_node.input[0])) if a == 1)
 
         if len(first_node.input) == 2 and axes1 is None:
-            return self.none(second_node, inspect.currentframe().f_lineno)
+            return self.none(second_node, _get_lineno())
         if len(second_node.input) == 2 and axes2 is None:
-            return self.none(second_node, inspect.currentframe().f_lineno)
+            return self.none(second_node, _get_lineno())
         tax1 = tuple(map(int, axes1))
         tax2 = tuple(map(int, axes2))
         if tax1 == tax2:
             if len(axes1) > 1 and tuple(map(int, axes1)) != tuple(
                 range(min(axes1), max(axes1) + 1)
             ):
-                return self.none(second_node, inspect.currentframe().f_lineno)
+                return self.none(second_node, _get_lineno())
             return "Identity", None
         if first_node.op_type == "Unsqueeze" and set(tax1) < set(tax2):
             keep_axes = sorted(set(tax2) - set(tax1))
@@ -154,7 +158,7 @@ class SqueezeUnsqueezePattern(PatternOptimization):
                 m = len([t for t in tax1 if t < keep_axes[i]])
                 keep_axes[i] -= m
             return "Squeeze", tuple(keep_axes)
-        return self.none(second_node, inspect.currentframe().f_lineno)
+        return self.none(second_node, _get_lineno())
 
     def match(
         self,
@@ -171,7 +175,7 @@ class SqueezeUnsqueezePattern(PatternOptimization):
             or node_before.op_type == node.op_type
             or node_before.domain != ""
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         diff = self._diff_axes(g, node_before, node)
         if diff is None:
             return diff
@@ -184,7 +188,7 @@ class SqueezeUnsqueezePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node_first: NodeProto,
         node_second: NodeProto,
     ) -> List[NodeProto]:
@@ -342,22 +346,22 @@ class UnsqueezeUnsqueezePattern(PatternOptimization):
             return self.none()
         next_nodes = [n for n in g.next_nodes(node.output[0]) if n.op_type == "Unsqueeze"]
         if not next_nodes:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_node = next_nodes[0]
         if next_node.op_type != "Unsqueeze" or node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if next_node.input[0] != node.output[0]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(node.input[1]) or not g.is_constant(next_node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_rank(node.input[1]) or not g.has_rank(next_node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_rank(node.input[1]) != 1 or g.get_rank(next_node.input[1]) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         axis1 = g.get_constant_or_attribute(node, "axis", 1)
         axis2 = g.get_constant_or_attribute(next_node, "axis", 1)
         if (len(axis1) > 1 or len(axis2) > 1) and not g.has_rank(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node, next_node], self.apply, insert_at=node)
 
     @classmethod
@@ -371,7 +375,7 @@ class UnsqueezeUnsqueezePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         next_node: NodeProto,
     ) -> List[NodeProto]:
@@ -530,14 +534,14 @@ class SqueezeAddPattern(PatternOptimization):
             or node_before[0].op_type != "Squeeze"
             or node_before[1].op_type != "Squeeze"
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if len(node_before[0].input) == 2:
             s1 = g.builder.value_as_shape(node_before[0].input[1])
         else:
             if not g.has_shape(node_before[0].input[0]) or g.get_shape(
                 node_before[0].input[0]
             ) != (1,):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             s1 = (0,)
 
         if len(node_before[1].input) == 2:
@@ -546,16 +550,16 @@ class SqueezeAddPattern(PatternOptimization):
             if not g.has_shape(node_before[1].input[0]) or g.get_shape(
                 node_before[1].input[0]
             ) != (1,):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             s2 = (0,)
 
         if s1 is None or s2 is None or s1 != s2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [*node_before, node], self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         squeeze1: NodeProto,
         squeeze2: NodeProto,
         add: NodeProto,
@@ -704,38 +708,38 @@ class SqueezeBinaryUnsqueezePattern(PatternOptimization):
         if node.op_type != "Unsqueeze" or node.domain != "" or g.builder.main_opset < 13:
             return self.none()
         if not g.is_constant_scalar(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         scalar = g.get_constant_scalar(node.input[1])
         if scalar != 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         binary = g.node_before(node.input[0])
         if binary is None or binary.op_type not in {"Add", "Div", "Mul", "Sub"}:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(binary.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(binary.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_rank(binary.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_rank(binary.input[1]) != 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         squeeze = g.node_before(binary.input[0])
         if squeeze is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if len(squeeze.input) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_rank(squeeze.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_rank(squeeze.input[0]) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [squeeze, binary, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         squeeze_node: NodeProto,
         binary_node: NodeProto,
         unsqueeze_node: NodeProto,

@@ -1,10 +1,13 @@
-import inspect
 from collections import Counter
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto
 from ...xbuilder import GraphBuilder, FunctionOptions
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
 from . import SimplifyingEasyPatternFunction
+
+if TYPE_CHECKING:
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class FunctionPackedMatMulPattern(PatternOptimization):
@@ -21,7 +24,7 @@ class FunctionPackedMatMulPattern(PatternOptimization):
         if node.op_type != "MatMul" or node.domain != "":
             return self.none()
         if not g.is_constant(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         side_nodes = g.next_nodes(node.input[0])
         matmul_nodes = [
             n
@@ -29,7 +32,7 @@ class FunctionPackedMatMulPattern(PatternOptimization):
             if n.op_type == "MatMul" and n.input[0] == node.input[0] and g.is_constant(n.input[1])
         ]
         if len(matmul_nodes) < 2 or not g.has_rank(matmul_nodes[0].output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         mm = []
         for n in matmul_nodes:
@@ -41,35 +44,35 @@ class FunctionPackedMatMulPattern(PatternOptimization):
         matmul_nodes = [n for n, s in mm if s == best_shape]
         if len(matmul_nodes) < 2:
             # Nothing to do.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # Reshape
         next_nodes = [g.next_nodes(n.output[0]) for n in matmul_nodes]
         if any(len(nn) != 1 or nn[0].op_type != "Reshape" for nn in next_nodes):
             # More than one users after.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_node = [_[0] for _ in next_nodes]
         first_shape = next_node[0].input[1]
         if any(_.input[1] != first_shape for _ in next_node):
             # Not the same shape for all.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         reshape_nodes = next_node
         if len(reshape_nodes) != len(matmul_nodes):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # Transpose
         next_nodes = [g.next_nodes(n.output[0]) for n in reshape_nodes]
         if any(len(nn) != 1 or nn[0].op_type != "Transpose" for nn in next_nodes):
             # More than one users after.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_node = [_[0] for _ in next_nodes]
         first_perm = list(g.get_attribute(next_node[0], "perm").ints)
         if any(list(g.get_attribute(_, "perm").ints) != first_perm for _ in next_node):
             # Not the same shape for all.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         tr_nodes = next_node
         if len(tr_nodes) != len(matmul_nodes):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(
             self,
             [*matmul_nodes, *reshape_nodes, *tr_nodes],

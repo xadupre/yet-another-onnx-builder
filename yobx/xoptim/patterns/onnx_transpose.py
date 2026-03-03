@@ -1,9 +1,13 @@
-import inspect
-from typing import List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 import numpy as np
 from onnx import NodeProto
 from ...xshape._shape_helper import is_static_shape
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class TransposeTransposePattern(PatternOptimization):
@@ -131,7 +135,7 @@ class TransposeTransposePattern(PatternOptimization):
             if n.op_type == "Transpose":
                 next_node = n
         if next_node is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # Three consecutive transpose are not expected but let's continue
         # as if it could be possible.
@@ -145,13 +149,13 @@ class TransposeTransposePattern(PatternOptimization):
         first = list(range(lens[0]))
         last = self.apply_transposes(perms)
         if last != first and g.is_used_more_than_once(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, next_node], self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         next_node: NodeProto,
     ) -> List[NodeProto]:
@@ -357,26 +361,26 @@ class TransposeReshapeTransposePattern(PatternOptimization):
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         reshape = next_nodes[0]
         if reshape.op_type != "Reshape" or reshape.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(reshape.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(reshape.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         transpose = next_nodes[0]
         if transpose.op_type != "Transpose" or transpose.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         resh_tr = self._new_shape_perm(g, node, reshape, transpose)
 
         if resh_tr is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, reshape, transpose], self.apply)
 
@@ -476,7 +480,7 @@ class TransposeReshapeTransposePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         t1_node: NodeProto,
         reshape_node: NodeProto,
         t2_node: NodeProto,
@@ -633,7 +637,7 @@ class TransposeEqualReshapePattern(PatternOptimization):
         if node.op_type != "Transpose" or node.domain != "":
             return self.none()
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         perms = list(enumerate(g.get_attribute(node, "perm").ints))
         first = None
         for i, p in perms:
@@ -653,7 +657,7 @@ class TransposeEqualReshapePattern(PatternOptimization):
             if shape[i] != 1:
                 not_one += 1
         if not_one > 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def _make_new_shape(self, input_shape, perm):
@@ -671,7 +675,7 @@ class TransposeEqualReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         transpose_node: NodeProto,
     ) -> List[NodeProto]:
         new_shape = self._make_new_shape(
@@ -806,24 +810,24 @@ class TransposeGatherPattern(PatternOptimization):
             return self.none()
         tr_node = g.node_before(node.input[0])
         if not tr_node:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if tr_node.op_type != "Transpose" or tr_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_rank(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         rank = g.get_rank(node.input[1])
         if rank != 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         perm = tr_node.attribute[0].ints
         axis = node.attribute[0].i if node.attribute else 0
         perm_less = [p for i, p in enumerate(perm) if i != axis]
         if sorted(perm_less) != perm_less:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [tr_node, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         transpose_node: NodeProto,
         gather_node: NodeProto,
     ) -> List[NodeProto]:
@@ -964,22 +968,22 @@ class SwapUnsqueezeTransposePattern(PatternOptimization):
         if node.op_type != "Transpose" or node.domain != "":
             return self.none()
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         unsq_node = g.node_before(node.input[0])
         if not unsq_node:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if unsq_node.op_type != "Unsqueeze" or unsq_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(unsq_node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_computed_constant(unsq_node.input[1])
         if cst is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [unsq_node, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         unsqueeze_node: NodeProto,
         transpose_node: NodeProto,
     ) -> List[NodeProto]:

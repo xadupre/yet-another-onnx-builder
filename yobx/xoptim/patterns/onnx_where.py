@@ -1,8 +1,12 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 import numpy as np
 from onnx import NodeProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class NotWherePattern(PatternOptimization):
@@ -97,15 +101,15 @@ class NotWherePattern(PatternOptimization):
             return self.none()
         wheres = g.next_nodes(node.output[0])
         if len(wheres) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         where = wheres[0]
         if where.op_type != "Where" or where.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node, where], self.apply, insert_at=where)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         not_node: NodeProto,
         where_node: NodeProto,
     ) -> List[NodeProto]:
@@ -233,28 +237,28 @@ class WhereAddPattern(PatternOptimization):
         if node.op_type != "Where" or node.domain != "":
             return self.none()
         if not g.is_constant_scalar(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(node.input[2]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst1 = g.get_constant_scalar(node.input[1])
         cst2 = g.get_constant_scalar(node.input[2])
         if cst1 is None or cst2 is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if cst1 != 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not np.isinf(cst2):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         add_nodes = g.next_nodes(node.output[0])
         if len(add_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if add_nodes[0].op_type != "Add" or add_nodes[0].domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(self, [node, add_nodes[0]], self.apply, insert_at=add_nodes[0])
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         where_node: NodeProto,
         add_node: NodeProto,
     ) -> List[NodeProto]:

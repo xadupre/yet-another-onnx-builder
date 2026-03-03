@@ -1,9 +1,13 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 import numpy as np
 from onnx import NodeProto
 from ...helpers.onnx_helper import make_idn
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class SlicesSplitPattern(PatternOptimization):
@@ -182,25 +186,25 @@ class SlicesSplitPattern(PatternOptimization):
             return self.none()
 
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         users = [
             op for op in g.next_nodes(node.input[0]) if op.op_type == "Slice" and op.domain == ""
         ]
         if len(users) <= 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         for user in users:
             if len(user.input) == 4:
                 continue
             if len(user.input) == 5:
                 if not g.is_constant_scalar(user.input[-1]):
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 scalar = g.get_constant_scalar(user.input[-1])
                 if scalar != 1:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 continue
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # axis
         if all(len(op.input) == 2 for op in users):
@@ -208,35 +212,35 @@ class SlicesSplitPattern(PatternOptimization):
         else:
             axes = [op.input[3] for op in users]
             if any(not g.is_constant_scalar(a) for a in axes):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             csts = [g.get_constant_scalar(a) for a in axes]
             if len(set(csts)) != 1:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             axis = csts[0]
 
         shape = g.get_shape(node.input[0])
         dim = shape[axis]
         if not isinstance(dim, int):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # starts, ends
         starts = [op.input[1] for op in users]
         ends = [op.input[2] for op in users]
 
         if not g.is_constant_scalar(starts[0], 0):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant_scalar(ends[-1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         last = g.get_constant_scalar(ends[-1])
         if last not in (dim, 9223372036854775807):
             # 9223372036854775807 is what torch uses to specify the end
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if any(not g.is_constant(i) for i in starts) or any(not g.is_constant(i) for i in ends):
             # no constants
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cst_starts = [None for a in starts]
         cst_ends = [None for a in ends]
@@ -249,13 +253,13 @@ class SlicesSplitPattern(PatternOptimization):
                 cst_ends[i] = end
                 cst_starts[i + 1] = start
                 continue
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, users, self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         *nodes: NodeProto,
     ) -> List[NodeProto]:
         # nodes are all slices
@@ -436,13 +440,13 @@ class GathersSplitPattern(PatternOptimization):
             return self.none()
 
         if not g.has_shape(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         users = [
             op for op in g.next_nodes(node.input[0]) if op.op_type == "Gather" and op.domain == ""
         ]
         if len(users) <= 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         axis = None
         csts = set()
@@ -454,18 +458,18 @@ class GathersSplitPattern(PatternOptimization):
             a = g.get_attribute_with_default(user, "axis", default_value=0)
             assert a is not None, f"user={user}"
             if axis is not None and a != axis:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             axis = a
             if not g.is_constant_scalar(user.input[1]):
                 continue
             cst = g.get_constant_scalar(user.input[1])
             if cst is None:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if cst in csts:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             rk = g.get_rank(user.input[1])
             if rank is not None and rk != rank:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             rank = rk
             csts.add(cst)
             keep_users.append(user)
@@ -473,22 +477,22 @@ class GathersSplitPattern(PatternOptimization):
         users = keep_users
         sorted_indices = sorted(csts)
         if sorted_indices != list(range(len(csts))):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape = g.get_shape(node.input[0])
         if axis < 0:
             axis += len(shape)
         if axis >= len(shape):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not isinstance(shape[axis], int):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if shape[axis] != len(sorted_indices):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, users, self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         *gather_nodes: NodeProto,
     ) -> List[NodeProto]:
         # nodes are all slices
@@ -622,16 +626,16 @@ class SplitConcatPattern(PatternOptimization):
         for o in node.output:
             n = g.next_nodes(o)
             if len(n) != 1:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             i = make_idn(n[0])
             if only_id is None:
                 only_id = i
                 only_node = n[0]
             elif i != only_id:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         if only_node.op_type != "Concat" or only_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         axis_split = g.get_attribute(node, "axis").i
         axis_concat = g.get_attribute(only_node, "axis").i
         if axis_split < 0 and axis_concat >= 0:
@@ -639,15 +643,15 @@ class SplitConcatPattern(PatternOptimization):
         if axis_concat < 0 and axis_split >= 0:
             axis_concat += g.get_rank(node.input[0])
         if axis_split != axis_concat:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if node.output != only_node.input:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, only_node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         split_node: NodeProto,
         concat_node: NodeProto,
     ) -> List[NodeProto]:

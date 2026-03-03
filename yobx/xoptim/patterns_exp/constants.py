@@ -1,9 +1,13 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 import numpy as np
 import onnx.numpy_helper as onh
 from onnx import NodeProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class TriMatrixPattern(PatternOptimization):
@@ -200,19 +204,19 @@ class TriMatrixPattern(PatternOptimization):
             or not g.is_constant_scalar(node.input[1])
             or not g.is_constant_scalar(node.input[2])
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         start, limit, delta = [g.get_constant_scalar(i) for i in node.input]
         if start != 0 or delta != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         types = {n.op_type for n in next_nodes}
         if types != {"Add", "Less"}:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if next_nodes[0].op_type == "Add":
             add_node, less_node = next_nodes
@@ -223,36 +227,36 @@ class TriMatrixPattern(PatternOptimization):
             not g.is_constant_scalar(add_node.input[1])
             or g.get_constant_scalar(add_node.input[1]) != 1
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         resh_node = g.next_nodes(add_node.output[0])
         if len(resh_node) != 1 or resh_node[0].op_type != "Reshape":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         reshape_node = resh_node[0]
 
         shape = g.get_computed_constant(reshape_node.input[1])
         if shape.tolist() != [limit, 1]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if less_node.input != [node.output[0], reshape_node.output[0]]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         where_node = g.next_nodes(less_node.output[0])
         if len(where_node) != 1 or where_node[0].op_type != "Where":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         where_node = where_node[0]
         if not g.is_constant_scalar(where_node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cst_node = g.node_before(where_node.input[2])
         if cst_node.op_type != "ConstantOfShape":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         shape = g.get_computed_constant(cst_node.input[0])
         if shape.tolist() != [limit, limit]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(
             self,
@@ -263,7 +267,7 @@ class TriMatrixPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         range_node: NodeProto,
         add_node: NodeProto,
         reshape_node: NodeProto,

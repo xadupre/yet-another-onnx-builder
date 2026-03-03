@@ -1,7 +1,11 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class Sub1MulPattern(PatternOptimization):
@@ -117,19 +121,19 @@ class Sub1MulPattern(PatternOptimization):
         op_right = None if node_right is None else node_right.op_type
 
         if op_left != "Sub" and op_right != "Sub":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if (op_left == "Sub" and g.is_used_more_than_once(node.input[0])) or (
             op_right == "Sub" and g.is_used_more_than_once(node.input[1])
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cst_left, cst_right = None, None
 
         if op_left == "Sub" and g.is_constant(node_left.input[0]):
             cst_min, cst_max = g.get_computed_constant(node_left.input[0], ["min", "max"])
             if cst_min is None or cst_max is None:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             if cst_min == cst_max == 1:
                 cst_left = cst_min
@@ -137,18 +141,18 @@ class Sub1MulPattern(PatternOptimization):
         if op_right == "Sub" and g.is_constant(node_right.input[0]):
             cst_min, cst_max = g.get_computed_constant(node_right.input[0], ["min", "max"])
             if cst_min is None or cst_max is None:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if cst_min == cst_max == 1:
                 cst_right = cst_min
 
         if cst_left is None and cst_right is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node, node_left, node_right], self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         node_left: NodeProto,
         node_right: NodeProto,

@@ -1,6 +1,6 @@
 import hashlib
 from collections import Counter
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
 import onnx
 import onnx.helper as oh
@@ -11,7 +11,7 @@ from .patterns_api import make_pattern_from_onnx, OnnxEasyPatternOptimization
 def node_type_frequency(
     onx: Union[Sequence[onnx.NodeProto], onnx.ModelProto, onnx.GraphProto, onnx.FunctionProto],
     min_freq: int = 2,
-) -> Tuple[Dict[Tuple[str, str], int], Dict[Tuple[str, str], int], int, List[Tuple[str, str]]]:
+) -> Tuple[Dict[Tuple[str, str], int], Dict[int, int], int, List[Tuple[str, str]]]:
     """
     Computes the frequency of every node type in a list.
 
@@ -47,9 +47,9 @@ def _serialize_attribute(attribute: Sequence[onnx.AttributeProto]) -> bytes:
 
 class _GraphPattern:
     def __init__(self, first_node: int):
-        self.cursor = first_node
-        self.first_node = first_node
-        self.subgraph = set()
+        self.cursor: int = first_node
+        self.first_node: int = first_node
+        self.subgraph: Set[int] = set()
 
     def add_cursor(self):
         assert self.cursor >= 0, f"Cannot add a negative cursor ({self.cursor})"
@@ -62,12 +62,12 @@ class _GraphPattern:
 class _GraphIterator:
     def __init__(self, graph: "_GraphPatterns", node_index: int):
         self.graph = graph
-        self.node_index = node_index
-        self.io_index = None
-        self.io_kind = None
-        self.io_name = None
-        self.o_suc = None
-        self.o_suc_index = None
+        self.node_index: int = node_index
+        self.io_index: int = 0
+        self.io_kind: Optional[bool] = None
+        self.io_name: Optional[str] = None
+        self.o_suc: int = 0
+        self.o_suc_index: Optional[int] = None
 
     def __str__(self) -> str:
         if self.node_index is None:
@@ -133,7 +133,7 @@ class _GraphIterator:
                 )
         return True
 
-    def get_name(self, node_index: int) -> str:
+    def get_name(self, node_index: int) -> Optional[str]:
         node = self.graph.nodes[node_index]
         if self.io_kind is None:
             return None
@@ -146,7 +146,7 @@ class _GraphIterator:
         ), f"Inconsistency with node_index={node_index}, name={name!r}, self={self!r}"
         return name
 
-    def get_node_index(self, node_index: int) -> int:
+    def get_node_index(self, node_index: int) -> Optional[int]:
         node = self.graph.nodes[node_index]
         if self.io_kind is None:
             return None
@@ -204,7 +204,7 @@ class _GraphPredecessorSuccessors:
         self.build_all_predecessors()
         self.build_signatures()
 
-    def input_names_involved(self, node: onnx.NodeProto) -> List[int]:
+    def input_names_involved(self, node: onnx.NodeProto) -> Union[str, List[str]]:
         set_inputs = set(self.input_names)
         inputs = set()
         allp = self.all_precessors[node.output[0]]
@@ -264,7 +264,7 @@ class _GraphPredecessorSuccessors:
         return sig
 
     def build_edges(self):
-        self.successors: Dict[str, Dict[str, int]] = {}
+        self.successors: Dict[str, List[int]] = {}
         self.predecessor: Dict[str, int] = {}
         self.signatures: Dict[int, str] = {}
         self.result_names = set()
@@ -348,7 +348,7 @@ class _GraphPatterns(_GraphPredecessorSuccessors):
         self.pats = [_GraphPattern(c) for c in cursor]
         self.current: List[_GraphIterator] = []
         self.processed_indices = set()
-        self.mapped: Dict[int : List[int]] = {}
+        self.mapped: Dict[int, Set[int]] = {}
 
     def validate_cursor(self, verbose: int = 0):
         # op_types
@@ -403,9 +403,12 @@ class _GraphPatterns(_GraphPredecessorSuccessors):
     def apply_path(self, node_index: int) -> int:
         if not self.current:
             return node_index
+        result: Optional[int] = node_index
         for p in self.current:
-            node_index = p.get_node_index(node_index)
-        return node_index
+            if result is None:
+                return -1
+            result = p.get_node_index(result)
+        return result if result is not None else -1
 
     def set_cursor(self):
         bug = set()
@@ -592,5 +595,6 @@ def find_largest_repeated_pattern(
     if keep is None:
         return keep
     if all_instances:
+        assert all_patterns is not None
         return all_patterns, keep[1]
     return keep

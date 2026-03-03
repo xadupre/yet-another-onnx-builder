@@ -1,7 +1,11 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto, TensorProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class TransposeCastPattern(PatternOptimization):
@@ -113,13 +117,13 @@ class TransposeCastPattern(PatternOptimization):
 
         perm = list(g.get_attribute(node, "perm").ints)
         if perm != [1, 0]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.has_type(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.get_type(node.input[0]) not in self._allowed_types:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cast_node_before = g.node_before(node.input[0])
         if (
@@ -149,11 +153,11 @@ class TransposeCastPattern(PatternOptimization):
         if cast_node_after is not None:
             return MatchResult(self, [None, node, cast_node_after[0]], self.apply, insert_at=node)
 
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         cast_node_before: Optional[NodeProto],
         node: NodeProto,
         cast_node_after: Optional[NodeProto],

@@ -1,7 +1,11 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class DropoutPattern(PatternOptimization):
@@ -126,7 +130,7 @@ class DropoutPattern(PatternOptimization):
 
         for o in node.output[1:]:
             if o and g.is_used(o):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         if not (
             len(node.input) >= 3
@@ -142,13 +146,13 @@ class DropoutPattern(PatternOptimization):
             and g.is_constant_scalar(node.input[2])
             and g.get_constant_scalar(node.input[2]) != 0
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         dropout_node: NodeProto,
     ) -> List[NodeProto]:
         return [

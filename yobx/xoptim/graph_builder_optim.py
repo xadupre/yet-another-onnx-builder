@@ -2,13 +2,17 @@ import os
 import pprint
 import textwrap
 import time
-from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Set, Tuple, Union
+
+if TYPE_CHECKING:
+    from ..xbuilder.graph_builder import GraphBuilder
 import numpy as np
 from onnx import AttributeProto, GraphProto, NodeProto, TensorProto, save as onnx_save
 from onnx.shape_inference import infer_shapes
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 from ..helpers.onnx_helper import make_idn, enumerate_subgraphs_builder
+from ..xshape._shape_helper import DYNAMIC_SHAPE
 from ..xshape.type_inference import infer_types
 from .patterns_api import MatchResult, PatternOptimization
 from .patterns import get_default_patterns
@@ -520,7 +524,7 @@ class GraphBuilderPatternOptimization:
         """Returns the type of a result."""
         return self.builder.get_type(name)
 
-    def has_rank(self, name: str) -> int:
+    def has_rank(self, name: str) -> bool:
         """Tells if a result has a rank."""
         return self.builder.has_rank(name)
 
@@ -539,11 +543,11 @@ class GraphBuilderPatternOptimization:
         """
         return self.builder.same_shape(a, b)
 
-    def get_shape(self, name: str) -> int:
+    def get_shape(self, name: str) -> DYNAMIC_SHAPE:
         """Returns the shape of a result."""
         return self.builder.get_shape(name)
 
-    def get_shape_renamed(self, name: str) -> int:
+    def get_shape_renamed(self, name: str) -> DYNAMIC_SHAPE:
         """Returns the shape of a result using user dimension name."""
         return self.builder.get_shape_renamed(name)
 

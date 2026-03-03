@@ -1,11 +1,14 @@
-import inspect
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 import numpy as np
 from onnx import NodeProto, TensorProto
 from ...helpers.onnx_helper import make_idn
 from ...xbuilder import FunctionOptions, GraphBuilder
 from ...xshape._shape_helper import STATIC_SHAPE
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class RotaryConcatPartPattern(PatternOptimization):
@@ -192,7 +195,7 @@ class RotaryConcatPartPattern(PatternOptimization):
             return self.match_concat(g, node, matched)
         if "Transpose" in (left.op_type, right.op_type):
             return self.match_transpose(g, node, matched)
-        return self.none(node, inspect.currentframe().f_lineno)
+        return self.none(node, _get_lineno())
 
     def match_concat(
         self,
@@ -203,37 +206,37 @@ class RotaryConcatPartPattern(PatternOptimization):
         if node.op_type != "Add" or node.domain != "":
             return self.none()
         if g.is_used_more_than_once(node.input[0]) or g.is_used_more_than_once(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         concat_left, concat_right = (
             g.node_before(node.input[0]),
             g.node_before(node.input[1]),
         )
         if concat_left is None or concat_right is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if len(concat_left.input) != 2 or len(concat_right.input) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         axis1 = g.get_axis(concat_left, 0)
         axis2 = g.get_axis(concat_right, 0)
         if axis1 != axis2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # checking every result has shapes
         all_inputs = list(concat_left.input) + list(concat_right.input)
         if any(not g.has_shape(a) for a in all_inputs):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         concat_left_before = [g.node_before(i) for i in concat_left.input]
         concat_right_before = [g.node_before(i) for i in concat_right.input]
         if None in concat_left_before or None in concat_right_before:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         type_left = [n.op_type for n in concat_left_before]
         type_right = [n.op_type for n in concat_right_before]
         if "ConstantOfShape" not in type_left or "ConstantOfShape" not in type_right:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if type_left.index("ConstantOfShape") == type_right.index("ConstantOfShape"):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cst_left = next(n for n in concat_left_before if n.op_type == "ConstantOfShape")
         cst_right = next(n for n in concat_right_before if n.op_type == "ConstantOfShape")
@@ -249,7 +252,7 @@ class RotaryConcatPartPattern(PatternOptimization):
             if (len(slice_left) == 0 and len(split_left) == 0) or (
                 len(slice_left) > 0 and len(split_left) > 0
             ):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             slice_left = slice_left[0] if slice_left else None
             split_left = split_left[0] if split_left else None
 
@@ -269,11 +272,11 @@ class RotaryConcatPartPattern(PatternOptimization):
             if (len(slice_right) == 0 and len(split_right) == 0) or (
                 len(slice_right) > 0 and len(split_right) > 0
             ):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             slice_right = slice_right[0] if slice_right else None
             split_right = split_right[0] if split_right else None
         else:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if (
             (slice_left is None and slice_right is not None)
@@ -281,24 +284,24 @@ class RotaryConcatPartPattern(PatternOptimization):
             or (split_left is None and split_right is not None)
             or (split_left is not None and split_right is None)
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         is_slice = slice_left is not None
         if is_slice:
             if slice_left.input[0] != slice_right.input[0]:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             slice_left_def = [g.get_computed_constant(i) for i in slice_left.input[1:]]
             slice_right_def = [g.get_computed_constant(i) for i in slice_right.input[1:]]
             if len(slice_left_def) != 3 or len(slice_right_def) != 3:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if slice_left_def[2].tolist() != slice_right_def[2].tolist():
                 # axis are different
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             lengths = {len(v) for v in slice_left_def} | {len(v) for v in slice_right_def}
             if lengths != {1}:
                 # more than one axis
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             axis = slice_left_def[2][0]
             dim_left = slice_left_def[1][0] - slice_left_def[0][0]
@@ -310,18 +313,18 @@ class RotaryConcatPartPattern(PatternOptimization):
             cdim_right = shape_right[axis]
 
             if dim_left != cdim_right or dim_right != cdim_left:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         else:
             if make_idn(split_left) != make_idn(split_right):
                 # not the same split
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if len(split_left.output) != 2:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             axis = g.get_axis(split_left, 0)
             axis1 = g.get_axis(concat_left, 0)
             axis2 = g.get_axis(concat_right, 0)
             if len({axis, axis1, axis2}) != 1:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         # last check about size.
         axis = g.get_axis(concat_left, 0)
@@ -336,7 +339,7 @@ class RotaryConcatPartPattern(PatternOptimization):
         idims = set(d for d in dims if isinstance(d, int))
         sdims = set(d for d in dims if isinstance(d, str))
         if len(idims) > 1 or len(sdims) > 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         nodes = [
             cst_left,
@@ -432,29 +435,29 @@ class RotaryConcatPartPattern(PatternOptimization):
         if node.op_type != "Add" or node.domain != "":
             return self.none()
         if g.is_used_more_than_once(node.input[0]) or g.is_used_more_than_once(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         transpose_left, transpose_right = (
             g.node_before(node.input[0]),
             g.node_before(node.input[1]),
         )
         if transpose_left.op_type != "Transpose" or transpose_right.op_type != "Transpose":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         perm_left = list(g.get_attribute(transpose_left, "perm").ints)
         perm_right = list(g.get_attribute(transpose_right, "perm").ints)
         if perm_left != perm_right:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         scatter_left, scatter_right = (
             g.node_before(transpose_left.input[0]),
             g.node_before(transpose_right.input[0]),
         )
         if scatter_left is None or scatter_right is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if scatter_left.op_type != "ScatterND" or scatter_right.op_type != "ScatterND":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         tr_data_left, tr_data_right = (
             g.node_before(scatter_left.input[0]),
@@ -466,13 +469,13 @@ class RotaryConcatPartPattern(PatternOptimization):
             or tr_data_right is None
             or tr_data_right.op_type != "Transpose"
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if (
             list(g.get_attribute(tr_data_left, "perm").ints) != perm_left
             or list(g.get_attribute(tr_data_right, "perm").ints) != perm_right
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         tr_update_left, tr_update_right = (
             g.node_before(scatter_left.input[2]),
@@ -482,7 +485,7 @@ class RotaryConcatPartPattern(PatternOptimization):
             list(g.get_attribute(tr_update_left, "perm").ints) != perm_left
             or list(g.get_attribute(tr_update_right, "perm").ints) != perm_right
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         nodes = [
             scatter_left,
@@ -500,12 +503,12 @@ class RotaryConcatPartPattern(PatternOptimization):
             (node.output[0] not in allowed and g.is_used_more_than_once(node.output[0]))
             for node in nodes
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         cst_left = g.node_before(tr_data_left.input[0])
         cst_right = g.node_before(tr_data_right.input[0])
         if cst_left.op_type != "ConstantOfShape" or cst_right.op_type != "ConstantOfShape":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         slice_left = g.node_before(tr_update_left.input[0])
         slice_right = g.node_before(tr_update_right.input[0])
@@ -518,19 +521,19 @@ class RotaryConcatPartPattern(PatternOptimization):
             "Neg",
             "Split",
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if slice_left.op_type == "Neg" and g.node_before(slice_left.input[0]).op_type not in (
             "Slice",
             "Split",
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if slice_right.op_type == "Neg" and g.node_before(slice_right.input[0]).op_type not in (
             "Slice",
             "Split",
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if slice_left.op_type == "Neg":
             neg_left = slice_left
@@ -559,21 +562,21 @@ class RotaryConcatPartPattern(PatternOptimization):
             )
             for node in nodes2
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         use_split = False
         if slice_left.op_type == "Split" == slice_right.op_type:
             if make_idn(slice_left) != make_idn(slice_right):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             use_split = True
 
         # Checking shapes and indices
         if not g.has_shape(scatter_left.input[0]) or not g.has_shape(scatter_right.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape_left = g.get_shape(scatter_left.input[0])
         shape_right = g.get_shape(scatter_right.input[0])
         if shape_left != shape_right:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         indices_left = g.get_computed_constant(scatter_left.input[1])
         indices_right = g.get_computed_constant(scatter_right.input[1])
@@ -583,7 +586,7 @@ class RotaryConcatPartPattern(PatternOptimization):
             or len(indices_right.shape) != 2
             or indices_right.shape[1] != 1
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         ind_left = indices_left.ravel().tolist()
         ind_right = indices_right.ravel().tolist()
@@ -593,25 +596,25 @@ class RotaryConcatPartPattern(PatternOptimization):
             ind = ind_right + ind_left
 
         if ind != list(range(shape_left[0])):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # Slices
         if not use_split:
             if slice_left.input[0] != slice_right.input[0]:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
             slice_left_def = [g.get_computed_constant(i) for i in slice_left.input[1:]]
             slice_right_def = [g.get_computed_constant(i) for i in slice_right.input[1:]]
             if len(slice_left_def) != 4 or len(slice_right_def) != 4:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if slice_left_def[2].tolist() != slice_right_def[2].tolist():
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             if slice_left_def[3].tolist() != [1] or slice_right_def[3].tolist() != [1]:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             lengths = {len(v) for v in slice_left_def} | {len(v) for v in slice_right_def}
             if lengths != {1}:
                 # more than one axis
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             axis = slice_left_def[2][0]
             dim_left = slice_left_def[1][0] - slice_left_def[0][0]
             dim_right = slice_right_def[1][0] - slice_right_def[0][0]
@@ -622,14 +625,14 @@ class RotaryConcatPartPattern(PatternOptimization):
             cdim_right = shape_right[axis]
 
             if dim_right + dim_left != cdim_right or cdim_right != cdim_left:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         else:
             split_node = slice_left
             if not g.is_constant(split_node.input[1]):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             cst = g.get_computed_constant(split_node.input[1])
             if cst.min() != cst.max():
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         nodes = [
             cst_left,
@@ -880,7 +883,7 @@ class FunctionHalfRotaryEmbeddingPattern(PatternOptimization):
         rk = None if not g.has_rank(node.input[0]) else g.get_rank(node.input[0])
         if rk is None or rk != 4:
             # 3 should be allowed as well. Let's see when it happens.
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # checks split is the expected split
         axis = g.get_attribute(node, "axis", exc=False)
@@ -889,42 +892,42 @@ class FunctionHalfRotaryEmbeddingPattern(PatternOptimization):
         if axis < 0:
             axis += rk
         if axis != rk - 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if len(node.input) == 2:
             cst = g.get_computed_constant(node.input[1])
             if cst.dtype != np.int64 or cst.shape != (2,) or cst[0] != cst[1]:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         else:
             att = g.get_attribute(node, "num_outputs", exc=False)
             if att is None or att.i != 2:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         # checks what follows
         node_after = g.next_nodes(node.output[1])
         if len(node_after) != 1 or node_after[0].op_type != "Neg":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         neg_node = node_after[0]
         node_after = g.next_nodes(neg_node.output[0])
         if len(node_after) != 1 or node_after[0].op_type != "Concat":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         concat_node = node_after[0]
         if set(concat_node.input) != {split_node.output[0], neg_node.output[0]}:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         axis = g.get_attribute(concat_node, "axis").i
         if axis != -1 and (rk is None or axis != rk - 1):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         node_after = g.next_nodes(concat_node.output[0])
         if len(node_after) != 1 or node_after[0].op_type != "Mul":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         mul1_node = node_after[0]
         node_after = g.next_nodes(split_node.input[0])
         if len(node_after) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         mul2_node = node_after[0] if node_after[0].op_type == "Mul" else node_after[1]
         if mul2_node.op_type != "Mul":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         node_after1 = g.next_nodes(mul1_node.output[0])
         node_after2 = g.next_nodes(mul2_node.output[0])
         if (
@@ -934,7 +937,7 @@ class FunctionHalfRotaryEmbeddingPattern(PatternOptimization):
             or node_after1[0].op_type != "Add"
             or make_idn(node_after1[0]) != make_idn(node_after2[0])
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         return MatchResult(
             self,
             [split_node, neg_node, concat_node, mul1_node, mul2_node, node_after1[0]],
@@ -944,7 +947,7 @@ class FunctionHalfRotaryEmbeddingPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         split_node: NodeProto,
         neg_node: NodeProto,
         concat_node: NodeProto,
@@ -1200,56 +1203,56 @@ class RotaryEmbeddingPattern(PatternOptimization):
             # Not ready in opset 23.
             return self.none()
         if not g.has_rank(node.input[0]) or g.get_rank(node.input[0]) != 4:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.has_shape(node.input[1]) or not g.has_shape(node.input[2]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         shape_cos = g.get_shape(node.input[1])
         shape_sin = g.get_shape(node.input[2])
         if shape_cos != shape_sin:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if len(shape_cos) != 4:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if shape_cos[1] != 1 or shape_sin[1] != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         concat_cos = g.node_before(node.input[1])
         if concat_cos is None or concat_cos.op_type != "Concat" or concat_cos.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if concat_cos.input[0] != concat_cos.input[1]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_attribute(concat_cos, "axis").i != -1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         concat_sin = g.node_before(node.input[2])
         if concat_sin is None or concat_sin.op_type != "Concat" or concat_sin.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if concat_sin.input[0] != concat_sin.input[1]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.get_attribute(concat_sin, "axis").i != -1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if g.is_used_more_than_once(node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         split_node = g.node_before(node.input[0])
         if split_node is None or split_node.op_type != "Split" or split_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(split_node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_computed_constant(split_node.input[1])
         if cst.shape != (2,):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         concat_node = next_nodes[0]
         if concat_node.op_type != "Concat" or concat_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if split_node.output[1] != concat_node.input[1]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         axis = g.get_attribute(concat_node, "axis").i
         if axis != -1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(
             self,
@@ -1260,7 +1263,7 @@ class RotaryEmbeddingPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         concat_cos: NodeProto,
         concat_sin: NodeProto,
         split_node: NodeProto,
@@ -1494,43 +1497,43 @@ class FunctionCausalMaskPattern(PatternOptimization):
         sq1 = g.node_before(node.input[0])
         sq2 = g.node_before(node.input[1])
         if sq1 is None or sq1.op_type != "Unsqueeze" or len(sq1.input) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if sq2 is None or sq2.op_type not in {"Unsqueeze", "Sub"} or len(sq2.input) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if sq2.op_type == "Sub":
             sub2 = sq2
             sq2 = g.node_before(sub2.input[0])
             if sq2 is None or sq2.op_type != "Unsqueeze" or len(sq2.input) != 2:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         else:
             sub2 = None
         if not g.is_constant(sq1.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(sq2.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         axes1 = g.get_computed_constant(sq1.input[1])
         axes2 = g.get_computed_constant(sq2.input[1])
         if tuple(axes1) != (0, 1, 2):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if tuple(axes2) != (0, 1, 3):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         rg1 = g.node_before(sq1.input[0])
         rg2 = g.node_before(sq2.input[0])
         if rg1 is None or rg1.op_type != "Range" or len(rg1.input) != 3:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if rg2 is None or rg2.op_type != "Range" or len(rg1.input) != 3:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if rg1.input[1] != rg2.input[1]:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(rg1.input[2]) and g.get_constant_scalar(rg1.input[2]) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(rg1.input[0]) and g.get_constant_scalar(rg1.input[2]) != 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(rg2.input[2]) and g.get_constant_scalar(rg2.input[2]) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # rg1 (0, d, 1)
         # rg2 (c, d, 1)
@@ -1538,15 +1541,15 @@ class FunctionCausalMaskPattern(PatternOptimization):
         dsq1 = g.node_before(rg2.input[0])
         dsq2 = g.node_before(rg2.input[1])
         if dsq1 is None or dsq1.op_type != "Squeeze" or len(dsq1.input) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if dsq2 is None or dsq2.op_type != "Squeeze" or len(dsq2.input) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [dsq1, dsq2, rg1, rg2, sq1, sq2, sub2, node], self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         dim_squeeze1: NodeProto,
         dim_squeeze2: NodeProto,
         range1: NodeProto,
@@ -1800,48 +1803,48 @@ class FunctionCausalMaskMulAddPattern(PatternOptimization):
         sq1 = g.node_before(node.input[0])
         mul = g.node_before(node.input[1])
         if sq1 is None or sq1.op_type != "Unsqueeze" or len(sq1.input) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if sq1 is None or g.is_used_more_than_once(sq1.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if mul is None or g.is_used_more_than_once(mul.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(sq1.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         sq2 = g.node_before(mul.input[0])
         if sq2 is None or sq2.op_type != "Unsqueeze" or len(sq2.input) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(sq2.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(sq2.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         axes1 = g.get_computed_constant(sq1.input[1])
         axes2 = g.get_computed_constant(sq2.input[1])
         if tuple(axes1) != (0, 1, 2):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if tuple(axes2) != (1, 2, 3):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         rg1 = g.node_before(sq1.input[0])
         rg2 = g.node_before(sq2.input[0])
         if g.is_used_more_than_once(rg1.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(rg2.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if rg1 is None or rg1.op_type != "Range" or len(rg1.input) != 3:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if rg2 is None or rg2.op_type != "Range" or len(rg1.input) != 3:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if not g.is_constant(rg1.input[2]) and g.get_constant_scalar(rg1.input[2]) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(rg1.input[0]) and g.get_constant_scalar(rg1.input[2]) != 0:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(rg2.input[0]) and g.get_constant_scalar(rg2.input[0]) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(rg2.input[2]) and g.get_constant_scalar(rg2.input[2]) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # rg1 (0, d, 1)
         # rg2 (c, d, 1)
@@ -1849,15 +1852,15 @@ class FunctionCausalMaskMulAddPattern(PatternOptimization):
         dsq1 = g.node_before(rg1.input[1])
         dsq2 = g.node_before(rg2.input[1])
         if dsq1 is None or dsq1.op_type != "Squeeze" or len(dsq1.input) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if dsq2 is None or dsq2.op_type != "Squeeze" or len(dsq2.input) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [dsq1, dsq2, rg1, rg2, sq1, sq2, mul, node], self.apply)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         dim_squeeze1: NodeProto,
         dim_squeeze2: NodeProto,
         range1: NodeProto,
@@ -2099,7 +2102,7 @@ class FunctionCosSinCachePattern(PatternOptimization):
     ) -> Optional[Tuple[NodeProto, NodeProto]]:
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         next_node = next_nodes[0]
         if next_node.op_type == "Cast" and next_node.domain == "":
             cast_node = next_node
@@ -2119,7 +2122,7 @@ class FunctionCosSinCachePattern(PatternOptimization):
         cos = node
         cos_sin = g.next_nodes(cos.input[0])
         if len(cos_sin) != 2:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         sin = cos_sin[1 if cos.output[0] == cos_sin[0].output[0] else 0]
 
         # what follows
@@ -2134,7 +2137,7 @@ class FunctionCosSinCachePattern(PatternOptimization):
             or mul_node.op_type != "Mul"
             or mul_node.domain != ""
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         reshape_node = g.node_before(mul_node.input[1])
         if (
@@ -2143,46 +2146,46 @@ class FunctionCosSinCachePattern(PatternOptimization):
             or reshape_node.op_type != "Reshape"
             or reshape_node.domain != ""
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if not g.is_constant(reshape_node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst = g.get_computed_constant(reshape_node.input[1])
         if tuple(cst) != (0, -1, 1):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(reshape_node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # Unsqueeze -> Cast -> Reshape -> Mul or Cast -> Unsqueeze -> Reshape -> Mul
 
         cast_node = g.node_before(reshape_node.input[0])
         if cast_node is None:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if g.is_used_more_than_once(cast_node.input[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         unsq_node = g.node_before(cast_node.input[0])
 
         if unsq_node is None or unsq_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if {cast_node.op_type, unsq_node.op_type} != {"Cast", "Unsqueeze"}:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         true_unsq_node = unsq_node if unsq_node.op_type == "Unsqueeze" else cast_node
         last_node = unsq_node
 
         if not g.is_constant(true_unsq_node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst_position_ids = g.get_computed_constant(true_unsq_node.input[1])
         if tuple(cst_position_ids) not in ((0, 1), (1,)):
             # unsqueeze before position ids
             # (0, 1) -> input is a scalar
             # (1, ) -> input is a tensor with position_ids
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         range_node = g.node_before(last_node.input[0])
         if range_node is None:
             if tuple(cst_position_ids) != (1,):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         elif (
             g.is_used_more_than_once(range_node.input[0])
             or g.is_used_more_than_once(range_node.input[1])
@@ -2190,12 +2193,12 @@ class FunctionCosSinCachePattern(PatternOptimization):
             or range_node.op_type != "Range"
             or range_node.domain != ""
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         if range_node is not None and (
             not g.is_constant(range_node.input[2])
             or g.get_constant_scalar(range_node.input[2]) != 1
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if range_node:
             dim_squeeze1 = g.node_before(range_node.input[0])
@@ -2205,7 +2208,7 @@ class FunctionCosSinCachePattern(PatternOptimization):
                 or dim_squeeze1.domain != ""
                 or len(dim_squeeze1.input) != 1
             ):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             dim_squeeze2 = g.node_before(range_node.input[1])
             if (
                 dim_squeeze2 is None
@@ -2213,14 +2216,14 @@ class FunctionCosSinCachePattern(PatternOptimization):
                 or dim_squeeze2.domain != ""
                 or len(dim_squeeze2.input) != 1
             ):
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
         else:
             dim_squeeze1 = None
             dim_squeeze2 = None
 
         if (sin_cast is None) != (cos_cast is None):
             # cast issue
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(
             self,
@@ -2242,7 +2245,7 @@ class FunctionCosSinCachePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         dim_squeeze1: NodeProto,
         dim_squeeze2: NodeProto,
         range_node: NodeProto,

@@ -1,10 +1,14 @@
-import inspect
 from enum import IntEnum
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 import numpy as np
 from onnx import NodeProto
 from ...xshape._shape_helper import DYNAMIC_SHAPE
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class MulMulMulScalarPattern(PatternOptimization):
@@ -126,30 +130,30 @@ class MulMulMulScalarPattern(PatternOptimization):
         if node.op_type not in {"Div", "Mul"} or node.domain != "":
             return self.none()
         if g.is_used_more_than_once(node.input[0]) or g.is_used_more_than_once(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         node_left = g.node_before(node.input[0])
         if node_left is None or node_left.op_type not in {"Div", "Mul"} or node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         node_right = g.node_before(node.input[1])
         if node_right is None or node_right.op_type not in {"Div", "Mul"} or node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         # checking for the constant (right)
         if not g.is_constant(node_left.input[1]) or not g.is_constant(node_right.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         cst_left = g.get_computed_constant(node_left.input[1])
         cst_right = g.get_computed_constant(node_right.input[1])
         if cst_left.shape not in {tuple(), (1,)} or cst_right.shape not in {
             tuple(),
             (1,),
         }:
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         if (node_left.op_type == "Div" or node_right.op_type == "Div") and (
             cst_left.dtype not in (np.float32, np.float64, np.float16)
             or cst_right.dtype not in (np.float32, np.float64, np.float16)
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         nodes = [node, node_left, node_right]
 
@@ -157,7 +161,7 @@ class MulMulMulScalarPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         node_left: NodeProto,
         node_right: NodeProto,
@@ -324,7 +328,7 @@ class SwitchOrderBinaryPattern(PatternOptimization):
             return self.none()
 
         if not g.has_shape(node.input[0]) or not g.has_shape(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         op_type = node.op_type
 
@@ -347,7 +351,7 @@ class SwitchOrderBinaryPattern(PatternOptimization):
                 or not g.has_shape(left.input[1])
             ):
                 if right.op_type != op_type:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 choose = 1
             elif (
                 right.op_type != op_type
@@ -355,11 +359,11 @@ class SwitchOrderBinaryPattern(PatternOptimization):
                 or not g.has_shape(right.input[1])
             ):
                 if left.op_type != op_type:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 choose = 0
             elif right.op_type != op_type:
                 if left.op_type != op_type:
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(node, _get_lineno())
                 choose = 0
             elif left.op_type != op_type:
                 choose = 1
@@ -372,7 +376,7 @@ class SwitchOrderBinaryPattern(PatternOptimization):
             other_node.op_type == node.op_type
         ), f"Type mismatch {node.op_type} != {other_node.op_type}"
         if not g.has_shape(other_node.input[0]) or not g.has_shape(other_node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         shape_left = g.get_shape(node.input[0])
         shape_right = g.get_shape(node.input[1])
@@ -381,20 +385,20 @@ class SwitchOrderBinaryPattern(PatternOptimization):
 
         if self.switch_order(shape_left, shape_right, before_left, before_right, choose) == 0:
             if choose < 3:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
             choose = 1
             other_node = right
             before_left = g.get_shape(other_node.input[0])
             before_right = g.get_shape(other_node.input[1])
             if self.switch_order(shape_left, shape_right, before_left, before_right, choose) == 0:
-                return self.none(node, inspect.currentframe().f_lineno)
+                return self.none(node, _get_lineno())
 
         assert choose in (0, 1), f"Unexpected value for choose={choose}"
         assert (
             other_node.op_type == node.op_type
         ), f"Type mismatch {node.op_type} != {other_node.op_type}"
         if g.is_used_more_than_once(other_node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         nodes = [node, left if choose == 0 else None, right if choose == 1 else None]
 
@@ -489,7 +493,7 @@ class SwitchOrderBinaryPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         node_left: NodeProto,
         node_right: NodeProto,

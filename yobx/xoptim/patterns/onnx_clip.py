@@ -1,7 +1,11 @@
-import inspect
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto
-from ..patterns_api import MatchResult, PatternOptimization
+from ..patterns_api import MatchResult, PatternOptimization, _get_lineno
+
+if TYPE_CHECKING:
+    from ...xbuilder.graph_builder import GraphBuilder
+    from ..graph_builder_optim import GraphBuilderPatternOptimization
+
 
 
 class ClipClipPattern(PatternOptimization):
@@ -119,22 +123,22 @@ class ClipClipPattern(PatternOptimization):
             or before.op_type != "Clip"
             or before.domain != ""
         ):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         min1 = before.input[1] if len(before.input) > 1 else ""
         min2 = node.input[1] if len(node.input) > 1 else ""
         if (min1 and min2) or (not min1 and not min2):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
         max1 = before.input[2] if len(before.input) > 2 else ""
         max2 = node.input[2] if len(node.input) > 2 else ""
         if (max1 and max2) or (not max1 and not max2):
-            return self.none(node, inspect.currentframe().f_lineno)
+            return self.none(node, _get_lineno())
 
         return MatchResult(self, [before, node], self.apply, insert_at=node)
 
     def apply(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         before: NodeProto,
         node: NodeProto,
     ) -> List[NodeProto]:
