@@ -16,15 +16,17 @@ This example shows how to:
 3. Display a unified diff for each
    :class:`PatchInfo <yobx.helpers.patch_helper.PatchInfo>` so you can see
    exactly what changed in the original PyTorch internals.
+4. Show which patches were actually exercised when exporting a real model
+   (`arnir0/Tiny-LLM`).
 
 The context manager both **applies** the patches on entry and **removes** them
 on exit, so the original functions are restored once the ``with`` block ends.
 """
 
-import matplotlib.pyplot as plt
 import torch
 from yobx.helpers.patch_helper import PatchDetails
-from yobx.torch import apply_patches_for_model
+from yobx.torch import apply_patches_for_model, register_flattening_functions, use_dyn_not_str
+from yobx.torch.tiny_models import get_tiny_model
 
 # %%
 # 1. Apply patches and inspect PatchDetails
@@ -62,54 +64,29 @@ for patch in details:
     print()
 
 # %%
-# 3. Verify the patches are removed after the context exits
-# ----------------------------------------------------------
+# 3. Show which patches apply when exporting arnir0/Tiny-LLM
+# -----------------------------------------------------------
 #
-# Applying the same patches a second time succeeds, which proves the first
-# ``with`` block cleanly removed them.
-
-with apply_patches_for_model(patch_torch=True) as details2:
-    assert details2.n_patches == details.n_patches, (
-        f"Expected {details.n_patches} patches, got {details2.n_patches}"
-    )
-print("Patches removed and re-applied successfully.")
-
-# %%
-# 4. Visualise patch sizes
-# -------------------------
+# When exporting a real transformers model we can find out exactly which
+# patched functions were exercised by calling
+# :meth:`PatchDetails.patches_involved_in_graph` after
+# :func:`torch.export.export`.
 #
-# The chart below shows the total number of changed lines (additions +
-# removals) for each patch, giving a quick sense of how invasive each
-# rewrite is.
+# :func:`register_flattening_functions` must also be active so that the
+# :class:`~transformers.DynamicCache` pytree structure is understood by the
+# exporter.
 
-patch_names = []
-diff_sizes = []
+data = get_tiny_model("arnir0/Tiny-LLM")
+model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
 
-for patch in details:
-    diff = patch.make_diff()
-    added = sum(
-        1 for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++")
-    )
-    removed = sum(
-        1 for line in diff.splitlines() if line.startswith("-") and not line.startswith("---")
-    )
-    patch_names.append(patch.name)
-    diff_sizes.append(added + removed)
+with (
+    register_flattening_functions(patch_transformers=True),
+    apply_patches_for_model(
+        patch_torch=True, patch_transformers=True, model=model
+    ) as details2,
+):
+    ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=use_dyn_not_str(ds))
 
-fig, ax = plt.subplots(figsize=(max(6, len(patch_names) * 1.5), 4))
-bars = ax.bar(range(len(patch_names)), diff_sizes, color="#4c72b0")
-ax.set_xticks(range(len(patch_names)))
-ax.set_xticklabels(patch_names, rotation=45, ha="right", fontsize=8)
-ax.set_ylabel("Changed lines (added + removed)")
-ax.set_title("Size of each torch patch")
-for bar, val in zip(bars, diff_sizes):
-    ax.text(
-        bar.get_x() + bar.get_width() / 2,
-        bar.get_height() + 0.1,
-        str(val),
-        ha="center",
-        va="bottom",
-        fontsize=9,
-    )
-plt.tight_layout()
-plt.show()
+patches = details2.patches_involved_in_graph(ep.graph)
+print(f"\nPatches involved in the exported graph: {len(patches)}")
+print(details2.make_report(patches))
