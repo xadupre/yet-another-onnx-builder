@@ -16,6 +16,7 @@ def get_onnxruntime_patterns(
         from yobx.xoptim.patterns_ort import get_onnxruntime_patterns
 
         print(pattern_table_doc(get_onnxruntime_patterns(), as_rst=True))
+        print()
     """
     from .activation import (
         BiasGeluPattern,
