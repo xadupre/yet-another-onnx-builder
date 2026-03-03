@@ -100,7 +100,7 @@ The method does the rewriting. It assumes it can happen.
 It takes a list of nodes impacted by the rewriting. It assumes no other
 pattern optimizer modified them or will modify them.
 It receives the list of nodes
-returned by method *apply*. Since it is a list of argument, method
+returned by method *match*. Since it is a list of arguments, method
 *match* can include None values. The method returns the new nodes.
 The optimizer considers that any node given to this function is removed
 from the graph, and any node returned by it are added.
