@@ -1,8 +1,14 @@
 .. _l-design-flatten:
 
-============================
-Flattening Functionalities
-============================
+================================
+Flattening Functionalities (torch)
+================================
+
+.. note::
+    This section covers functionality that is **specific to PyTorch**.
+    It is only relevant when exporting :class:`torch.nn.Module` models with
+    :func:`torch.export.export` and has no bearing on ONNX models built
+    directly with the builder APIs.
 
 :func:`torch.export.export` and the :epkg:`torch` pytree machinery require every
 Python object that appears as a model input or output to be **registered** as a
