@@ -43,7 +43,7 @@ class OptimizationOptions:
         other attributes defined in this class
 
     It is possible to define a precise of the pattern to apply to a model.
-    The value is interpreted by :func:`experimental_experiment.xoptim.get_pattern_list`.
+    The value is interpreted by :func:`yobx.xoptim.get_pattern_list`.
 
     * ``patterns=None``: no pattern optimization
     * ``patterns="TransposeTranspose,TransposeMatMul"``: applies two patterns
@@ -89,7 +89,7 @@ class OptimizationOptions:
         constant_fusing: bool = True,
         remove_identity: bool = True,
         remove_duplicated_shape: bool = True,
-        patterns: Optional[Union[str, List[Any]]] = None,  # "default",
+        patterns: Optional[Union[str, List[Any]]] = "default",
         max_iter: int = -1,
         recursive: bool = True,
         stop_after: int = -1,

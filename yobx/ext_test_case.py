@@ -1154,12 +1154,17 @@ class ExtTestCase(unittest.TestCase):
     def check_ort(
         self, onx: "onnx.ModelProto"  # noqa: F821
     ) -> "onnxruntime.InferenceSession":  # noqa: F821
-        from onnxruntime import InferenceSession
+        return self._check_with_ort(onx, cpu=True)
 
-        return InferenceSession(
-            onx if isinstance(onx, str) else onx.SerializeToString(),
-            providers=["CPUExecutionProvider"],
-        )
+    def _check_with_ort(
+        self, proto: "onnx.ModelProto", cpu: bool = False  # noqa: F821
+    ) -> "onnxruntime.InferenceSession":  # noqa: F821
+        from onnxruntime import InferenceSession, get_available_providers
+
+        providers = ["CPUExecutionProvider"]
+        if not cpu and "CUDAExecutionProvider" in get_available_providers():
+            providers.insert(0, "CUDAExecutionProvider")
+        return InferenceSession(proto.SerializeToString(), providers=providers)
 
     def assertRaise(self, fct: Callable, exc_type: type[Exception], msg: Optional[str] = None):
         """In the name"""

@@ -56,7 +56,7 @@ def enumerate_subgraphs_builder(
             this = node, att.name, att.g
             yield this  # type: ignore
             for no in att.g.node:
-                for tu in enumerate_subgraphs(no):  # type: ignore
+                for tu in enumerate_subgraphs_builder(no):  # type: ignore
                     yield this + tu  # type: ignore
 
 
@@ -1522,3 +1522,26 @@ def make_idg(g: onnx.GraphProto) -> int:
     # return f"{id(g)}-{len(g.node)}-{len(g.input)}-{len(g.output)}-{g.name}"
     # id(g) should be enough and faster.
     return id(g)
+
+
+def is_float_type(itype: int) -> bool:
+    """Tells if a onnx type is a float."""
+    return itype in {
+        onnx.TensorProto.DOUBLE,
+        onnx.TensorProto.FLOAT,
+        onnx.TensorProto.FLOAT16,
+        onnx.TensorProto.BFLOAT16,
+    }
+
+
+def enumerate_nodes(graph: onnx.GraphProto) -> Iterator[onnx.NodeProto]:
+    """
+    Enumerates all inputs from a node including all the hidden inputs
+    from subgraphs.
+    """
+    for node in graph.node:
+        yield node
+        if node.op_type[0] in "LSI" and node.op_type in {"Loop", "Scan", "If", "SequenceMap"}:
+            for att in node.attribute:
+                if att.type == onnx.AttributeProto.GRAPH:
+                    yield from enumerate_nodes(att.g)
