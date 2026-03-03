@@ -3088,7 +3088,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         )
         raise NotImplementedError(f"Source is available for {dim!r}, name={name!r}")
 
-    def _get_dynamic_dimension(self, name: str, dim: int) -> Optional[Union[str, "WrapDim"]]:
+    def _get_dynamic_dimension(self, name: str, dim: int) -> Optional[Union[str, "_WrapDim"]]:
         if self.dynamic_shapes is None:
             return None
         if not self.dynamic_shapes or name not in self.dynamic_shapes:
