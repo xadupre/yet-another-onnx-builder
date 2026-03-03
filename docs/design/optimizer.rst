@@ -167,9 +167,10 @@ We consider the following simple model:
 
 .. runpython::
     :showcode:
+    :exception:
 
     import torch
-    from yobx.helpers import pretty_onnx
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.xbuilder import OptimizationOptions
     from yobx.torch_interpreter import to_onnx
 
@@ -201,9 +202,9 @@ Which we can render as follows:
     :script: DOT-SECTION
 
     import onnx
-    from yobx.doc import to_dot
+    from yobx.doc import to_dot, demo_mlp_model
 
-    onx = onnx.load("temp_doc_mlp.onnx")
+    onx = demo_mlp_model("temp_doc_mlp.onnx")
 
     print("DOT-SECTION", to_dot(onx))
 
@@ -213,10 +214,11 @@ We then apply the optimizations by writing the following code:
     :showcode:
 
     import onnx
-    from yobx.helpers import pretty_onnx
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.xbuilder import GraphBuilder
+    from yobx.doc import demo_mlp_model
 
-    onx = onnx.load("temp_doc_mlp.onnx")
+    onx = demo_mlp_model("temp_doc_mlp.onnx")
 
     # The model is placed in a GraphBuilder.
     # It creates dictionaries to store shapes, ranks, types
@@ -250,8 +252,9 @@ Verbosity
 
     import onnx
     from yobx.xbuilder import GraphBuilder
+    from yobx.doc import demo_mlp_model
 
-    onx = onnx.load("temp_doc_mlp.onnx")
+    onx = demo_mlp_model("temp_doc_mlp.onnx")
 
     gr = GraphBuilder(onx, infer_shapes_options=True, verbose=1)
     opt_onx = gr.to_onnx(optimize=True)
@@ -263,8 +266,9 @@ With more verbosity:
 
     import onnx
     from yobx.xbuilder import GraphBuilder
+    from yobx.doc import demo_mlp_model
 
-    onx = onnx.load("temp_doc_mlp.onnx")
+    onx = demo_mlp_model("temp_doc_mlp.onnx")
 
     gr = GraphBuilder(onx, infer_shapes_options=True, verbose=11)
     opt_onx = gr.to_onnx(optimize=True)
@@ -280,8 +284,9 @@ is used to enable or disable patterns.
 
     import onnx
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
+    from yobx.doc import demo_mlp_model
 
-    onx = onnx.load("temp_doc_mlp.onnx")
+    onx = demo_mlp_model("temp_doc_mlp.onnx")
 
     gr = GraphBuilder(
         onx,
@@ -304,8 +309,9 @@ There exists some predefined lists of patterns:
 
     import onnx
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
+    from yobx.doc import demo_mlp_model
 
-    onx = onnx.load("temp_doc_mlp.onnx")
+    onx = demo_mlp_model("temp_doc_mlp.onnx")
 
     gr = GraphBuilder(
         onx,
@@ -327,8 +333,9 @@ This can be used to see when a pattern is applied and how long it takes.
     import pandas
     import onnx
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
+    from yobx.doc import demo_mlp_model
 
-    onx = onnx.load("temp_doc_mlp.onnx")
+    onx = demo_mlp_model("temp_doc_mlp.onnx")
 
     gr = GraphBuilder(
         onx,
@@ -347,8 +354,9 @@ It can be aggregated:
     import pandas
     import onnx
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
+    from yobx.doc import demo_mlp_model
 
-    onx = onnx.load("temp_doc_mlp.onnx")
+    onx = demo_mlp_model("temp_doc_mlp.onnx")
 
     gr = GraphBuilder(
         onx,

@@ -36,4 +36,4 @@ jobs:
       - name: pip freeze
         run: pip freeze
       - name: Build documentation
-        run: sphinx-build -b html docs docs/_build/html -W
+        run: sphinx-build -b html docs docs/_build/html -W -j auto

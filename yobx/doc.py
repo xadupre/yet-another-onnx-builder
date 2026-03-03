@@ -5,6 +5,8 @@ import sys
 from typing import Optional, List, Tuple, Union
 import numpy as np
 import onnx
+import onnx.helper as oh
+import onnx.numpy_helper as onh
 from .helpers.dot_helper import to_dot
 
 
@@ -308,3 +310,71 @@ def plot_dot(
         ax.set_axis_off()
         ax.get_figure().tight_layout()
     return ax
+
+
+def demo_mlp_model(filename: str) -> onnx.ModelProto:
+    """
+    One model obtained with the following.
+
+    .. code-black:: python
+
+        import torch
+        from yobx.helpers.onnx_helper import pretty_onnx
+        from yobx.xbuilder import OptimizationOptions
+        from yobx.torch_interpreter import to_onnx
+        from yobx.translate import translate
+
+
+        class MLP(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.layers = torch.nn.Sequential(
+                    torch.nn.Linear(10, 32),
+                    torch.nn.ReLU(),
+                    torch.nn.Linear(32, 1),
+                )
+
+            def forward(self, x):
+                return self.layers(x)
+
+
+        x = torch.rand(3, 10)
+        onx = to_onnx(
+            MLP(), (x,), input_names=["x"], options=OptimizationOptions(patterns=None)
+        )
+        with open("temp_doc_mlp.onnx", "wb") as f:
+            f.write(onx.SerializeToString())
+        print(pretty_onnx(onx))
+        print(translate(onx, api="onnx-short"))
+    """
+    if os.path.exists(filename):
+        return onnx.load(filename)
+    return oh.make_model(
+        oh.make_graph(
+            [
+                oh.make_node("MatMul", ["x", "p_layers_0_weight::T10"], ["_onx_matmul_x"]),
+                oh.make_node("Add", ["_onx_matmul_x", "layers.0.bias"], ["linear"]),
+                oh.make_node("Relu", ["linear"], ["relu"]),
+                oh.make_node("MatMul", ["relu", "p_layers_2_weight::T10"], ["_onx_matmul_relu"]),
+                oh.make_node("Add", ["_onx_matmul_relu", "layers.2.bias"], ["output_0"]),
+            ],
+            "experiment",
+            [oh.make_tensor_value_info("x", onnx.TensorProto.FLOAT, (3, 10))],
+            [oh.make_tensor_value_info("output_0", onnx.TensorProto.FLOAT, (3, 1))],
+            [
+                onh.from_array(
+                    np.random.randn(10, 32).astype(np.float32), name="p_layers_0_weight::T10"
+                ),
+                onh.from_array(
+                    np.random.randn(32, 1).astype(np.float32), name="p_layers_2_weight::T10"
+                ),
+                onh.from_array(np.random.randn(32).astype(np.float32), name="layers.0.bias"),
+                onh.from_array(
+                    np.array([-0.1422213315963745], dtype=np.float32), name="layers.2.bias"
+                ),
+            ],
+        ),
+        functions=[],
+        opset_imports=[oh.make_opsetid("", 18)],
+        ir_version=8,
+    )
