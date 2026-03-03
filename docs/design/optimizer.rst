@@ -10,10 +10,10 @@ It searches for a specific sequence of nodes in the graph and
 replaces it by another one without changing the inputs or the outputs
 of the graph. The goal of the optimizer is to make the whole computation
 graph more efficient. The goal of this implementation is to make this
-optimization as fast as possible. 
+optimization as fast as possible.
 Assuming the nodes in an onnx graph are ordered in a way every input of a
 node was created by previous nodes, the optimizer must not require
-any global reordering. The cost should be in :math:`O(N P I)` in the worst 
+any global reordering. The cost should be in :math:`O(N P I)` in the worst
 case where *N* is the number of nodes, *P* is the number of patterns,
 *I* is the number of iterations.
 
