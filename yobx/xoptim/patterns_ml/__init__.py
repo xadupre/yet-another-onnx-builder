@@ -18,6 +18,7 @@ def get_ml_patterns(
         )
 
         print(pattern_table_doc(get_ml_patterns(), as_rst=True))
+        print()
     """
     from .tree_ensemble import (
         TreeEnsembleRegressorConcatPattern,
