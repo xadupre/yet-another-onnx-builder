@@ -10,10 +10,10 @@ It searches for a specific sequence of nodes in the graph and
 replaces it by another one without changing the inputs or the outputs
 of the graph. The goal of the optimizer is to make the whole computation
 graph more efficient. The goal of this implementation is to make this
-optimization as fast as possible. 
+optimization as fast as possible.
 Assuming the nodes in an onnx graph are ordered in a way every input of a
 node was created by previous nodes, the optimizer must not require
-any global reordering. The cost should be in :math:`O(N P I)` in the worst 
+any global reordering. The cost should be in :math:`O(N P I)` in the worst
 case where *N* is the number of nodes, *P* is the number of patterns,
 *I* is the number of iterations.
 
@@ -104,7 +104,7 @@ returned by method *match*. Since it is a list of arguments, method
 *match* can include None values. The method returns the new nodes.
 The optimizer considers that any node given to this function is removed
 from the graph, and any node returned by it are added.
-If a received node must be kept, it must be added to the list of returned node.
+If a received node must be kept, it must be added to the list of returned nodes.
 
 Optimization Algorithm
 ======================
@@ -119,7 +119,7 @@ It is implemented in method :meth:`optimize
     ) -> List[Dict[str, Any]]:
 
 
-The algorithm runs multiple iteration until the graph is not evolving
+The algorithm runs multiple iterations until the graph is not evolving
 or `max_iter` is reached. By default, it is equal to the number of nodes.
 An iteration is:
 
@@ -135,11 +135,10 @@ An iteration is:
 
         for all nodes n:
 
-            r = p.match(n) 
+            r = p.match(n)
             if r:
                 if no node already scheduled to be rewritten by another match:
                     matches.append(r)
-    
     # Step 2: apply
 
     for all matches r:
