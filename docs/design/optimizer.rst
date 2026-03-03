@@ -59,7 +59,7 @@ The method returns None if no match is found or an instance of class :class:`Mat
   not be impacted by other pattern optimizer.
 * A function doing the rewriting (usually method *apply* of the pattern class).
 * An existing node where the rewritten nodes can be inserted.
-  Knowing it makes it faster to rewriter. If not specified, the optimizer
+  Knowing it makes it faster to rewrite. If not specified, the optimizer
   will automatically determine the position of the new nodes.
 
 *Debugging: method none*
