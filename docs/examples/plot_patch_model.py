@@ -81,9 +81,7 @@ model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
 
 with (
     register_flattening_functions(patch_transformers=True),
-    apply_patches_for_model(
-        patch_torch=True, patch_transformers=True, model=model
-    ) as details2,
+    apply_patches_for_model(patch_torch=True, patch_transformers=True, model=model) as details2,
 ):
     ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=use_dyn_not_str(ds))
 
