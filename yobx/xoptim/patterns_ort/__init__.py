@@ -25,7 +25,6 @@ def get_onnxruntime_patterns(
         GeluErfPattern,
         QuickGeluPattern,
     )
-    from .batch_normalization import OrtBatchNormalizationTrainingPattern
     from .fused_conv import FusedConvPattern
     from .fused_matmul import (
         FusedMatMulDivPattern,
@@ -78,7 +77,6 @@ def get_onnxruntime_patterns(
         MissingReduceMaxPattern(verbose=verbose),
         MissingTopKPattern(verbose=verbose),
         MultiHeadAttention3DPattern(verbose=verbose),
-        OrtBatchNormalizationTrainingPattern(verbose=verbose),
         QuickGeluPattern(verbose=verbose),
         ReshapeGemmPattern(verbose=verbose),
         ReshapeGemmReshapePattern(verbose=verbose),

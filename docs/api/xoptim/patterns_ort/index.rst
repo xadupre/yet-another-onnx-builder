@@ -6,7 +6,6 @@ yobx.xoptim.patterns_ort
     :caption: modules
 
     activation
-    batch_normalization
     fused_conv
     fused_matmul
     llm_optim
