@@ -1,8 +1,14 @@
 .. _l-design-patches:
 
-=======
-Patches
-=======
+=========================
+Patches (torch export)
+=========================
+
+.. note::
+    This section covers functionality that is **specific to PyTorch**.
+    It is only relevant when exporting :class:`torch.nn.Module` models with
+    :func:`torch.export.export` and has no bearing on ONNX models built
+    directly with the builder APIs.
 
 Before exporting a :class:`torch.nn.Module` with :func:`torch.export.export`,
 certain internal functions in :mod:`torch` and :mod:`transformers` must be
