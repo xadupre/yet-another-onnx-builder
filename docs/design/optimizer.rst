@@ -7,7 +7,7 @@ Pattern Optimizer
 The pattern optimizer is implemented by class :class:`GraphBuilderPatternOptimization
 <yobx.xoptim.GraphBuilderPatternOptimization>`.
 It searches for a specific sequence of nodes in the graph and
-replaces it by another one without changing the inputs or the long_outputs
+replaces it by another one without changing the inputs or the outputs
 of the graph. The goal of the optimizer is to make the whole computation
 graph more efficient. The goal of this implementation is to make this
 optimization as fast as possible. 
@@ -47,7 +47,7 @@ PatternOptimization.match
   are part of set of nodes this pattern optimizer can rewrite.
   From there, the function explores wherever it needs,
   checking any condition it needs.
-* ``matched``: usually unused, it returns of nodes already matching
+* ``matched``: usually unused, it contains the list of nodes already matching
   a pattern
 
 The method must not modify the graph.
@@ -59,7 +59,7 @@ The method returns None if no match is found or an instance of class :class:`Mat
   not be impacted by other pattern optimizer.
 * A function doing the rewriting (usually method *apply* of the pattern class).
 * An existing node where the rewritten nodes can be inserted.
-  Knowing it makes it faster to rewriter. If not specified, the optimizer
+  Knowing it makes it faster to rewrite. If not specified, the optimizer
   will automatically determine the position of the new nodes.
 
 *Debugging: method none*
@@ -73,7 +73,7 @@ The method returns None if no match is found or an instance of class :class:`Mat
         msg: Optional[Union[Callable[[], str], str]] = None,
     ):
 
-It may be useful which reason made a pattern matching fail.
+It may be useful to know the reason why a pattern matching failed.
 Instead of returning None, method *match* can return the following
 expression:
 
@@ -100,7 +100,7 @@ The method does the rewriting. It assumes it can happen.
 It takes a list of nodes impacted by the rewriting. It assumes no other
 pattern optimizer modified them or will modify them.
 It receives the list of nodes
-returned by method *apply*. Since it is a list of argument, method
+returned by method *match*. Since it is a list of arguments, method
 *match* can include None values. The method returns the new nodes.
 The optimizer considers that any node given to this function is removed
 from the graph, and any node returned by it are added.
@@ -158,7 +158,7 @@ Adding a pattern
 ================
 
 Example
-=======
+-------
 
 Simple API
 ++++++++++
@@ -195,7 +195,7 @@ We consider the following simple model:
         f.write(onx.SerializeToString())
     print(pretty_onnx(onx))
 
-Which we can renders as follows:
+Which we can render as follows:
 
 .. gdot::
     :script: DOT-SECTION
@@ -219,7 +219,7 @@ We then apply the optimizations by writing the following code:
     onx = onnx.load("temp_doc_mlp.onnx")
 
     # The model is placed in a GraphBuilder.
-    # It creates dictionnaires to store shapes, ranks, types
+    # It creates dictionaries to store shapes, ranks, types
     # to make it easier to the optimizers to find the information
     # they need. It still uses NodeProto to store nodes
     gr = GraphBuilder(onx, infer_shapes_options=True)
@@ -380,7 +380,7 @@ same results. If it is missing, some patterns cannot match for sure
 and they will not match.
 
 This information can be built by running shape inference
-on the onnx models. That's what is done is the previous examples.
+on the onnx models. That's what is done in the previous examples.
 However, the best case is when this information comes from torch.
 
 Function :func:`to_onnx <yobx.torch_interpreter.to_onnx>`
@@ -391,8 +391,7 @@ on the onnx model it generates before optimizing it.
 Available Patterns and API
 ==========================
 
-All patterns may be found at :ref:`l-pattern-optimization-onnx`
-and :ref:`l-pattern-optimization-ort`.
+All patterns are documented in :ref:`l-design-pattern-optimizer-patterns`.
 
 When writing a pattern, walking along the graph or checking the shape
 is very common. Class :class:`GraphBuilderPatternOptimization
@@ -428,7 +427,7 @@ Constants
 * :meth:`is_constant_scalar <yobx.xoptim.GraphBuilderPatternOptimization.is_constant_scalar>`:
   checks a constant is a scalar and compares its value to a number
 * :meth:`get_computed_constant <yobx.xoptim.GraphBuilderPatternOptimization.get_computed_constant>`:
-  returns the constant, computes it is a constant built from other constants
+  returns the constant, computing it if it is a constant built from other constants
 * :meth:`get_attribute <yobx.xoptim.GraphBuilderPatternOptimization.get_attribute>`:
   returns an attribute of a node
 
