@@ -14,6 +14,18 @@ class ModelData:
     export_inputs: Dict[str, Any]
     dynamic_shapes: Dict[str, Any]
 
+    @property
+    def dynamic_shapes_for_torch_export_export(self) -> Dict[str, Any]:
+        """
+        The dynamic shapes contains strings.
+        :func:`torch.export.export` needs them to be replaced
+        by ``torch.export.Dim.DYNAMIC``. This is what
+        this property is doing.
+        """
+        from . import use_dyn_not_str
+
+        return use_dyn_not_str(self.dynamic_shapes)
+
 
 def _update_config(config: Any, mkwargs: Dict[str, Any]):
     """Updates a configuration with different values."""
@@ -39,13 +51,71 @@ def _update_config(config: Any, mkwargs: Dict[str, Any]):
             setattr(config, k, v)
 
 
-class _BroadcastAddModel(nn.Module):
+class TinyBroadcastAddModel(nn.Module):
     """
     A model where one output dynamic dimension becomes ``max(d1, d2)`` after a broadcast.
 
     Inputs ``x`` (shape ``(batch, d1)``) and ``y`` (shape ``(batch, d2)``) are added
     element-wise. Broadcasting rules require that ``d1 == d2`` or one of them equals
     ``1`` at runtime; the symbolic output shape is ``(batch, max(d1, d2))``.
+
+    This model triggers the following when exported.
+
+    .. runpython::
+        :showcode:
+
+        import torch
+        from yobx.helpers import string_type
+        from yobx.torch import get_tiny_model, apply_patches_for_model
+
+        model_data = get_tiny_model("local/BroadcastAdd")
+
+        print(f"-- inputs: {string_type(model_data.export_inputs, with_shape=True)}")
+        print(f"-- shapes: {string_type(model_data.dynamic_shapes)}")
+        print("--")
+        print("-- simple export --")
+        print("--")
+
+        try:
+            torch.export.export(
+                model_data.model,
+                (),
+                kwargs=model_data.export_inputs,
+                dynamic_shapes=model_data.dynamic_shapes_for_torch_export_export,
+            )
+        except Exception as e:
+            print(e)
+
+        print("--")
+        print("-- export with backed_size_oblivious=True --")
+        print("--")
+
+        with torch.fx.experimental._config.patch(backed_size_oblivious=True):
+            try:
+                torch.export.export(
+                    model_data.model,
+                    (),
+                    kwargs=model_data.export_inputs,
+                    dynamic_shapes=model_data.dynamic_shapes_for_torch_export_export,
+                )
+            except Exception as e:
+                print(e)
+
+        print("--")
+        print("-- patched export --")
+        print("--")
+
+        with (
+            torch.fx.experimental._config.patch(backed_size_oblivious=True),
+            apply_patches_for_model(patch_torch=True),
+        ):
+            ep = torch.export.export(
+                model_data.model,
+                (),
+                kwargs=model_data.export_inputs,
+                dynamic_shapes=model_data.dynamic_shapes_for_torch_export_export,
+            )
+            print(ep)
     """
 
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
@@ -63,7 +133,8 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
     * ``"arnir0/Tiny-LLM"`` — a tiny LLaMA-based causal language model with a
       :class:`transformers.cache_utils.DynamicCache` past-key-value cache.
     * ``"local/BroadcastAdd"`` — a minimal two-input model whose output has the
-      symbolic shape ``(batch, max(d1, d2))`` due to broadcasting.
+      symbolic shape ``(batch, max(d1, d2))`` due to broadcasting,
+      see :class:`yobx.torch.tiny_models.TinyBroadcastAddModel`.
 
     :param model_id: model id, see the list of supported values above
     :param config_updates: modification to add to the configuration before creating the model
@@ -89,7 +160,7 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
     if model_id == "local/BroadcastAdd":
         return ModelData(
             model_id=model_id,
-            model=_BroadcastAddModel(),
+            model=TinyBroadcastAddModel(),
             export_inputs=dict(
                 x=torch.randn(2, 5),
                 y=torch.randn(2, 1),
