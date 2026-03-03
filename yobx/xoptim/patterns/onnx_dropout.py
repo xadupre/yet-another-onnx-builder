@@ -137,8 +137,8 @@ class DropoutPattern(PatternOptimization):
             return MatchResult(self, [node], self.apply, insert_at=node)
 
         if (
-            len(node.input) >= 2
-            and node.input[1] != ""
+            len(node.input) >= 3
+            and node.input[2] != ""
             and g.is_constant_scalar(node.input[2])
             and g.get_constant_scalar(node.input[2]) != 0
         ):
