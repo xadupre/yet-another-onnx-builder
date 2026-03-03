@@ -9,12 +9,12 @@ API for the pattern-based optimization of ONNX graphs.
 
     graph_builder_optim
     patterns_api
-    patterns
-    patterns_exp
-    patterns_fix
-    patterns_investigation
-    patterns_ml
-    patterns_ort
+    patterns/index
+    patterns_exp/index
+    patterns_fix/index
+    patterns_investigation/index
+    patterns_ml/index
+    patterns_ort/index
     repeated_optim
     unfused
 
