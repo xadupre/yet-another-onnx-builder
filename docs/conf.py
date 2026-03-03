@@ -11,6 +11,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.coverage",
     "sphinx.ext.githubpages",
+    "sphinx.ext.graphviz",
     "sphinx.ext.ifconfig",
     "sphinx.ext.intersphinx",
     "sphinx.ext.linkcode",
@@ -27,6 +28,8 @@ extensions = [
 ]
 extensions.append("sphinx.ext.imgmath")
 imgmath_image_format = "svg"
+graphviz_output_format = "svg"
+graphviz_dot_args = ["-Gbgcolor=transparent"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build"]
