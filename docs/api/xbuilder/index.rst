@@ -11,9 +11,12 @@ API for the graph builder used to construct and optimize ONNX graphs.
     graph_builder
     graph_builder_opset
     infer_shapes_options
+    initializer_info
     optimization_options
     order_optim
     virtual_tensor
+    wrap_dim
+    wrap_sym
 
 GraphBuilder
 ++++++++++++
@@ -33,6 +36,13 @@ InferShapesOptions
 ++++++++++++++++++
 
 .. autoclass:: yobx.xbuilder.InferShapesOptions
+    :members:
+    :no-undoc-members:
+
+InitializerInfo
++++++++++++++++
+
+.. autoclass:: yobx.xbuilder.InitializerInfo
     :members:
     :no-undoc-members:
 
@@ -61,5 +71,19 @@ VirtualTensor
 +++++++++++++
 
 .. autoclass:: yobx.xbuilder.VirtualTensor
+    :members:
+    :no-undoc-members:
+
+WrapDim
++++++++
+
+.. autoclass:: yobx.xbuilder.WrapDim
+    :members:
+    :no-undoc-members:
+
+WrapSym
++++++++
+
+.. autoclass:: yobx.xbuilder.WrapSym
     :members:
     :no-undoc-members:
