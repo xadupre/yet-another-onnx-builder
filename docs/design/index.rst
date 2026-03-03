@@ -9,5 +9,6 @@ Elements of Design
    flatten
    graph_builder
    helpers
+   patches
    shape
    translate
