@@ -2303,6 +2303,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         got = ort.run(None, feeds)
         self.assertEqualArray(expected, got[0], 1e-5)
 
+    @requires_onnxruntime("1.24")
     def test_onnx_gqa_no_rotary_4D(self):
         _mkv_ = oh.make_tensor_value_info
 
@@ -2426,6 +2427,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         self.assertEqualArray(got[2], got[5], atol=1e-5)
         self.assertEqualArray(got[0], got[3], atol=1e-5)
 
+    @requires_onnxruntime("1.24")
     def test_onnx_gqa_no_rotary_3D(self):
         _mkv_ = oh.make_tensor_value_info
 
