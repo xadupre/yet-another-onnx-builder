@@ -11,4 +11,5 @@ API Reference
    torch/index
    translate/index
    xbuilder/index
+   xoptim/index
    xshape/index
