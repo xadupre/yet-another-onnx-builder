@@ -2942,6 +2942,20 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         g._known_shapes["Y"] = ("b", 4)
         self.assertFalse(g.same_shape("X", "Y"))
 
+    def test_set_value_shape_constraint_dim_registration(self):
+        # When a name already has a symbolic (string) value shape like ("batch",)
+        # and set_value_shape is called with a concrete (int,) tuple,
+        # the constraint should be registered for the symbolic dim name ("batch"),
+        # not for the literal string "existing".
+        g = GraphBuilder(18)
+        g.make_tensor_input("X", TFLOAT, ("batch",))
+        g._known_value_shape["batch_value"] = ("batch",)
+        g._known_ranks["batch_value"] = 1
+        g.set_value_shape("batch_value", (5,))
+        self.assertIn("batch", g.constraints_)
+        self.assertIn(5, g.constraints_["batch"])
+        self.assertNotIn("existing", g.constraints_)
+
     def test_get_dimension_as_result_already_known(self):
         gr = GraphBuilder(18)
         gr.make_tensor_input("X", TFLOAT, ("batch", "seq"))

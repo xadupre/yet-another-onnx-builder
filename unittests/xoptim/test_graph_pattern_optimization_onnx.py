@@ -1964,6 +1964,36 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    def test_reshape_same_shape(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Reshape", ["X", "shape"], ["Y"])],
+                "dummy",
+                [_mkv_("X", TFLOAT, [2, 3])],
+                [_mkv_("Y", TFLOAT, [2, 3])],
+                [onh.from_array(np.array([2, 3], dtype=np.int64), name="shape")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        check_model(model)
+        feeds = {"X": self._range(2, 3)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["Reshape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
+        self.assertEqual(0, len(opt_onx.graph.initializer))
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
     def test_reshape_reshape_binary(self):
         model = oh.make_model(
             oh.make_graph(

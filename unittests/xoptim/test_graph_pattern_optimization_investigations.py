@@ -35,7 +35,43 @@ class TestGraphPatternOptimizationInvestigation(ExtTestCase):
         names = set(r.__class__.__name__ for r in res)
         self.assertIn("BinaryInvestigation", names)
 
-    @hide_stdout()
+    def test_dump_applied_patterns(self):
+        import tempfile
+
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Reshape", ["X", "shape"], ["Y"])],
+                "dummy",
+                [oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [2, 3])],
+                [oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [2, 3])],
+                [onh.from_array(np.array([2, 3], dtype=np.int64), name="shape")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            gr = GraphBuilder(
+                model,
+                infer_shapes_options=True,
+                optimization_options=OptimizationOptions(
+                    patterns=["Reshape"],
+                    dump_applied_patterns=tmpdir,
+                    verbose=0,
+                ),
+            )
+            opt_onx = gr.to_onnx(optimize=True)
+            self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
+            # The pattern saver creates a subfolder named after the pattern class
+            subfolders = os.listdir(tmpdir)
+            self.assertGreater(len(subfolders), 0)
+            pattern_files = []
+            for sub in subfolders:
+                pattern_files.extend(os.listdir(os.path.join(tmpdir, sub)))
+            # Expect at least one .onnx file and one .py file were saved
+            self.assertTrue(any(f.endswith(".onnx") for f in pattern_files))
+            self.assertTrue(any(f.endswith(".py") for f in pattern_files))
+
+
     def test_packed_matmul(self):
         model = oh.make_model(
             oh.make_graph(
