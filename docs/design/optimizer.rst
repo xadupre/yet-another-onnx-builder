@@ -427,7 +427,7 @@ Constants
 * :meth:`is_constant_scalar <yobx.xoptim.GraphBuilderPatternOptimization.is_constant_scalar>`:
   checks a constant is a scalar and compares its value to a number
 * :meth:`get_computed_constant <yobx.xoptim.GraphBuilderPatternOptimization.get_computed_constant>`:
-  returns the constant, computes it is a constant built from other constants
+  returns the constant, computing it if it is a constant built from other constants
 * :meth:`get_attribute <yobx.xoptim.GraphBuilderPatternOptimization.get_attribute>`:
   returns an attribute of a node
 
