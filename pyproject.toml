@@ -30,7 +30,7 @@ dev = [
 ]
 docs = [
     "black",
-    "furo",
+    "piccolo-theme",
     "matplotlib",
     "onnx-diagnostic",
     "openpyxl",

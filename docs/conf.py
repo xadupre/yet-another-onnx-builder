@@ -33,15 +33,11 @@ graphviz_dot_args = ["-Gbgcolor=transparent"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build"]
-html_theme = "furo"
+html_theme = "piccolo_theme"
 html_static_path = ["_static"]
 html_logo = "_static/logo.svg"
 html_favicon = "_static/logo.svg"
-html_theme_options = {
-    "source_repository": "https://github.com/xadupre/yet-another-onnx-builder",
-    "source_branch": "main",
-    "source_directory": "docs/",
-}
+html_theme_options = {}
 
 
 def linkcode_resolve(domain, info):
