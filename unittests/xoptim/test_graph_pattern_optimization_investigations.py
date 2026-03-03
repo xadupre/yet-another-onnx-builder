@@ -5,7 +5,7 @@ import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 from typing import Optional
-from yobx.ext_test_case import ExtTestCase, hide_stdout
+from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
 from yobx.xoptim import get_pattern_list
 from yobx.reference import ExtendedReferenceEvaluator
@@ -70,7 +70,6 @@ class TestGraphPatternOptimizationInvestigation(ExtTestCase):
             # Expect at least one .onnx file and one .py file were saved
             self.assertTrue(any(f.endswith(".onnx") for f in pattern_files))
             self.assertTrue(any(f.endswith(".py") for f in pattern_files))
-
 
     def test_packed_matmul(self):
         model = oh.make_model(
