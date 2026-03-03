@@ -755,7 +755,7 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
         return onh.from_array(merged, name=as_tensor)
 
     def _opset_process(
-        cls, g: "GraphBuilder", atts: Dict[str, Any]  # noqa: F821
+        self, g: "GraphBuilder", atts: Dict[str, Any]  # noqa: F821
     ) -> Dict[str, Any]:
         """
         as_tensor not supported in opset ai.onnx.ml < 3.
