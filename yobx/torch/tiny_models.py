@@ -2,7 +2,6 @@ from dataclasses import dataclass
 import copy
 from typing import Any, Dict, Optional
 import torch
-import torch.nn as nn
 
 
 @dataclass
@@ -51,7 +50,7 @@ def _update_config(config: Any, mkwargs: Dict[str, Any]):
             setattr(config, k, v)
 
 
-class TinyBroadcastAddModel(nn.Module):
+class TinyBroadcastAddModel(torch.nn.Module):
     """
     A model where one output dynamic dimension becomes ``max(d1, d2)`` after a broadcast.
 
@@ -66,22 +65,25 @@ class TinyBroadcastAddModel(nn.Module):
 
         import torch
         from yobx.helpers import string_type
-        from yobx.torch import get_tiny_model, apply_patches_for_model
+        from yobx.torch import apply_patches_for_model, use_dyn_not_str
+        from yobx.torch.tiny_models import TinyBroadcastAddModel
 
-        model_data = get_tiny_model("local/BroadcastAdd")
+        model = TinyBroadcastAddModel()
+        export_inputs = model._export_inputs()
+        dynamic_shapes = use_dyn_not_str(model._dynamic_shapes())
 
-        print(f"-- inputs: {string_type(model_data.export_inputs, with_shape=True)}")
-        print(f"-- shapes: {string_type(model_data.dynamic_shapes)}")
+        print(f"-- inputs: {string_type(export_inputs, with_shape=True)}")
+        print(f"-- shapes: {dynamic_shapes}")
         print("--")
         print("-- simple export --")
         print("--")
 
         try:
             torch.export.export(
-                model_data.model,
+                model,
                 (),
-                kwargs=model_data.export_inputs,
-                dynamic_shapes=model_data.dynamic_shapes_for_torch_export_export,
+                kwargs=export_inputs,
+                dynamic_shapes=dynamic_shapes,
             )
         except Exception as e:
             print(e)
@@ -93,10 +95,10 @@ class TinyBroadcastAddModel(nn.Module):
         with torch.fx.experimental._config.patch(backed_size_oblivious=True):
             try:
                 torch.export.export(
-                    model_data.model,
+                    model,
                     (),
-                    kwargs=model_data.export_inputs,
-                    dynamic_shapes=model_data.dynamic_shapes_for_torch_export_export,
+                    kwargs=export_inputs,
+                    dynamic_shapes=dynamic_shapes,
                 )
             except Exception as e:
                 print(e)
@@ -110,13 +112,16 @@ class TinyBroadcastAddModel(nn.Module):
             apply_patches_for_model(patch_torch=True),
         ):
             ep = torch.export.export(
-                model_data.model,
+                model,
                 (),
-                kwargs=model_data.export_inputs,
-                dynamic_shapes=model_data.dynamic_shapes_for_torch_export_export,
+                kwargs=export_inputs,
+                dynamic_shapes=dynamic_shapes,
             )
             print(ep)
     """
+
+    _export_inputs = lambda: dict(x=torch.randn(2, 5), y=torch.randn(2, 1))  # noqa: E731
+    _dynamic_shapes = lambda: dict(x={0: "batch", 1: "d1"}, y={0: "batch", 1: "d2"})  # noqa: E731
 
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         return x + y
@@ -161,14 +166,8 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
         return ModelData(
             model_id=model_id,
             model=TinyBroadcastAddModel(),
-            export_inputs=dict(
-                x=torch.randn(2, 5),
-                y=torch.randn(2, 1),
-            ),
-            dynamic_shapes=dict(
-                x={0: "batch", 1: "d1"},
-                y={0: "batch", 1: "d2"},
-            ),
+            export_inputs=TinyBroadcastAddModel._export_inputs(),
+            dynamic_shapes=TinyBroadcastAddModel._dynamic_shapes(),
         )
 
     if model_id == "arnir0/Tiny-LLM":
