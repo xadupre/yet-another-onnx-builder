@@ -185,7 +185,7 @@ class FunctionSplitRotaryMulPattern(SimplifyingEasyPatternFunction):
         )
         return g.op.Concat(add, part, axis=-1)
 
-    def apply_pattern(self, g, X, split1, split2, C1, C2):
+    def apply_pattern(self, g: GraphBuilder, X, split1, split2, C1, C2):
         assert self.f_name() == "SplitRotaryMul", f"Name mismatch {self.f_name()!r}"
         return g.anyop.SplitRotaryMul(X, split1, split2, C1, C2, domain=self.f_domain)
 
@@ -212,6 +212,6 @@ class FunctionPowTanhPattern(SimplifyingEasyPatternFunction):
         add = g.op.Add(X, g.op.Mul(g.op.Pow(X, three), o_o_four))
         return g.op.Mul(g.op.Mul(X, half), g.op.Add(g.op.Tanh(g.op.Mul(add, o_height)), one))
 
-    def apply_pattern(self, g, X, three, o_o_four, half, o_height, one):
+    def apply_pattern(self, g: GraphBuilder, X, three, o_o_four, half, o_height, one):
         assert self.f_name() == "PowTanh", f"Name mismatch {self.f_name()!r}"
         return g.anyop.PowTanh(X, three, o_o_four, half, o_height, one, domain=self.f_domain)
