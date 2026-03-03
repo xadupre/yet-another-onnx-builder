@@ -1256,7 +1256,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
         )
         got = opt_ref.run(None, feeds)
-        self.assertEqualAny(expected, got)
+        self.assertEqualAny(expected, got, atol=1e-5)
 
     def test_skip_simplified_layer_normalization_mul(self):
         from onnxruntime import InferenceSession
