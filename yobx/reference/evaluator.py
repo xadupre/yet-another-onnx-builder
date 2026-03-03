@@ -177,7 +177,6 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         Rotary,
         ScatterNDOfShape,
         SubMul,
-        ToComplex,
         Transpose2DCastFP16,
         Transpose2DCastFP32,
         TriMatrix,
