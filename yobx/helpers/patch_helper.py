@@ -165,7 +165,26 @@ class PatchInfo:
         return {k: getattr(self, k) for k in self.__slots__}
 
     def make_diff(self) -> str:
-        """Returns a diff as a string."""
+        """
+        Returns a diff as a string.
+        See example :ref:`l-plot-patch-model-diff`.
+
+        ::
+
+            -- original
+            +++ rewritten
+            @@ -1,6 +1,5 @@
+            def _print_Symbol(self, expr: sympy.Symbol) -> str:
+            -    if not isinstance(expr, sympy.Symbol):
+            -        raise AssertionError(f"Expected sympy.Symbol, got {type(expr)}")
+            -    if not self.symbol_to_source.get(expr):
+            -        raise AssertionError(f"Unknown symbol {expr} created by constraints solver")
+            -    return self.symbol_to_source[expr][0].name
+            +    assert isinstance(expr, sympy.Symbol), str(type(expr))
+            +    if self.symbol_to_source.get(expr):  # type: ignore
+            +        return self.symbol_to_source[expr][0].name  # type: ignore
+            +    return str(expr)
+        """
         if isinstance(self.function_to_patch, str):
             return clean_code_with_black(inspect.getsource(self.patch))
         f = self.function_to_patch or self._last_patched_function
@@ -202,7 +221,7 @@ class PatchInfo:
 
     def format_diff(self, format: str = "raw") -> str:
         """
-        Format a diff between two function as a string.
+        Formats a diff between two function as a string.
 
         :param format: ``'raw'`` or ``'rst'``
         :return: diff
@@ -390,6 +409,24 @@ class PatchDetails:
         :param patches: from method :meth:`patches_involved_in_graph`
         :param format: format of the report
         :return: report
+
+        See example :ref:`l-plot-patch-model-diff`.
+
+        ::
+
+            -- original
+            +++ rewritten
+            @@ -1,6 +1,5 @@
+            def _print_Symbol(self, expr: sympy.Symbol) -> str:
+            -    if not isinstance(expr, sympy.Symbol):
+            -        raise AssertionError(f"Expected sympy.Symbol, got {type(expr)}")
+            -    if not self.symbol_to_source.get(expr):
+            -        raise AssertionError(f"Unknown symbol {expr} created by constraints solver")
+            -    return self.symbol_to_source[expr][0].name
+            +    assert isinstance(expr, sympy.Symbol), str(type(expr))
+            +    if self.symbol_to_source.get(expr):  # type: ignore
+            +        return self.symbol_to_source[expr][0].name  # type: ignore
+            +    return str(expr)
         """
         rows = []
         for patch, nodes in patches:

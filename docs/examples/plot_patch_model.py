@@ -1,5 +1,5 @@
 """
-.. _l-plot-patch-model:
+.. _l-plot-patch-model-diff:
 
 Applying patches to a model and displaying the diff
 =====================================================

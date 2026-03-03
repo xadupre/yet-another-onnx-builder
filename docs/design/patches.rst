@@ -129,9 +129,7 @@ variant whose ``forward`` is called indirectly from the top-level
 ``nn.Module``).  Without the full diff it is easy to overlook a patched
 sub-function and miss the reason a particular graph node was introduced:
 
-.. runpython::
-    :showcode:
-    :process:
+.. code-block:: python
 
     import torch
     import torch._refs
@@ -155,6 +153,45 @@ sub-function and miss the reason a particular graph node was introduced:
     patch.undo()
     # Print the first few lines of the diff.
     print("\n".join(diff.splitlines()[:10]))
+
+That gives::
+
+    --- original
+    +++ rewritten
+    @@ -1,77 +1,6 @@
+    -def _broadcast_shapes(*_shapes):
+    -    from torch.fx.experimental.symbolic_shapes import (
+    -        guard_or_false,
+    -        has_hint,
+    -        is_nested_int,
+    -        size_hint,
+    -    )  
+    ...
+
+Or with ``diff = patch.format_diff("rst")``::
+
+    .. _patch-torch-my_patched_fn:
+
+    torch: _broadcast_shapes -> my_patched_fn
+    =========================================
+
+    .. code-block:: diff
+        :linenos:
+
+        --- original
+        +++ rewritten
+        @@ -1,77 +1,6 @@
+        -def _broadcast_shapes(*_shapes):
+        -    from torch.fx.experimental.symbolic_shapes import (
+        -        guard_or_false,
+        -        has_hint,
+        -        is_nested_int,
+        -        size_hint,
+        -    )
+        -
+        -    backed_so = torch.fx.experimental._config.backed_size_oblivious
+
+    ...
 
 PatchDetails
 ------------
