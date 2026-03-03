@@ -4,6 +4,22 @@ from typing import Any, Dict, Optional
 import torch
 
 
+class _AddModel(torch.nn.Module):
+    """A minimal two-input add model used for testing torch patches."""
+
+    def forward(self, x, y):
+        return x + y
+
+
+class _ScaledBroadcastModel(torch.nn.Module):
+    """A model that multiplies a ``(batch, seq, hidden)`` tensor by a
+    ``(1, 1, hidden)`` scale vector, exercising shape-broadcasting paths
+    through the torch fake-tensor machinery."""
+
+    def forward(self, x, w):
+        return x * w
+
+
 @dataclass
 class ModelData:
     """Contains all the necessary information to export a model."""
@@ -46,12 +62,38 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
 
     Supported model IDs:
 
+    * ``"add"`` — a minimal two-input element-wise add model.
+      Exercises :func:`torch.export._trace._get_range_constraints` (kwargs ordering
+      patch) and :class:`torch.fx.experimental.symbolic_shapes.DynamicDimConstraintPrinter`
+      (constraint-printing patch).  Requires only :epkg:`torch`, no *transformers*.
+
+    * ``"broadcast_multiply"`` — multiplies a ``(batch, seq, hidden)`` tensor by a
+      ``(1, 1, hidden)`` scale vector.  Exercises
+      :func:`torch._subclasses.fake_impls.infer_size` and
+      :func:`torch._refs._broadcast_shapes` (broadcasting-shape patches).
+      Requires only :epkg:`torch`, no *transformers*.
+
     * ``"arnir0/Tiny-LLM"`` — a tiny LLaMA-based causal language model with a
       :class:`transformers.cache_utils.DynamicCache` past-key-value cache.
 
     :param model_id: model id, see the list of supported values above
     :param config_updates: modification to add to the configuration before creating the model
     :return: the necessary information
+
+    Example::
+
+        import torch
+        from yobx.torch import get_tiny_model, apply_patches_for_model
+
+        model_data = get_tiny_model("add")
+        result = model_data.model(**model_data.export_inputs)
+        with apply_patches_for_model(patch_torch=True):
+            ep = torch.export.export(
+                model_data.model,
+                (),
+                kwargs=model_data.export_inputs,
+                dynamic_shapes=model_data.dynamic_shapes,
+            )
 
     Example::
 
@@ -70,6 +112,38 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
             dynamic_shapes=model_data.dynamic_shapes,
         )
     """
+    if model_id == "add":
+        batch = torch.export.Dim("batch", min=1, max=1024)
+        seq = torch.export.Dim("seq", min=1, max=4096)
+        return ModelData(
+            model_id=model_id,
+            model=_AddModel(),
+            export_inputs=dict(
+                x=torch.randn(2, 3, dtype=torch.float32),
+                y=torch.randn(2, 3, dtype=torch.float32),
+            ),
+            dynamic_shapes=dict(
+                x={0: batch, 1: seq},
+                y={0: batch, 1: seq},
+            ),
+        )
+
+    if model_id == "broadcast_multiply":
+        batch = torch.export.Dim("batch", min=1, max=1024)
+        seq = torch.export.Dim("seq", min=1, max=4096)
+        return ModelData(
+            model_id=model_id,
+            model=_ScaledBroadcastModel(),
+            export_inputs=dict(
+                x=torch.randn(2, 5, 8, dtype=torch.float32),
+                w=torch.randn(1, 1, 8, dtype=torch.float32),
+            ),
+            dynamic_shapes=dict(
+                x={0: batch, 1: seq},
+                w={},
+            ),
+        )
+
     if model_id == "arnir0/Tiny-LLM":
         import transformers
         from .in_transformers.models import get_cached_configuration
