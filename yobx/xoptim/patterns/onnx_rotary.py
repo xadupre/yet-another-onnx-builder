@@ -14,6 +14,7 @@ class RotaryConcatPartPattern(PatternOptimization):
 
     .. gdot::
         :script: DOT-SECTION
+        :process:
 
         import numpy as np
         from onnx import TensorProto

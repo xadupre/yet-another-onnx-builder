@@ -30,7 +30,7 @@ def unfused_nodes(
 
         import onnx
         from yobx.xoptim.unfused import unfused_nodes
-        from yobx.helpers import pretty_onnx
+        from yobx.helpers.onnx_helper import pretty_onnx
 
 
         print("-- load optimized model")

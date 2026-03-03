@@ -2,7 +2,6 @@ import unittest
 import numpy as np
 import onnx
 import onnx.helper as oh
-import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
 
@@ -77,11 +76,7 @@ class TestExtendedOpsAddAddMulMul(ExtTestCase):
 
     def test_add_mul_transpose_middle(self):
         model = _make_model(
-            [
-                oh.make_node(
-                    "AddMul", ["X", "Y", "Z"], ["out"], domain=DOMAIN, transposeMiddle=1
-                )
-            ],
+            [oh.make_node("AddMul", ["X", "Y", "Z"], ["out"], domain=DOMAIN, transposeMiddle=1)],
             [
                 oh.make_tensor_value_info("X", TFLOAT, None),
                 oh.make_tensor_value_info("Y", TFLOAT, None),
@@ -115,11 +110,7 @@ class TestExtendedOpsAddAddMulMul(ExtTestCase):
 
     def test_mul_add_transpose_middle(self):
         model = _make_model(
-            [
-                oh.make_node(
-                    "MulAdd", ["X", "Y", "Z"], ["out"], domain=DOMAIN, transposeMiddle=1
-                )
-            ],
+            [oh.make_node("MulAdd", ["X", "Y", "Z"], ["out"], domain=DOMAIN, transposeMiddle=1)],
             [
                 oh.make_tensor_value_info("X", TFLOAT, None),
                 oh.make_tensor_value_info("Y", TFLOAT, None),
@@ -298,11 +289,7 @@ class TestExtendedOpsReplaceZero(ExtTestCase):
 
     def test_replace_zero_equal(self):
         model = _make_model(
-            [
-                oh.make_node(
-                    "ReplaceZero", ["X"], ["out"], domain=DOMAIN, by=float(-1), equal=1
-                )
-            ],
+            [oh.make_node("ReplaceZero", ["X"], ["out"], domain=DOMAIN, by=float(-1), equal=1)],
             [oh.make_tensor_value_info("X", TFLOAT, None)],
             [oh.make_tensor_value_info("out", TFLOAT, None)],
         )
@@ -314,11 +301,7 @@ class TestExtendedOpsReplaceZero(ExtTestCase):
 
     def test_replace_zero_not_equal(self):
         model = _make_model(
-            [
-                oh.make_node(
-                    "ReplaceZero", ["X"], ["out"], domain=DOMAIN, by=float(-1), equal=0
-                )
-            ],
+            [oh.make_node("ReplaceZero", ["X"], ["out"], domain=DOMAIN, by=float(-1), equal=0)],
             [oh.make_tensor_value_info("X", TFLOAT, None)],
             [oh.make_tensor_value_info("out", TFLOAT, None)],
         )
@@ -466,9 +449,7 @@ class TestExtendedOpsTriMatrix(ExtTestCase):
         csts = np.array([0.1, 1.0, 0.2], dtype=np.float32)
         ref = ExtendedReferenceEvaluator(model)
         got = ref.run(None, {"shape": shape, "csts": csts})
-        expected = np.array(
-            [[1.0, 0.2, 0.2], [0.1, 1.0, 0.2], [0.1, 0.1, 1.0]], dtype=np.float32
-        )
+        expected = np.array([[1.0, 0.2, 0.2], [0.1, 1.0, 0.2], [0.1, 0.1, 1.0]], dtype=np.float32)
         self.assertEqualArray(expected, got[0])
 
     def test_tri_matrix_non_square(self):

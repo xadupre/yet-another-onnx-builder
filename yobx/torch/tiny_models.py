@@ -69,8 +69,8 @@ class TinyBroadcastAddModel(torch.nn.Module):
         from yobx.torch.tiny_models import TinyBroadcastAddModel
 
         model = TinyBroadcastAddModel()
-        export_inputs = model._export_inputs()
-        dynamic_shapes = use_dyn_not_str(model._dynamic_shapes())
+        export_inputs = TinyBroadcastAddModel._export_inputs()
+        dynamic_shapes = use_dyn_not_str(TinyBroadcastAddModel._dynamic_shapes())
 
         print(f"-- inputs: {string_type(export_inputs, with_shape=True)}")
         print(f"-- shapes: {dynamic_shapes}")

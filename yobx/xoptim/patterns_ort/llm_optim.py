@@ -1888,6 +1888,11 @@ class GroupQueryAttention3DPattern(PatternOptimization):
 
 
 class Attention3DPattern(PatternOptimization):
+    """
+    Fuses nodes into Attention from `com.microsoft` domain.
+    In progress.
+    """
+
     _prefixes_operator_name = (f"{FunctionAttentionPattern._operator_name}_to",)
 
     def __init__(self, verbose: int = 0, priority: int = 2):
