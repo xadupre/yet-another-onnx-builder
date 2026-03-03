@@ -73,7 +73,7 @@ The method returns None if no match is found or an instance of class :class:`Mat
         msg: Optional[Union[Callable[[], str], str]] = None,
     ):
 
-It may be useful which reason made a pattern matching fail.
+It may be useful to know the reason why a pattern matching failed.
 Instead of returning None, method *match* can return the following
 expression:
 
