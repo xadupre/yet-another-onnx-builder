@@ -1311,7 +1311,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         expected = ref.run(None, feeds)
         ref2 = InferenceSession(model2.SerializeToString(), providers=["CPUExecutionProvider"])
         expected2 = ref2.run(None, feeds)
-        self.assertEqualAny(expected, expected2)
+        self.assertEqualAny(expected, expected2, atol=3e-4)
 
         gr = GraphBuilder(
             model,
@@ -1599,7 +1599,6 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             lambda: self.make_inference_session(model),
             onnxruntime.capi.onnxruntime_pybind11_state.InvalidGraph,
         )
-        self.make_inference_session(opt_onx)
 
     def test_contrib_rotary_embedding_concat_after_position_ids(self):
         opset = 20

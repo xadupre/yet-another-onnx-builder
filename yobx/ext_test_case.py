@@ -1167,9 +1167,11 @@ class ExtTestCase(unittest.TestCase):
         return InferenceSession(proto.SerializeToString(), providers=providers)
 
     def make_inference_session(
-        self, onx: "onnx.ModelProto"  # noqa: F821
+        self,
+        onx: "onnx.ModelProto",  # noqa: F821
+        cpu: bool = True,
     ) -> "onnxruntime.InferenceSession":  # noqa: F821
-        return self._check_with_ort(onx)
+        return self._check_with_ort(onx, cpu=cpu)
 
     def assertRaise(self, fct: Callable, exc_type: type[Exception], msg: Optional[str] = None):
         """In the name"""
