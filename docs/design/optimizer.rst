@@ -158,7 +158,7 @@ Adding a pattern
 ================
 
 Example
-=======
+-------
 
 Simple API
 ++++++++++
