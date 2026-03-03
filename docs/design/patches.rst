@@ -54,7 +54,8 @@ shipped with this library systematically replace ``if ... : raise`` patterns
 in torch and transformers internals with ``torch._check(...)`` equivalents so
 that symbolic tracing can proceed without crashing.
 
-Other common failure modes include:
+Other common failure modes
+--------------------------
 
 * ``GuardOnDataDependentSymNode`` — a symbolic size cannot be evaluated to a
   concrete boolean at trace time, crashing broadcasting helpers such as
