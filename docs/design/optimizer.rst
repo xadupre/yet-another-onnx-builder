@@ -7,7 +7,7 @@ Pattern Optimizer
 The pattern optimizer is implemented by class :class:`GraphBuilderPatternOptimization
 <yobx.xoptim.GraphBuilderPatternOptimization>`.
 It searches for a specific sequence of nodes in the graph and
-replaces it by another one without changing the inputs or the long_outputs
+replaces it by another one without changing the inputs or the outputs
 of the graph. The goal of the optimizer is to make the whole computation
 graph more efficient. The goal of this implementation is to make this
 optimization as fast as possible. 
