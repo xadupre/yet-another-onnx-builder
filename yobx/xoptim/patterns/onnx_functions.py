@@ -335,7 +335,7 @@ class LeakyReluPattern(EasyPatternOptimization):
         pattern_nodes: Optional[List[NodeProto]] = None,
     ) -> bool:
         assert len(deleted_nodes) == 3, f"Unexpected pattern length {len(deleted_nodes)}"
-        assert deleted_nodes[2].op_type == "Where", f"-- {deleted_nodes[0]}"
+        assert deleted_nodes[2].op_type == "Where", f"-- {deleted_nodes[2]}"
         greater, mul = (
             (deleted_nodes[0], deleted_nodes[1])
             if deleted_nodes[0].op_type == "Greater"
