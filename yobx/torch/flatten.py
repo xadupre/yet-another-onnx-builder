@@ -114,7 +114,7 @@ def flattening_functions(
     all_functions: Dict[type, Optional[str]] = {}
 
     if patch_transformers:
-        from .transformers.flatten_class import (  # type: ignore[attr-defined]
+        from .in_transformers.flatten_class import (  # type: ignore[attr-defined]
             __dict__ as dtr,
             SUPPORTED_DATACLASSES,
             TRANSFORMERS_CLASSES,
@@ -180,7 +180,7 @@ def register_cache_flattening(
     transformers_version = None
     if patch_transformers:
         import transformers
-        from .transformers.flatten_class import WRONG_REGISTRATIONS
+        from .in_transformers.flatten_class import WRONG_REGISTRATIONS
 
         wrong |= WRONG_REGISTRATIONS
         transformers_version = pv.Version(transformers.__version__)

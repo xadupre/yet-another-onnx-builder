@@ -8,7 +8,7 @@ from yobx.ext_test_case import (
     requires_transformers,
 )
 from yobx.helpers import flatten_object
-from yobx.torch.transformers.cache_helper import (
+from yobx.torch.in_transformers.cache_helper import (
     make_encoder_decoder_cache,
     make_dynamic_cache,
     make_dynamic_shapes_kv_cache,

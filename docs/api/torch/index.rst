@@ -8,7 +8,7 @@ yobx.torch
     flatten
     input_observer
     torch_helper
-    transformers/index
+    in_transformers/index
 
 register_flattening_functions
 +++++++++++++++++++++++++++++

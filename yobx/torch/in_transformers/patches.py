@@ -1,3 +1,5 @@
+import sys
+import warnings
 from typing import List, Optional
 import torch
 import transformers
@@ -8,7 +10,15 @@ PATCHES: List[PatchInfo] = []
 
 
 def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
-    """Returns the list of patches for a specific model."""
+    """
+    Returns the list of patches for a specific model.
+
+    .. note::
+        The function detects that ``RotaryEmbedding.forward`` is wrapped by checking
+        if can find substring ``transformers/modeling_rope_utils.py`` in
+        ``RotaryEmbedding.forward.__wrapped__``. It does not seem to be the case
+        with Python 3.10.
+    """
     if model is None:
         return PATCHES
     patches = list(PATCHES)
@@ -16,8 +26,12 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
         if (
             hasattr(submodule.forward, "__wrapped__")
             and hasattr(submodule.forward.__wrapped__, "__code__")
-            and "transformers/modeling_rope_utils.py"
-            in str(submodule.forward.__wrapped__.__code__)
+            and (
+                "transformers/modeling_rope_utils.py"
+                in str(submodule.forward.__wrapped__.__code__)
+                or "transformers\\modeling_rope_utils.py"
+                in str(submodule.forward.__wrapped__.__code__)
+            )
         ):
             # RotaryEmbedding is wrapped and this one includes a control-flow.
             if submodule.__class__.__name__.endswith("RotaryEmbedding"):
@@ -36,6 +50,12 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
                         family="transformers",
                         _last_patched_function=transformers.modeling_rope_utils.dynamic_rope_update,
                     )
+                )
+            elif submodule.__class__.__name__.endswith("RotaryEmbedding") and sys.version_info[
+                :2
+            ] < (3, 11):
+                warnings.warn(
+                    "RotaryEmbedding.forward cannot be patched with python<3.11.", UserWarning
                 )
             else:
                 raise NotImplementedError(

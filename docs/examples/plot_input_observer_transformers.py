@@ -37,7 +37,7 @@ import torch
 from yobx.helpers import string_type
 from yobx.torch import register_flattening_functions
 from yobx.torch.input_observer import InputObserver
-from yobx.torch.transformers.cache_helper import make_dynamic_cache
+from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
 
 # %%
 # 1. Simple model - two tensor inputs

@@ -186,7 +186,7 @@ def make_dynamic_cache(
 
         import torch
         from yobx.helpers import string_type
-        from yobx.torch.transformers.cache_helper import make_dynamic_cache
+        from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
 
         n_layers = 2
         bsize, nheads, slen, dim = 2, 4, 3, 7
@@ -374,7 +374,7 @@ def make_static_cache(
 
         import torch
         from yobx.helpers import string_type
-        from yobx.torch.transformers.cache_helper import make_static_cache
+        from yobx.torch.in_transformers.cache_helper import make_static_cache
 
         n_layers = 2
         bsize, nheads, slen, dim = 2, 4, 3, 7

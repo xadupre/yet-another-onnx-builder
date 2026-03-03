@@ -121,7 +121,7 @@ select = [
 "unittests/helpers/test_dot_helper.py" = ["B904", "E501"]
 "yobx/builder/light/*" = ["PYI032", "UP037"]
 "yobx/builder/light/_op*" = ["F821"]
-"yobx/torch/transformers/models/_cached_configs.py" = ["PIE804"]
+"yobx/torch/in_transformers/models/_cached_configs.py" = ["PIE804"]
 
 [tool.mypy]
 ignore_missing_imports = true
@@ -138,7 +138,7 @@ module = [
     "yobx.reference.ops.*",
     "yobx.reference.torch_ops.*",
     "yobx.torch.tracing.*",
-    "yobx.torch.transformers._patches_model_rope_utils",
+    "yobx.torch.in_transformers._patches_model_rope_utils",
     "yobx.translate.*",
     "yobx.xshape._shape_runtime",
     "yobx.xshape._builder_runtime",
@@ -168,8 +168,8 @@ project-excludes = [
     "yobx/reference/onnxruntime_evaluator.py",
     "yobx/torch/torch_helper.py",
     "yobx/torch/tracing.py",
-    "yobx/torch/transformers/_patches_model_rope_utils.py",
-    "yobx/torch/transformers/models/_cached_configs.py",
+    "yobx/torch/in_transformers/_patches_model_rope_utils.py",
+    "yobx/torch/in_transformers/models/_cached_configs.py",
     "yobx/translate/*",
     "yobx/xshape/_builder_runtime.py",
     "yobx/xshape/_inference_runtime.py",

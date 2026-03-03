@@ -4,8 +4,8 @@ import transformers
 from transformers.modeling_outputs import BaseModelOutput
 from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.torch.flatten import register_class_flattening, unregister_class_flattening
-from yobx.torch.transformers.cache_helper import make_dynamic_cache, make_static_cache
-from yobx.torch.transformers.flatten_class import (
+from yobx.torch.in_transformers.cache_helper import make_dynamic_cache, make_static_cache
+from yobx.torch.in_transformers.flatten_class import (
     flatten_dynamic_cache,
     flatten_with_keys_dynamic_cache,
     unflatten_dynamic_cache,

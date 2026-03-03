@@ -4,7 +4,7 @@ import torch
 from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.torch import register_flattening_functions, get_tiny_model
 from yobx.torch.input_observer import InputObserver
-from yobx.torch.transformers.cache_helper import make_dynamic_cache, make_encoder_decoder_cache
+from yobx.torch.in_transformers.cache_helper import make_dynamic_cache, make_encoder_decoder_cache
 
 # from onnx_diagnostic.export.api import to_onnx
 # from onnx_diagnostic.helpers.rt_helper import onnx_generate

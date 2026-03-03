@@ -162,7 +162,7 @@ After the ``with`` block all registrations are rolled back, leaving
 ``torch.utils._pytree.SUPPORTED_NODES`` exactly as it was before.
 
 Transformers-specific registrations
-=====================================
+===================================
 
 When ``patch_transformers=True`` is passed to
 :func:`~yobx.torch.flatten.register_cache_flattening` (or
@@ -182,7 +182,7 @@ following classes from :epkg:`transformers` are registered:
 +-----------------------------+-------------------------------------------------------------+
 
 The flatten functions are defined in
-:mod:`yobx.torch.transformers.flatten_class`.  The module also patches
+:mod:`yobx.torch.in_transformers.flatten_class`.  The module also patches
 registrations that are already present but known to be incompatible with
 :func:`torch.export.export` (see ``WRONG_REGISTRATIONS``).
 
@@ -195,7 +195,7 @@ registrations that are already present but known to be incompatible with
     introduced in **transformers >= 4.50**.  On older versions of
     ``transformers`` the cache is serialized with plain ``key_<i>`` /
     ``value_<i>`` keys and no per-layer type information is preserved.  Use
-    :func:`~yobx.torch.transformers.flatten_class.flatten_dynamic_cache` only
+    :func:`~yobx.torch.in_transformers.flatten_class.flatten_dynamic_cache` only
     with ``transformers >= 4.50`` if you need to round-trip mixed layer types.
 
 A ``DynamicCache`` can contain layers of different types
@@ -218,8 +218,8 @@ correct layer class and its kwargs are recreated on unflatten:
 The following example builds a cache whose first layer is a plain
 ``DynamicLayer`` and whose second layer is a ``DynamicSlidingWindowLayer``.
 It then round-trips the cache through
-:func:`~yobx.torch.transformers.flatten_class.flatten_dynamic_cache` /
-:func:`~yobx.torch.transformers.flatten_class.unflatten_dynamic_cache` and
+:func:`~yobx.torch.in_transformers.flatten_class.flatten_dynamic_cache` /
+:func:`~yobx.torch.in_transformers.flatten_class.unflatten_dynamic_cache` and
 shows that the layer types **and** the ``sliding_window`` parameter are
 preserved:
 
@@ -229,8 +229,8 @@ preserved:
     import torch
     import transformers
     from yobx.helpers import string_type
-    from yobx.torch.transformers.cache_helper import make_dynamic_cache
-    from yobx.torch.transformers.flatten_class import (
+    from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
+    from yobx.torch.in_transformers.flatten_class import (
         flatten_dynamic_cache,
         unflatten_dynamic_cache,
     )
