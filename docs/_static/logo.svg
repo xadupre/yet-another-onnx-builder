@@ -1,17 +1,61 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
-  <!-- Background circle -->
-  <circle cx="60" cy="60" r="58" fill="#1a1a2e" stroke="#4fa3e0" stroke-width="2"/>
-  <!-- ONNX graph nodes (circles connected by lines) -->
-  <!-- Top node -->
-  <circle cx="60" cy="22" r="10" fill="#4fa3e0"/>
-  <!-- Bottom-left node -->
-  <circle cx="28" cy="78" r="10" fill="#4fa3e0"/>
-  <!-- Bottom-right node -->
-  <circle cx="92" cy="78" r="10" fill="#4fa3e0"/>
-  <!-- Edges connecting nodes -->
-  <line x1="60" y1="32" x2="38" y2="69" stroke="#4fa3e0" stroke-width="3"/>
-  <line x1="60" y1="32" x2="82" y2="69" stroke="#4fa3e0" stroke-width="3"/>
-  <line x1="38" y1="78" x2="82" y2="78" stroke="#4fa3e0" stroke-width="3"/>
-  <!-- Center label -->
-  <text x="60" y="108" font-family="monospace" font-size="14" fill="#ffffff" font-weight="bold" text-anchor="middle">yobx</text>
+  <defs>
+    <!-- Background gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a2438"/>
+      <stop offset="100%" stop-color="#0a0a14"/>
+    </radialGradient>
+    <!-- ONNX node: blue -->
+    <radialGradient id="nOnnx" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#93c5fd"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </radialGradient>
+    <!-- yobx node: amber -->
+    <radialGradient id="nYobx" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#fcd34d"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </radialGradient>
+    <!-- ORT node: green -->
+    <radialGradient id="nOrt" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#6ee7b7"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </radialGradient>
+    <!-- Edge gradients -->
+    <linearGradient id="eOY" x1="30" y1="80" x2="60" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#fcd34d"/>
+    </linearGradient>
+    <linearGradient id="eYR" x1="60" y1="28" x2="90" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fcd34d"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="eOR" x1="30" y1="80" x2="90" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <!-- yobx label gradient -->
+    <linearGradient id="lblGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#93c5fd"/>
+      <stop offset="50%" stop-color="#fcd34d"/>
+      <stop offset="100%" stop-color="#6ee7b7"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <circle cx="60" cy="60" r="58" fill="url(#bgGrad)" stroke="#3b82f6" stroke-width="1.5"/>
+  <!-- Triangle edges (behind nodes) -->
+  <!-- onnx (bottom-left) → yobx (top) -->
+  <line x1="30" y1="80" x2="60" y2="28" stroke="url(#eOY)" stroke-width="2.8" stroke-linecap="round"/>
+  <!-- yobx (top) → ort (bottom-right) -->
+  <line x1="60" y1="28" x2="90" y2="80" stroke="url(#eYR)" stroke-width="2.8" stroke-linecap="round"/>
+  <!-- onnx (bottom-left) → ort (bottom-right) -->
+  <line x1="30" y1="80" x2="90" y2="80" stroke="url(#eOR)" stroke-width="2.8" stroke-linecap="round"/>
+  <!-- Nodes -->
+  <!-- Top: yobx (amber) -->
+  <circle cx="60" cy="28" r="12" fill="url(#nYobx)" stroke="#fff" stroke-width="1.5"/>
+  <!-- Bottom-left: onnx (blue) -->
+  <circle cx="30" cy="80" r="10" fill="url(#nOnnx)" stroke="#fff" stroke-width="1.5"/>
+  <!-- Bottom-right: ort (green) -->
+  <circle cx="90" cy="80" r="10" fill="url(#nOrt)" stroke="#fff" stroke-width="1.5"/>
+  <!-- Center label: yobx (centroid of triangle at ~62.7, adjusted for text baseline) -->
+  <text x="60" y="67" font-family="monospace" font-size="13" fill="url(#lblGrad)" font-weight="bold" text-anchor="middle">yobx</text>
 </svg>
