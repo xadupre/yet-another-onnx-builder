@@ -5,48 +5,36 @@
       <stop offset="0%" stop-color="#1a2438"/>
       <stop offset="100%" stop-color="#0a0a14"/>
     </radialGradient>
-    <!-- ONNX nodes: blue / purple -->
-    <radialGradient id="nO1" cx="40%" cy="35%" r="60%">
+    <!-- ONNX node: blue -->
+    <radialGradient id="nOnnx" cx="40%" cy="35%" r="60%">
       <stop offset="0%" stop-color="#93c5fd"/>
       <stop offset="100%" stop-color="#2563eb"/>
     </radialGradient>
-    <radialGradient id="nO2" cx="40%" cy="35%" r="60%">
-      <stop offset="0%" stop-color="#c4b5fd"/>
-      <stop offset="100%" stop-color="#7c3aed"/>
-    </radialGradient>
-    <!-- Hub (yobx) node: amber -->
-    <radialGradient id="nC" cx="40%" cy="35%" r="60%">
+    <!-- yobx node: amber -->
+    <radialGradient id="nYobx" cx="40%" cy="35%" r="60%">
       <stop offset="0%" stop-color="#fcd34d"/>
       <stop offset="100%" stop-color="#d97706"/>
     </radialGradient>
-    <!-- ORT nodes: green -->
-    <radialGradient id="nR1" cx="40%" cy="35%" r="60%">
+    <!-- ORT node: green -->
+    <radialGradient id="nOrt" cx="40%" cy="35%" r="60%">
       <stop offset="0%" stop-color="#6ee7b7"/>
       <stop offset="100%" stop-color="#059669"/>
     </radialGradient>
-    <radialGradient id="nR2" cx="40%" cy="35%" r="60%">
-      <stop offset="0%" stop-color="#86efac"/>
-      <stop offset="100%" stop-color="#16a34a"/>
-    </radialGradient>
     <!-- Edge gradients -->
-    <linearGradient id="eO1C" x1="24" y1="40" x2="60" y2="56" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#93c5fd"/>
+    <linearGradient id="eOY" x1="30" y1="80" x2="60" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563eb"/>
       <stop offset="100%" stop-color="#fcd34d"/>
     </linearGradient>
-    <linearGradient id="eO2C" x1="24" y1="72" x2="60" y2="56" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#c4b5fd"/>
-      <stop offset="100%" stop-color="#fcd34d"/>
-    </linearGradient>
-    <linearGradient id="eCR1" x1="60" y1="56" x2="96" y2="40" gradientUnits="userSpaceOnUse">
+    <linearGradient id="eYR" x1="60" y1="28" x2="90" y2="80" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#fcd34d"/>
-      <stop offset="100%" stop-color="#6ee7b7"/>
+      <stop offset="100%" stop-color="#059669"/>
     </linearGradient>
-    <linearGradient id="eCR2" x1="60" y1="56" x2="96" y2="72" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#fcd34d"/>
-      <stop offset="100%" stop-color="#86efac"/>
+    <linearGradient id="eOR" x1="30" y1="80" x2="90" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#059669"/>
     </linearGradient>
     <!-- yobx label gradient -->
-    <linearGradient id="yobxGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <linearGradient id="lblGrad" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#93c5fd"/>
       <stop offset="50%" stop-color="#fcd34d"/>
       <stop offset="100%" stop-color="#6ee7b7"/>
@@ -54,25 +42,23 @@
   </defs>
   <!-- Background -->
   <circle cx="60" cy="60" r="58" fill="url(#bgGrad)" stroke="#3b82f6" stroke-width="1.5"/>
-  <!-- Subtle vertical dividers -->
-  <line x1="44" y1="14" x2="44" y2="94" stroke="#ffffff" stroke-width="0.3" stroke-opacity="0.12" stroke-dasharray="3,4"/>
-  <line x1="76" y1="14" x2="76" y2="94" stroke="#ffffff" stroke-width="0.3" stroke-opacity="0.12" stroke-dasharray="3,4"/>
-  <!-- Edges (behind nodes) -->
-  <line x1="24" y1="40" x2="60" y2="56" stroke="url(#eO1C)" stroke-width="2.5" stroke-linecap="round"/>
-  <line x1="24" y1="72" x2="60" y2="56" stroke="url(#eO2C)" stroke-width="2.5" stroke-linecap="round"/>
-  <line x1="60" y1="56" x2="96" y2="40" stroke="url(#eCR1)" stroke-width="2.5" stroke-linecap="round"/>
-  <line x1="60" y1="56" x2="96" y2="72" stroke="url(#eCR2)" stroke-width="2.5" stroke-linecap="round"/>
-  <!-- ONNX nodes (left, blue/purple) -->
-  <circle cx="24" cy="40" r="9" fill="url(#nO1)" stroke="#fff" stroke-width="1.5"/>
-  <circle cx="24" cy="72" r="9" fill="url(#nO2)" stroke="#fff" stroke-width="1.5"/>
-  <!-- Hub node (center, amber = yobx) -->
-  <circle cx="60" cy="56" r="11" fill="url(#nC)" stroke="#fff" stroke-width="1.5"/>
-  <!-- ORT nodes (right, green) -->
-  <circle cx="96" cy="40" r="9" fill="url(#nR1)" stroke="#fff" stroke-width="1.5"/>
-  <circle cx="96" cy="72" r="9" fill="url(#nR2)" stroke="#fff" stroke-width="1.5"/>
-  <!-- Cluster labels -->
-  <text x="24" y="22" font-family="monospace" font-size="7" fill="#93c5fd" text-anchor="middle" font-weight="bold">onnx</text>
-  <text x="96" y="22" font-family="monospace" font-size="7" fill="#6ee7b7" text-anchor="middle" font-weight="bold">ort</text>
-  <!-- Main label -->
-  <text x="60" y="107" font-family="monospace" font-size="13" fill="url(#yobxGrad)" font-weight="bold" text-anchor="middle">yobx</text>
+  <!-- Triangle edges (behind nodes) -->
+  <!-- onnx (bottom-left) → yobx (top) -->
+  <line x1="30" y1="80" x2="60" y2="28" stroke="url(#eOY)" stroke-width="2.8" stroke-linecap="round"/>
+  <!-- yobx (top) → ort (bottom-right) -->
+  <line x1="60" y1="28" x2="90" y2="80" stroke="url(#eYR)" stroke-width="2.8" stroke-linecap="round"/>
+  <!-- onnx (bottom-left) → ort (bottom-right) -->
+  <line x1="30" y1="80" x2="90" y2="80" stroke="url(#eOR)" stroke-width="2.8" stroke-linecap="round"/>
+  <!-- Nodes -->
+  <!-- Top: yobx (amber) -->
+  <circle cx="60" cy="28" r="12" fill="url(#nYobx)" stroke="#fff" stroke-width="1.5"/>
+  <!-- Bottom-left: onnx (blue) -->
+  <circle cx="30" cy="80" r="10" fill="url(#nOnnx)" stroke="#fff" stroke-width="1.5"/>
+  <!-- Bottom-right: ort (green) -->
+  <circle cx="90" cy="80" r="10" fill="url(#nOrt)" stroke="#fff" stroke-width="1.5"/>
+  <!-- Node labels -->
+  <text x="30" y="98" font-family="monospace" font-size="6.5" fill="#93c5fd" text-anchor="middle" font-weight="bold">onnx</text>
+  <text x="90" y="98" font-family="monospace" font-size="6.5" fill="#6ee7b7" text-anchor="middle" font-weight="bold">ort</text>
+  <!-- Center label: yobx -->
+  <text x="60" y="60" font-family="monospace" font-size="13" fill="url(#lblGrad)" font-weight="bold" text-anchor="middle">yobx</text>
 </svg>
