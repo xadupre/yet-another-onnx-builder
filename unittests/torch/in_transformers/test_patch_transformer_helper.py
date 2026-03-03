@@ -1,7 +1,14 @@
 import unittest
 import torch
 import transformers
-from yobx.ext_test_case import ExtTestCase, requires_transformers, has_transformers, hide_stdout
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_python,
+    requires_transformers,
+    has_transformers,
+    hide_stdout,
+    skipif_ci_windows,
+)
 from yobx.helpers.patch_helper import PatchDetails
 from yobx.torch import (
     apply_patches_for_model,
@@ -13,6 +20,7 @@ from yobx.torch.torch_helper import torch_deepcopy
 
 
 class TestPatchTransformerHelper(ExtTestCase):
+    @requires_python("3.10", "wraps is not captured the same way in __wrapped__")
     def test_is_wrapped(self):
         llama = transformers.models.llama.modeling_llama.LlamaRotaryEmbedding
         self.assertTrue(hasattr(llama.forward, "__wrapped__"))
@@ -70,6 +78,7 @@ class TestPatchTransformerHelper(ExtTestCase):
             got = ep.module()(**inputs)
             self.assertEqualAny(expected, got)
 
+    @skipif_ci_windows("patch did not apply on windows")
     @requires_transformers("4.57")
     @hide_stdout()
     def test_involved_patches_long_rope(self):

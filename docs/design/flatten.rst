@@ -162,7 +162,7 @@ After the ``with`` block all registrations are rolled back, leaving
 ``torch.utils._pytree.SUPPORTED_NODES`` exactly as it was before.
 
 Transformers-specific registrations
-=====================================
+===================================
 
 When ``patch_transformers=True`` is passed to
 :func:`~yobx.torch.flatten.register_cache_flattening` (or
