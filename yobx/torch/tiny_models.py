@@ -44,9 +44,29 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
     The `model_id` refers to what exists on HuggingFace.
     This functions is not expected to have fully coverage of architectures.
 
-    :param model_id: model_id
+    Supported model IDs:
+
+    * ``"arnir0/Tiny-LLM"`` — a tiny LLaMA-based causal language model with a
+      :class:`transformers.cache_utils.DynamicCache` past-key-value cache.
+
+    :param model_id: model id, see the list of supported values above
     :param config_updates: modification to add to the configuration before creating the model
     :return: the necessary information
+
+    Example::
+
+        import torch
+        from yobx.torch import get_tiny_model
+        from yobx.torch.torch_helper import torch_deepcopy
+
+        model_data = get_tiny_model("arnir0/Tiny-LLM")
+        result = model_data.model(**torch_deepcopy(model_data.export_inputs))
+        ep = torch.export.export(
+            model_data.model,
+            (),
+            kwargs=torch_deepcopy(model_data.export_inputs),
+            dynamic_shapes=model_data.dynamic_shapes,
+        )
     """
     if model_id == "arnir0/Tiny-LLM":
         import transformers
