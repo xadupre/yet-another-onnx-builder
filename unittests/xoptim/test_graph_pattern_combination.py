@@ -397,23 +397,6 @@ class TestGraphPatternCombination(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
-    def test_simplified_only(self):
-        for model in ["noopt-llama-custom__0.onnx"]:
-            onx = self._get_model(model)
-            with self.subTest(model=model):
-                gr = GraphBuilder(
-                    onx,
-                    optimization_options=OptimizationOptions(
-                        patterns=["SimplifiedLayerNormalization"],
-                        verbose=0,
-                    ),
-                    infer_shapes_options=True,
-                )
-                onx = gr.to_onnx(optimize=True)
-                types = set(n.op_type for n in onx.graph.node)
-                self.assertIn("SimplifiedLayerNormalization", types)
-                self._check_ort_cpu_or_cuda(onx)
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

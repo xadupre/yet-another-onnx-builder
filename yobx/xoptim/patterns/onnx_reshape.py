@@ -44,7 +44,7 @@ class ReshapePattern(PatternOptimization):
     ) -> List[NodeProto]:
         new_node = g.make_node(
             "Identity",
-            node.input,
+            node.input[:1],
             node.output,
             name=f"{self.__class__.__name__}--{node.name}",
             doc_string=node.doc_string,

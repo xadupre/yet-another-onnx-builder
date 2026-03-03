@@ -1127,7 +1127,8 @@ def _set_shape_type_op_any_reshape(self: ShapeBuilder, node: NodeProto):
 
     if self.has_shape(node.input[1]):
         rk = self.get_shape(node.input[1])
-        self.set_rank(k, len(rk))
+        assert len(rk) == 1, f"A shape must have a rank==1 but it is {rk}{self.get_debug_msg()}"
+        self.set_rank(k, rk[0])
         return True
     assert not self._debug_shape_missing, (
         f"Unable to compute shape for node: "

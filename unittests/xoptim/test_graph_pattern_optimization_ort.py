@@ -1801,6 +1801,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 patterns=["FunctionCosSinCache", "FunctionHalfRotaryEmbedding"], verbose=0
             ),
         )
+        print("****", gr.pretty_text())
         opt_onx = gr.to_onnx(optimize=True)
         self.dump_onnx("test_contrib_rotary_embedding_concat_after_position_ids0.onnx", opt_onx)
         ref = self.make_inference_session(model)

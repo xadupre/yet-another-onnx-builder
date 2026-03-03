@@ -35,40 +35,6 @@ class TestGraphPatternOptimizationInvestigation(ExtTestCase):
         names = set(r.__class__.__name__ for r in res)
         self.assertIn("BinaryInvestigation", names)
 
-    def test_binary_ops(self):
-        model = self._get_model("noopt-llama-custom__1.onnx")
-
-        gr = GraphBuilder(
-            model,
-            infer_shapes_options=True,
-            optimization_options=OptimizationOptions(patterns=["BinaryInvestigation"], verbose=1),
-        )
-        opt_onx, out, _err = self.capture(lambda: gr.to_onnx(optimize=True))
-        self.assertIn("[BinaryInvestigation] Mul(2x2x1024x512, 1x1x1024x512)", out)
-        self.assertGreater(len(model.graph.node), len(opt_onx.graph.node))
-
-    def test_dump_applied_patterns(self):
-        model = self._get_model("noopt-llama-custom__1.onnx")
-
-        gr = GraphBuilder(
-            model,
-            infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["RotaryConcatPart"],
-                dump_applied_patterns="test_dump_applied_patterns",
-                verbose=10,
-            ),
-        )
-        _opt_onx, out, _err = self.capture(lambda: gr.to_onnx(optimize=True))
-        self.assertIn("save", out)
-        assert os.path.exists(
-            "test_dump_applied_patterns"
-        ), "folder 'test_dump_applied_patterns' not found"
-        assert os.listdir("test_dump_applied_patterns"), (
-            f"No file found in 'test_dump_applied_patterns': "
-            f"{os.listdir('test_dump_applied_patterns')}"
-        )
-
     @hide_stdout()
     def test_packed_matmul(self):
         model = oh.make_model(

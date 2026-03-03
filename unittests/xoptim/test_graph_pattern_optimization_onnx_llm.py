@@ -829,6 +829,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         )
         return model, inputs, ds, expected
 
+    @unittest.skipIf(to_onnx is None, "not implemented yet")
     @hide_stdout()
     def test_local_attention_gqa_0(self):
         model, inputs, ds, expected = self._get_gqa_model()
@@ -858,6 +859,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         self.assertEqual(["LocalAttentionSW_to1"], [f.name for f in onx.functions])
         self.assertIn("LocalAttentionSW_to1", [n.op_type for n in onx.graph.node])
 
+    @unittest.skipIf(to_onnx is None, "not implemented yet")
     @hide_stdout()
     def test_local_attention_gqa_1(self):
         model, inputs, ds, expected = self._get_gqa_model()
@@ -887,6 +889,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         self.assertEqual(["LocalAttentionGQASW_to1"], [f.name for f in onx.functions])
         self.assertIn("LocalAttentionGQASW_to1", [n.op_type for n in onx.graph.node])
 
+    @unittest.skipIf(to_onnx is None, "not implemented yet")
     @hide_stdout()
     def test_local_attention_gqa_2(self):
         model, inputs, ds, expected = self._get_gqa_model()
@@ -1041,6 +1044,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         )
         return model, inputs, ds, expected
 
+    @unittest.skipIf(to_onnx is None, "not implemented yet")
     @ignore_warnings((UserWarning, FutureWarning))
     @hide_stdout()
     def test_attention_gqa_default_22(self):
@@ -1061,6 +1065,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         got = ort.run(None, feeds)
         self.assertEqualArray(expected, got[0], 1e-5)
 
+    @unittest.skipIf(to_onnx is None, "not implemented yet")
     @ignore_warnings((UserWarning, FutureWarning))
     @hide_stdout()
     def test_attention_gqa_default_24(self):
