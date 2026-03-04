@@ -28,7 +28,7 @@ def get_output_names(estimator: BaseEstimator) -> List[str]:
             except AttributeError:
                 pass
     if is_classifier(estimator):
-        return ["labels", "probabilities"]
+        return ["label", "probabilities"]
     if is_regressor(estimator):
         return ["predictions"]
     return ["Y"]
