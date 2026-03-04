@@ -925,13 +925,13 @@ def max_diff(
     if isinstance(expected, np.ndarray) or isinstance(got, np.ndarray):
         dev = None
         if not isinstance(expected, np.ndarray) and hasattr(expected, "numpy"):
-            from .torch.torch_helper import to_numpy
+            from ..torch.torch_helper import to_numpy
 
             dev = 0 if expected.device.type == "cpu" else 1
             expected = to_numpy(expected)
 
         if not isinstance(got, np.ndarray) and hasattr(got, "numpy"):
-            from .torch.torch_helper import to_numpy
+            from ..torch.torch_helper import to_numpy
 
             dev = 0 if got.device.type == "cpu" else 1
             got = to_numpy(got)
