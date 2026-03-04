@@ -48,6 +48,9 @@ docs = [
     "tqdm",
     "xlsxwriter",
 ]
+sklearn = [
+    "scikit-learn>=1.4",
+]
 torch = [
     "accelerate",
     "huggingface_hub",

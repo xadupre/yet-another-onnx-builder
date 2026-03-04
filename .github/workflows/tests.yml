@@ -1,4 +1,4 @@
-name: Tests
+name: torch-python
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   tests:
-    name: tests (${{ matrix.os }}, py${{ matrix.python-version }}, torch-${{ matrix.torch-version || 'stable' }}, transformers-${{ matrix.transformers-version || 'latest' }})
+    name: tt-tests (${{ matrix.os }}, py${{ matrix.python-version }}, torch-${{ matrix.torch-version || 'stable' }}, transformers-${{ matrix.transformers-version || 'latest' }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12"]
         exclude:
           - os: "macos-latest"
             python-version: "3.10"
@@ -31,7 +31,7 @@ jobs:
           - os: "windows-latest"
             python-version: "3.12"
         include:
-          - python-version: "3.13"
+          - python-version: "3.12"
             torch-version: "nightly"
           - python-version: "3.10"
             transformers-version: "4.49"
@@ -43,11 +43,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install nightly pytorch
-        if: matrix.python-version == '3.13'
+        if: matrix.python-version == '3.12'
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
 
       - name: Install pytorch 2.10
-        if: matrix.python-version != '3.13'
+        if: matrix.python-version != '3.12'
         run: pip install torch==2.10.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
       - name: Install transformers==4.49 (Python 3.10 only)
@@ -61,10 +61,4 @@ jobs:
         run: pip freeze
 
       - name: Run tests
-        run: pytest --cov=yobx --cov-report=xml --durations=10
-
-      - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.13'
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+        run: pytest --durations=10

@@ -1,0 +1,35 @@
+name: scikit-learn
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 4 * * *"
+
+jobs:
+  sklearn_tests:
+    name: skl-tests (ubuntu-latest, py3.12, sklearn-${{ matrix.sklearn-version }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        sklearn-version: ["1.4", "1.8"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,sklearn]"
+
+      - name: Install scikit-learn==${{ matrix.sklearn-version }}
+        run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*" && pip freeze
+
+      - name: Run sklearn tests
+        run: pytest unittests/sklearn --durations=10

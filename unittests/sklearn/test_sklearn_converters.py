@@ -146,6 +146,103 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(pipe.predict(X), label)
         self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
+    def test_decision_tree_classifier_binary(self):
+        from sklearn.tree import DecisionTreeClassifier
+        from yobx.sklearn import to_onnx
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        dt = DecisionTreeClassifier(random_state=0)
+        dt.fit(X, y)
+
+        onx = to_onnx(dt, (X,))
+
+        # Check graph structure
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsembleClassifier", op_types)
+
+        # Check outputs
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(dt.predict(X), label)
+        self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+    def test_decision_tree_classifier_multiclass(self):
+        from sklearn.tree import DecisionTreeClassifier
+        from yobx.sklearn import to_onnx
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1, 2, 2])
+        dt = DecisionTreeClassifier(random_state=0)
+        dt.fit(X, y)
+
+        onx = to_onnx(dt, (X,))
+
+        # Check graph structure
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsembleClassifier", op_types)
+
+        # Check outputs
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(dt.predict(X), label)
+        self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+    def test_decision_tree_regressor(self):
+        from sklearn.tree import DecisionTreeRegressor
+        from yobx.sklearn import to_onnx
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
+        dt = DecisionTreeRegressor(random_state=0)
+        dt.fit(X, y)
+
+        onx = to_onnx(dt, (X,))
+
+        # Check graph structure
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsembleRegressor", op_types)
+
+        # Check outputs
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        self.assertEqualArray(
+            dt.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
+        )
+
+    def test_pipeline_decision_tree_classifier(self):
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.tree import DecisionTreeClassifier
+        from sklearn.pipeline import Pipeline
+        from yobx.sklearn import to_onnx
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        pipe = Pipeline([("scaler", StandardScaler()), ("clf", DecisionTreeClassifier(random_state=0))])
+        pipe.fit(X, y)
+
+        onx = to_onnx(pipe, (X,))
+
+        # Check graph contains nodes from both steps
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Sub", op_types)
+        self.assertIn("Div", op_types)
+        self.assertIn("TreeEnsembleClassifier", op_types)
+
+        # Check outputs
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(pipe.predict(X), label)
+        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
