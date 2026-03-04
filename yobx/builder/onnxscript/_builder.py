@@ -13,7 +13,7 @@ Example::
 
     import numpy as np
     from onnx import TensorProto
-    from yobx.builder.onnxscript_bridge import OnnxScriptGraphBuilder
+    from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 
     gr = OnnxScriptGraphBuilder({"": 18})
     gr.make_tensor_input("X", TensorProto.FLOAT, (None, 4))

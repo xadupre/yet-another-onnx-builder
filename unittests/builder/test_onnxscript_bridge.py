@@ -1,5 +1,5 @@
 """
-Unit tests for :class:`yobx.builder.onnxscript_bridge.OnnxScriptGraphBuilder`.
+Unit tests for :class:`yobx.builder.onnxscript.OnnxScriptGraphBuilder`.
 """
 
 import unittest
@@ -19,7 +19,7 @@ class TestOnnxScriptBridge(ExtTestCase):
     # ------------------------------------------------------------------
 
     def _make_builder(self, opset=18):
-        from yobx.builder.onnxscript_bridge import OnnxScriptGraphBuilder
+        from yobx.builder.onnxscript._builder import OnnxScriptGraphBuilder
 
         return OnnxScriptGraphBuilder(opset)
 
@@ -28,13 +28,13 @@ class TestOnnxScriptBridge(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_construction_with_int_opset(self):
-        from yobx.builder.onnxscript_bridge import OnnxScriptGraphBuilder
+        from yobx.builder.onnxscript._builder import OnnxScriptGraphBuilder
 
         gr = OnnxScriptGraphBuilder(18)
         self.assertEqual(gr.opsets, {"": 18})
 
     def test_construction_with_dict_opset(self):
-        from yobx.builder.onnxscript_bridge import OnnxScriptGraphBuilder
+        from yobx.builder.onnxscript._builder import OnnxScriptGraphBuilder
 
         gr = OnnxScriptGraphBuilder({"": 18, "com.microsoft": 1})
         self.assertEqual(gr.opsets[""], 18)
@@ -304,7 +304,7 @@ class TestOnnxScriptBridge(ExtTestCase):
                 )
 
     def test_to_onnx_custom_ir_version_at_construction(self):
-        from yobx.builder.onnxscript_bridge import OnnxScriptGraphBuilder
+        from yobx.builder.onnxscript._builder import OnnxScriptGraphBuilder
 
         gr = OnnxScriptGraphBuilder(18, ir_version=7)
         gr.make_tensor_input("X", TensorProto.FLOAT, (3,))

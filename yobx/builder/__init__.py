@@ -3,7 +3,7 @@ Builder sub-package.
 """
 
 try:
-    from .onnxscript_bridge import OnnxScriptGraphBuilder
+    from .onnxscript import OnnxScriptGraphBuilder
 
     __all__ = ["OnnxScriptGraphBuilder"]
 except ImportError:
