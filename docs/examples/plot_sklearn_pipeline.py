@@ -141,26 +141,42 @@ assert np.allclose(proba_mc_sk, proba_mc_onnx, atol=1e-5), "Multiclass proba mis
 print("Multiclass predictions match ✓")
 
 # %%
-# 5. Visualize probability comparison
-# -------------------------------------
+# 5. Visualize the ONNX graph
+# ----------------------------
 #
-# The bar chart below shows the predicted probability for class 0 on the
-# first five test samples, comparing the scikit-learn and ONNX outputs.
+# :func:`to_dot <yobx.helpers.dot_helper.to_dot>` converts the
+# :class:`onnx.ModelProto` into a DOT string that can be rendered by
+# Graphviz.  The graph shows every ONNX node produced by the converter,
+# with dtype/shape annotations on each edge.
 
-import matplotlib.pyplot as plt  # noqa: E402
+from yobx.helpers.dot_helper import to_dot  # noqa: E402
 
-n_show = 5
-x_pos = np.arange(n_show)
-width = 0.35
+dot_src = to_dot(onx)
+print(dot_src)
 
-fig, ax = plt.subplots(figsize=(7, 4))
-ax.bar(x_pos - width / 2, proba_sk[:n_show, 0], width, label="sklearn", color="#4c72b0")
-ax.bar(x_pos + width / 2, proba_onnx[:n_show, 0], width, label="ONNX", color="#dd8452", alpha=0.8)
-ax.set_xticks(x_pos)
-ax.set_xticklabels([f"sample {i}" for i in range(n_show)])
-ax.set_ylabel("P(class=0)")
-ax.set_title("Predicted probability for class 0 — sklearn vs ONNX")
-ax.legend()
-ax.set_ylim(0, 1.1)
-plt.tight_layout()
-plt.show()
+# %%
+# Display the graph
+# ------------------
+#
+# The DOT source produced above describes the following graph.
+#
+# .. gdot::
+#     :script: DOT-SECTION
+#
+#     import numpy as np
+#     from sklearn.linear_model import LogisticRegression
+#     from sklearn.pipeline import Pipeline
+#     from sklearn.preprocessing import StandardScaler
+#     from yobx.sklearn import to_onnx
+#     from yobx.helpers.dot_helper import to_dot
+#
+#     rng = np.random.default_rng(0)
+#     X_train = rng.standard_normal((80, 4)).astype(np.float32)
+#     y_train = (X_train[:, 0] + X_train[:, 1] > 0).astype(int)
+#     pipe = Pipeline(
+#         [("scaler", StandardScaler()), ("clf", LogisticRegression())]
+#     )
+#     pipe.fit(X_train, y_train)
+#     onx = to_onnx(pipe, (X_train[:1],))
+#     dot = to_dot(onx)
+#     print("DOT-SECTION", dot)
