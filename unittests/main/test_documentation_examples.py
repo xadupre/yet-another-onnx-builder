@@ -5,7 +5,7 @@ import importlib.util
 import subprocess
 import time
 from yobx import __file__ as yobx_file
-from yobx.ext_test_case import ExtTestCase, is_windows, ignore_errors, has_transformers
+from yobx.ext_test_case import ExtTestCase, is_windows, ignore_errors, has_transformers, has_torch
 
 VERBOSE = 0
 ROOT = os.path.realpath(os.path.abspath(os.path.join(yobx_file, "..", "..")))
@@ -85,6 +85,21 @@ class TestDocumentationExamples(ExtTestCase):
 
             if not reason and sys.platform.startswith(("win", "darwin")):
                 reason = "CI complains on Windows"
+
+            if (
+                not reason
+                and not has_torch()
+                and name
+                in {
+                    "plot_evaluator_comparison.py",
+                    "plot_flattening.py",
+                    "plot_input_observer.py",
+                    "plot_mini_onnx_builder.py",
+                    "plot_input_observer_transformers.py",
+                    "plot_patch_model.py",
+                }
+            ):
+                reason = "torch not installed"
 
             if reason:
 

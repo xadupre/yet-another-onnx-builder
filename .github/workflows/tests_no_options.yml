@@ -1,4 +1,4 @@
-name: No Torch Tests
+name: Tests with no options (no torch, ...)
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   no_torch_tests:
-    name: no torch tests (${{ matrix.os }}, py${{ matrix.python-version }})
+    name: no options tests (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest"]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
@@ -25,7 +25,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install package
-        run: pip install -e .
+        run: pip install -e .[dev]
 
       - name: Install pytest
         run: pip install pytest
@@ -37,11 +37,9 @@ jobs:
         run: |
           pytest --durations=10 \
             --ignore=unittests/torch \
-            --ignore=unittests/helpers/test_mini_onnx_builder.py \
             --ignore=unittests/helpers/test_patch_helper.py \
-            --ignore=unittests/reference/test__inference_session.py \
+            --ignore=unittests/reference/test__inference_session_torch.py \
             --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
             --ignore=unittests/reference/test_onnxruntime_evaluator.py \
-            --ignore=unittests/reference/test_runtime_info.py \
             --ignore=unittests/reference/test_torch_reference_evaluator.py \
             --ignore=unittests/xoptim/test_untrained_models.py

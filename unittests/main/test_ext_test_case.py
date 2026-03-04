@@ -17,7 +17,6 @@ from yobx.ext_test_case import (
     requires_onnx,
     requires_onnxruntime,
     requires_python,
-    requires_sklearn,
     has_onnxruntime,
     has_onnxruntime_training,
     has_onnxruntime_genai,
@@ -171,12 +170,6 @@ class TestRequiresFunctions(ExtTestCase):
 
     def test_requires_onnxruntime_passes_for_low_version(self):
         dec = requires_onnxruntime("1.0.0")
-        self.assertTrue(callable(dec))
-        sentinel = object()
-        self.assertIs(dec(sentinel), sentinel)
-
-    def test_requires_sklearn_passes_for_low_version(self):
-        dec = requires_sklearn("1.0.0")
         self.assertTrue(callable(dec))
         sentinel = object()
         self.assertIs(dec(sentinel), sentinel)

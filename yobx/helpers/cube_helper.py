@@ -261,9 +261,12 @@ class CubePlot:
     @classmethod
     def _make_loop(cls, ensemble, verbose):
         if verbose:  # pragma: no cover
-            from tqdm import tqdm
+            try:
+                from tqdm import tqdm
 
-            loop = tqdm(ensemble)
+                loop = tqdm(ensemble)
+            except ImportError:
+                loop = ensemble
         else:
             loop = ensemble
         return loop

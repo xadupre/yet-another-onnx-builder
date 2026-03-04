@@ -5,7 +5,7 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from yobx.ext_test_case import ExtTestCase, requires_torch
+from yobx.ext_test_case import ExtTestCase, requires_torch, requires_onnxscript
 
 TFLOAT = onnx.TensorProto.FLOAT
 
@@ -278,6 +278,7 @@ class TestDeserializeGraph(ExtTestCase):
         c.large_initializers = large_initializers or {}
         return c
 
+    @requires_onnxscript()
     def test_simple_graph(self):
         """_deserialize_graph on a graph with inputs, output, and one node but no initializers."""
         import onnx_ir
@@ -304,6 +305,7 @@ class TestDeserializeGraph(ExtTestCase):
         self.assertEqual(len(g.initializers), 0)
         self.assertEqual(len(list(g)), 1)
 
+    @requires_onnxscript()
     def test_graph_with_inline_initializer(self):
         """_deserialize_graph deserialises a regular (non-external) initializer correctly."""
         import onnx_ir
@@ -330,6 +332,7 @@ class TestDeserializeGraph(ExtTestCase):
             initializer_value.const_value.numpy(), np.ones((2, 3), dtype=np.float32)
         )
 
+    @requires_onnxscript()
     def test_graph_with_external_numpy_initializer(self):
         """_deserialize_graph loads an external initializer backed by a numpy array."""
         import onnx_ir
@@ -354,6 +357,7 @@ class TestDeserializeGraph(ExtTestCase):
         np.testing.assert_array_equal(g.initializers["W"].const_value.numpy(), data)
 
     @requires_torch()
+    @requires_onnxscript()
     def test_graph_with_external_torch_initializer(self):
         """_deserialize_graph loads an external initializer backed by a torch tensor."""
         import torch

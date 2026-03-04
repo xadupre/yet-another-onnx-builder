@@ -1548,8 +1548,9 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                     oh.make_node("Cos", ["xc"], ["xcc"]),
                     oh.make_node("Cast", ["zero"], ["zeroc"], to=TensorProto.BFLOAT16),
                     oh.make_node("Cast", ["one"], ["onec"], to=TensorProto.BFLOAT16),
-                    oh.make_node("Cast", ["five"], ["fivec"], to=TensorProto.BFLOAT16),
-                    oh.make_node("Range", ["zeroc", "onec", "fivec"], ["y"]),
+                    oh.make_node("Size", ["X"], ["size"]),
+                    oh.make_node("Cast", ["size"], ["sizec"], to=TensorProto.BFLOAT16),
+                    oh.make_node("Range", ["zeroc", "onec", "sizec"], ["y"]),
                     oh.make_node("Add", ["xcc", "xcs"], ["xccc"]),
                     oh.make_node("Add", ["xccc", "y"], ["yc"]),
                     oh.make_node("Cast", ["yc"], ["Y"], to=TensorProto.FLOAT),
@@ -1560,13 +1561,12 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 [
                     onh.from_array(np.array(0, dtype=np.int64), name="zero"),
                     onh.from_array(np.array(1, dtype=np.int64), name="one"),
-                    onh.from_array(np.array(5, dtype=np.int64), name="five"),
                 ],
             ),
             opset_imports=[oh.make_operatorsetid("", opset)],
             ir_version=10,
         )
-
+        self.assertIn("Range", [n.op_type for n in model.graph.node])
         gr = GraphBuilder(
             model,
             infer_shapes_options=InferShapesOptions.BUILDER,
@@ -1575,14 +1575,18 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
+        self.assertIn("Range", [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(
             [
+                "Size",
                 "Cast",
                 "Cast",
                 "Sin",
                 "Cast",
                 "Cast",
                 "Cos",
+                "Cast",
+                "Cast",
                 "Cast",
                 "Range",
                 "Cast",

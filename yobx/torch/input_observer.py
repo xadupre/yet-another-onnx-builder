@@ -1205,9 +1205,12 @@ class InputObserver:
         assert self.info.latencies is not None
         io_sets = list(zip(self.info.inputs, self.info.flat_outputs, self.info.latencies))
         if progress_bar:
-            from tqdm import tqdm
+            try:
+                from tqdm import tqdm
 
-            loop = tqdm(io_sets)
+                loop = tqdm(io_sets)
+            except ImportError:
+                loop = io_sets
         else:
             loop = io_sets
         lhist = list(hist)

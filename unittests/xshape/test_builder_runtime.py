@@ -1,20 +1,15 @@
 import unittest
 import numpy as np
 import onnx.helper as oh
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.xshape import BasicShapeBuilder
 
 
 class _TorchShapeBuilder(BasicShapeBuilder):
     """BasicShapeBuilder extended with a ``torch`` property for runtime tests."""
 
-    @property
-    def torch(self):
-        import torch
-
-        return torch
-
     def make_torch_tensor_from_np_array(self, x):
+        assert self._has_torch, "torch is not available"
         import torch
 
         return torch.from_numpy(x)
@@ -106,6 +101,7 @@ class TestApplyTranspose(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (4, 2, 3))
 
+    @requires_torch()
     def test_transpose_torch(self):
         import torch
 
@@ -128,6 +124,7 @@ class TestApplyExpand(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].shape, (2, 3))
 
+    @requires_torch()
     def test_expand_torch(self):
         import torch
 
@@ -174,6 +171,7 @@ class TestApplySqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].shape, (3, 5))
 
+    @requires_torch()
     def test_squeeze_torch_no_axis(self):
         import torch
 
@@ -183,6 +181,7 @@ class TestApplySqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (3, 5))
 
+    @requires_torch()
     def test_squeeze_torch_with_axis_scalar(self):
         import torch
 
@@ -193,6 +192,7 @@ class TestApplySqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (3, 5))
 
+    @requires_torch()
     def test_squeeze_torch_with_axis_array(self):
         import torch
 
@@ -232,6 +232,7 @@ class TestApplyUnsqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].shape, (1, 2, 3, 1))
 
+    @requires_torch()
     def test_unsqueeze_torch_scalar_axis(self):
         import torch
 
@@ -242,6 +243,7 @@ class TestApplyUnsqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (1, 2, 3))
 
+    @requires_torch()
     def test_unsqueeze_torch_single_axis(self):
         import torch
 
@@ -252,6 +254,7 @@ class TestApplyUnsqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (2, 1, 3))
 
+    @requires_torch()
     def test_unsqueeze_torch_multiple_axes(self):
         import torch
 
@@ -274,6 +277,7 @@ class TestApplyCast(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (2, 3))
 
+    @requires_torch()
     def test_cast_torch_to_float32(self):
         import torch
 
@@ -284,6 +288,7 @@ class TestApplyCast(ExtTestCase):
         self.assertEqual(result[0].dtype, torch.float32)
         self.assertEqual(tuple(result[0].shape), (2, 3))
 
+    @requires_torch()
     def test_cast_torch_to_int64(self):
         import torch
 
@@ -322,6 +327,7 @@ class TestApplyShapeOnShape(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].tolist()), (3, 4))
 
+    @requires_torch()
     def test_result_dtype_is_int64(self):
         import torch
 
@@ -341,6 +347,7 @@ class TestApplyShape(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].tolist()), (2, 3, 4))
 
+    @requires_torch()
     def test_shape_of_torch_tensor(self):
         import torch
 
@@ -392,6 +399,7 @@ class TestApplyUnaryFunction(ExtTestCase):
 
     # --- torch path ---
 
+    @requires_torch()
     def test_reciprocal_torch(self):
         import torch
 
@@ -401,6 +409,7 @@ class TestApplyUnaryFunction(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqualArray(result[0].numpy(), np.array([0.5, 0.25], dtype=np.float32))
 
+    @requires_torch()
     def test_unknown_op_torch_raises(self):
         import torch
 
@@ -415,6 +424,7 @@ class TestApplyUnaryFunction(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqualArray(result[0], np.array([2.0, 3.0, 4.0], dtype=np.float32))
 
+    @requires_torch()
     def test_sqrt_torch(self):
         import torch
 
@@ -424,6 +434,7 @@ class TestApplyUnaryFunction(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqualArray(result[0].numpy(), np.array([2.0, 3.0, 4.0], dtype=np.float32))
 
+    @requires_torch()
     def test_exp_torch(self):
         import torch
 
@@ -437,9 +448,6 @@ class TestApplyUnaryFunction(ExtTestCase):
 class TestApplyBinaryOp(ExtTestCase):
     @classmethod
     def setUpClass(cls):
-        import torch
-
-        cls.torch = torch
         cls.b = _TorchShapeBuilder()
 
     def _make_node(self, op_type, input_names=("a", "b"), output_names=("c",)):
@@ -489,42 +497,57 @@ class TestApplyBinaryOp(ExtTestCase):
 
     # --- torch tests ---
 
+    @requires_torch()
     def test_add_torch(self):
+        import torch
+
         node = self._make_node("Add")
-        a = self.torch.tensor([1.0, 2.0])
-        b = self.torch.tensor([3.0, 4.0])
+        a = torch.tensor([1.0, 2.0])
+        b = torch.tensor([3.0, 4.0])
         result = self.b._apply_binary_op(node, {"a": a, "b": b})
         self.assertEqual(len(result), 1)
         self.assertEqual(list(result[0].tolist()), [4.0, 6.0])
 
+    @requires_torch()
     def test_mul_torch(self):
+        import torch
+
         node = self._make_node("Mul")
-        a = self.torch.tensor([2.0, 3.0])
-        b = self.torch.tensor([4.0, 5.0])
+        a = torch.tensor([2.0, 3.0])
+        b = torch.tensor([4.0, 5.0])
         result = self.b._apply_binary_op(node, {"a": a, "b": b})
         self.assertEqual(len(result), 1)
         self.assertEqual(list(result[0].tolist()), [8.0, 15.0])
 
+    @requires_torch()
     def test_sub_torch(self):
+        import torch
+
         node = self._make_node("Sub")
-        a = self.torch.tensor([5.0, 7.0])
-        b = self.torch.tensor([3.0, 2.0])
+        a = torch.tensor([5.0, 7.0])
+        b = torch.tensor([3.0, 2.0])
         result = self.b._apply_binary_op(node, {"a": a, "b": b})
         self.assertEqual(len(result), 1)
         self.assertEqual(list(result[0].tolist()), [2.0, 5.0])
 
+    @requires_torch()
     def test_div_torch(self):
+        import torch
+
         node = self._make_node("Div")
-        a = self.torch.tensor([6.0, 9.0])
-        b = self.torch.tensor([2.0, 3.0])
+        a = torch.tensor([6.0, 9.0])
+        b = torch.tensor([2.0, 3.0])
         result = self.b._apply_binary_op(node, {"a": a, "b": b})
         self.assertEqual(len(result), 1)
         self.assertEqual(list(result[0].tolist()), [3.0, 3.0])
 
+    @requires_torch()
     def test_pow_torch(self):
+        import torch
+
         node = self._make_node("Pow")
-        a = self.torch.tensor([2.0, 3.0])
-        b = self.torch.tensor([3.0, 2.0])
+        a = torch.tensor([2.0, 3.0])
+        b = torch.tensor([3.0, 2.0])
         result = self.b._apply_binary_op(node, {"a": a, "b": b})
         self.assertEqual(len(result), 1)
         self.assertEqual(list(result[0].tolist()), [8.0, 9.0])
@@ -630,6 +653,7 @@ class TestApplySlice(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (3, 5))
 
+    @requires_torch()
     def test_slice_torch_tensor_input(self):
         import torch
 
@@ -684,6 +708,7 @@ class TestApplyWhere(ExtTestCase):
         expected = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
         self.assertEqualArray(expected, result[0])
 
+    @requires_torch()
     def test_where_torch_tensors(self):
         import torch
 
@@ -696,6 +721,7 @@ class TestApplyWhere(ExtTestCase):
         expected = torch.tensor([1.0, 20.0, 3.0])
         self.assertEqualArray(expected, result[0])
 
+    @requires_torch()
     def test_where_numpy_inputs_with_torch(self):
         import torch
 
@@ -757,6 +783,7 @@ class TestApplyTrilu(ExtTestCase):
         self.assertEqual(len(result), 1)
         np.testing.assert_array_equal(result[0], np.tril(x, 1))
 
+    @requires_torch()
     def test_torch_upper_with_k0(self):
         import torch
 
@@ -770,6 +797,7 @@ class TestApplyTrilu(ExtTestCase):
         self.assertEqual(tuple(result[0].shape), (3, 3))
         self.assertTrue(torch.equal(result[0], expected))
 
+    @requires_torch()
     def test_torch_lower_with_k0(self):
         import torch
 

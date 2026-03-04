@@ -199,7 +199,8 @@ def string_type(
                     rows.append(f"{k}:DYN({v})")
                 else:
                     rows.append(f"{k}:{string_type(v)}")
-            return f"{{{','.join(rows)}}}"
+            res = f"{{{','.join(rows)}}}"
+            return res.replace("_DimHint(type:AUTO,_factory:bool)", "AUTO")
 
         kws = dict(
             with_shape=with_shape,
@@ -209,6 +210,7 @@ def string_type(
             limit=limit,
         )
         s = ",".join(f"{kv[0]}:{string_type(kv[1],**kws)}" for kv in obj.items())  # type: ignore[arg-type]
+        s = s.replace("_DimHint(type:AUTO,_factory:bool)", "AUTO")
         if all(isinstance(k, int) for k in obj):
             return f"{{{s}}}"
         return f"dict({s})"
@@ -235,30 +237,6 @@ def string_type(
             return f"A{i}r{len(obj.shape)}"
         return f"A{i}s{'x'.join(map(str, obj.shape))}"
 
-    import torch
-
-    # Dim, SymInt
-    if isinstance(obj, torch.export.dynamic_shapes._DerivedDim):
-        return "DerivedDim"
-    if isinstance(obj, torch.export.dynamic_shapes._Dim):
-        return f"Dim({obj.__name__})"
-    if isinstance(obj, torch.SymInt):
-        return "SymInt"
-    if isinstance(obj, torch.SymFloat):
-        return "SymFloat"
-
-    if isinstance(obj, torch.export.dynamic_shapes._DimHint):
-        cl = (
-            torch.export.dynamic_shapes._DimHintType
-            if hasattr(torch.export.dynamic_shapes, "_DimHintType")
-            else torch.export.Dim
-        )
-        if obj in (torch.export.Dim.DYNAMIC, cl.DYNAMIC):
-            return "DYNAMIC"
-        if obj in (torch.export.Dim.AUTO, cl.AUTO):
-            return "AUTO"
-        return str(obj).replace("DimHint(DYNAMIC)", "DYNAMIC").replace("DimHint(AUTO)", "AUTO")
-
     if isinstance(obj, bool):
         if with_min_max:
             return f"bool={obj}"
@@ -276,6 +254,79 @@ def string_type(
     if isinstance(obj, slice):
         return "slice"
 
+    try:
+        import torch
+
+        has_torch = True
+    except ImportError:
+        has_torch = False
+
+    has_torch = has_torch and hasattr(torch, "__version__")
+    if has_torch:
+        # Dim, SymInt
+        if isinstance(obj, torch.export.dynamic_shapes._DerivedDim):
+            return "DerivedDim"
+        if isinstance(obj, torch.export.dynamic_shapes._Dim):
+            return f"Dim({obj.__name__})"
+        if isinstance(obj, torch.SymInt):
+            return "SymInt"
+        if isinstance(obj, torch.SymFloat):
+            return "SymFloat"
+
+        if isinstance(obj, torch.export.dynamic_shapes._DimHint):
+            cl = (
+                torch.export.dynamic_shapes._DimHintType
+                if hasattr(torch.export.dynamic_shapes, "_DimHintType")
+                else torch.export.Dim
+            )
+            if obj in (torch.export.Dim.DYNAMIC, cl.DYNAMIC):
+                return "DYNAMIC"
+            if obj in (torch.export.Dim.AUTO, cl.AUTO):
+                return "AUTO"
+            return (
+                str(obj).replace("DimHint(DYNAMIC)", "DYNAMIC").replace("DimHint(AUTO)", "AUTO")
+            )
+
+        if obj.__class__.__name__ == "_DimHintType":
+            if obj in (torch.export.Dim.DYNAMIC, obj.__class__.DYNAMIC):
+                return "DYNAMIC"
+            if obj in (torch.export.Dim.AUTO, obj.__class__.AUTO):
+                return "AUTO"
+            return (
+                str(obj).replace("DimHint(DYNAMIC)", "DYNAMIC").replace("DimHint(AUTO)", "AUTO")
+            )
+
+        # Tensors
+        if isinstance(obj, torch._subclasses.fake_tensor.FakeTensor):
+            return _string_tensor(obj, "F", with_shape, with_device)
+
+        if isinstance(obj, torch.Tensor):
+            from ..torch.torch_helper import torch_dtype_to_onnx_dtype
+
+            if with_min_max:
+                s = string_type(obj, with_shape=with_shape, with_device=with_device)
+                if len(obj.shape) == 0:
+                    return f"{s}={obj}"
+                if obj.numel() == 0:
+                    return f"{s}[empty]"
+                n_nan = obj.reshape((-1,)).isnan().to(int).sum()
+                if n_nan > 0:
+                    nob = obj.reshape((-1,))
+                    nob = nob[~nob.isnan()]
+                    if obj.dtype in {torch.complex64, torch.complex128}:
+                        return (
+                            f"{s}[{nob.abs().min()},{nob.abs().max():A{nob.mean()}N{n_nan}nans}]"
+                        )
+                    return f"{s}[{obj.min()},{obj.max()}:A{obj.to(float).mean()}N{n_nan}nans]"
+                if obj.dtype in {torch.complex64, torch.complex128}:
+                    return f"{s}[{obj.abs().min()},{obj.abs().max()}:A{obj.abs().mean()}]"
+                return f"{s}[{obj.min()},{obj.max()}:A{obj.to(float).mean()}]"
+            i = torch_dtype_to_onnx_dtype(obj.dtype)
+            prefix = ("G" if obj.get_device() >= 0 else "C") if with_device else ""
+            if not with_shape:
+                return f"{prefix}T{i}r{len(obj.shape)}"
+            return f"{prefix}T{i}s{'x'.join(map(str, obj.shape))}"
+
     if is_dataclass(obj):
         # That includes torch.export.Dim.AUTO, torch.export.Dim.DYNAMIC so they need to be
         # handled before that.
@@ -290,35 +341,6 @@ def string_type(
             limit=limit,
         )
         return f"{obj.__class__.__name__}{s[4:]}"
-
-    # Tensors
-    if isinstance(obj, torch._subclasses.fake_tensor.FakeTensor):
-        return _string_tensor(obj, "F", with_shape, with_device)
-
-    if isinstance(obj, torch.Tensor):
-        from ..torch.torch_helper import torch_dtype_to_onnx_dtype
-
-        if with_min_max:
-            s = string_type(obj, with_shape=with_shape, with_device=with_device)
-            if len(obj.shape) == 0:
-                return f"{s}={obj}"
-            if obj.numel() == 0:
-                return f"{s}[empty]"
-            n_nan = obj.reshape((-1,)).isnan().to(int).sum()
-            if n_nan > 0:
-                nob = obj.reshape((-1,))
-                nob = nob[~nob.isnan()]
-                if obj.dtype in {torch.complex64, torch.complex128}:
-                    return f"{s}[{nob.abs().min()},{nob.abs().max():A{nob.mean()}N{n_nan}nans}]"
-                return f"{s}[{obj.min()},{obj.max()}:A{obj.to(float).mean()}N{n_nan}nans]"
-            if obj.dtype in {torch.complex64, torch.complex128}:
-                return f"{s}[{obj.abs().min()},{obj.abs().max()}:A{obj.abs().mean()}]"
-            return f"{s}[{obj.min()},{obj.max()}:A{obj.to(float).mean()}]"
-        i = torch_dtype_to_onnx_dtype(obj.dtype)
-        prefix = ("G" if obj.get_device() >= 0 else "C") if with_device else ""
-        if not with_shape:
-            return f"{prefix}T{i}r{len(obj.shape)}"
-        return f"{prefix}T{i}s{'x'.join(map(str, obj.shape))}"
 
     if obj.__class__.__name__ == "OrtValue":
         if not obj.has_value():
@@ -428,20 +450,21 @@ def string_type(
             f"cross_attention_cache={cross})"
         )
 
-    import torch.utils._pytree as pytree
+    if has_torch:
+        import torch.utils._pytree as pytree
 
-    if obj.__class__ in pytree.SUPPORTED_NODES:
-        from ..torch.in_transformers.cache_helper import flatten_unflatten_for_dynamic_shapes
+        if obj.__class__ in pytree.SUPPORTED_NODES:
+            from ..torch.in_transformers.cache_helper import flatten_unflatten_for_dynamic_shapes
 
-        args = flatten_unflatten_for_dynamic_shapes(obj)
-        att = string_type(
-            args,
-            with_shape=with_shape,
-            with_min_max=with_min_max,
-            with_device=with_device,
-            limit=limit,
-        )
-        return f"{obj.__class__.__name__}[serialized]({att})"
+            args = flatten_unflatten_for_dynamic_shapes(obj)
+            att = string_type(
+                args,
+                with_shape=with_shape,
+                with_min_max=with_min_max,
+                with_device=with_device,
+                limit=limit,
+            )
+            return f"{obj.__class__.__name__}[serialized]({att})"
 
     if type(obj).__name__ == "Node" and hasattr(obj, "meta"):
         # torch.fx.node.Node
@@ -538,20 +561,21 @@ def string_type(
         )
         return f"{obj.__class__.__name__}(keys={s1}, values={s2})"
 
-    if isinstance(obj, torch.nn.Module):
-        return f"{obj.__class__.__name__}(...)"
+    if has_torch:
+        if isinstance(obj, torch.nn.Module):
+            return f"{obj.__class__.__name__}(...)"
 
-    if isinstance(obj, (torch.device, torch.dtype, torch.memory_format, torch.layout)):
-        return f"{obj.__class__.__name__}({obj})"
+        if isinstance(obj, (torch.device, torch.dtype, torch.memory_format, torch.layout)):
+            return f"{obj.__class__.__name__}({obj})"
 
-    if isinstance(  # TreeSpec, MappingKey, SequenceKey
-        obj,
-        (pytree.TreeSpec, pytree.MappingKey, pytree.SequenceKey),
-    ):
-        return repr(obj).replace(" ", "").replace("\n", " ")
+        if isinstance(  # TreeSpec, MappingKey, SequenceKey
+            obj,
+            (pytree.TreeSpec, pytree.MappingKey, pytree.SequenceKey),
+        ):
+            return repr(obj).replace(" ", "").replace("\n", " ")
 
-    if isinstance(obj, torch.fx.proxy.Proxy):
-        return repr(obj)
+        if isinstance(obj, torch.fx.proxy.Proxy):
+            return repr(obj)
 
     if ignore:
         return f"{obj.__class__.__name__}(...)"
@@ -586,7 +610,7 @@ def string_type(
         )
         return f"Chat({msg})"
 
-    raise TypeError(f"Unsupported type {type(obj).__name__!r} - {type(obj)}")
+    raise TypeError(f"Unsupported type {type(obj).__name__!r} - {type(obj)} ({has_torch=})")
 
 
 def string_signature(sig: Any) -> str:
@@ -924,15 +948,14 @@ def max_diff(
 
     if isinstance(expected, np.ndarray) or isinstance(got, np.ndarray):
         dev = None
-        import torch
-
-        if isinstance(expected, torch.Tensor):
-            from .torch.torch_helper import to_numpy
+        if not isinstance(expected, np.ndarray) and hasattr(expected, "numpy"):
+            from ..torch.torch_helper import to_numpy
 
             dev = 0 if expected.device.type == "cpu" else 1
             expected = to_numpy(expected)
-        if isinstance(got, torch.Tensor):
-            from .torch.torch_helper import to_numpy
+
+        if not isinstance(got, np.ndarray) and hasattr(got, "numpy"):
+            from ..torch.torch_helper import to_numpy
 
             dev = 0 if got.device.type == "cpu" else 1
             got = to_numpy(got)

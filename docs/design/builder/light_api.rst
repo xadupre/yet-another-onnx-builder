@@ -1,9 +1,9 @@
 
 .. _l-design-light-api:
 
-==============================
+===============================
 Fluent ONNX Builder (Light API)
-==============================
+===============================
 
 :mod:`yobx.builder.light` provides a chainable, expression-oriented API for
 building ONNX graphs without writing protobuf boilerplate.  It is designed for

@@ -21,10 +21,14 @@ def proto_from_array(
     :param verbose: display the type and shape
     :return: a onnx.TensorProto
     """
+    if arr.__class__.__name__ != "Tensor":
+        raise TypeError(f"Unexpected type {type(arr)}.")
+
     import torch
 
     if not isinstance(arr, torch.Tensor):
         raise TypeError(f"Unexpected type {type(arr)}.")
+
     if arr.is_sparse:
         raise NotImplementedError(
             f"Sparse tensor is not supported yet but initializer {name!r} is."
@@ -33,12 +37,8 @@ def proto_from_array(
     # arr.contiguous() is slow after a transpose, maybe there is a way to optimize this.
     arr_cpu = arr.cpu() if arr.is_contiguous() else arr.contiguous().cpu()
 
-    import torch
-
     numel = torch.numel(arr_cpu)
     element_size = arr_cpu.element_size()
-
-    import torch
 
     if arr_cpu.dtype in {torch.bfloat16}:
         np_arr = arr_cpu
@@ -63,8 +63,6 @@ def proto_from_array(
 
     if verbose > 1 and numel > 100:
         print(f"[proto_from_array] {tensor.data_type}[{arr_cpu.shape}]")
-
-    import torch
 
     if isinstance(np_arr, torch.Tensor):
         byte_data = (ctypes.c_ubyte * numel * element_size).from_address(np_arr.data_ptr())
@@ -196,10 +194,8 @@ class MiniOnnxBuilder:
                 elem_type=onnx.TensorProto.FLOAT, shape=None
             )
         else:
-            import torch
-
             assert all(
-                isinstance(t, (np.ndarray, torch.Tensor)) for t in tensors
+                hasattr(t, "shape") for t in tensors
             ), f"Nested sequences are not supported, types are {[type(t) for t in tensors]}"
             names = []
             for i, t in enumerate(tensors):

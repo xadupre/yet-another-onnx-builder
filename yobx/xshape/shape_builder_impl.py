@@ -67,10 +67,26 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         self._debug_value_shape = os.environ.get("ONNXSTOPVALUESHAPE", "")
         self._debug_constant_folding = 0
         self._debug_msg = {}
-        self.maybe_disable_fake_tensor_mode = _maybe_disable_fake_tensor_mode
         self.main_opset = opset or 18
         self.time_evaluation_constants_ = 0
         self.optimization_options = _OptimizationOptions()
+
+        self.maybe_disable_fake_tensor_mode = contextlib.nullcontext
+        if os.environ.get("NOTORCH", "0") in ("1", "true"):
+            self._has_torch = False
+            self.torch = None
+        else:
+            try:
+                import torch
+                import torch._subclasses
+
+                self._has_torch = True
+                self.torch = torch
+                self.torch_subclasses = torch._subclasses
+                self.maybe_disable_fake_tensor_mode = _maybe_disable_fake_tensor_mode
+            except (NameError, ImportError, AttributeError):
+                self._has_torch = False
+                self.torch = None
 
     @property
     def input_names(self) -> List[str]:

@@ -327,9 +327,12 @@ def _cmd_agg(argv: List[Any]):
     )
     assert csv, f"No csv files in {args.inputs}, args.filter={args.filter!r}, csv={csv}"
     if args.verbose:
-        from tqdm import tqdm
+        try:
+            from tqdm import tqdm
 
-        loop = tqdm(csv)
+            loop = tqdm(csv)
+        except ImportError:
+            loop = csv
     else:
         loop = csv
     dfs = []

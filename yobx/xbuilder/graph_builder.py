@@ -58,7 +58,6 @@ from ..helpers.onnx_helper import (
     unary_like_op_types,
     str_tensor_proto_type,
 )
-from ..torch.torch_helper import onnx_dtype_to_torch_dtype, torch_dtype_to_onnx_dtype
 from ..xshape.rename_expressions import rename_dynamic_dimensions, rename_dynamic_expression
 from ..xshape._shape_helper import (
     DYNAMIC_SHAPE,
@@ -202,7 +201,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     ``ONNXSTOPVALUESHAPE``, ``ONNXSTOPOUTPUT`` to raise an exception when the type or shape
     of a variable is set. Example: ``ONNXSTOP=attn_output python ...``.
     ``ONNXCST=1`` shows which constant is computed,
-    ``NULLSHAPE=1`` raises an exception as soon as a null shape occurs. The code includes:
+    ``NULLSHAPE=1`` raises an exception as soon as a null shape occurs.
+    ``NOTORCH=1`` disables the use of :epkg:`torch` even if it is installed.
+    The code includes:
 
     ::
 
@@ -275,13 +276,27 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         _context: Optional[Set[str]] = None,
         _parent: Optional[Union["GraphBuilder", Tuple["GraphBuilder", NodeProto]]] = None,
     ):
-        import torch
+        self.maybe_disable_fake_tensor_mode = contextlib.nullcontext
+        if os.environ.get("NOTORCH", "0") in ("1", "true"):
+            self._has_torch = False
+            self.torch = None
+        else:
+            try:
+                import torch
+                import torch._subclasses
+
+                self._has_torch = True
+                self.torch = torch
+                self.torch_subclasses = torch._subclasses
+                self.maybe_disable_fake_tensor_mode = _unset_fake_temporarily  # type: ignore
+            except (NameError, ImportError, AttributeError):
+                self._has_torch = False
+                self.torch = None
+
         from . import TEMPLATE_TYPE
 
         self.TEMPLATE_TYPE = TEMPLATE_TYPE
 
-        self.torch = torch
-        self.maybe_disable_fake_tensor_mode = _unset_fake_temporarily
         self.optimization_options = optimization_options or OptimizationOptions(verbose=verbose)
         self.local_domain = local_domain
         self.as_function = as_function
@@ -564,19 +579,13 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         unique_names: Optional[Set[str]] = None,
     ) -> Any:
         """Replaces Hints by true DynamicShapes."""
-        import torch
-
-        if isinstance(dynamic_shapes, torch.export.dynamic_shapes._Dim):
+        if not dynamic_shapes:
             return dynamic_shapes
         if isinstance(dynamic_shapes, str):
             # Not allowed by pytorch but allowed here.
             return cls.WrapDim(dynamic_shapes)
         if isinstance(dynamic_shapes, cls.WrapDim):
             return dynamic_shapes
-        if not dynamic_shapes:
-            return dynamic_shapes
-        if unique_names is None:
-            unique_names = set()
         if isinstance(dynamic_shapes, (tuple, list)):
             processed = [cls._pre_process_dynamic_shape(i, unique_names) for i in dynamic_shapes]
             return tuple(processed) if isinstance(dynamic_shapes, tuple) else processed
@@ -585,6 +594,14 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 k: cls._pre_process_dynamic_shape(v, unique_names)
                 for k, v in dynamic_shapes.items()
             }
+
+        import torch
+
+        if isinstance(dynamic_shapes, torch.export.dynamic_shapes._Dim):
+            return dynamic_shapes
+        if unique_names is None:
+            unique_names = set()
+
         if dynamic_shapes in (torch.export.Dim.DYNAMIC, torch.export.Dim.AUTO):
             i = 0
             name = "DYN0"
@@ -600,50 +617,67 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         # args_0 {0: <class '._bash_bench_model_runner.batch'>}
 
         def handle_dim(_k, _v, input_name=input_name):
-            if isinstance(_v, self.torch.SymInt):
-                self.make_dynamic_object(
-                    _v.__name__,  # pyrefly: ignore[missing-attribute]
-                    _v,
-                    axis=_k,
-                    input_name=input_name,
-                )
-            elif isinstance(_v, self.torch.export.dynamic_shapes._DerivedDim):
-                self.make_dynamic_object(
-                    _v.__name__,
-                    self.torch.SymInt(_v.__name__),
-                    axis=_k,
-                    input_name=input_name,
-                )
-                # It should be recursive.
-                # maybe add a constraint here
-                self.make_dynamic_object(
-                    _v.root.__name__,
-                    self.torch.SymInt(_v.root.__name__),
-                    axis=None,
-                    input_name=None,
-                )
-            elif isinstance(_v, self.torch.export.dynamic_shapes._Dim):
-                self.make_dynamic_object(
-                    _v.__name__,
-                    self.torch.SymInt(_v.__name__),
-                    axis=_k,
-                    input_name=input_name,
-                )
-            elif isinstance(_v, self.WrapDim):
-                self.make_dynamic_object(
-                    _v.name,
-                    self.torch.SymInt(_v.name),
-                    axis=_k,
-                    input_name=input_name,
-                )
-            elif _v is not None:
-                raise AssertionError(
-                    f"Unexpected type {type(_v)} for dynamic "
-                    f"dimension for axis {_k}, input_name={input_name!r}, "
-                    f"pos_vv={shape_dict!r}, "
-                    f"self.dynamic_shapes={self.dynamic_shapes}, "
-                    f"self.output_dynamic_shapes={self.output_dynamic_shapes}"
-                )
+            if self._has_torch:
+                if isinstance(_v, self.torch.SymInt):  # type: ignore
+                    self.make_dynamic_object(
+                        _v.__name__,  # pyrefly: ignore[missing-attribute]
+                        _v,
+                        axis=_k,
+                        input_name=input_name,
+                    )
+                elif isinstance(_v, self.torch.export.dynamic_shapes._DerivedDim):  # type: ignore
+                    self.make_dynamic_object(
+                        _v.__name__,
+                        self.torch.SymInt(_v.__name__),  # type: ignore
+                        axis=_k,
+                        input_name=input_name,
+                    )
+                    # It should be recursive.
+                    # maybe add a constraint here
+                    self.make_dynamic_object(
+                        _v.root.__name__,
+                        self.torch.SymInt(_v.root.__name__),  # type: ignore
+                        axis=None,
+                        input_name=None,
+                    )
+                elif isinstance(_v, self.torch.export.dynamic_shapes._Dim):  # type: ignore
+                    self.make_dynamic_object(
+                        _v.__name__,
+                        self.torch.SymInt(_v.__name__),  # type: ignore
+                        axis=_k,
+                        input_name=input_name,
+                    )
+                elif isinstance(_v, self.WrapDim):
+                    self.make_dynamic_object(
+                        _v.name,
+                        self.torch.SymInt(_v.name),  # type: ignore
+                        axis=_k,
+                        input_name=input_name,
+                    )
+                elif _v is not None:
+                    raise AssertionError(
+                        f"Unexpected type {type(_v)} for dynamic "
+                        f"dimension for axis {_k}, input_name={input_name!r}, "
+                        f"pos_vv={shape_dict!r}, "
+                        f"self.dynamic_shapes={self.dynamic_shapes}, "
+                        f"self.output_dynamic_shapes={self.output_dynamic_shapes}"
+                    )
+            else:
+                if isinstance(_v, self.WrapDim):
+                    self.make_dynamic_object(
+                        _v.name,
+                        self.torch.SymInt(_v.name),  # type: ignore
+                        axis=_k,
+                        input_name=input_name,
+                    )
+                elif _v is not None:
+                    raise AssertionError(
+                        f"Unexpected type {type(_v)} for dynamic "
+                        f"dimension for axis {_k}, input_name={input_name!r}, "
+                        f"pos_vv={shape_dict!r}, "
+                        f"self.dynamic_shapes={self.dynamic_shapes}, "
+                        f"self.output_dynamic_shapes={self.output_dynamic_shapes}"
+                    )
 
         if not isinstance(shape_dict, dict):
             # A scalar, no axis.
@@ -698,7 +732,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     u = _unfold(v, p)
                     res.extend(u)
                 return res
-            if isinstance(obj, (str, self.torch.export.dynamic_shapes._Dim)):
+            if self._has_torch and isinstance(obj, (str, self.torch.export.dynamic_shapes._Dim)):  # type: ignore
                 _prefixes.append(prefix)
                 return [(prefix, obj)]
             raise TypeError(f"Unexpected type {type(obj)} and prefix={prefix!r}")
@@ -706,7 +740,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         seq_dynamic_shapes = _unfold(dynamic_shapes)
 
         for input_name_or_position, pos_vv in seq_dynamic_shapes:
-            assert isinstance(pos_vv, (dict, str, self.torch.export.dynamic_shapes._Dim)), (
+            assert isinstance(pos_vv, (dict, str)) or (
+                self._has_torch and isinstance(pos_vv, (self.torch.export.dynamic_shapes._Dim))  # type: ignore
+            ), (
                 f"Unexpected pos_vv={pos_vv} (type is {type(pos_vv)}), "
                 f"input_name_or_position={input_name_or_position}"
             )
@@ -779,15 +815,17 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 )
                 return None
             return self.make_key(onh.to_array(value))
-        if isinstance(value, self.torch.Tensor):
-            if value.dtype == self.torch.int64 and value.numel() < 8:
-                return self.make_key(value.detach().cpu().numpy())
-            return None
+
         if isinstance(value, int):
             return int, value
         if isinstance(value, np.ndarray):
             if value.size < self.SMALL_TENSOR:
                 return (str(value.dtype), tuple(value.shape), tuple(value.ravel().tolist()))
+
+        if self._has_torch and isinstance(value, self.torch.Tensor):  # type: ignore
+            if value.dtype == self.torch.int64 and value.numel() < 8:  # type: ignore
+                return self.make_key(value.detach().cpu().numpy())
+            return None
         return None
 
     def pretty_tensor(self, tensor: Any) -> str:
@@ -896,16 +934,17 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         """
 
         def _d(d1) -> str:
-            if isinstance(d1, self.torch.SymInt):
-                return f"SymInt({self._torch_sym_int_to_str(d1)})"
-            if isinstance(d1, self.torch.SymBool):
-                return f"SymBool({self._torch_sym_int_to_str(d1)})"  # type: ignore
-            if isinstance(d1, (self.WrapDim, self.WrapSym)):
-                return repr(d1)
-            if isinstance(d1, self.torch.export.dynamic_shapes._DerivedDim):
-                return f"_DerivedDim({d1.__name__})"
-            if isinstance(d1, self.torch.export.dynamic_shapes._Dim):
-                return f"_Dim({d1.__name__})"
+            if self._has_torch:
+                if isinstance(d1, self.torch.SymInt):  # type: ignore
+                    return f"SymInt({self._torch_sym_int_to_str(d1)})"
+                if isinstance(d1, self.torch.SymBool):  # type: ignore
+                    return f"SymBool({self._torch_sym_int_to_str(d1)})"  # type: ignore
+                if isinstance(d1, (self.WrapDim, self.WrapSym)):
+                    return repr(d1)
+                if isinstance(d1, self.torch.export.dynamic_shapes._DerivedDim):  # type: ignore
+                    return f"_DerivedDim({d1.__name__})"
+                if isinstance(d1, self.torch.export.dynamic_shapes._Dim):  # type: ignore
+                    return f"_Dim({d1.__name__})"
             if isinstance(d1, list):
                 s = ", ".join(map(_d, d1))
                 return f"[{s}]"
@@ -1018,7 +1057,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         rows.append(f"{node.op}:[{node.name}:{node.target}]")
                     elif isinstance(val, list):
                         rows.append(f"{node.op}:[{node.name}:{node.target}] - list")
-                    elif isinstance(val, self.torch.Tensor):
+                    elif self._has_torch and isinstance(val, self.torch.Tensor):  # type: ignore
                         rows.append(
                             f"{node.op}:[{node.name}:{node.target}] - {val.dtype}:{val.shape}"
                         )
@@ -1105,7 +1144,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     source=f"GraphBuilder.compute_constant/from({name}){src}",
                 )
                 return v, None
-            if isinstance(value, self.torch._subclasses.fake_tensor.FakeTensor):
+            if self._has_torch and isinstance(
+                value, self.torch._subclasses.fake_tensor.FakeTensor  # type: ignore
+            ):
                 assert not self._debug_constant_folding, (
                     f"Unable to compute constant because value is a FakeTensor"
                     f"{string_type(value, with_shape=True)}"
@@ -1198,8 +1239,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             return value
 
         if possible_value is not None:
-            assert isinstance(
-                possible_value, (np.ndarray, self.torch.Tensor, NodeProto)
+            assert isinstance(possible_value, (np.ndarray, NodeProto)) or (
+                self._has_torch and isinstance(possible_value, self.torch.Tensor)  # type: ignore
             ), f"Unexpected type {type(possible_value)} for a constant{self.get_debug_msg()}"
             if computed_value and isinstance(possible_value, NodeProto):
                 res, _ = self.compute_constant(name, exc=exc)
@@ -1314,18 +1355,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     )
             return value
 
-        if isinstance(value, self.torch.Tensor):
-            with self.maybe_disable_fake_tensor_mode():
-                v = value.detach().cpu()
-                self.constants_computed_[name] = v
-            assert not multiple_outputs, f"Multiple output is not allowed for name={name!r}"
-            if self._debug_get_constant:
-                print(
-                    f"[GraphBuilder-{self._hash()}.get_constant] "
-                    f"  L: nptorch.Tensor {v.shape}, {v.dtype}"
-                )
-            return v
-
         if isinstance(value, TensorProto):
             if uses_external_data(value):
                 if exc:
@@ -1348,6 +1377,18 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if self._debug_get_constant:
                 print(f"[GraphBuilder-{self._hash()}.get_constant]   P: np.float32 {value}")
             return np.array(value, dtype=np.float32)
+
+        if self._has_torch and isinstance(value, self.torch.Tensor):  # type: ignore
+            with self.maybe_disable_fake_tensor_mode():
+                v = value.detach().cpu()
+                self.constants_computed_[name] = v
+            assert not multiple_outputs, f"Multiple output is not allowed for name={name!r}"
+            if self._debug_get_constant:
+                print(
+                    f"[GraphBuilder-{self._hash()}.get_constant] "
+                    f"  L: nptorch.Tensor {v.shape}, {v.dtype}"
+                )
+            return v
 
         raise TypeError(f"Unable to convert type {type(value)} into numpy array.")
 
@@ -1533,17 +1574,21 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 _exa, val = val1
                 if val is not None and len(val) == 3:
                     el_type, size = val[1:]
-                    if el_type in (
-                        self.torch.float32,
-                        self.torch.float64,
-                        self.torch.float16,
-                        self.torch.bfloat16,
-                        self.torch.bool,
+                    if self._has_torch and el_type in (
+                        self.torch.float32,  # type: ignore
+                        self.torch.float64,  # type: ignore
+                        self.torch.float16,  # type: ignore
+                        self.torch.bfloat16,  # type: ignore
+                        self.torch.bool,  # type: ignore
                     ):
                         return False
                     if len(size) >= 2:
                         return False
-                    if el_type in (self.torch.int64, self.torch.int32) and len(size) == 0:
+                    if (
+                        self._has_torch
+                        and el_type in (self.torch.int64, self.torch.int32)  # type: ignore
+                        and len(size) == 0
+                    ):
                         # A single integer with no shape, it looks like a dimension.
                         # Let's assume it is. It is more efficient to consider it as
                         # a dimension.
@@ -1551,12 +1596,17 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     # In another case, let's assume it is not.
                     return False
                 else:
-                    if elem_type is not None and elem_type in (
-                        self.torch.float32,
-                        self.torch.float64,
-                        self.torch.float16,
-                        self.torch.bfloat16,
-                        self.torch.bool,
+                    if (
+                        elem_type is not None
+                        and self._has_torch
+                        and elem_type
+                        in (
+                            self.torch.float32,  # type: ignore
+                            self.torch.float64,  # type: ignore
+                            self.torch.float16,  # type: ignore
+                            self.torch.bfloat16,  # type: ignore
+                            self.torch.bool,  # type: ignore
+                        )
                     ):
                         return False
                     if not self.has_type(name) or (shape is not None and len(shape) >= 2):
@@ -1599,11 +1649,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             elif value[0] == "call_module":
                 if isinstance(value[1], tuple) and len(value[1]) == 2:
                     el_type, size = value[1]
-                    if el_type in (
-                        self.torch.float32,
-                        self.torch.float64,
-                        self.torch.float16,
-                        self.torch.bfloat16,
+                    if self._has_torch and el_type in (
+                        self.torch.float32,  # type: ignore
+                        self.torch.float64,  # type: ignore
+                        self.torch.float16,  # type: ignore
+                        self.torch.bfloat16,  # type: ignore
                     ):
                         return False
                     if len(size) >= 2:
@@ -1741,14 +1791,16 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 continue
 
             d1_, d2_ = d1, d2
-            if isinstance(d1, self.torch.SymInt):
-                d1 = self._torch_sym_int_to_str(d1)
-            elif isinstance(d1, self.torch.export.dynamic_shapes._Dim):
-                d1 = self._torch_sym_int_to_str(d1)  # type: ignore
-            if isinstance(d2, self.torch.SymInt):
-                d2 = self._torch_sym_int_to_str(d2)
-            elif isinstance(d2, self.torch.export.dynamic_shapes._Dim):
-                d2 = self._torch_sym_int_to_str(d2)  # type: ignore
+
+            if self._has_torch:
+                if isinstance(d1, self.torch.SymInt):  # type: ignore
+                    d1 = self._torch_sym_int_to_str(d1)
+                elif isinstance(d1, self.torch.export.dynamic_shapes._Dim):  # type: ignore
+                    d1 = self._torch_sym_int_to_str(d1)
+                if isinstance(d2, self.torch.SymInt):  # type: ignore
+                    d2 = self._torch_sym_int_to_str(d2)
+                elif isinstance(d2, self.torch.export.dynamic_shapes._Dim):  # type: ignore
+                    d2 = self._torch_sym_int_to_str(d2)
 
             if isinstance(d1, (int, str)) and isinstance(d2, (int, str)):
                 if d1 == d2:
@@ -2108,6 +2160,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 and isinstance(value[1], tuple)
                 and len(value[1][1]) == 3
             ):
+                assert self._has_torch, (
+                    f"Unexpected types for values {string_type(value, with_shape=True)}, "
+                    f"torch is not allowed"
+                )
+                from ..torch.torch_helper import torch_dtype_to_onnx_dtype
+
                 dtype = value[1][1][1]  # type: ignore
                 itype = torch_dtype_to_onnx_dtype(dtype)
                 return itype
@@ -2335,7 +2393,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         """
 
         def _append_to_source(name, input_name, axis, value):
-            if input_name is not None and isinstance(value, self.torch.SymInt):
+            if (
+                input_name is not None
+                and self._has_torch
+                and isinstance(value, self.torch.SymInt)  # type: ignore
+            ):
                 # axis can be None for a scaler.
                 assert name != input_name, (
                     f"Name {name!r} (input_name={input_name!r}) "
@@ -2362,15 +2424,17 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         ), f"Dynamic object {name!r}, value={value!r} is already there{self.get_debug_msg()}"
         if isinstance(value, self.WrapSym):
             value = value.sym
-        assert isinstance(
-            value, (str, self.torch.SymInt, self.torch.SymFloat, self.torch.SymBool)
+        assert isinstance(value, (str, self.WrapSym, self.WrapDim)) or (
+            self._has_torch
+            and isinstance(value, (self.torch.SymInt, self.torch.SymFloat, self.torch.SymBool))  # type: ignore
         ), f"Unexpected type {type(value)} for value{self.get_debug_msg()}"
         _append_to_source(name, input_name, axis, value)
 
         self.add_dynamic_object(name, value, parse=True)
         if (
             shape_as_input
-            and isinstance(value, self.torch.SymInt)
+            and self._has_torch
+            and isinstance(value, self.torch.SymInt)  # type: ignore
             and value.node.maybe_as_int() is None
         ):
             # Then an input is a shape.
@@ -2381,7 +2445,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         #    self._known_value_shape[name] = name
 
         key = None
-        if isinstance(value, (self.torch.SymInt, self.torch.SymFloat)):
+        if self._has_torch and isinstance(value, (self.torch.SymInt, self.torch.SymFloat)):  # type: ignore
             if hasattr(value, "node"):
                 from torch.fx.experimental.sym_node import SymNode
 
@@ -2403,7 +2467,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self.add_dynamic_objects_rev(key, (name, value))
 
         if shape_as_input:
-            assert isinstance(value, (self.torch.SymInt, self.torch.SymFloat)), (
+            assert self._has_torch and isinstance(
+                value, (self.torch.SymInt, self.torch.SymFloat)  # type: ignore
+            ), (
                 f"shape_as_input={shape_as_input}, unexpected type "
                 f"{type(value)} for value{self.get_debug_msg()}"
             )
@@ -2417,7 +2483,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     self._known_value_shape[name],
                     (
                         TensorProto.INT64
-                        if isinstance(value, self.torch.SymInt)
+                        if self._has_torch and isinstance(value, self.torch.SymInt)  # type: ignore
                         else TensorProto.FLOAT
                     ),
                     tuple(),
@@ -2466,9 +2532,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         for d in shape:
             if isinstance(d, int):
                 key.append(d)
-            elif isinstance(d, self.torch.SymInt):
-                value = self._torch_sym_int(d)
-                key.append(value)
             elif isinstance(d, str):
                 assert self._debug_quiet or (
                     self.has_shape(d) or (self.has_rank(d) and self.get_rank(d) == 0)
@@ -2477,6 +2540,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     f"has_type={self.has_type(d)}{self.get_debug_msg()}"
                 )
                 key.append(d)
+            elif self._has_torch and isinstance(d, self.torch.SymInt):  # type: ignore
+                value = self._torch_sym_int(d)
+                key.append(value)
             else:
                 raise RuntimeError(
                     f"Unexpected type {type(d)} for a dimension in "
@@ -2552,7 +2618,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     shape_shape = None
                     conc.append(name)
 
-            elif isinstance(d, self.torch.SymInt):
+            elif self._has_torch and isinstance(d, self.torch.SymInt):  # type: ignore
                 value = self._torch_sym_int(d)
                 if isinstance(value, str) and value in self.dynamic_objects_rev:
                     assert len(self.dynamic_objects_rev[value]) >= 1
@@ -2564,10 +2630,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     name = self.get_dimension_as_result(name)
                 else:
                     name = value
-                if isinstance(name, self.torch.SymInt):
+                if self._has_torch and isinstance(name, self.torch.SymInt):  # type: ignore
                     name = self._torch_sym_int(name)
-                    assert not isinstance(name, self.torch.SymInt)
-                assert not isinstance(name, self.torch.SymInt)
+                    assert not isinstance(name, self.torch.SymInt)  # type: ignore
+                assert not self._has_torch or not isinstance(name, self.torch.SymInt)  # type: ignore
                 assert isinstance(name, str)
                 assert name in self.dynamic_objects or self.has_name(
                     name
@@ -2665,7 +2731,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 f"Shape {value.shape} does not match the registered one {self.get_shape(name)} "
                 f"for name {name!r}{self.get_debug_msg()}"
             )
-        elif isinstance(value, self.torch.Tensor):
+        elif self._has_torch and isinstance(value, self.torch.Tensor):  # type: ignore
             # torch.nn.parameter.Parameter -> np.ndarray
             assert "FakeTensor" not in str(type(value)), (
                 f"FakeTensor {name!r} cannot be an initializer {type(value)}"
@@ -2912,11 +2978,17 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     def _shape_type(self, value: Any) -> Tuple[Any, int, STATIC_SHAPE]:
         if isinstance(value, np.ndarray):
             return oh.np_dtype_to_tensor_dtype(value.dtype), value.size, value.shape
-        if isinstance(value, self.torch.Tensor):
-            return torch_dtype_to_onnx_dtype(value.dtype), value.nelement(), value.shape
         if isinstance(value, TensorProto):
             shape = tuple(value.dims)
             return value.data_type, int(np.prod(shape)), shape
+        if self._has_torch and isinstance(value, self.torch.Tensor):  # type: ignore
+            assert not self._has_torch, (
+                f"Unexpected types for values {string_type(value, with_shape=True)}, "
+                f"torch is not allowed"
+            )
+            from ..torch.torch_helper import torch_dtype_to_onnx_dtype
+
+            return torch_dtype_to_onnx_dtype(value.dtype), value.nelement(), value.shape
         raise TypeError(f"Unsupported type for a constant {type(value)}")
 
     def constant_is_equal_to(self, name, value):
@@ -2947,8 +3019,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 return cst == value
             return np.abs(cst - value).max() == 0
 
-        t1 = self.torch.from_numpy(cst) if isinstance(cst, np.ndarray) else cst
-        t2 = self.torch.from_numpy(value) if isinstance(value, np.ndarray) else value
+        assert self._has_torch, f"Unexpected type {type(cst)} and {type(value)}"
+        t1 = self.torch.from_numpy(cst) if isinstance(cst, np.ndarray) else cst  # type: ignore
+        t2 = self.torch.from_numpy(value) if isinstance(value, np.ndarray) else value  # type: ignore
         assert hasattr(t1, "dtype"), f"Unexpected type {type(t1)} for name={name!r}"
         assert hasattr(t2, "dtype"), f"Unexpected type {type(t2)}, {type(value)}"
         if t1.dtype != t2.dtype:
@@ -3012,10 +3085,14 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     ) -> bool:
         if allow_none and dim is None:
             return True
-        if not isinstance(dim, (int, self.torch.SymInt, str)):
-            return False
         if str(dim) in self._dynamic_alias:
             dim = self._dynamic_alias[str(dim)]
+        if isinstance(dim, str):
+            return True
+        if not isinstance(dim, int) and (
+            not self._has_torch or isinstance(dim, self.torch.SymInt)  # type: ignore
+        ):
+            return False
         assert (
             not verify
             or is_static_dimension(dim)
@@ -3042,8 +3119,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 np.array([dim], dtype=np.int64),
                 source="GraphBuilder.get_dynamic_dimension.dim",
             )
-        assert isinstance(
-            dim, (str, self.torch.SymInt)
+        assert isinstance(dim, str) or (
+            self._has_torch and isinstance(dim, (str, self.torch.SymInt))  # type: ignore
         ), f"Unexpected type {type(dim)} for dim={dim}{self.get_debug_msg()}"
         if isinstance(dim, str):
             if self.has_name(dim):
@@ -3132,11 +3209,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         :param check_token: check that the subtoken are
             registered prior to this addition
         """
-        assert not isinstance(value, self.torch.export.dynamic_shapes._Dim), (
-            f"Unexpected dimension type {type(value)}:{value!r}, "
-            f"class is {value.__class__.__name__!r} for key={key!r}"  # type: ignore
-            f"{self.get_debug_msg()}"
-        )
         if isinstance(key, self.WrapDim):
             keykey = key.name
         else:
@@ -3144,7 +3216,19 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 key, str
             ), f"Unexpected type {type(key)} for key{self.get_debug_msg()}"
             keykey = key
-        if isinstance(value, (self.torch.SymInt, self.torch.SymFloat, self.WrapDim)):
+
+        assert not self._has_torch or not isinstance(
+            value, self.torch.export.dynamic_shapes._Dim  # type: ignore
+        ), (
+            f"Unexpected dimension type {type(value)}:{value!r}, "
+            f"class is {value.__class__.__name__!r} for key={key!r}"  # type: ignore
+            f"{self.get_debug_msg()}"
+        )
+
+        if isinstance(value, (self.WrapDim)) or (
+            self._has_torch
+            and isinstance(value, (self.torch.SymInt, self.torch.SymFloat, self.WrapDim))  # type: ignore
+        ):
             wrapped_value = self.WrapSym(value)  # type: ignore
             self.dynamic_objects[keykey] = wrapped_value
             wrapped_name = wrapped_value.name
@@ -3192,8 +3276,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._dynamic_examples[name].add(value)
 
     def _torch_sym_int(self, d, add: bool = False) -> Optional[Union[int, str, float]]:
-        assert isinstance(
-            d, (self.torch.SymInt, str, self.torch.SymFloat)
+        assert isinstance(d, str) or (
+            self._has_torch and isinstance(d, (self.torch.SymInt, str, self.torch.SymFloat))  # type: ignore
         ), f"unexpected type for d={d}, type={type(d)}"
         value = None
         try:
@@ -3205,11 +3289,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         if isinstance(d, (str, int, float)):
             return d
-        if isinstance(d.node, str):
+        if isinstance(d.node, str):  # type: ignore
             return d.node
         if value is None:
             # Is it an integer?
-            value = d.node.maybe_as_int()
+            value = d.node.maybe_as_int()  # type: ignore
         else:
             # maybe an expression which is a single integer
             try:
@@ -3218,7 +3302,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 pass
 
         if isinstance(value, int):
-            assert not isinstance(value, self.torch.SymInt)
+            assert not isinstance(value, self.torch.SymInt)  # type: ignore
             return value
 
         if value is None:
@@ -3231,7 +3315,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             # The dynamic dimension does not seem to be registered.
             # Maybe it is constant.
             try:
-                val_int = d.node.maybe_as_int()
+                val_int = d.node.maybe_as_int()  # type: ignore
                 if val_int is not None:
                     self._add_dynamic_example(value, val_int)
                 return value
@@ -3239,7 +3323,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 pass
 
         if value in self.dynamic_objects:
-            assert not isinstance(value, self.torch.SymInt)
+            assert not isinstance(value, self.torch.SymInt)  # type: ignore
             return value
 
         if value not in self.dynamic_objects_rev and value not in self._known_value_shape and add:
@@ -3253,7 +3337,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             f"{dir(d)}{self.get_debug_msg()}"
         )
         assert not isinstance(
-            value, self.torch.SymInt
+            value, self.torch.SymInt  # type: ignore
         ), f"Unexpected type {type(value)} for d={d!r}"
         if value in self.dynamic_objects_rev:
             new_value = self.dynamic_objects_rev[value]
@@ -3288,10 +3372,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         return value
 
     def verify_dynamic_shape(
-        self,
-        shape: Any,
-        name: Optional[str] = None,
-        add: bool = True,
+        self, shape: Any, name: Optional[str] = None, add: bool = True
     ) -> Optional[DYNAMIC_SHAPE]:
         """The implementation of this method should be revisited."""
         if shape is None:
@@ -3306,7 +3387,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             return tuple(int(i) for i in shape)
         new_shape: List[Union[int, str]] = []
         for dim, d in enumerate(shape):
-            if isinstance(d, (self.torch.SymInt, str, self.WrapDim)):
+            if isinstance(d, (str, self.WrapDim)) or (
+                self._has_torch and isinstance(d, self.torch.SymInt)  # type: ignore
+            ):
                 dyn_name = None if name is None else self._get_dynamic_dimension(name, dim)
                 if dyn_name is not None:
                     if add:
@@ -3324,8 +3407,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 ), f"Unexpected type {type(d)} in shape={shape}{self.get_debug_msg()}"
                 new_shape.append(value)  # type: ignore[arg-type]
                 continue
-            if (
-                isinstance(d, self.torch.export.dynamic_shapes._Dim)
+            if self._has_torch and (
+                isinstance(d, self.torch.export.dynamic_shapes._Dim)  # type: ignore
                 or "_DerivedDim" in str(d)
                 or "_Dim" in str(d)
             ):
@@ -3411,19 +3494,17 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 )
             return res
 
-        assert (
-            self.as_function or elem_type
-        ), f"elem_type is unknown for name={name!r}{self.get_debug_msg()}"
+        assert self.as_function or elem_type, (
+            f"elem_type is unknown for name={name!r} and "
+            f"{self.as_function=}{self.get_debug_msg()}"
+        )
         add_node: Callable[[], Any] = lambda: None  # noqa: E731
         if self.current_input < len(self.input_names):
             # The input needs to be renamed, an identity node is added.
             input_name = self.input_names[self.current_input]
             if input_name != name:
                 add_node = lambda: self.make_node(  # noqa: E731
-                    "Identity",
-                    [input_name],
-                    [name],
-                    name="make_tensor_input_id",
+                    "Identity", [input_name], [name], name="make_tensor_input_id"
                 )
         else:
             if is_dimension:
@@ -3432,10 +3513,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 input_name = f"{name}_dim_"
                 if input_name != name:
                     add_node = lambda: self.make_node(  # noqa: E731
-                        "Identity",
-                        [input_name],
-                        [name],
-                        name="make_tensor_input_id",
+                        "Identity", [input_name], [name], name="make_tensor_input_id"
                     )
                 self.input_names.append(input_name)
             else:
@@ -3647,40 +3725,43 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         if isinstance(obj, str):
             return obj
-        if isinstance(obj, self.torch.export.dynamic_shapes._DerivedDim):
-            return obj.__name__
-        if isinstance(obj, self.torch.export.dynamic_shapes._Dim):
-            return obj.__name__
-        if isinstance(obj, self.torch.SymInt):
-            if isinstance(obj.node, str):
-                return obj.node
-            i = obj.node._expr
-            if "sympy" in str(type(i)) or (
-                hasattr(i, "__module__") and i.__module__ == "torch.utils._sympy.functions"
-            ):
-                return str(i).replace(" ", "")
-            if isinstance(i, self.torch.SymInt):
-                return self._dynamic_to_str(
-                    i, exc=exc, register_if_not_exist=register_if_not_exist
-                )
+        if isinstance(obj, self.WrapDim):
+            return obj.name
+        if self._has_torch:
+            if isinstance(obj, self.torch.export.dynamic_shapes._DerivedDim):  # type: ignore
+                return obj.__name__
+            if isinstance(obj, self.torch.export.dynamic_shapes._Dim):  # type: ignore
+                return obj.__name__
+            if isinstance(obj, self.torch.SymInt):  # type: ignore
+                if isinstance(obj.node, str):
+                    return obj.node
+                i = obj.node._expr
+                if "sympy" in str(type(i)) or (
+                    hasattr(i, "__module__") and i.__module__ == "torch.utils._sympy.functions"
+                ):
+                    return str(i).replace(" ", "")
+                if isinstance(i, self.torch.SymInt):  # type: ignore
+                    return self._dynamic_to_str(
+                        i, exc=exc, register_if_not_exist=register_if_not_exist
+                    )
             if exc:
                 raise AssertionError(
                     f"Object has {type(obj)} but could not find a dynamic interpretation"
                 )
             return None
-        if isinstance(obj, self.WrapDim):
-            return obj.name
         raise AssertionError(f"Unexpected type {type(obj)} to convert into string")
 
     def _is_dynamic_dimension(self, dyn: Any) -> bool:
-        return isinstance(
-            dyn,
-            (
-                str,
-                self.torch.export.dynamic_shapes._DerivedDim,
-                self.torch.export.dynamic_shapes._Dim,
-                self.torch.SymInt,
-            ),
+        return isinstance(dyn, str) or (
+            self._has_torch
+            and isinstance(
+                dyn,
+                (
+                    self.torch.export.dynamic_shapes._DerivedDim,  # type: ignore
+                    self.torch.export.dynamic_shapes._Dim,  # type: ignore
+                    self.torch.SymInt,  # type: ignore
+                ),
+            )
         )
 
     def _add_dynamic_alias(self, key, value):
@@ -4896,8 +4977,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     initializer.append(t)
                     continue
                 else:
-                    assert isinstance(
-                        v, self.torch.Tensor
+                    assert self._has_torch and isinstance(
+                        v, self.torch.Tensor  # type: ignore
                     ), f"tensor {k!r} has un unexpected type {type(v)}"
                     assert "FakeTensor" not in str(
                         type(v)
@@ -4953,12 +5034,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 v.doc_string += doc_string
                 res.append(v)
                 continue
-            if isinstance(v, self.torch.Tensor):
-                # no string tensor
-                t = self.from_array(v, name=k)  # type: ignore[attr-defined]
-                t.doc_string += doc_string
-                res.append(t)
-                continue
             if isinstance(v, np.ndarray):
                 if self.verbose > 2 and np.prod(v.shape) > 100:
                     print(
@@ -4966,6 +5041,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         f"onh.from_array:{k}:{v.dtype}[{v.shape}]"
                     )
                 t = onh.from_array(v, name=k)
+                t.doc_string += doc_string
+                res.append(t)
+                continue
+            if self._has_torch and isinstance(v, self.torch.Tensor):  # type: ignore
+                # no string tensor
+                t = self.from_array(v, name=k)  # type: ignore[attr-defined]
                 t.doc_string += doc_string
                 res.append(t)
                 continue
@@ -5299,7 +5380,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         #         node.replace_all_uses_with(cloned_node)
         # graph_module.recompile()
         if (
-            isinstance(graph_module, self.torch.nn.Module)
+            self._has_torch
+            and isinstance(graph_module, self.torch.nn.Module)  # type: ignore
             and interpreter.dispatcher
             and interpreter.dispatcher.find_function(type(graph_module))
         ):
@@ -7964,7 +8046,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         for i, sh in enumerate(shape):
             if isinstance(sh, int):
                 continue
-            self.make_dynamic_object(sh, self.torch.SymInt(sh), input_name=val.name, axis=i)
+            if self._has_torch:
+                self.make_dynamic_object(sh, self.torch.SymInt(sh), input_name=val.name, axis=i)  # type: ignore
         if (
             0 in shape
             and len(shape) > 1
@@ -8216,8 +8299,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         # We replace it with a letter.
                         sh = f"dim_{i.name}_{axis}"
                     new_shape.append(sh)
+
                     self.make_dynamic_object(
-                        sh, self.torch.SymInt(sh), input_name=i.name, axis=axis
+                        sh,
+                        self.WrapSym(sh) if not self._has_torch else self.torch.SymInt(sh),  # type: ignore
+                        input_name=i.name,
+                        axis=axis,
                     )
                 shape = tuple(new_shape)
                 self.set_shape(i.name, shape)
@@ -9059,15 +9146,18 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def _to_torch_tensor(self, a: Any) -> "torch.Tensor":
         """Torch does not convert numpy dtype very well."""
-        if isinstance(a, self.torch.Tensor):
+        if isinstance(a, self.torch.Tensor):  # type: ignore
             return a
         if isinstance(a, np.ndarray):
             if len(a.shape) == 0:
                 # Then torch may consider this as a the creation of empty array.
-                tt = self.torch.from_numpy(a.reshape((1,)).copy())
+                tt = self.torch.from_numpy(a.reshape((1,)).copy())  # type: ignore
                 tt = tt[0]
             else:
                 tt = self.make_torch_tensor_from_np_array(a)
+
+            from ..torch.torch_helper import onnx_dtype_to_torch_dtype
+
             ttype = onnx_dtype_to_torch_dtype(dtype_to_tensor_dtype(a.dtype))
             res = tt.to(ttype)
             assert a.shape == tuple(res.shape), (
@@ -9773,7 +9863,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         f"{self.get_debug_msg()}"
                     )
 
-                    if isinstance(ret_shape[k], self.torch.SymInt):
+                    if self._has_torch and isinstance(ret_shape[k], self.torch.SymInt):  # type: ignore
                         # We let it, set_shape will replace it
                         # by the dynamic dimension name and register an alias.
                         continue
@@ -9792,7 +9882,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     if i >= len(ret_shape):
                         # torch.export.export flattens everything
                         continue
-                    if isinstance(ret_shape[i], self.torch.SymInt):
+                    if self._has_torch and isinstance(ret_shape[i], self.torch.SymInt):  # type: ignore
                         # We let it, set_shape will replace it
                         # by the dynamic dimension name and register an alias.
                         continue
@@ -9823,7 +9913,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     def make_new_dynamic_shape(self, rank: int, prefix: str = "d") -> Tuple["torch.SymInt", ...]:
         """Creates a dynamic shape of a known rank with new dynamic dimension."""
         return tuple(
-            self.torch.SymInt(self.make_new_dynamic_name(f"{prefix}_d{i}")) for i in range(rank)
+            self.torch.SymInt(self.make_new_dynamic_name(f"{prefix}_d{i}")) for i in range(rank)  # type: ignore
         )
 
     def make_new_dynamic_name(self, prefix: str = "d") -> str:
@@ -9848,8 +9938,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if ml_dtypes is not None:
             dt = np_array.dtype
             if dt == ml_dtypes.bfloat16:
-                return self.torch.tensor(np_array.astype(np.float32)).to(self.torch.bfloat16)
-        return self.torch.tensor(np_array)
+                return self.torch.tensor(np_array.astype(np.float32)).to(self.torch.bfloat16)  # type: ignore
+        return self.torch.tensor(np_array)  # type: ignore
 
     def rename_names(self, name_to_rename: Dict[str, str], with_existing: bool = False):
         """Renames some names in the graph and its subgraphs."""

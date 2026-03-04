@@ -352,7 +352,6 @@ class TestPatternDebugPrint(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_base_debug_print_returns_empty(self):
-        """PatternOptimization._debug_print returns empty string by default."""
         pat = PatternOptimization(verbose=0)
         self.assertEqual(pat._debug_print(), "")
 
@@ -361,8 +360,6 @@ class TestPatternDebugPrint(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_easy_debug_print_without_debug_attr(self):
-        """EasyPatternOptimization._debug_print returns '' when _debug is absent."""
-
         class SimpleAddPattern(EasyPatternOptimization):
             """Simple add pattern."""
 
@@ -376,8 +373,6 @@ class TestPatternDebugPrint(ExtTestCase):
         self.assertEqual(pat._debug_print(), "")
 
     def test_easy_debug_print_with_debug_attr(self):
-        """EasyPatternOptimization._debug_print produces output when _debug is set."""
-
         class SimpleAddPattern(EasyPatternOptimization):
             """Simple add pattern."""
 
@@ -404,11 +399,7 @@ class TestGetApplyPattern(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_get_apply_pattern(self):
-        """_get_apply_pattern returns a GraphBuilderPatternOptimization."""
-
         class AddPattern(EasyPatternOptimization):
-            """Replaces Add(x, y) with Add(x, y)."""
-
             def match_pattern(self, g, x: T, y: T):
                 return g.op.Add(x, y)
 
@@ -439,8 +430,6 @@ class TestGetApplyPattern(ExtTestCase):
         self.assertIsInstance(apply_pat, GraphBuilderPatternOptimization)
 
     def test_get_apply_pattern_is_cached(self):
-        """_get_apply_pattern returns the same object on repeated calls."""
-
         class AddPattern(EasyPatternOptimization):
             """Replaces Add(x, y) with Add(x, y)."""
 
@@ -481,7 +470,6 @@ class TestPatternTableDoc(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_pattern_table_doc_returns_list(self):
-        """pattern_table_doc returns a list of dicts when as_rst=False."""
         from yobx.xoptim import get_pattern_list
 
         patterns = get_pattern_list("default")[:3]
@@ -494,7 +482,6 @@ class TestPatternTableDoc(ExtTestCase):
             self.assertIn("doc", item)
 
     def test_pattern_table_doc_fields(self):
-        """pattern_table_doc contains expected fields for each pattern."""
         from yobx.xoptim import get_pattern_list
 
         patterns = get_pattern_list("default")[:1]

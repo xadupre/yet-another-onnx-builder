@@ -393,22 +393,26 @@ class GraphBuilderPatternOptimization:
         }:
             return complex(value)
 
-        if value.dtype in {
-            self.builder.torch.float32,
-            self.builder.torch.float16,
-            self.builder.torch.float64,
-            self.builder.torch.bfloat16,
-        }:
-            with self.builder.maybe_disable_fake_tensor_mode():
-                return float(value)
-        if value.dtype in {
-            self.builder.torch.complex64,
-            self.builder.torch.complex128,
-        }:
-            with self.builder.maybe_disable_fake_tensor_mode():
-                return complex(value)
+        if self.builder._has_torch:
+            if value.dtype in {
+                self.builder.torch.float32,
+                self.builder.torch.float16,
+                self.builder.torch.float64,
+                self.builder.torch.bfloat16,
+            }:
+                with self.builder.maybe_disable_fake_tensor_mode():
+                    return float(value)
+            if value.dtype in {
+                self.builder.torch.complex64,
+                self.builder.torch.complex128,
+            }:
+                with self.builder.maybe_disable_fake_tensor_mode():
+                    return complex(value)
 
-        with self.builder.maybe_disable_fake_tensor_mode():
+        if self.builder._has_torch:
+            with self.builder.maybe_disable_fake_tensor_mode():
+                return int(value)
+        else:
             return int(value)
 
     def get_computed_constant(self, name: str, statistics: Optional[List[str]] = None) -> Any:

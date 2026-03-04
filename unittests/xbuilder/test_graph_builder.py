@@ -10,6 +10,7 @@ from yobx.ext_test_case import (
     ignore_warnings,
     requires_onnxir,
     requires_torch,
+    requires_onnxscript,
 )
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder import GraphBuilder, FunctionOptions, OptimizationOptions
@@ -944,6 +945,7 @@ class TestGraphBuilder(ExtTestCase):
 
     @ignore_warnings(DeprecationWarning)
     @requires_onnxir("0.1.8")
+    @requires_onnxscript()
     def test_large_model_onnxscript_ir(self):
         import onnx_ir as oir
 
@@ -2743,6 +2745,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         gr = GraphBuilder(18, verbose=0)
         self.assertRaises(RuntimeError, gr.get_is_dimension, "unknown")
 
+    @requires_torch()
     def test_get_is_dimension_run_node_float(self):
         import torch
 
@@ -2754,6 +2757,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         gr.set_shapes_types("z", "run_node", (("",), ("op", torch.float64, ())))
         self.assertFalse(gr.get_is_dimension("z"))
 
+    @requires_torch()
     def test_get_is_dimension_run_node_scalar_int64(self):
         import torch
 
@@ -2761,6 +2765,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         gr.set_shapes_types("x", "run_node", (("",), ("op", torch.int64, ())))
         self.assertTrue(gr.get_is_dimension("x"))
 
+    @requires_torch()
     def test_get_is_dimension_run_node_multidim_int64(self):
         import torch
 

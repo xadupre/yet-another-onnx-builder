@@ -5,21 +5,10 @@ import ml_dtypes
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-import torch
-from torch._C import _from_dlpack
-from yobx.ext_test_case import (
-    ExtTestCase,
-    hide_stdout,
-    requires_onnxruntime_training,
-    requires_cuda,
-)
+from yobx.ext_test_case import ExtTestCase, hide_stdout, requires_torch
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
-from yobx.torch.torch_helper import onnx_dtype_to_torch_dtype
-from yobx.reference._inference_session import (
-    InferenceSessionForNumpy,
-    InferenceSessionForTorch,
-    investigate_onnxruntime_issue,
-)
+from yobx.reference._inference_session import investigate_onnxruntime_issue
+from yobx.reference._inference_session_numpy import InferenceSessionForNumpy
 
 TFLOAT = onnx.TensorProto.FLOAT
 
@@ -31,12 +20,12 @@ class TestInferenceSession(ExtTestCase):
         x = np.arange(n).astype(np.float32) / n
         if bias:
             x = x + bias
-        return torch.from_numpy(x.reshape(tuple(shape)).astype(np.float32))
+        return x.reshape(tuple(shape)).astype(np.float32)
 
     @classmethod
     def _get_model(
         cls,
-    ) -> Tuple[onnx.ModelProto, Dict[str, torch.Tensor], Tuple[torch.Tensor, ...]]:
+    ) -> Tuple[onnx.ModelProto, Dict[str, np.ndarray], Tuple[np.ndarray, ...]]:
         model = oh.make_model(
             oh.make_graph(
                 [
@@ -85,119 +74,23 @@ class TestInferenceSession(ExtTestCase):
         device = ortvalue._ortvalue.__dlpack_device__()
         self.assertEqual((1, 0), device)
 
-    def test_ort_value_dlpack_torch(self):
-        from onnxruntime.capi.onnxruntime_pybind11_state import OrtValue as C_OrtValue
-
-        torch_arr_input = torch.tensor([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=torch.float32)
-        shape = torch_arr_input.shape
-        ptr = torch_arr_input.data_ptr()
-        dlp = torch_arr_input.__dlpack__()
-        ortvalue = C_OrtValue.from_dlpack(dlp, False)
-        self.assertEqual(shape, tuple(ortvalue.shape()))
-        ptr2 = ortvalue.data_ptr()
-        self.assertEqual(ptr, ptr2)
-
-        tv = _from_dlpack(ortvalue.to_dlpack())
-        self.assertEqual(tv.shape, shape)
-        ptr3 = tv.data_ptr()
-        self.assertEqual(ptr, ptr3)
-
     def test_numpy(self):
         model, feeds, expected = self._get_model()
         wrap = InferenceSessionForNumpy(model, providers="cpu")
-        got = wrap.run(None, {k: v.numpy() for k, v in feeds.items()})
+        got = wrap.run(None, feeds)
         self.assertIsInstance(got[0], np.ndarray)
         self.assertEqualArray(expected[0], got[0])
 
     def test_numpy_no_optimization(self):
         model, feeds, expected = self._get_model()
         wrap = InferenceSessionForNumpy(model, providers="cpu", graph_optimization_level=False)
-        got = wrap.run(None, {k: v.numpy() for k, v in feeds.items()})
+        got = wrap.run(None, feeds)
         self.assertIsInstance(got[0], np.ndarray)
         self.assertEqualArray(expected[0], got[0])
-
-    def test_torch_guess_cpu(self):
-        model, feeds, expected = self._get_model()
-        wrap = InferenceSessionForTorch(model, providers="cpu", use_training_api=True)
-        got = wrap.run(None, feeds)
-        self.assertIsInstance(got[0], torch.Tensor)
-        self.assertEqualArray(expected[0], got[0])
-
-    @requires_onnxruntime_training(True)
-    def test_torch_training_cpu(self):
-        model, feeds, expected = self._get_model()
-        wrap = InferenceSessionForTorch(model, providers="cpu", use_training_api=True)
-        got = wrap.run(None, feeds)
-        self.assertIsInstance(got[0], torch.Tensor)
-        self.assertEqualArray(expected[0], got[0])
-
-    def test_torch_notraining_cpu(self):
-        model, feeds, expected = self._get_model()
-        wrap = InferenceSessionForTorch(model, providers="cpu", use_training_api=False)
-        got = wrap.run(None, feeds)
-        self.assertIsInstance(got[0], torch.Tensor)
-        self.assertEqualArray(expected[0], got[0])
-
-    @requires_cuda()
-    def test_torch_guess_cuda(self):
-        model, feeds, expected = self._get_model()
-        feeds = {k: v.to("cuda") for k, v in feeds.items()}
-        expected = tuple(t.to("cuda") for t in expected)
-        wrap = InferenceSessionForTorch(model, providers="cuda", use_training_api=True)
-        got = wrap.run(None, feeds)
-        self.assertIsInstance(got[0], torch.Tensor)
-        self.assertEqualArray(expected[0], got[0])
-        self.assertEqual(got[0].get_device(), 0)
-
-    @requires_cuda()
-    @requires_onnxruntime_training(True)
-    def test_torch_training_cuda(self):
-        model, feeds, expected = self._get_model()
-        feeds = {k: v.to("cuda") for k, v in feeds.items()}
-        expected = tuple(t.to("cuda") for t in expected)
-        wrap = InferenceSessionForTorch(model, providers="cuda", use_training_api=True)
-        got = wrap.run(None, feeds)
-        self.assertIsInstance(got[0], torch.Tensor)
-        self.assertEqualArray(expected[0], got[0])
-        self.assertEqual(got[0].get_device(), 0)
-
-    @requires_cuda()
-    def test_torch_notraining_cuda(self):
-        model, feeds, expected = self._get_model()
-        feeds = {k: v.to("cuda") for k, v in feeds.items()}
-        expected = tuple(t.to("cuda") for t in expected)
-        wrap = InferenceSessionForTorch(model, providers="cuda", use_training_api=False)
-        got = wrap.run(None, feeds)
-        self.assertIsInstance(got[0], torch.Tensor)
-        # The output is not necessarily on CUDA.
-        self.assertEqualArray(expected[0].cpu(), got[0].cpu())
-        # self.assertEqual(got[0].get_device(), 0)
-
-    @hide_stdout()
-    def test_investigate_onnxruntime_issue_torch(self):
-        model, feeds, _expected = self._get_model()
-        investigate_onnxruntime_issue(
-            model,
-            feeds=feeds,
-            verbose=10,
-            dump_filename="test_investigate_onnxruntime_issue_torch.onnx",
-        )
-
-    @hide_stdout()
-    def test_investigate_onnxruntime_issue_torch_quiet(self):
-        model, feeds, _expected = self._get_model()
-        investigate_onnxruntime_issue(
-            model,
-            feeds=feeds,
-            verbose=10,
-            dump_filename="test_investigate_onnxruntime_issue_torch.onnx",
-            quiet=True,
-        )
 
     @hide_stdout()
     def test_investigate_onnxruntime_issue_numpy(self):
         model, feeds, _expected = self._get_model()
-        feeds = {k: v.numpy() for k, v in feeds.items()}
         investigate_onnxruntime_issue(
             model,
             feeds=feeds,
@@ -210,7 +103,6 @@ class TestInferenceSession(ExtTestCase):
         import onnxruntime
 
         model, feeds, _expected = self._get_model()
-        feeds = {k: v.numpy() for k, v in feeds.items()}
         investigate_onnxruntime_issue(
             model,
             feeds=feeds,
@@ -224,7 +116,6 @@ class TestInferenceSession(ExtTestCase):
     @hide_stdout()
     def test_investigate_onnxruntime_issue_callable_str(self):
         model, feeds, _expected = self._get_model()
-        feeds = {k: v.numpy() for k, v in feeds.items()}
         investigate_onnxruntime_issue(
             model,
             feeds=feeds,
@@ -236,7 +127,6 @@ class TestInferenceSession(ExtTestCase):
     @classmethod
     def _get_model_init(cls, itype) -> Tuple[onnx.ModelProto, Dict[str, Any], Tuple[Any, ...]]:
         dtype = tensor_dtype_to_np_dtype(itype)
-        ttype = onnx_dtype_to_torch_dtype(itype)
         cst = np.arange(6).astype(dtype)
         model = oh.make_model(
             oh.make_graph(
@@ -257,58 +147,26 @@ class TestInferenceSession(ExtTestCase):
             ir_version=10,
         )
         onnx.checker.check_model(model)
-        feeds = {"x": cls._range(5, 6).to(ttype)}
-        expected = torch.isnan(feeds["x"]).to(int) + torch.isnan(
-            torch.from_numpy(cst.astype(float))
-        ).to(int)
-        return (model, feeds, (expected.to(ttype),))
+        feeds = {"x": cls._range(5, 6).astype(dtype)}
+        expected = np.isnan(feeds["x"]).astype(int) + np.isnan(cst.astype(float)).astype(int)
+        return (model, feeds, (expected.astype(dtype),))
 
     def test_init_numpy_afloat32(self):
         model, feeds, expected = self._get_model_init(onnx.TensorProto.FLOAT)
         wrap = InferenceSessionForNumpy(model, providers="cpu", graph_optimization_level=False)
-        got = wrap.run(None, {k: v.numpy() for k, v in feeds.items()})
+        got = wrap.run(None, feeds)
         self.assertIsInstance(got[0], np.ndarray)
         self.assertEqualArray(expected[0], got[0])
 
+    @requires_torch()
     def test_init_numpy_bfloat16(self):
         model, feeds, expected = self._get_model_init(onnx.TensorProto.BFLOAT16)
         wrap = InferenceSessionForNumpy(model, providers="cpu", graph_optimization_level=False)
         got = wrap.run(
-            None, {k: v.to(float).numpy().astype(ml_dtypes.bfloat16) for k, v in feeds.items()}
+            None, {k: v.astype(np.float32).astype(ml_dtypes.bfloat16) for k, v in feeds.items()}
         )
         self.assertIsInstance(got[0], np.ndarray)
         self.assertEqualArray(expected[0], got[0])
-
-    def test_init_torch_afloat32(self):
-        model, feeds, expected = self._get_model_init(onnx.TensorProto.FLOAT)
-        wrap = InferenceSessionForTorch(model, providers="cpu", graph_optimization_level=False)
-        got = wrap.run(None, feeds)
-        self.assertIsInstance(got[0], torch.Tensor)
-        self.assertEqualArray(expected[0], got[0])
-
-    def test_init_torch_bfloat16(self):
-        model, feeds, expected = self._get_model_init(onnx.TensorProto.BFLOAT16)
-        wrap = InferenceSessionForTorch(model, providers="cpu", graph_optimization_level=False)
-        got = wrap.run(None, feeds)
-        self.assertIsInstance(got[0], torch.Tensor)
-        self.assertEqualArray(expected[0], got[0])
-
-    def test_profiling(self):
-        model, feeds, expected = self._get_model_init(onnx.TensorProto.BFLOAT16)
-        wrap = InferenceSessionForTorch(
-            model,
-            providers="cpu",
-            graph_optimization_level=False,
-            enable_profiling=True,
-            optimized_model_filepath=self.get_dump_file("test_init_torch_bfloat16.onnx"),
-            log_severity_level=2,
-            log_verbosity_level=2,
-            disable_aot_function_inlining=1,
-        )
-        got = wrap.run(None, feeds)
-        self.assertIsInstance(got[0], torch.Tensor)
-        self.assertEqualArray(expected[0], got[0])
-        self.clean_dump()
 
 
 if __name__ == "__main__":

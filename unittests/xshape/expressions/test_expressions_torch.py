@@ -1,5 +1,5 @@
 import unittest
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.xshape.expressions.expressions_torch import parse_expression, Expression
 
 
@@ -11,6 +11,7 @@ class TestDimension(ExtTestCase):
         self.assertIsInstance(e, Expression)
         self.assertEqual(repr(e), "Expression('a*b*c')")
 
+    @requires_torch()
     def test_parse_expression_div2(self):
         import torch
 
@@ -19,6 +20,7 @@ class TestDimension(ExtTestCase):
         self.assertIsInstance(e, Expression)
         self.assertEqual(repr(e), "Expression('32//s3')")
 
+    @requires_torch()
     def test_parse_expression_node2(self):
         import torch
         from torch.fx.experimental.symbolic_shapes import ShapeEnv
@@ -35,6 +37,7 @@ class TestDimension(ExtTestCase):
         self.assertIsInstance(e, Expression)
         self.assertEqual(repr(e), "Expression('a*b*c')")
 
+    @requires_torch()
     def test_parse_expression_div(self):
         import torch
 
@@ -43,6 +46,7 @@ class TestDimension(ExtTestCase):
         self.assertIsInstance(e, Expression)
         self.assertEqual(repr(e), "Expression('32//s3')")
 
+    @requires_torch()
     def test_parse_expression_node(self):
         import torch
         from torch.fx.experimental.symbolic_shapes import ShapeEnv
