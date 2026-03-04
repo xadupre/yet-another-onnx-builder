@@ -37,11 +37,9 @@ jobs:
         run: |
           pytest --durations=10 \
             --ignore=unittests/torch \
-            --ignore=unittests/helpers/test_mini_onnx_builder.py \
             --ignore=unittests/helpers/test_patch_helper.py \
-            --ignore=unittests/reference/test__inference_session.py \
+            --ignore=unittests/reference/test__inference_session_torch.py \
             --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
             --ignore=unittests/reference/test_onnxruntime_evaluator.py \
-            --ignore=unittests/reference/test_runtime_info.py \
             --ignore=unittests/reference/test_torch_reference_evaluator.py \
             --ignore=unittests/xoptim/test_untrained_models.py

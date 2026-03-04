@@ -58,7 +58,6 @@ from ..helpers.onnx_helper import (
     unary_like_op_types,
     str_tensor_proto_type,
 )
-from ..torch.torch_helper import onnx_dtype_to_torch_dtype, torch_dtype_to_onnx_dtype
 from ..xshape.rename_expressions import rename_dynamic_dimensions, rename_dynamic_expression
 from ..xshape._shape_helper import (
     DYNAMIC_SHAPE,
@@ -2108,6 +2107,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 and isinstance(value[1], tuple)
                 and len(value[1][1]) == 3
             ):
+                from ..torch.torch_helper import torch_dtype_to_onnx_dtype
+
                 dtype = value[1][1][1]  # type: ignore
                 itype = torch_dtype_to_onnx_dtype(dtype)
                 return itype
@@ -2913,6 +2914,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if isinstance(value, np.ndarray):
             return oh.np_dtype_to_tensor_dtype(value.dtype), value.size, value.shape
         if isinstance(value, self.torch.Tensor):
+            from ..torch.torch_helper import torch_dtype_to_onnx_dtype
+
             return torch_dtype_to_onnx_dtype(value.dtype), value.nelement(), value.shape
         if isinstance(value, TensorProto):
             shape = tuple(value.dims)
@@ -9068,6 +9071,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 tt = tt[0]
             else:
                 tt = self.make_torch_tensor_from_np_array(a)
+
+            from ..torch.torch_helper import onnx_dtype_to_torch_dtype
+
             ttype = onnx_dtype_to_torch_dtype(dtype_to_tensor_dtype(a.dtype))
             res = tt.to(ttype)
             assert a.shape == tuple(res.shape), (

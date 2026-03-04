@@ -440,7 +440,7 @@ def requires_onnxir(version: str, msg: str = "") -> Callable:
     try:
         import onnx_ir
     except ImportError:
-        return unittest.skip("onnx-ir missing")
+        return unittest.skip(msg or "onnx-ir not installed")
 
     if not hasattr(onnx_ir, "__version__"):
         # development version
@@ -458,8 +458,8 @@ def requires_sklearn(version: str = "", msg: str = "") -> Callable:
 
     try:
         import sklearn
-    except ImportError:
-        return unittest.skip("scikit-learn missing")
+    except (AttributeError, ImportError):
+        return unittest.skip(msg or "scikit-learn not installed")
 
     if pv.Version(sklearn.__version__) < pv.Version(version):
         msg = f"scikit-learn version {sklearn.__version__} < {version}: {msg}"
@@ -473,7 +473,7 @@ def has_torch(version: str) -> bool:
 
     try:
         import torch
-    except ImportError:
+    except (ImportError, AttributeError):
         return False
 
     return pv.Version(torch.__version__) >= pv.Version(version)
@@ -482,7 +482,12 @@ def has_torch(version: str) -> bool:
 def has_transformers(version: str) -> bool:
     "Returns True if transformers version is higher."
     import packaging.version as pv
-    import transformers
+
+    try:
+        import torch  # noqa: F401
+        import transformers
+    except (ImportError, AttributeError):
+        return False
 
     return pv.Version(transformers.__version__) >= pv.Version(version)
 
@@ -491,8 +496,8 @@ def requires_torch(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`pytorch` is not recent enough."""
     try:
         import torch
-    except ImportError:
-        return unittest.skip("torch missing")
+    except (ImportError, AttributeError):
+        return unittest.skip(msg or "torch not installed")
 
     if not version:
         return lambda x: x
@@ -510,7 +515,7 @@ def requires_onnx_diagnostic(version: str = "", msg: str = "") -> Callable:
     try:
         import onnx_diagnostic
     except ImportError:
-        return unittest.skip("onnx_diagnostic missing")
+        return unittest.skip(msg or "onnx_diagnostic not installed")
 
     if not version:
         return lambda x: x
@@ -528,7 +533,7 @@ def requires_matplotlib(version: str = "", msg: str = "") -> Callable:
     try:
         import matplotlib
     except ImportError:
-        return unittest.skip("matplotlib missing")
+        return unittest.skip(msg or "matplotlib not installed")
 
     if not version:
         return lambda x: x
@@ -544,7 +549,11 @@ def requires_matplotlib(version: str = "", msg: str = "") -> Callable:
 def requires_numpy(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`numpy` is not recent enough."""
     import packaging.version as pv
-    import numpy
+
+    try:
+        import numpy
+    except ImportError:
+        return unittest.skip(msg or "numpy not installed")
 
     if pv.Version(numpy.__version__) < pv.Version(version):
         msg = f"numpy version {numpy.__version__} < {version}: {msg}"
@@ -557,10 +566,10 @@ def requires_transformers(
 ) -> Callable:
     """Skips a unit test if :epkg:`transformers` is not recent enough."""
     try:
+        import torch  # noqa: F401
         import transformers
-    except ImportError:
-        msg = f"transformers not installed {msg}"
-        return unittest.skip(msg)
+    except (AttributeError, ImportError):
+        return unittest.skip(msg or "transformers not installed")
 
     if not version:
         return lambda x: x
@@ -586,10 +595,10 @@ def requires_diffusers(
     """Skips a unit test if :epkg:`transformers` is not recent enough."""
 
     try:
+        import torch  # noqa: F401
         import diffusers
-    except ImportError:
-        msg = f"diffusers not installed {msg}"
-        return unittest.skip(msg)
+    except (ImportError, AttributeError):
+        return unittest.skip(msg or "diffuers not installed")
 
     if not version:
         return lambda x: x
@@ -611,8 +620,7 @@ def requires_onnxscript(version: str, msg: str = "") -> Callable:
     try:
         import onnxscript
     except ImportError:
-        msg = f"onnxscript not installed {msg}"
-        return unittest.skip(msg)
+        return unittest.skip(msg or "onnxscript not installed")
 
     if not version:
         return lambda x: x
@@ -650,7 +658,11 @@ def has_onnxscript(version: str) -> Callable:
 def requires_onnxruntime(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not recent enough."""
     import packaging.version as pv
-    import onnxruntime
+
+    try:
+        import onnxruntime
+    except ImportError:
+        return unittest.skip(msg or "onnxruntime not installed")
 
     if pv.Version(onnxruntime.__version__) < pv.Version(version):
         msg = f"onnxruntime version {onnxruntime.__version__} < {version}: {msg}"
@@ -740,7 +752,11 @@ def requires_onnxruntime_training(
 def requires_onnx(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx` is not recent enough."""
     import packaging.version as pv
-    import onnx
+
+    try:
+        import onnx
+    except ImportError:
+        return unittest.skip(msg or "onnx not installed")
 
     if pv.Version(onnx.__version__) < pv.Version(version):
         msg = f"onnx version {onnx.__version__} < {version}: {msg}"

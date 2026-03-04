@@ -3,7 +3,7 @@ import numpy as np
 import ml_dtypes
 import onnx
 import torch
-from yobx.ext_test_case import ExtTestCase, requires_transformers
+from yobx.ext_test_case import ExtTestCase, requires_transformers, requires_torch
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.helpers.mini_onnx_builder import (
     create_onnx_model_from_input_tensors,
@@ -11,7 +11,6 @@ from yobx.helpers.mini_onnx_builder import (
     proto_from_array,
     MiniOnnxBuilder,
 )
-from yobx.torch.in_transformers.cache_helper import make_dynamic_cache, CacheKeyValue
 from yobx.helpers import string_type
 
 
@@ -60,6 +59,7 @@ class TestMiniOnnxBuilder(ExtTestCase):
         self.assertEqual((2,), got[1].shape)
         self.assertEqual(np.float32, got[1].dtype)
 
+    @requires_torch()
     def test_mini_onnx_builder1(self):
         data = [
             (
@@ -219,6 +219,8 @@ class TestMiniOnnxBuilder(ExtTestCase):
 
     @requires_transformers("4.57")
     def test_mini_onnx_builder_transformers(self):
+        from yobx.torch.in_transformers.cache_helper import make_dynamic_cache, CacheKeyValue
+
         cache = make_dynamic_cache([(torch.ones((3, 3)), torch.ones((3, 3)) * 2)])
         dc = CacheKeyValue(cache)
         self.assertEqual(len(dc.key_cache), 1)
@@ -234,6 +236,8 @@ class TestMiniOnnxBuilder(ExtTestCase):
 
     @requires_transformers("4.57")
     def test_mini_onnx_builder_transformers_sep(self):
+        from yobx.torch.in_transformers.cache_helper import make_dynamic_cache, CacheKeyValue
+
         cache = make_dynamic_cache([(torch.ones((3, 3)), torch.ones((3, 3)) * 2)])
         dc = CacheKeyValue(cache)
         self.assertEqual(len(dc.key_cache), 1)

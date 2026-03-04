@@ -3,8 +3,7 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-import torch
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.reference.runtime_info import (
     first_used_last_used,
     RuntimeValue,
@@ -14,7 +13,10 @@ from yobx.reference.runtime_info import (
 
 
 class TestRuntimeInfo(ExtTestCase):
+    @requires_torch()
     def test_runtime_info(self):
+        import torch
+
         rt = RuntimeValue("e", is_shape=True, value=torch.Tensor([0]))
         r = repr(rt)
         self.assertEqual("RuntimeValue(name=e, is_shape=True, value=T1s1)", r)
