@@ -28,9 +28,9 @@ def _extract_tree_attributes(tree, n_classes: int, is_classifier: bool):
         Only single-output trees are supported (``tree.n_outputs == 1``).
         Multi-output trees would require multiple TreeEnsemble nodes.
     """
-    assert tree.n_outputs == 1, (
-        f"Only single-output decision trees are supported, got n_outputs={tree.n_outputs}."
-    )
+    assert (
+        tree.n_outputs == 1
+    ), f"Only single-output decision trees are supported, got n_outputs={tree.n_outputs}."
     n_nodes = tree.node_count
     feature = tree.feature
     threshold = tree.threshold.astype(np.float32)
@@ -70,7 +70,9 @@ def _extract_tree_attributes(tree, n_classes: int, is_classifier: bool):
             nodes_truenodeids.append(0)
             nodes_falsenodeids.append(0)
 
-            node_value = value[node_id, 0]  # shape: (max_n_classes,); index 0 = first (only) output
+            node_value = value[
+                node_id, 0
+            ]  # shape: (max_n_classes,); index 0 = first (only) output
             if is_classifier:
                 total = node_value.sum()
                 # total > 0 for all valid fitted nodes; guard against degenerate cases

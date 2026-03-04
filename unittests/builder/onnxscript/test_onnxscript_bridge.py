@@ -1,41 +1,24 @@
-"""
-Unit tests for :class:`yobx.builder.onnxscript.OnnxScriptGraphBuilder`.
-"""
-
 import unittest
 import numpy as np
-from onnx import TensorProto
+import onnx
 from onnx.checker import check_model
-
+import onnx.numpy_helper as onh
+import onnx_ir as ir
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
+from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+from yobx.reference import ExtendedReferenceEvaluator
 
 
 @requires_onnxscript()
 class TestOnnxScriptBridge(ExtTestCase):
-    """Tests for OnnxScriptGraphBuilder."""
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
-    def _make_builder(self, opset=18):
-        from yobx.builder.onnxscript._builder import OnnxScriptGraphBuilder
-
-        return OnnxScriptGraphBuilder(opset)
-
-    # ------------------------------------------------------------------
-    # Construction
-    # ------------------------------------------------------------------
+    def _make_builder(self, opset=18, ir_version=None):
+        return OnnxScriptGraphBuilder(opset, ir_version=ir_version)
 
     def test_construction_with_int_opset(self):
-        from yobx.builder.onnxscript._builder import OnnxScriptGraphBuilder
-
         gr = OnnxScriptGraphBuilder(18)
         self.assertEqual(gr.opsets, {"": 18})
 
     def test_construction_with_dict_opset(self):
-        from yobx.builder.onnxscript._builder import OnnxScriptGraphBuilder
-
         gr = OnnxScriptGraphBuilder({"": 18, "com.microsoft": 1})
         self.assertEqual(gr.opsets[""], 18)
         self.assertIn("com.microsoft", gr.opsets)
@@ -49,23 +32,19 @@ class TestOnnxScriptBridge(ExtTestCase):
         gr = self._make_builder()
         self.assertIsNotNone(gr.op)
 
-    # ------------------------------------------------------------------
-    # make_tensor_input
-    # ------------------------------------------------------------------
-
     def test_make_tensor_input_returns_name(self):
         gr = self._make_builder()
-        name = gr.make_tensor_input("X", TensorProto.FLOAT, (None, 4))
+        name = gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (None, 4))
         self.assertEqual(name, "X")
 
     def test_make_tensor_input_registers_name(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         self.assertTrue(gr.has_name("X"))
 
     def test_make_tensor_input_no_shape(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT)
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT)
         self.assertTrue(gr.has_name("X"))
 
     def test_make_tensor_input_no_type(self):
@@ -76,42 +55,38 @@ class TestOnnxScriptBridge(ExtTestCase):
 
     def test_make_tensor_input_static_shape(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3, 4))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3, 4))
         gr.make_node("Relu", ["X"], ["Y"])
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
         check_model(proto)
 
     def test_make_tensor_input_dynamic_shape_int(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (None, 4))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (None, 4))
         gr.make_node("Relu", ["X"], ["Y"])
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
         check_model(proto)
 
     def test_make_tensor_input_symbolic_shape(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, ("batch", 4))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 4))
         gr.make_node("Relu", ["X"], ["Y"])
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
         check_model(proto)
 
-    # ------------------------------------------------------------------
-    # make_tensor_output
-    # ------------------------------------------------------------------
-
     def test_make_tensor_output_returns_name(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         gr.make_node("Relu", ["X"], ["Y"])
-        name = gr.make_tensor_output("Y", TensorProto.FLOAT)
+        name = gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         self.assertEqual(name, "Y")
 
     def test_make_tensor_output_list(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (5,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (5,))
         k = gr.make_initializer("k", np.array([3], dtype=np.int64))
         gr.make_node("TopK", ["X", k], ["vals", "idxs"])
         names = gr.make_tensor_output(["vals", "idxs"])
@@ -119,13 +94,9 @@ class TestOnnxScriptBridge(ExtTestCase):
 
     def test_make_tensor_output_missing_name_raises(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         with self.assertRaises(KeyError):
             gr.make_tensor_output("does_not_exist")
-
-    # ------------------------------------------------------------------
-    # make_initializer
-    # ------------------------------------------------------------------
 
     def test_make_initializer_numpy(self):
         gr = self._make_builder()
@@ -145,7 +116,6 @@ class TestOnnxScriptBridge(ExtTestCase):
         self.assertEqual(name, "eps")
 
     def test_make_initializer_tensor_proto(self):
-        import onnx.numpy_helper as onh
 
         gr = self._make_builder()
         arr = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
@@ -162,10 +132,10 @@ class TestOnnxScriptBridge(ExtTestCase):
 
     def test_make_initializer_in_graph(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (None, 3))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (None, 3))
         bias = gr.make_initializer("bias", np.array([1.0, 2.0, 3.0], dtype=np.float32))
         gr.make_node("Add", ["X", bias], ["Y"])
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
         check_model(proto)
         self.assertEqual(len(proto.graph.initializer), 1)
@@ -177,13 +147,13 @@ class TestOnnxScriptBridge(ExtTestCase):
 
     def test_make_node_single_output_str(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         result = gr.make_node("Relu", ["X"], ["Y"])
         self.assertEqual(result, "Y")
 
     def test_make_node_single_output_int(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         result = gr.make_node("Relu", ["X"], 1)
         # Auto-generated name
         self.assertIsInstance(result, str)
@@ -191,7 +161,7 @@ class TestOnnxScriptBridge(ExtTestCase):
 
     def test_make_node_multiple_output_list(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (5,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (5,))
         k = gr.make_initializer("k", np.array([3], dtype=np.int64))
         result = gr.make_node("TopK", ["X", k], ["vals", "idxs"])
         self.assertIsInstance(result, list)
@@ -199,19 +169,19 @@ class TestOnnxScriptBridge(ExtTestCase):
 
     def test_make_node_chained(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         r = gr.make_node("Relu", ["X"], ["r"])
         n = gr.make_node("Neg", [r], ["n"])
-        gr.make_tensor_output(n, TensorProto.FLOAT)
+        gr.make_tensor_output(n, onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
         check_model(proto)
         self.assertEqual([node.op_type for node in proto.graph.node], ["Relu", "Neg"])
 
     def test_make_node_with_kwargs_attributes(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3, 4))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3, 4))
         gr.make_node("Transpose", ["X"], ["T"], perm=[1, 0])
-        gr.make_tensor_output("T", TensorProto.FLOAT)
+        gr.make_tensor_output("T", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
         check_model(proto)
         node = proto.graph.node[0]
@@ -223,10 +193,10 @@ class TestOnnxScriptBridge(ExtTestCase):
         import onnx.helper as oh
 
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3, 4))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3, 4))
         attr = oh.make_attribute("perm", [1, 0])
         gr.make_node("Transpose", ["X"], ["T"], attributes=[attr])
-        gr.make_tensor_output("T", TensorProto.FLOAT)
+        gr.make_tensor_output("T", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
         check_model(proto)
 
@@ -235,24 +205,24 @@ class TestOnnxScriptBridge(ExtTestCase):
         # We only check the node is created without error;
         # custom domain ops cannot be validated by the checker.
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         result = gr.make_node("CustomOp", ["X"], ["Y"], domain="custom")
         self.assertEqual(result, "Y")
 
     def test_make_node_optional_input(self):
         """Empty-string optional inputs are forwarded as None."""
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3, 4))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3, 4))
         # Unsqueeze in opset 13+ takes a separate axes input
         axes = gr.make_initializer("axes", np.array([0], dtype=np.int64))
         gr.make_node("Unsqueeze", ["X", axes], ["Y"])
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
         check_model(proto)
 
     def test_make_node_unknown_input_raises(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         with self.assertRaises(KeyError):
             gr.make_node("Add", ["X", "missing"], ["Y"])
 
@@ -264,37 +234,37 @@ class TestOnnxScriptBridge(ExtTestCase):
         from onnx import ModelProto
 
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         gr.make_node("Relu", ["X"], ["Y"])
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
         self.assertIsInstance(proto, ModelProto)
 
     def test_to_onnx_multiple_outputs(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (5,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (5,))
         k = gr.make_initializer("k", np.array([3], dtype=np.int64))
         gr.make_node("TopK", ["X", k], ["vals", "idxs"])
-        gr.make_tensor_output("vals", TensorProto.FLOAT)
-        gr.make_tensor_output("idxs", TensorProto.INT64)
+        gr.make_tensor_output("vals", onnx.TensorProto.FLOAT)
+        gr.make_tensor_output("idxs", onnx.TensorProto.INT64)
         proto = gr.to_onnx()
         check_model(proto)
         self.assertEqual(len(proto.graph.output), 2)
 
     def test_to_onnx_ir_version_override(self):
-        gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr = self._make_builder(ir_version=8)
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         gr.make_node("Relu", ["X"], ["Y"])
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
-        proto = gr.to_onnx(ir_version=8)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
+        proto = gr.to_onnx()
         self.assertEqual(proto.ir_version, 8)
 
     def test_to_onnx_shape_field_present(self):
         """Exported proto should have tensor_type.shape set (onnx >= 1.20 requirement)."""
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (None, 3))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (None, 3))
         gr.make_node("Relu", ["X"], ["Y"])
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
         for vi in list(proto.graph.input) + list(proto.graph.output):
             if vi.type.HasField("tensor_type"):
@@ -304,18 +274,12 @@ class TestOnnxScriptBridge(ExtTestCase):
                 )
 
     def test_to_onnx_custom_ir_version_at_construction(self):
-        from yobx.builder.onnxscript._builder import OnnxScriptGraphBuilder
-
         gr = OnnxScriptGraphBuilder(18, ir_version=7)
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         gr.make_node("Relu", ["X"], ["Y"])
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
         self.assertEqual(proto.ir_version, 7)
-
-    # ------------------------------------------------------------------
-    # has_name / get_value
-    # ------------------------------------------------------------------
 
     def test_has_name_false_for_unknown(self):
         gr = self._make_builder()
@@ -327,29 +291,21 @@ class TestOnnxScriptBridge(ExtTestCase):
             gr.get_value("unknown")
 
     def test_get_value_returns_ir_value(self):
-        import onnx_ir as ir
-
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         v = gr.get_value("X")
         self.assertIsInstance(v, ir.Value)
-
-    # ------------------------------------------------------------------
-    # Correctness (end-to-end numerical check)
-    # ------------------------------------------------------------------
 
     def test_add_bias_numerical(self):
         """Add a bias to an input and verify numerical correctness."""
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (None, 3))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (None, 3))
         bias = gr.make_initializer("bias", np.array([1.0, 2.0, 3.0], dtype=np.float32))
         gr.make_node("Add", ["X", bias], ["Y"])
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
 
-        import onnx.reference as ref_impl
-
-        session = ref_impl.ReferenceEvaluator(proto)
+        session = ExtendedReferenceEvaluator(proto)
         x = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]], dtype=np.float32)
         (y,) = session.run(None, {"X": x})
         expected = x + np.array([1.0, 2.0, 3.0], dtype=np.float32)
@@ -357,10 +313,10 @@ class TestOnnxScriptBridge(ExtTestCase):
 
     def test_matmul_numerical(self):
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (2, 3))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (2, 3))
         w = gr.make_initializer("W", np.eye(3, dtype=np.float32))
         gr.make_node("MatMul", ["X", w], ["Y"])
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
 
         import onnx.reference as ref_impl
@@ -376,10 +332,9 @@ class TestOnnxScriptBridge(ExtTestCase):
 
     def test_inner_builder_can_create_nodes_directly(self):
         """Nodes created via inner_builder.op should be present in the graph."""
-        import onnx_ir as ir
 
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, (3,))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         x_val = gr.get_value("X")
         y_val = gr.inner_builder.op.Relu(x_val)
         y_val.name = "Y"

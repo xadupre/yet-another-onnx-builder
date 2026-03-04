@@ -1,49 +1,80 @@
-"""
-Bridge between yobx :class:`~yobx.xbuilder.GraphBuilder` API and
-:class:`onnxscript._internal.builder.GraphBuilder`.
-
-The :class:`OnnxScriptGraphBuilder` wraps the onnxscript imperative IR builder
-and exposes a simplified interface that mirrors the most commonly used methods
-of the yobx ``GraphBuilder``.  This allows callers to build ONNX graphs using
-the familiar yobx naming conventions (string-based inputs/outputs, ONNX
-``TensorProto`` element-type integers, tuple shapes) while delegating the
-heavy-lifting to onnxscript's native IR layer.
-
-Example::
-
-    import numpy as np
-    from onnx import TensorProto
-    from yobx.builder.onnxscript import OnnxScriptGraphBuilder
-
-    gr = OnnxScriptGraphBuilder({"": 18})
-    gr.make_tensor_input("X", TensorProto.FLOAT, (None, 4))
-    init_name = gr.make_initializer("W", np.ones((4, 2), dtype=np.float32))
-    out_names = gr.make_node("MatMul", ["X", init_name], 1, name="mm")
-    gr.make_tensor_output(out_names, TensorProto.FLOAT, (None, 2))
-    model_proto = gr.to_onnx()
-"""
-
 from __future__ import annotations
-
 from typing import Any, Dict, List, Optional, Sequence, Union
-
-from onnx import AttributeProto, ModelProto
-
+import numpy as np
+import onnx
 import onnx_ir as ir
+from ...container import ExtendedModelContainer
+from ...helpers.onnx_helper import _default_OPSET_TO_IR_VERSION
 
-from ._helpers import (
-    default_ir_version as _default_ir_version,
-    kwargs_to_ir_attrs as _kwargs_to_ir_attrs,
-    to_ir_dtype as _to_ir_dtype,
-    to_ir_shape as _to_ir_shape,
-    value_to_ir_tensor as _value_to_ir_tensor,
-)
+
+def to_ir_dtype(elem_type: Optional[int]) -> Optional[ir.DataType]:
+    """
+    Converts an ONNX ``TensorProto`` element-type integer to :class:`ir.DataType`.
+
+    :param elem_type: ONNX element type (e.g. ``TensorProto.FLOAT == 1``),
+        or ``None`` / 0 for *unknown*.
+    :return: Corresponding :class:`ir.DataType`, or ``None`` when unknown.
+    """
+    if not elem_type:
+        return None
+    return ir.DataType(elem_type)
+
+
+def to_ir_shape(shape: Optional[Sequence[Optional[Union[int, str]]]]) -> Optional[ir.Shape]:
+    """
+    Converts a yobx-style shape tuple to :class:`ir.Shape`.
+
+    :param shape: A sequence of dimension sizes.  Each element may be an
+        ``int`` (static), a ``str`` (symbolic / dynamic), or ``None``
+        (fully unknown dimension).
+    :return: :class:`ir.Shape`, or ``None`` when *shape* itself is ``None``.
+    """
+    if shape is None:
+        return None
+    return ir.Shape(list(shape))
+
+
+def value_to_ir_tensor(value: Any, name: str) -> ir.TensorProtocol:
+    """
+    Converts an initializer *value* to an :class:`ir.TensorProtocol`.
+
+    Supported input types:
+
+    * :class:`numpy.ndarray`
+    * scalar Python ``int`` or ``float`` (promoted to 0-D arrays)
+    * :class:`onnx.TensorProto` (converted via :func:`ir.from_proto`)
+    * Any object already satisfying :class:`ir.TensorProtocol`
+
+    :param value: The raw initializer value.
+    :param name: Name that should be associated with the resulting tensor.
+    :return: An :class:`ir.TensorProtocol` suitable for passing to
+        :meth:`onnxscript._internal.builder.GraphBuilder.initializer`.
+    :raises TypeError: When *value* has an unsupported type.
+    """
+    if isinstance(value, onnx.TensorProto):
+        t = ir.from_proto(value)
+        return t
+    if isinstance(value, int):
+        value = np.array(value, dtype=np.int64)
+    elif isinstance(value, float):
+        value = np.array(value, dtype=np.float32)
+    if isinstance(value, np.ndarray):
+        return ir.tensor(value, name=name)
+    # Try to use it as-is (e.g. already an ir.TensorProtocol subclass)
+    if hasattr(value, "dtype") and hasattr(value, "shape"):
+        return ir.tensor(np.array(value), name=name)
+    raise TypeError(
+        f"Cannot convert initializer {name!r} of type {type(value)} "
+        "to an onnx-ir tensor.  Supported types: numpy.ndarray, int, float, "
+        "onnx.TensorProto."
+    )
 
 
 class OnnxScriptGraphBuilder:
-    """Bridge builder that exposes a yobx-compatible API over onnxscript's IR.
+    """
+    Bridge builder that exposes a yobx-compatible API over onnxscript's IR.
 
-    :param target_opset_or_opsets: Either a single opset version (``int``) or
+    :param target_opset_or_existing_proto: Either a single opset version (``int``) or
         a mapping ``{domain: version}`` (``Dict[str, int]``).  For example
         ``18`` or ``{"": 18, "com.microsoft": 1}``.
     :param ir_version: ONNX IR version to use when exporting.  When ``None``
@@ -66,41 +97,50 @@ class OnnxScriptGraphBuilder:
 
     def __init__(
         self,
-        target_opset_or_opsets: Union[int, Dict[str, int]],
+        target_opset_or_existing_proto: Union[int, Dict[str, int]],
         ir_version: Optional[int] = None,
     ) -> None:
-        from onnxscript._internal.builder import GraphBuilder as _OSGraphBuilder
+        from onnxscript._internal.builder import GraphBuilder as OSGraphBuilder
 
-        if isinstance(target_opset_or_opsets, int):
-            opsets: Dict[str, int] = {"": target_opset_or_opsets}
+        if isinstance(target_opset_or_existing_proto, (int, dict)):
+            self.opsets = (
+                {"": target_opset_or_existing_proto}
+                if isinstance(target_opset_or_existing_proto, int)
+                else target_opset_or_existing_proto
+            )
         else:
-            opsets = dict(target_opset_or_opsets)
+            raise NotImplementedError(
+                f"Type {type(target_opset_or_existing_proto)} is not supported."
+            )
 
-        self._opsets = opsets
-        self._ir_version = ir_version
+        self.ir_version = (
+            ir_version if ir_version else _default_OPSET_TO_IR_VERSION()[self.main_opset]
+        )
+        assert self.ir_version, f"{self.ir_version=} is wrong, {self.main_opset=}"
 
         self._graph = ir.Graph(
             name="graph",
             inputs=[],
             outputs=[],
             nodes=[],
-            opset_imports=opsets,
+            opset_imports=self.opsets,
         )
-        self._inner: _OSGraphBuilder = _OSGraphBuilder(self._graph)
+        self._inner: OSGraphBuilder = OSGraphBuilder(self._graph)
 
         # Mapping from the user-visible name → ir.Value
         self._name_to_value: Dict[str, ir.Value] = {}
         # Counter for auto-generating output names
         self._output_counter: int = 0
 
-    # ------------------------------------------------------------------
-    # Properties
-    # ------------------------------------------------------------------
+    @property
+    def main_opset(self):
+        "Returns the opset for the main domain (assuming it is used)."
+        return self.opsets[""]
 
     @property
     def inner_builder(self):
-        """The underlying :class:`onnxscript._internal.builder.GraphBuilder`.
-
+        """
+        The underlying :class:`onnxscript._internal.builder.GraphBuilder`.
         Use this to access onnxscript-native functionality that is not
         exposed through the yobx-compatible bridge API.
 
@@ -110,35 +150,31 @@ class OnnxScriptGraphBuilder:
 
     @property
     def op(self):
-        """Dynamic op dispatcher from the underlying onnxscript builder.
-
+        """
+        Dynamic op dispatcher from the underlying onnxscript builder.
         Equivalent to ``self.inner_builder.op``.  Allows constructs such as::
 
             y = gr.op.Relu(x_value)
 
-        where *x_value* is an :class:`ir.Value` retrieved from
-        :meth:`get_value`.
+        where *x_value* is an :class:`ir.Value` retrieved from :meth:`get_value`.
         """
         return self._inner.op
-
-    @property
-    def opsets(self) -> Dict[str, int]:
-        """Opset dictionary ``{domain: version}``."""
-        return dict(self._opsets)
 
     # ------------------------------------------------------------------
     # Name registry helpers
     # ------------------------------------------------------------------
 
     def has_name(self, name: str) -> bool:
-        """Return ``True`` when *name* is a known value in this graph.
+        """
+        Returns ``True`` when *name* is a known value in this graph.
 
         :param name: Tensor name to query.
         """
         return name in self._name_to_value
 
     def get_value(self, name: str) -> ir.Value:
-        """Return the :class:`ir.Value` associated with *name*.
+        """
+        Returns the :class:`ir.Value` associated with *name*.
 
         :param name: Tensor name.
         :raises KeyError: When *name* has not been registered.
@@ -147,8 +183,7 @@ class OnnxScriptGraphBuilder:
             return self._name_to_value[name]
         except KeyError:
             raise KeyError(
-                f"Name {name!r} is not known.  "
-                f"Known names: {sorted(self._name_to_value)}"
+                f"Name {name!r} is not known. Known names: {sorted(self._name_to_value)}"
             ) from None
 
     def _register(self, name: str, value: ir.Value) -> None:
@@ -165,7 +200,8 @@ class OnnxScriptGraphBuilder:
         elem_type: Optional[int] = None,
         shape: Optional[Sequence[Optional[Union[int, str]]]] = None,
     ) -> str:
-        """Add a graph input and return its name.
+        """
+        Adds a graph input and return its name.
 
         :param name: Input tensor name.
         :param elem_type: ONNX element type (e.g. ``TensorProto.FLOAT``).
@@ -174,12 +210,10 @@ class OnnxScriptGraphBuilder:
             dimension and a ``str`` for a symbolic / dynamic dimension.
         :return: The registered name (same as *name*).
         """
-        dtype = _to_ir_dtype(elem_type)
-        ir_shape = _to_ir_shape(shape)
+        dtype = to_ir_dtype(elem_type)
+        ir_shape = to_ir_shape(shape)
 
-        tensor_type: Optional[ir.TensorType] = (
-            ir.TensorType(dtype) if dtype is not None else None
-        )
+        tensor_type: Optional[ir.TensorType] = ir.TensorType(dtype) if dtype is not None else None
         value = ir.Value(name=name, type=tensor_type, shape=ir_shape)
         self._graph.inputs.append(value)
         self._register(name, value)
@@ -191,7 +225,8 @@ class OnnxScriptGraphBuilder:
         elem_type: Optional[int] = None,
         shape: Optional[Sequence[Optional[Union[int, str]]]] = None,
     ) -> Union[str, List[str]]:
-        """Register an existing value as a graph output and return its name.
+        """
+        Registers an existing value as a graph output and return its name.
 
         :param name: Name (or list of names) of the tensor(s) to mark as
             graph output(s).  Must already exist in this builder (i.e. have
@@ -212,11 +247,11 @@ class OnnxScriptGraphBuilder:
         value = self.get_value(name)
 
         # Optionally apply type/shape hints
-        dtype = _to_ir_dtype(elem_type)
+        dtype = to_ir_dtype(elem_type)
         if dtype is not None and value.type is None:
             value.type = ir.TensorType(dtype)
 
-        ir_shape = _to_ir_shape(shape)
+        ir_shape = to_ir_shape(shape)
         if ir_shape is not None and value.shape is None:
             value.shape = ir_shape
 
@@ -228,7 +263,8 @@ class OnnxScriptGraphBuilder:
         name: str,
         value: Any,
     ) -> str:
-        """Add an initializer tensor and return its name.
+        """
+        Adds an initializer tensor and return its name.
 
         :param name: Name for the initializer.  May be an empty string ``""``
             in which case a unique name is generated automatically.
@@ -240,7 +276,7 @@ class OnnxScriptGraphBuilder:
         if not name:
             name = f"init_{len(self._name_to_value)}"
 
-        tensor = _value_to_ir_tensor(value, name)
+        tensor = value_to_ir_tensor(value, name)
         ir_value = self._inner.initializer(tensor, name=name, qualify=False)
         self._register(name, ir_value)
         return name
@@ -251,11 +287,12 @@ class OnnxScriptGraphBuilder:
         inputs: Union[str, List[str]],
         outputs: Union[int, str, List[str]] = 1,
         domain: str = "",
-        attributes: Optional[List[AttributeProto]] = None,
+        attributes: Optional[List[onnx.AttributeProto]] = None,
         name: Optional[str] = None,
         **kwargs: Any,
     ) -> Union[str, List[str]]:
-        """Create an ONNX node and return its output name(s).
+        """
+        Creates an ONNX node and return its output name(s).
 
         :param op_type: ONNX operator type (e.g. ``"Relu"``, ``"MatMul"``).
         :param inputs: Input tensor name(s).  Each name must have been
@@ -303,10 +340,7 @@ class OnnxScriptGraphBuilder:
                 ir_attr = ir.from_proto(attr)
                 extra_kwargs[attr.name] = ir_attr.value
 
-        # Merge all attribute sources; user kwargs take precedence
-        all_kwargs = _kwargs_to_ir_attrs({**extra_kwargs, **kwargs})
-
-        # Pass output specification to call_op
+        all_kwargs = {**extra_kwargs, **kwargs}
         if output_names is not None:
             all_kwargs["_outputs"] = output_names
         else:
@@ -315,10 +349,8 @@ class OnnxScriptGraphBuilder:
         if domain:
             all_kwargs["_domain"] = domain
 
-        # Call onnxscript builder
         result = self._inner.call_op(op_type, ir_inputs, all_kwargs)
 
-        # Normalise to list
         if isinstance(result, ir.Value):
             result_list: List[ir.Value] = [result]
         else:
@@ -350,36 +382,26 @@ class OnnxScriptGraphBuilder:
     # Export
     # ------------------------------------------------------------------
 
-    def to_onnx(self, ir_version: Optional[int] = None) -> ModelProto:
-        """Export the graph as an ONNX :class:`~onnx.ModelProto`.
-
-        :param ir_version: Override the IR version for this call.  Falls back
-            to the value passed at construction time, or an automatic default.
-        :return: A fully populated :class:`~onnx.ModelProto`.
-        """
-        from onnx import TensorShapeProto
-
-        effective_ir_version = ir_version or self._ir_version
-        if effective_ir_version is None:
-            # Pick a reasonable default based on the main opset version
-            main_opset = self._opsets.get("", 18)
-            effective_ir_version = _default_ir_version(main_opset)
-
-        ir_model = ir.Model(
-            self._graph,
-            ir_version=effective_ir_version,
-        )
+    def to_onnx(
+        self,
+    ) -> Union[
+        onnx.FunctionProto,
+        onnx.ModelProto,
+        onnx.GraphProto,
+        ExtendedModelContainer,
+        Dict[str, Any],
+    ]:
+        """Exports the graph as an ONNX :class:`~onnx.ModelProto`."""
+        ir_model = ir.Model(self._graph, ir_version=self.ir_version)
         proto = ir.to_proto(ir_model)
 
         # onnx >= 1.20 requires the ``shape`` field to be present even when
         # the shape is fully unknown.  Add an empty TensorShapeProto where
         # needed (mirrors the fix in yobx/builder/light/_graph.py).
         for value_info in list(proto.graph.input) + list(proto.graph.output):
-            if (
-                value_info.type.HasField("tensor_type")
-                and not value_info.type.tensor_type.HasField("shape")
-            ):
-                value_info.type.tensor_type.shape.CopyFrom(TensorShapeProto())
+            if value_info.type.HasField(
+                "tensor_type"
+            ) and not value_info.type.tensor_type.HasField("shape"):
+                value_info.type.tensor_type.shape.CopyFrom(onnx.TensorShapeProto())
 
         return proto
-

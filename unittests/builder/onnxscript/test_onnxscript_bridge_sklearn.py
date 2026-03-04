@@ -8,47 +8,33 @@ For each supported sklearn estimator, the test:
 1. Fits the estimator on a small dataset.
 2. Converts it to ONNX via ``yobx.sklearn.to_onnx`` (uses the yobx ``GraphBuilder``).
 3. Manually recreates an equivalent ONNX model using ``OnnxScriptGraphBuilder``.
-4. Runs both models through ``onnx.reference.ReferenceEvaluator`` and asserts
+4. Runs both models through ``onnx.reference.ExtendedReferenceEvaluator`` and asserts
    numerical equivalence.
 
 This confirms that the two builder paths produce interchangeable graphs.
 """
 
 import unittest
-
 import numpy as np
-from onnx import TensorProto
-from onnx.checker import check_model
-from onnx.reference import ReferenceEvaluator
-
+import onnx
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript, requires_sklearn
+from yobx.helpers.onnx_helper import _default_OPSET_TO_IR_VERSION
+from yobx.reference import ExtendedReferenceEvaluator
 
 
 @requires_onnxscript()
 @requires_sklearn("1.4")
 class TestOnnxScriptBridgeWithSklearnConverter(ExtTestCase):
-    """Verify OnnxScriptGraphBuilder against yobx's sklearn converter output."""
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
     def _make_builder(self, opset: int = 18):
         from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 
         return OnnxScriptGraphBuilder(opset)
 
     def _ref_run(self, proto, inputs: dict):
-        """Run *proto* through ``onnx.reference.ReferenceEvaluator``."""
-        ref = ReferenceEvaluator(proto)
+        ref = ExtendedReferenceEvaluator(proto)
         return ref.run(None, inputs)
 
-    # ------------------------------------------------------------------
-    # StandardScaler
-    # ------------------------------------------------------------------
-
     def test_standard_scaler_valid_onnx(self):
-        """yobx sklearn converter produces ONNX with the expected Sub/Div nodes."""
         from sklearn.preprocessing import StandardScaler
         from yobx.sklearn import to_onnx
 
@@ -78,15 +64,15 @@ class TestOnnxScriptBridgeWithSklearnConverter(ExtTestCase):
 
         # --- OnnxScriptGraphBuilder replica ---
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, ("batch", 2))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 2))
         mean_name = gr.make_initializer("mean", ss.mean_.astype(np.float32))
         scale_name = gr.make_initializer("scale", ss.scale_.astype(np.float32))
         centered = gr.make_node("Sub", ["X", mean_name], "centered")
-        output = gr.make_node("Div", [centered, scale_name], "Y")
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        _output = gr.make_node("Div", [centered, scale_name], "Y")
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
 
-        check_model(proto)
+        onnx.checker.check_model(proto)
         (result_bridge,) = self._ref_run(proto, {"X": X})
 
         self.assertEqualArray(expected, result_ref, atol=1e-5)
@@ -102,13 +88,13 @@ class TestOnnxScriptBridgeWithSklearnConverter(ExtTestCase):
         expected = ss.transform(X).astype(np.float32)
 
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, ("batch", 2))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 2))
         scale_name = gr.make_initializer("scale", ss.scale_.astype(np.float32))
         gr.make_node("Div", ["X", scale_name], "Y")
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
 
-        check_model(proto)
+        onnx.checker.check_model(proto)
         (result,) = self._ref_run(proto, {"X": X})
         self.assertEqualArray(expected, result, atol=1e-5)
 
@@ -122,13 +108,13 @@ class TestOnnxScriptBridgeWithSklearnConverter(ExtTestCase):
         expected = ss.transform(X).astype(np.float32)
 
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, ("batch", 2))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 2))
         mean_name = gr.make_initializer("mean", ss.mean_.astype(np.float32))
         gr.make_node("Sub", ["X", mean_name], "Y")
-        gr.make_tensor_output("Y", TensorProto.FLOAT)
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
 
-        check_model(proto)
+        onnx.checker.check_model(proto)
         (result,) = self._ref_run(proto, {"X": X})
         self.assertEqualArray(expected, result, atol=1e-5)
 
@@ -171,36 +157,28 @@ class TestOnnxScriptBridgeWithSklearnConverter(ExtTestCase):
 
         # OnnxScriptGraphBuilder replica: Gemm → Sigmoid → Concat → ArgMax → Gather
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, ("batch", 2))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 2))
         coef_name = gr.make_initializer("coef", coef)
         intercept_name = gr.make_initializer("intercept", intercept)
 
-        decision = gr.make_node(
-            "Gemm", ["X", coef_name, intercept_name], "decision", transB=1
-        )
+        decision = gr.make_node("Gemm", ["X", coef_name, intercept_name], "decision", transB=1)
         proba_pos = gr.make_node("Sigmoid", [decision], "proba_pos")
         one = gr.make_initializer("one", np.array([1.0], dtype=np.float32))
         proba_neg = gr.make_node("Sub", [one, proba_pos], "proba_neg")
-        proba = gr.make_node(
-            "Concat", [proba_neg, proba_pos], "probabilities", axis=-1
-        )
+        proba = gr.make_node("Concat", [proba_neg, proba_pos], "probabilities", axis=-1)
 
         label_idx = gr.make_node("ArgMax", [proba], "label_idx", axis=1, keepdims=0)
         label_idx_64 = gr.make_node(
-            "Cast", [label_idx], "label_idx_64", to=TensorProto.INT64
+            "Cast", [label_idx], "label_idx_64", to=onnx.TensorProto.INT64
         )
-        classes = gr.make_initializer(
-            "classes", lr.classes_.astype(np.int64)
-        )
-        label = gr.make_node(
-            "Gather", [classes, label_idx_64], "label", axis=0
-        )
+        classes = gr.make_initializer("classes", lr.classes_.astype(np.int64))
+        _label = gr.make_node("Gather", [classes, label_idx_64], "label", axis=0)
 
-        gr.make_tensor_output("label", TensorProto.INT64)
-        gr.make_tensor_output("probabilities", TensorProto.FLOAT)
+        gr.make_tensor_output("label", onnx.TensorProto.INT64)
+        gr.make_tensor_output("probabilities", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
 
-        check_model(proto)
+        onnx.checker.check_model(proto)
         results_bridge = self._ref_run(proto, {"X": X})
         label_bridge, proba_bridge = results_bridge[0], results_bridge[1]
 
@@ -216,9 +194,7 @@ class TestOnnxScriptBridgeWithSklearnConverter(ExtTestCase):
         from sklearn.linear_model import LogisticRegression
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32
-        )
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
         y = np.array([0, 0, 1, 1, 2, 2])
         lr = LogisticRegression(max_iter=200)
         lr.fit(X, y)
@@ -234,9 +210,7 @@ class TestOnnxScriptBridgeWithSklearnConverter(ExtTestCase):
         from sklearn.linear_model import LogisticRegression
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32
-        )
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
         y = np.array([0, 0, 1, 1, 2, 2])
         lr = LogisticRegression(max_iter=200)
         lr.fit(X, y)
@@ -250,142 +224,97 @@ class TestOnnxScriptBridgeWithSklearnConverter(ExtTestCase):
 
         # OnnxScriptGraphBuilder replica: Gemm → Softmax → ArgMax → Gather
         gr = self._make_builder()
-        gr.make_tensor_input("X", TensorProto.FLOAT, ("batch", 2))
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 2))
         coef_name = gr.make_initializer("coef", coef)
         intercept_name = gr.make_initializer("intercept", intercept)
 
-        decision = gr.make_node(
-            "Gemm", ["X", coef_name, intercept_name], "decision", transB=1
-        )
-        proba = gr.make_node(
-            "Softmax", [decision], "probabilities", axis=1
-        )
+        decision = gr.make_node("Gemm", ["X", coef_name, intercept_name], "decision", transB=1)
+        proba = gr.make_node("Softmax", [decision], "probabilities", axis=1)
         label_idx = gr.make_node("ArgMax", [proba], "label_idx", axis=1, keepdims=0)
         label_idx_64 = gr.make_node(
-            "Cast", [label_idx], "label_idx_64", to=TensorProto.INT64
+            "Cast", [label_idx], "label_idx_64", to=onnx.TensorProto.INT64
         )
         classes = gr.make_initializer("classes", lr.classes_.astype(np.int64))
-        label = gr.make_node("Gather", [classes, label_idx_64], "label", axis=0)
+        _label = gr.make_node("Gather", [classes, label_idx_64], "label", axis=0)
 
-        gr.make_tensor_output("label", TensorProto.INT64)
-        gr.make_tensor_output("probabilities", TensorProto.FLOAT)
+        gr.make_tensor_output("label", onnx.TensorProto.INT64)
+        gr.make_tensor_output("probabilities", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
 
-        check_model(proto)
+        onnx.checker.check_model(proto)
         results_bridge = self._ref_run(proto, {"X": X})
 
         self.assertEqualArray(results_ref[0], results_bridge[0])
         self.assertEqualArray(results_ref[1], results_bridge[1], atol=1e-5)
 
-    # ------------------------------------------------------------------
-    # Helpers: _to_ir_dtype / to_ir_dtype
-    # ------------------------------------------------------------------
-
-    def test_helpers_accessible_from_package(self):
-        """Helper functions are importable from the onnxscript package."""
-        from yobx.builder.onnxscript import (
-            default_ir_version,
-            kwargs_to_ir_attrs,
-            to_ir_dtype,
-            to_ir_shape,
-            value_to_ir_tensor,
-        )
-
-        self.assertIsNotNone(to_ir_dtype)
-        self.assertIsNotNone(to_ir_shape)
-        self.assertIsNotNone(value_to_ir_tensor)
-        self.assertIsNotNone(kwargs_to_ir_attrs)
-        self.assertIsNotNone(default_ir_version)
-
     def test_to_ir_dtype_float(self):
-        from yobx.builder.onnxscript import to_ir_dtype
+        from yobx.builder.onnxscript.bridge_graph_builder import to_ir_dtype
         import onnx_ir as ir
 
-        dtype = to_ir_dtype(TensorProto.FLOAT)
+        dtype = to_ir_dtype(onnx.TensorProto.FLOAT)
         self.assertEqual(dtype, ir.DataType.FLOAT)
 
     def test_to_ir_dtype_none(self):
-        from yobx.builder.onnxscript import to_ir_dtype
+        from yobx.builder.onnxscript.bridge_graph_builder import to_ir_dtype
 
         self.assertIsNone(to_ir_dtype(None))
         self.assertIsNone(to_ir_dtype(0))
 
     def test_to_ir_shape_static(self):
-        from yobx.builder.onnxscript import to_ir_shape
+        from yobx.builder.onnxscript.bridge_graph_builder import to_ir_shape
         import onnx_ir as ir
 
         shape = to_ir_shape((2, 4))
         self.assertIsInstance(shape, ir.Shape)
 
     def test_to_ir_shape_dynamic(self):
-        from yobx.builder.onnxscript import to_ir_shape
+        from yobx.builder.onnxscript.bridge_graph_builder import to_ir_shape
         import onnx_ir as ir
 
         shape = to_ir_shape(("batch", None, 4))
         self.assertIsInstance(shape, ir.Shape)
 
     def test_to_ir_shape_none(self):
-        from yobx.builder.onnxscript import to_ir_shape
+        from yobx.builder.onnxscript.bridge_graph_builder import to_ir_shape
 
         self.assertIsNone(to_ir_shape(None))
 
     def test_value_to_ir_tensor_ndarray(self):
-        from yobx.builder.onnxscript import value_to_ir_tensor
+        from yobx.builder.onnxscript.bridge_graph_builder import value_to_ir_tensor
 
         arr = np.ones((3, 4), dtype=np.float32)
         t = value_to_ir_tensor(arr, "W")
         self.assertIsNotNone(t)
 
     def test_value_to_ir_tensor_int_scalar(self):
-        from yobx.builder.onnxscript import value_to_ir_tensor
+        from yobx.builder.onnxscript.bridge_graph_builder import value_to_ir_tensor
 
         t = value_to_ir_tensor(42, "x")
         self.assertIsNotNone(t)
 
     def test_value_to_ir_tensor_float_scalar(self):
-        from yobx.builder.onnxscript import value_to_ir_tensor
+        from yobx.builder.onnxscript.bridge_graph_builder import value_to_ir_tensor
 
         t = value_to_ir_tensor(3.14, "x")
         self.assertIsNotNone(t)
 
     def test_value_to_ir_tensor_tensor_proto(self):
         from onnx import numpy_helper
-        from yobx.builder.onnxscript import value_to_ir_tensor
+        from yobx.builder.onnxscript.bridge_graph_builder import value_to_ir_tensor
 
         tp = numpy_helper.from_array(np.array([1.0, 2.0], dtype=np.float32), name="v")
         t = value_to_ir_tensor(tp, "v")
         self.assertIsNotNone(t)
 
     def test_value_to_ir_tensor_unsupported_raises(self):
-        from yobx.builder.onnxscript import value_to_ir_tensor
+        from yobx.builder.onnxscript.bridge_graph_builder import value_to_ir_tensor
 
         with self.assertRaises(TypeError):
             value_to_ir_tensor("not_a_tensor", "bad")
 
     def test_default_ir_version_known_opset(self):
-        from yobx.builder.onnxscript import default_ir_version
-
-        self.assertEqual(default_ir_version(18), 8)
-        self.assertEqual(default_ir_version(21), 10)
-
-    def test_default_ir_version_unknown_opset(self):
-        from yobx.builder.onnxscript import default_ir_version
-
-        self.assertEqual(default_ir_version(999), 10)
-
-    def test_kwargs_to_ir_attrs_passthrough(self):
-        from yobx.builder.onnxscript import kwargs_to_ir_attrs
-
-        result = kwargs_to_ir_attrs({"axis": 1, "keepdims": 0})
-        self.assertEqual(result, {"axis": 1, "keepdims": 0})
-
-    def test_kwargs_to_ir_attrs_converts_attribute_proto(self):
-        from onnx import helper
-        from yobx.builder.onnxscript import kwargs_to_ir_attrs
-
-        attr = helper.make_attribute("axis", 2)
-        result = kwargs_to_ir_attrs({"axis": attr})
-        self.assertEqual(result["axis"], 2)
+        self.assertEqual(_default_OPSET_TO_IR_VERSION()[18], 8)
+        self.assertEqual(_default_OPSET_TO_IR_VERSION()[21], 10)
 
 
 if __name__ == "__main__":
