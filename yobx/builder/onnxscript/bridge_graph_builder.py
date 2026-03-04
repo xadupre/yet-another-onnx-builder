@@ -53,7 +53,7 @@ def value_to_ir_tensor(value: Any, name: str) -> ir.TensorProtocol:
     """
     if isinstance(value, onnx.TensorProto):
         t = ir.from_proto(value)
-        return t
+        return t  # type: ignore
     if isinstance(value, int):
         value = np.array(value, dtype=np.int64)
     elif isinstance(value, float):
@@ -338,7 +338,7 @@ class OnnxScriptGraphBuilder:
         if attributes:
             for attr in attributes:
                 ir_attr = ir.from_proto(attr)
-                extra_kwargs[attr.name] = ir_attr.value
+                extra_kwargs[attr.name] = ir_attr.value  # type: ignore
 
         all_kwargs = {**extra_kwargs, **kwargs}
         if output_names is not None:

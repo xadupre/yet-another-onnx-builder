@@ -36,10 +36,12 @@ jobs:
       - name: Run tests (no torch)
         run: |
           pytest --durations=10 \
-            --ignore=unittests/torch \
+            --ignore=unittests/builder/onnxscript \
             --ignore=unittests/helpers/test_patch_helper.py \
             --ignore=unittests/reference/test__inference_session_torch.py \
             --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
             --ignore=unittests/reference/test_onnxruntime_evaluator.py \
             --ignore=unittests/reference/test_torch_reference_evaluator.py \
+            --ignore=unittests/sklearn \
+            --ignore=unittests/torch \
             --ignore=unittests/xoptim/test_untrained_models.py
