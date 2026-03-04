@@ -5,8 +5,6 @@ import ml_dtypes
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-import torch
-from torch._C import _from_dlpack
 from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
 from yobx.reference._inference_session import (
@@ -29,7 +27,7 @@ class TestInferenceSession(ExtTestCase):
     @classmethod
     def _get_model(
         cls,
-    ) -> Tuple[onnx.ModelProto, Dict[str, torch.Tensor], Tuple[torch.Tensor, ...]]:
+    ) -> Tuple[onnx.ModelProto, Dict[str, np.ndarray], Tuple[np.ndarray, ...]]:
         model = oh.make_model(
             oh.make_graph(
                 [
@@ -77,23 +75,6 @@ class TestInferenceSession(ExtTestCase):
 
         device = ortvalue._ortvalue.__dlpack_device__()
         self.assertEqual((1, 0), device)
-
-    def test_ort_value_dlpack_torch(self):
-        from onnxruntime.capi.onnxruntime_pybind11_state import OrtValue as C_OrtValue
-
-        torch_arr_input = torch.tensor([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=torch.float32)
-        shape = torch_arr_input.shape
-        ptr = torch_arr_input.data_ptr()
-        dlp = torch_arr_input.__dlpack__()
-        ortvalue = C_OrtValue.from_dlpack(dlp, False)
-        self.assertEqual(shape, tuple(ortvalue.shape()))
-        ptr2 = ortvalue.data_ptr()
-        self.assertEqual(ptr, ptr2)
-
-        tv = _from_dlpack(ortvalue.to_dlpack())
-        self.assertEqual(tv.shape, shape)
-        ptr3 = tv.data_ptr()
-        self.assertEqual(ptr, ptr3)
 
     def test_numpy(self):
         model, feeds, expected = self._get_model()
