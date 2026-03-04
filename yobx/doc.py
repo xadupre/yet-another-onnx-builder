@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import tempfile
 import subprocess
@@ -43,7 +44,7 @@ def reset_torch_transformers(gallery_conf, fname):  # pragma: no cover
 
 def plot_legend(
     text: str, text_bottom: str = "", color: str = "green", fontsize: int = 15
-) -> "matplotlib.axes.Axes":  # noqa: F821
+) -> matplotlib.axes.Axes:
     """
     Plots a graph with only text (for :epkg:`sphinx-gallery`).
 
@@ -83,14 +84,14 @@ def rotate_align(ax, angle=15, align="right"):
     return ax
 
 
-def save_fig(ax, name: str, **kwargs) -> "matplotlib.axis.Axis":  # noqa: F821
+def save_fig(ax, name: str, **kwargs) -> matplotlib.axis.Axis:
     """Applies ``tight_layout`` and saves the figures. Returns ax."""
     fig = ax.get_figure()
     fig.savefig(name, **kwargs)
     return ax
 
 
-def title(ax: "plt.axes", title: str) -> "matplotlib.axis.Axis":  # noqa: F821
+def title(ax: plt.axes, title: str) -> matplotlib.axis.Axis:
     "Adds a title to axes and returns them."
     ax.set_title(title)
     return ax
@@ -98,11 +99,11 @@ def title(ax: "plt.axes", title: str) -> "matplotlib.axis.Axis":  # noqa: F821
 
 def plot_histogram(
     tensor: np.ndarray,
-    ax: Optional["plt.axes"] = None,  # noqa: F821
+    ax: Optional[plt.axes] = None,
     bins: int = 30,
     color: str = "orange",
     alpha: float = 0.7,
-) -> "matplotlib.axis.Axis":  # noqa: F821
+) -> matplotlib.axis.Axis:
     "Computes the distribution for a tensor."
     if ax is None:
         import matplotlib.pyplot as plt
@@ -250,10 +251,10 @@ def draw_graph_graphviz(dot: Union[str, onnx.ModelProto], image: str, engine: st
 
 def plot_dot(
     dot: Union[str, onnx.ModelProto],
-    ax: Optional["matplotlib.axis.Axis"] = None,  # noqa: F821
+    ax: Optional[matplotlib.axis.Axis] = None,
     engine: str = "dot",
     figsize: Optional[Tuple[int, int]] = None,
-) -> "matplotlib.axis.Axis":  # noqa: F821
+) -> matplotlib.axis.Axis:
     """
     Draws a dot graph into a matplotlib axis.
 

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import ast
 from typing import Any, Dict, Optional
 from .simplify_expressions import simplify_expression

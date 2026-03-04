@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import sys
 import time
@@ -76,7 +77,7 @@ class ExtendedModelContainer(ModelContainer):
 
     def load(
         self, file_path: str, load_large_initializers: bool = True
-    ) -> "ExtendedModelContainer":
+    ) -> ExtendedModelContainer:
         """
         Loads the large model.
 
@@ -230,8 +231,8 @@ class ExtendedModelContainer(ModelContainer):
     def _deserialize_graph(
         self,
         proto: onnx.GraphProto,
-        scoped_values: List[Dict[str, "onnx_ir.Value"]],  # type: ignore # noqa: F821
-    ) -> "onnx_ir.Graph":  # type: ignore # noqa: F821
+        scoped_values: List[Dict[str, onnx_ir.Value]],  # type: ignore
+    ) -> onnx_ir.Graph:  # type: ignore
         """See :epkg:`onnxscript`."""
         import onnx.numpy_helper as onh
         import onnx_ir as oir
@@ -358,7 +359,7 @@ class ExtendedModelContainer(ModelContainer):
             return getattr(proto, field)
         return None
 
-    def to_ir(self) -> "onnx_ir.Model":  # type: ignore # noqa: F821
+    def to_ir(self) -> onnx_ir.Model:  # type: ignore
         """Conversion to :class:`onnx_ir.Model`."""
         import onnx_ir as oir
         import onnx_ir.serde as oirs

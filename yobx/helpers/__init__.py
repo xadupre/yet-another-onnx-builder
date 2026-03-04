@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .helper import (
     flatten_object,
     get_sig_kwargs,

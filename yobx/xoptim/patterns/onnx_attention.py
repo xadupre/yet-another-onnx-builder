@@ -736,7 +736,7 @@ class FunctionAttentionPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1000,7 +1000,7 @@ class FunctionAttentionPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         mul1: NodeProto,
         transpose_mul1: Optional[NodeProto],
         reshape_mul1: Optional[NodeProto],
@@ -1202,7 +1202,7 @@ class FunctionAttentionPattern(PatternOptimization):
 class _CommonGQAMethods:
     def none(
         self,
-        node: Optional["NodeProto"] = None,
+        node: Optional[NodeProto] = None,
         lineno: Optional[int] = None,
         msg: Optional[Union[Callable[[], str], str]] = None,
     ) -> None:
@@ -1210,7 +1210,7 @@ class _CommonGQAMethods:
         raise NotImplementedError("_CommonGQAMethods must be used as a mixin with PatternOptimization")
     def _match_keys_or_values(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         keys_or_values: str,
     ) -> Optional[Tuple[NodeProto, NodeProto, NodeProto, Tuple[Tuple[Union[int, str], ...], Tuple[Union[int, str], ...], Tuple[Union[int, str], ...]]]]:
@@ -1504,7 +1504,7 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1555,7 +1555,7 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         gqa_unsqueeze: NodeProto,
         gqa_expand: NodeProto,
         gqa_reshape: NodeProto,
@@ -1803,7 +1803,7 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1923,7 +1923,7 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         keys_concat_node: NodeProto,
         values_concat_node: NodeProto,
         gqa_unsqueeze: Optional[NodeProto],

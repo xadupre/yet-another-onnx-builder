@@ -1,3 +1,4 @@
+from __future__ import annotations
 import enum
 import inspect
 import json
@@ -471,7 +472,7 @@ def string_type(
 
     if obj.__class__.__name__ == "VirtualTensor":
 
-        def _torch_sym_int_to_str(value: "torch.SymInt") -> Union[int, str]:  #  noqa: F821
+        def _torch_sym_int_to_str(value: torch.SymInt) -> Union[int, str]:
             if isinstance(value, str):
                 return value
             if hasattr(value, "node") and isinstance(value.node, str):

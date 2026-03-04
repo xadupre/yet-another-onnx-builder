@@ -1,3 +1,4 @@
+from __future__ import annotations
 import contextlib
 import os
 import pprint
@@ -267,13 +268,13 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         local_domain: str = "local_function",
         signature: Optional[Any] = None,
         check_empty_source: bool = False,
-        graph_module: Optional["torch.fx.GraphModule"] = None,
+        graph_module: Optional[torch.fx.GraphModule] = None,
         exe_path: str = "",
         output_names: Optional[List[str]] = None,
         output_dynamic_shapes: Optional[Union[Dict[str, Any], Tuple[Any]]] = None,
         _opsets: Optional[Dict[str, int]] = None,
         _context: Optional[Set[str]] = None,
-        _parent: Optional[Union["GraphBuilder", Tuple["GraphBuilder", NodeProto]]] = None,
+        _parent: Optional[Union[GraphBuilder, Tuple[GraphBuilder, NodeProto]]] = None,
     ):
         import torch
         from . import TEMPLATE_TYPE
@@ -490,7 +491,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         name: str,
         domain: str,
         add_local_functions: bool = False,
-    ) -> "GraphBuilder":
+    ) -> GraphBuilder:
         """
         Creates a copy of the existing builder but with information reduced to the input_names
         considered as inputs.
@@ -732,7 +733,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def empty_copy(
         self, as_function: bool = False, constant_size: int = 2**24, _shapable: bool = True
-    ) -> "GraphBuilder":
+    ) -> GraphBuilder:
         """
         Creates an empty copy but with the same opsets.
         This is used in pattern matching.
@@ -1127,9 +1128,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     ) -> Optional[
         Union[
             np.ndarray,
-            "torch.Tensor",
+            torch.Tensor,
             NodeProto,
-            Tuple[Optional[Union["torch.Tensor", np.ndarray, NodeProto]], ...],
+            Tuple[Optional[Union[torch.Tensor, np.ndarray, NodeProto]], ...],
         ]
     ]:
         """
@@ -1675,7 +1676,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def set_shapes_types(
         self,
-        name: Union[str, "torch.fx.Node"],
+        name: Union[str, torch.fx.Node],
         where: str,
         value: Any,
     ):
@@ -1683,7 +1684,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             name = name.name
         self._known_torch_value[name] = (where, value)  # type: ignore
 
-    def _torch_sym_int_to_str(self, value: "torch.SymInt") -> Union[int, str]:
+    def _torch_sym_int_to_str(self, value: torch.SymInt) -> Union[int, str]:
         if isinstance(value, str):
             return value
         if hasattr(value, "node") and isinstance(value.node, str):
@@ -3091,7 +3092,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         )
         raise NotImplementedError(f"Source is available for {dim!r}, name={name!r}")
 
-    def _get_dynamic_dimension(self, name: str, dim: int) -> Optional[Union[str, "_WrapDim"]]:
+    def _get_dynamic_dimension(self, name: str, dim: int) -> Optional[Union[str, _WrapDim]]:
         if self.dynamic_shapes is None:
             return None
         if not self.dynamic_shapes or name not in self.dynamic_shapes:
@@ -4491,7 +4492,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         return res
 
     def _update_other_builder_local_function_before_merging(
-        self, builder: "GraphBuilder", merge_allowed: bool = True
+        self, builder: GraphBuilder, merge_allowed: bool = True
     ):
         def _check_():
             local_domains = {k[0] for k in builder.functions}
@@ -4560,7 +4561,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def make_nodes(
         self,
-        builder: "GraphBuilder",
+        builder: GraphBuilder,
         input_names: List[str],
         output_names: List[str],
         prefix: str = "",
@@ -5275,7 +5276,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def process(
         self,
-        graph_module: "torch.fx.GraphModule",
+        graph_module: torch.fx.GraphModule,
         interpreter: Any,
         source_lines: Optional[Dict[str, Tuple[str, Tuple[int, int]]]] = None,
     ):
@@ -5628,7 +5629,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if values:
             oh.set_metadata_props(model, values)
 
-    def _get_size(self, t: Union["torch.Tensor", np.ndarray, TensorProto]) -> int:
+    def _get_size(self, t: Union[torch.Tensor, np.ndarray, TensorProto]) -> int:
         if hasattr(t, "shape"):
             return int(np.prod(t.shape)) * size_type(t.dtype)  # type: ignore
         assert isinstance(t, TensorProto), f"Unexpected type {type(t)}"
@@ -8533,7 +8534,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def make_local_function(
         self,
-        builder: "GraphBuilder",
+        builder: GraphBuilder,
         function_options: FunctionOptions,
         optimize: bool = False,
         metadata_props: Optional[Dict[str, str]] = None,
@@ -8927,7 +8928,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         f: FunctionProto,
         rename_allowed: bool = False,
         merge_allowed: bool = False,
-        builder: Optional["GraphBuilder"] = None,
+        builder: Optional[GraphBuilder] = None,
     ) -> Tuple[str, str]:
         """
         Adds a new local function.
@@ -9015,7 +9016,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def get_local_function(
         self, name: str, domain: str = "", builder: bool = False
-    ) -> Union[FunctionProto, "GraphBuilder"]:
+    ) -> Union[FunctionProto, GraphBuilder]:
         """Returns a local function."""
         if builder:
             return self.functions_builder[domain, name]
@@ -9057,7 +9058,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         """Returns the constraints registered so far."""
         return self.constraints_
 
-    def _to_torch_tensor(self, a: Any) -> "torch.Tensor":
+    def _to_torch_tensor(self, a: Any) -> torch.Tensor:
         """Torch does not convert numpy dtype very well."""
         if isinstance(a, self.torch.Tensor):
             return a
@@ -9820,7 +9821,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             f"{self.get_debug_msg()}"
         )
 
-    def make_new_dynamic_shape(self, rank: int, prefix: str = "d") -> Tuple["torch.SymInt", ...]:
+    def make_new_dynamic_shape(self, rank: int, prefix: str = "d") -> Tuple[torch.SymInt, ...]:
         """Creates a dynamic shape of a known rank with new dynamic dimension."""
         return tuple(
             self.torch.SymInt(self.make_new_dynamic_name(f"{prefix}_d{i}")) for i in range(rank)
@@ -9839,7 +9840,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def make_torch_tensor_from_np_array(  # pyrefly: ignore[bad-param-name-override]
         self, np_array: np.ndarray
-    ) -> "torch.Tensor":
+    ) -> torch.Tensor:
         """Converts a numpy array into a :class:`torch.Tensor`."""
         try:
             import ml_dtypes

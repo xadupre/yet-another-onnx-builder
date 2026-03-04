@@ -122,7 +122,7 @@ class DropoutPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -153,7 +153,7 @@ class DropoutPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         dropout_node: NodeProto,
     ) -> List[NodeProto]:
         return [

@@ -183,7 +183,7 @@ class RotaryConcatPartPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -200,7 +200,7 @@ class RotaryConcatPartPattern(PatternOptimization):
 
     def match_concat(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -359,7 +359,7 @@ class RotaryConcatPartPattern(PatternOptimization):
 
     def apply_concat(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         cst_left: NodeProto,
         split: NodeProto,
         slice_left: NodeProto,
@@ -429,7 +429,7 @@ class RotaryConcatPartPattern(PatternOptimization):
 
     def match_transpose(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -657,7 +657,7 @@ class RotaryConcatPartPattern(PatternOptimization):
 
     def apply_transpose(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         cst_left: NodeProto,
         slice_left: NodeProto,
         neg_left: NodeProto,
@@ -874,7 +874,7 @@ class FunctionHalfRotaryEmbeddingPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -948,7 +948,7 @@ class FunctionHalfRotaryEmbeddingPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         split_node: NodeProto,
         neg_node: NodeProto,
         concat_node: NodeProto,
@@ -1192,7 +1192,7 @@ class RotaryEmbeddingPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1264,7 +1264,7 @@ class RotaryEmbeddingPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         concat_cos: NodeProto,
         concat_sin: NodeProto,
         split_node: NodeProto,
@@ -1488,7 +1488,7 @@ class FunctionCausalMaskPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1550,7 +1550,7 @@ class FunctionCausalMaskPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         dim_squeeze1: NodeProto,
         dim_squeeze2: NodeProto,
         range1: NodeProto,
@@ -1794,7 +1794,7 @@ class FunctionCausalMaskMulAddPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1861,7 +1861,7 @@ class FunctionCausalMaskMulAddPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         dim_squeeze1: NodeProto,
         dim_squeeze2: NodeProto,
         range1: NodeProto,
@@ -2099,7 +2099,7 @@ class FunctionCosSinCachePattern(PatternOptimization):
     _domain_name = "intermediate"
 
     def _match_branch(
-        self, g: "GraphBuilderPatternOptimization", node: NodeProto  # noqa: F821
+        self, g: GraphBuilderPatternOptimization, node: NodeProto
     ) -> Optional[Tuple[NodeProto, NodeProto]]:
         next_nodes = g.next_nodes(node.output[0])
         if len(next_nodes) != 1:
@@ -2113,7 +2113,7 @@ class FunctionCosSinCachePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -2246,7 +2246,7 @@ class FunctionCosSinCachePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         dim_squeeze1: NodeProto,
         dim_squeeze2: NodeProto,
         range_node: NodeProto,

@@ -122,7 +122,7 @@ class SequenceConstructAtPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -147,7 +147,7 @@ class SequenceConstructAtPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_seq: NodeProto,
         *node_ats: NodeProto,
     ) -> List[NodeProto]:

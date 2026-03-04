@@ -1,3 +1,4 @@
+from __future__ import annotations
 import ast
 from collections import Counter
 from typing import Dict, List, Optional, Tuple, Union

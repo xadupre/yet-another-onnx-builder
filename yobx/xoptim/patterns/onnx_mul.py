@@ -124,7 +124,7 @@ class MulMulMulScalarPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -162,7 +162,7 @@ class MulMulMulScalarPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         node_left: NodeProto,
         node_right: NodeProto,
@@ -321,7 +321,7 @@ class SwitchOrderBinaryPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -494,7 +494,7 @@ class SwitchOrderBinaryPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         node_left: NodeProto,
         node_right: NodeProto,

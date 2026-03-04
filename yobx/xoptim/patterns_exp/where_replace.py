@@ -128,7 +128,7 @@ class ReplaceZeroPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -158,7 +158,7 @@ class ReplaceZeroPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         cast_node: NodeProto,
         where_node: NodeProto,
     ) -> List[NodeProto]:

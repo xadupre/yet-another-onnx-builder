@@ -1,3 +1,4 @@
+from __future__ import annotations
 import contextlib
 import os
 import pprint
@@ -318,7 +319,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
                 self._known_value_shape[n] = new_value
 
     def set_device(
-        self, name: str, device: Union[int, "torch.dtype"], exc: bool = True  # noqa: F821
+        self, name: str, device: Union[int, torch.dtype], exc: bool = True
     ):
         """
         Sets the shape for a result. It is exists, it checks the new shape

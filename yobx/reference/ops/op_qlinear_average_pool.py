@@ -1,3 +1,4 @@
+from __future__ import annotations
 from onnx.reference.op_run import OpRun
 from onnx.reference.ops.op_average_pool import AveragePool_19 as AveragePool
 from onnx.reference.ops.op_dequantize_linear import DequantizeLinear_19 as DequantizeLinear

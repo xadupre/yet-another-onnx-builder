@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .expressions.rename_expressions import (  # noqa: F401
     RenameTransformer,
     parse_expression_tokens,

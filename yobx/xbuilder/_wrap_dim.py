@@ -1,3 +1,4 @@
+from __future__ import annotations
 class WrapDim:
     """Wraps a string considered as a ``torch.export.Dim``."""
 

@@ -107,7 +107,7 @@ class TransposeCastPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -158,7 +158,7 @@ class TransposeCastPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         cast_node_before: Optional[NodeProto],
         node: NodeProto,
         cast_node_after: Optional[NodeProto],

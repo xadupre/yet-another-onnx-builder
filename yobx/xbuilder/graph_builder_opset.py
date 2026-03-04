@@ -1,3 +1,4 @@
+from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING, Any, List, Optional, Union
 import numpy as np
@@ -88,7 +89,7 @@ class Opset:
 
     def __init__(
         self,
-        builder: "GraphBuilder",
+        builder: GraphBuilder,
         allow_unknown: bool = False,
     ):
         self.builder = builder

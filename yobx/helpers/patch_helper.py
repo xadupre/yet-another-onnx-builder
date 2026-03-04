@@ -1,3 +1,4 @@
+from __future__ import annotations
 import difflib
 import inspect
 import pprint
@@ -67,7 +68,7 @@ class PatchInfo:
     )
 
     @classmethod
-    def _setattr(cls, to_patch, function_or_method: "str", new_value: Callable) -> Callable:
+    def _setattr(cls, to_patch, function_or_method: str, new_value: Callable) -> Callable:
         previous = getattr(to_patch, function_or_method)
         setattr(to_patch, function_or_method, new_value)
         return previous
@@ -80,7 +81,7 @@ class PatchInfo:
         method_or_function_name: str,
         family: str,
         _last_patched_function: Optional[Callable] = None,
-    ) -> "PatchInfo":
+    ) -> PatchInfo:
         """
         Creates a patch with the given information.
 
@@ -144,7 +145,7 @@ class PatchInfo:
         self._undo(self.function_to_patch)
         self.function_to_patch = None
 
-    def add_dependency(self, patch_info: "PatchInfo"):
+    def add_dependency(self, patch_info: PatchInfo):
         self.depends_on.append(patch_info)
 
     @property
@@ -386,7 +387,7 @@ class PatchDetails:
             res[patch].append(node)
         return list(res.items())
 
-    def matching_pair(cls, patch: PatchInfo, node: "torch.fx.Node") -> bool:  # type: ignore # noqa: F821
+    def matching_pair(cls, patch: PatchInfo, node: torch.fx.Node) -> bool:  # type: ignore
         """
         Last validation for a pair. RotaryEmbedding has many rewriting
         and they all end up in the same code line.
@@ -400,7 +401,7 @@ class PatchDetails:
 
     def make_report(
         cls,
-        patches: List[Tuple[PatchInfo, List["torch.fx.Node"]]],  # type: ignore # noqa: F821
+        patches: List[Tuple[PatchInfo, List[torch.fx.Node]]],  # type: ignore
         format: str = "raw",
     ) -> str:
         """

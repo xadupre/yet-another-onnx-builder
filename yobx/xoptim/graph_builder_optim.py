@@ -66,7 +66,7 @@ class GraphBuilderPatternOptimization:
 
     def __init__(
         self,
-        builder: "GraphBuilder",  # noqa: F821
+        builder: GraphBuilder,
         patterns: Optional[List[PatternOptimization]] = None,
         recursive: bool = False,
         verifies: bool = False,

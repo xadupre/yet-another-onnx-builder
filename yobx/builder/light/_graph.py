@@ -1,3 +1,4 @@
+from __future__ import annotations
 from enum import IntEnum
 from typing import Any, Dict, List, Optional, Union
 import numpy as np
@@ -129,7 +130,7 @@ class OnnxGraph:
         name: str,
         elem_type: int = TensorProto.FLOAT,
         shape: Optional[Any] = None,
-    ) -> "Var":  # noqa: F821
+    ) -> Var:
         """
         Declares a new graph input and returns a :class:`Var`.
 
@@ -233,7 +234,7 @@ class OnnxGraph:
             raise RuntimeError(f"No opset version specified for domain {domain!r}.")
         return node
 
-    def cst(self, value: np.ndarray, name: Optional[str] = None) -> "Var":  # noqa: F821
+    def cst(self, value: np.ndarray, name: Optional[str] = None) -> Var:
         """
         Adds a constant initializer and returns it as a :class:`Var`.
 
@@ -259,7 +260,7 @@ class OnnxGraph:
             name = self.renames_[name]
         return name
 
-    def get_var(self, name: str) -> "Var":  # noqa: F821
+    def get_var(self, name: str) -> Var:
         """
         Returns the :class:`Var` corresponding to *name*.
 

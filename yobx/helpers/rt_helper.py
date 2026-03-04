@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, Dict, Sequence, Union
 import numpy as np
 import onnx
@@ -10,7 +11,7 @@ def make_feeds(
     use_numpy: bool = False,
     copy: bool = False,
     is_modelbuilder: bool = False,
-) -> Dict[str, Union["torch.Tensor", np.ndarray]]:  # type: ignore[name-defined] # noqa: F821
+) -> Dict[str, Union[torch.Tensor, np.ndarray]]:  # type: ignore[name-defined]
     """
     Serializes the inputs to produce feeds expected
     by :class:`onnxruntime.InferenceSession`.

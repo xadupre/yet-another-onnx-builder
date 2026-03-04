@@ -1,3 +1,4 @@
+from __future__ import annotations
 from ._command_lines_parser import main
 
 if __name__ == "__main__":

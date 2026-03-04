@@ -229,7 +229,7 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -346,7 +346,7 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
 
     def _match_last_part(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         concat_cos: NodeProto,
         concat_sin: NodeProto,
         split_node: Optional[NodeProto],
@@ -426,7 +426,7 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
 
     def _find_common_ancestor(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         concat_cos: NodeProto,
         concat_sin: NodeProto,
     ) -> Optional[List[NodeProto]]:
@@ -456,7 +456,7 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         expand_node: Optional[NodeProto],
         concat_cos: NodeProto,
         concat_sin: NodeProto,
@@ -784,7 +784,7 @@ class ContribRotaryEmbedding3DPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -801,7 +801,7 @@ class ContribRotaryEmbedding3DPattern(PatternOptimization):
         return MatchResult(self, [transpose, node], self.apply, insert_at=node)
 
     def apply(
-        self, g: "GraphBuilderPatternOptimization", transpose: NodeProto, rotary: NodeProto  # noqa: F821
+        self, g: GraphBuilderPatternOptimization, transpose: NodeProto, rotary: NodeProto
     ) -> List[NodeProto]:
         last_dim = g.unique_name(f"{transpose.input[0]}::Shape3")
         new_shape2 = g.unique_name(f"{transpose.input[0]}::Shape+1")
@@ -1119,7 +1119,7 @@ class MultiHeadAttention3DPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1207,7 +1207,7 @@ class MultiHeadAttention3DPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         q_transpose: NodeProto,
         k_transpose: NodeProto,
         k_concat: NodeProto,
@@ -1682,7 +1682,7 @@ class GroupQueryAttention3DPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1743,7 +1743,7 @@ class GroupQueryAttention3DPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         keys_concat_node: NodeProto,
         values_concat_node: NodeProto,
         local_attention_gqa: NodeProto,
@@ -1904,7 +1904,7 @@ class Attention3DPattern(PatternOptimization):
         super().__init__(verbose, priority)
 
     def _match_above(
-        self, g: "GraphBuilderPatternOptimization", node: NodeProto, name: str  # noqa: F821
+        self, g: GraphBuilderPatternOptimization, node: NodeProto, name: str
     ) -> Optional[Tuple[NodeProto, NodeProto, NodeProto]]:
         transpose = g.node_before(name)
         if not transpose or transpose.op_type != "Transpose":
@@ -1926,7 +1926,7 @@ class Attention3DPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1993,7 +1993,7 @@ class Attention3DPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         mm_q: NodeProto,
         re_q: NodeProto,
         tr_q: NodeProto,

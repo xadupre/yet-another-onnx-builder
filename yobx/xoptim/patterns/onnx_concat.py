@@ -105,7 +105,7 @@ class ConcatGatherPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -131,7 +131,7 @@ class ConcatGatherPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         concat_node: NodeProto,
         gather_node: NodeProto,
     ) -> List[NodeProto]:
@@ -255,7 +255,7 @@ class ConcatEmptyPattern(_CommonConcatPattern):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -266,7 +266,7 @@ class ConcatEmptyPattern(_CommonConcatPattern):
             return self.none(node, _get_lineno())
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(self, g: "GraphBuilderPatternOptimization", node: NodeProto) -> List[NodeProto]:  # noqa: F821
+    def apply(self, g: GraphBuilderPatternOptimization, node: NodeProto) -> List[NodeProto]:
         rem = self.remove_set(g, node)
         assert rem, f"rem is empty for node={node}"
         new_inputs = [n for i, n in enumerate(node.input) if i not in rem]
@@ -383,7 +383,7 @@ class ConcatTwiceUnaryPattern(_CommonConcatPattern):
     @classmethod
     def _valid_node(
         cls,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         concat: NodeProto,
         unary: NodeProto,
     ):
@@ -401,7 +401,7 @@ class ConcatTwiceUnaryPattern(_CommonConcatPattern):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -421,7 +421,7 @@ class ConcatTwiceUnaryPattern(_CommonConcatPattern):
         return self.none(node, _get_lineno())
 
     def apply(
-        self, g: "GraphBuilderPatternOptimization", concat: NodeProto, unary: NodeProto  # noqa: F821
+        self, g: GraphBuilderPatternOptimization, concat: NodeProto, unary: NodeProto
     ) -> List[NodeProto]:
         new_name = g.unique_name(f"u{unary.output[0]}")
         nodes = [

@@ -2,6 +2,7 @@
 The module contains the main class ``ExtTestCase`` which adds
 specific functionalities to this project.
 """
+from __future__ import annotations
 
 import glob
 import itertools
@@ -835,18 +836,18 @@ class ExtTestCase(unittest.TestCase):
         return onnxruntime
 
     @classmethod
-    def to_onnx(self, *args, **kwargs) -> "ModelProto":  # noqa: F821
+    def to_onnx(self, *args, **kwargs) -> ModelProto:
         from yobx.torch_interpreter import to_onnx
 
         return to_onnx(*args, **kwargs)
 
-    def print_model(self, model: "ModelProto"):  # noqa: F821
+    def print_model(self, model: ModelProto):
         "Prints a ModelProto"
         from yobx.helpers.onnx_helper import pretty_onnx
 
         print(pretty_onnx(model))
 
-    def print_onnx(self, model: "ModelProto"):  # noqa: F821
+    def print_onnx(self, model: ModelProto):
         "Prints a ModelProto"
         from yobx.helpers.onnx_helper import pretty_onnx
 
@@ -1152,13 +1153,13 @@ class ExtTestCase(unittest.TestCase):
         self.assertEqualArray(expected, value, atol=atol, rtol=rtol)
 
     def check_ort(
-        self, onx: "onnx.ModelProto"  # noqa: F821
-    ) -> "onnxruntime.InferenceSession":  # noqa: F821
+        self, onx: onnx.ModelProto
+    ) -> onnxruntime.InferenceSession:
         return self._check_with_ort(onx, cpu=True)
 
     def _check_with_ort(
-        self, proto: "onnx.ModelProto", cpu: bool = False  # noqa: F821
-    ) -> "onnxruntime.InferenceSession":  # noqa: F821
+        self, proto: onnx.ModelProto, cpu: bool = False
+    ) -> onnxruntime.InferenceSession:
         from onnxruntime import InferenceSession, get_available_providers
 
         providers = ["CPUExecutionProvider"]
@@ -1168,9 +1169,9 @@ class ExtTestCase(unittest.TestCase):
 
     def make_inference_session(
         self,
-        onx: "onnx.ModelProto",  # noqa: F821
+        onx: onnx.ModelProto,
         cpu: bool = True,
-    ) -> "onnxruntime.InferenceSession":  # noqa: F821
+    ) -> onnxruntime.InferenceSession:
         return self._check_with_ort(onx, cpu=cpu)
 
     def assertRaise(self, fct: Callable, exc_type: type[Exception], msg: Optional[str] = None):

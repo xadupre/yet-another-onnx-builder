@@ -1,3 +1,4 @@
+from __future__ import annotations
 import enum
 import io
 import os
@@ -104,7 +105,7 @@ class CubeViewDef:
         keep_columns_in_index: Optional[Sequence[str]] = None,
         dropna: bool = True,
         transpose: bool = False,
-        f_highlight: Optional[Callable[[Any], "CubeViewDef.HighLightKind"]] = None,
+        f_highlight: Optional[Callable[[Any], CubeViewDef.HighLightKind]] = None,
         name: Optional[str] = None,
         no_index: bool = False,
         plots: bool = False,
@@ -437,7 +438,7 @@ class CubeLogs:
 
     def clone(
         self, data: Optional[pandas.DataFrame] = None, keys: Optional[Sequence[str]] = None
-    ) -> "CubeLogs":
+    ) -> CubeLogs:
         """
         Makes a copy of the dataframe.
         It copies the processed data not the original one.
@@ -1399,7 +1400,7 @@ class CubeLogs:
             if verbose:
                 print(f"[CubeLogs.to_excel] done with {len(views)} views")
 
-    def cube_time(self, fill_other_dates: bool = False, threshold: float = 1.2) -> "CubeLogs":
+    def cube_time(self, fill_other_dates: bool = False, threshold: float = 1.2) -> CubeLogs:
         """
         Aggregates the data over time to detect changes on the last value.
         If *fill_other_dates* is True, all dates are kept, but values
@@ -1688,7 +1689,7 @@ class CubeLogsPerformance(CubeLogs):
 
     def clone(
         self, data: Optional[pandas.DataFrame] = None, keys: Optional[Sequence[str]] = None
-    ) -> "CubeLogs":
+    ) -> CubeLogs:
         """
         Makes a copy of the dataframe.
         It copies the processed data not the original one.

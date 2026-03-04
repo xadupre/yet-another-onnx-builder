@@ -119,7 +119,7 @@ class SqueezeUnsqueezePattern(PatternOptimization):
 
     def _diff_axes(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         first_node: NodeProto,
         second_node: NodeProto,
     ):
@@ -165,7 +165,7 @@ class SqueezeUnsqueezePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -191,7 +191,7 @@ class SqueezeUnsqueezePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_first: NodeProto,
         node_second: NodeProto,
     ) -> List[NodeProto]:
@@ -341,7 +341,7 @@ class UnsqueezeUnsqueezePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -378,7 +378,7 @@ class UnsqueezeUnsqueezePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         next_node: NodeProto,
     ) -> List[NodeProto]:
@@ -524,7 +524,7 @@ class SqueezeAddPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -562,7 +562,7 @@ class SqueezeAddPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         squeeze1: NodeProto,
         squeeze2: NodeProto,
         add: NodeProto,
@@ -704,7 +704,7 @@ class SqueezeBinaryUnsqueezePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -742,7 +742,7 @@ class SqueezeBinaryUnsqueezePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         squeeze_node: NodeProto,
         binary_node: NodeProto,
         unsqueeze_node: NodeProto,

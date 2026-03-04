@@ -1,3 +1,4 @@
+from __future__ import annotations
 import functools
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
@@ -283,7 +284,7 @@ class TorchReferenceEvaluator:
         proto: Union[onnx.FunctionProto, onnx.GraphProto, onnx.ModelProto],
         providers: Tuple[str, ...] = ("CPUExecutionProvider",),
         opsets: Optional[Dict[str, int]] = None,
-        local_functions: Optional[Dict[Tuple[str, str], "TorchReferenceEvaluator"]] = None,
+        local_functions: Optional[Dict[Tuple[str, str], TorchReferenceEvaluator]] = None,
         verbose: int = 0,
         custom_kernels: Optional[Dict[Tuple[str, str], type[torch_ops.OpRunKernel]]] = None,
     ):

@@ -124,7 +124,7 @@ class TransposeTransposePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -156,7 +156,7 @@ class TransposeTransposePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         next_node: NodeProto,
     ) -> List[NodeProto]:
@@ -353,7 +353,7 @@ class TransposeReshapeTransposePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -425,7 +425,7 @@ class TransposeReshapeTransposePattern(PatternOptimization):
 
     def _new_shape_perm(
         self,
-        g: "GraphBulder",  # noqa: F821
+        g: GraphBulder,
         t1_node: NodeProto,
         reshape_node: NodeProto,
         t2_node: NodeProto,
@@ -481,7 +481,7 @@ class TransposeReshapeTransposePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         t1_node: NodeProto,
         reshape_node: NodeProto,
         t2_node: NodeProto,
@@ -631,7 +631,7 @@ class TransposeEqualReshapePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -676,7 +676,7 @@ class TransposeEqualReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         transpose_node: NodeProto,
     ) -> List[NodeProto]:
         new_shape = self._make_new_shape(
@@ -803,7 +803,7 @@ class TransposeGatherPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -828,7 +828,7 @@ class TransposeGatherPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         transpose_node: NodeProto,
         gather_node: NodeProto,
     ) -> List[NodeProto]:
@@ -962,7 +962,7 @@ class SwapUnsqueezeTransposePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -984,7 +984,7 @@ class SwapUnsqueezeTransposePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         unsqueeze_node: NodeProto,
         transpose_node: NodeProto,
     ) -> List[NodeProto]:

@@ -18,7 +18,7 @@ class BinaryInvestigation(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -50,7 +50,7 @@ class BinaryInvestigation(PatternOptimization):
 
     def report(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         left: Optional[NodeProto],
         right: Optional[NodeProto],

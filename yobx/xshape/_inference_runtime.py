@@ -1,3 +1,4 @@
+from __future__ import annotations
 import time
 from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np

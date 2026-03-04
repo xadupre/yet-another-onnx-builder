@@ -1,3 +1,4 @@
+from __future__ import annotations
 import ast
 from typing import Dict, Optional, Set
 from .simplify_expressions import SimpleSimpliflyTransformer, CommonTransformer

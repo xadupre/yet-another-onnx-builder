@@ -4,7 +4,7 @@ from typing import Any, Sequence, Tuple, Union
 import numpy as np
 
 STATIC_SHAPE = Tuple[int, ...]
-DYNAMIC_SHAPE = Tuple[Union[int, "torch.SymInt", "torch.SymFloat", float, str], ...]  # type: ignore[name-defined]  # noqa: F821
+DYNAMIC_SHAPE = Tuple[Union[int, "torch.SymInt", "torch.SymFloat", float, str], ...]  # type: ignore[name-defined]
 
 
 def reshape_implementation_with_zero(data: Any, shape: Sequence[int], allowzero: int = 0) -> Any:

@@ -160,7 +160,7 @@ class GeluPattern(EasyPatternOptimization):
         super().__init__(verbose, priority, min_opset=min_opset)
         self.domain = domain
 
-    def match_pattern(self, g: "GraphBuilder", x, c3, c04, cpi, one, c2):  # noqa: F821
+    def match_pattern(self, g: GraphBuilder, x, c3, c04, cpi, one, c2):
         x3 = g.op.Pow(x, c3)  # 3
         cx3 = g.op.Mul(x3, c04)  # 0.044715
         add = g.op.Add(x, cx3)
@@ -172,7 +172,7 @@ class GeluPattern(EasyPatternOptimization):
 
     def apply_pattern(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: GraphBuilder,
         x,
         c3,
         c04,
@@ -184,7 +184,7 @@ class GeluPattern(EasyPatternOptimization):
 
     def validate_mapping(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         deleted_nodes: List[NodeProto],
         pattern_nodes: Optional[List[NodeProto]] = None,
     ) -> bool:
@@ -325,12 +325,12 @@ class LeakyReluPattern(EasyPatternOptimization):
     def __init__(self, verbose: int = 0, priority: int = 0, min_opset: int = 6):
         super().__init__(verbose, priority, min_opset=min_opset)
 
-    def match_pattern(self, g: "GraphBuilder", x, zero, slope):  # noqa: F821
+    def match_pattern(self, g: GraphBuilder, x, zero, slope):
         return g.op.Where(g.op.Greater(x, zero), x, g.op.Mul(x, slope))
 
     def apply_pattern(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: GraphBuilder,
         x,
         zero,
         slope,
@@ -340,7 +340,7 @@ class LeakyReluPattern(EasyPatternOptimization):
 
     def validate_mapping(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         deleted_nodes: List[NodeProto],
         pattern_nodes: Optional[List[NodeProto]] = None,
     ) -> bool:
@@ -520,7 +520,7 @@ class SoftmaxCrossEntropyLossCastPattern(EasyPatternOptimization):
 
     def match_pattern(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: GraphBuilder,
         X,
         indices,
         axis,
@@ -552,7 +552,7 @@ class SoftmaxCrossEntropyLossCastPattern(EasyPatternOptimization):
     @classmethod
     def apply_pattern(
         cls,
-        g: "GraphBuilder",  # noqa: F821
+        g: GraphBuilder,
         X,
         indices,
         axis,
@@ -564,7 +564,7 @@ class SoftmaxCrossEntropyLossCastPattern(EasyPatternOptimization):
 
     def validate_mapping(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         deleted_nodes: List[NodeProto],
         pattern_nodes: Optional[List[NodeProto]] = None,
     ) -> bool:

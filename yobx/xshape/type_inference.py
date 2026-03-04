@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import List, NoReturn, Optional, Sequence, Tuple, Union
 from onnx import FunctionProto, NodeProto, TensorProto
 

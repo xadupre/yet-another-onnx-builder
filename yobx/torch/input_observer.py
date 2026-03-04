@@ -1,3 +1,4 @@
+from __future__ import annotations
 import contextlib
 import inspect
 import time
@@ -235,7 +236,7 @@ class InputCandidate:
 
     def align_with(
         self,
-        best_candidate: "InputCandidate",
+        best_candidate: InputCandidate,
         captured_inputs: dict[int | str, int],
         signature_names: list[str],
     ):

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 import scipy.special as scipy_special
 from onnx.reference.op_run import OpRun

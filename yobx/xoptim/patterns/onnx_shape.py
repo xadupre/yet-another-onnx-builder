@@ -19,7 +19,7 @@ class ShapeBasedShapeShapeAddPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -44,7 +44,7 @@ class ShapeBasedShapeShapeAddPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         shape1_node: NodeProto,
         shape2_node: NodeProto,
         add_node: NodeProto,

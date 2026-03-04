@@ -61,7 +61,7 @@ class _GraphPattern:
 
 
 class _GraphIterator:
-    def __init__(self, graph: "_GraphPatterns", node_index: int):
+    def __init__(self, graph: _GraphPatterns, node_index: int):
         self.graph = graph
         self.node_index: int = node_index
         self.io_index: int = 0

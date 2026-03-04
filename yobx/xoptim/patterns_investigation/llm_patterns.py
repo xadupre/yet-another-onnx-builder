@@ -18,7 +18,7 @@ class FunctionPackedMatMulPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -83,7 +83,7 @@ class FunctionPackedMatMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         *nodes: NodeProto,
     ) -> List[NodeProto]:
         matmul_nodes = [n for n in nodes if n.op_type == "MatMul"]

@@ -174,7 +174,7 @@ class MatMulAddPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -250,7 +250,7 @@ class MatMulAddPattern(PatternOptimization):
 
     def _apply_matmmul(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         matmul_node: NodeProto,
         add_node: NodeProto,
     ) -> List[NodeProto]:
@@ -395,7 +395,7 @@ class MatMulAddPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         matmul_node: NodeProto,
         add_node: NodeProto,
     ) -> List[NodeProto]:
@@ -528,7 +528,7 @@ class GemmTransposePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -546,7 +546,7 @@ class GemmTransposePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
     ) -> List[NodeProto]:
         tr = g.unique_name(f"{self.__class__.__name__}--{node.input[1]}")
@@ -705,7 +705,7 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
 
     def same_size(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821,
+        g: GraphBuilderPatternOptimization,
         sh1: Tuple[Union[int, str, float], ...],
         sh2: Tuple[Union[int, str, float], ...],
         constraints: Dict[str, Set[Union[int, str]]],
@@ -720,7 +720,7 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -834,7 +834,7 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_left: Optional[NodeProto],
         node_right: Optional[NodeProto],
         node: NodeProto,
@@ -1169,7 +1169,7 @@ class MulMulMatMulPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1190,7 +1190,7 @@ class MulMulMatMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         mul1: NodeProto,
         mul2: NodeProto,
         node: NodeProto,
@@ -1343,7 +1343,7 @@ class ReshapeMatMulReshapePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1419,7 +1419,7 @@ class ReshapeMatMulReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_before_left: NodeProto,
         node_before_right: NodeProto,
         node: NodeProto,
@@ -1525,7 +1525,7 @@ class TransposeMatMulPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1593,7 +1593,7 @@ class TransposeMatMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_before_left: Optional[NodeProto],
         node_before_right: Optional[NodeProto],
         node: NodeProto,
@@ -1772,7 +1772,7 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
         print("DOT-SECTION", to_dot(model))
     """
 
-    def check_transpose_node(self, g: "GraphBuilderPatternOptimization", name: str) -> bool:  # noqa: F821
+    def check_transpose_node(self, g: GraphBuilderPatternOptimization, name: str) -> bool:
         if g.is_used_more_than_once(name):
             return False
         node = g.node_before(name)
@@ -1791,7 +1791,7 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
         left_first: bool = True,
@@ -1844,7 +1844,7 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         node_left: Optional[NodeProto],
         node_left_tr: Optional[NodeProto],
@@ -2022,7 +2022,7 @@ class SwitchReshapeActivationPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
         left_first: bool = True,
@@ -2073,7 +2073,7 @@ class SwitchReshapeActivationPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         mm_node: NodeProto,
         tr_node: NodeProto,
         f_node: NodeProto,
@@ -2224,7 +2224,7 @@ class ShapeBasedMatMulToMulPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
         left_first: bool = True,
@@ -2261,7 +2261,7 @@ class ShapeBasedMatMulToMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         mm_node: NodeProto,
         transpose: Optional[NodeProto],
     ) -> List[NodeProto]:

@@ -444,7 +444,7 @@ class LayerNormalizationPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -535,7 +535,7 @@ class LayerNormalizationPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         red: NodeProto,
         sub: NodeProto,
         pow: NodeProto,
@@ -741,7 +741,7 @@ class LayerNormalizationScalePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -785,7 +785,7 @@ class LayerNormalizationScalePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         ln_node: NodeProto,
         mul_node: NodeProto,
         add_node: Optional[NodeProto],
@@ -1012,7 +1012,7 @@ class CastLayerNormalizationCastPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1057,7 +1057,7 @@ class CastLayerNormalizationCastPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         cast_before: NodeProto,
         node: NodeProto,
         cast_after: NodeProto,
@@ -1305,7 +1305,7 @@ class BatchNormalizationPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1361,7 +1361,7 @@ class BatchNormalizationPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
     ) -> List[NodeProto]:
         new_node = g.make_node(
@@ -1382,7 +1382,7 @@ class BatchNormalizationTrainingPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1415,7 +1415,7 @@ class BatchNormalizationTrainingPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
     ) -> List[NodeProto]:
         nname = f"{self.__class__.__name__}--{node.name}"
@@ -1640,7 +1640,7 @@ class RMSNormalizationPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1740,7 +1740,7 @@ class RMSNormalizationPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         cast_1: NodeProto,
         node_pow: NodeProto,
         node_reduce: NodeProto,
@@ -1912,7 +1912,7 @@ class RMSNormalizationMulPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1939,7 +1939,7 @@ class RMSNormalizationMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         rms_node: NodeProto,
         mul_node: NodeProto,
     ) -> List[NodeProto]:

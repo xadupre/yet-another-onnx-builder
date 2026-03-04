@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, Dict, Optional, Set, Tuple
 import torch
 from torch._subclasses.fake_tensor import FakeTensorMode, FakeTensor

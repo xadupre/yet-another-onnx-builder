@@ -1,3 +1,4 @@
+from __future__ import annotations
 from onnx.reference.op_run import OpRun
 from onnx.reference.ops.op_layer_normalization import _layer_normalization
 

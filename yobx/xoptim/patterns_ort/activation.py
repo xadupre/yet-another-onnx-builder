@@ -158,7 +158,7 @@ class BiasGeluPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -218,7 +218,7 @@ class BiasGeluPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         add_node: NodeProto,
         div_node: NodeProto,
         erf_node: NodeProto,
@@ -520,19 +520,19 @@ class GeluErfPattern(EasyPatternOptimization):
     def __init__(self, verbose: int = 0, priority: int = 0, min_opset: int = 1):
         super().__init__(verbose, priority, min_opset=min_opset)
 
-    def match_pattern(self, g: "GraphBuilder", x, cst2, one, c05):  # noqa: F821
+    def match_pattern(self, g: GraphBuilder, x, cst2, one, c05):
         xd = g.op.Div(x, cst2)  # 1.4140625
         exd = g.op.Erf(xd)
         aexd = g.op.Add(exd, one)  # 1
         mul = g.op.Mul(x, aexd)
         return g.op.Mul(c05, mul)  # 0.5
 
-    def apply_pattern(self, g: "GraphBuilder", x, cst2, one, c05):  # noqa: F821
+    def apply_pattern(self, g: GraphBuilder, x, cst2, one, c05):
         return g.anyop.Gelu(x, domain="com.microsoft")
 
     def validate_mapping(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         deleted_nodes: List[NodeProto],
         pattern_nodes: Optional[List[NodeProto]] = None,
     ) -> bool:
@@ -654,7 +654,7 @@ class FastGeluPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -664,7 +664,7 @@ class FastGeluPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         gelu_node: NodeProto,
     ) -> List[NodeProto]:
         return [
@@ -786,7 +786,7 @@ class BiasSoftmaxPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -806,7 +806,7 @@ class BiasSoftmaxPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         add_node: NodeProto,
         softmax_node: NodeProto,
     ) -> List[NodeProto]:
@@ -918,7 +918,7 @@ class QuickGeluPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -936,7 +936,7 @@ class QuickGeluPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         sigmoid: NodeProto,
         mul_node: NodeProto,
     ) -> List[NodeProto]:

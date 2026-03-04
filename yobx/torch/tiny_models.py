@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 import copy
 from typing import Any, Dict, Optional

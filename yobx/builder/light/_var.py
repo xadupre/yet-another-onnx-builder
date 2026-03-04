@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, Dict, List, Optional, Union
 import numpy as np
 from onnx import TensorProto
@@ -26,7 +27,7 @@ class BaseVar:
         n_outputs: int = 1,
         output_names: Optional[List[str]] = None,
         **kwargs: Any,
-    ) -> Union["Var", "Vars"]:
+    ) -> Union[Var, Vars]:
         """
         Creates a node using *inputs* and returns the resulting :class:`Var`
         (single output) or :class:`Vars` (multiple outputs).
@@ -61,7 +62,7 @@ class BaseVar:
         name: str,
         elem_type: int = TensorProto.FLOAT,
         shape: Optional[Any] = None,
-    ) -> "Var":
+    ) -> Var:
         """
         Declares a new graph input.
 
@@ -72,7 +73,7 @@ class BaseVar:
         """
         return self.parent.vin(name, elem_type=elem_type, shape=shape)
 
-    def cst(self, value: np.ndarray, name: Optional[str] = None) -> "Var":
+    def cst(self, value: np.ndarray, name: Optional[str] = None) -> Var:
         """
         Adds a constant initializer.
 
@@ -83,7 +84,7 @@ class BaseVar:
         tensor = self.parent.make_constant(value, name=name)
         return Var(self.parent, tensor.name, elem_type=tensor.data_type, shape=tuple(tensor.dims))
 
-    def v(self, name: str) -> "Var":
+    def v(self, name: str) -> Var:
         """
         Retrieves a variable by name from the parent graph.
 
@@ -92,7 +93,7 @@ class BaseVar:
         """
         return self.parent.get_var(name)
 
-    def bring(self, *vars: Any) -> Union["Var", "Vars"]:
+    def bring(self, *vars: Any) -> Union[Var, Vars]:
         """
         Combines variables into a :class:`Vars` (or a single :class:`Var`).
 
@@ -106,11 +107,11 @@ class BaseVar:
             return v
         return Vars(self.parent, *vars)
 
-    def left_bring(self, *vars: Any) -> "Vars":
+    def left_bring(self, *vars: Any) -> Vars:
         """Creates :class:`Vars` with ``*vars`` first, then ``self``."""
         return Vars(self.parent, *vars, self)
 
-    def right_bring(self, *vars: Any) -> "Vars":
+    def right_bring(self, *vars: Any) -> Vars:
         """Creates :class:`Vars` with ``self`` first, then ``*vars``."""
         return Vars(self.parent, self, *vars)
 
@@ -118,7 +119,7 @@ class BaseVar:
         "Delegates to the parent graph's :meth:`OnnxGraph.to_onnx`."
         return self.parent.to_onnx()
 
-    def vout(self, **kwargs: Dict[str, Any]) -> Union["Var", "Vars"]:
+    def vout(self, **kwargs: Dict[str, Any]) -> Union[Var, Vars]:
         "Declare outputs - must be overridden in subclasses."
         raise NotImplementedError(f"vout() not implemented in {type(self).__name__}.")
 
@@ -165,7 +166,7 @@ class Var(BaseVar, OpsVar):
         self,
         elem_type: int = TensorProto.FLOAT,
         shape: Optional[Any] = None,
-    ) -> "Var":
+    ) -> Var:
         """
         Declares this variable as a graph output.
 
@@ -176,7 +177,7 @@ class Var(BaseVar, OpsVar):
         self.parent.make_output(self.name, elem_type=elem_type, shape=shape)
         return self
 
-    def rename(self, new_name: str) -> "Var":
+    def rename(self, new_name: str) -> Var:
         """
         Renames this variable.
 
@@ -186,15 +187,15 @@ class Var(BaseVar, OpsVar):
         self.parent.rename(self.name, new_name)
         return self
 
-    def to(self, to: int) -> "Var":
+    def to(self, to: int) -> Var:
         "Casts to another ONNX element type."
         return self.Cast(to=to)
 
-    def astype(self, to: int) -> "Var":
+    def astype(self, to: int) -> Var:
         "Casts to another ONNX element type (alias for :meth:`to`)."
         return self.Cast(to=to)
 
-    def reshape(self, new_shape: Any) -> "Var":
+    def reshape(self, new_shape: Any) -> Var:
         "Reshapes the variable."
         if isinstance(new_shape, tuple):
             cst = self.cst(np.array(new_shape, dtype=np.int64))
@@ -205,49 +206,49 @@ class Var(BaseVar, OpsVar):
     # Python operator overloads
     # ------------------------------------------------------------------
 
-    def __add__(self, other: Any) -> "Var":
+    def __add__(self, other: Any) -> Var:
         return self.bring(self, other).Add()
 
-    def __sub__(self, other: Any) -> "Var":
+    def __sub__(self, other: Any) -> Var:
         return self.bring(self, other).Sub()
 
-    def __mul__(self, other: Any) -> "Var":
+    def __mul__(self, other: Any) -> Var:
         return self.bring(self, other).Mul()
 
-    def __truediv__(self, other: Any) -> "Var":
+    def __truediv__(self, other: Any) -> Var:
         return self.bring(self, other).Div()
 
-    def __matmul__(self, other: Any) -> "Var":
+    def __matmul__(self, other: Any) -> Var:
         return self.bring(self, other).MatMul()
 
-    def __neg__(self) -> "Var":
+    def __neg__(self) -> Var:
         return self.Neg()
 
-    def __abs__(self) -> "Var":
+    def __abs__(self) -> Var:
         return self.Abs()
 
-    def __eq__(self, other: Any) -> "Var":  # type: ignore[override]
+    def __eq__(self, other: Any) -> Var:  # type: ignore[override]
         return self.bring(self, other).Equal()
 
-    def __ne__(self, other: Any) -> "Var":  # type: ignore[override]
+    def __ne__(self, other: Any) -> Var:  # type: ignore[override]
         return self.bring(self, other).Equal().Not()
 
-    def __lt__(self, other: Any) -> "Var":
+    def __lt__(self, other: Any) -> Var:
         return self.bring(self, other).Less()
 
-    def __le__(self, other: Any) -> "Var":
+    def __le__(self, other: Any) -> Var:
         return self.bring(self, other).LessOrEqual()
 
-    def __gt__(self, other: Any) -> "Var":
+    def __gt__(self, other: Any) -> Var:
         return self.bring(self, other).Greater()
 
-    def __ge__(self, other: Any) -> "Var":
+    def __ge__(self, other: Any) -> Var:
         return self.bring(self, other).GreaterOrEqual()
 
-    def __mod__(self, other: Any) -> "Var":
+    def __mod__(self, other: Any) -> Var:
         return self.bring(self, other).Mod()
 
-    def __pow__(self, other: Any) -> "Var":
+    def __pow__(self, other: Any) -> Var:
         return self.bring(self, other).Pow()
 
 
@@ -307,7 +308,7 @@ class Vars(BaseVar, OpsVars):
     def __repr__(self) -> str:
         return f"Vars({', '.join(repr(v) for v in self.vars_)})"
 
-    def _check_nin(self, n_inputs: int) -> "Vars":
+    def _check_nin(self, n_inputs: int) -> Vars:
         "Asserts the number of variables matches *n_inputs*."
         if len(self) != n_inputs:
             raise RuntimeError(f"Expected {n_inputs} inputs but got {len(self)}.")
@@ -317,7 +318,7 @@ class Vars(BaseVar, OpsVars):
         "Returns the :class:`Var` at position *index*."
         return self.vars_[index]
 
-    def rename(self, *new_names: str) -> "Vars":
+    def rename(self, *new_names: str) -> Vars:
         """
         Renames each variable.
 
@@ -334,7 +335,7 @@ class Vars(BaseVar, OpsVars):
         self,
         elem_type: int = TensorProto.FLOAT,
         shape: Optional[Any] = None,
-    ) -> "Vars":
+    ) -> Vars:
         """
         Declares all variables as graph outputs.
 

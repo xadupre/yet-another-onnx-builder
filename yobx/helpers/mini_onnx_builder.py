@@ -1,3 +1,4 @@
+from __future__ import annotations
 import ctypes
 import sys
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
@@ -10,7 +11,7 @@ from . import string_type
 
 
 def proto_from_array(
-    arr: "torch.Tensor",  # type: ignore[name-defined] # noqa: F821
+    arr: torch.Tensor,  # type: ignore[name-defined]
     name: Optional[str] = None,
     verbose: int = 0,
 ) -> onnx.TensorProto:
@@ -128,7 +129,7 @@ class MiniOnnxBuilder:
     def append_output_initializer(
         self,
         name: str,
-        tensor: Union[np.ndarray, "torch.Tensor"],  # type: ignore[name-defined] # noqa: F821
+        tensor: Union[np.ndarray, torch.Tensor],  # type: ignore[name-defined]
         randomize: bool = False,
     ):
         """
@@ -180,7 +181,7 @@ class MiniOnnxBuilder:
         self.nodes.append(oh.make_node("Identity", [init_name], [name]))
 
     def append_output_sequence(
-        self, name: str, tensors: List[Union[np.ndarray, "torch.Tensor"]]  # type: ignore[name-defined] # noqa: F821
+        self, name: str, tensors: List[Union[np.ndarray, torch.Tensor]]  # type: ignore[name-defined]
     ):
         """
         Adds a sequence of initializers as an output.
@@ -217,7 +218,7 @@ class MiniOnnxBuilder:
         self.outputs.append(output)
 
     def append_output_dict(
-        self, name: str, tensors: Dict[str, Union[np.ndarray, "torch.Tensor"]]  # type: ignore[name-defined] # noqa: F821
+        self, name: str, tensors: Dict[str, Union[np.ndarray, torch.Tensor]]  # type: ignore[name-defined]
     ):
         """
         Adds two outputs, a string tensors for the keys and a sequence of tensors

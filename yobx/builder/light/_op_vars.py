@@ -14,16 +14,16 @@ class OpsVars:
     The ``vars_`` attribute holds the list of :class:`Var` objects.
     """
 
-    def BitShift(self, direction: str = "") -> "Var":
+    def BitShift(self, direction: str = "") -> Var:
         return self.make_node("BitShift", *self.vars_, direction=direction)
 
-    def CenterCropPad(self, axes: Optional[List[int]] = None) -> "Var":
+    def CenterCropPad(self, axes: Optional[List[int]] = None) -> Var:
         kwargs = {}
         if axes is not None:
             kwargs["axes"] = axes
         return self.make_node("CenterCropPad", *self.vars_, **kwargs)
 
-    def Clip(self) -> "Var":
+    def Clip(self) -> Var:
         return self.make_node("Clip", *self.vars_)
 
     def Col2Im(
@@ -31,7 +31,7 @@ class OpsVars:
         dilations: Optional[List[int]] = None,
         pads: Optional[List[int]] = None,
         strides: Optional[List[int]] = None,
-    ) -> "Var":
+    ) -> Var:
         kwargs = {}
         if dilations is not None:
             kwargs["dilations"] = dilations
@@ -41,10 +41,10 @@ class OpsVars:
             kwargs["strides"] = strides
         return self.make_node("Col2Im", *self.vars_, **kwargs)
 
-    def Compress(self, axis: int = 0) -> "Var":
+    def Compress(self, axis: int = 0) -> Var:
         return self.make_node("Compress", *self.vars_, axis=axis)
 
-    def Concat(self, axis: int = 0) -> "Var":
+    def Concat(self, axis: int = 0) -> Var:
         return self.make_node("Concat", *self.vars_, axis=axis)
 
     def Conv(
@@ -55,7 +55,7 @@ class OpsVars:
         kernel_shape: Optional[List[int]] = None,
         pads: Optional[List[int]] = None,
         strides: Optional[List[int]] = None,
-    ) -> "Var":
+    ) -> Var:
         kwargs = {}
         if dilations is not None:
             kwargs["dilations"] = dilations
@@ -75,7 +75,7 @@ class OpsVars:
         kernel_shape: Optional[List[int]] = None,
         pads: Optional[List[int]] = None,
         strides: Optional[List[int]] = None,
-    ) -> "Var":
+    ) -> Var:
         kwargs = {}
         if dilations is not None:
             kwargs["dilations"] = dilations
@@ -99,7 +99,7 @@ class OpsVars:
         output_shape: Optional[List[int]] = None,
         pads: Optional[List[int]] = None,
         strides: Optional[List[int]] = None,
-    ) -> "Var":
+    ) -> Var:
         kwargs = {}
         if dilations is not None:
             kwargs["dilations"] = dilations
@@ -117,10 +117,10 @@ class OpsVars:
             "ConvTranspose", *self.vars_, auto_pad=auto_pad, group=group, **kwargs
         )
 
-    def CumSum(self, exclusive: int = 0, reverse: int = 0) -> "Var":
+    def CumSum(self, exclusive: int = 0, reverse: int = 0) -> Var:
         return self.make_node("CumSum", *self.vars_, exclusive=exclusive, reverse=reverse)
 
-    def DFT(self, axis: int = 1, inverse: int = 0, onesided: int = 0) -> "Var":
+    def DFT(self, axis: int = 1, inverse: int = 0, onesided: int = 0) -> Var:
         return self.make_node("DFT", *self.vars_, axis=axis, inverse=inverse, onesided=onesided)
 
     def DeformConv(
@@ -131,7 +131,7 @@ class OpsVars:
         offset_group: int = 1,
         pads: Optional[List[int]] = None,
         strides: Optional[List[int]] = None,
-    ) -> "Var":
+    ) -> Var:
         kwargs = {}
         if dilations is not None:
             kwargs["dilations"] = dilations
@@ -145,21 +145,21 @@ class OpsVars:
             "DeformConv", *self.vars_, group=group, offset_group=offset_group, **kwargs
         )
 
-    def DequantizeLinear(self, axis: int = 1) -> "Var":
+    def DequantizeLinear(self, axis: int = 1) -> Var:
         return self.make_node("DequantizeLinear", *self.vars_, axis=axis)
 
-    def Einsum(self, equation: str = "") -> "Var":
+    def Einsum(self, equation: str = "") -> Var:
         return self.make_node("Einsum", *self.vars_, equation=equation)
 
-    def Gather(self, axis: int = 0) -> "Var":
+    def Gather(self, axis: int = 0) -> Var:
         return self.make_node("Gather", *self.vars_, axis=axis)
 
-    def GatherElements(self, axis: int = 0) -> "Var":
+    def GatherElements(self, axis: int = 0) -> Var:
         return self.make_node("GatherElements", *self.vars_, axis=axis)
 
     def Gemm(
         self, alpha: float = 1.0, beta: float = 1.0, transA: int = 0, transB: int = 0
-    ) -> "Var":
+    ) -> Var:
         return self.make_node(
             "Gemm", *self.vars_, alpha=alpha, beta=beta, transA=transA, transB=transB
         )
@@ -169,7 +169,7 @@ class OpsVars:
         align_corners: int = 0,
         mode: str = "bilinear",
         padding_mode: str = "zeros",
-    ) -> "Var":
+    ) -> Var:
         return self.make_node(
             "GridSample",
             *self.vars_,
@@ -180,20 +180,20 @@ class OpsVars:
 
     def GroupNormalization(
         self, epsilon: float = 9.999999747378752e-06, num_groups: int = 0
-    ) -> "Var":
+    ) -> Var:
         return self.make_node(
             "GroupNormalization", *self.vars_, epsilon=epsilon, num_groups=num_groups
         )
 
-    def InstanceNormalization(self, epsilon: float = 9.999999747378752e-06) -> "Var":
+    def InstanceNormalization(self, epsilon: float = 9.999999747378752e-06) -> Var:
         return self.make_node("InstanceNormalization", *self.vars_, epsilon=epsilon)
 
-    def MatMulInteger(self) -> "Var":
+    def MatMulInteger(self) -> Var:
         return self.make_node("MatMulInteger", *self.vars_)
 
     def MaxRoiPool(
         self, pooled_shape: Optional[List[int]] = None, spatial_scale: float = 1.0
-    ) -> "Var":
+    ) -> Var:
         kwargs = {}
         if pooled_shape is not None:
             kwargs["pooled_shape"] = pooled_shape
@@ -204,7 +204,7 @@ class OpsVars:
         kernel_shape: Optional[List[int]] = None,
         pads: Optional[List[int]] = None,
         strides: Optional[List[int]] = None,
-    ) -> "Var":
+    ) -> Var:
         kwargs = {}
         if kernel_shape is not None:
             kwargs["kernel_shape"] = kernel_shape
@@ -214,13 +214,13 @@ class OpsVars:
             kwargs["strides"] = strides
         return self.make_node("MaxUnpool", *self.vars_, **kwargs)
 
-    def MelWeightMatrix(self, output_datatype: int = 1) -> "Var":
+    def MelWeightMatrix(self, output_datatype: int = 1) -> Var:
         return self.make_node("MelWeightMatrix", *self.vars_, output_datatype=output_datatype)
 
-    def Mod(self, fmod: int = 0) -> "Var":
+    def Mod(self, fmod: int = 0) -> Var:
         return self.make_node("Mod", *self.vars_, fmod=fmod)
 
-    def NegativeLogLikelihoodLoss(self, ignore_index: int = 0, reduction: str = "mean") -> "Var":
+    def NegativeLogLikelihoodLoss(self, ignore_index: int = 0, reduction: str = "mean") -> Var:
         return self.make_node(
             "NegativeLogLikelihoodLoss",
             *self.vars_,
@@ -228,13 +228,13 @@ class OpsVars:
             reduction=reduction,
         )
 
-    def NonMaxSuppression(self, center_point_box: int = 0) -> "Var":
+    def NonMaxSuppression(self, center_point_box: int = 0) -> Var:
         return self.make_node("NonMaxSuppression", *self.vars_, center_point_box=center_point_box)
 
-    def OneHot(self, axis: int = -1) -> "Var":
+    def OneHot(self, axis: int = -1) -> Var:
         return self.make_node("OneHot", *self.vars_, axis=axis)
 
-    def Pad(self, mode: str = "constant") -> "Var":
+    def Pad(self, mode: str = "constant") -> Var:
         return self.make_node("Pad", *self.vars_, mode=mode)
 
     def QLinearConv(
@@ -245,7 +245,7 @@ class OpsVars:
         kernel_shape: Optional[List[int]] = None,
         pads: Optional[List[int]] = None,
         strides: Optional[List[int]] = None,
-    ) -> "Var":
+    ) -> Var:
         kwargs = {}
         if kernel_shape is not None:
             kwargs["kernel_shape"] = kernel_shape
@@ -259,16 +259,16 @@ class OpsVars:
             "QLinearConv", *self.vars_, auto_pad=auto_pad, group=group, **kwargs
         )
 
-    def QLinearMatMul(self) -> "Var":
+    def QLinearMatMul(self) -> Var:
         return self.make_node("QLinearMatMul", *self.vars_)
 
-    def QuantizeLinear(self, axis: int = 1, saturate: int = 1) -> "Var":
+    def QuantizeLinear(self, axis: int = 1, saturate: int = 1) -> Var:
         return self.make_node("QuantizeLinear", *self.vars_, axis=axis, saturate=saturate)
 
-    def Range(self) -> "Var":
+    def Range(self) -> Var:
         return self.make_node("Range", *self.vars_)
 
-    def ReduceL1(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
+    def ReduceL1(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> Var:
         return self.make_node(
             "ReduceL1",
             *self.vars_,
@@ -276,7 +276,7 @@ class OpsVars:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def ReduceL2(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
+    def ReduceL2(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> Var:
         return self.make_node(
             "ReduceL2",
             *self.vars_,
@@ -284,7 +284,7 @@ class OpsVars:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def ReduceLogSum(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
+    def ReduceLogSum(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> Var:
         return self.make_node(
             "ReduceLogSum",
             *self.vars_,
@@ -292,7 +292,7 @@ class OpsVars:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def ReduceLogSumExp(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
+    def ReduceLogSumExp(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> Var:
         return self.make_node(
             "ReduceLogSumExp",
             *self.vars_,
@@ -300,7 +300,7 @@ class OpsVars:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def ReduceMax(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
+    def ReduceMax(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> Var:
         return self.make_node(
             "ReduceMax",
             *self.vars_,
@@ -308,7 +308,7 @@ class OpsVars:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def ReduceMean(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
+    def ReduceMean(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> Var:
         return self.make_node(
             "ReduceMean",
             *self.vars_,
@@ -316,7 +316,7 @@ class OpsVars:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def ReduceMin(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
+    def ReduceMin(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> Var:
         return self.make_node(
             "ReduceMin",
             *self.vars_,
@@ -324,7 +324,7 @@ class OpsVars:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def ReduceProd(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
+    def ReduceProd(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> Var:
         return self.make_node(
             "ReduceProd",
             *self.vars_,
@@ -332,7 +332,7 @@ class OpsVars:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def ReduceSum(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
+    def ReduceSum(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> Var:
         return self.make_node(
             "ReduceSum",
             *self.vars_,
@@ -340,7 +340,7 @@ class OpsVars:
             noop_with_empty_axes=noop_with_empty_axes,
         )
 
-    def ReduceSumSquare(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
+    def ReduceSumSquare(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> Var:
         return self.make_node(
             "ReduceSumSquare",
             *self.vars_,
@@ -359,7 +359,7 @@ class OpsVars:
         keep_aspect_ratio_policy: str = "stretch",
         mode: str = "nearest",
         nearest_mode: str = "round_prefer_floor",
-    ) -> "Var":
+    ) -> Var:
         kwargs = {}
         if axes is not None:
             kwargs["axes"] = axes
@@ -385,7 +385,7 @@ class OpsVars:
         output_width: int = 1,
         sampling_ratio: int = 0,
         spatial_scale: float = 1.0,
-    ) -> "Var":
+    ) -> Var:
         return self.make_node(
             "RoiAlign",
             *self.vars_,
@@ -397,22 +397,22 @@ class OpsVars:
             spatial_scale=spatial_scale,
         )
 
-    def STFT(self, onesided: int = 1) -> "Var":
+    def STFT(self, onesided: int = 1) -> Var:
         return self.make_node("STFT", *self.vars_, onesided=onesided)
 
-    def Scatter(self, axis: int = 0) -> "Var":
+    def Scatter(self, axis: int = 0) -> Var:
         return self.make_node("Scatter", *self.vars_, axis=axis)
 
-    def ScatterElements(self, axis: int = 0, reduction: str = "none") -> "Var":
+    def ScatterElements(self, axis: int = 0, reduction: str = "none") -> Var:
         return self.make_node("ScatterElements", *self.vars_, axis=axis, reduction=reduction)
 
-    def ScatterND(self, reduction: str = "none") -> "Var":
+    def ScatterND(self, reduction: str = "none") -> Var:
         return self.make_node("ScatterND", *self.vars_, reduction=reduction)
 
-    def Slice(self) -> "Var":
+    def Slice(self) -> Var:
         return self.make_node("Slice", *self.vars_)
 
-    def TopK(self, axis: int = -1, largest: int = 1, sorted: int = 1) -> "Vars":
+    def TopK(self, axis: int = -1, largest: int = 1, sorted: int = 1) -> Vars:
         return self.make_node(
             "TopK",
             *self.vars_,
@@ -422,13 +422,13 @@ class OpsVars:
             n_outputs=2,
         )
 
-    def Trilu(self, upper: int = 1) -> "Var":
+    def Trilu(self, upper: int = 1) -> Var:
         return self.make_node("Trilu", *self.vars_, upper=upper)
 
-    def Upsample(self, mode: str = "nearest") -> "Var":
+    def Upsample(self, mode: str = "nearest") -> Var:
         return self.make_node("Upsample", *self.vars_, mode=mode)
 
-    def Where(self) -> "Var":
+    def Where(self) -> Var:
         return self.make_node("Where", *self.vars_)
 
 

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import contextlib
 import inspect
 import math
@@ -39,7 +40,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
     Works with :class:`CustomTracer`.
     """
 
-    def __init__(self, node: Node, tracer: Optional["TracerBase"] = None):
+    def __init__(self, node: Node, tracer: Optional[TracerBase] = None):
         super().__init__(node, tracer=tracer)
         assert isinstance(
             self.tracer, CustomTracer
@@ -52,7 +53,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
         "To avoid bugs."
         return f"CustomProxy(%{str(self.node)})"
 
-    def __getattr__(self, k) -> "CustomAttribute":
+    def __getattr__(self, k) -> CustomAttribute:
         # note: not added to the graph yet, if this is a method call
         # we peephole optimize to the method invocation
         return CustomAttribute(self, k)
@@ -124,12 +125,12 @@ class CustomProxy(torch.fx.proxy.Proxy):
     @classmethod
     def cat(
         cls,
-        tensors: List["CustomProxy"],
+        tensors: List[CustomProxy],
         dim: int = 0,
         *,
         out=None,
         axis: Optional[int] = None,
-    ) -> "CustomProxy":
+    ) -> CustomProxy:
         """Implements cat for tensors."""
         assert out is None, "Tracing is not implementing is out is not None."
         if isinstance(tensors, list):
@@ -438,7 +439,7 @@ class CustomTracer(torch.fx.Tracer):
         """Overwrites this method to replace the default Proxy by CustomProxy."""
         return cls(node, self)
 
-    def create_arg(self, a: Any) -> "Argument":  # noqa: F821
+    def create_arg(self, a: Any) -> Argument:
         """Overwrites this method to deal with more argument."""
         if a is bool:
             return torch.bool

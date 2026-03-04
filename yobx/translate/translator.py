@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 from onnx import AttributeProto, FunctionProto, GraphProto, ModelProto, NodeProto
@@ -16,7 +17,7 @@ class Translator:
     def __init__(
         self,
         proto: Union[ModelProto, FunctionProto, GraphProto],
-        emitter: Optional["InnerEmitter"] = None,
+        emitter: Optional[InnerEmitter] = None,
     ):
         if emitter is None:
             from .inner_emitter import InnerEmitter

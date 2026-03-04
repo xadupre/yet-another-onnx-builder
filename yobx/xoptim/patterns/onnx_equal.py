@@ -130,7 +130,7 @@ class UnsqueezeEqualPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -159,7 +159,7 @@ class UnsqueezeEqualPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_unsqueeze: NodeProto,
         node_equal: NodeProto,
         node_equal_unsqueeze: NodeProto,

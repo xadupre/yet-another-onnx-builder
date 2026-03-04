@@ -1,3 +1,4 @@
+from __future__ import annotations
 from ._op_run import OpRunKernel, OpRunFunction, OpRunSequence, OpRunTensor, OpRunValue
 from .access_ops import Gather_1, ScatterND_16, Slice_13
 from .binary_ops import (

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .graph_builder import GraphBuilder
 from .function_options import FunctionOptions
 from .infer_shapes_options import InferShapesOptions

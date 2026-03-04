@@ -20,7 +20,7 @@ class ReshapePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -44,7 +44,7 @@ class ReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
     ) -> List[NodeProto]:
         new_node = g.make_node(
@@ -159,7 +159,7 @@ class ShapedBasedReshapePattern(ReshapePattern):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -269,7 +269,7 @@ class ReduceReshapePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -321,7 +321,7 @@ class ReduceReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         next_node: NodeProto,
     ) -> List[NodeProto]:
@@ -461,7 +461,7 @@ class ReshapeReshapePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -584,7 +584,7 @@ class ReshapeReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         next_node: NodeProto,
     ) -> List[NodeProto]:
@@ -819,7 +819,7 @@ class Reshape2Of3Pattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -909,7 +909,7 @@ class Reshape2Of3Pattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_left: NodeProto,
         node_right: NodeProto,
         next_node: NodeProto,
@@ -1107,7 +1107,7 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1146,7 +1146,7 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         left: NodeProto,
         right: NodeProto,
         node: NodeProto,
@@ -1297,7 +1297,7 @@ class ConcatReshapePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1342,7 +1342,7 @@ class ConcatReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         concat: NodeProto,
         reshape: NodeProto,
     ) -> List[NodeProto]:
@@ -1504,7 +1504,7 @@ class StaticConcatReshapePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1537,7 +1537,7 @@ class StaticConcatReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         concat: NodeProto,
         reshape: NodeProto,
     ) -> List[NodeProto]:
@@ -1797,7 +1797,7 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1824,7 +1824,7 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         reshape: NodeProto,
     ) -> List[NodeProto]:
         aligned_reshape = self._align_shapes(
@@ -1976,7 +1976,7 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -2009,7 +2009,7 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         reshape: NodeProto,
     ) -> List[NodeProto]:
         op_type, axes = self._squeeze_axes(
@@ -2148,7 +2148,7 @@ class UnsqueezeReshapePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -2185,7 +2185,7 @@ class UnsqueezeReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         unsqueeze: NodeProto,
         reshape: NodeProto,
     ) -> List[NodeProto]:
@@ -2320,7 +2320,7 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -2358,7 +2358,7 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_before: NodeProto,
         reshape_node: NodeProto,
     ) -> List[NodeProto]:

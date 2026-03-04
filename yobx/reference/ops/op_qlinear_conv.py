@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Tuple
 from onnx.defs import OpSchema
 from onnx.helper import make_attribute

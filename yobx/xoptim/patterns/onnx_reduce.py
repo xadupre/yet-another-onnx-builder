@@ -128,7 +128,7 @@ class ReduceSumNormalizePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -163,7 +163,7 @@ class ReduceSumNormalizePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         cast_node: NodeProto,
         node: NodeProto,
         mul_node: NodeProto,
@@ -315,7 +315,7 @@ class ReduceArgTopKPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -358,7 +358,7 @@ class ReduceArgTopKPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         reduce_node: NodeProto,
         arg_node: NodeProto,
     ) -> List[NodeProto]:

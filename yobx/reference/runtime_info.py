@@ -1,3 +1,4 @@
+from __future__ import annotations
 import enum
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import onnx
@@ -117,7 +118,7 @@ class RuntimeValue:
             f"kind={self.kind}{text}, value={self.value.string_type()})"
         )
 
-    def set_value(self, value: Union["torch.Tensor", TensorLike]):  # type: ignore[name-defined] # noqa: F821
+    def set_value(self, value: Union[torch.Tensor, TensorLike]):  # type: ignore[name-defined]
         """Sets the value."""
         assert value is not None, "Use clean_value to set a value to None"
         self.value = value

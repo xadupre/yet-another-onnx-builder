@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import time
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
@@ -107,7 +108,7 @@ class ExportOptions:
     def __repr__(self) -> str:
         return string_sig(self)  # type: ignore[arg-type]
 
-    def clone(self, **kwargs) -> "ExportOptions":
+    def clone(self, **kwargs) -> ExportOptions:
         """Makes a copy and updates some of the values."""
         kw = get_sig_kwargs(self)
         kw.update(kwargs)
@@ -135,10 +136,10 @@ class ExportOptions:
 
     def post_process_exported_program(
         self,
-        exported_program: "torch.export.ExportedProgram",  # noqa: F821
+        exported_program: torch.export.ExportedProgram,
         verbose: int = 0,
         print_exported_program: bool = False,
-    ) -> "torch.export.ExportedProgram":  # noqa: F821
+    ) -> torch.export.ExportedProgram:
         """
         Run decompositions, remove inplace operations.
         The graph is modified inplace.
@@ -229,7 +230,7 @@ class ExportOptions:
         verbose: int,
         backed_size_oblivious: Union[bool, str] = False,
         prefer_deferred_runtime_asserts_over_guards: bool = False,
-    ) -> "torch.export.ExportedProgram":  # noqa: F821
+    ) -> torch.export.ExportedProgram:
         import torch
         from . import use_dyn_not_str
 
@@ -268,7 +269,7 @@ class ExportOptions:
         input_names: Optional[List[str]] = None,
         exc: bool = True,
         verbose: int = 0,
-    ) -> Union["torch.export.ExportedProgram", "torch.fx.GraphModule"]:  # noqa: F821
+    ) -> Union[torch.export.ExportedProgram, torch.fx.GraphModule]:
         """Exports the model into an exported program."""
         print_exported_program = os.environ.get("PRINT_EXPORTED_PROGRAM", "0") in (1, "1")
         begin = time.perf_counter()  # to avoid many warnings from pyrefly
@@ -442,7 +443,7 @@ class ExportOptions:
     def validate_exported_program(
         self,
         model: Any,
-        exported_program: "torch.export.ExportedProgram",  # noqa: F821
+        exported_program: torch.export.ExportedProgram,
         args: Optional[Tuple[Any, ...]],
         kwargs: Optional[Dict[str, Any]],
         verbose: int = 0,
@@ -483,7 +484,7 @@ def _get_decomposition_table_by_name(
     )
 
 
-def _inplace_nodes(graph: "torch.fx.Graph") -> List[Any]:  # noqa: F821
+def _inplace_nodes(graph: torch.fx.Graph) -> List[Any]:
     """Returns nodes with no users (candidates for inplace operations)."""
     nodes = []
     for node in graph.nodes:
@@ -494,13 +495,13 @@ def _inplace_nodes(graph: "torch.fx.Graph") -> List[Any]:  # noqa: F821
     return nodes
 
 
-def _has_inplace_nodes(graph: "torch.fx.Graph") -> bool:  # noqa: F821
+def _has_inplace_nodes(graph: torch.fx.Graph) -> bool:
     """Returns True if the graph has probable inplace nodes."""
     return bool(_inplace_nodes(graph))
 
 
 def _remove_inplace_nodes(
-    graph: "torch.fx.Graph",  # noqa: F821
+    graph: torch.fx.Graph,
     verbose: int = 0,
 ) -> int:
     """
@@ -534,10 +535,10 @@ def _remove_inplace_nodes(
 
 
 def apply_decompositions(
-    exported_program: "torch.export.ExportedProgram",  # noqa: F821
+    exported_program: torch.export.ExportedProgram,
     decomposition_table: Optional[Union[str, Dict[Any, Callable[..., Any]]]],
     backed_size_oblivious: Union[bool, str],
-) -> "torch.export.ExportedProgram":  # noqa: F821
+) -> torch.export.ExportedProgram:
     """
     Applies decompositions to an exported program.
 
@@ -577,8 +578,8 @@ def apply_decompositions(
 
 
 def insert_contiguous_between_transpose_and_view(
-    exported_program: "torch.export.ExportedProgram",  # noqa: F821
-) -> "torch.export.ExportedProgram":  # noqa: F821
+    exported_program: torch.export.ExportedProgram,
+) -> torch.export.ExportedProgram:
     """
     Modifies the module inplace to insert a ``contiguous`` node between a
     ``transpose`` node followed by a ``view`` node.

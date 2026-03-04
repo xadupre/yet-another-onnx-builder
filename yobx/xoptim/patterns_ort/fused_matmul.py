@@ -136,7 +136,7 @@ class FusedMatMulDivPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -160,7 +160,7 @@ class FusedMatMulDivPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         node_div: NodeProto,
     ) -> List[NodeProto]:
@@ -305,7 +305,7 @@ class FusedMatMulPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -393,7 +393,7 @@ class FusedMatMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_before_left: Optional[NodeProto],
         node_before_right: Optional[NodeProto],
         node: NodeProto,
@@ -616,7 +616,7 @@ class FusedMatMulx2Pattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -649,7 +649,7 @@ class FusedMatMulx2Pattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         div_node: Optional[NodeProto],
         *mnodes: Optional[NodeProto],
     ) -> List[NodeProto]:
@@ -808,7 +808,7 @@ class FusedMatMulTransposePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -839,7 +839,7 @@ class FusedMatMulTransposePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         transpose_node: NodeProto,
     ) -> List[NodeProto]:
@@ -983,7 +983,7 @@ class ReshapeGemmPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1011,7 +1011,7 @@ class ReshapeGemmPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         reshape_node: NodeProto,
         gemm_node: NodeProto,
     ) -> List[NodeProto]:
@@ -1154,7 +1154,7 @@ class ReshapeGemmReshapePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1189,7 +1189,7 @@ class ReshapeGemmReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         reshape_before: NodeProto,
         gemm_node: NodeProto,
         reshape_after: NodeProto,
@@ -1325,7 +1325,7 @@ class TransposeFusedMatMulBPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1353,7 +1353,7 @@ class TransposeFusedMatMulBPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         transpose_node: NodeProto,
         node: NodeProto,
     ) -> List[NodeProto]:

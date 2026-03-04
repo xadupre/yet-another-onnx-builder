@@ -1,3 +1,4 @@
+from __future__ import annotations
 import io
 from typing import Any, Callable, Dict, Optional
 import pandas
@@ -9,7 +10,7 @@ def apply_excel_style(
         Dict[
             str,
             Callable[
-                [Any], "CubeViewDef.HighLightKind"  # pyrefly: ignore[unknown-name]]  # noqa: F821
+                [Any], CubeViewDef.HighLightKind  # pyrefly: ignore[unknown-name]]
             ],
         ]
     ] = None,

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import contextlib
 import traceback
 from typing import Iterator, Optional

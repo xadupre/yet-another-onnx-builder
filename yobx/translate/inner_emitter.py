@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from onnx import AttributeProto, TensorProto

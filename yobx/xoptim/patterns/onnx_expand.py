@@ -122,7 +122,7 @@ class ExpandPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -147,7 +147,7 @@ class ExpandPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
     ) -> List[NodeProto]:
         new_node = g.make_node(
@@ -278,7 +278,7 @@ class ExpandBroadcastPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -330,7 +330,7 @@ class ExpandBroadcastPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         next_node: NodeProto,
     ) -> List[NodeProto]:
@@ -420,7 +420,7 @@ class ShapeBasedExpandBroadcastPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -467,7 +467,7 @@ class ShapeBasedExpandBroadcastPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         expand_left: NodeProto,
         expand_right: NodeProto,
         binary_node: NodeProto,
@@ -603,7 +603,7 @@ class ExpandSwapPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -634,7 +634,7 @@ class ExpandSwapPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         next_node: NodeProto,
     ) -> List[NodeProto]:
@@ -776,7 +776,7 @@ class ShapeBasedStaticExpandPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -802,7 +802,7 @@ class ShapeBasedStaticExpandPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         reshape: NodeProto,
     ) -> List[NodeProto]:
         expand_shape = self._find_expand_shape(
@@ -1030,7 +1030,7 @@ class ShapeBasedExpandSwapPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1109,7 +1109,7 @@ class ShapeBasedExpandSwapPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         expand_left: NodeProto,
         expand_right: NodeProto,
         binary_node: NodeProto,
@@ -1271,7 +1271,7 @@ class ShapeBasedExpandBroadcastMatMulPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1318,7 +1318,7 @@ class ShapeBasedExpandBroadcastMatMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         expand_left: NodeProto,
         expand_right: NodeProto,
         binary_node: NodeProto,
@@ -1480,7 +1480,7 @@ class ShapeBasedExpandCastWhereSwapPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1523,7 +1523,7 @@ class ShapeBasedExpandCastWhereSwapPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         expand_node: NodeProto,
         cast_node: NodeProto,
         where_node: NodeProto,
@@ -1665,7 +1665,7 @@ class ShapeBasedConcatExpandPattern(PatternOptimization):
     @classmethod
     def _compatible_shapes(
         cls,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         shape: DYNAMIC_SHAPE,
         expanded_shape: DYNAMIC_SHAPE,
         concat_input: Sequence[str],
@@ -1684,7 +1684,7 @@ class ShapeBasedConcatExpandPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1717,7 +1717,7 @@ class ShapeBasedConcatExpandPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         concat_node: NodeProto,
         expand_node: NodeProto,
     ) -> List[NodeProto]:
@@ -1866,7 +1866,7 @@ class SwapExpandReshapePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1894,7 +1894,7 @@ class SwapExpandReshapePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         expand_node: NodeProto,
         reshape_node: NodeProto,
     ) -> List[NodeProto]:

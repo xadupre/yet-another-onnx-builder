@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from ..patterns_api import PatternOptimization
 
 
-def get_investigation_patterns(verbose: int = 0) -> List["PatternOptimization"]:  # noqa: F821
+def get_investigation_patterns(verbose: int = 0) -> List[PatternOptimization]:
     """
     Returns a default list of patterns for investigations.
     They do nothing but prints information if verbose > 0.

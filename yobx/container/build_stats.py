@@ -1,3 +1,4 @@
+from __future__ import annotations
 class BuildStats:
     """
     Holds statistics collected during model export by

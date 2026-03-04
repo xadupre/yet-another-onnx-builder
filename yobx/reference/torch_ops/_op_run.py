@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, Dict, List, Optional, Union, Tuple
 import onnx
 import torch
@@ -49,7 +50,7 @@ class OpRunTensor(OpRunValue):
         "Tells if it is sequence."
         return False
 
-    def to(self, to: Any) -> "OpRunTensor":
+    def to(self, to: Any) -> OpRunTensor:
         "Changes the device."
         return OpRunTensor(self.tensor.to(to))
 
@@ -109,7 +110,7 @@ class OpRunTensor(OpRunValue):
             return self.cached
         return self._tensor_as_tuple_int()
 
-    def copy(self) -> "OpRunTensor":
+    def copy(self) -> OpRunTensor:
         "Shallow copy."
         return self.__class__(self.tensor)
 
@@ -145,7 +146,7 @@ class OpRunSequence(OpRunValue):
 
     def insert_at(
         self, tensor: torch.Tensor, position: Optional[OpRunTensor] = None
-    ) -> "OpRunSequence":
+    ) -> OpRunSequence:
         "Inserts a value at a given position."
         assert isinstance(tensor, OpRunTensor), f"Unexpected type {type(tensor)} for tensor"
         new_seq = OpRunSequence()  # type: ignore[abstract]
@@ -157,7 +158,7 @@ class OpRunSequence(OpRunValue):
             seq.insert(int(position.tensor.item()), tensor.tensor)
         return new_seq
 
-    def copy(self) -> "OpRunSequence":
+    def copy(self) -> OpRunSequence:
         "Shallow copy."
         return self.__class__(self.sequence, dtype=self.dtype)
 
@@ -317,7 +318,7 @@ class OpRunFunction(OpRunKernel):
 
     def __init__(
         self,
-        runtime: "yobx.reference.torch_evaluator.TorchReferenceEvaluator",  # noqa: F821
+        runtime: yobx.reference.torch_evaluator.TorchReferenceEvaluator,
         node: onnx.NodeProto,
         version: Optional[int] = None,
         verbose: int = 0,

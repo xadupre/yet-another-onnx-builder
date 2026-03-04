@@ -5,6 +5,7 @@ Enables registration of transformers cache classes with
 :mod:`pytree` so that :func:`torch.export.export`
 can handle them as inputs and outputs.
 """
+from __future__ import annotations
 
 import itertools
 import re

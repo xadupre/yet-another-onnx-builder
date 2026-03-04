@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Dict, Optional
 from ._graph import OnnxGraph, ProtoType
 from ._var import Var, Vars

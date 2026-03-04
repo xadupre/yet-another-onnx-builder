@@ -47,7 +47,7 @@ class MatchResult:
 
     def __init__(
         self,
-        pattern: "PatternOptimization",
+        pattern: PatternOptimization,
         nodes: List[NodeProto],
         apply: Callable,
         insert_at: Optional[NodeProto] = None,
@@ -86,7 +86,7 @@ class MatchResult:
     def __str__(self) -> str:
         return self.to_string(short=True)
 
-    def debug_string(self, g: Optional["GraphBuilder"] = None) -> str:  # noqa: F821
+    def debug_string(self, g: Optional[GraphBuilder] = None) -> str:
         """
         Returns a string showing the matched nodes.
         """
@@ -151,13 +151,13 @@ class PatternOptimization:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
 
-    def __eq__(self, o: "PatternOptimization"):
+    def __eq__(self, o: PatternOptimization):
         """Basic comparison based on the class name."""
         return type(o) == type(self)  # noqa: E721
 
     def enumerate_matches(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         subset_nodes: Optional[List[NodeProto]] = None,
     ) -> Iterator[MatchResult]:
         """
@@ -202,7 +202,7 @@ class PatternOptimization:
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -282,7 +282,7 @@ class PatternOptimization:
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         *nodes: Any,
     ) -> List[NodeProto]:
         """
@@ -302,7 +302,7 @@ class PatternOptimization:
             f"This function must be overloaded in class {self.__class__.__name__!r}."
         )
 
-    def _pattern_to_string(self, _g: "GraphBuilderPatternOptimization"):  # noqa: F821
+    def _pattern_to_string(self, _g: GraphBuilderPatternOptimization):
         return "Pattern cannot be constructed without the matched nodes."
 
 
@@ -333,7 +333,7 @@ class EasyPatternOptimization(PatternOptimization):
 
     def match_pattern(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: GraphBuilder,
         *args: List[str],
         **kwargs: Dict[str, Any],
     ):
@@ -344,9 +344,9 @@ class EasyPatternOptimization(PatternOptimization):
 
     def _build_pattern(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         fct: Callable,
-    ) -> "GraphBuilderPatternOptimization":  # noqa: F821
+    ) -> GraphBuilderPatternOptimization:
         from .graph_builder_optim import GraphBuilderPatternOptimization
 
         kwargs = {}
@@ -393,7 +393,7 @@ class EasyPatternOptimization(PatternOptimization):
         pat._build()
         return pat
 
-    def add_local_functions_to_builder(self, g2: "GraphBuilder"):  # noqa: F821
+    def add_local_functions_to_builder(self, g2: GraphBuilder):
         """
         Adds missing local functions to understand the applied pattern.
         There is none by default but there some pattern may need to overwrite this.
@@ -401,8 +401,8 @@ class EasyPatternOptimization(PatternOptimization):
 
     def _get_match_pattern(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
-    ) -> "GraphBuilderPatternOptimization":  # noqa: F821
+        g: GraphBuilderPatternOptimization,
+    ) -> GraphBuilderPatternOptimization:
         cache_key = 0, tuple(sorted(g.opsets.items()))
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -413,8 +413,8 @@ class EasyPatternOptimization(PatternOptimization):
 
     def _get_apply_pattern(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
-    ) -> "GraphBuilderPatternOptimization":  # noqa: F821
+        g: GraphBuilderPatternOptimization,
+    ) -> GraphBuilderPatternOptimization:
         cache_key = 1, tuple(sorted(g.opsets.items()))
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -436,9 +436,9 @@ class EasyPatternOptimization(PatternOptimization):
 
     def _match_backward(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
-        pat: "GraphBuilderPatternOptimization",  # noqa: F821
+        pat: GraphBuilderPatternOptimization,
         marked: Dict[int, Tuple[NodeProto, NodeProto]],
         pair_results_names: Dict[str, str],
         stacked: List[int],
@@ -559,9 +559,9 @@ class EasyPatternOptimization(PatternOptimization):
 
     def _match_forward(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
-        pat: "GraphBuilderPatternOptimization",  # noqa: F821
+        pat: GraphBuilderPatternOptimization,
         marked: Dict[int, Tuple[NodeProto, NodeProto]],
         pair_results_names: Dict[str, str],
         stacked: List[int],
@@ -859,7 +859,7 @@ class EasyPatternOptimization(PatternOptimization):
 
     def validate_mapping(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         deleted_nodes: List[NodeProto],
         pattern_nodes: Optional[List[NodeProto]] = None,
     ) -> bool:
@@ -875,7 +875,7 @@ class EasyPatternOptimization(PatternOptimization):
 
     def validate_attribute_mapping(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         deleted_nodes: List[NodeProto],
         pattern_nodes: Optional[List[NodeProto]] = None,
     ) -> bool:
@@ -1000,7 +1000,7 @@ class EasyPatternOptimization(PatternOptimization):
                 return True
         return False
 
-    def _pattern_to_string(self, g: "GraphBuilderPatternOptimization"):  # noqa: F821
+    def _pattern_to_string(self, g: GraphBuilderPatternOptimization):
         return textwrap.indent(self.display_pattern(g, self.match_pattern), "    ")
 
     def pretty_matched_pairs(self, pairs: List[Tuple[NodeProto, NodeProto]]) -> str:
@@ -1014,7 +1014,7 @@ class EasyPatternOptimization(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1183,7 +1183,7 @@ class EasyPatternOptimization(PatternOptimization):
 
         return MatchResult(self, matched_nodes, self.apply)
 
-    def apply_pattern(self, g: "GraphBuilder", *args, **kwargs):  # noqa: F821
+    def apply_pattern(self, g: GraphBuilder, *args, **kwargs):
         """Applies the replacement."""
         raise NotImplementedError(
             f"Class {self.__class__.__name__!r} must overwrite method 'apply_pattern'."
@@ -1191,7 +1191,7 @@ class EasyPatternOptimization(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         *nodes: Any,
     ) -> List[NodeProto]:
         # Why build the pattern gain
@@ -1355,9 +1355,9 @@ class OnnxEasyPatternOptimization(EasyPatternOptimization):
 
     def _build_pattern(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         fct: Callable,
-    ) -> "GraphBuilderPatternOptimization":  # noqa: F821
+    ) -> GraphBuilderPatternOptimization:
         if fct == self.match_pattern:
             onx = self._match_model
         elif fct == self.apply_pattern:

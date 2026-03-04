@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .expressions.simplify_expressions import (  # noqa: F401
     CommonTransformer,
     CommonVisitor,

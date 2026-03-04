@@ -190,7 +190,7 @@ class SameChildrenPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -323,7 +323,7 @@ class SameChildrenPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         *nodes: NodeProto,
     ) -> List[NodeProto]:
         """
@@ -464,7 +464,7 @@ class SameChildrenFromInputPattern(SameChildrenPattern):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -591,7 +591,7 @@ class ShapeBasedSameChildrenPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -621,7 +621,7 @@ class ShapeBasedSameChildrenPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         *nodes: NodeProto,
     ) -> List[NodeProto]:
         """
@@ -768,7 +768,7 @@ class IdentityPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -931,7 +931,7 @@ class IdentityPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
     ) -> List[NodeProto]:
         name = node.input[
@@ -1056,7 +1056,7 @@ class ShapeBasedIdentityPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1085,7 +1085,7 @@ class ShapeBasedIdentityPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
     ) -> List[NodeProto]:
         return [
@@ -1208,7 +1208,7 @@ class SwapUnaryPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1233,7 +1233,7 @@ class SwapUnaryPattern(PatternOptimization):
         return MatchResult(self, [node, next_node], self.apply)
 
     def apply(
-        self, g: "GraphBuilderPatternOptimization", node: NodeProto, unary_node: NodeProto  # noqa: F821
+        self, g: GraphBuilderPatternOptimization, node: NodeProto, unary_node: NodeProto
     ) -> List[NodeProto]:
         temp_name = g.unique_name(f"{self.__class__.__name__}--{node.output[0]}")
         res = [
@@ -1339,7 +1339,7 @@ class NotNotPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1352,7 +1352,7 @@ class NotNotPattern(PatternOptimization):
         return MatchResult(self, [not_before, node], self.apply, insert_at=node)
 
     def apply(
-        self, g: "GraphBuilderPatternOptimization", not_before: NodeProto, not_after: NodeProto  # noqa: F821
+        self, g: GraphBuilderPatternOptimization, not_before: NodeProto, not_after: NodeProto
     ) -> List[NodeProto]:
         pre_nodes = []
         if g.is_used_more_than_once(not_before.output[0]):

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, List, Optional, Set, Tuple, Union
 from ..helpers import string_sig
 from .order_optim import OrderAlgorithm

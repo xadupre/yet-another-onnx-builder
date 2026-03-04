@@ -1,3 +1,4 @@
+from __future__ import annotations
 import functools
 import re
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
@@ -377,7 +378,7 @@ def np_dtype_to_tensor_dtype(dtype: np.dtype) -> int:
         raise ValueError(f"Unable to convert {dtype=} into ONNX dtype.") from e
 
 
-def dtype_to_tensor_dtype(dt: Union[np.dtype, "torch.dtype"]) -> int:  # type: ignore[arg-type,name-defined] # noqa: F821
+def dtype_to_tensor_dtype(dt: Union[np.dtype, torch.dtype]) -> int:  # type: ignore[arg-type,name-defined]
     """
     Converts a torch dtype or numpy dtype into a onnx element type.
 

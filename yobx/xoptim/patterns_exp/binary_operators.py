@@ -22,7 +22,7 @@ class _common:
     @classmethod
     def _same_shape(
         cls,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         name1: str,
         name2: str,
         broadcast: bool = False,
@@ -157,7 +157,7 @@ class AddAddMulMulPattern(PatternOptimization, _common):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -192,7 +192,7 @@ class AddAddMulMulPattern(PatternOptimization, _common):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_left: NodeProto,
         node_right: NodeProto,
         node: NodeProto,
@@ -336,7 +336,7 @@ class AddMulPattern(PatternOptimization, _common):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -374,7 +374,7 @@ class AddMulPattern(PatternOptimization, _common):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_left: NodeProto,
         node_right: NodeProto,
         node: NodeProto,
@@ -519,7 +519,7 @@ class MulSigmoidPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -545,7 +545,7 @@ class MulSigmoidPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_sigmoid: NodeProto,
         node_mul: NodeProto,
     ) -> List[NodeProto]:
@@ -671,7 +671,7 @@ class NegXplus1Pattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -694,7 +694,7 @@ class NegXplus1Pattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
     ) -> List[NodeProto]:
         new_node = g.make_node(
@@ -808,7 +808,7 @@ class SubMulPattern(PatternOptimization, _common):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -845,7 +845,7 @@ class SubMulPattern(PatternOptimization, _common):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_left: NodeProto,
         node_right: NodeProto,
         node: NodeProto,
@@ -996,7 +996,7 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
         PatternOptimization.__init__(self, verbose, priority)
         _common.__init__(self, broadcast)
 
-    def can_fuse(self, g: "GraphBuilderPatternOptimization", nodes: List[NodeProto]) -> bool:  # noqa: F821
+    def can_fuse(self, g: GraphBuilderPatternOptimization, nodes: List[NodeProto]) -> bool:
         """Checks that one node if not using the output of another."""
         assert len(nodes) == 2, f"Not implemented for {len(nodes)} nodes."
         p1 = g.get_position(nodes[0])
@@ -1025,7 +1025,7 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1062,7 +1062,7 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         *nodes: NodeProto,
     ) -> List[NodeProto]:
         assert len(nodes) == 2, f"not implemented for {len(nodes)} nodes"
@@ -1223,7 +1223,7 @@ class AddMulTransposePattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1250,7 +1250,7 @@ class AddMulTransposePattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         transpose_node: NodeProto,
     ) -> List[NodeProto]:

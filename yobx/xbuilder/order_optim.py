@@ -1,3 +1,4 @@
+from __future__ import annotations
 import random
 import time
 from enum import IntEnum
@@ -23,8 +24,8 @@ class OrderAlgorithm(IntEnum):
 
     @classmethod
     def from_str(
-        cls, value: Optional[Union[str, "OrderAlgortihm"]]  # type: ignore # noqa: F821
-    ) -> "OrderAlgorithm":
+        cls, value: Optional[Union[str, OrderAlgortihm]]  # type: ignore
+    ) -> OrderAlgorithm:
         if isinstance(value, OrderAlgorithm):
             return value
         if not value or value == "NONE":
@@ -49,7 +50,7 @@ class OrderOptimization:
 
     def __init__(
         self,
-        builder: "GraphBuilder",
+        builder: GraphBuilder,
         algorithm: OrderAlgorithm = OrderAlgorithm.NONE,
         verbose: int = 0,
     ):

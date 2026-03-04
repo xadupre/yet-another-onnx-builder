@@ -132,7 +132,7 @@ class SwapRangeAddScalarPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -150,7 +150,7 @@ class SwapRangeAddScalarPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_range: NodeProto,
         node_add: NodeProto,
     ) -> List[NodeProto]:

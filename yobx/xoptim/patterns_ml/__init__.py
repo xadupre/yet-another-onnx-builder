@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 def get_ml_patterns(
     verbose: int = 0,
-) -> List["PatternOptimization"]:  # noqa: F821
+) -> List[PatternOptimization]:
     """
     Returns a default list of optimization patterns for ai.onnx.ml.
     It is equal to the following list.

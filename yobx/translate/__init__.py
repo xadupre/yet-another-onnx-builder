@@ -1,3 +1,4 @@
+from __future__ import annotations
 import textwrap
 from onnx import ModelProto
 from .translator import Translator

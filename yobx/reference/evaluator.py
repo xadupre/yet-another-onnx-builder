@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, Dict, List, Optional, Union
 from onnx import FunctionProto, ModelProto, NodeProto, TypeProto
 from onnx.defs import get_schema

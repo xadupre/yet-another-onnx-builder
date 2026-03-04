@@ -1,3 +1,4 @@
+from __future__ import annotations
 import contextlib
 from itertools import zip_longest
 from typing import Dict, Generator, List, Tuple
@@ -33,7 +34,7 @@ class _BuilderRuntime:
     <yobx.xshape._inference_runtime._InferenceRuntime.compute_constant>`.
     """
 
-    def onnx_dtype_to_torch_dtype(self, itype: int) -> "torch.dtype":  # noqa: F821
+    def onnx_dtype_to_torch_dtype(self, itype: int) -> torch.dtype:
         """See :func:`yobx.torch.torch_helper.onnx_dtype_to_torch_dtype`."""
         from ..torch.torch_helper import onnx_dtype_to_torch_dtype
 
@@ -241,8 +242,8 @@ class _BuilderRuntime:
     def _apply_transpose(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        feeds: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
         perm = None
         for att in node.attribute:
             if att.name == "perm":
@@ -264,8 +265,8 @@ class _BuilderRuntime:
     def _apply_expand(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        feeds: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
         x = feeds[node.input[0]]
         new_shape = feeds[node.input[1]]
         if isinstance(x, self.torch.Tensor):
@@ -293,8 +294,8 @@ class _BuilderRuntime:
     def _apply_squeeze(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        feeds: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
         x = feeds[node.input[0]]
         if len(node.input) == 1:
             # No axis.
@@ -307,8 +308,8 @@ class _BuilderRuntime:
     def _apply_unsqueeze(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        feeds: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
         x = feeds[node.input[0]]
         axis = feeds[node.input[1]]
         if isinstance(x, np.ndarray):
@@ -333,8 +334,8 @@ class _BuilderRuntime:
     def _apply_cast(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        feeds: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
         x = feeds[node.input[0]]
         if not isinstance(x, np.ndarray) and (
             not hasattr(self, "torch") or not isinstance(x, self.torch.Tensor)
@@ -378,8 +379,8 @@ class _BuilderRuntime:
     def _apply_unary_function(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        feeds: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
         x = feeds[node.input[0]]
         itype = dtype_to_tensor_dtype(x.dtype)
         if isinstance(x, np.ndarray):
@@ -409,8 +410,8 @@ class _BuilderRuntime:
     def _apply_trilu(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        feeds: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
         upper = True
         for att in node.attribute:
             if att.name == "upper":
@@ -446,8 +447,8 @@ class _BuilderRuntime:
     def _apply_binary_op(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        feeds: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
         a, b = feeds[node.input[0]], feeds[node.input[1]]
         if a.dtype != b.dtype:
             a = self._to_torch_tensor(a)
@@ -474,15 +475,15 @@ class _BuilderRuntime:
     def make_torch_tensor_from_np_array(
         self,
         arr: np.ndarray,
-    ) -> "torch.Tensor":  # noqa: F821
+    ) -> torch.Tensor:
         """Converts a numpy array to a torch tensor."""
         return self.torch.from_numpy(arr)
 
     def _apply_where(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        feeds: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
         new_feeds = {}
         for k, v in feeds.items():
             if not hasattr(self, "torch"):
@@ -509,8 +510,8 @@ class _BuilderRuntime:
     def _apply_slice(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        feeds: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
         new_feeds = {}
         for k, v in feeds.items():
             if isinstance(v, np.ndarray):
@@ -569,7 +570,7 @@ class _BuilderRuntime:
 
     def _apply_shape_on_shape(
         self, node: NodeProto, shape: Tuple[int, ...]
-    ) -> "torch.Tensor":  # noqa: F821
+    ) -> torch.Tensor:
         if node.attribute:
             start = 0
             end = None
@@ -584,7 +585,7 @@ class _BuilderRuntime:
     def _apply_shape(
         self,
         node: NodeProto,
-        feeds: Dict[str, "torch.Tensor"],  # noqa: F821
-    ) -> "torch.Tensor":  # noqa: F821
+        feeds: Dict[str, torch.Tensor],
+    ) -> torch.Tensor:
         shape = tuple(map(int, feeds[node.input[0]].shape))
         return self._apply_shape_on_shape(node, shape)

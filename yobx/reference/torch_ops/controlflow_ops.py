@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, Dict, Optional
 import onnx
 import torch
@@ -17,7 +18,7 @@ class OpRunControlFlow(OpRunKernel):
         node: onnx.NodeProto,
         version: Optional[int] = None,
         parent: Optional[
-            "yobx.reference.torch_evaluator.TorchReferenceEvaluator"  # noqa: F821
+            yobx.reference.torch_evaluator.TorchReferenceEvaluator
         ] = None,
         verbose: int = 0,
     ):
@@ -54,7 +55,7 @@ class Loop_16(OpRunControlFlow):
         node: onnx.NodeProto,
         version: Optional[int] = None,
         parent: Optional[
-            "yobx.reference.torch_evaluator.TorchReferenceEvaluator"  # noqa: F821
+            yobx.reference.torch_evaluator.TorchReferenceEvaluator
         ] = None,
         verbose: int = 0,
     ):

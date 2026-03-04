@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
 import onnx
@@ -57,7 +58,7 @@ class OnnxList(list):
             return self
         return OnnxList([v.detach().cpu().numpy() for v in self])
 
-    def to(self, tensor_like) -> "OnnxList":
+    def to(self, tensor_like) -> OnnxList:
         "Creates a new list with all tensors on numpy or pytorch depending on `tensor_like`."
         if isinstance(tensor_like, np.ndarray):
             return self
@@ -70,7 +71,7 @@ class OnnxList(list):
             ]
         )
 
-    def clone(self) -> "OnnxList":
+    def clone(self) -> OnnxList:
         "Clone (torch)."
         return OnnxList([t.clone() for t in self]) if len(self) > 0 else OnnxList(self.itype)
 
@@ -104,7 +105,7 @@ class OnnxruntimeEvaluator:
 
     def __init__(
         self,
-        proto: Union[str, Proto, "OnnxruntimeEvaluator"],
+        proto: Union[str, Proto, OnnxruntimeEvaluator],
         session_options: Optional[onnxruntime.SessionOptions] = None,
         providers: Optional[Union[str, List[str]]] = None,
         nvtx: bool = False,
@@ -117,7 +118,7 @@ class OnnxruntimeEvaluator:
         use_training_api: bool = False,
         verbose: int = 0,
         local_functions: Optional[
-            Dict[Tuple[str, str], Union[Proto, "OnnxruntimeEvaluator"]]
+            Dict[Tuple[str, str], Union[Proto, OnnxruntimeEvaluator]]
         ] = None,
         ir_version: int = 10,
         opsets: Optional[Union[int, Dict[str, int]]] = None,
@@ -141,7 +142,7 @@ class OnnxruntimeEvaluator:
         ), f"whole must be True for dump_onnx_model={dump_onnx_model!r}"
 
         self._cache: Dict[
-            Any, Tuple[Proto, Union["OnnxruntimeEvaluator", _InferenceSession]]  # noqa: UP037
+            Any, Tuple[Proto, Union[OnnxruntimeEvaluator, _InferenceSession]]  # noqa: UP037
         ] = {}
         self.ir_version = ir_version
         self.opsets = opsets
@@ -188,7 +189,7 @@ class OnnxruntimeEvaluator:
             )
             self.rt_nodes_ = self.nodes.copy()
 
-        self.local_functions: Dict[Tuple[str, str], "OnnxruntimeEvaluator"] = (  # noqa: UP037
+        self.local_functions: Dict[Tuple[str, str], OnnxruntimeEvaluator] = (  # noqa: UP037
             {(f.domain, f.name): self.__class__(f) for f in self.proto.functions}
             if hasattr(self.proto, "functions")
             else {}
@@ -594,7 +595,7 @@ class OnnxruntimeEvaluator:
 
     def _get_sess_if(
         self, node: onnx.NodeProto, branch: str, inputs: List[Any], context: Dict[str, Any]
-    ) -> Tuple[onnx.ModelProto, "OnnxruntimeEvaluator"]:
+    ) -> Tuple[onnx.ModelProto, OnnxruntimeEvaluator]:
         g = None
         for att in node.attribute:
             if att.name == branch:
@@ -623,7 +624,7 @@ class OnnxruntimeEvaluator:
 
     def _get_sess_local(
         self, node: onnx.NodeProto, inputs: List[Any]
-    ) -> Tuple[onnx.FunctionProto, "OnnxruntimeEvaluator"]:
+    ) -> Tuple[onnx.FunctionProto, OnnxruntimeEvaluator]:
         ev = self.local_functions[node.domain, node.op_type]
         sess = OnnxruntimeEvaluator(
             ev,
@@ -706,7 +707,7 @@ class OnnxruntimeEvaluator:
 
     def _get_sess_scan_or_loop(
         self, node: onnx.NodeProto, branch: str, inputs: List[Any], context: Dict[str, Any]
-    ) -> Tuple[onnx.ModelProto, "OnnxruntimeEvaluator"]:
+    ) -> Tuple[onnx.ModelProto, OnnxruntimeEvaluator]:
         g = None
         for att in node.attribute:
             if att.name == branch:

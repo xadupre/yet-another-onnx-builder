@@ -150,7 +150,7 @@ class ConstantOfShapeScatterNDPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -184,7 +184,7 @@ class ConstantOfShapeScatterNDPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_before: NodeProto,
         node: NodeProto,
     ) -> List[NodeProto]:
@@ -360,7 +360,7 @@ class MaskedShapeScatterNDPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -419,7 +419,7 @@ class MaskedShapeScatterNDPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         scatter_node: NodeProto,
         where_node: NodeProto,
         equal_node: NodeProto,

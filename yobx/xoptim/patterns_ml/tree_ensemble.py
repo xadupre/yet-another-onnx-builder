@@ -219,7 +219,7 @@ class TreeEnsembleRegressorMulPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -237,7 +237,7 @@ class TreeEnsembleRegressorMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         tree_node: NodeProto,
         mul_node: NodeProto,
     ) -> List[NodeProto]:
@@ -585,7 +585,7 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -678,7 +678,7 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
 
     @classmethod
     def get_attribute_value(
-        cls, g: "GraphBuilderPatternOptimization", node: NodeProto, name: str, exc: bool = True  # noqa: F821
+        cls, g: GraphBuilderPatternOptimization, node: NodeProto, name: str, exc: bool = True
     ) -> Any:
         att = g.get_attribute(node, name, exc=exc)
         if not exc and att is None:
@@ -697,7 +697,7 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
 
     @classmethod
     def _first_tree_id(
-        cls, g: "GraphBuilderPatternOptimization", trees: List[NodeProto]  # noqa: F821
+        cls, g: GraphBuilderPatternOptimization, trees: List[NodeProto]
     ) -> Dict[int, int]:
         res = {}
         current = 0
@@ -712,7 +712,7 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
     @classmethod
     def _merge(
         cls,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         trees: List[NodeProto],
         name: str,
         as_tensor: Optional[str] = None,
@@ -760,7 +760,7 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
         return onh.from_array(merged, name=as_tensor)
 
     def _opset_process(
-        self, g: "GraphBuilderPatternOptimization", atts: Dict[str, Any]  # noqa: F821
+        self, g: GraphBuilderPatternOptimization, atts: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         as_tensor not supported in opset ai.onnx.ml < 3.
@@ -787,7 +787,7 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         concat_node: NodeProto,
         *trees_or_sigmoid: NodeProto,
     ) -> List[NodeProto]:

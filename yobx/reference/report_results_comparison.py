@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, Dict, List, Set, Tuple, Union
 from ..helpers.onnx_helper import dtype_to_tensor_dtype
 from ..helpers import max_diff, string_type
@@ -16,7 +17,7 @@ class ReportResultComparison:
     """
 
     # pyrefly: ignore[unknown-name]
-    def __init__(self, tensors: Dict[ReportKeyNameType, "torch.Tensor"]):  # type: ignore[name-defined] # noqa: F821
+    def __init__(self, tensors: Dict[ReportKeyNameType, torch.Tensor]):  # type: ignore[name-defined]
         assert all(
             hasattr(v, "shape") and hasattr(v, "dtype") for v in tensors.values()
         ), f"One of the tensors is not: {string_type(tensors, with_shape=True)}"
@@ -27,7 +28,7 @@ class ReportResultComparison:
         self.unique_run_names: Set[str] = set()
 
     # pyrefly: ignore[unknown-name]
-    def key(self, tensor: "torch.Tensor") -> ReportKeyValueType:  # type: ignore[name-defined] # noqa: F821
+    def key(self, tensor: torch.Tensor) -> ReportKeyValueType:  # type: ignore[name-defined]
         "Returns a key for a tensor, (onnx dtype, shape)."
         return self.dtype_to_tensor_dtype(tensor.dtype), tuple(map(int, tensor.shape))
 
@@ -68,7 +69,7 @@ class ReportResultComparison:
     def report(
         self,
         # pyrefly: ignore[unknown-name]
-        outputs: Dict[str, "torch.Tensor"],  # type: ignore[name-defined] # noqa: F821
+        outputs: Dict[str, torch.Tensor],  # type: ignore[name-defined]
     ) -> List[Tuple[Tuple[int, str], ReportKeyNameType, Dict[str, Union[float, str]]]]:
         """
         For every tensor in outputs, compares it to every tensor held by
@@ -84,7 +85,7 @@ class ReportResultComparison:
             if key not in self.mapping:
                 continue
             # pyrefly: ignore[unknown-name]
-            cache: Dict["torch.device", "torch.Tensor"] = {}  # type: ignore[name-defined] # noqa: F821, UP037
+            cache: Dict[torch.device, torch.Tensor] = {}  # type: ignore[name-defined], UP037
             for held_key in self.mapping[key]:
                 t2 = self.tensors[held_key]
                 if hasattr(t2, "device") and hasattr(tensor, "device"):

@@ -129,7 +129,7 @@ class SimpleRotaryPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -192,7 +192,7 @@ class SimpleRotaryPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         split_node: NodeProto,
         neg_node: NodeProto,
         concat_node: NodeProto,

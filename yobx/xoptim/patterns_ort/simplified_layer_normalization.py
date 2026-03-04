@@ -155,7 +155,7 @@ class SimplifiedLayerNormalizationPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -228,7 +228,7 @@ class SimplifiedLayerNormalizationPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_pow: NodeProto,
         node_reduce: NodeProto,
         node_add: NodeProto,
@@ -415,7 +415,7 @@ class SkipLayerNormalizationPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -445,7 +445,7 @@ class SkipLayerNormalizationPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         add_node: NodeProto,
         norm_node: NodeProto,
     ) -> List[NodeProto]:
@@ -821,7 +821,7 @@ class SkipSimplifiedLayerNormalizationPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -858,7 +858,7 @@ class SkipSimplifiedLayerNormalizationPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node_add: NodeProto,
         node_simplified: NodeProto,
     ) -> List[NodeProto]:
@@ -1434,7 +1434,7 @@ class SkipSimplifiedLayerNormalizationMulPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1468,7 +1468,7 @@ class SkipSimplifiedLayerNormalizationMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         skip_simp_node: NodeProto,
         mul_node: NodeProto,
     ) -> List[NodeProto]:
@@ -2030,7 +2030,7 @@ class SimplifiedLayerNormalizationMulPattern(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -2065,7 +2065,7 @@ class SimplifiedLayerNormalizationMulPattern(PatternOptimization):
 
     def apply(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimization,
         simp_node: NodeProto,
         mul_node: NodeProto,
     ) -> List[NodeProto]:
