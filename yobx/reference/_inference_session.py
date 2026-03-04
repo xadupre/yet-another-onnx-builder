@@ -144,7 +144,6 @@ class _InferenceSession:
         self.output_shapes = [i.shape for i in sess.get_outputs()]
         self.input_types = [i.type for i in sess.get_inputs()]
         self.output_types = [i.type for i in sess.get_outputs()]
-        self.torch = torch
         self.nvtx = nvtx
         self.run_options = onnxruntime.RunOptions()
 
@@ -156,12 +155,6 @@ class _InferenceSession:
         self.use_training_api = can_use_training_api and (
             self.has_onnxruntime_training() if use_training_api is None else use_training_api
         )
-
-        if torch.cuda.device_count() > 0:
-            for i in range(torch.cuda.device_count()):
-                DEVICES[i] = ORTC.OrtDevice(
-                    ORTC.OrtDevice.cuda(), ORTC.OrtDevice.default_memory(), i
-                )
 
         self._torch_from_dlpack = None
         self.sess_bool_outputs = [i.type == "tensor(bool)" for i in sess.get_outputs()]

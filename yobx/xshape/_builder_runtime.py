@@ -364,7 +364,7 @@ class _BuilderRuntime:
         if not hasattr(self, "torch"):
             ttype = tensor_dtype_to_np_dtype(to)
             return [x.astype(ttype)]
-        if isinstance(x, np.ndarray):
+        if self._has_torch and isinstance(x, np.ndarray):
             # Type conversion between numpy and torch is not robust.
             itype = dtype_to_tensor_dtype(x.dtype)
             ttype = self.onnx_dtype_to_torch_dtype(itype)
@@ -374,12 +374,13 @@ class _BuilderRuntime:
                 f"node.op_type={node.op_type!r}, type={self.torch.Tensor}"
                 f"{self.pretty_text()}"
             )
-        assert isinstance(x, self.torch.Tensor), (
-            f"Unexpected type {type(x)} for x for node type {node.op_type}, "
-            f"name={node.name}, inputs={node.input}, outputs={node.output}"
-        )
-        ttype = self.onnx_dtype_to_torch_dtype(to)
-        return [x.to(ttype)]
+            assert isinstance(x, self.torch.Tensor), (
+                f"Unexpected type {type(x)} for x for node type {node.op_type}, "
+                f"name={node.name}, inputs={node.input}, outputs={node.output}"
+            )
+            ttype = self.onnx_dtype_to_torch_dtype(to)
+            return [x.to(ttype)]
+        return [x]
 
     def _apply_unary_function(
         self,

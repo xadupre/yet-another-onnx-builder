@@ -8043,7 +8043,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         for i, sh in enumerate(shape):
             if isinstance(sh, int):
                 continue
-            self.make_dynamic_object(sh, self.torch.SymInt(sh), input_name=val.name, axis=i)  # type: ignore
+            if self._has_torch:
+                self.make_dynamic_object(sh, self.torch.SymInt(sh), input_name=val.name, axis=i)  # type: ignore
         if (
             0 in shape
             and len(shape) > 1

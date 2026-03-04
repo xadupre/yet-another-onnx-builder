@@ -387,10 +387,9 @@ def get_figure(ax):
 
 def has_cuda() -> bool:
     """Returns ``torch.cuda.device_count() > 0``."""
-    try:
-        import torch
-    except (ImportError, NameError, AttributeError):
+    if not has_torch():
         return False
+    import torch
 
     return torch.cuda.device_count() > 0
 
@@ -481,7 +480,10 @@ def has_torch(version: str) -> bool:
         import torch
     except (ImportError, AttributeError):
         return False
-
+    if not hasattr(torch, "__version__") or os.environ.get("NOTORCH", "0") == "1":
+        return False
+    if not version:
+        return True
     return pv.Version(torch.__version__) >= pv.Version(version)
 
 

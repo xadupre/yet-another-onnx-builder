@@ -59,6 +59,11 @@ class InferenceSessionForTorch(_InferenceSession):
         )
         self.cpu_outputs = cpu_outputs
         self._torch_from_dlpack = _from_dlpack
+        if torch.cuda.device_count() > 0:
+            for i in range(torch.cuda.device_count()):
+                DEVICES[i] = ORTC.OrtDevice(
+                    ORTC.OrtDevice.cuda(), ORTC.OrtDevice.default_memory(), i
+                )
 
     def _get_ortvalues_from_torch_tensors(
         self, tensors: Tuple[torch.Tensor, ...], n_outputs: int
