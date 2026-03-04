@@ -53,7 +53,7 @@ sklearn = [
 torch = [
     "accelerate",
     "huggingface_hub",
-    "git+https://github.com/microsoft/onnxscript.git",
+    "onnxscript @ git+https://github.com/microsoft/onnxscript.git",
     "optree",
     "sentencepiece",
     "torch>=2.10",
