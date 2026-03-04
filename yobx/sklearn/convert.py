@@ -1,18 +1,9 @@
 from typing import Any, Dict, Optional, Sequence, Tuple
-from sklearn.base import BaseEstimator, is_classifier, is_regressor
-from .register import get_sklearn_converter
+from sklearn.base import BaseEstimator
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
-
-
-def get_output_names(estimator):
-    if hasattr(estimator, "get_feature_names_out"):
-        return estimator.get_feature_names_out()
-    if is_classifier(estimator):
-        return ["labels", "probabilities"]
-    if is_regressor(estimator):
-        return ["predictions"]
-    return ["Y"]
+from .register import get_sklearn_converter
+from .sklearn_helper import get_output_names
 
 
 def to_onnx(
@@ -52,7 +43,7 @@ def to_onnx(
         shape = list(arg.shape)
         for i, dim in ds.items():
             shape[i] = dim
-        g.make_tensor_input(name, np_dtype_to_tensor_dtype(arg.dtype), shape)
+        g.make_tensor_input(name, np_dtype_to_tensor_dtype(arg.dtype), shape, device=-1)
 
     output_names = get_output_names(estimator)
     fct(g, {}, output_names, estimator, *input_names, name="main")

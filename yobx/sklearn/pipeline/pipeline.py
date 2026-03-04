@@ -1,7 +1,8 @@
 from typing import Tuple, Dict, List, Union
 from sklearn.pipeline import Pipeline
-from ..register import register_sklearn_converter, get_sklearn_converter
 from ...xbuilder import GraphBuilder
+from ..register import register_sklearn_converter, get_sklearn_converter
+from ..sklearn_helper import get_output_names
 
 
 @register_sklearn_converter(Pipeline)
@@ -27,10 +28,13 @@ def sklearn_pipeline(
     assert isinstance(estimator, Pipeline), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
     current_input = (X,)
-    for step_name, step in estimator.steps:
-        output_names = estimator.get_feature_names_out()
+    for i, (step_name, step) in enumerate(estimator.steps):
+        if i == len(estimator.steps) - 1:
+            output_names = outputs
+        else:
+            output_names = get_output_names(step)
+            output_names = [g.unique_name(n) for n in output_names]
         fct = get_sklearn_converter(type(step))
-        current_input = fct(
-            g, sts, output_names, step, *current_input, name=f"{name}__{step_name}"
-        )
+        fct(g, sts, output_names, step, *current_input, name=f"{name}__{step_name}")
+        current_input = output_names
     return current_input

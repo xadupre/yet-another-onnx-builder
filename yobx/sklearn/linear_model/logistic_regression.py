@@ -43,9 +43,9 @@ def sklearn_logistic_regression(
     decision = g.op.Gemm(X, coef, intercept, transB=1, name=f"{name}_decision")
 
     if is_binary:
-        proba_pos = g.op.Sigmoid(decision, name=f"{name}_sigmoid")
-        proba_neg = g.op.Sub(np.array([1], dtype=dtype), decision, name=name)
-        proba = g.op.Concat(proba_neg, proba_pos, axis=1, name=name, outputs=outputs[1:])
+        proba_pos = g.op.Sigmoid(decision, name=name)
+        proba_neg = g.op.Sub(np.array([1], dtype=dtype), proba_pos, name=name)
+        proba = g.op.Concat(proba_neg, proba_pos, axis=-1, name=name, outputs=outputs[1:])
     else:
         proba = g.op.Softmax(decision, axis=1, name=name, outputs=outputs[1:])
 

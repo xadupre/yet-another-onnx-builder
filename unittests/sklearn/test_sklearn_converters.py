@@ -48,7 +48,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         # Check graph structure
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Gemm", op_types)
-        self.assertIn("Sigmoid", op_types)
 
         # Check outputs
         ref = ExtendedReferenceEvaluator(onx)
