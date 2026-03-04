@@ -72,6 +72,19 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         self.time_evaluation_constants_ = 0
         self.optimization_options = _OptimizationOptions()
 
+        if os.environ.get("NOTORCH", "0") in ("1", "true"):
+            self._has_torch = False
+            self.torch = None
+        else:
+            try:
+                import torch
+
+                self._has_torch = True
+                self.torch = torch
+            except (NameError, ImportError, AttributeError):
+                self._has_torch = False
+                self.torch = None
+
     @property
     def input_names(self) -> List[str]:
         """Returns the list of input names of the model."""

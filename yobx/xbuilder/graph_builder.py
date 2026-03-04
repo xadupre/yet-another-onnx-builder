@@ -2130,7 +2130,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 and isinstance(value[1], tuple)
                 and len(value[1][1]) == 3
             ):
-                assert not self.has_torch, (
+                assert self._has_torch, (
                     f"Unexpected types for values {string_type(value, with_shape=True)}, "
                     f"torch is not allowed"
                 )
