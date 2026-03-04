@@ -239,10 +239,10 @@ class OnnxScriptGraphBuilder:
         :return: The name (or list of names), matching the *name* argument.
         """
         if isinstance(name, list):
-            return [
-                self.make_tensor_output(n, elem_type=elem_type, shape=shape)  # type: ignore[misc]
-                for n in name
-            ]
+            assert all(isinstance(n, str) for n in name)  # type happiness
+            res = [self.make_tensor_output(n, elem_type=elem_type, shape=shape) for n in name]
+            assert all(isinstance(n, str) for n in res)  # type happiness
+            return res  # type: ignore
 
         value = self.get_value(name)
 
@@ -349,7 +349,7 @@ class OnnxScriptGraphBuilder:
         if domain:
             all_kwargs["_domain"] = domain
 
-        result = self._inner.call_op(op_type, ir_inputs, all_kwargs)
+        result = self._inner.call_op(op_type, ir_inputs, all_kwargs)  # type: ignore
 
         if isinstance(result, ir.Value):
             result_list: List[ir.Value] = [result]

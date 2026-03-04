@@ -158,11 +158,11 @@ def sklearn_decision_tree_classifier(
     tree = estimator.tree_
     attrs = _extract_tree_attributes(tree, n_classes, is_classifier=True)
 
-    if np.issubdtype(classes.dtype, np.integer):
-        classlabels = classes.astype(np.int64).tolist()
+    if np.issubdtype(classes.dtype, np.integer):  # type: ignore
+        classlabels = classes.astype(np.int64).tolist()  # type: ignore
         label_kwargs = {"classlabels_int64s": classlabels}
     else:
-        classlabels = classes.astype(str).tolist()
+        classlabels = classes.astype(str).tolist()  # type: ignore
         label_kwargs = {"classlabels_strings": classlabels}
 
     result = g.make_node(
@@ -172,7 +172,7 @@ def sklearn_decision_tree_classifier(
         domain="ai.onnx.ml",
         name=name,
         post_transform="NONE",
-        **attrs,
+        **attrs,  # type: ignore
         **label_kwargs,
     )
 
@@ -217,7 +217,7 @@ def sklearn_decision_tree_regressor(
         name=name,
         n_targets=1,
         post_transform="NONE",
-        **attrs,
+        **attrs,  # type: ignore
     )
 
     return result if isinstance(result, str) else result[0]
