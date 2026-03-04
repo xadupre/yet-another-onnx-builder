@@ -1,4 +1,4 @@
-name: Torch Transformers Tests
+name: transformers
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   torch_tests:
-    name: torch transformers tests (ubuntu-latest, py3.12, torch-${{ matrix.torch-version }}, transformers-${{ matrix.transformers-version }})
+    name: tt-tests (ubuntu-latest, py3.13, transformers 5.2/4.57/4/.5/4.49 torch-${{ matrix.torch-version }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,7 +20,7 @@ jobs:
         torch-version: ["2.10"]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python 3.12
+      - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"

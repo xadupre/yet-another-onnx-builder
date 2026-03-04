@@ -1,4 +1,4 @@
-name: Tests with no options (no torch, ...)
+name: Tests No Torch
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   no_torch_tests:
-    name: no options tests (${{ matrix.os }}, py${{ matrix.python-version }})
+    name: zero-tests (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
