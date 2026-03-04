@@ -11,7 +11,9 @@ def register_sklearn_converters():
     from .linear_model import register as register_linear_model
     from .pipeline import register as register_pipeline
     from .preprocessing import register as register_preprocessing
+    from .tree import register as register_tree
 
     register_linear_model()
     register_pipeline()
     register_preprocessing()
+    register_tree()
