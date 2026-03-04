@@ -16,12 +16,6 @@ class _TestShapeBuilder(BasicShapeBuilder):
     as_function = False
     _debug_quiet = False
 
-    @property
-    def torch(self):
-        import torch
-
-        return torch
-
     def unique_dimension_name(self, prefix: str) -> str:
         return f"{prefix}_0"
 

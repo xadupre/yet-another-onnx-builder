@@ -49,12 +49,6 @@ class _TestShapeBuilder(BasicShapeBuilder):
     as_function = False
     _dim_counter = 0
 
-    @property
-    def torch(self):
-        import torch
-
-        return torch
-
     def unique_dimension_name(self, prefix: str) -> str:
         _TestShapeBuilder._dim_counter += 1
         return f"{prefix}_{_TestShapeBuilder._dim_counter}"

@@ -8,13 +8,8 @@ from yobx.xshape import BasicShapeBuilder
 class _TorchShapeBuilder(BasicShapeBuilder):
     """BasicShapeBuilder extended with a ``torch`` property for runtime tests."""
 
-    @property
-    def torch(self):
-        import torch
-
-        return torch
-
     def make_torch_tensor_from_np_array(self, x):
+        assert self._has_torch, "torch is not available"
         import torch
 
         return torch.from_numpy(x)
