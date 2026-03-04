@@ -587,9 +587,7 @@ class _InferenceRuntime:
             f"v.op_type={v.op_type!r}, v.name={v.name!r}{self.get_debug_msg()}"
         )
         assert cst is not None, f"Constant {name!r} was not found in {v.output}"
-        if hasattr(self, "torch") and isinstance(
-            cst, self.torch._subclasses.fake_tensor.FakeTensor
-        ):
+        if self._has_torch and isinstance(cst, self.torch._subclasses.fake_tensor.FakeTensor):
             assert not self._debug_constant_folding, (
                 f"Unable to compute constant for node {self.pretty_node(v)}"
                 f"because a FakeTensor appeared{self.get_debug_msg()}"

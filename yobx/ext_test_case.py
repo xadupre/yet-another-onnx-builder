@@ -505,6 +505,8 @@ def requires_torch(version: str = "", msg: str = "") -> Callable:
     except (ImportError, AttributeError, NameError):
         return unittest.skip(msg or "torch not installed")
 
+    if not hasattr(torch, "__version__") or os.environ.get("NOTORCH", "0") == "1":
+        return unittest.skip(msg or "torch not installed")
     if not version:
         return lambda x: x
 
