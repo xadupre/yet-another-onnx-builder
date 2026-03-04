@@ -199,7 +199,8 @@ def string_type(
                     rows.append(f"{k}:DYN({v})")
                 else:
                     rows.append(f"{k}:{string_type(v)}")
-            return f"{{{','.join(rows)}}}"
+            res = f"{{{','.join(rows)}}}"
+            return res.replace("_DimHint(type:AUTO,_factory:bool)", "AUTO")
 
         kws = dict(
             with_shape=with_shape,
@@ -209,6 +210,10 @@ def string_type(
             limit=limit,
         )
         s = ",".join(f"{kv[0]}:{string_type(kv[1],**kws)}" for kv in obj.items())  # type: ignore[arg-type]
+        print(
+            "***",
+        )
+        s = s.replace("_DimHint(type:AUTO,_factory:bool)", "AUTO")
         if all(isinstance(k, int) for k in obj):
             return f"{{{s}}}"
         return f"dict({s})"
@@ -252,21 +257,6 @@ def string_type(
     if isinstance(obj, slice):
         return "slice"
 
-    if is_dataclass(obj):
-        # That includes torch.export.Dim.AUTO, torch.export.Dim.DYNAMIC so they need to be
-        # handled before that.
-        values = {f.name: getattr(obj, f.name, None) for f in fields(obj)}
-        values = {k: v for k, v in values.items() if v is not None}
-        s = string_type(
-            values,
-            with_shape=with_shape,
-            with_min_max=with_min_max,
-            with_device=with_device,
-            ignore=ignore,
-            limit=limit,
-        )
-        return f"{obj.__class__.__name__}{s[4:]}"
-
     try:
         import torch
 
@@ -295,6 +285,15 @@ def string_type(
             if obj in (torch.export.Dim.DYNAMIC, cl.DYNAMIC):
                 return "DYNAMIC"
             if obj in (torch.export.Dim.AUTO, cl.AUTO):
+                return "AUTO"
+            return (
+                str(obj).replace("DimHint(DYNAMIC)", "DYNAMIC").replace("DimHint(AUTO)", "AUTO")
+            )
+
+        if obj.__class__.__name__ == "_DimHintType":
+            if obj in (torch.export.Dim.DYNAMIC, obj.__class__.DYNAMIC):
+                return "DYNAMIC"
+            if obj in (torch.export.Dim.AUTO, obj.__class__.AUTO):
                 return "AUTO"
             return (
                 str(obj).replace("DimHint(DYNAMIC)", "DYNAMIC").replace("DimHint(AUTO)", "AUTO")
@@ -330,6 +329,21 @@ def string_type(
             if not with_shape:
                 return f"{prefix}T{i}r{len(obj.shape)}"
             return f"{prefix}T{i}s{'x'.join(map(str, obj.shape))}"
+
+    if is_dataclass(obj):
+        # That includes torch.export.Dim.AUTO, torch.export.Dim.DYNAMIC so they need to be
+        # handled before that.
+        values = {f.name: getattr(obj, f.name, None) for f in fields(obj)}
+        values = {k: v for k, v in values.items() if v is not None}
+        s = string_type(
+            values,
+            with_shape=with_shape,
+            with_min_max=with_min_max,
+            with_device=with_device,
+            ignore=ignore,
+            limit=limit,
+        )
+        return f"{obj.__class__.__name__}{s[4:]}"
 
     if obj.__class__.__name__ == "OrtValue":
         if not obj.has_value():
@@ -599,7 +613,7 @@ def string_type(
         )
         return f"Chat({msg})"
 
-    raise TypeError(f"Unsupported type {type(obj).__name__!r} - {type(obj)}")
+    raise TypeError(f"Unsupported type {type(obj).__name__!r} - {type(obj)} ({has_torch=})")
 
 
 def string_signature(sig: Any) -> str:

@@ -276,6 +276,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         _context: Optional[Set[str]] = None,
         _parent: Optional[Union["GraphBuilder", Tuple["GraphBuilder", NodeProto]]] = None,
     ):
+        self.maybe_disable_fake_tensor_mode = contextlib.nullcontext
         if os.environ.get("NOTORCH", "0") in ("1", "true"):
             self._has_torch = False
             self.torch = None
@@ -285,6 +286,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
                 self._has_torch = True
                 self.torch = torch
+                self.maybe_disable_fake_tensor_mode = _unset_fake_temporarily
             except (NameError, ImportError, AttributeError):
                 self._has_torch = False
                 self.torch = None
@@ -293,7 +295,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         self.TEMPLATE_TYPE = TEMPLATE_TYPE
 
-        self.maybe_disable_fake_tensor_mode = _unset_fake_temporarily
         self.optimization_options = optimization_options or OptimizationOptions(verbose=verbose)
         self.local_domain = local_domain
         self.as_function = as_function

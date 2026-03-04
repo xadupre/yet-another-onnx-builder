@@ -171,6 +171,7 @@ class TestApplySqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].shape, (3, 5))
 
+    @requires_torch()
     def test_squeeze_torch_no_axis(self):
         import torch
 
@@ -180,6 +181,7 @@ class TestApplySqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (3, 5))
 
+    @requires_torch()
     def test_squeeze_torch_with_axis_scalar(self):
         import torch
 
@@ -190,6 +192,7 @@ class TestApplySqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (3, 5))
 
+    @requires_torch()
     def test_squeeze_torch_with_axis_array(self):
         import torch
 
@@ -229,6 +232,7 @@ class TestApplyUnsqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].shape, (1, 2, 3, 1))
 
+    @requires_torch()
     def test_unsqueeze_torch_scalar_axis(self):
         import torch
 
@@ -239,6 +243,7 @@ class TestApplyUnsqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (1, 2, 3))
 
+    @requires_torch()
     def test_unsqueeze_torch_single_axis(self):
         import torch
 
@@ -249,6 +254,7 @@ class TestApplyUnsqueeze(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (2, 1, 3))
 
+    @requires_torch()
     def test_unsqueeze_torch_multiple_axes(self):
         import torch
 
