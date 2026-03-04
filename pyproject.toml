@@ -13,10 +13,8 @@ dependencies = [
     "ml_dtypes",
     "numpy>=2.1",
     "onnx>=1.14",
-    "onnx-diagnostic",
     "onnxruntime>=1.20",
     "packaging",
-    "scikit-learn>=1.4",
 ]
 
 [project.optional-dependencies]
@@ -34,11 +32,11 @@ dev = [
 ]
 docs = [
     "black",
-    "piccolo-theme",
     "matplotlib",
     "onnx-diagnostic",
     "openpyxl",
     "pandas",
+    "piccolo-theme",
     "sphinx>=7",
     "sphinx-copybutton",
     "sphinx-gallery",
@@ -54,7 +52,7 @@ sklearn = [
 torch = [
     "accelerate",
     "huggingface_hub",
-    "onnxscript>=0.1",
+    "onnxscript",
     "optree",
     "sentencepiece",
     "torch>=2.10",
