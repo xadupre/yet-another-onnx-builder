@@ -604,7 +604,7 @@ def requires_diffusers(
         import torch  # noqa: F401
         import diffusers
     except (ImportError, AttributeError):
-        return unittest.skip(msg or "diffuers not installed")
+        return unittest.skip(msg or "diffusers not installed")
 
     if not version:
         return lambda x: x
