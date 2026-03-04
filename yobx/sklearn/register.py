@@ -9,8 +9,8 @@ def register_sklearn_converter(cls: Union[type, Tuple[type]]):
         global SKLEARN_CONVERTERS
         if isinstance(cls, tuple):
             for c in cls:
-                if cls in SKLEARN_CONVERTERS:
-                    raise TypeError(f"A converter is already registered for {cls}.")
+                if c in SKLEARN_CONVERTERS:
+                    raise TypeError(f"A converter is already registered for {c}.")
                 SKLEARN_CONVERTERS[c] = fct
         else:
             SKLEARN_CONVERTERS[cls] = fct
