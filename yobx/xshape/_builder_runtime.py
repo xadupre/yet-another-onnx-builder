@@ -39,6 +39,12 @@ class _BuilderRuntime:
 
         return onnx_dtype_to_torch_dtype(itype)
 
+    def onnx_dtype_to_np_dtype(self, itype: int) -> np.dtype:
+        """See :func:`yobx.helpers.onnx_helper.tensor_dtype_to_np_dtype`."""
+        from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
+
+        return tensor_dtype_to_np_dtype(itype)
+
     def _apply_slice_to_shape(
         self,
         shape: STATIC_SHAPE,
