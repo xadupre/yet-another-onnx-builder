@@ -18,6 +18,12 @@ def sklearn_pipeline(
     Converts a :class:`sklearn.pipeline.Pipeline` into ONNX using registered
     converters for each step in the pipeline.
 
+    The converter iterates over the pipeline steps and chains each step's
+    converter output into the next step's input.  Intermediate tensor names
+    are generated with
+    :meth:`GraphBuilder.unique_name <yobx.xbuilder.GraphBuilder.unique_name>`
+    to avoid collisions.
+
     :param g: the graph builder to add nodes to
     :param sts: shapes and types defined by :epkg:`scikit-learn`
     :param outputs: desired output tensor names for the pipeline result
