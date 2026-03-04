@@ -8299,7 +8299,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
                     self.make_dynamic_object(
                         sh,
-                        self.torch.SymInt(sh) if self._has_torch else self.WrapSym(sh),  # type: ignore
+                        self.WrapSym(sh) if self._has_torch else self.torch.SymInt(sh),  # type: ignore
                         input_name=i.name,
                         axis=axis,
                     )

@@ -50,9 +50,12 @@ def apply_excel_style(
         CubeViewDef.HighLightKind.RED: Font(color="FF0000"),
     }
     if verbose:  # pragma: no cover
-        from tqdm import tqdm
+        try:
+            from tqdm import tqdm
 
-        sheet_names = tqdm(list(workbook.sheetnames))
+            sheet_names = tqdm(list(workbook.sheetnames))
+        except ImportError:
+            sheet_names = workbook.sheetnames
     else:
         sheet_names = workbook.sheetnames
     for name in sheet_names:

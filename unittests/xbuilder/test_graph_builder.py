@@ -10,6 +10,7 @@ from yobx.ext_test_case import (
     ignore_warnings,
     requires_onnxir,
     requires_torch,
+    requires_onnxscript,
 )
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder import GraphBuilder, FunctionOptions, OptimizationOptions
@@ -944,6 +945,7 @@ class TestGraphBuilder(ExtTestCase):
 
     @ignore_warnings(DeprecationWarning)
     @requires_onnxir("0.1.8")
+    @requires_onnxscript()
     def test_large_model_onnxscript_ir(self):
         import onnx_ir as oir
 
