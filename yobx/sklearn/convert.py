@@ -15,12 +15,12 @@ def to_onnx(
     verbose: int = 0,
 ):
     """
-    Converts a :epkg:`scikit-learn` estimatior into ONNX.
+    Converts a :epkg:`scikit-learn` estimator into ONNX.
 
     :param estimator: estimator
     :param args: dummy inputs
     :param dynamic_shapes: dynamic shapes
-    :param target_opset: opset to use, it mush be specified
+    :param target_opset: opset to use, it must be specified
     :param verbose: verbosity
     :return: onnx model
     """
