@@ -32,10 +32,20 @@ def sklearn_standard_scaler(
     itype = g.get_type(X)
     dtype = g.onnx_dtype_to_np_dtype(itype)
 
-    mean = estimator.mean_.astype(dtype)
-    scale = estimator.scale_.astype(dtype)
-    centered = g.op.Sub(X, mean, name=name)
-    res = g.op.Div(centered, scale, name=name, outputs=outputs)
+    # Apply centering only if requested.
+    if getattr(estimator, "with_mean", True):
+        mean = estimator.mean_.astype(dtype)
+        centered = g.op.Sub(X, mean, name=name)
+    else:
+        centered = X
+
+    # Apply scaling only if requested.
+    if getattr(estimator, "with_std", True):
+        scale = estimator.scale_.astype(dtype)
+        res = g.op.Div(centered, scale, name=name, outputs=outputs)
+    else:
+        # No scaling: forward the (possibly centered) tensor to the desired outputs.
+        res = g.op.Identity(centered, name=name, outputs=outputs)
     if not sts:
         g.set_type(res, g.get_type(X))
         g.set_shape(res, g.get_shape(X))
