@@ -1,0 +1,18 @@
+/* Fix sphinx-gallery output visibility in piccolo_theme dark mode.
+   piccolo_theme uses :root[data-mode=dark/darkest] while sphinx-gallery
+   only defines its dark CSS variables for html/body[data-theme=dark]. */
+:root[data-mode=dark],
+:root[data-mode=darkest] {
+  --sg-script-out: rgb(179, 179, 179);
+  --sg-script-pre: #2e2e22;
+  --sg-pytb-foreground: #fff;
+  --sg-pytb-background: #1b1717;
+  --sg-pytb-border-color: #622;
+  --sg-download-a-background-color: #443;
+  --sg-download-a-background-image: linear-gradient(to bottom, #443, #221);
+  --sg-download-a-border-color: 1px solid #3a3a0d;
+  --sg-download-a-color: #fff;
+  --sg-download-a-hover-background-color: #616135;
+  --sg-download-a-hover-box-shadow-1: rgba(0, 0, 0, 0.1);
+  --sg-download-a-hover-box-shadow-2: rgba(255, 255, 255, 0.25);
+}
