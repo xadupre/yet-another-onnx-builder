@@ -90,8 +90,8 @@ def to_onnx(
         else:
             ds = {0: "batch"}
         shape = list(arg.shape)
-        for i, dim in ds.items():
-            shape[i] = dim
+        for axis, dim in ds.items():
+            shape[axis] = dim
         g.make_tensor_input(name, np_dtype_to_tensor_dtype(arg.dtype), shape, device=-1)
 
     output_names = get_output_names(estimator)

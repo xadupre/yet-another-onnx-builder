@@ -13,6 +13,8 @@ def register_sklearn_converter(cls: Union[type, Tuple[type]]):
                     raise TypeError(f"A converter is already registered for {c}.")
                 SKLEARN_CONVERTERS[c] = fct
         else:
+            if cls in SKLEARN_CONVERTERS:
+                raise TypeError(f"A converter is already registered for {cls}.")
             SKLEARN_CONVERTERS[cls] = fct
         return fct
 
