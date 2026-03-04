@@ -61,10 +61,4 @@ jobs:
         run: pip freeze
 
       - name: Run tests
-        run: pytest --cov=yobx --cov-report=xml --durations=10
-
-      - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.13'
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+        run: pytest --durations=10
