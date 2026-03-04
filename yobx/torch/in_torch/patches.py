@@ -319,7 +319,7 @@ def patched__maybe_broadcast(*args, preserve_cpu_scalar_tensors=True):
             if preserve_cpu_scalar_tensors and torch._prims_common.is_cpu_scalar_tensor(x):  # type: ignore
                 return x
 
-            if should_expand(x.shape, common_shape):
+            if should_expand(x.shape, common_shape):  # type: ignore
                 return x.expand(common_shape)  # type: ignore
 
             return x

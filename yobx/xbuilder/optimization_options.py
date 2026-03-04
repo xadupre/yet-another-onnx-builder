@@ -132,7 +132,7 @@ class OptimizationOptions:
             if isinstance(patterns, str):
                 from ..xoptim import get_pattern_list
 
-                self.patterns: Optional[Union[str, List[Any]]] = get_pattern_list(
+                self.patterns = get_pattern_list(
                     patterns, verbose=verbose
                 )
             else:
