@@ -16,11 +16,10 @@ def get_ml_patterns(
         :rst:
 
         from yobx.xoptim.patterns_api import pattern_table_doc
-        from yobx.xoptim.patterns_ml import (
-            get_ml_patterns,
-        )
+        from yobx.xoptim.patterns_ml import get_ml_patterns
 
         print(pattern_table_doc(get_ml_patterns(), as_rst=True))
+        print()
     """
     from .tree_ensemble import (
         TreeEnsembleRegressorConcatPattern,

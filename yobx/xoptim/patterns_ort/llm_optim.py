@@ -2024,6 +2024,12 @@ class Attention3DPattern(PatternOptimization):
             g.get_shape(mm_k.input[1])[-1],
             g.get_shape(mm_v.input[1])[-1],
         ]
+        dtype = tensor_dtype_to_np_dtype(g.get_type(attention.input[0]))
+        zero_bias = g.make_initializer(
+            "",
+            np.zeros(sum(sizes), dtype=dtype),
+            source=f"{self.__class__.__name__}.bias",
+        )
 
         where_node = None
         if len(attention.input) > 3 and attention.input[3]:
@@ -2054,7 +2060,7 @@ class Attention3DPattern(PatternOptimization):
             [
                 mm_q.input[0],
                 packed,
-                "",
+                zero_bias,
                 "",
                 "",
                 mask,

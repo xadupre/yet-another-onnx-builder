@@ -22,6 +22,7 @@ def get_investigation_patterns(verbose: int = 0) -> List["PatternOptimization"]:
         )
 
         print(pattern_table_doc(get_investigation_patterns(), as_rst=True))
+        print()
     """
     from .element_wise import BinaryInvestigation
     from .llm_patterns import (

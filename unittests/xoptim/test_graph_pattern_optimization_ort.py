@@ -2831,7 +2831,6 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         )
         return model, num_heads, head_size, hidden_dim
 
-    @unittest.skip("crashes")
     def test_attention_3d_pattern(self):
         model, _num_heads, _head_size, hidden_dim = self._build_attention_3d_model(
             same_hidden=True
@@ -2863,7 +2862,6 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         # The QKV MatMul/Reshape/Transpose projections should be absorbed
         self.assertNotIn("LocalAttention_to1", (n for n, _ in op_types))
 
-    @unittest.skip("crashes")
     def test_attention_3d_pattern_no_match_different_hidden(self):
         model, _num_heads, _head_size, _hidden_dim = self._build_attention_3d_model(
             same_hidden=False
@@ -2886,6 +2884,125 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         ]
         self.assertEqual(0, len(ms_attention))
         self.assertIn("LocalAttention_to1", [n.op_type for n in opt_onx.graph.node])
+
+
+class TestMissingKernelPatterns(ExtTestCase):
+    """Tests for MissingReduceMaxPattern and MissingTopKPattern."""
+
+    def _range(self, *shape, bias: Optional[float] = None):
+        n = np.prod(shape)
+        x = np.arange(n).astype(np.float32) / n
+        if bias:
+            x = x + bias
+        return x.reshape(tuple(shape)).astype(np.float32)
+
+    def test_missing_reduce_max_pattern_matches_bfloat16(self):
+        """MissingReduceMaxPattern wraps ReduceMax on BFLOAT16 with Cast nodes."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Cast", ["X"], ["Xbf"], to=TensorProto.BFLOAT16),
+                    oh.make_node("ReduceMax", ["Xbf"], ["Y"], keepdims=0),
+                    oh.make_node("Cast", ["Y"], ["Yf"], to=TFLOAT),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [3, 4])],
+                [oh.make_tensor_value_info("Yf", TFLOAT, [3])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=InferShapesOptions.BUILDER,
+            optimization_options=OptimizationOptions(patterns=["MissingReduceMax"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # The ReduceMax on BFLOAT16 should be surrounded by Cast nodes
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("ReduceMax", op_types)
+        # There should be extra Cast nodes introduced by the pattern
+        cast_count = op_types.count("Cast")
+        self.assertGreaterEqual(cast_count, 3)
+
+    def test_missing_reduce_max_pattern_no_match_float(self):
+        """MissingReduceMaxPattern does not fire for FLOAT input."""
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("ReduceMax", ["X"], ["Y"], keepdims=0)],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [3, 4])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [3])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=InferShapesOptions.BUILDER,
+            optimization_options=OptimizationOptions(patterns=["MissingReduceMax"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # No Cast should have been introduced
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertNotIn("Cast", op_types)
+
+    def test_missing_topk_pattern_matches_bfloat16(self):
+        """MissingTopKPattern wraps TopK on BFLOAT16 with Cast nodes."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Cast", ["X"], ["Xbf"], to=TensorProto.BFLOAT16),
+                    oh.make_node("TopK", ["Xbf", "k"], ["vals", "inds"]),
+                    oh.make_node("Cast", ["vals"], ["valsf"], to=TFLOAT),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [3, 4])],
+                [
+                    oh.make_tensor_value_info("valsf", TFLOAT, [3, 2]),
+                    oh.make_tensor_value_info("inds", TINT64, [3, 2]),
+                ],
+                [onh.from_array(np.array([2], dtype=np.int64), name="k")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=InferShapesOptions.BUILDER,
+            optimization_options=OptimizationOptions(patterns=["MissingTopK"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("TopK", op_types)
+        # Extra Cast nodes should be present
+        cast_count = op_types.count("Cast")
+        self.assertGreaterEqual(cast_count, 3)
+
+    def test_missing_topk_pattern_no_match_float(self):
+        """MissingTopKPattern does not fire for FLOAT input."""
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("TopK", ["X", "k"], ["vals", "inds"])],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [3, 4])],
+                [
+                    oh.make_tensor_value_info("vals", TFLOAT, [3, 2]),
+                    oh.make_tensor_value_info("inds", TINT64, [3, 2]),
+                ],
+                [onh.from_array(np.array([2], dtype=np.int64), name="k")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=InferShapesOptions.BUILDER,
+            optimization_options=OptimizationOptions(patterns=["MissingTopK"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertNotIn("Cast", op_types)
 
 
 if __name__ == "__main__":

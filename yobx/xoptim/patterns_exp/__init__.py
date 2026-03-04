@@ -16,9 +16,7 @@ def get_experimental_patterns(
         :rst:
 
         from yobx.xoptim.patterns_api import pattern_table_doc
-        from yobx.xoptim.patterns_exp import (
-            get_experimental_patterns,
-        )
+        from yobx.xoptim.patterns_exp import get_experimental_patterns
 
         print(pattern_table_doc(get_experimental_patterns(), as_rst=True))
     """

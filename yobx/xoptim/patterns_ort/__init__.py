@@ -19,6 +19,7 @@ def get_onnxruntime_patterns(
         from yobx.xoptim.patterns_ort import get_onnxruntime_patterns
 
         print(pattern_table_doc(get_onnxruntime_patterns(), as_rst=True))
+        print()
     """
     from .activation import (
         BiasGeluPattern,
@@ -28,7 +29,6 @@ def get_onnxruntime_patterns(
         GeluErfPattern,
         QuickGeluPattern,
     )
-    from .batch_normalization import OrtBatchNormalizationTrainingPattern
     from .fused_conv import FusedConvPattern
     from .fused_matmul import (
         FusedMatMulDivPattern,
@@ -81,7 +81,6 @@ def get_onnxruntime_patterns(
         MissingReduceMaxPattern(verbose=verbose),
         MissingTopKPattern(verbose=verbose),
         MultiHeadAttention3DPattern(verbose=verbose),
-        OrtBatchNormalizationTrainingPattern(verbose=verbose),
         QuickGeluPattern(verbose=verbose),
         ReshapeGemmPattern(verbose=verbose),
         ReshapeGemmReshapePattern(verbose=verbose),
