@@ -260,12 +260,14 @@ class _BuilderRuntime:
             f"Shape mismatch between x.shape={x.shape} and perm={perm!r}, "
             f"node is {self.pretty_node(node)}{self.get_debug_msg()}"
         )
-        if isinstance(x, np.ndarray):
-            # Type conversion between numpy and torch is not robust.
-            itype = dtype_to_tensor_dtype(x.dtype)
-            ttype = self.onnx_dtype_to_torch_dtype(itype)
-            x = self.torch.from_numpy(x.copy()).to(ttype)
-        return [self.torch.permute(x, perm).to(x.dtype)]
+        if self._has_torch:
+            if isinstance(x, np.ndarray):
+                # Type conversion between numpy and torch is not robust.
+                itype = dtype_to_tensor_dtype(x.dtype)
+                ttype = self.onnx_dtype_to_torch_dtype(itype)
+                x = self.torch.from_numpy(x.copy()).to(ttype)
+            return [self.torch.permute(x, perm).to(x.dtype)]
+        return [x.transpose(perm).astype(x.dtype)]
 
     def _apply_expand(
         self,
@@ -274,7 +276,7 @@ class _BuilderRuntime:
     ) -> "torch.Tensor":  # noqa: F821
         x = feeds[node.input[0]]
         new_shape = feeds[node.input[1]]
-        if isinstance(x, self.torch.Tensor):
+        if self._has_torch and isinstance(x, self.torch.Tensor):
             if len(x.shape) == 0:
                 if len(new_shape) == 0:
                     return x
@@ -435,7 +437,7 @@ class _BuilderRuntime:
             f"x cannot be empty but shape is {x.shape}, execution of Trilu "
             f"failed{self.get_debug_msg()}"
         )
-        if isinstance(x, self.torch.Tensor):
+        if self._has_torch and isinstance(x, self.torch.Tensor):
             assert isinstance(k, self.torch.Tensor), (
                 f"Expecting a tensor for {node.input[1]!r} but got "
                 f"{type(k)}{self.get_debug_msg()}"
@@ -494,9 +496,7 @@ class _BuilderRuntime:
     ) -> "torch.Tensor":  # noqa: F821
         new_feeds = {}
         for k, v in feeds.items():
-            if not hasattr(self, "torch"):
-                new_feeds[k] = v
-            elif isinstance(v, np.ndarray):
+            if self._has_torch and isinstance(v, np.ndarray):
                 # Type conversion between numpy and torch is not robust.
                 itype = dtype_to_tensor_dtype(v.dtype)
                 ttype = self.onnx_dtype_to_torch_dtype(itype)
@@ -509,7 +509,7 @@ class _BuilderRuntime:
                 new_feeds[k] = x
             else:
                 new_feeds[k] = v
-        if not hasattr(self, "torch"):
+        if not self._has_torch:
             y = np.where(*[new_feeds[k] for k in node.input])
             return [y]
         y = self.torch.where(*[new_feeds[k] for k in node.input])
@@ -522,7 +522,7 @@ class _BuilderRuntime:
     ) -> "torch.Tensor":  # noqa: F821
         new_feeds = {}
         for k, v in feeds.items():
-            if isinstance(v, np.ndarray):
+            if self._has_torch and isinstance(v, np.ndarray):
                 # Type conversion between numpy and torch is not robust.
                 itype = dtype_to_tensor_dtype(v.dtype)
                 ttype = self.onnx_dtype_to_torch_dtype(itype)
@@ -588,7 +588,9 @@ class _BuilderRuntime:
                 elif att.name == "end":
                     end = att.i
             shape = shape[start:] if end is None else shape[start:end]
-        return [self.torch.from_numpy(np.array(shape, dtype=np.int64))]
+        if self._has_torch:
+            return [self.torch.from_numpy(np.array(shape, dtype=np.int64))]
+        return [np.array(shape, dtype=np.int64)]
 
     def _apply_shape(
         self,

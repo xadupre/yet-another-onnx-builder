@@ -1179,6 +1179,13 @@ def _set_shape_type_op_any_sign(self: ShapeBuilder, node: NodeProto):
     return set_type_shape_unary_op(self, node.output[0], node.input[0])
 
 
+def _set_shape_type_op_any_size(self: ShapeBuilder, node: NodeProto):
+    "Sets the output shape for node type Sign."
+    self.set_type(node.output[0], TensorProto.INT64)
+    self.set_shape(node.output[0], tuple())
+    return True
+
+
 def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Slice."
     if self.has_device(node.input[0]):
@@ -1911,6 +1918,7 @@ _set_shape_type_op_any_known = {
     "ScatterND": _set_shape_type_op_any_scatternd,
     "SequenceEmpty": _set_shape_type_op_any_sequence_empty,
     "Sign": _set_shape_type_op_any_sign,
+    "Size": _set_shape_type_op_any_size,
     "Slice": _set_shape_type_op_any_slice,
     "Softmax": _set_shape_type_op_any_unary,
     "SpaceToDepth": _set_shape_type_op_any_space_to_depth,

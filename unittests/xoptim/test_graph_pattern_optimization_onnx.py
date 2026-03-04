@@ -3228,6 +3228,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @hide_stdout()
     def test_transpose_equal_reshape_null(self):
         model = oh.make_model(
             oh.make_graph(
