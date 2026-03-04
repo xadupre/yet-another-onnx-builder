@@ -228,7 +228,7 @@ class MatMulAddPattern(PatternOptimization):
                     return self.none(node, _get_lineno())
                 elif shape_node_out != shape_bias:
                     return self.none(node, _get_lineno())
-            elif min(shape_bias[:-1]) <= 1:
+            elif any(isinstance(d, int) and d <= 1 for d in shape_bias[:-1]):
                 return self.none(node, _get_lineno())
 
         if add_node.input[0] == add_node.input[1]:
@@ -249,11 +249,14 @@ class MatMulAddPattern(PatternOptimization):
 
     def _apply_matmmul(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         matmul_node: NodeProto,
         add_node: NodeProto,
     ) -> List[NodeProto]:
         bias2 = add_node.input[0 if add_node.input[1] == matmul_node.output[0] else 1]
+        reshape_node: Optional[NodeProto] = None
+        reshape_nodes: List[NodeProto] = []
+        reshape_back: Optional[NodeProto] = None
         if g.get_rank(matmul_node.input[0]) > 2:
             rk_bias = g.get_rank(bias2)
             # get k
@@ -385,7 +388,7 @@ class MatMulAddPattern(PatternOptimization):
         )
         if matmul_node.op_type == "Gemm":
             new_node.attribute.extend(matmul_node.attribute)
-        if reshape_node:
+        if reshape_node and reshape_back is not None:
             return [*reshape_nodes, new_node, reshape_back]
         return [new_node]
 

@@ -1694,7 +1694,7 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
 
     @classmethod
     def _align_shapes(
-        cls, s1: DYNAMIC_SHAPE, s2: Tuple[Union[str, int]]
+        cls, s1: DYNAMIC_SHAPE, s2: Tuple[Union[str, int, float], ...]
     ) -> Optional[Tuple[int, ...]]:
         """
         Compute the edit distance (Levenshtein distance) between two shapes and
@@ -1944,8 +1944,8 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
 
     @classmethod
     def _squeeze_axes(
-        cls, s1: DYNAMIC_SHAPE, s2: Tuple[Union[str, int]]
-    ) -> Optional[Tuple[int, ...]]:
+        cls, s1: DYNAMIC_SHAPE, s2: Tuple[Union[str, int, float], ...]
+    ) -> Tuple[Optional[str], Optional[Tuple[int, ...]]]:
         if s1 == s2:
             return None, None
         sh1 = tuple(s for s in s1 if s != 1)
@@ -1963,7 +1963,7 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
         return op_type, axes
 
     @classmethod
-    def _find_squeeze_axes(cls, s1: DYNAMIC_SHAPE, s2: DYNAMIC_SHAPE) -> Tuple[int, ...]:
+    def _find_squeeze_axes(cls, s1: DYNAMIC_SHAPE, s2: DYNAMIC_SHAPE) -> Optional[Tuple[int, ...]]:
         sh1 = tuple(s for s in s1 if s != 1)
         if sh1 != s2:
             return None
@@ -2177,7 +2177,7 @@ class UnsqueezeReshapePattern(PatternOptimization):
             return self.none(node, _get_lineno())
         return MatchResult(self, [unsq, node], self.apply, insert_at=node)
 
-    def compute_new_axes(self, axes: Tuple[int, ...], shape: Tuple[int, ...]) -> Tuple[int, ...]:
+    def compute_new_axes(self, axes: Tuple[int, ...], shape: Tuple[int, ...]) -> Optional[Tuple[int, ...]]:
         if axes == (2,) and shape == (0, 1, -1, 0):
             return (1,)
         return None

@@ -926,6 +926,8 @@ class EasyPatternOptimization(PatternOptimization):
                         rk = g.get_rank(node.input[0])
                         i1 = (att.i + rk) % rk
                         i2 = (n_att.i + rk) % rk
+                    else:
+                        i1, i2 = att.i, n_att.i
                     if i1 != i2:
                         if self.verbose >= 5:
                             print(

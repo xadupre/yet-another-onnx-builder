@@ -87,7 +87,11 @@ def get_pattern(
             if isinstance(s, str) and s in mapping:
                 res.append(mapping[s])
             else:
-                res.extend(get_pattern(s, as_list=True, verbose=verbose))
+                pat = get_pattern(s, as_list=True, verbose=verbose)
+                if isinstance(pat, list):
+                    res.extend(pat)
+                else:
+                    res.append(pat)
         return res
     if obj in mapping:
         return [mapping[obj]] if as_list else mapping[obj]
@@ -118,11 +122,17 @@ def get_pattern_list(
         return []
     if isinstance(positive_list, str) and "-" in positive_list and not negative_list:
         positive_list, negative_list = positive_list.split("-")
-    pos_list = get_pattern(positive_list, as_list=True, verbose=verbose)
+    pos_list_result = get_pattern(positive_list, as_list=True, verbose=verbose)
+    pos_list: List[PatternOptimization] = (
+        pos_list_result if isinstance(pos_list_result, list) else [pos_list_result]
+    )
     if negative_list is None:
         return pos_list
 
-    neg_list = get_pattern(negative_list, as_list=True, verbose=verbose)
+    neg_list_result = get_pattern(negative_list, as_list=True, verbose=verbose)
+    neg_list: List[PatternOptimization] = (
+        neg_list_result if isinstance(neg_list_result, list) else [neg_list_result]
+    )
 
     res = []
     for p in pos_list:

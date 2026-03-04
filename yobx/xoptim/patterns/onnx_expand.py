@@ -761,8 +761,8 @@ class ShapeBasedStaticExpandPattern(PatternOptimization):
 
     @classmethod
     def _find_expand_shape(
-        cls, sh1: Tuple[Union[str, int], ...], sh2: Tuple[Union[str, int], ...]
-    ) -> Tuple[int, ...]:
+        cls, sh1: Tuple[Union[str, int, float], ...], sh2: Tuple[Union[str, int, float], ...]
+    ) -> Optional[Tuple[int, ...]]:
         expand_shape = []
         for s1, s2 in zip(sh1, sh2):
             if s1 == s2:

@@ -545,11 +545,14 @@ class GeluErfPattern(EasyPatternOptimization):
 
         node = deleted_nodes[1]
         if not g.is_constant_scalar(cst2) or g.get_constant_scalar(cst2) != 1.4140625:
-            return self.none(node, _get_lineno())
+            self.none(node, _get_lineno())
+            return False
         if not g.is_constant_scalar(one) or g.get_constant_scalar(one) != 1:
-            return self.none(node, _get_lineno())
+            self.none(node, _get_lineno())
+            return False
         if not g.is_constant_scalar(c05) or g.get_constant_scalar(c05) != 0.5:
-            return self.none(node, _get_lineno())
+            self.none(node, _get_lineno())
+            return False
         return True
 
 

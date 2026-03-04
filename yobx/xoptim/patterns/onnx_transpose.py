@@ -106,7 +106,7 @@ class TransposeTransposePattern(PatternOptimization):
         cls, perm: Tuple[int, ...], on: List[Union[int, str]]
     ) -> List[Union[int, str]]:
         assert len(perm) == len(on), "length mismatch"
-        res = [None for i in on]
+        res: List[Optional[Union[int, str]]] = [None for i in on]
         for i, p in enumerate(perm):
             res[i] = on[p]
         return res

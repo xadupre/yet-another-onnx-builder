@@ -360,7 +360,7 @@ class GraphBuilderPatternOptimization:
             )
         return None
 
-    def get_constant_scalar(self, name: str, broadcast: bool = False) -> Union[int, float]:
+    def get_constant_scalar(self, name: str, broadcast: bool = False) -> Union[int, float, complex]:
         """
         Returns a scalar as a constant.
 
@@ -454,11 +454,11 @@ class GraphBuilderPatternOptimization:
 
     @overload
     def get_attribute(
-        self, node: NodeProto, att_name: str, exc: Literal[False]
+        self, node: NodeProto, att_name: str, exc: Union[Literal[False], None]
     ) -> Optional[AttributeProto]: ...
 
     def get_attribute(
-        self, node: NodeProto, att_name: str, exc: bool = True
+        self, node: NodeProto, att_name: str, exc: Optional[bool] = True
     ) -> Optional[AttributeProto]:
         """Returns an attribute for a node."""
         return self.builder.get_attribute(node, att_name, exc=exc)
@@ -526,7 +526,7 @@ class GraphBuilderPatternOptimization:
         except (ValueError, TypeError) as e:
             raise RuntimeError(f"Unable to convert val={val} with cvt={cvt}") from e
 
-    def has_type(self, name: str) -> bool:
+    def has_type(self, name: str) -> Union[bool, int]:
         """Tells if a result has a type."""
         return self.builder.has_type(name)
 
@@ -618,13 +618,13 @@ class GraphBuilderPatternOptimization:
 
         input_types = [(self.get_type(i) if self.has_type(i) else 0) for i in node.input]
         output_type = infer_types(node, input_types, name, exc=exc)
-        if output_type > 0:
+        if isinstance(output_type, int) and output_type > 0:
             return output_type
 
         # second try with more depth
         input_types = [self.try_infer_type(i, exc=exc) for i in node.input]
         output_type = infer_types(node, input_types, name, exc=exc)
-        if output_type > 0:
+        if isinstance(output_type, int) and output_type > 0:
             return output_type
 
         # no luck
@@ -1337,7 +1337,7 @@ class GraphBuilderPatternOptimization:
         priorities,
         current_priority_index,
         subset_nodes: Optional[List[NodeProto]] = None,
-    ) -> Tuple[bool, Tuple[PatternOptimization, MatchResult], Dict[str, Any], bool]:
+    ) -> Tuple[bool, List[Tuple[PatternOptimization, MatchResult]], Dict[str, Any], bool]:
         return self._optimize_matching_step(
             it,
             patterns_list,
@@ -1359,7 +1359,7 @@ class GraphBuilderPatternOptimization:
         priorities,
         current_priority_index,
         subset_nodes: Optional[List[NodeProto]] = None,
-    ) -> Tuple[bool, Tuple[PatternOptimization, MatchResult], Dict[str, Any], bool]:
+    ) -> Tuple[bool, List[Tuple[PatternOptimization, MatchResult]], Dict[str, Any], bool]:
         found = False
         marked = set()
         matches = []

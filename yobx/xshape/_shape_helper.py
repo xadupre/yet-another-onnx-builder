@@ -119,7 +119,7 @@ def compatible_shapes(sh1: DYNAMIC_SHAPE, sh2: DYNAMIC_SHAPE) -> bool:
     return True
 
 
-def compatible_dimensions(*dims: Sequence[Union[int, str]]) -> bool:
+def compatible_dimensions(*dims: Union[int, str]) -> bool:
     """
     Evaluates the fact all the dimensions can be equal or not.
 

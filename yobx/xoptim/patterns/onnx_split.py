@@ -501,9 +501,10 @@ class GathersSplitPattern(PatternOptimization):
         # nodes are all slices
 
         axis = g.get_attribute_with_default(gather_nodes[0], "axis", default_value=0)
-        outputs = [None for u in gather_nodes]
+        outputs: List[Optional[str]] = [None for u in gather_nodes]
         rank = g.get_rank(gather_nodes[0].input[1])
         post_nodes = []
+        axis_init: Optional[str] = None
         if rank == 0:
             axis_init = g.make_initializer(
                 "", np.array([axis], dtype=np.int64), source=f"{self.__class__.__name__}.axes"

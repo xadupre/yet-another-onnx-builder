@@ -144,6 +144,8 @@ class SqueezeUnsqueezePattern(PatternOptimization):
             return self.none(second_node, _get_lineno())
         if len(second_node.input) == 2 and axes2 is None:
             return self.none(second_node, _get_lineno())
+        if axes1 is None or axes2 is None:
+            return self.none(second_node, _get_lineno())
         tax1 = tuple(map(int, axes1))
         tax2 = tuple(map(int, axes2))
         if tax1 == tax2:

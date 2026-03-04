@@ -500,6 +500,7 @@ class LayerNormalizationPattern(PatternOptimization):
         add = g.next_nodes(node.output[0])
         if len(add) != 1:
             return self.none(node, _get_lineno())
+        sqrt: List[NodeProto]
         if add[0].op_type == "Add":
             add = add[0]
             if not g.is_constant_scalar(add.input[1], broadcast=True):
@@ -507,7 +508,6 @@ class LayerNormalizationPattern(PatternOptimization):
             sqrt = g.next_nodes(add.output[0])
         else:
             add = None
-        if add is None:
             sqrt = g.next_nodes(node.output[0])
         if len(sqrt) != 1 or sqrt[0].op_type != "Sqrt":
             return self.none(node, _get_lineno())

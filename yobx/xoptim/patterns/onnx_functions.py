@@ -202,18 +202,23 @@ class GeluPattern(EasyPatternOptimization):
         node = deleted_nodes[0]
 
         if not g.is_constant_scalar(c3) or g.get_constant_scalar(c3) != 3:
-            return self.none(node, _get_lineno())
+            self.none(node, _get_lineno())
+            return False
         if not g.is_constant_scalar(cx3) or g.get_constant_scalar(cx3) not in (
             0.044715,
             0.044708251953125,
         ):
-            return self.none(node, _get_lineno())
+            self.none(node, _get_lineno())
+            return False
         if not g.is_constant_scalar(cpi) or g.get_constant_scalar(cpi) != 0.7978515625:
-            return self.none(node, _get_lineno())
+            self.none(node, _get_lineno())
+            return False
         if not g.is_constant_scalar(one) or g.get_constant_scalar(one) != 1:
-            return self.none(node, _get_lineno())
+            self.none(node, _get_lineno())
+            return False
         if not g.is_constant_scalar(c2) or g.get_constant_scalar(c2) != 0.5:
-            return self.none(node, _get_lineno())
+            self.none(node, _get_lineno())
+            return False
         return True
 
 
@@ -349,9 +354,11 @@ class LeakyReluPattern(EasyPatternOptimization):
         slope = mul.input[1]
 
         if not g.is_constant_scalar(zero) or g.get_constant_scalar(zero) != 0:
-            return self.none(greater, _get_lineno())
+            self.none(greater, _get_lineno())
+            return False
         if not g.is_constant_scalar(slope):
-            return self.none(mul, _get_lineno())
+            self.none(mul, _get_lineno())
+            return False
         self.add_validate_param("slope", g.get_constant_scalar(slope))
         return True
 
@@ -567,11 +574,13 @@ class SoftmaxCrossEntropyLossCastPattern(EasyPatternOptimization):
             if n.op_type in {"Squeeze", "Unsqueeze"}:
                 c = n.input[1]
                 if not g.is_constant_scalar(c) or g.get_constant_scalar(c) != 1:
-                    return self.none(node, _get_lineno())
+                    self.none(node, _get_lineno())
+                    return False
                 continue
             if n.op_type in {"Equal"}:
                 c = n.input[1]
                 if not g.is_constant_scalar(c) or g.get_constant_scalar(c) != -100:
-                    return self.none(node, _get_lineno())
+                    self.none(node, _get_lineno())
+                    return False
                 continue
         return True

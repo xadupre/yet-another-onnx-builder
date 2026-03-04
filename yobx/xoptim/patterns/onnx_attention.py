@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
 import numpy as np
 from onnx import NodeProto, TensorProto
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
@@ -854,6 +854,7 @@ class FunctionAttentionPattern(PatternOptimization):
         if mul2.op_type == "Mul":
             # This condition is verified for Attention or MultiHeadAttention.
             gqa_expand = gqa_reshape = gqa_unsqueeze = None
+            exp_shape = unsq_shape = resh_shape = None
         elif mul2.op_type == "Reshape":
             # This condition is verified by GroupQueryAttention.
             gqa_reshape = mul2
@@ -944,17 +945,17 @@ class FunctionAttentionPattern(PatternOptimization):
             if not g.is_constant(gqa_expand.input[1]):
                 return self.none(node, _get_lineno())
             exp_shape_v = g.get_computed_constant(gqa_expand_v.input[1])
-            if tuple(exp_shape) != tuple(exp_shape_v):
+            if exp_shape is None or tuple(exp_shape) != tuple(exp_shape_v):
                 return self.none(node, _get_lineno())
             if not g.is_constant(gqa_unsqueeze_v.input[1]):
                 return self.none(node, _get_lineno())
             unsq_shape_v = g.get_computed_constant(gqa_unsqueeze_v.input[1])
-            if tuple(unsq_shape_v) != tuple(unsq_shape):
+            if unsq_shape is None or tuple(unsq_shape_v) != tuple(unsq_shape):
                 return self.none(node, _get_lineno())
             if not g.is_constant(gqa_reshape_v.input[1]):
                 return self.none(node, _get_lineno())
             resh_shape_v = g.get_computed_constant(gqa_reshape_v.input[1])
-            if tuple(resh_shape_v) != tuple(resh_shape):
+            if resh_shape is None or tuple(resh_shape_v) != tuple(resh_shape):
                 return self.none(node, _get_lineno())
         else:
             gqa_expand_v = gqa_reshape_v = gqa_unsqueeze_v = None
@@ -1198,12 +1199,20 @@ class FunctionAttentionPattern(PatternOptimization):
 
 
 class _CommonGQAMethods:
+    def none(
+        self,
+        node: Optional["NodeProto"] = None,
+        lineno: Optional[int] = None,
+        msg: Optional[Union[Callable[[], str], str]] = None,
+    ) -> None:
+        """Provided by :class:`PatternOptimization` through MRO."""
+        raise NotImplementedError("_CommonGQAMethods must be used as a mixin with PatternOptimization")
     def _match_keys_or_values(
         self,
         g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         keys_or_values: str,
-    ) -> Optional[Tuple[NodeProto, NodeProto, NodeProto, Tuple[Tuple[Union[int, str], ...]]]]:
+    ) -> Optional[Tuple[NodeProto, NodeProto, NodeProto, Tuple[Tuple[Union[int, str], ...], Tuple[Union[int, str], ...], Tuple[Union[int, str], ...]]]]:
 
         gqa_reshape = g.node_before(keys_or_values)
         if (
