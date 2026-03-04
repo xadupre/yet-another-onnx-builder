@@ -22,13 +22,17 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "black",
+    "matplotlib",
+    "openpyxl",
+]   "pandas",
     "pytest>=7",
     "py-cpuinfo",
     "pytest-coverage",
     "pytest-subtests",
     "ruff",
-]
-docs = [
+    "xlsxwriter",
+ 
+=docs = [
     "black",
     "piccolo-theme",
     "matplotlib",

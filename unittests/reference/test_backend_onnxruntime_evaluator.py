@@ -12,6 +12,7 @@ from onnx.backend.base import Device, DeviceType
 from onnx.defs import onnx_opset_version
 import onnxruntime
 from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
+from yobx.ext_test_case import has_torch
 
 ORT_OPSET = max(21, onnx_opset_version() - 2)
 
@@ -55,6 +56,8 @@ class OnnxruntimeEvaluatorBackend(onnx.backend.base.Backend):
         if d.type == DeviceType.CPU:
             return True
         if d.type == DeviceType.CUDA:
+            if has_torch():
+                return False
             import torch
 
             return torch.cuda.is_available()
