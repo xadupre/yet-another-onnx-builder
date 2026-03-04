@@ -17,7 +17,6 @@ from yobx.ext_test_case import (
     requires_onnx,
     requires_onnxruntime,
     requires_python,
-    requires_sklearn,
     has_onnxruntime,
     has_onnxruntime_training,
     has_onnxruntime_genai,
