@@ -320,7 +320,7 @@ def investigate_onnxruntime_issue(
         else:
             from ._inference_session_torch import InferenceSessionForTorch
 
-            cls = InferenceSessionForTorch
+            cls = InferenceSessionForTorch  # type: ignore
     if verbose and not onnx_to_session:
         print(f"[investigate_onnxruntime_issue] cls={cls}")
 

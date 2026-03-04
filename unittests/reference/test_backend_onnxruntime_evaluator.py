@@ -56,7 +56,7 @@ class OnnxruntimeEvaluatorBackend(onnx.backend.base.Backend):
         if d.type == DeviceType.CPU:
             return True
         if d.type == DeviceType.CUDA:
-            if has_torch():
+            if not has_torch():
                 return False
             import torch
 

@@ -58,7 +58,7 @@ class InferenceSessionForTorch(_InferenceSession):
             use_training_api=use_training_api,
         )
         self.cpu_outputs = cpu_outputs
-        self._torch_from_dlpack = _from_dlpack
+        self._torch_from_dlpack = _from_dlpack  # type: ignore
         self.torch = torch
         if torch.cuda.device_count() > 0:  # type: ignore
             for i in range(torch.cuda.device_count()):  # type: ignore

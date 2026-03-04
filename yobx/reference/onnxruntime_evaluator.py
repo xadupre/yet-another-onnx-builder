@@ -158,7 +158,7 @@ class OnnxruntimeEvaluator:
         else:
             from ..torch.torch_helper import to_tensor
 
-            self.to_tensor_or_array = to_tensor
+            self.to_tensor_or_array = to_tensor  # type: ignore
         self.function_kwargs = function_kwargs
         self.dump_onnx_model = dump_onnx_model
 
@@ -537,7 +537,7 @@ class OnnxruntimeEvaluator:
         else:
             from ._inference_session_torch import InferenceSessionForTorch
 
-            cls = InferenceSessionForTorch
+            cls = InferenceSessionForTorch  # type: ignore
         if (
             "providers" not in self.session_kwargs or not self.session_kwargs["providers"]
         ) and any(hasattr(t, "is_cuda") and t.is_cuda for t in inputs):
