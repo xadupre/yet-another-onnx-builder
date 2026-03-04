@@ -3,6 +3,7 @@ Elements of Design
 
 .. toctree::
    :caption: helpers
+   :maxdepth:
 
    container
    cube
@@ -12,6 +13,7 @@ Elements of Design
 
 .. toctree::
    :caption: builders
+   :maxdepth:
 
    graph_builder
    optimizer
@@ -20,6 +22,7 @@ Elements of Design
 
 .. toctree::
    :caption: torch
+   :maxdepth:
 
    flatten
    patches

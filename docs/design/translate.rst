@@ -165,13 +165,7 @@ stays readable for large weight matrices.
         ),
         opset_imports=[oh.make_opsetid("", 17)],
     )
-    short = translate(model, api="onnx-short")
-    # Show only the initializer line from the short version
-    for line in short.splitlines():
-        if "randn" in line or "randint" in line:
-            print("short initializer:", line.strip())
-            break
-
+    print(translate(model, api="onnx-short"))
 
 InnerEmitterCompact
 ===================

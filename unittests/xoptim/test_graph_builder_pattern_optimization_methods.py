@@ -1,16 +1,6 @@
-"""
-Tests for GraphBuilderPatternOptimization methods,
-MatchResult.debug_string, EasyPatternOptimization._get_apply_pattern,
-PatternOptimization._debug_print, EasyPatternOptimization._debug_print,
-and pattern_table_doc.
-"""
-
 import unittest
-from typing import List, Optional
-import numpy as np
-from onnx import NodeProto, TensorProto
+from onnx import TensorProto
 import onnx.helper as oh
-import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions, InferShapesOptions
 from yobx.xoptim import GraphBuilderPatternOptimization, EasyPatternOptimization
@@ -53,20 +43,20 @@ class TestGraphBuilderPatternOptimizationMethods(ExtTestCase):
 
     def test_try_infer_type_known(self):
         """try_infer_type returns correct type for a name with known type."""
-        gr, gro = _make_simple_gbpo()
+        _gr, gro = _make_simple_gbpo()
         # "X" should have type FLOAT since we defined it as such
         t = gro.try_infer_type("X")
         self.assertEqual(t, TensorProto.FLOAT)
 
     def test_try_infer_type_output(self):
         """try_infer_type returns type for output result."""
-        gr, gro = _make_simple_gbpo()
+        _gr, gro = _make_simple_gbpo()
         t = gro.try_infer_type("Z")
         self.assertEqual(t, TensorProto.FLOAT)
 
     def test_try_infer_type_unknown_returns_zero(self):
         """try_infer_type returns 0 for an unknown name (no exc)."""
-        gr, gro = _make_simple_gbpo()
+        _gr, gro = _make_simple_gbpo()
         t = gro.try_infer_type("nonexistent", exc=False)
         self.assertEqual(t, 0)
 
@@ -76,19 +66,19 @@ class TestGraphBuilderPatternOptimizationMethods(ExtTestCase):
 
     def test_try_infer_shape_known(self):
         """try_infer_shape returns correct shape for a name with known shape."""
-        gr, gro = _make_simple_gbpo()
+        _gr, gro = _make_simple_gbpo()
         shape = gro.try_infer_shape("X")
         self.assertEqual(shape, (3, 4))
 
     def test_try_infer_shape_output(self):
         """try_infer_shape returns shape for output result."""
-        gr, gro = _make_simple_gbpo()
+        _gr, gro = _make_simple_gbpo()
         shape = gro.try_infer_shape("Z")
         self.assertEqual(shape, (3, 4))
 
     def test_try_infer_shape_unknown_returns_none(self):
         """try_infer_shape returns None for unknown name (no exc)."""
-        gr, gro = _make_simple_gbpo()
+        _gr, gro = _make_simple_gbpo()
         shape = gro.try_infer_shape("nonexistent", exc=False)
         self.assertIsNone(shape)
 

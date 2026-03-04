@@ -131,6 +131,7 @@ pivot table from the cube.  Rows and columns of the pivot are controlled by a
 
 .. runpython::
     :showcode:
+    :warningout: Pandas4Warning
 
     import io
     import textwrap

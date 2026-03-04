@@ -18,6 +18,7 @@ class RotaryConcatPartPattern(PatternOptimization):
 
         import numpy as np
         from onnx import TensorProto
+        from yobx.doc import to_dot
         from yobx.builder.light import start
 
         def mk(shape):
@@ -56,8 +57,7 @@ class RotaryConcatPartPattern(PatternOptimization):
             .vout(TensorProto.FLOAT, ("a", "b", "c", "d"))
             .to_onnx()
         )
-        dot = to_dot(model)
-        print("DOT-SECTION", dot)
+        print("DOT-SECTION", to_dot(model))
 
     Model with nodes to be fused:
 
