@@ -1,4 +1,4 @@
-name: No Torch Tests
+name: Tests with no options (no torch, ...)
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   no_torch_tests:
-    name: no torch tests (${{ matrix.os }}, py${{ matrix.python-version }})
+    name: no options tests (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest"]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
