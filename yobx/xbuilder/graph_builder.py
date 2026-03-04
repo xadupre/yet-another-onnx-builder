@@ -625,7 +625,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 elif isinstance(_v, self.torch.export.dynamic_shapes._DerivedDim):  # type: ignore
                     self.make_dynamic_object(
                         _v.__name__,
-                        self.torch.SymInt(_v.__name__),
+                        self.torch.SymInt(_v.__name__),  # type: ignore
                         axis=_k,
                         input_name=input_name,
                     )
@@ -633,7 +633,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     # maybe add a constraint here
                     self.make_dynamic_object(
                         _v.root.__name__,
-                        self.torch.SymInt(_v.root.__name__),
+                        self.torch.SymInt(_v.root.__name__),  # type: ignore
                         axis=None,
                         input_name=None,
                     )
@@ -819,8 +819,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if value.size < self.SMALL_TENSOR:
                 return (str(value.dtype), tuple(value.shape), tuple(value.ravel().tolist()))
 
-        if self._has_torch and isinstance(value, self.torch.Tensor):
-            if value.dtype == self.torch.int64 and value.numel() < 8:
+        if self._has_torch and isinstance(value, self.torch.Tensor):  # type: ignore
+            if value.dtype == self.torch.int64 and value.numel() < 8:  # type: ignore
                 return self.make_key(value.detach().cpu().numpy())
             return None
         return None

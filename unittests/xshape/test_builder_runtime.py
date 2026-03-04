@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import onnx.helper as oh
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.xshape import BasicShapeBuilder
 
 
@@ -269,6 +269,7 @@ class TestApplyCast(ExtTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (2, 3))
 
+    @requires_torch()
     def test_cast_torch_to_float32(self):
         import torch
 
@@ -279,6 +280,7 @@ class TestApplyCast(ExtTestCase):
         self.assertEqual(result[0].dtype, torch.float32)
         self.assertEqual(tuple(result[0].shape), (2, 3))
 
+    @requires_torch()
     def test_cast_torch_to_int64(self):
         import torch
 

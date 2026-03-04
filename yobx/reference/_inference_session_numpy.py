@@ -64,7 +64,7 @@ class InferenceSessionForNumpy(_InferenceSession):
     def run(
         self,
         output_names: Optional[List[str]],
-        feeds: Union[Dict[str, np.ndarray], Dict[str, ORTC.OrtValue]],
+        feeds: Union[Dict[str, np.ndarray], Dict[str, ORTC.OrtValue]],  # type: ignore
     ) -> List[Optional[TensorLike]]:
         """Calls :meth:`onnxruntime.InferenceSession.run`."""
         # sess.run does not support bfloat16
@@ -85,37 +85,36 @@ class InferenceSessionForNumpy(_InferenceSession):
             if not k:
                 continue
             if isinstance(v, np.ndarray):
-                new_feeds[k] = ORTC.OrtValue.ortvalue_from_numpy_with_onnx_type(
+                new_feeds[k] = ORTC.OrtValue.ortvalue_from_numpy_with_onnx_type(  # type: ignore
                     v, np_dtype_to_tensor_dtype(v.dtype)
                 )
-            elif v.dtype == torch.bool:
-                vi = v.detach().cpu().numpy()
-                memory.append(vi)
-                new_feeds[k] = ORTC.OrtValue.ortvalue_from_numpy_with_onnx_type(
-                    vi, onnx.TensorProto.BOOL
+            elif v.dtype == np.bool_:
+                memory.append(v)
+                new_feeds[k] = ORTC.OrtValue.ortvalue_from_numpy_with_onnx_type(  # type: ignore
+                    v, onnx.TensorProto.BOOL
                 )
             else:
-                new_feeds[k] = ORTC.OrtValue.from_dlpack(v.__dlpack__(), False)
+                new_feeds[k] = ORTC.OrtValue.from_dlpack(v.__dlpack__(), False)  # type: ignore
 
         if self.nvtx:
-            self.torch.cuda.nvtx.range_push("run_with_ort_values")
-        ort_outputs = self.sess._sess.run_with_ort_values(
+            self.torch.cuda.nvtx.range_push("run_with_ort_values")  # type: ignore
+        ort_outputs = self.sess._sess.run_with_ort_values(  # type: ignore
             new_feeds, output_names or self.output_names, self.run_options
         )
         if self.nvtx:
-            self.torch.cuda.nvtx.range_pop()
+            self.torch.cuda.nvtx.range_pop()  # type: ignore
         pth_outputs = self._ortvalues_to_numpy_tensor(ort_outputs)
         return pth_outputs
 
     def _ortvalues_to_numpy_tensor(
         self,
-        ortvalues: Union[List[ORTC.OrtValue], ORTC.OrtValueVector],
+        ortvalues: Union[List[ORTC.OrtValue], ORTC.OrtValueVector],  # type: ignore
     ) -> Tuple[Optional[TensorLike], ...]:
         if len(ortvalues) == 0:
             return tuple()
 
         if self.nvtx:
-            self.torch.cuda.nvtx.range_push("_ortvalues_to_numpy_tensor")
+            self.torch.cuda.nvtx.range_push("_ortvalues_to_numpy_tensor")  # type: ignore
         res: List[Optional[TensorLike]] = []  # noqa: F823
         for i in range(len(ortvalues)):
             if not ortvalues[i].has_value():
@@ -148,5 +147,5 @@ class InferenceSessionForNumpy(_InferenceSession):
             res.append(npt.view(dtype))
 
         if self.nvtx:
-            self.torch.cuda.nvtx.range_pop()
+            self.torch.cuda.nvtx.range_pop()  # type: ignore
         return tuple(res)

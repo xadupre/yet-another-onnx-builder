@@ -7,7 +7,7 @@ import onnxruntime
 from onnxruntime.capi import _pybind_state as ORTC
 
 DEVICES = {-1: ORTC.OrtDevice(ORTC.OrtDevice.cpu(), ORTC.OrtDevice.default_memory(), 0)}
-TensorLike = Union[np.ndarray, torch.Tensor]
+TensorLike = Union[np.ndarray, "torch.Tensor"]
 
 
 class _InferenceSession:

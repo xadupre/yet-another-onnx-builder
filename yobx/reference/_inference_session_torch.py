@@ -59,17 +59,18 @@ class InferenceSessionForTorch(_InferenceSession):
         )
         self.cpu_outputs = cpu_outputs
         self._torch_from_dlpack = _from_dlpack
-        if torch.cuda.device_count() > 0:
-            for i in range(torch.cuda.device_count()):
-                DEVICES[i] = ORTC.OrtDevice(
-                    ORTC.OrtDevice.cuda(), ORTC.OrtDevice.default_memory(), i
+        self.torch = torch
+        if torch.cuda.device_count() > 0:  # type: ignore
+            for i in range(torch.cuda.device_count()):  # type: ignore
+                DEVICES[i] = ORTC.OrtDevice(  # type: ignore
+                    ORTC.OrtDevice.cuda(), ORTC.OrtDevice.default_memory(), i  # type: ignore
                 )
 
     def _get_ortvalues_from_torch_tensors(
         self, tensors: Tuple[torch.Tensor, ...], n_outputs: int
-    ) -> Tuple[ORTC.OrtValueVector, List[onnxruntime.OrtDevice]]:
+    ) -> Tuple[ORTC.OrtValueVector, List[onnxruntime.OrtDevice]]:  # type: ignore
         assert tensors is not None, "tensors cannot be None"
-        ortvalues = ORTC.OrtValueVector()
+        ortvalues = ORTC.OrtValueVector()  # type: ignore
         ortvalues.reserve(len(tensors))
         dtypes = []
         shapes = []
@@ -77,7 +78,7 @@ class InferenceSessionForTorch(_InferenceSession):
         devices = []
 
         if self.nvtx:
-            self.torch.cuda.nvtx.range_push("_get_ortvalues_from_torch_tensors.1")
+            self.torch.cuda.nvtx.range_push("_get_ortvalues_from_torch_tensors.1")  # type: ignore
         max_device = -1
         new_tensors = []
         for tensor in tensors:
@@ -91,8 +92,8 @@ class InferenceSessionForTorch(_InferenceSession):
             max_device = max(max_device, d)
 
         if self.nvtx:
-            self.torch.cuda.nvtx.range_pop()
-            self.torch.cuda.nvtx.range_push("_get_ortvalues_from_torch_tensors.2")
+            self.torch.cuda.nvtx.range_pop()  # type: ignore
+            self.torch.cuda.nvtx.range_push("_get_ortvalues_from_torch_tensors.2")  # type: ignore
 
         assert isinstance(max_device, int), f"unexpected type for device={max_device!r}"
         ortvalues.push_back_batch(new_tensors, data_ptrs, dtypes, shapes, devices)
@@ -102,35 +103,35 @@ class InferenceSessionForTorch(_InferenceSession):
             output_devices.append(dev)
 
         if self.nvtx:
-            self.torch.cuda.nvtx.range_pop()
+            self.torch.cuda.nvtx.range_pop()  # type: ignore
         return ortvalues, output_devices
 
     def _ortvalues_to_torch_tensor(
         self,
-        ortvalues: Union[List[ORTC.OrtValue], ORTC.OrtValueVector],
+        ortvalues: Union[List[ORTC.OrtValue], ORTC.OrtValueVector],  # type: ignore
     ) -> Tuple[torch.Tensor, ...]:
         if len(ortvalues) == 0:
             return tuple()
 
         if all(ortvalues[i].has_value() for i in range(len(ortvalues))):
             if self.nvtx:
-                self.torch.cuda.nvtx.range_push("_ortvalues_to_torch_tensor.1")
+                self.torch.cuda.nvtx.range_push("_ortvalues_to_torch_tensor.1")  # type: ignore
             res = ortvalues.to_dlpacks(_from_dlpack)  # type: ignore
             if self.nvtx:
-                self.torch.cuda.nvtx.range_pop()
+                self.torch.cuda.nvtx.range_pop()  # type: ignore
         else:
             if self.nvtx:
-                self.torch.cuda.nvtx.range_push("_ortvalues_to_torch_tensor.2")
+                self.torch.cuda.nvtx.range_push("_ortvalues_to_torch_tensor.2")  # type: ignore
             res = []
             for i in range(len(ortvalues)):
                 res.append(
-                    self._torch_from_dlpack(ortvalues[i].to_dlpack())
+                    self._torch_from_dlpack(ortvalues[i].to_dlpack())  # type: ignore
                     if ortvalues[i].has_value()
                     else None
                 )
             if self.nvtx:
-                self.torch.cuda.nvtx.range_pop()
-        return tuple(res)
+                self.torch.cuda.nvtx.range_pop()  # type: ignore
+        return tuple(res)  # type: ignore
 
     def run(  # type: ignore
         self, output_names: Optional[List[str]], feeds: Dict[str, torch.Tensor]
@@ -161,9 +162,9 @@ class InferenceSessionForTorch(_InferenceSession):
         )
 
         if self.nvtx:
-            self.torch.cuda.nvtx.range_push("run_with_ortvaluevector")
+            self.torch.cuda.nvtx.range_push("run_with_ortvaluevector")  # type: ignore
 
-        ort_outputs = ORTC.OrtValueVector()
+        ort_outputs = ORTC.OrtValueVector()  # type: ignore
         self.sess.run_with_ortvaluevector(
             self.run_options,
             self.input_names,
@@ -174,7 +175,7 @@ class InferenceSessionForTorch(_InferenceSession):
         )
 
         if self.nvtx:
-            self.torch.cuda.nvtx.range_pop()
+            self.torch.cuda.nvtx.range_pop()  # type: ignore
 
         pth_outputs = self._ortvalues_to_torch_tensor(ort_outputs)
         return pth_outputs
@@ -188,7 +189,7 @@ class InferenceSessionForTorch(_InferenceSession):
         The output device is CPU even if the outputs are on CUDA.
         """
         input_names = []
-        values = ORTC.OrtValueVector()
+        values = ORTC.OrtValueVector()  # type: ignore
         device = -1
         for k, v in feeds.items():
             assert k != "", f"Input cannot be empty but feeds names={list(feeds)}"
@@ -202,20 +203,20 @@ class InferenceSessionForTorch(_InferenceSession):
                 v = v.contiguous()
             if v.dtype == torch.bool:
                 v = v.to(torch.uint8)
-                v = ORTC.OrtValue.from_dlpack(v.__dlpack__(), True)
+                v = ORTC.OrtValue.from_dlpack(v.__dlpack__(), True)  # type: ignore
             else:
-                v = ORTC.OrtValue.from_dlpack(v.detach().__dlpack__(), False)
+                v = ORTC.OrtValue.from_dlpack(v.detach().__dlpack__(), False)  # type: ignore
             input_names.append(k)
             values.push_back(v)
         if self.nvtx:
-            self.torch.cuda.nvtx.range_push("run_with_ortvaluevector")
+            self.torch.cuda.nvtx.range_push("run_with_ortvaluevector")  # type: ignore
 
         # ort_outputs = self.sess._sess.run_with_ort_values(
         #    new_feeds, output_names or self.output_names, self.run_options
         # )
-        ort_outputs = ORTC.OrtValueVector()
+        ort_outputs = ORTC.OrtValueVector()  # type: ignore
         out_names = output_names or self.output_names
-        self.sess._sess.run_with_ortvaluevector(
+        self.sess._sess.run_with_ortvaluevector(  # type: ignore
             self.run_options,
             input_names,
             values,
@@ -224,6 +225,6 @@ class InferenceSessionForTorch(_InferenceSession):
             [DEVICES[-1 if self.cpu_outputs else device] for o in out_names],
         )
         if self.nvtx:
-            self.torch.cuda.nvtx.range_pop()
+            self.torch.cuda.nvtx.range_pop()  # type: ignore
         pth_outputs = self._ortvalues_to_torch_tensor(ort_outputs)
         return pth_outputs

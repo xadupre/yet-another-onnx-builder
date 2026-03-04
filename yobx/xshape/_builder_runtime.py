@@ -343,7 +343,7 @@ class _BuilderRuntime:
     ) -> "torch.Tensor":  # noqa: F821
         x = feeds[node.input[0]]
         if not isinstance(x, np.ndarray) and (
-            not hasattr(self, "torch") or not isinstance(x, self.torch.Tensor)
+            not self._has_torch or not isinstance(x, self.torch.Tensor)
         ):
             # Maybe a float, then we process it as a float, tensor.to only works
             # on tensors.
@@ -361,10 +361,10 @@ class _BuilderRuntime:
         assert to is not None, f"to not here in node {node}"
         assert to != 8 and to < 17, f"Cast not implemented for to={to}, {str_tensor_proto_type()}"
         del saturate
-        if not hasattr(self, "torch"):
+        if not self._has_torch:
             ttype = tensor_dtype_to_np_dtype(to)
             return [x.astype(ttype)]
-        if self._has_torch and isinstance(x, np.ndarray):
+        if isinstance(x, np.ndarray):
             # Type conversion between numpy and torch is not robust.
             itype = dtype_to_tensor_dtype(x.dtype)
             ttype = self.onnx_dtype_to_torch_dtype(itype)
@@ -380,7 +380,9 @@ class _BuilderRuntime:
             )
             ttype = self.onnx_dtype_to_torch_dtype(to)
             return [x.to(ttype)]
-        return [x]
+        assert self._has_torch and isinstance(x, self.torch.Tensor), "unexpected configuration"
+        ttype = self.onnx_dtype_to_torch_dtype(to)
+        return [x.to(ttype)]
 
     def _apply_unary_function(
         self,
