@@ -77,7 +77,7 @@ Pass a single class or a tuple of classes as the first argument:
     from yobx.xbuilder import GraphBuilder
 
     @register_sklearn_converter(MyEstimator)
-    def sklearn_my_estimator(
+    def convert_my_estimator(
         g: GraphBuilder,
         sts: dict,
         outputs: list[str],
@@ -261,7 +261,7 @@ To support a new :epkg:`scikit-learn` estimator:
 
 
     @register_sklearn_converter(RandomForestClassifier)
-    def sklearn_random_forest_classifier(
+    def convert_random_forest_classifier(
         g: GraphBuilder,
         sts: dict,
         outputs: list[str],
