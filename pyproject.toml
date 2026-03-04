@@ -15,6 +15,7 @@ dependencies = [
     "onnx>=1.14",
     "onnxruntime>=1.20",
     "packaging",
+    "scipy",
 ]
 
 [project.optional-dependencies]
