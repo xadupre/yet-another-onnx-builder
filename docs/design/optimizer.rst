@@ -461,3 +461,49 @@ Nodes
 * :meth:`make_node_check_opset <yobx.xoptim.GraphBuilderPatternOptimization.make_node_check_opset>`:
   creates a node without adding it to the graph, deals with some constraints
   related to opset version
+
+Debugging Environment Variables
+================================
+
+Several environment variables can be set to help debug the pattern optimizer.
+
+* ``LOG_PATTERN_OPTIMIZE``: sets the verbosity level for all patterns.
+  Setting it to ``10`` produces the most detailed output. Example::
+
+      LOG_PATTERN_OPTIMIZE=10 python my_script.py
+
+* ``PATTERN``: increases the verbosity to ``10`` for one or more specific patterns
+  (comma-separated class names or class names with the ``Pattern`` suffix removed).
+  This is useful to focus on a single pattern without flooding the output with
+  information from all the others. Example::
+
+      PATTERN=ReshapeReshapePattern python my_script.py
+
+* ``<ClassName>``: setting an environment variable whose name matches the class name
+  of a pattern (e.g. ``ReshapeReshapePattern=10``) sets the verbosity for that
+  individual pattern. This is equivalent to using ``PATTERN`` but more explicit.
+
+* ``DROPPATTERN``: comma-separated list of pattern class names to exclude from the
+  optimizer. Useful to bisect which pattern is causing a wrong result or an
+  unexpected error. Example::
+
+      DROPPATTERN=ReshapeReshapePattern,CastPattern python my_script.py
+
+* ``DUMPPATTERNS``: when set to a folder path, the optimizer writes the matched
+  nodes and their replacements to that folder for every successful pattern
+  application. Useful for inspecting what the optimizer is actually doing.
+  Example::
+
+      DUMPPATTERNS=/tmp/dump_patterns python my_script.py
+
+* ``PATTERNNOREMOVE``: when set to a result name, the optimizer raises an exception
+  if an optimization step removes that name from the graph. Useful to track down
+  which pattern is eliminating a particular node or result. Example::
+
+      PATTERNNOREMOVE=output_0 python my_script.py
+
+* ``PATTERNSTEP``: when set to ``1``, ``True``, or ``true``, the optimizer runs one
+  optimization step at a time, which can help narrow down which step introduces
+  a problem. Example::
+
+      PATTERNSTEP=1 python my_script.py
