@@ -218,15 +218,15 @@ next step's input.  Intermediate tensor names are generated with
 :meth:`GraphBuilder.unique_name <yobx.xbuilder.GraphBuilder.unique_name>`
 to avoid collisions.
 
-.. runpython::
-    :showcode:
+.. gdot::
+    :script: DOT-SECTION
 
     import numpy as np
     from sklearn.pipeline import Pipeline
     from sklearn.preprocessing import StandardScaler
     from sklearn.linear_model import LogisticRegression
     from yobx.sklearn import to_onnx
-    from yobx.helpers.onnx_helper import pretty_onnx
+    from yobx.helpers.dot_helper import to_dot
 
     rng = np.random.default_rng(2)
     X = rng.standard_normal((20, 4)).astype(np.float32)
@@ -238,7 +238,7 @@ to avoid collisions.
     ]).fit(X, y)
 
     model = to_onnx(pipe, (X,))
-    print(pretty_onnx(model))
+    print("DOT-SECTION", to_dot(model))
 
 Adding a new converter
 ======================
