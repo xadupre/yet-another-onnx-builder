@@ -530,7 +530,8 @@ class OnnxruntimeEvaluator:
 
         if self.dump_onnx_model:
             onnx.save(onx, self.dump_onnx_model, save_as_external_data=len(onx.graph.node) > 100)
-        if any(isinstance(i, np.ndarray) for i in inputs):
+        if not inputs or any(isinstance(i, np.ndarray) for i in inputs):
+            # TODO: improves the case when it is empty.
             from ._inference_session_numpy import InferenceSessionForNumpy
 
             cls = InferenceSessionForNumpy

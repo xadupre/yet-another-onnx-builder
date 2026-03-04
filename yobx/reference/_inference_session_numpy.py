@@ -3,7 +3,12 @@ import onnx
 import numpy as np
 import onnxruntime
 from onnxruntime.capi import _pybind_state as ORTC
-from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
+from ..helpers.helper import size_type
+from ..helpers.onnx_helper import (
+    np_dtype_to_tensor_dtype,
+    onnx_dtype_name,
+    tensor_dtype_to_np_dtype,
+)
 from ._inference_session import _InferenceSession, TensorLike
 
 
@@ -54,6 +59,13 @@ class InferenceSessionForNumpy(_InferenceSession):
             disable_aot_function_inlining=disable_aot_function_inlining,
             use_training_api=use_training_api,
         )
+        try:
+            import torch
+
+            self._has_torch = hasattr(torch, "__version__")
+            self.torch = torch
+        except ImportError:
+            self._has_torch = False
 
     def run(
         self,
@@ -127,5 +139,14 @@ class InferenceSessionForNumpy(_InferenceSession):
                 res.append(a)
                 continue
 
-            raise AssertionError(f"Type {el_type} is not handled without torch.")
+            assert self._has_torch, f"Type {el_type} is not handled without torch."
+            tch = self.torch.from_dlpack(ortvalues[i].to_dlpack())
+            size = size_type(el_type)
+            assert size == 2, f"Not implemented for type {onnx_dtype_name(el_type)}"
+            it = self.torch.uint16
+            itch = tch.view(it)
+            npt = itch.numpy()
+
+            dtype = tensor_dtype_to_np_dtype(el_type)
+            res.append(npt.view(dtype))
         return tuple(res)
