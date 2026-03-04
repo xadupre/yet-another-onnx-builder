@@ -1388,18 +1388,24 @@ def pattern_table_doc(
     """
     data = []
     for pat in pattern_list:
-        print(pat)
+        doc = pat.__class__.__doc__.split("::", maxsplit=1)[0].replace("\n", " ")
+        for end in [".. gdot", ".. runpython", ".. math"]:
+            if doc.endswith(end):
+                doc = doc[: -len(end)]
+        doc = doc.strip()
+        if doc.endswith(":"):
+            doc = doc[:-1] + "..."
         data.append(
             dict(
                 name=pat.__class__.__name__,
                 short_name=pat.__class__.__name__.replace("Pattern", ""),
                 priority=pat.priority,
-                doc=pat.__class__.__doc__.split("::", maxsplit=1)[0].replace("\n", " "),
+                doc=doc,
             )
         )
     if as_rst:
         import pandas
 
         df = pandas.DataFrame(data)
-        return df.to_markdown(tablefmt="rst")
+        return "\n".join(["", df.to_markdown(tablefmt="rst"), ""])
     return data

@@ -7329,9 +7329,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["SwapRangeAddScalar"], verbose=0
-            ),
+            optimization_options=OptimizationOptions(patterns=["SwapRangeAddScalar"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(["Range", "Add"], [n.op_type for n in opt_onx.graph.node])
@@ -7408,9 +7406,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["RMSNormalizationMul"], verbose=0
-            ),
+            optimization_options=OptimizationOptions(patterns=["RMSNormalizationMul"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(["RMSNormalization", "Add"], [n.op_type for n in opt_onx.graph.node])
@@ -7490,15 +7486,14 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         gr = GraphBuilder(
             model,
-            optimization_options=OptimizationOptions(
-                patterns=["UnsqueezeUnsqueeze"], verbose=0
-            ),
+            optimization_options=OptimizationOptions(patterns=["UnsqueezeUnsqueeze"], verbose=0),
         )
         opt_onx = gr.to_onnx()
         self.assertEqual(["Unsqueeze", "Unsqueeze"], [n.op_type for n in opt_onx.graph.node])
 
     def test_cast_cast_binary_no_match(self):
-        # Cast(INT64->FLOAT16) + Cast(INT64->FLOAT16) -> Add: original types not in _dtypes_allowed
+        # Cast(INT64->FLOAT16) + Cast(INT64->FLOAT16) ->
+        # Add: original types not in _dtypes_allowed
         model = oh.make_model(
             oh.make_graph(
                 [
