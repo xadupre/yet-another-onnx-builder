@@ -485,6 +485,123 @@ of all node identifiers that have already been claimed by an earlier
 discarded if any of its nodes appears in that set, so no two rewrites ever
 touch the same node during the same pass.
 
+Worked examples
++++++++++++++++
+
+The two classes cover the same use-cases but at different levels of abstraction.
+The examples below both implement a *Not + Not → Identity* fusion so that the
+difference is easy to compare.
+
+**PatternOptimization** (manual ``match`` / ``apply``)
+
+The developer writes the matching logic by hand, navigating the graph with the
+helpers provided by
+:class:`GraphBuilderPatternOptimization <yobx.xoptim.GraphBuilderPatternOptimization>`.
+
+.. code-block:: python
+
+    import inspect
+    from typing import List, Optional
+    from onnx import NodeProto
+    from yobx.xoptim import PatternOptimization, MatchResult
+
+
+    class NotNotPattern(PatternOptimization):
+        """Fuses ``Not(Not(x))`` into ``Identity(x)``."""
+
+        def match(
+            self,
+            g: "GraphBuilderPatternOptimization",
+            node: NodeProto,
+            matched: List[MatchResult],
+        ) -> Optional[MatchResult]:
+            # Only consider Not nodes.
+            if node.op_type != "Not" or node.domain != "":
+                return self.none()
+
+            # Walk one step backward: the producer of node's input must also be Not.
+            not_before = g.node_before(node.input[0])
+            if not_before is None or not_before.op_type != "Not" or not_before.domain != "":
+                return self.none(node, inspect.currentframe().f_lineno)
+
+            # Return both nodes as the rewrite target.
+            return MatchResult(self, [not_before, node], self.apply, insert_at=node)
+
+        def apply(
+            self,
+            g: "GraphBuilder",
+            not_before: NodeProto,
+            not_after: NodeProto,
+        ) -> List[NodeProto]:
+            pre_nodes = []
+            # Keep the first Not if its output is consumed elsewhere.
+            if g.is_used_more_than_once(not_before.output[0]):
+                pre_nodes.append(not_before)
+            return [
+                *pre_nodes,
+                g.make_node(
+                    "Identity",
+                    [not_before.input[0]],
+                    [not_after.output[0]],
+                    name=f"{self.__class__.__name__}--{not_after.name}",
+                ),
+            ]
+
+**EasyPatternOptimization** (declarative ``match_pattern`` / ``apply_pattern``)
+
+The developer declares the subgraph to look for and the replacement as builder
+calls. The framework takes care of matching and result renaming automatically.
+
+.. code-block:: python
+
+    from typing import List, Optional
+    from onnx import NodeProto
+    from yobx.xoptim import EasyPatternOptimization, MatchResult
+
+
+    class NotNotEasyPattern(EasyPatternOptimization):
+        """Fuses ``Not(Not(x))`` into ``Identity(x)`` using the easy API."""
+
+        def match_pattern(self, g: "GraphBuilder", x):
+            t = g.op.Not(x)      # first Not
+            return g.op.Not(t)   # second Not  <-- anchor node
+
+        def apply_pattern(self, g: "GraphBuilder", x):
+            return g.op.Identity(x)
+
+Key differences
+~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 35 35
+
+   * - Aspect
+     - ``PatternOptimization``
+     - ``EasyPatternOptimization``
+   * - Matching logic
+     - Written by hand in ``match()``. The developer calls graph-navigation
+       helpers such as ``node_before``, ``next_nodes``, ``get_attribute``, …
+     - Declared as a Python function ``match_pattern()`` using ``g.op.*``
+       calls. The bidirectional BFS is run automatically by the framework.
+   * - Replacement logic
+     - Written by hand in ``apply()``. The developer calls ``g.make_node``
+       and explicitly manages which nodes are kept or removed.
+     - Declared as a Python function ``apply_pattern()`` using ``g.op.*``
+       calls. The framework renames results and assembles the replacement
+       nodes automatically.
+   * - Flexibility
+     - Full control: can inspect any attribute, handle optional inputs, cope
+       with multi-output rewrites, or make graph-wide checks.
+     - More constrained: the subgraph must have a fixed topology with no
+       branching within the pattern. Attribute checks require overriding
+       ``validate_mapping`` or ``validate_attribute_mapping``.
+   * - Typical use-case
+     - Complex rewrites (e.g. Attention fusion) where the matching involves
+       many conditional checks that are hard to express as a fixed topology.
+     - Simple structural fusions (e.g. double-Not, LeakyRelu decomposition,
+       Gelu decomposition) where the topology is fixed and self-describing.
+
 Shape inference
 ===============
 
