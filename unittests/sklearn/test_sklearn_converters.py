@@ -224,7 +224,9 @@ class TestSklearnBaseConverters(ExtTestCase):
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
-        pipe = Pipeline([("scaler", StandardScaler()), ("clf", DecisionTreeClassifier(random_state=0))])
+        pipe = Pipeline(
+            [("scaler", StandardScaler()), ("clf", DecisionTreeClassifier(random_state=0))]
+        )
         pipe.fit(X, y)
 
         onx = to_onnx(pipe, (X,))

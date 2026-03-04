@@ -272,3 +272,15 @@ class InferenceSessionForTorch(_InferenceSession):
         if self.nvtx:
             self.torch.cuda.nvtx.range_pop()  # type: ignore
         return tuple(res)
+
+    def _post_process_inplace(self, outputs):
+        for i in range(len(outputs)):
+            o = outputs[i]
+            if self.sess_bool_outputs[i]:
+                if isinstance(o, np.ndarray):
+                    if o.dtype != np.bool_:
+                        outputs[i] = o.astype(np.bool_)
+                else:
+                    if o.dtype != torch.bool:
+                        outputs[i] = o.to(torch.bool)
+        return outputs

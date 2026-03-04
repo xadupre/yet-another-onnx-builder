@@ -28,9 +28,9 @@ def _extract_tree_attributes(tree, n_classes: int, is_classifier: bool):
         Only single-output trees are supported (``tree.n_outputs == 1``).
         Multi-output trees would require multiple TreeEnsemble nodes.
     """
-    assert tree.n_outputs == 1, (
-        f"Only single-output decision trees are supported, got n_outputs={tree.n_outputs}."
-    )
+    assert (
+        tree.n_outputs == 1
+    ), f"Only single-output decision trees are supported, got n_outputs={tree.n_outputs}."
     n_nodes = tree.node_count
     feature = tree.feature
     threshold = tree.threshold.astype(np.float32)
@@ -70,7 +70,9 @@ def _extract_tree_attributes(tree, n_classes: int, is_classifier: bool):
             nodes_truenodeids.append(0)
             nodes_falsenodeids.append(0)
 
-            node_value = value[node_id, 0]  # shape: (max_n_classes,); index 0 = first (only) output
+            node_value = value[
+                node_id, 0
+            ]  # shape: (max_n_classes,); index 0 = first (only) output
             if is_classifier:
                 total = node_value.sum()
                 # total > 0 for all valid fitted nodes; guard against degenerate cases
@@ -156,11 +158,11 @@ def sklearn_decision_tree_classifier(
     tree = estimator.tree_
     attrs = _extract_tree_attributes(tree, n_classes, is_classifier=True)
 
-    if np.issubdtype(classes.dtype, np.integer):
-        classlabels = classes.astype(np.int64).tolist()
+    if np.issubdtype(classes.dtype, np.integer):  # type: ignore
+        classlabels = classes.astype(np.int64).tolist()  # type: ignore
         label_kwargs = {"classlabels_int64s": classlabels}
     else:
-        classlabels = classes.astype(str).tolist()
+        classlabels = classes.astype(str).tolist()  # type: ignore
         label_kwargs = {"classlabels_strings": classlabels}
 
     result = g.make_node(
@@ -170,7 +172,7 @@ def sklearn_decision_tree_classifier(
         domain="ai.onnx.ml",
         name=name,
         post_transform="NONE",
-        **attrs,
+        **attrs,  # type: ignore
         **label_kwargs,
     )
 
@@ -215,7 +217,7 @@ def sklearn_decision_tree_regressor(
         name=name,
         n_targets=1,
         post_transform="NONE",
-        **attrs,
+        **attrs,  # type: ignore
     )
 
     return result if isinstance(result, str) else result[0]

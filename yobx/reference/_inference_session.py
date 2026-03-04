@@ -2,12 +2,11 @@ import os
 from typing import Any, Callable, Dict, List, Optional, Union
 import onnx
 import numpy as np
-import torch
 import onnxruntime
 from onnxruntime.capi import _pybind_state as ORTC
 
 DEVICES = {-1: ORTC.OrtDevice(ORTC.OrtDevice.cpu(), ORTC.OrtDevice.default_memory(), 0)}
-TensorLike = Union[np.ndarray, "torch.Tensor"]
+TensorLike = Union[np.ndarray, "torch.Tensor"]  # type: ignore # noqa: F821
 
 
 class _InferenceSession:
@@ -176,12 +175,8 @@ class _InferenceSession:
         for i in range(len(outputs)):
             o = outputs[i]
             if self.sess_bool_outputs[i]:
-                if isinstance(o, np.ndarray):
-                    if o.dtype != np.bool_:
-                        outputs[i] = o.astype(np.bool_)
-                else:
-                    if o.dtype != torch.bool:
-                        outputs[i] = o.to(torch.bool)
+                if o.dtype != np.bool_:
+                    outputs[i] = o.astype(np.bool_)
         return outputs
 
 

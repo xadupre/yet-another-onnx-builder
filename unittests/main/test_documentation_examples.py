@@ -5,7 +5,14 @@ import importlib.util
 import subprocess
 import time
 from yobx import __file__ as yobx_file
-from yobx.ext_test_case import ExtTestCase, is_windows, ignore_errors, has_transformers, has_torch
+from yobx.ext_test_case import (
+    ExtTestCase,
+    is_windows,
+    ignore_errors,
+    has_transformers,
+    has_sklearn,
+    has_torch,
+)
 
 VERBOSE = 0
 ROOT = os.path.realpath(os.path.abspath(os.path.join(yobx_file, "..", "..")))
@@ -100,6 +107,9 @@ class TestDocumentationExamples(ExtTestCase):
                 }
             ):
                 reason = "torch not installed"
+
+            if not reason and not has_sklearn() and name in {"plot_sklearn_pipeline.py"}:
+                reason = "scikit-learn not installed"
 
             if reason:
 
