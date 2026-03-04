@@ -387,7 +387,10 @@ def get_figure(ax):
 
 def has_cuda() -> bool:
     """Returns ``torch.cuda.device_count() > 0``."""
-    import torch
+    try:
+        import torch
+    except (ImportError, NameError, AttributeError):
+        return False
 
     return torch.cuda.device_count() > 0
 
@@ -412,7 +415,10 @@ def requires_cuda(msg: str = "", version: str = "", memory: int = 0):
     :param version: minimum version
     :param memory: minimum number of Gb to run the test
     """
-    import torch
+    try:
+        import torch
+    except (ImportError, NameError, AttributeError):
+        return unittest.skip(msg or "cuda not installed")
 
     if torch.cuda.device_count() == 0:
         msg = msg or "only runs on CUDA but torch does not have it"
@@ -496,7 +502,7 @@ def requires_torch(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`pytorch` is not recent enough."""
     try:
         import torch
-    except (ImportError, AttributeError):
+    except (ImportError, AttributeError, NameError):
         return unittest.skip(msg or "torch not installed")
 
     if not version:
@@ -568,7 +574,7 @@ def requires_transformers(
     try:
         import torch  # noqa: F401
         import transformers
-    except (AttributeError, ImportError):
+    except (AttributeError, ImportError, NameError):
         return unittest.skip(msg or "transformers not installed")
 
     if not version:

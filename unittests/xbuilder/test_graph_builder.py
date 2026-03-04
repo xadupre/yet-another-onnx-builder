@@ -2743,6 +2743,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         gr = GraphBuilder(18, verbose=0)
         self.assertRaises(RuntimeError, gr.get_is_dimension, "unknown")
 
+    @requires_torch()
     def test_get_is_dimension_run_node_float(self):
         import torch
 
@@ -2754,6 +2755,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         gr.set_shapes_types("z", "run_node", (("",), ("op", torch.float64, ())))
         self.assertFalse(gr.get_is_dimension("z"))
 
+    @requires_torch()
     def test_get_is_dimension_run_node_scalar_int64(self):
         import torch
 
@@ -2761,6 +2763,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         gr.set_shapes_types("x", "run_node", (("",), ("op", torch.int64, ())))
         self.assertTrue(gr.get_is_dimension("x"))
 
+    @requires_torch()
     def test_get_is_dimension_run_node_multidim_int64(self):
         import torch
 
