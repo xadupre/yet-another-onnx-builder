@@ -6,4 +6,5 @@ Elements of Design
 
    misc/index
    builder/index
+   sklearn/index
    torch/index
