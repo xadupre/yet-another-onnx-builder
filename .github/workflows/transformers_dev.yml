@@ -1,4 +1,4 @@
-name: transformers dev
+name: transformers-dev
 
 on:
   push:
