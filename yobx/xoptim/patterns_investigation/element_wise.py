@@ -49,7 +49,7 @@ class BinaryInvestigation(PatternOptimization):
 
     def report(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         node: NodeProto,
         left: Optional[NodeProto],
         right: Optional[NodeProto],

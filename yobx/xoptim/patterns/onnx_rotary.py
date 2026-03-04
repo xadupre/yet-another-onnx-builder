@@ -358,7 +358,7 @@ class RotaryConcatPartPattern(PatternOptimization):
 
     def apply_concat(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         cst_left: NodeProto,
         split: NodeProto,
         slice_left: NodeProto,
@@ -656,7 +656,7 @@ class RotaryConcatPartPattern(PatternOptimization):
 
     def apply_transpose(
         self,
-        g: "GraphBuilder",  # noqa: F821
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
         cst_left: NodeProto,
         slice_left: NodeProto,
         neg_left: NodeProto,

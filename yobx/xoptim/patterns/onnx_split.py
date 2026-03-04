@@ -221,7 +221,7 @@ class SlicesSplitPattern(PatternOptimization):
             axis = csts[0]
 
         shape = g.get_shape(node.input[0])
-        dim = shape[axis]
+        dim = shape[int(axis)]
         if not isinstance(dim, int):
             return self.none(node, _get_lineno())
 
@@ -268,7 +268,7 @@ class SlicesSplitPattern(PatternOptimization):
         ends = [op.input[2] for op in nodes]
         cst_starts = [g.get_constant_scalar(a) for a in starts]
         cst_ends = [g.get_constant_scalar(a) for a in ends]
-        axis = g.get_constant_scalar(nodes[0].input[3])
+        axis = int(g.get_constant_scalar(nodes[0].input[3]))
         if cst_ends[-1] == 9223372036854775807:
             # 9223372036854775807 is what torch uses to specify the end
             shape = g.get_shape(nodes[0].input[0])
@@ -479,13 +479,16 @@ class GathersSplitPattern(PatternOptimization):
         if sorted_indices != list(range(len(csts))):
             return self.none(node, _get_lineno())
         shape = g.get_shape(node.input[0])
-        if axis < 0:
-            axis += len(shape)
-        if axis >= len(shape):
+        if axis is None:
             return self.none(node, _get_lineno())
-        if not isinstance(shape[axis], int):
+        iaxis = int(axis)
+        if iaxis < 0:
+            iaxis += len(shape)
+        if iaxis >= len(shape):
             return self.none(node, _get_lineno())
-        if shape[axis] != len(sorted_indices):
+        if not isinstance(shape[iaxis], int):
+            return self.none(node, _get_lineno())
+        if shape[iaxis] != len(sorted_indices):
             return self.none(node, _get_lineno())
 
         return MatchResult(self, users, self.apply)

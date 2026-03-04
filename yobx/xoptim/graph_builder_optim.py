@@ -2,7 +2,7 @@ import os
 import pprint
 import textwrap
 import time
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Literal, Optional, Set, Tuple, Union, overload
 
 if TYPE_CHECKING:
     from ..xbuilder.graph_builder import GraphBuilder
@@ -446,6 +446,16 @@ class GraphBuilderPatternOptimization:
                 self._cache_computed_constant[key] = stat
             stats.append(stat)
         return stats
+
+    @overload
+    def get_attribute(
+        self, node: NodeProto, att_name: str, exc: Literal[True] = ...
+    ) -> AttributeProto: ...
+
+    @overload
+    def get_attribute(
+        self, node: NodeProto, att_name: str, exc: Literal[False]
+    ) -> Optional[AttributeProto]: ...
 
     def get_attribute(
         self, node: NodeProto, att_name: str, exc: bool = True
@@ -1443,8 +1453,11 @@ class GraphBuilderPatternOptimization:
         return found, matches, durations, continue_optimization
 
     def _optimize_apply_step(
-        self, it: int, matches: List[MatchResult], statistics: List[Dict[str, Any]]
-    ) -> Tuple[MatchResult, Set[str], int, int, List[NodeProto]]:
+        self,
+        it: int,
+        matches: List[Tuple[PatternOptimization, MatchResult]],
+        statistics: List[Dict[str, Any]],
+    ) -> Tuple[List[PatternOptimization], Set[str], int, int, List[NodeProto]]:
         added_types = set()
         n_added = 0
         n_removed = 0

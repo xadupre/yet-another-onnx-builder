@@ -282,7 +282,7 @@ class PatternOptimization:
     def apply(
         self,
         g: "GraphBuilderPatternOptimization",  # noqa: F821
-        *nodes: Sequence[NodeProto],
+        *nodes: Any,
     ) -> List[NodeProto]:
         """
         The method does the rewriting. It assumes it can happen.
@@ -849,7 +849,7 @@ class EasyPatternOptimization(PatternOptimization):
 
         return "\n".join(rows)
 
-    def _hint(self, *args: Sequence[Any]):
+    def _hint(self, *args: Any):
         """
         Add debugging information to help users.
         """
@@ -1189,7 +1189,7 @@ class EasyPatternOptimization(PatternOptimization):
     def apply(
         self,
         g: "GraphBuilderPatternOptimization",  # noqa: F821
-        *nodes: Sequence[NodeProto],
+        *nodes: Any,
     ) -> List[NodeProto]:
         # Why build the pattern gain
         pat = self._get_match_pattern(g)

@@ -995,7 +995,7 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
         PatternOptimization.__init__(self, verbose, priority)
         _common.__init__(self, broadcast)
 
-    def can_fuse(self, g: "GraphBuilder", nodes: List[NodeProto]) -> bool:  # noqa: F821
+    def can_fuse(self, g: "GraphBuilderPatternOptimization", nodes: List[NodeProto]) -> bool:  # noqa: F821
         """Checks that one node if not using the output of another."""
         assert len(nodes) == 2, f"Not implemented for {len(nodes)} nodes."
         p1 = g.get_position(nodes[0])

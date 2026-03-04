@@ -677,7 +677,7 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
 
     @classmethod
     def get_attribute_value(
-        cls, g: "GraphBuilder", node: NodeProto, name: str, exc: bool = True  # noqa: F821
+        cls, g: "GraphBuilderPatternOptimization", node: NodeProto, name: str, exc: bool = True  # noqa: F821
     ) -> Any:
         att = g.get_attribute(node, name, exc=exc)
         if not exc and att is None:
@@ -696,7 +696,7 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
 
     @classmethod
     def _first_tree_id(
-        cls, g: "GraphBuilder", trees: List[NodeProto]  # noqa: F821
+        cls, g: "GraphBuilderPatternOptimization", trees: List[NodeProto]  # noqa: F821
     ) -> Dict[int, int]:
         res = {}
         current = 0
@@ -759,7 +759,7 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
         return onh.from_array(merged, name=as_tensor)
 
     def _opset_process(
-        self, g: "GraphBuilder", atts: Dict[str, Any]  # noqa: F821
+        self, g: "GraphBuilderPatternOptimization", atts: Dict[str, Any]  # noqa: F821
     ) -> Dict[str, Any]:
         """
         as_tensor not supported in opset ai.onnx.ml < 3.

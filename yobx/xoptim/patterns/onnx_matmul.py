@@ -702,8 +702,8 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
     def same_size(
         self,
         g: "GraphBuilderPatternOptimization",  # noqa: F821,
-        sh1: Tuple[int, ...],
-        sh2: Tuple[int, ...],
+        sh1: Tuple[Union[int, str, float], ...],
+        sh2: Tuple[Union[int, str, float], ...],
         constraints: Dict[str, Set[Union[int, str]]],
     ) -> bool:
         # We cannot handle all the case.
@@ -1768,7 +1768,7 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
         print("DOT-SECTION", to_dot(model))
     """
 
-    def check_transpose_node(self, g: "GraphBuilder", name: str) -> bool:  # noqa: F821
+    def check_transpose_node(self, g: "GraphBuilderPatternOptimization", name: str) -> bool:  # noqa: F821
         if g.is_used_more_than_once(name):
             return False
         node = g.node_before(name)

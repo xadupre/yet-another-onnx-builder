@@ -462,7 +462,7 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
         split_node: NodeProto,
         half_node: NodeProto,
         concat_node: NodeProto,
-        *prefix_nodes: Sequence[NodeProto],
+        *prefix_nodes: NodeProto,
     ) -> List[NodeProto]:
         if split_node is None:
             rotary_dim = None
