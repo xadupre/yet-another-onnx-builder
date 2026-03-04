@@ -1,9 +1,58 @@
 from typing import Any, Dict, Optional, Sequence, Tuple
+import numpy as np
 from sklearn.base import BaseEstimator
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
 from .register import get_sklearn_converter
 from .sklearn_helper import get_output_names
+
+
+def convert_standard_scaler(
+    estimator,
+    X: np.ndarray,
+    **kwargs,
+):
+    """
+    Converts a fitted :class:`sklearn.preprocessing.StandardScaler` into ONNX.
+
+    :param estimator: a fitted ``StandardScaler``
+    :param X: sample input array (used to infer dtype and shape)
+    :param kwargs: extra keyword arguments forwarded to :func:`to_onnx`
+    :return: onnx model
+    """
+    return to_onnx(estimator, (X,), **kwargs)
+
+
+def convert_logistic_regression(
+    estimator,
+    X: np.ndarray,
+    **kwargs,
+):
+    """
+    Converts a fitted :class:`sklearn.linear_model.LogisticRegression` into ONNX.
+
+    :param estimator: a fitted ``LogisticRegression``
+    :param X: sample input array (used to infer dtype and shape)
+    :param kwargs: extra keyword arguments forwarded to :func:`to_onnx`
+    :return: onnx model
+    """
+    return to_onnx(estimator, (X,), **kwargs)
+
+
+def convert_pipeline(
+    estimator,
+    X: np.ndarray,
+    **kwargs,
+):
+    """
+    Converts a fitted :class:`sklearn.pipeline.Pipeline` into ONNX.
+
+    :param estimator: a fitted ``Pipeline``
+    :param X: sample input array (used to infer dtype and shape)
+    :param kwargs: extra keyword arguments forwarded to :func:`to_onnx`
+    :return: onnx model
+    """
+    return to_onnx(estimator, (X,), **kwargs)
 
 
 def to_onnx(
