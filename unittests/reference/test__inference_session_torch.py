@@ -14,10 +14,8 @@ from yobx.ext_test_case import (
 )
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
 from yobx.torch.torch_helper import onnx_dtype_to_torch_dtype
-from yobx.reference._inference_session import (
-    InferenceSessionForTorch,
-    investigate_onnxruntime_issue,
-)
+from yobx.reference._inference_session import investigate_onnxruntime_issue
+from yobx.reference._inference_session_torch import InferenceSessionForTorch
 
 TFLOAT = onnx.TensorProto.FLOAT
 

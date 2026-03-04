@@ -7,10 +7,8 @@ import onnx.helper as oh
 import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
-from yobx.reference._inference_session import (
-    InferenceSessionForNumpy,
-    investigate_onnxruntime_issue,
-)
+from yobx.reference._inference_session import investigate_onnxruntime_issue
+from yobx.reference._inference_session_numpy import InferenceSessionForNumpy
 
 TFLOAT = onnx.TensorProto.FLOAT
 
