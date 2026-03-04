@@ -101,7 +101,7 @@ def get_pattern_list(
     positive_list: Optional[Union[str, List[Union[str, type]]]] = "default",
     negative_list: Optional[Union[str, List[Union[str, type]]]] = None,
     verbose: int = 0,
-):
+) -> Optional[List[PatternOptimization]]:
     """
     Builds a list of patterns based on two lists, negative and positive.
 

@@ -9,6 +9,7 @@ Elements of Design
    cube
    evaluator
    helpers
+   onnx_inspection
    translate
 
 .. toctree::
@@ -16,6 +17,7 @@ Elements of Design
    :maxdepth: 1
 
    graph_builder
+   light_api
    optimizer
    optimizer_patterns
    shape
@@ -25,4 +27,5 @@ Elements of Design
    :maxdepth: 1
 
    flatten
+   input_observer
    patches
