@@ -15,15 +15,16 @@ def sklearn_pipeline(
     name: str = "pipeline",
 ) -> Union[str, Tuple[str, str]]:
     """
-    Converts a :class:`class sklearn.preprocessing.StandardScaler` into ONNX.
+    Converts a :class:`sklearn.pipeline.Pipeline` into ONNX using registered
+    converters for each step in the pipeline.
 
     :param g: the graph builder to add nodes to
-    :param sts: shapes defined by :epkg:`scikit-learn`
-    :param estimator: a fitted ``LogisticRegression``
-    :param outputs: desired names (scaled inputs)
-    :param X: inputs
-    :param name: prefix names for the added nodes
-    :return: output
+    :param sts: shapes and types defined by :epkg:`scikit-learn`
+    :param outputs: desired output tensor names for the pipeline result
+    :param estimator: a fitted :class:`sklearn.pipeline.Pipeline`
+    :param X: name of the input tensor to the pipeline
+    :param name: prefix used for names of nodes added for each pipeline step
+    :return: name of the output tensor, or a tuple of output tensor names
     """
     assert isinstance(estimator, Pipeline), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
