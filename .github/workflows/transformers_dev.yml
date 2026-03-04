@@ -1,4 +1,4 @@
-name: Transformers Dev
+name: transformers dev
 
 on:
   push:
@@ -10,16 +10,16 @@ on:
 
 jobs:
   transformers_dev:
-    name: transformers dev (ubuntu-latest, py3.12, torch-nightly, transformers-dev)
+    name: tt-tests (ubuntu-latest, py3.13, transformers-dev, torch-nightly)
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python 3.12
+      - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
       - name: Install nightly pytorch
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Install development version of transformers

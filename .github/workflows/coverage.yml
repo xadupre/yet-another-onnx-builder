@@ -1,4 +1,4 @@
-name: Coverage
+name: all-tests
 
 on:
   push:
