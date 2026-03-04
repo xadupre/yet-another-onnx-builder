@@ -9,4 +9,5 @@ Miscellaneous
    evaluator
    helpers
    onnx_inspection
+   sklearn_converter
    translate
