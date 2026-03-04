@@ -375,6 +375,116 @@ It can be aggregated:
     }
     print(df.groupby("pattern").agg(aggs))
 
+.. _l-design-pattern-matching-algorithm:
+
+Matching Algorithm
+==================
+
+:class:`EasyPatternOptimization <yobx.xoptim.EasyPatternOptimization>`
+implements a bidirectional subgraph-matching algorithm that avoids a full
+enumeration of all possible node assignments. Rather than writing a custom
+``match`` method, the user only has to declare the subgraph to look for
+(*match_pattern*) and the replacement (*apply_pattern*) using the same
+builder API that is used to build ONNX graphs.
+
+Pattern definition
+++++++++++++++++++
+
+Both ``match_pattern`` and ``apply_pattern`` are written as regular Python
+functions that call ``g.op.<OpType>(...)`` to create nodes.
+Each positional argument becomes a symbolic input to the subgraph.
+The function returns the name(s) of the symbolic output(s).
+
+.. code-block:: python
+
+    class TransposeTransposePattern(EasyPatternOptimization):
+
+        def match_pattern(self, g: "GraphBuilder", x):
+            t1 = g.op.Transpose(x)
+            return g.op.Transpose(t1)
+
+        def apply_pattern(self, g: "GraphBuilder", x):
+            return x   # two transposes cancel each other
+
+At build time the framework converts each function into a small
+:class:`GraphBuilderPatternOptimization
+<yobx.xoptim.GraphBuilderPatternOptimization>` that stores the nodes in
+topological order. The **last node** of the match pattern is used as the
+*anchor*: the matching loop only fires when a graph node has the same
+``op_type`` as that anchor.
+
+Bidirectional matching
+++++++++++++++++++++++
+
+Given a candidate graph node with the same type as the anchor,
+the algorithm expands the match iteratively with a stack-based approach:
+
+::
+
+    marked  = {anchor_pattern_key: (graph_node, anchor_pattern_node)}
+    stacked = [anchor_pattern_key]
+
+    while stacked:
+        (graph_node, pattern_node) = pop(stacked)
+
+        # --- backward pass ---
+        # Walk up the predecessors of pattern_node.
+        # For each predecessor in the pattern, find the corresponding
+        # predecessor in the graph. Fail if types or arities differ.
+        backward_match(graph_node, pattern_node)
+
+        # --- forward pass ---
+        # Walk down the successors of pattern_node.
+        # For each successor in the pattern, find the corresponding
+        # successor in the graph. Fail if types or arities differ.
+        forward_match(graph_node, pattern_node)
+
+        # New matched pairs are pushed onto stacked.
+
+The two sub-routines are implemented in
+:meth:`_match_backward <yobx.xoptim.EasyPatternOptimization._match_backward>`
+and
+:meth:`_match_forward <yobx.xoptim.EasyPatternOptimization._match_forward>`.
+
+Ambiguity detection
++++++++++++++++++++
+
+A dictionary ``pair_results_names`` maps every *pattern result name* to the
+*graph result name* it has been paired with. Before recording a new pair the
+algorithm checks that neither name already points to a different name
+(*ambiguity*). An ambiguity means the same pattern result would have to
+correspond to two different graph results simultaneously, which would be
+inconsistent; the match is rejected in that case.
+
+Validation
+++++++++++
+
+After all pattern nodes have been matched the algorithm performs two
+additional checks:
+
+* :meth:`validate_attribute_mapping
+  <yobx.xoptim.EasyPatternOptimization.validate_attribute_mapping>` – verifies
+  that the attributes of the matched graph nodes are consistent with those
+  declared in the pattern (e.g. same ``axis`` value).
+
+* :meth:`validate_mapping
+  <yobx.xoptim.EasyPatternOptimization.validate_mapping>` – an optional hook
+  for subclasses to add arbitrary semantic checks (e.g. verify that a
+  constant operand has a specific numerical value).
+
+Only when both validations succeed does the method return a
+:class:`MatchResult <yobx.xoptim.MatchResult>` that schedules the matched
+nodes for replacement.
+
+Overlap prevention
+++++++++++++++++++
+
+The outer loop (see `Optimization Algorithm`_ above) maintains a *marked* set
+of all node identifiers that have already been claimed by an earlier
+:class:`MatchResult <yobx.xoptim.MatchResult>`. A candidate match is
+discarded if any of its nodes appears in that set, so no two rewrites ever
+touch the same node during the same pass.
+
 Shape inference
 ===============
 
