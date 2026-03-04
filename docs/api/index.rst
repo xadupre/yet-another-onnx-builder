@@ -8,6 +8,7 @@ API Reference
    container/index
    helpers/index
    reference/index
+   sklearn/index
    torch/index
    translate/index
    xbuilder/index
