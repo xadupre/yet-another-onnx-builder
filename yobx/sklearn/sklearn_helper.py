@@ -1,4 +1,4 @@
-from typing import List, Sequence
+from typing import Sequence
 from sklearn.base import BaseEstimator, is_classifier, is_regressor
 from sklearn.pipeline import Pipeline
 
@@ -10,7 +10,7 @@ def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     return 1
 
 
-def get_output_names(estimator: BaseEstimator) -> List[str]:
+def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
     """Returns output names for every estimator."""
     if hasattr(estimator, "get_feature_names_out"):
         if isinstance(estimator, Pipeline):

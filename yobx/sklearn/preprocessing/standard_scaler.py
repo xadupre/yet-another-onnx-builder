@@ -34,6 +34,7 @@ def sklearn_standard_scaler(
 
     # Apply centering only if requested.
     if getattr(estimator, "with_mean", True):
+        assert estimator.mean_ is not None  # type happiness
         mean = estimator.mean_.astype(dtype)
         centered = g.op.Sub(X, mean, name=name)
     else:
@@ -41,13 +42,16 @@ def sklearn_standard_scaler(
 
     # Apply scaling only if requested.
     if getattr(estimator, "with_std", True):
+        assert estimator.scale_ is not None  # type happiness
         scale = estimator.scale_.astype(dtype)
         res = g.op.Div(centered, scale, name=name, outputs=outputs)
     else:
         # No scaling: forward the (possibly centered) tensor to the desired outputs.
         res = g.op.Identity(centered, name=name, outputs=outputs)
+    assert isinstance(res, str)  # type happiness
     if not sts:
         g.set_type(res, g.get_type(X))
         g.set_shape(res, g.get_shape(X))
-        g.set_device(res, g.get_device(X))
-    return (res,)
+        if g.has_device(X):
+            g.set_device(res, g.get_device(X))
+    return res

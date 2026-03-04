@@ -13,7 +13,7 @@ def sklearn_pipeline(
     estimator: Pipeline,
     X: str,
     name: str = "pipeline",
-) -> Union[str, Tuple[str, str]]:
+) -> Union[str, Tuple[str, ...]]:
     """
     Converts a :class:`sklearn.pipeline.Pipeline` into ONNX using registered
     converters for each step in the pipeline.

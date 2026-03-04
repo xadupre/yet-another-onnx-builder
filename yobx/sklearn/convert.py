@@ -43,7 +43,7 @@ def to_onnx(
         shape = list(arg.shape)
         for axis, dim in ds.items():
             shape[axis] = dim
-        g.make_tensor_input(name, np_dtype_to_tensor_dtype(arg.dtype), shape, device=-1)
+        g.make_tensor_input(name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1)
 
     output_names = get_output_names(estimator)
     fct(g, {}, output_names, estimator, *input_names, name="main")

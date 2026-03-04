@@ -3,7 +3,7 @@ from typing import Dict, Callable, Tuple, Union
 SKLEARN_CONVERTERS: Dict[type, Callable] = {}
 
 
-def register_sklearn_converter(cls: Union[type, Tuple[type]]):
+def register_sklearn_converter(cls: Union[type, Tuple[type, ...]]):
     def decorator(fct: Callable):
         """Registers a function to converts a model."""
         global SKLEARN_CONVERTERS
