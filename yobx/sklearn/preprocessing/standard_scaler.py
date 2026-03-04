@@ -12,7 +12,7 @@ def sklearn_standard_scaler(
     estimator: StandardScaler,
     X: str,
     name: str = "scaler",
-) -> Tuple[str]:
+) -> str:
     """
     Converts a :class:`sklearn.preprocessing.StandardScaler` into ONNX.
 
