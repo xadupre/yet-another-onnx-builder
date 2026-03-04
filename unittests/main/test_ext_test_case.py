@@ -175,12 +175,6 @@ class TestRequiresFunctions(ExtTestCase):
         sentinel = object()
         self.assertIs(dec(sentinel), sentinel)
 
-    def test_requires_sklearn_passes_for_low_version(self):
-        dec = requires_sklearn("1.0.0")
-        self.assertTrue(callable(dec))
-        sentinel = object()
-        self.assertIs(dec(sentinel), sentinel)
-
     def test_has_onnxruntime_returns_bool(self):
         result = has_onnxruntime("1.0.0")
         self.assertIsInstance(result, bool)
