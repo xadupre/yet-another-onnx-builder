@@ -28,12 +28,12 @@ def sklearn_pipeline(
     """
     assert isinstance(estimator, Pipeline), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
-    current_input = (X,)
+    current_input = [X]
     for i, (step_name, step) in enumerate(estimator.steps):
         if i == len(estimator.steps) - 1:
             output_names = outputs
         else:
-            output_names = get_output_names(step)
+            output_names = list(get_output_names(step))
             output_names = [g.unique_name(n) for n in output_names]
         fct = get_sklearn_converter(type(step))
         fct(g, sts, output_names, step, *current_input, name=f"{name}__{step_name}")
