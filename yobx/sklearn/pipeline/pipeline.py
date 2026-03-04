@@ -38,4 +38,4 @@ def sklearn_pipeline(
         fct = get_sklearn_converter(type(step))
         fct(g, sts, output_names, step, *current_input, name=f"{name}__{step_name}")
         current_input = output_names
-    return current_input
+    return current_input[0] if len(current_input) == 1 else tuple(current_input)

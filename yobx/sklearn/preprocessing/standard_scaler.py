@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from sklearn.preprocessing import StandardScaler
 from ..register import register_sklearn_converter
 from ...xbuilder import GraphBuilder

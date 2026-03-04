@@ -1,4 +1,4 @@
-from .convert import to_onnx, convert_standard_scaler, convert_logistic_regression, convert_pipeline
+from .convert import to_onnx
 
 
 def register_sklearn_converters():
