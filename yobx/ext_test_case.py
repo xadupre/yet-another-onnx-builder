@@ -473,7 +473,7 @@ def requires_sklearn(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
-def has_torch(version: str) -> bool:
+def has_torch(version: str = "") -> bool:
     "Returns True if torch transformers is higher."
     import packaging.version as pv
 
