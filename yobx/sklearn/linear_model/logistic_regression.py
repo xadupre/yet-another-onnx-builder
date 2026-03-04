@@ -18,6 +18,33 @@ def sklearn_logistic_regression(
     """
     Converts a :class:`class sklearn.linear_model.LogisticRegression` into ONNX.
 
+    The graph structure depends on the number of classes.
+
+    **Binary classification** (``coef_.shape[0] == 1``):
+
+    .. code-block:: text
+
+        X  ──Gemm(coef, intercept)──►  decision
+                                           │
+                                  ┌────────┴────────┐
+                               Sigmoid           Sub(1, ·)
+                                  │                  │
+                               proba_pos          proba_neg
+                                  └────────┬────────┘
+                                        Concat  ──►  probabilities
+                                           │
+                                        ArgMax ──Cast──Gather(classes) ──►  label
+
+    **Multiclass** (``coef_.shape[0] > 1``):
+
+    .. code-block:: text
+
+        X  ──Gemm(coef, intercept)──►  decision
+                                           │
+                                       Softmax  ──►  probabilities
+                                           │
+                                       ArgMax ──Cast──Gather(classes)  ──►  label
+
     :param g: the graph builder to add nodes to
     :param sts: shapes defined by :epkg:`scikit-learn`
     :param estimator: a fitted ``LogisticRegression``

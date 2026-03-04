@@ -16,6 +16,16 @@ def sklearn_standard_scaler(
     """
     Converts a :class:`sklearn.preprocessing.StandardScaler` into ONNX.
 
+    The implementation respects the ``with_mean`` and ``with_std`` flags:
+
+    .. code-block:: text
+
+        X  ──Sub(mean)──►  centered  ──Div(scale)──►  output
+             (if with_mean)               (if with_std)
+
+    When ``with_mean=False`` the ``Sub`` node is skipped; when
+    ``with_std=False`` the ``Div`` node is replaced by an ``Identity``.
+
     :param g: the graph builder to add nodes to
     :param sts: shapes defined by :epkg:`scikit-learn`
     :param estimator: a fitted ``StandardScaler``
