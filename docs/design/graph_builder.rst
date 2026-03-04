@@ -297,6 +297,117 @@ Default passes (in order):
     print("nodes before:", len(model.graph.node))
     print("nodes after :", len(optimized.graph.node))
 
+Optimization report
+===================
+
+Passing ``return_optimize_report=True`` to
+:meth:`to_onnx <yobx.xbuilder.GraphBuilder.to_onnx>` makes the method return
+a ``(model, stats)`` tuple instead of just the model.  ``stats`` is a list of
+dictionaries — one entry per optimization pass — that records how many nodes
+were added or removed and how long each pass took.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Key
+     - Description
+   * - ``pattern``
+     - Name of the optimization pass (e.g. ``"remove_identity"``,
+       ``"constant_folding"``, ``"TransposeTranspose"`` …).
+   * - ``added``
+     - Number of nodes added by this pass.
+   * - ``removed``
+     - Number of nodes removed by this pass.
+   * - ``time_in``
+     - Wall-clock time spent in this pass (seconds).
+   * - ``iteration``
+     - Iteration number (only for pattern-based passes).
+   * - ``match_index``
+     - Sequential index of the match within the iteration (pattern passes).
+   * - ``instances``
+     - Number of times the pattern was matched (pattern passes).
+
+The list can be converted to a :class:`pandas.DataFrame` for quick
+exploration:
+
+.. runpython::
+    :showcode:
+
+    import pandas
+    import onnx
+    import onnx.helper as oh
+    from yobx.xbuilder import GraphBuilder, OptimizationOptions
+
+    TFLOAT = onnx.TensorProto.FLOAT
+
+    model = oh.make_model(
+        oh.make_graph(
+            [
+                oh.make_node("Identity", ["X"], ["X2"]),
+                oh.make_node("Transpose", ["X2"], ["T"], perm=[1, 0]),
+                oh.make_node("Transpose", ["T"], ["Z"], perm=[1, 0]),
+            ],
+            "demo",
+            [oh.make_tensor_value_info("X", TFLOAT, [3, 4])],
+            [oh.make_tensor_value_info("Z", TFLOAT, [3, 4])],
+        ),
+        opset_imports=[oh.make_opsetid("", 18)],
+        ir_version=10,
+    )
+
+    opts = OptimizationOptions(patterns="default")
+    g = GraphBuilder(model, infer_shapes_options=True, optimization_options=opts)
+    optimized, stats = g.to_onnx(return_optimize_report=True)
+
+    df = pandas.DataFrame(stats)
+    # keep only rows that have numeric added/removed counts
+    df["added"] = df["added"].fillna(0).astype(int)
+    df["removed"] = df["removed"].fillna(0).astype(int)
+    print(df[["pattern", "added", "removed", "time_in"]].to_string(index=False))
+    print(f"\nnodes before: {len(model.graph.node)}")
+    print(f"nodes after : {len(optimized.graph.node)}")
+
+The report can be aggregated by pass name:
+
+.. runpython::
+    :showcode:
+
+    import pandas
+    import onnx
+    import onnx.helper as oh
+    from yobx.xbuilder import GraphBuilder, OptimizationOptions
+
+    TFLOAT = onnx.TensorProto.FLOAT
+
+    model = oh.make_model(
+        oh.make_graph(
+            [
+                oh.make_node("Identity", ["X"], ["X2"]),
+                oh.make_node("Transpose", ["X2"], ["T"], perm=[1, 0]),
+                oh.make_node("Transpose", ["T"], ["Z"], perm=[1, 0]),
+            ],
+            "demo",
+            [oh.make_tensor_value_info("X", TFLOAT, [3, 4])],
+            [oh.make_tensor_value_info("Z", TFLOAT, [3, 4])],
+        ),
+        opset_imports=[oh.make_opsetid("", 18)],
+        ir_version=10,
+    )
+
+    opts = OptimizationOptions(patterns="default")
+    g = GraphBuilder(model, infer_shapes_options=True, optimization_options=opts)
+    _, stats = g.to_onnx(return_optimize_report=True)
+
+    df = pandas.DataFrame(stats)
+    for c in ["added", "removed"]:
+        df[c] = df[c].fillna(0).astype(int)
+    agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
+    agg = agg[(agg["added"] > 0) | (agg["removed"] > 0)].sort_values(
+        "removed", ascending=False
+    )
+    print(agg.to_string())
+
 Local functions
 ===============
 
