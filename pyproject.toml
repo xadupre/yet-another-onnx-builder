@@ -24,15 +24,15 @@ dev = [
     "black",
     "matplotlib",
     "openpyxl",
-]   "pandas",
+    "pandas",
     "pytest>=7",
     "py-cpuinfo",
     "pytest-coverage",
     "pytest-subtests",
     "ruff",
     "xlsxwriter",
- 
-=docs = [
+]
+docs = [
     "black",
     "piccolo-theme",
     "matplotlib",
