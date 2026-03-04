@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING, Dict, List, Optional, Set
 from onnx import AttributeProto, NodeProto, TensorProto
 from ...helpers.onnx_helper import make_idn, unary_like_op_types

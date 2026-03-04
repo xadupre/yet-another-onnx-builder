@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto, TensorProto
 from ...helpers.helper import size_type

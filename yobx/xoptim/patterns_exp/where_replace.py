@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto, TensorProto
 from ..patterns_api import MatchResult, PatternOptimization, _get_lineno

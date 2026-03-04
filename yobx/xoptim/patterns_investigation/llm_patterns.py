@@ -1,3 +1,4 @@
+from __future__ import annotations
 from collections import Counter
 from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto

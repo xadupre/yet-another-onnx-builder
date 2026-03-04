@@ -1,3 +1,4 @@
+from __future__ import annotations
 import collections
 from typing import TYPE_CHECKING, List, Optional
 from onnx import NodeProto, TensorProto
