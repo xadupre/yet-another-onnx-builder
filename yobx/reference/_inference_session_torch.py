@@ -1,13 +1,14 @@
 from typing import Dict, List, Optional, Tuple, Union
 import onnx
+import numpy as np
 import torch
 from torch._C import _from_dlpack
 import onnxruntime
 from onnxruntime.capi import _pybind_state as ORTC
-from ..helpers.helper import string_type
-from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
+from ..helpers.helper import string_type, size_type
+from ..helpers.onnx_helper import tensor_dtype_to_np_dtype, onnx_dtype_name
 from ..torch.torch_helper import torch_dtype_to_onnx_dtype
-from ._inference_session import _InferenceSession, DEVICES
+from ._inference_session import _InferenceSession, DEVICES, TensorLike
 
 
 class InferenceSessionForTorch(_InferenceSession):
@@ -228,3 +229,46 @@ class InferenceSessionForTorch(_InferenceSession):
             self.torch.cuda.nvtx.range_pop()  # type: ignore
         pth_outputs = self._ortvalues_to_torch_tensor(ort_outputs)
         return pth_outputs
+
+    def _ortvalues_to_numpy_tensor(
+        self,
+        ortvalues: Union[List[ORTC.OrtValue], ORTC.OrtValueVector],  # type: ignore
+    ) -> Tuple[Optional[TensorLike], ...]:
+        if len(ortvalues) == 0:
+            return tuple()
+
+        if self.nvtx:
+            self.torch.cuda.nvtx.range_push("_ortvalues_to_numpy_tensor")  # type: ignore
+        res: List[Optional[TensorLike]] = []  # noqa: F823
+        for i in range(len(ortvalues)):
+            if not ortvalues[i].has_value():
+                res.append(None)
+                continue
+
+            el_type = ortvalues[i].element_type()
+            if el_type < onnx.TensorProto.BFLOAT16:
+                try:
+                    a = np.from_dlpack(ortvalues[i])
+                except RuntimeError as e:
+                    assert "ORT only supports contiguous tensor for now." in str(e), (
+                        f"As it says, non-contiguous OrtValue are not supported "
+                        f"though DLPack, i={i}, the error is different {e}"
+                    )
+                    # We make a copy in that case.
+                    a = ortvalues[i].numpy()
+                res.append(a)
+                continue
+
+            tch = torch.from_dlpack(ortvalues[i].to_dlpack())
+            size = size_type(el_type)
+            assert size == 2, f"Not implemented for type {onnx_dtype_name(el_type)}"
+            it = torch.uint16
+            itch = tch.view(it)
+            npt = itch.numpy()
+
+            dtype = tensor_dtype_to_np_dtype(el_type)
+            res.append(npt.view(dtype))
+
+        if self.nvtx:
+            self.torch.cuda.nvtx.range_pop()  # type: ignore
+        return tuple(res)

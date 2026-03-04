@@ -576,8 +576,9 @@ def requires_transformers(
     version: str, msg: str = "", or_older_than: Optional[str] = None
 ) -> Callable:
     """Skips a unit test if :epkg:`transformers` is not recent enough."""
+    if not has_torch():
+        return unittest.skip(msg or "torch not installed")
     try:
-        import torch  # noqa: F401
         import transformers
     except (AttributeError, ImportError, NameError):
         return unittest.skip(msg or "transformers not installed")

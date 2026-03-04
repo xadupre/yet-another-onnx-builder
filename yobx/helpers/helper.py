@@ -210,9 +210,6 @@ def string_type(
             limit=limit,
         )
         s = ",".join(f"{kv[0]}:{string_type(kv[1],**kws)}" for kv in obj.items())  # type: ignore[arg-type]
-        print(
-            "***",
-        )
         s = s.replace("_DimHint(type:AUTO,_factory:bool)", "AUTO")
         if all(isinstance(k, int) for k in obj):
             return f"{{{s}}}"

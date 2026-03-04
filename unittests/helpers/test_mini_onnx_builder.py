@@ -2,12 +2,6 @@ import unittest
 import numpy as np
 import ml_dtypes
 import onnx
-import pytest
-
-try:
-    import torch
-except ImportError:  # pragma: no cover
-    pytest.skip("Torch is required for these tests", allow_module_level=True)
 from yobx.ext_test_case import ExtTestCase, requires_transformers, requires_torch
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.helpers.mini_onnx_builder import (
@@ -20,7 +14,10 @@ from yobx.helpers import string_type
 
 
 class TestMiniOnnxBuilder(ExtTestCase):
+    @requires_torch()
     def test_proto_from_array(self):
+        import torch
+
         self.assertRaise(lambda: proto_from_array(None), TypeError)
         t = torch.tensor([[0, 2.0], [3, 0]]).to_sparse()
         self.assertRaise(lambda: proto_from_array(t), NotImplementedError)
@@ -66,6 +63,8 @@ class TestMiniOnnxBuilder(ExtTestCase):
 
     @requires_torch()
     def test_mini_onnx_builder1(self):
+        import torch
+
         data = [
             (
                 np.array([1, 2], dtype=np.int64),
@@ -224,6 +223,7 @@ class TestMiniOnnxBuilder(ExtTestCase):
 
     @requires_transformers("4.57")
     def test_mini_onnx_builder_transformers(self):
+        import torch
         from yobx.torch.in_transformers.cache_helper import make_dynamic_cache, CacheKeyValue
 
         cache = make_dynamic_cache([(torch.ones((3, 3)), torch.ones((3, 3)) * 2)])
@@ -241,6 +241,7 @@ class TestMiniOnnxBuilder(ExtTestCase):
 
     @requires_transformers("4.57")
     def test_mini_onnx_builder_transformers_sep(self):
+        import torch
         from yobx.torch.in_transformers.cache_helper import make_dynamic_cache, CacheKeyValue
 
         cache = make_dynamic_cache([(torch.ones((3, 3)), torch.ones((3, 3)) * 2)])
@@ -256,7 +257,10 @@ class TestMiniOnnxBuilder(ExtTestCase):
                 restored = create_input_tensors_from_onnx_model(model, sep="#")
                 self.assertEqualAny(inputs, restored)
 
+    @requires_torch()
     def test_mini_onnx_bulder_specific_data(self):
+        import torch
+
         data = {
             ("amain", 0, "I"): (
                 (
@@ -299,7 +303,10 @@ class TestMiniOnnxBuilder(ExtTestCase):
         self.assertEqual(list(data), list(restored))
         self.assertEqualAny(data, restored)
 
+    @requires_torch()
     def test_mini_onnx_builder_engines(self):
+        import torch
+
         data = [
             np.array([1, 2], dtype=np.int64),
             torch.tensor([4, 5], dtype=torch.float32),

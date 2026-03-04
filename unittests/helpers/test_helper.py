@@ -12,6 +12,7 @@ from yobx.helpers.onnx_helper import (
 
 
 class TestSizeType(ExtTestCase):
+    @requires_torch()
     def test_size_type_onnx(self):
         from yobx.torch.torch_helper import onnx_dtype_to_torch_dtype
 
@@ -505,6 +506,7 @@ class TestStringType(ExtTestCase):
         s = string_type(False, with_min_max=True)
         self.assertIn("bool=", s)
 
+    @requires_torch()
     def test_string_tensor_no_shape(self):
         import torch
         from yobx.helpers.helper import _string_tensor
@@ -893,6 +895,7 @@ class TestFlattenObject(ExtTestCase):
         self.assertIs(result[0], t1)
         self.assertIs(result[1], t2)
 
+    @requires_torch()
     @requires_transformers("4.50")
     def test_dynamic_cache(self):
         import torch
@@ -906,6 +909,7 @@ class TestFlattenObject(ExtTestCase):
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 2)
 
+    @requires_torch()
     @requires_transformers("4.50")
     def test_encoder_decoder_cache(self):
         import torch

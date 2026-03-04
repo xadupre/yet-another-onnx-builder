@@ -5,7 +5,7 @@ import ml_dtypes
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from yobx.ext_test_case import ExtTestCase, hide_stdout
+from yobx.ext_test_case import ExtTestCase, hide_stdout, requires_torch
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
 from yobx.reference._inference_session import investigate_onnxruntime_issue
 from yobx.reference._inference_session_numpy import InferenceSessionForNumpy
@@ -158,6 +158,7 @@ class TestInferenceSession(ExtTestCase):
         self.assertIsInstance(got[0], np.ndarray)
         self.assertEqualArray(expected[0], got[0])
 
+    @requires_torch()
     def test_init_numpy_bfloat16(self):
         model, feeds, expected = self._get_model_init(onnx.TensorProto.BFLOAT16)
         wrap = InferenceSessionForNumpy(model, providers="cpu", graph_optimization_level=False)

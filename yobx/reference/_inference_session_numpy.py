@@ -1,15 +1,9 @@
 from typing import Dict, List, Optional, Tuple, Union
 import onnx
 import numpy as np
-import torch
 import onnxruntime
 from onnxruntime.capi import _pybind_state as ORTC
-from ..helpers.helper import size_type
-from ..helpers.onnx_helper import (
-    np_dtype_to_tensor_dtype,
-    onnx_dtype_name,
-    tensor_dtype_to_np_dtype,
-)
+from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ._inference_session import _InferenceSession, TensorLike
 
 
@@ -113,8 +107,6 @@ class InferenceSessionForNumpy(_InferenceSession):
         if len(ortvalues) == 0:
             return tuple()
 
-        if self.nvtx:
-            self.torch.cuda.nvtx.range_push("_ortvalues_to_numpy_tensor")  # type: ignore
         res: List[Optional[TensorLike]] = []  # noqa: F823
         for i in range(len(ortvalues)):
             if not ortvalues[i].has_value():
@@ -135,17 +127,5 @@ class InferenceSessionForNumpy(_InferenceSession):
                 res.append(a)
                 continue
 
-            # no easy conversion, let's use torch
-            tch = torch.from_dlpack(ortvalues[i].to_dlpack())
-            size = size_type(el_type)
-            assert size == 2, f"Not implemented for type {onnx_dtype_name(el_type)}"
-            it = torch.uint16
-            itch = tch.view(it)
-            npt = itch.numpy()
-
-            dtype = tensor_dtype_to_np_dtype(el_type)
-            res.append(npt.view(dtype))
-
-        if self.nvtx:
-            self.torch.cuda.nvtx.range_pop()  # type: ignore
+            raise AssertionError(f"Type {el_type} is not handled without torch.")
         return tuple(res)
