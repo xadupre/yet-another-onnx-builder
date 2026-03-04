@@ -283,9 +283,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         else:
             try:
                 import torch
+                import torch._subclasses
 
                 self._has_torch = True
                 self.torch = torch
+                self.torch_subclasses = torch._subclasses
                 self.maybe_disable_fake_tensor_mode = _unset_fake_temporarily
             except (NameError, ImportError, AttributeError):
                 self._has_torch = False
@@ -8300,7 +8302,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
                     self.make_dynamic_object(
                         sh,
-                        self.WrapSym(sh) if self._has_torch else self.torch.SymInt(sh),  # type: ignore
+                        self.WrapSym(sh) if not self._has_torch else self.torch.SymInt(sh),  # type: ignore
                         input_name=i.name,
                         axis=axis,
                     )

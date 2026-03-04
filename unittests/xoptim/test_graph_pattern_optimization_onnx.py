@@ -31,6 +31,7 @@ from yobx.ext_test_case import (
     requires_torch,
     requires_onnxruntime,
     hide_stdout,
+    has_torch,
 )
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions, InferShapesOptions
 from yobx.xoptim.patterns import ConstantToInitializerPattern
@@ -2915,6 +2916,8 @@ class TestGraphPatternOptimization(ExtTestCase):
                     raise AssertionError(f"Issue with kwargs={kwargs}, model{opt_onx}") from e
                 self.assertEqualArray(expected, got, atol=1e-3)
 
+                if not has_torch():
+                    return
                 import torch
 
                 if torch.cuda.device_count() > 0:
@@ -3012,6 +3015,8 @@ class TestGraphPatternOptimization(ExtTestCase):
                     raise AssertionError(f"Issue with kwargs={kwargs}, model{opt_onx}") from e
                 self.assertEqualArray(expected, got, atol=1e-3)
 
+                if not has_torch():
+                    return
                 import torch
 
                 if torch.cuda.device_count() > 0:
@@ -3100,6 +3105,8 @@ class TestGraphPatternOptimization(ExtTestCase):
                 got = opt_ref.run(None, feeds)[0]
                 self.assertEqualArray(expected, got, atol=1e-3)
 
+                if not has_torch():
+                    return
                 import torch
 
                 if torch.cuda.device_count() > 0:

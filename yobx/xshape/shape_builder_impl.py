@@ -78,9 +78,11 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         else:
             try:
                 import torch
+                import torch._subclasses
 
                 self._has_torch = True
                 self.torch = torch
+                self.torch_subclasses = torch._subclasses
                 self.maybe_disable_fake_tensor_mode = _maybe_disable_fake_tensor_mode
             except (NameError, ImportError, AttributeError):
                 self._has_torch = False
