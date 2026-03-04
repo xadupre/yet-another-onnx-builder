@@ -37,6 +37,8 @@ Two helper classes round out the public API:
   which optimization passes run inside :meth:`to_onnx
   <yobx.xbuilder.GraphBuilder.to_onnx>`.
 
+.. _builder-api-make:
+
 Building a graph from scratch
 ==============================
 
@@ -149,6 +151,8 @@ creating a duplicate node.
     model = g.to_onnx()
     print("initializer name :", list(g.initializers_dict)[0])
     print("initializer shape:", list(g.initializers_dict.values())[0].shape)
+
+.. _buillder-api:
 
 Shape and type tracking
 =======================

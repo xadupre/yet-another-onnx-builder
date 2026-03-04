@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 from sklearn.base import BaseEstimator
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
@@ -13,6 +13,7 @@ def to_onnx(
     dynamic_shapes: Optional[Tuple[Dict[int, str]]] = None,
     target_opset: int = 20,
     verbose: int = 0,
+    builder_cls: Union[type, Callable] = GraphBuilder,
 ):
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
@@ -22,12 +23,16 @@ def to_onnx(
     :param dynamic_shapes: dynamic shapes
     :param target_opset: opset to use, it must be specified
     :param verbose: verbosity
+    :param builder_cls: by default the graph builder is a
+        :class:`yobx.xbuilder.GraphBuilder` but any builder can
+        be used as long it implements the apis :ref:`builder-api`
+        and :ref:`builder-api-make`
     :return: onnx model
     """
     from . import register_sklearn_converters
 
     register_sklearn_converters()
-    g = GraphBuilder(target_opset)
+    g = builder_cls(target_opset)
     fct = get_sklearn_converter(type(estimator))
 
     if input_names:

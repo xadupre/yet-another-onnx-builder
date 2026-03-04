@@ -316,6 +316,34 @@ class TestOnnxScriptBridgeWithSklearnConverter(ExtTestCase):
         self.assertEqual(_default_OPSET_TO_IR_VERSION()[18], 8)
         self.assertEqual(_default_OPSET_TO_IR_VERSION()[21], 10)
 
+    def test_pipeline_standard_scaler_logistic_regression(self):
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.pipeline import Pipeline
+        from yobx.sklearn import to_onnx
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression())])
+        pipe.fit(X, y)
+
+        onx = to_onnx(pipe, (X,), builder_cls=OnnxScriptGraphBuilder)
+
+        # Check graph contains nodes from both steps
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Sub", op_types)
+        self.assertIn("Div", op_types)
+        self.assertIn("Gemm", op_types)
+
+        # Check outputs
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(pipe.predict(X), label)
+        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

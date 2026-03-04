@@ -1,4 +1,5 @@
 from __future__ import annotations
+from functools import partial
 from typing import Any, Dict, List, Optional, Sequence, Union
 import numpy as np
 import onnx
@@ -70,6 +71,14 @@ def value_to_ir_tensor(value: Any, name: str) -> ir.TensorProtocol:
     )
 
 
+class _OnnxScriptGraphBuilderOpset:
+    def __init__(self, builder):
+        self.builder = builder
+
+    def __getattr__(self, name):
+        return partial(self.builder._make_node, name)
+
+
 class OnnxScriptGraphBuilder:
     """
     Bridge builder that exposes a yobx-compatible API over onnxscript's IR.
@@ -131,6 +140,8 @@ class OnnxScriptGraphBuilder:
         self._name_to_value: Dict[str, ir.Value] = {}
         # Counter for auto-generating output names
         self._output_counter: int = 0
+        self._unique_names = set()
+        self.op = _OnnxScriptGraphBuilderOpset(self)
 
     @property
     def main_opset(self):
@@ -148,21 +159,59 @@ class OnnxScriptGraphBuilder:
         """
         return self._inner
 
-    @property
-    def op(self):
-        """
-        Dynamic op dispatcher from the underlying onnxscript builder.
-        Equivalent to ``self.inner_builder.op``.  Allows constructs such as::
-
-            y = gr.op.Relu(x_value)
-
-        where *x_value* is an :class:`ir.Value` retrieved from :meth:`get_value`.
-        """
-        return self._inner.op
-
     # ------------------------------------------------------------------
     # Name registry helpers
     # ------------------------------------------------------------------
+
+    def _make_node(
+        self,
+        op_type: str,
+        *args,
+        domain: str = "",
+        outputs: Optional[Sequence[str]] = None,
+        **kwargs,
+    ):
+        """Creates a node."""
+        new_args = []
+        for a in args:
+            if isinstance(a, str):
+                new_args.append(self._name_to_value[a])
+            else:
+                new_args.append(self.make_initializer("", a))
+        op = getattr(self._inner.op, op_type)
+        output = op(*new_args, **kwargs)
+        if isinstance(output, ir.Value):
+            if outputs:
+                assert len(outputs) == 1
+                self._register(outputs[0], output)
+                return outputs[0]
+            name = self.unique_name(op_type)
+            self._register(name, output)
+            return name
+        res = []
+        for i, o in enumerate(output):
+            if outputs:
+                n = outputs[i]
+                self._register(n, o)
+                res.append(n)
+            else:
+                n = self.unique_name(op_type)
+                self._register(n, o)
+                res.append(n)
+        return tuple(res)
+
+    def unique_name(self, prefix: str) -> str:
+        """Returns a unique name."""
+        if prefix in self._unique_names:
+            i = 2
+            sug = f"{prefix}2"
+            while sug in self._unique_names:
+                i += 1
+                sug = f"{prefix}{i}"
+            self._unique_names.add(sug)
+            return sug
+        self._unique_names.add(prefix)
+        return prefix
 
     def has_name(self, name: str) -> bool:
         """
@@ -171,6 +220,32 @@ class OnnxScriptGraphBuilder:
         :param name: Tensor name to query.
         """
         return name in self._name_to_value
+
+    def has_type(self, name: str) -> int:
+        """Tells if a value has a type."""
+        if name not in self._name_to_value:
+            return False
+        value = self._name_to_value[name]
+        dtype = value.type
+        if not dtype:
+            return False
+        return True
+
+    def get_type(self, name: str) -> int:
+        """Returns the type."""
+        if name not in self._name_to_value:
+            return False
+        value = self._name_to_value[name]
+        dtype = value.type
+        if not dtype:
+            return False
+        return int(dtype.dtype)
+
+    def onnx_dtype_to_np_dtype(self, itype: int) -> np.dtype:
+        """See :func:`yobx.helpers.onnx_helper.tensor_dtype_to_np_dtype`."""
+        from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
+
+        return tensor_dtype_to_np_dtype(itype)
 
     def get_value(self, name: str) -> ir.Value:
         """
@@ -199,6 +274,7 @@ class OnnxScriptGraphBuilder:
         name: str,
         elem_type: Optional[int] = None,
         shape: Optional[Sequence[Optional[Union[int, str]]]] = None,
+        device: Optional[int] = None,
     ) -> str:
         """
         Adds a graph input and return its name.
@@ -208,6 +284,7 @@ class OnnxScriptGraphBuilder:
             Pass ``None`` or ``0`` if unknown (only valid for function graphs).
         :param shape: Tensor shape.  Use ``None`` for a fully unknown
             dimension and a ``str`` for a symbolic / dynamic dimension.
+        :param device: unused for the time being
         :return: The registered name (same as *name*).
         """
         dtype = to_ir_dtype(elem_type)
