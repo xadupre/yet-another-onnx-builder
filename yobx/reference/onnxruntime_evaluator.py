@@ -14,11 +14,7 @@ from ..helpers.onnx_helper import (
     pretty_onnx,
 )
 from ..torch.torch_helper import onnx_dtype_to_torch_dtype, torch_dtype_to_onnx_dtype
-from ._inference_session import (
-    InferenceSessionForTorch,
-    InferenceSessionForNumpy,
-    _InferenceSession,
-)
+from ._inference_session import _InferenceSession
 from ..torch.torch_helper import to_tensor
 from .report_results_comparison import ReportResultComparison
 from .evaluator import ExtendedReferenceEvaluator
@@ -529,12 +525,14 @@ class OnnxruntimeEvaluator:
 
         if self.dump_onnx_model:
             onnx.save(onx, self.dump_onnx_model, save_as_external_data=len(onx.graph.node) > 100)
-        cls = (
-            InferenceSessionForNumpy
-            if any(isinstance(i, np.ndarray) for i in inputs)
-            and (not isinstance(self.torch_or_numpy, bool) or not self.torch_or_numpy)
-            else InferenceSessionForTorch
-        )
+        if any(isinstance(i, np.ndarray) for i in inputs):
+            from ._inference_session_numpy import InferenceSessionForNumpy
+
+            cls = InferenceSessionForNumpy
+        else:
+            from ._inference_session_torch import InferenceSessionForTorch
+
+            cls = InferenceSessionForTorch
         if (
             "providers" not in self.session_kwargs or not self.session_kwargs["providers"]
         ) and any(hasattr(t, "is_cuda") and t.is_cuda for t in inputs):
