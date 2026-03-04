@@ -1,4 +1,4 @@
-from typing import Tuple, Dict, List
+from typing import Dict, List, Tuple
 from sklearn.preprocessing import StandardScaler
 from ..register import register_sklearn_converter
 from ...xbuilder import GraphBuilder
@@ -12,7 +12,7 @@ def sklearn_standard_scaler(
     estimator: StandardScaler,
     X: str,
     name: str = "scaler",
-) -> Tuple[str, str]:
+) -> Tuple[str]:
     """
     Converts a :class:`sklearn.preprocessing.StandardScaler` into ONNX.
 
@@ -40,4 +40,4 @@ def sklearn_standard_scaler(
         g.set_type(res, g.get_type(X))
         g.set_shape(res, g.get_shape(X))
         g.set_device(res, g.get_device(X))
-    return res
+    return (res,)
