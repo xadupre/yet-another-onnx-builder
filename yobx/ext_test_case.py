@@ -626,7 +626,7 @@ def requires_diffusers(
     return lambda x: x
 
 
-def requires_onnxscript(version: str, msg: str = "") -> Callable:
+def requires_onnxscript(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxscript` is not recent enough."""
     try:
         import onnxscript
