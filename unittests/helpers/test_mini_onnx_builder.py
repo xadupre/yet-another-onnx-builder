@@ -2,7 +2,12 @@ import unittest
 import numpy as np
 import ml_dtypes
 import onnx
-import torch
+import pytest
+
+try:
+    import torch
+except ImportError:  # pragma: no cover
+    pytest.skip("Torch is required for these tests", allow_module_level=True)
 from yobx.ext_test_case import ExtTestCase, requires_transformers, requires_torch
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.helpers.mini_onnx_builder import (
