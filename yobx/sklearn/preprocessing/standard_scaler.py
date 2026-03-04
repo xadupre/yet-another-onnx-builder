@@ -14,14 +14,14 @@ def sklearn_standard_scaler(
     name: str = "scaler",
 ) -> Tuple[str, str]:
     """
-    Converts a :class:`class sklearn.preprocessing.StandardScaler` into ONNX.
+    Converts a :class:`sklearn.preprocessing.StandardScaler` into ONNX.
 
     :param g: the graph builder to add nodes to
     :param sts: shapes defined by :epkg:`scikit-learn`
-    :param estimator: a fitted ``LogisticRegression``
+    :param estimator: a fitted ``StandardScaler``
     :param outputs: desired names (scaled inputs)
     :param X: inputs
-    :param name: prefix names for the added nodes
+    :param name: prefix name for the added nodes
     :return: output
     """
     assert isinstance(
