@@ -288,7 +288,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 self._has_torch = True
                 self.torch = torch
                 self.torch_subclasses = torch._subclasses
-                self.maybe_disable_fake_tensor_mode = _unset_fake_temporarily
+                self.maybe_disable_fake_tensor_mode = _unset_fake_temporarily  # type: ignore
             except (NameError, ImportError, AttributeError):
                 self._has_torch = False
                 self.torch = None
