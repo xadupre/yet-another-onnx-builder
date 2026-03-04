@@ -32,6 +32,7 @@ class TestCommandLines(ExtTestCase):
             get_parser_print().print_help()
         text = st.getvalue()
         self.assertIn("pretty", text)
+        self.assertIn("onnx-compact", text)
 
     def test_parser_find(self):
         st = StringIO()
