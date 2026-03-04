@@ -36,7 +36,7 @@ jobs:
       - name: Run tests (no torch)
         run: |
           pytest --durations=10 \
-            --ignore=unittests/builder/onnxscript \
+            --ignore=unittests/builder/oxs \
             --ignore=unittests/helpers/test_patch_helper.py \
             --ignore=unittests/reference/test__inference_session_torch.py \
             --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
