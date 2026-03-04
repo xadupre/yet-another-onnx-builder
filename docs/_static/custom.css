@@ -1,3 +1,9 @@
+/* Make the logo bigger in piccolo_theme. */
+img.logo {
+  width: 200px;
+  max-width: 100%;
+}
+
 /* Fix sphinx-gallery output visibility in piccolo_theme dark mode.
    piccolo_theme uses :root[data-mode=dark/darkest] while sphinx-gallery
    only defines its dark CSS variables for html/body[data-theme=dark]. */

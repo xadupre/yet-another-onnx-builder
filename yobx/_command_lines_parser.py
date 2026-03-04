@@ -458,16 +458,17 @@ def get_parser_print() -> ArgumentParser:
     )
     parser.add_argument(
         "fmt",
-        choices=["dot", "pretty", "printer", "raw", "shape"],
+        choices=["dot", "onnx-compact", "pretty", "printer", "raw", "shape"],
         default="pretty",
         help=textwrap.dedent("""
             Prints out a model on the standard output.
 
-            dot     - converts the graph into dot
-            pretty  - an improved rendering
-            printer - onnx.printer.to_text(...)
-            raw     - just prints the model with print(...)
-            shape   - prints every node node with input and output shapes
+            dot          - converts the graph into dot
+            onnx-compact - translates the model into compact Python code
+            pretty       - an improved rendering
+            printer      - onnx.printer.to_text(...)
+            raw          - just prints the model with print(...)
+            shape        - prints every node with input and output shapes
 
             """.strip("\n")),
     )
@@ -479,7 +480,11 @@ def _cmd_print(argv: List[Any]):
     parser = get_parser_print()
     args = parser.parse_args(argv[1:])
     onx = onnx.load(args.input)
-    if args.fmt == "raw":
+    if args.fmt == "onnx-compact":
+        from .translate import translate
+
+        print(translate(onx, api="onnx-compact"))
+    elif args.fmt == "raw":
         print(onx)
     elif args.fmt == "pretty":
         from .helpers.onnx_helper import pretty_onnx
