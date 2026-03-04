@@ -27,3 +27,9 @@ def get_sklearn_converter(cls: type):
     if cls in SKLEARN_CONVERTERS:
         return SKLEARN_CONVERTERS[cls]
     raise ValueError(f"Unable to find a converter for type {cls}.")
+
+
+def get_sklearn_converters():
+    """Returns all registered converters as a mapping from type to converter function."""
+    global SKLEARN_CONVERTERS
+    return dict(SKLEARN_CONVERTERS)
