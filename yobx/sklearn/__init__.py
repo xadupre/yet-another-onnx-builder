@@ -1,12 +1,17 @@
-"""
-Converts scikit-learn estimators into ONNX graphs using :class:`GraphBuilder`.
-"""
-from ._standard_scaler import convert_standard_scaler
-from ._logistic_regression import convert_logistic_regression
-from ._pipeline import convert_pipeline
+from .convert import to_onnx
 
-__all__ = [
-    "convert_logistic_regression",
-    "convert_pipeline",
-    "convert_standard_scaler",
-]
+
+def register_sklearn_converters():
+    """Registers all converters implemented in this package."""
+    from .register import SKLEARN_CONVERTERS
+
+    if SKLEARN_CONVERTERS:
+        # already done
+        return
+    from .linear_model import register as register_linear_model
+    from .pipeline import register as register_pipeline
+    from .preprocessing import register as register_preprocessing
+
+    register_linear_model()
+    register_pipeline()
+    register_preprocessing()

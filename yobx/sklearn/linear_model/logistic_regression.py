@@ -1,0 +1,77 @@
+from typing import Tuple, Dict, List, Union
+import numpy as np
+import onnx
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+from ..register import register_sklearn_converter
+from ...xbuilder import GraphBuilder
+
+
+@register_sklearn_converter((LogisticRegression, LogisticRegressionCV))
+def sklearn_logistic_regression(
+    g: GraphBuilder,
+    sts: Dict,
+    outputs: List[str],
+    estimator: Union[LogisticRegression, LogisticRegressionCV],
+    X: str,
+    name: str = "logistic_regression",
+) -> Tuple[str, str]:
+    """
+    Converts a :class:`class sklearn.linear_model.LogisticRegression` into ONNX.
+
+    :param g: the graph builder to add nodes to
+    :param sts: shapes defined by :epkg:`scikit-learn`
+    :param estimator: a fitted ``LogisticRegression``
+    :param outputs: desired names (label, probabilities)
+    :param X: inputs
+    :param name: prefix names for the added nodes
+    :return: tuple ``(label_result_name, proba_result_name)``
+    """
+    assert isinstance(
+        estimator, (LogisticRegression, LogisticRegressionCV)
+    ), f"Unexpected type {type(estimator)} for estimator."
+    assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
+
+    itype = g.get_type(X)
+    dtype = g.onnx_dtype_to_np_dtype(itype)
+
+    coef = estimator.coef_.astype(dtype)
+    intercept = estimator.intercept_.astype(dtype)
+
+    classes = estimator.classes_
+    is_binary = coef.shape[0] == 1
+
+    decision = g.op.Gemm(X, coef, intercept, transB=1, name=f"{name}_decision")
+
+    if is_binary:
+        proba_pos = g.op.Sigmoid(decision, name=f"{name}_sigmoid")
+        proba_neg = g.op.Sub(np.array([1], dtype=dtype), decision, name=name)
+        proba = g.op.Concat(proba_neg, proba_pos, axis=1, name=name, outputs=outputs[1:])
+    else:
+        proba = g.op.Softmax(decision, axis=1, name=name, outputs=outputs[1:])
+
+    label_idx = g.op.ArgMax(proba, axis=1, keepdims=0, name=name)
+    label_idx_cast = g.op.Cast(label_idx, to=onnx.TensorProto.INT64, name=name)
+
+    if np.issubdtype(classes.dtype, np.integer):
+        classes_arr = classes.astype(np.int64)
+        label = g.op.Gather(
+            classes_arr,
+            label_idx_cast,
+            axis=0,
+            name=f"{name}_label",
+            outputs=outputs[:1],
+        )
+        if not sts:
+            g.set_type(label, onnx.TensorProto.INT64)
+    else:
+        classes_arr = np.array(classes.astype(str))
+        label = g.op.Gather(
+            classes_arr,
+            label_idx_cast,
+            axis=0,
+            name=f"{name}_label_string",
+            outputs=outputs[:1],
+        )
+        if not sts:
+            g.set_type(label, onnx.TensorProto.STRING)
+    return label, proba
