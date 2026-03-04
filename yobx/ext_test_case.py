@@ -458,6 +458,21 @@ def requires_onnxir(version: str, msg: str = "") -> Callable:
     return lambda x: x
 
 
+def has_sklearn(version: str = "") -> bool:
+    "Returns True if torch transformers is higher."
+    import packaging.version as pv
+
+    try:
+        import sklearn
+    except (ImportError, AttributeError):
+        return False
+    if not hasattr(sklearn, "__version__"):
+        return False
+    if not version:
+        return True
+    return pv.Version(sklearn.__version__) >= pv.Version(version)
+
+
 def requires_sklearn(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`scikit-learn` is not recent enough."""
     import packaging.version as pv

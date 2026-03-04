@@ -171,7 +171,7 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
         )
 
     if model_id == "arnir0/Tiny-LLM":
-        import transformers
+        from transformers import AutoModelForCausalLM
         from .in_transformers.models import get_cached_configuration
         from .in_transformers.cache_helper import make_dynamic_cache
 
@@ -183,7 +183,7 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
         bsize, nheads, slen, dim = 2, 1, 30, 96
         return ModelData(
             model_id=model_id,
-            model=transformers.AutoModelForCausalLM.from_config(config),
+            model=AutoModelForCausalLM.from_config(config),
             export_inputs=dict(
                 input_ids=torch.randint(15, size=(2, 3), dtype=torch.int64),
                 attention_mask=torch.randint(1, size=(2, 33), dtype=torch.int64),
