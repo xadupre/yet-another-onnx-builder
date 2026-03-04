@@ -414,14 +414,15 @@ def requires_cuda(msg: str = "", version: str = "", memory: int = 0):
     :param version: minimum version
     :param memory: minimum number of Gb to run the test
     """
-    try:
-        import torch
-    except (ImportError, NameError, AttributeError):
+    if not has_torch():
         return unittest.skip(msg or "cuda not installed")
+
+    import torch
 
     if torch.cuda.device_count() == 0:
         msg = msg or "only runs on CUDA but torch does not have it"
         return unittest.skip(msg or "cuda not installed")
+
     if version:
         import packaging.versions as pv
 
