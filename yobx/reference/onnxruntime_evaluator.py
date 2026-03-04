@@ -10,12 +10,10 @@ from ..helpers import string_type
 from ..helpers.onnx_helper import (
     get_hidden_inputs,
     dtype_to_tensor_dtype,
-    np_dtype_to_tensor_dtype,
+    tensor_dtype_to_np_dtype,
     pretty_onnx,
 )
-from ..torch.torch_helper import onnx_dtype_to_torch_dtype, torch_dtype_to_onnx_dtype
 from ._inference_session import _InferenceSession
-from ..torch.torch_helper import to_tensor
 from .report_results_comparison import ReportResultComparison
 from .evaluator import ExtendedReferenceEvaluator
 
@@ -30,14 +28,16 @@ class OnnxList(list):
         super().__init__()
         if isinstance(itype, int):
             self.itype = itype
-            self.dtype = onnx_dtype_to_torch_dtype(itype)
+            self.dtype = tensor_dtype_to_np_dtype(itype)
         else:
             assert itype, "The list cannot be created with an empty list."
-            self.itype = (
-                np_dtype_to_tensor_dtype(itype[0].dtype)
-                if isinstance(itype[0], np.ndarray)
-                else torch_dtype_to_onnx_dtype(itype[0].dtype)
-            )
+            if isinstance(itype[0], np.ndarray):
+                self.dtype = itype[0].dtype
+            else:
+                from ..torch.torch_helper import torch_dtype_to_onnx_dtype
+
+                self.itype = torch_dtype_to_onnx_dtype(itype[0].dtype)
+
             self.extend(itype)
             self.dtype = itype[0].dtype
         self.shape = "OnnxList"
@@ -153,7 +153,12 @@ class OnnxruntimeEvaluator:
             disable_aot_function_inlining=disable_aot_function_inlining,
             use_training_api=use_training_api,
         )
-        self.to_tensor_or_array = onh.to_array if not torch_or_numpy else to_tensor
+        if not torch_or_numpy:
+            self.to_tensor_or_array = onh.to_array
+        else:
+            from ..torch.torch_helper import to_tensor
+
+            self.to_tensor_or_array = to_tensor
         self.function_kwargs = function_kwargs
         self.dump_onnx_model = dump_onnx_model
 
