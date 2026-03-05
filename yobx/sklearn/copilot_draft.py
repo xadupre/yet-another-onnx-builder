@@ -1,5 +1,5 @@
 """
-Compatibility shim – the implementation has moved to
+Compatibility shim - the implementation has moved to
 :mod:`yobx.helpers.copilot`.  This module re-exports everything so that
 existing imports continue to work without modification.
 """

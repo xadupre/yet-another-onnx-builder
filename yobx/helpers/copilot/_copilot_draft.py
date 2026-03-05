@@ -14,7 +14,6 @@ from typing import Optional, Type
 
 from sklearn.base import BaseEstimator, is_classifier, is_regressor
 
-
 # ---------------------------------------------------------------------------
 # Low-level HTTP helpers
 # ---------------------------------------------------------------------------
@@ -59,9 +58,7 @@ def _call_copilot_api(
     :raises urllib.error.HTTPError: when the API returns a non-2xx status.
     """
     url = "https://api.githubcopilot.com/chat/completions"
-    body = json.dumps(
-        {"model": model, "messages": messages, "max_tokens": max_tokens}
-    ).encode()
+    body = json.dumps({"model": model, "messages": messages, "max_tokens": max_tokens}).encode()
     req = urllib.request.Request(
         url,
         data=body,
@@ -81,7 +78,7 @@ def _call_copilot_api(
 
 
 # ---------------------------------------------------------------------------
-# Helpers – code extraction / module inference / prompt building
+# Helpers - code extraction / module inference / prompt building
 # ---------------------------------------------------------------------------
 
 
@@ -152,8 +149,7 @@ def _build_converter_prompt(estimator_class: type) -> str:
     except Exception:
         kind = "estimator"
 
-    example_code = textwrap.dedent(
-        """\
+    example_code = textwrap.dedent("""\
         from typing import Dict, List
         from sklearn.preprocessing import StandardScaler
         from ..register import register_sklearn_converter
@@ -214,11 +210,9 @@ def _build_converter_prompt(estimator_class: type) -> str:
                 if g.has_device(X):
                     g.set_device(res, g.get_device(X))
             return res
-        """
-    ).strip()
+        """).strip()
 
-    return textwrap.dedent(
-        f"""\
+    return textwrap.dedent(f"""\
         I need an ONNX converter for the scikit-learn estimator `{cls_name}` from
         `{sklearn_module}`. This is a {kind} estimator.
 
@@ -230,19 +224,19 @@ def _build_converter_prompt(estimator_class: type) -> str:
         ```
 
         Available GraphBuilder API:
-        - `g.op.Gemm(A, B, C, transA=0, transB=0, ...)` – matrix multiplication
+        - `g.op.Gemm(A, B, C, transA=0, transB=0, ...)` - matrix multiplication
         - `g.op.Add(X, Y, ...)`, `g.op.Sub(...)`, `g.op.Mul(...)`, `g.op.Div(...)`
-        - `g.op.MatMul(A, B, ...)` – matrix multiplication without bias
+        - `g.op.MatMul(A, B, ...)` - matrix multiplication without bias
         - `g.op.Relu(X, ...)`, `g.op.Sigmoid(X, ...)`, `g.op.Softmax(X, axis=..., ...)`
         - `g.op.ArgMax(X, axis=..., keepdims=..., ...)`, `g.op.Cast(X, to=..., ...)`
         - `g.op.Gather(data, indices, axis=..., ...)`, `g.op.Concat(*inputs, axis=..., ...)`
-        - `g.op.Identity(X, ...)` – no-op / rename
-        - `g.make_node(op_type, inputs, outputs=..., domain=..., ...)` – lower-level API
+        - `g.op.Identity(X, ...)` - no-op / rename
+        - `g.make_node(op_type, inputs, outputs=..., domain=..., ...)` - lower-level API
         - `g.has_type(name)`, `g.get_type(name)`, `g.set_type(name, dtype)`
         - `g.has_shape(name)`, `g.get_shape(name)`, `g.set_shape(name, shape)`
         - `g.has_device(name)`, `g.get_device(name)`, `g.set_device(name, device)`
-        - `g.onnx_dtype_to_np_dtype(itype)` – convert ONNX dtype to numpy dtype
-        - `g.unique_name(prefix)` – generate a unique tensor name
+        - `g.onnx_dtype_to_np_dtype(itype)` - convert ONNX dtype to numpy dtype
+        - `g.unique_name(prefix)` - generate a unique tensor name
 
         Write the complete converter function for `{cls_name}`. Requirements:
         1. Use the `@register_sklearn_converter({cls_name})` decorator.
@@ -254,8 +248,7 @@ def _build_converter_prompt(estimator_class: type) -> str:
 
         Return ONLY the Python source code for the converter file (starting with
         the imports). Do not include any prose outside a code block.
-        """
-    ).strip()
+        """).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -385,7 +378,7 @@ def draft_converter_with_copilot(
     # ----- write generated code -----
     out_path = os.path.join(output_dir, filename)
     if os.path.exists(out_path) and verbose:
-        print(f"[copilot_draft] WARNING: {out_path!r} already exists – overwriting")
+        print(f"[copilot_draft] WARNING: {out_path!r} already exists - overwriting")
 
     with open(out_path, "w", encoding="utf-8") as fh:
         fh.write(code + "\n")
