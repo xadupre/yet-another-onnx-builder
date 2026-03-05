@@ -1,8 +1,8 @@
 .. _l-design-copilot-draft:
 
-=====================================
+=======================================
 Drafting Converters with GitHub Copilot
-=====================================
+=======================================
 
 :func:`yobx.helpers.copilot.draft_converter_with_copilot` uses the
 `GitHub Copilot <https://github.com/features/copilot>`_ chat API to
