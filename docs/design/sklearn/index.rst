@@ -1,6 +1,17 @@
 Scikit-learn Export to ONNX
 ===========================
 
+.. toctree::
+   :maxdepth: 1
+
+   expected_api
+   sklearn_converter
+   custom_converter
+   copilot_draft
+
+A basic :epkg:`scikit-learn` model may look like the following,
+a scaler following by an estimator.
+
 .. runpython::
     :rst:
 
@@ -23,6 +34,8 @@ Scikit-learn Export to ONNX
     print()
     for line in html.split("\n"):
         print(f"    {line}")
+
+And we expect its conversion into ONNX to look like the following.
 
 .. gdot::
     :script: DOT-SECTION
@@ -67,7 +80,7 @@ already implemented its own way of doing, :epkg:`ir-py`, :epkg:`onnxscript`,
 a new one but more to define what the converters expect to find in a class
 classed ``GraphBuilder``. It then becomes possible to create a bridge
 such as :class:`yobx.builder.onnxscript.OnnxScriptGraphBuilder` which implements
-this API for every known way.
+this API for every known way. See :ref:`l-design-expected-api` for further details.
 
 **AI**
 
@@ -75,11 +88,3 @@ Known LLMs now provides a good first draft when it comes to implement a new conv
 for a model not already covered but this library. This package includes
 a function able to query *Copilot* to get that first draft.
 That saves quite some time.
-
-.. toctree::
-   :maxdepth: 1
-
-   expected_api
-   sklearn_converter
-   custom_converter
-   copilot_draft

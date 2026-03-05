@@ -52,7 +52,7 @@ Construction API
      - Convenience short-hand: ``g.op.Relu("X")`` is equivalent to
        ``g.make_node("Relu", ["X"], 1)``.  Inline numpy arrays are
        automatically promoted to initializers.
-   * - ``to_onnx()``
+   * - ``to_onnx(...)``
      - Finalise and return an :class:`onnx.ModelProto`.
 
 Minimal example
@@ -98,7 +98,8 @@ Shape and type API
 
 Converters are expected to propagate shape and type information after each
 node so that downstream converters (e.g. pipeline steps) can query them
-without re-running inference.  The required methods are:
+without re-running inference. The model may be different given that information.
+The required methods are:
 
 .. list-table::
    :header-rows: 1
@@ -126,9 +127,18 @@ without re-running inference.  The required methods are:
      - Return the device.
    * - ``g.has_device(name)``
      - Return ``True`` if a device is registered for the tensor.
+
+In addition, it is usually useful to implement the following methods.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
    * - ``g.unique_name(prefix)``
      - Return a name that starts with *prefix* and is not yet in use
        anywhere in the graph.
+   * - ``g.set_type_shape_unary_op(name, input_name, itype: int = None)``
+     - Defines shape, type, device for `name` equal the one defined for `input_name`, `itype` can be used the change the type
 
 Propagating shape and type in a converter
 -----------------------------------------
