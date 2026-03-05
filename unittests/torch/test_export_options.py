@@ -10,7 +10,6 @@ from yobx.torch.export_options import (
     ExportOptions,
     _get_decomposition_table_by_name,
     _inplace_nodes,
-    _remove_inplace_nodes,
     apply_decompositions,
     insert_contiguous_between_transpose_and_view,
 )
@@ -622,128 +621,6 @@ class TestInplaceFunctions(ExtTestCase):
         nodes = _inplace_nodes(ep.graph)
         self.assertIsInstance(nodes, list)
 
-    def test_remove_inplace_nodes(self):
-        """_remove_inplace_nodes removes inplace-style nodes that have no users."""
-        # Build a raw fx.Graph with one fake inplace-style node (no users)
-        graph = torch.fx.Graph()
-        x = graph.placeholder("x")
-
-        def fake_inplace_(a):
-            pass
-
-        fake_inplace_.__name__ = "fake_"
-        graph.call_function(fake_inplace_, (x,))
-        graph.output(x)
-
-        nodes_before = _inplace_nodes(graph)
-        self.assertEqual(len(nodes_before), 1)
-
-        n_removed = _remove_inplace_nodes(graph)
-        self.assertEqual(n_removed, 1)
-
-        nodes_after = _inplace_nodes(graph)
-        self.assertEqual(len(nodes_after), 0)
-
-    def test_remove_inplace_nodes_empty_graph(self):
-        """_remove_inplace_nodes returns 0 when there are no inplace nodes."""
-        graph = torch.fx.Graph()
-        x = graph.placeholder("x")
-        graph.output(x)
-
-        n_removed = _remove_inplace_nodes(graph)
-        self.assertEqual(n_removed, 0)
-
-    def test_remove_inplace_nodes_with_users_returns_minus_one(self):
-        """_remove_inplace_nodes returns -1 when an inplace node still has users."""
-        graph = torch.fx.Graph()
-        x = graph.placeholder("x")
-
-        def fake_inplace_(a):
-            return a
-
-        fake_inplace_.__name__ = "fake_"
-        inplace_node = graph.call_function(fake_inplace_, (x,))
-        # Make inplace_node have a user by using it in the output
-        graph.output(inplace_node)
-
-        n_removed = _remove_inplace_nodes(graph)
-        self.assertEqual(n_removed, -1)
-        # The inplace node must still be present in the graph's nodes
-        node_names = [n.op for n in graph.nodes]
-        self.assertIn("call_function", node_names)
-
-    def test_remove_inplace_nodes_mixed(self):
-        """_remove_inplace_nodes returns -1 when some inplace nodes have users."""
-        graph = torch.fx.Graph()
-        x = graph.placeholder("x")
-
-        def fake_inplace_(a):
-            return a
-
-        fake_inplace_.__name__ = "fake_"
-        # One node without users (removable)
-        graph.call_function(fake_inplace_, (x,))
-        # One node with a user (not removable)
-        inplace_node2 = graph.call_function(fake_inplace_, (x,))
-        graph.output(inplace_node2)
-
-        n_removed = _remove_inplace_nodes(graph)
-        self.assertEqual(n_removed, -1)
-
-    def test_remove_inplace_nodes_dot_underscore_pattern(self):
-        """_remove_inplace_nodes handles node names containing '_.'."""
-        graph = torch.fx.Graph()
-        x = graph.placeholder("x")
-
-        def fake_inplace_(a):
-            pass
-
-        # Simulate names like "aten.add_" that contain "_."
-        fake_inplace_.__name__ = "aten.add_"
-        graph.call_function(fake_inplace_, (x,))
-        graph.output(x)
-
-        nodes_before = _inplace_nodes(graph)
-        self.assertEqual(len(nodes_before), 1)
-
-        n_removed = _remove_inplace_nodes(graph)
-        self.assertEqual(n_removed, 1)
-
-        nodes_after = _inplace_nodes(graph)
-        self.assertEqual(len(nodes_after), 0)
-
-    def test_remove_inplace_nodes_call_method(self):
-        """_remove_inplace_nodes handles call_method ops with inplace-style names."""
-        graph = torch.fx.Graph()
-        x = graph.placeholder("x")
-        # call_method uses string as target
-        graph.call_method("add_", (x,))
-        graph.output(x)
-
-        nodes_before = _inplace_nodes(graph)
-        self.assertEqual(len(nodes_before), 1)
-
-        n_removed = _remove_inplace_nodes(graph)
-        self.assertEqual(n_removed, 1)
-
-        nodes_after = _inplace_nodes(graph)
-        self.assertEqual(len(nodes_after), 0)
-
-    def test_remove_inplace_nodes_verbose(self):
-        """_remove_inplace_nodes does not crash with verbose=1."""
-        graph = torch.fx.Graph()
-        x = graph.placeholder("x")
-
-        def fake_inplace_(a):
-            pass
-
-        fake_inplace_.__name__ = "fake_"
-        graph.call_function(fake_inplace_, (x,))
-        graph.output(x)
-
-        n_removed = _remove_inplace_nodes(graph, verbose=1)
-        self.assertEqual(n_removed, 1)
-
 
 @requires_torch("2.0")
 class TestGetDecompositionTable(ExtTestCase):
@@ -859,6 +736,72 @@ class TestGetSigKwargs(ExtTestCase):
         self.assertEqual(kw["strict"], True)
         self.assertEqual(kw["decomposition_table"], "default")
         self.assertFalse(kw["jit"])
+
+
+class TestRemoveInline(ExtTestCase):
+    @hide_stdout()
+    def test_remove_inline_slice_tensor(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, sumx):
+                K_33 = x.clone()
+                K_33[2:-2, 2:-2, :-1] = sumx[None, :, None]
+                K_33[2:-2, 2:-2, -1] = 0.0
+                return K_33
+
+        model = Model()
+        xs = (
+            (torch.arange(7 * 9 * 11) + 10).reshape((7, 9, 11)).to(torch.float32),
+            torch.arange(5).to(torch.float32),
+        )
+
+        try:
+            from experimental_experiment.torch_interpreter.export_options import (
+                ExportOptions as _ExportOptions,
+            )
+
+            _opts = _ExportOptions()
+            print("-------------")
+            _ep = _opts.export(
+                model,
+                args=xs,
+                kwargs=None,
+                tracing_mode=False,
+                dynamic_shapes=None,
+                same_signature=False,
+                verbose=10,
+            )
+            print(_ep.graph)
+            for node in _ep.graph.nodes:
+                if node.op == "output":
+                    continue
+                self.assertGreater(
+                    len(node.users),
+                    0,
+                    msg=lambda: f"node with no users {node.name!r}\n{str(_ep.graph)}",
+                )
+            print("-------------")
+        except ImportError:
+            _ep = None
+
+        opts = ExportOptions()
+        ep = opts.export(
+            model,
+            args=xs,
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=False,
+            verbose=10,
+        )
+        print(ep.graph)
+        for node in ep.graph.nodes:
+            if node.op == "output":
+                continue
+            self.assertGreater(
+                len(node.users),
+                0,
+                msg=lambda: f"node with no users {node.name!r}\n{str(ep.graph)}",
+            )
 
 
 if __name__ == "__main__":

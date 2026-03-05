@@ -771,6 +771,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqualArray(expected, got, atol=1e-5)
 
     @skipif_ci_windows("not working on windows")
+    @hide_stdout()
     def test_aten_clone_index_Tensor(self):
         import torch
 
@@ -804,6 +805,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqualArray(expected, got)
 
     @skipif_ci_windows("not working on windows")
+    @hide_stdout()
     def test_aten_clone_index_Tensor_0_2(self):
         import torch
 
@@ -823,8 +825,10 @@ class TestOnnxExportAten(ExtTestCase):
             torch.zeros((0, 2), dtype=torch.int64),
         )
         expected = model(*xsf)
-        model_path = self._call_exporter("test_aten_clone_index_Tensor_0_2", "custom", model, xs)
-        sess = ExtendedReferenceEvaluator(model_path, verbose=0)
+        model_path = self._call_exporter(
+            "test_aten_clone_index_Tensor_0_2", "custom", model, xs, verbose=10
+        )
+        sess = ExtendedReferenceEvaluator(model_path, verbose=10)
         feeds = dict(zip(sess.input_names, [x.numpy() for x in xsf]))
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
