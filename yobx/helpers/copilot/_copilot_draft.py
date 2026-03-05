@@ -84,12 +84,12 @@ def _call_copilot_api(
 
 def _extract_python_code(text: str) -> str:
     """
-    Extract Python source code from a Copilot markdown response.
+    Extracts Python source code from a Copilot markdown response.
 
     Handles the following formats (in order of preference):
 
-    1. A fenced ````python … ```` block.
-    2. A plain fenced ```` ``` … ``` ```` block.
+    1. A fenced  block.
+    2. A plain fenced block.
     3. Falls back to returning *text* unchanged (in case the model replied
        with raw code without a fence).
 
@@ -265,8 +265,8 @@ def draft_converter_with_copilot(
     verbose: int = 0,
 ) -> str:
     """
-    Submit a query to GitHub Copilot to draft a new ONNX converter for a
-    scikit-learn estimator and integrate the result into ``yobx/sklearn/``.
+    Submits a query to GitHub Copilot to draft a new ONNX converter for a
+    :epkg:`scikit-learn` estimator and integrate the result into ``yobx/sklearn/``.
 
     The function:
 
@@ -302,12 +302,6 @@ def draft_converter_with_copilot(
 
         code = draft_converter_with_copilot(Ridge, dry_run=True)
         print(code)
-
-    The function is also re-exported from :mod:`yobx.sklearn` and the
-    :mod:`yobx.sklearn.copilot_draft` compatibility shim, so the following
-    import also works::
-
-        from yobx.sklearn import draft_converter_with_copilot
     """
     # ----- resolve token -----
     if token is None:

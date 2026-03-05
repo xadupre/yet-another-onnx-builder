@@ -610,6 +610,12 @@ def string_type(
         )
         return f"Chat({msg})"
 
+    if obj.__class__.__name__ == "Value":
+        import onnx_ir
+
+        if isinstance(obj, onnx_ir.Value):
+            return f"ir.{obj.__class__.__name__}({obj})"
+
     raise TypeError(f"Unsupported type {type(obj).__name__!r} - {type(obj)} ({has_torch=})")
 
 

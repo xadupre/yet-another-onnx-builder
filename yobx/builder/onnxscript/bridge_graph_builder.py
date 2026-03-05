@@ -1,10 +1,13 @@
 from __future__ import annotations
-from typing import Any, Dict, List, Optional, Sequence, Union
+from functools import partial
+from typing import Any, Dict, List, Optional, Sequence, Set, Union
 import numpy as np
 import onnx
 import onnx_ir as ir
 from ...container import ExtendedModelContainer
 from ...helpers.onnx_helper import _default_OPSET_TO_IR_VERSION
+from ...xshape.shape_type_compute import set_type_shape_unary_op
+from ...xshape._shape_helper import DYNAMIC_SHAPE
 
 
 def to_ir_dtype(elem_type: Optional[int]) -> Optional[ir.DataType]:
@@ -70,6 +73,14 @@ def value_to_ir_tensor(value: Any, name: str) -> ir.TensorProtocol:
     )
 
 
+class _OnnxScriptGraphBuilderOpset:
+    def __init__(self, builder):
+        self.builder = builder
+
+    def __getattr__(self, name):
+        return partial(self.builder._make_node, name)
+
+
 class OnnxScriptGraphBuilder:
     """
     Bridge builder that exposes a yobx-compatible API over onnxscript's IR.
@@ -131,6 +142,8 @@ class OnnxScriptGraphBuilder:
         self._name_to_value: Dict[str, ir.Value] = {}
         # Counter for auto-generating output names
         self._output_counter: int = 0
+        self._unique_names: Set[str] = set()
+        self.op = _OnnxScriptGraphBuilderOpset(self)
 
     @property
     def main_opset(self):
@@ -148,21 +161,73 @@ class OnnxScriptGraphBuilder:
         """
         return self._inner
 
-    @property
-    def op(self):
-        """
-        Dynamic op dispatcher from the underlying onnxscript builder.
-        Equivalent to ``self.inner_builder.op``.  Allows constructs such as::
-
-            y = gr.op.Relu(x_value)
-
-        where *x_value* is an :class:`ir.Value` retrieved from :meth:`get_value`.
-        """
-        return self._inner.op
-
     # ------------------------------------------------------------------
     # Name registry helpers
     # ------------------------------------------------------------------
+
+    def _make_node(
+        self,
+        op_type: str,
+        *args,
+        domain: str = "",
+        outputs: Optional[Sequence[str]] = None,
+        **kwargs,
+    ):
+        """Creates a node."""
+        new_args = []
+        for a in args:
+            if isinstance(a, str):
+                # Existing values are referenced by name; look up their ir.Value.
+                new_args.append(self._name_to_value[a])
+            elif a is None:
+                # Represent missing optional inputs as None, not as an initializer.
+                new_args.append(None)  # type: ignore
+            else:
+                # Create an initializer and pass its corresponding ir.Value to the op.
+                init_name = self.make_initializer("", a)
+                new_args.append(self._name_to_value[init_name])
+
+        if "name" in kwargs:
+            # name is not supported by onnxscript.GraphBuilder.
+            kwargs.pop("name")
+
+        output = self._inner.call_op(op_type, new_args, kwargs)
+        if isinstance(output, ir.Value):
+            if outputs:
+                assert len(outputs) == 1
+                self._register(outputs[0], output)
+                return outputs[0]
+            name = self.unique_name(op_type)
+            self._register(name, output)
+            return name
+        res = []
+        for i, o in enumerate(output):
+            assert isinstance(o, ir.Value), (
+                f"This should be an ir.Value not {type(o)} for operator "
+                f"{op_type!r} called with args={new_args}"
+            )
+            if outputs:
+                n = outputs[i]
+                self._register(n, o)
+                res.append(n)
+            else:
+                n = self.unique_name(op_type)
+                self._register(n, o)
+                res.append(n)
+        return tuple(res)
+
+    def unique_name(self, prefix: str) -> str:
+        """Returns a unique name."""
+        if prefix in self._unique_names:
+            i = 2
+            sug = f"{prefix}2"
+            while sug in self._unique_names:
+                i += 1
+                sug = f"{prefix}{i}"
+            self._unique_names.add(sug)
+            return sug
+        self._unique_names.add(prefix)
+        return prefix
 
     def has_name(self, name: str) -> bool:
         """
@@ -171,6 +236,81 @@ class OnnxScriptGraphBuilder:
         :param name: Tensor name to query.
         """
         return name in self._name_to_value
+
+    def has_type(self, name: str) -> int:
+        """Tells if a value has a type."""
+        if name not in self._name_to_value:
+            return False
+        value = self._name_to_value[name]
+        dtype = value.type
+        if not dtype:
+            return False
+        return True
+
+    def get_type(self, name: str) -> int:
+        """Returns the type."""
+        if name not in self._name_to_value:
+            return False
+        value = self._name_to_value[name]
+        dtype = value.type
+        if not dtype:
+            return 0
+        return int(dtype.elem_type)  # type: ignore
+
+    def set_type(self, name: str, itype: int):
+        """Sets the type."""
+        if name not in self._name_to_value:
+            return False
+        value = self._name_to_value[name]
+        value.type = ir.TensorType(ir.DataType(itype))
+
+    def has_shape(self, name: str) -> bool:
+        """Tells if a value has a shape."""
+        if name not in self._name_to_value:
+            return False
+        value = self._name_to_value[name]
+        shape = value.shape
+        if shape is None:
+            return False
+        return True
+
+    def get_shape(self, name: str) -> DYNAMIC_SHAPE:
+        """Returns the shape."""
+        assert name in self._name_to_value, f"Name {name!r} is not registered."
+        value = self._name_to_value[name]
+        assert value is not None, f"Name {name!r} has a shape but it is None."
+        # A dynamic dimension is a ir.SymbolicDim.
+        return tuple(s if isinstance(s, (int, str)) else s.value for s in value.shape)  # type: ignore
+
+    def set_shape(self, name: str, shape: DYNAMIC_SHAPE, allow_zero: bool = False):
+        """Sets the shape."""
+        assert shape is not None, f"shape cannot be empty for name={name!r}"
+        if name not in self._name_to_value:
+            return False
+        value = self._name_to_value[name]
+        value.shape = ir.Shape(shape)
+        assert (
+            allow_zero or not shape or 0 not in shape
+        ), f"Shape {shape} for name={name!r} is null."
+
+    def has_device(self, name: str) -> int:
+        """
+        Tells if a value has a device.
+        This is not supported right now.
+        """
+        return False
+
+    def get_device(self, name: str) -> int:
+        """Returns the device. This is not supported right now."""
+        raise NotImplementedError(
+            f"device for {name!r} is not available with builder {self.__class__}"
+        )
+
+    def onnx_dtype_to_np_dtype(self, itype: int) -> np.dtype:
+        """See :func:`yobx.helpers.onnx_helper.tensor_dtype_to_np_dtype`."""
+        from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
+
+        return tensor_dtype_to_np_dtype(itype)
 
     def get_value(self, name: str) -> ir.Value:
         """
@@ -186,8 +326,18 @@ class OnnxScriptGraphBuilder:
                 f"Name {name!r} is not known. Known names: {sorted(self._name_to_value)}"
             ) from None
 
+    def set_type_shape_unary_op(
+        self,
+        name: str,
+        input_name: str,
+        itype: Optional[int] = None,
+    ) -> bool:
+        return set_type_shape_unary_op(self, name, input_name, itype)  # type: ignore[arg-type]
+
     def _register(self, name: str, value: ir.Value) -> None:
         """Register *value* under *name* in the internal name registry."""
+        assert isinstance(value, ir.Value), f"Unexpected type {type(value)} for name={name!r}"
+        value.name = name
         self._name_to_value[name] = value
 
     # ------------------------------------------------------------------
@@ -199,6 +349,7 @@ class OnnxScriptGraphBuilder:
         name: str,
         elem_type: Optional[int] = None,
         shape: Optional[Sequence[Optional[Union[int, str]]]] = None,
+        device: Optional[int] = None,
     ) -> str:
         """
         Adds a graph input and return its name.
@@ -208,6 +359,7 @@ class OnnxScriptGraphBuilder:
             Pass ``None`` or ``0`` if unknown (only valid for function graphs).
         :param shape: Tensor shape.  Use ``None`` for a fully unknown
             dimension and a ``str`` for a symbolic / dynamic dimension.
+        :param device: unused for the time being
         :return: The registered name (same as *name*).
         """
         dtype = to_ir_dtype(elem_type)
@@ -224,6 +376,8 @@ class OnnxScriptGraphBuilder:
         name: Union[str, List[str]],
         elem_type: Optional[int] = None,
         shape: Optional[Sequence[Optional[Union[int, str]]]] = None,
+        indexed: bool = False,
+        allow_untyped_output: bool = False,
     ) -> Union[str, List[str]]:
         """
         Registers an existing value as a graph output and return its name.
@@ -236,6 +390,8 @@ class OnnxScriptGraphBuilder:
             the ``ir.Value`` if it was not already inferred.
         :param shape: Optional shape hint; used to set / refine the shape on
             the ``ir.Value`` if not already inferred.
+        :param indexed: unused
+        :param allow_untyped_output: allows output with no shape and/or no type
         :return: The name (or list of names), matching the *name* argument.
         """
         if isinstance(name, list):
@@ -258,11 +414,7 @@ class OnnxScriptGraphBuilder:
         self._graph.outputs.append(value)
         return name
 
-    def make_initializer(
-        self,
-        name: str,
-        value: Any,
-    ) -> str:
+    def make_initializer(self, name: str, value: Any) -> str:
         """
         Adds an initializer tensor and return its name.
 
@@ -274,7 +426,7 @@ class OnnxScriptGraphBuilder:
             is empty).
         """
         if not name:
-            name = f"init_{len(self._name_to_value)}"
+            name = self.unique_name("init_")
 
         tensor = value_to_ir_tensor(value, name)
         ir_value = self._inner.initializer(tensor, name=name, qualify=False)

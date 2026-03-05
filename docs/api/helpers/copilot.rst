@@ -1,3 +1,5 @@
+.. _api-copilot:
+
 yobx.helpers.copilot
 ====================
 
