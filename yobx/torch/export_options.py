@@ -423,10 +423,10 @@ class ExportOptions:
                 for ip, (p, a) in enumerate(zip(sig.parameters, args)):
                     if a is not None and p not in concrete_args:
                         if isinstance(a, int):
-                            # not traceable otherise
+                            # not traceable otherwise
                             concrete_args[p] = torch.tensor(a, dtype=torch.int64)
                         elif isinstance(a, float):
-                            # not traceable otherise
+                            # not traceable otherwise
                             concrete_args[p] = torch.tensor(a, dtype=torch.float32)
                         else:
                             concrete_args[p] = a
@@ -650,10 +650,8 @@ class ExportOptions:
     def use_str_not_dyn(self, dynamic_shapes: Any, default_value=None) -> Any:
         if not hasattr(self, "_c_use_str_not_dyn"):
             self._c_use_str_not_dyn = 0
-        if isinstance(dynamic_shapes, list):
-            return [self.use_str_not_dyn(a, default_value=default_value) for a in dynamic_shapes]
-        if isinstance(dynamic_shapes, tuple):
-            return tuple(
+        if isinstance(dynamic_shapes, (tuple, list, set)):
+            return dynamic_shapes.__class__(
                 self.use_str_not_dyn(a, default_value=default_value) for a in dynamic_shapes
             )
         if isinstance(dynamic_shapes, dict):
@@ -661,8 +659,6 @@ class ExportOptions:
                 k: self.use_str_not_dyn(v, default_value=default_value)
                 for k, v in dynamic_shapes.items()
             }
-        if isinstance(dynamic_shapes, set):
-            return {self.use_str_not_dyn(a, default_value=default_value) for a in dynamic_shapes}
         if not isinstance(dynamic_shapes, (int, str)) and dynamic_shapes is not None:
             self._c_use_str_not_dyn += 1
             return f"udim{self._c_use_str_not_dyn}"

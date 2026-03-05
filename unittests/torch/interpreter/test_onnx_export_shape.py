@@ -30,7 +30,9 @@ class TestOnnxExportShape(ExtTestCase):
     ) -> str:
         import torch
 
-        filename = f"{test_name}_{exporter}_{'dec' if decomposition else ''}.onnx"
+        filename = self.get_dump_file(
+            f"{test_name}_{exporter}_{'dec' if decomposition else ''}.onnx"
+        )
         if exporter == "script":
             torch.onnx.export(model, inputs, filename, opset_version=18)
         elif exporter == "dynamo":
@@ -51,9 +53,11 @@ class TestOnnxExportShape(ExtTestCase):
                 else None
             )
             if patch:
-                from yobx.torch_export_patches import torch_export_patches
+                from yobx.torch import apply_patches_for_model
 
-                with torch_export_patches():
+                with apply_patches_for_model(
+                    patch_torch=True, patch_transformers=True, model=model
+                ):
                     to_onnx(
                         model,
                         inputs,
@@ -111,7 +115,7 @@ class TestOnnxExportShape(ExtTestCase):
         )
         onx = onnx.load(model_path)
         shape_x = [d.dim_param for d in onx.graph.input[0].type.tensor_type.shape.dim]
-        self.assertEqual(shape_x, ["batch", "channel", "D0"])
+        self.assertEqual(["batch", "channel", "D0"], shape_x)
         sess = ExtendedReferenceEvaluator(model_path, verbose=0)
         feeds = dict(zip(sess.input_names, [x.numpy() for x in xs]))
         got = sess.run(None, feeds)[0]
@@ -231,7 +235,7 @@ class TestOnnxExportShape(ExtTestCase):
         shape_x = [
             d.dim_param or d.dim_value for d in onx.graph.input[0].type.tensor_type.shape.dim
         ]
-        self.assertEqual(shape_x, ["num_audios", 16, "num_last"])
+        self.assertEqual(["num_audios", 16, "num_last"], shape_x)
         sess = ExtendedReferenceEvaluator(model_path, verbose=0)
         feeds = dict(zip(sess.input_names, [x.numpy() for x in xs]))
         got = sess.run(None, feeds)[0]
@@ -275,7 +279,7 @@ class TestOnnxExportShape(ExtTestCase):
         shape_x = [
             d.dim_param or d.dim_value for d in onx.graph.input[0].type.tensor_type.shape.dim
         ]
-        self.assertEqual(shape_x, ["num_audios", 16, "num_last"])
+        self.assertEqual(["num_audios", 16, "num_last"], shape_x)
         sess = ExtendedReferenceEvaluator(model_path, verbose=0)
         feeds = dict(zip(sess.input_names, [x.numpy() for x in xs]))
         got = sess.run(None, feeds)[0]
@@ -321,7 +325,7 @@ class TestOnnxExportShape(ExtTestCase):
         shape_x = [
             d.dim_param or d.dim_value for d in onx.graph.input[0].type.tensor_type.shape.dim
         ]
-        self.assertEqual(shape_x, ["dx", 4])
+        self.assertEqual(["dx", 4], shape_x)
         sess = ExtendedReferenceEvaluator(model_path, verbose=0)
         feeds = dict(zip(sess.input_names, [x.numpy() for x in xs]))
         got = sess.run(None, feeds)[0]
@@ -355,7 +359,7 @@ class TestOnnxExportShape(ExtTestCase):
         self.assertEqual(["NonZero", "Transpose"], [n.op_type for n in onx.graph.node])
         self.assertEqual(onx.graph.output[0].name, "Y")
         shape_x = [d.dim_param for d in onx.graph.input[0].type.tensor_type.shape.dim]
-        self.assertEqual(shape_x, ["dx", "dy"])
+        self.assertEqual(["dx", "dy"], shape_x)
         shape_y = [
             d.dim_param or d.dim_value for d in onx.graph.output[0].type.tensor_type.shape.dim
         ]
@@ -367,7 +371,7 @@ class TestOnnxExportShape(ExtTestCase):
 
     def test_dynamic_01_dimension(self):
         import torch
-        from yobx.export_helpers import torch_export
+        from yobx.torch.export_helper import torch_export
 
         class Model(torch.nn.Module):
             def forward(self, x):

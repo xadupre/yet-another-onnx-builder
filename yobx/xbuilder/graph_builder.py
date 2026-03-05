@@ -308,8 +308,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self.dynamic_dimensions_source: Dict[str, Any] = {}
         self.dynamic_dimensions_source_flat: Optional[List[Any]] = None
         self.output_dynamic_dimensions_source_flat: Optional[List[Any]] = None
-        self.dynamic_shapes = self._pre_process_dynamic_shape(dynamic_shapes)
-        self.output_dynamic_shapes = self._pre_process_dynamic_shape(output_dynamic_shapes)
+        unique_names = set()
+        self.dynamic_shapes = self._pre_process_dynamic_shape(dynamic_shapes, unique_names)
+        self.output_dynamic_shapes = self._pre_process_dynamic_shape(
+            output_dynamic_shapes, unique_names
+        )
         self.dynamic_objects: Dict[str, Any] = {}
         self.dynamic_objects_rev: Dict[str, Any] = {}
         self.functions: Dict[Tuple[str, str], FunctionProto] = {}
@@ -574,11 +577,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     @classmethod
     def _pre_process_dynamic_shape(
-        cls,
-        dynamic_shapes: Optional[Union[Dict[str, Any], Tuple[Any]]] = None,
-        unique_names: Optional[Set[str]] = None,
+        cls, dynamic_shapes: Union[Dict[str, Any], Tuple[Any]], unique_names: Set[str]
     ) -> Any:
         """Replaces Hints by true DynamicShapes."""
+        assert unique_names is not None, "will lead to a bug"
         if not dynamic_shapes:
             return dynamic_shapes
         if isinstance(dynamic_shapes, str):
@@ -587,8 +589,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if isinstance(dynamic_shapes, cls.WrapDim):
             return dynamic_shapes
         if isinstance(dynamic_shapes, (tuple, list)):
-            processed = [cls._pre_process_dynamic_shape(i, unique_names) for i in dynamic_shapes]
-            return tuple(processed) if isinstance(dynamic_shapes, tuple) else processed
+            return dynamic_shapes.__class__(
+                cls._pre_process_dynamic_shape(i, unique_names) for i in dynamic_shapes
+            )
         if isinstance(dynamic_shapes, dict):
             return {
                 k: cls._pre_process_dynamic_shape(v, unique_names)
@@ -599,9 +602,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         if isinstance(dynamic_shapes, torch.export.dynamic_shapes._Dim):
             return dynamic_shapes
-        if unique_names is None:
-            unique_names = set()
-
         if dynamic_shapes in (torch.export.Dim.DYNAMIC, torch.export.Dim.AUTO):
             i = 0
             name = "DYN0"

@@ -1575,7 +1575,7 @@ def type_info(itype: int, att: str):
 
 def get_onnx_signature(model: onnx.ModelProto) -> Tuple[Tuple[str, Any], ...]:
     """
-    Produces a tuple of tuples correspinding to the signatures.
+    Produces a tuple of tuples corresponding to the signatures.
 
     :param model: model
     :return: signature

@@ -669,13 +669,13 @@ class TestOnnxExportSubModules(ExtTestCase):
         outputs include SymInt values mixed with tensors.
         """
         from yobx.torch_models.hghub import get_untrained_model_with_inputs
-        from yobx.torch_export_patches import torch_export_patches
+        from yobx.torch import apply_patches_for_model
 
         model_id = "arnir0/Tiny-LLM"
         data = get_untrained_model_with_inputs(model_id)
         model, inputs, ds = data["model"], data["inputs"], data["dynamic_shapes"]
 
-        with torch_export_patches(patch_transformers=True):
+        with apply_patches_for_model(patch_torch=True, patch_transformers=True, model=model):
             onx = to_onnx(
                 model,
                 (),
