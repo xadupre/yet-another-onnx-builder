@@ -5,7 +5,8 @@ Torch Export to ONNX
    :maxdepth: 1
 
    flatten
+   flatten_list
    input_observer
    patches
+   patches_list
 
-@copilot add code to produce the list of flattened classes and the list of the diff of the patches
