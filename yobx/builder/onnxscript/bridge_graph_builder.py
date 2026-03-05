@@ -175,9 +175,15 @@ class OnnxScriptGraphBuilder:
         new_args = []
         for a in args:
             if isinstance(a, str):
+                # Existing values are referenced by name; look up their ir.Value.
                 new_args.append(self._name_to_value[a])
+            elif a is None:
+                # Represent missing optional inputs as None, not as an initializer.
+                new_args.append(None)
             else:
-                new_args.append(self.make_initializer("", a))
+                # Create an initializer and pass its corresponding ir.Value to the op.
+                init_name = self.make_initializer("", a)
+                new_args.append(self._name_to_value[init_name])
         op = getattr(self._inner.op, op_type)
         output = op(*new_args, **kwargs)
         if isinstance(output, ir.Value):
