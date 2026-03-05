@@ -60,8 +60,5 @@ def sklearn_standard_scaler(
         res = g.op.Identity(centered, name=name, outputs=outputs)
     assert isinstance(res, str)  # type happiness
     if not sts:
-        g.set_type(res, g.get_type(X))
-        g.set_shape(res, g.get_shape(X))
-        if g.has_device(X):
-            g.set_device(res, g.get_device(X))
+        g.set_type_shape_unary_op(res, X)
     return res

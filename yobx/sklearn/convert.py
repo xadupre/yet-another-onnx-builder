@@ -18,10 +18,13 @@ def to_onnx(
 ):
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
+    By default, the first dimension is considered as dynamic,
+    the others are static.
 
     :param estimator: estimator
     :param args: dummy inputs
-    :param dynamic_shapes: dynamic shapes
+    :param dynamic_shapes: dynamic shapes, if not specified, the first dimension
+        is dynamic, the others are static
     :param target_opset: opset to use, it must be specified
     :param verbose: verbosity
     :param builder_cls: by default the graph builder is a
