@@ -52,7 +52,6 @@ from yobx import doc
 from yobx.xbuilder import FunctionOptions, GraphBuilder
 from yobx.sklearn import to_onnx
 
-
 # %%
 # Helper: map ONNX element type to a skl2onnx input-type descriptor
 # ------------------------------------------------------------------

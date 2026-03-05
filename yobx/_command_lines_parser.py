@@ -583,8 +583,6 @@ def get_parser_copilot_draft() -> ArgumentParser:
 def _cmd_copilot_draft(argv: List[Any]):
     import importlib
 
-    from .helpers.copilot import draft_converter_with_copilot
-
     parser = get_parser_copilot_draft()
     args = parser.parse_args(argv[1:])
 
@@ -606,6 +604,8 @@ def _cmd_copilot_draft(argv: List[Any]):
 
     token = args.token or None
     output_dir = args.output_dir or None
+
+    from .helpers.copilot import draft_converter_with_copilot
 
     draft_converter_with_copilot(
         estimator_class,

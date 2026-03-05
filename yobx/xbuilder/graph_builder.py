@@ -2326,6 +2326,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._known_value_shape[name] = value
 
     def unique_function_name(self, prefix: str) -> str:
+        """Returns a function which does not exist yet."""
         if prefix in self.functions:
             return prefix
         sug = prefix
