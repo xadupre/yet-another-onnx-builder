@@ -8,14 +8,16 @@ from ...xbuilder import GraphBuilder
 
 
 @register_tf_op_converter(("MatMul", "BatchMatMulV2", "BatchMatMul"))
-def convert_matmul(g: GraphBuilder, op, ctx: dict, verbose: int = 0) -> None:
+def convert_matmul(
+    g: GraphBuilder, sts: dict, outputs: list, op, verbose: int = 0
+) -> None:
     """Converts TF ``MatMul`` / ``BatchMatMulV2`` to ONNX ``MatMul``.
 
     TF's transpose flags (``transpose_a`` / ``transpose_b``) are honoured by
     inserting ONNX ``Transpose`` nodes when needed.
     """
-    a = ctx.get(op.inputs[0].name)
-    b = ctx.get(op.inputs[1].name)
+    a = sts.get(op.inputs[0].name)
+    b = sts.get(op.inputs[1].name)
     if a is None or b is None:
         if verbose:
             print(f"[MatMul] missing input(s) for op {op.name!r}")
@@ -30,6 +32,6 @@ def convert_matmul(g: GraphBuilder, op, ctx: dict, verbose: int = 0) -> None:
     if "transpose_b" in attr_names and op.get_attr("transpose_b"):
         b = g.op.Transpose(b, perm=[-1, -2], name=f"{op_name}_tB")
 
-    result = g.op.MatMul(a, b, name=op_name)
+    result = g.op.MatMul(a, b, outputs=outputs[:1], name=op_name)
     assert isinstance(result, str)
-    ctx[op.outputs[0].name] = result
+    sts[op.outputs[0].name] = result

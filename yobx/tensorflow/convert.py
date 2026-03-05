@@ -33,7 +33,8 @@ def to_onnx(
         (``""``), or a dictionary mapping domain names to opset versions
     :param verbose: verbosity level (0 = silent)
     :param extra_converters: optional mapping from TF op-type string to converter
-        function; entries here take priority over the built-in op converters
+        function with signature ``(g, sts, outputs, op, verbose=0)``;
+        entries here take priority over the built-in op converters
     :return: onnx model
     """
     import tensorflow as tf
@@ -162,7 +163,8 @@ def _convert_concrete_function(
                 )
             continue
 
-        fct(g, op, ctx, verbose=verbose)
+        op_outputs = [sanitize_name(t.name) for t in op.outputs]
+        fct(g, ctx, op_outputs, op, verbose=verbose)
 
     # ------------------------------------------------------------------
     # 4. Register ONNX outputs.

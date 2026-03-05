@@ -131,14 +131,14 @@ class TestTensorflowBaseConverters(ExtTestCase):
 
         called = []
 
-        def custom_relu_converter(g, op, ctx, verbose=0):
+        def custom_relu_converter(g, sts, outputs, op, verbose=0):
             """Override: apply Relu but also track the call."""
             called.append(True)
-            a = ctx.get(op.inputs[0].name)
+            a = sts.get(op.inputs[0].name)
             if a is not None:
-                result = g.op.Relu(a, name="custom_relu")
+                result = g.op.Relu(a, outputs=outputs[:1], name="custom_relu")
                 assert isinstance(result, str)
-                ctx[op.outputs[0].name] = result
+                sts[op.outputs[0].name] = result
 
         onx = to_onnx(model, (X,), extra_converters={"Relu": custom_relu_converter})
 
