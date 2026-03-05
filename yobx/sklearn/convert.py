@@ -14,6 +14,7 @@ def to_onnx(
     target_opset: int = 20,
     verbose: int = 0,
     builder_cls: Union[type, Callable] = GraphBuilder,
+    extra_converters: Optional[Dict[type, Callable]] = None,
 ):
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
@@ -27,13 +28,21 @@ def to_onnx(
         :class:`yobx.xbuilder.GraphBuilder` but any builder can
         be used as long it implements the apis :ref:`builder-api`
         and :ref:`builder-api-make`
+    :param extra_converters: optional mapping from estimator type to converter
+        function; entries here take priority over the built-in converters and
+        allow converting custom estimators that are not natively supported
     :return: onnx model
     """
     from . import register_sklearn_converters
 
     register_sklearn_converters()
     g = builder_cls(target_opset)
-    fct = get_sklearn_converter(type(estimator))
+
+    cls = type(estimator)
+    if extra_converters and cls in extra_converters:
+        fct = extra_converters[cls]
+    else:
+        fct = get_sklearn_converter(cls)
 
     if input_names:
         if len(input_names) != len(args):
