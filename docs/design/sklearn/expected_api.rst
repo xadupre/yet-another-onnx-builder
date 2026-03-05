@@ -141,11 +141,11 @@ In addition, it is usually useful to implement the following methods.
    * - ``g.set_type_shape_unary_op(name, input_name, itype: int = None)``
      - Defines shape, type, device for `name` equal the one defined for `input_name`, `itype` can be used the change the type
 
-The API should be extended to support common operations on shapes, ``+, -, //, *, %, min, max``,
-to make sure a concatenation leads to the same expression indenpendant from the GraphBuilder
-implementation.
-
-**... in progress...**
+The current does not include common operations on shapes, ``+, -, //, *, %, min, max``
+or even their simplification. This is usually needed to optimize models
+but not mandatory to write the model itself. This is left to the builder.
+Every converter must usually known the type, the device, the rank
+and sometimes if a dimension is static or dynamic.
 
 Shape and Type representation
 -----------------------------
@@ -156,7 +156,7 @@ This API follows ONNX standard.
 * A type is an integer: see `supported types <https://onnx.ai/onnx/intro/concepts.html#supported-types>`_.
 * A shape is a tuple, empty or filled with integers (static dimension) or strings (dynamic dimension).
 
-Additionnaly:
+Additionally:
 
 * A device is an integer, -1 for CPU, a value >= 0 for a CUDA device.
 * A rank is an integer and equal to ``len(shape)``.
