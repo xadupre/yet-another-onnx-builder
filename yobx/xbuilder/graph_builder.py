@@ -2325,6 +2325,17 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     def _set_known_value_shape(self, name: str, value: DYNAMIC_SHAPE):
         self._known_value_shape[name] = value
 
+    def unique_function_name(self, prefix: str) -> str:
+        if prefix in self.functions:
+            return prefix
+        sug = prefix
+        i = 0
+        while sug in self.functions:
+            i += 1
+            sug = f"{prefix}{i}"
+        self._unique_names.add(sug)
+        return sug
+
     def unique_dimension_name(self, prefix: str) -> str:
         """
         Returns a unique dimension name.
