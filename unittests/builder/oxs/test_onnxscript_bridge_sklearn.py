@@ -329,6 +329,7 @@ class TestOnnxScriptBridgeWithSklearnConverter(ExtTestCase):
         pipe.fit(X, y)
 
         onx = to_onnx(pipe, (X,), builder_cls=OnnxScriptGraphBuilder)
+        self.dump_onnx("test_pipeline_standard_scaler_logistic_regression.onnx", onx)
 
         # Check graph contains nodes from both steps
         op_types = [n.op_type for n in onx.graph.node]

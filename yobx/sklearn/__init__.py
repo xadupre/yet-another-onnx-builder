@@ -1,4 +1,5 @@
 from .convert import to_onnx
+from yobx.helpers.copilot import draft_converter_with_copilot
 
 
 def register_sklearn_converters():

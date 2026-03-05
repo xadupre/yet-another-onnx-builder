@@ -67,7 +67,11 @@ from ..xshape._shape_helper import (
     is_static_dimension,
     is_static_shape,
 )
-from ..xshape.shape_type_compute import set_shape_type_op_any, set_shape_type_custom
+from ..xshape.shape_type_compute import (
+    set_shape_type_op_any,
+    set_shape_type_custom,
+    set_type_shape_unary_op,
+)
 from ..xshape._builder_runtime import _BuilderRuntime
 from ..xshape._shape_runtime import _ShapeRuntime
 from ..xshape._inference_runtime import _InferenceRuntime
@@ -10117,3 +10121,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             f"Unable to evaluate expression with dimension={dimension!r}, "
             f"args={args!r}, constraints={self.constraints_}{self.get_debug_msg()}"
         )
+
+    def set_type_shape_unary_op(
+        self,
+        name: str,
+        input_name: str,
+        itype: Optional[int] = None,
+    ) -> bool:
+        set_type_shape_unary_op(self, name, input_name, itype)

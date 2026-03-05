@@ -5,6 +5,7 @@ from yobx.ext_test_case import ExtTestCase
 from yobx._command_lines_parser import (
     get_main_parser,
     get_parser_agg,
+    get_parser_copilot_draft,
     get_parser_dot,
     get_parser_find,
     get_parser_partition,
@@ -25,6 +26,7 @@ class TestCommandLines(ExtTestCase):
         text = st.getvalue()
         self.assertIn("agg", text)
         self.assertIn("dot", text)
+        self.assertIn("copilot-draft", text)
 
     def test_parser_print(self):
         st = StringIO()
@@ -81,6 +83,26 @@ class TestCommandLines(ExtTestCase):
                 "dynamo": {"attn_impl": "eager", "exporter": "onnx-dynamo", "opt": "ir"},
             },
         )
+
+    def test_parser_copilot_draft(self):
+        st = StringIO()
+        with redirect_stdout(st):
+            get_parser_copilot_draft().print_help()
+        text = st.getvalue()
+        self.assertIn("--dry-run", text)
+        self.assertIn("--token", text)
+        self.assertIn("--output-dir", text)
+
+    def test_parser_copilot_draft_args(self):
+        parser = get_parser_copilot_draft()
+        args = parser.parse_args(
+            ["sklearn.linear_model.Ridge", "--dry-run", "--token", "ghp_test", "-v", "1"]
+        )
+        self.assertEqual(args.estimator, "sklearn.linear_model.Ridge")
+        self.assertTrue(args.dry_run)
+        self.assertEqual(args.token, "ghp_test")
+        self.assertEqual(args.verbose, 1)
+        self.assertEqual(args.output_dir, "")
 
 
 if __name__ == "__main__":
