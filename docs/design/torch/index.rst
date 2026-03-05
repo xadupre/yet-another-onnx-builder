@@ -5,5 +5,8 @@ Torch Export to ONNX
    :maxdepth: 1
 
    flatten
+   flatten_list
    input_observer
    patches
+   patches_list
+

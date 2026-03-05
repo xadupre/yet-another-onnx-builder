@@ -216,3 +216,5 @@ docs/sg_execution_times.rst
 dump_test*
 onnxruntime_profile*
 *.onnx
+*.ep
+*.ep.graph
