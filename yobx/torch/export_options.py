@@ -467,6 +467,15 @@ class ExportOptions:
             f"(atol={atol}) diff={string_diff(diff)}"
         )
 
+    def export_as_aten_function(self, aten_name: Any) -> bool:
+        if not self.aten_as_function:
+            return False
+        if isinstance(self.aten_as_function, bool):
+            return self.aten_as_function
+        if isinstance(aten_name, str):
+            return aten_name in self.aten_as_function
+        return aten_name in self.aten_as_function or str(aten_name) in self.aten_as_function
+
 
 def _get_decomposition_table_by_name(
     name: str,

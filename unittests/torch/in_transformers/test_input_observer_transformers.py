@@ -6,8 +6,8 @@ from yobx.torch import register_flattening_functions, get_tiny_model
 from yobx.torch.input_observer import InputObserver
 from yobx.torch.in_transformers.cache_helper import make_dynamic_cache, make_encoder_decoder_cache
 
-# from onnx_diagnostic.export.api import to_onnx
-# from onnx_diagnostic.helpers.rt_helper import onnx_generate
+# from yobx.export.api import to_onnx
+# from yobx.helpers.rt_helper import onnx_generate
 
 onnx_generate = lambda *args, **kwargs: None
 to_onnx = lambda *args, **kwargs: None

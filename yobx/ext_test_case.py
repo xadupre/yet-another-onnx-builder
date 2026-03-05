@@ -879,7 +879,7 @@ class ExtTestCase(unittest.TestCase):
 
     @classmethod
     def to_onnx(self, *args, **kwargs) -> "ModelProto":  # noqa: F821
-        from yobx.torch_interpreter import to_onnx
+        from yobx.torch.interpreter import to_onnx
 
         return to_onnx(*args, **kwargs)
 
@@ -1334,3 +1334,34 @@ class ExtTestCase(unittest.TestCase):
         from .helpers import max_diff
 
         return max_diff(*args, **kwargs)
+
+    def assert_conversion_with_ort_on_cpu(
+        self,
+        onx: "onnx.ModelProto",  # noqa: F821
+        expected: Tuple["torch.Tensor", ...],  # noqa: F821
+        inputs: Tuple["torch.Tensor", ...],  # noqa: F821
+        atol: float = 0,
+        rtol: float = 0,
+        msg: Optional[str] = None,
+        use_python: bool = False,
+    ):
+        import onnxruntime
+        from .reference import ExtendedReferenceEvaluator
+
+        if use_python:
+            sess = ExtendedReferenceEvaluator(onx, verbose=10)
+            feeds = dict(zip(sess.input_names, [x.detach().numpy() for x in inputs]))
+        else:
+            sess = onnxruntime.InferenceSession(
+                onx.SerializeToString(), providers=["CPUExecutionProvider"]
+            )
+            feeds = dict(
+                zip([i.name for i in sess.get_inputs()], [x.detach().numpy() for x in inputs])
+            )
+        got = sess.run(None, feeds)
+        if len(got) == 1 and hasattr(expected, "shape"):
+            self.assertEqualArray(expected, got[0], atol=atol, rtol=rtol, msg=msg)
+        else:
+            self.assertEqual(len(expected), len(got))
+            for e, g in zip(expected, got):
+                self.assertEqualArray(e, g, atol=atol, rtol=rtol, msg=msg)

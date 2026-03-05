@@ -7,7 +7,7 @@ from onnx.checker import check_model
 from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
 
-# from yobx.torch_interpreter import to_onnx
+# from yobx.torch.interpreter import to_onnx
 to_onnx = None
 
 TFLOAT = TensorProto.FLOAT

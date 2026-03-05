@@ -321,7 +321,7 @@ def demo_mlp_model(filename: str) -> onnx.ModelProto:
         import torch
         from yobx.helpers.onnx_helper import pretty_onnx
         from yobx.xbuilder import OptimizationOptions
-        from yobx.torch_interpreter import to_onnx
+        from yobx.torch.interpreter import to_onnx
         from yobx.translate import translate
 
 
