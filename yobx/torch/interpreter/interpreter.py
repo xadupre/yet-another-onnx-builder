@@ -32,10 +32,10 @@ class DynamoInterpreter:
     :param graph_builder: a graph builder
     :param retriever: callable to help retrieve the weights in a module,
         see function `_retrieve
-        <experimental_experiment.torch_interpreter.onnx_export._retrieve>`.
-    :param dispatcher: see :class:`experimental_experiment.torch_interpreter.Dispatcher`
+        <yobx.torch.interpreter.onnx_export._retrieve>`.
+    :param dispatcher: see :class:`yobx.torch.interpreter.Dispatcher`
     :param export_options: see :class:`ExportOptions
-        <experimental_experiment.torch_interpreter.ExportOptions>`
+        <yobx.torch.interpreter.ExportOptions>`
     :param optimize_submodules: optimizes submodules after they are built
     :param submodule_naming: a function which returns a submodule name in the onnx graph
     :param parameter_naming: a function which returns a parameter name in the onnx graph
