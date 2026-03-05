@@ -1716,7 +1716,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         expected = model(*inputs)
 
-        with apply_patches_for_model(patch_torch=2):
+        with apply_patches_for_model(patch_torch=True):
             onx = to_onnx(
                 model,
                 inputs,

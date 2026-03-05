@@ -5,6 +5,7 @@ import onnx
 import numpy as np
 import torch
 from yobx.torch.in_transformers.cache_helper import make_dynamic_cache, CacheKeyValue
+from yobx.torch.flatten import register_flattening_functions
 from yobx.torch.patch import apply_patches_for_model
 from yobx.ext_test_case import (
     ExtTestCase,
@@ -528,7 +529,10 @@ class TestOnnxExportSignatures(ExtTestCase):
         dyn = {}
         sname = inspect.currentframe().f_code.co_name
         sig_tracing = "NOCHECK"
-        with apply_patches_for_model(patch_transformers=True):
+        with (
+            apply_patches_for_model(patch_transformers=True),
+            register_flattening_functions(patch_transformers=True),
+        ):
             inp2 = CacheKeyValue(inputs[2])
             self._check_exporter(
                 sname,

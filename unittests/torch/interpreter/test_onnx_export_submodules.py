@@ -668,14 +668,17 @@ class TestOnnxExportSubModules(ExtTestCase):
         (arnir0/Tiny-LLM, a LlamaForCausalLM model) where some submodule
         outputs include SymInt values mixed with tensors.
         """
-        from yobx.torch_models.hghub import get_untrained_model_with_inputs
-        from yobx.torch import apply_patches_for_model
+        from yobx.torch.tiny_models import get_tiny_model
+        from yobx.torch import apply_patches_for_model, register_flattening_functions
 
         model_id = "arnir0/Tiny-LLM"
-        data = get_untrained_model_with_inputs(model_id)
-        model, inputs, ds = data["model"], data["inputs"], data["dynamic_shapes"]
+        data = get_tiny_model(model_id)
+        model, inputs, ds = data.model, data.inputs, data.dynamic_shapes
 
-        with apply_patches_for_model(patch_torch=True, patch_transformers=True, model=model):
+        with (
+            apply_patches_for_model(patch_torch=True, patch_transformers=True, model=model),
+            register_flattening_functions(patch_transformers=True),
+        ):
             onx = to_onnx(
                 model,
                 (),

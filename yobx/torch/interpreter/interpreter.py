@@ -1827,7 +1827,8 @@ class DynamoInterpreter:
             res = fct(new_builder, can_set, output_names, *args, **kwargs)
         except AssertionError as e:
             raise AssertionError(
-                f"The conversion of operator {name_fct!r} into a local function\n--ERROR--\n"
+                f"The conversion of operator {name_fct!r} "
+                f"into a local function failed.\n--ERROR--\n"
                 f"{e}{self.builder.get_debug_msg()}"
             ) from e
 
