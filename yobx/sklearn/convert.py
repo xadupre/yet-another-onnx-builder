@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 from sklearn.base import BaseEstimator
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
@@ -13,6 +13,7 @@ def to_onnx(
     dynamic_shapes: Optional[Tuple[Dict[int, str]]] = None,
     target_opset: int = 20,
     verbose: int = 0,
+    extra_converters: Optional[Dict[type, Callable]] = None,
 ):
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
@@ -22,13 +23,20 @@ def to_onnx(
     :param dynamic_shapes: dynamic shapes
     :param target_opset: opset to use, it must be specified
     :param verbose: verbosity
+    :param extra_converters: optional mapping from estimator type to converter
+        function; entries here take priority over the built-in converters and
+        allow converting custom estimators that are not natively supported
     :return: onnx model
     """
     from . import register_sklearn_converters
 
     register_sklearn_converters()
     g = GraphBuilder(target_opset)
-    fct = get_sklearn_converter(type(estimator))
+    cls = type(estimator)
+    if extra_converters and cls in extra_converters:
+        fct = extra_converters[cls]
+    else:
+        fct = get_sklearn_converter(cls)
 
     if input_names:
         if len(input_names) != len(args):
