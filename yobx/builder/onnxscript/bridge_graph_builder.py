@@ -388,7 +388,7 @@ class OnnxScriptGraphBuilder:
             the ``ir.Value`` if it was not already inferred.
         :param shape: Optional shape hint; used to set / refine the shape on
             the ``ir.Value`` if not already inferred.
-        :param indexed: unsed
+        :param indexed: unused
         :param allow_untyped_output: allows output with no shape and/or no type
         :return: The name (or list of names), matching the *name* argument.
         """
