@@ -1,7 +1,50 @@
 Scikit-learn Export to ONNX
 ===========================
 
-@copilot include a picture of a pipeline
+.. runpython::
+    :rst:
+
+    import numpy as np
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.linear_model import LogisticRegression
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((20, 4)).astype(np.float32)
+    y = (X[:, 0] > 0).astype(np.int64)
+
+    pipe = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", LogisticRegression()),
+    ]).fit(X, y)
+
+    html = pipe._repr_html_()
+    print(".. raw:: html")
+    print()
+    for line in html.split("\n"):
+        print(f"    {line}")
+
+.. gdot::
+    :script: DOT-SECTION
+
+    import numpy as np
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.linear_model import LogisticRegression
+    from yobx.sklearn import to_onnx
+    from yobx.helpers.dot_helper import to_dot
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((20, 4)).astype(np.float32)
+    y = (X[:, 0] > 0).astype(np.int64)
+
+    pipe = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", LogisticRegression()),
+    ]).fit(X, y)
+
+    model = to_onnx(pipe, (X,))
+    print("DOT-SECTION", to_dot(model))
 
 Models based on :epkg:`scikit-learn` are made of a custom collection of known
 transformers or estimators. The main function functions has to call
