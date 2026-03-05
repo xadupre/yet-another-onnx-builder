@@ -6,9 +6,6 @@ import json
 import os
 import textwrap
 import unittest
-import urllib.error
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from threading import Thread
 from unittest.mock import MagicMock, patch
 
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
@@ -126,8 +123,7 @@ class TestBuildConverterPrompt(ExtTestCase):
 class TestDraftConverterWithCopilot(ExtTestCase):
     """Integration tests for draft_converter_with_copilot using mocked HTTP."""
 
-    _FAKE_CODE = textwrap.dedent(
-        """\
+    _FAKE_CODE = textwrap.dedent("""\
         from typing import Dict, List
         from sklearn.linear_model import Ridge
         from ..register import register_sklearn_converter
@@ -146,8 +142,7 @@ class TestDraftConverterWithCopilot(ExtTestCase):
             \"\"\"Converts Ridge into ONNX.\"\"\"
             assert isinstance(estimator, Ridge)
             return g.op.Gemm(X, estimator.coef_, estimator.intercept_, name=name, outputs=outputs)
-        """
-    ).strip()
+        """).strip()
 
     def _make_fake_completions_response(self):
         return json.dumps(
@@ -276,9 +271,8 @@ class TestDraftConverterWithCopilot(ExtTestCase):
 
         # Ensure env vars are unset
         env = {k: v for k, v in os.environ.items() if k not in ("GITHUB_TOKEN", "GH_TOKEN")}
-        with patch.dict(os.environ, env, clear=True):
-            with self.assertRaises(ValueError):
-                draft_converter_with_copilot(Ridge, token=None)
+        with patch.dict(os.environ, env, clear=True), self.assertRaises(ValueError):
+            draft_converter_with_copilot(Ridge, token=None)
 
     def test_token_from_env_var(self):
         """Token should be read from the GITHUB_TOKEN env var when not passed."""
@@ -298,9 +292,11 @@ class TestDraftConverterWithCopilot(ExtTestCase):
             mock_resp.__exit__ = MagicMock(return_value=False)
             return mock_resp
 
-        with patch.dict(os.environ, {"GITHUB_TOKEN": "env-fake-pat"}):
-            with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-                code = draft_converter_with_copilot(Ridge, dry_run=True)
+        with (
+            patch.dict(os.environ, {"GITHUB_TOKEN": "env-fake-pat"}),
+            patch("urllib.request.urlopen", side_effect=fake_urlopen),
+        ):
+            code = draft_converter_with_copilot(Ridge, dry_run=True)
         self.assertEqual(code, self._FAKE_CODE)
 
 

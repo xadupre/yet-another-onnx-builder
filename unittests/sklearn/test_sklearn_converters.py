@@ -245,7 +245,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(pipe.predict(X), label)
         self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
-
     def test_custom_estimator_with_extra_converters(self):
         from sklearn.base import BaseEstimator, TransformerMixin
         from yobx.sklearn import to_onnx
@@ -278,9 +277,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         est = ScaleByConstant(scale=3.0)
         est.fit(X)
 
-        onx = to_onnx(
-            est, (X,), extra_converters={ScaleByConstant: convert_scale_by_constant}
-        )
+        onx = to_onnx(est, (X,), extra_converters={ScaleByConstant: convert_scale_by_constant})
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Mul", op_types)
@@ -311,9 +308,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         ss = StandardScaler()
         ss.fit(X)
 
-        onx = to_onnx(
-            ss, (X,), extra_converters={StandardScaler: custom_scaler_converter}
-        )
+        onx = to_onnx(ss, (X,), extra_converters={StandardScaler: custom_scaler_converter})
 
         self.assertTrue(called, "custom converter was not called")
         op_types = [n.op_type for n in onx.graph.node]
