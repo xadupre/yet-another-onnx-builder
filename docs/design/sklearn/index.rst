@@ -1,13 +1,5 @@
-Scikit-learn Export to ONNX
+scikit-learn Export to ONNX
 ===========================
-
-.. toctree::
-   :maxdepth: 1
-
-   expected_api
-   sklearn_converter
-   custom_converter
-   copilot_draft
 
 A basic :epkg:`scikit-learn` model may look like the following,
 a scaler following by an estimator.
@@ -34,30 +26,6 @@ a scaler following by an estimator.
     print()
     for line in html.split("\n"):
         print(f"    {line}")
-
-And we expect its conversion into ONNX to look like the following.
-
-.. gdot::
-    :script: DOT-SECTION
-
-    import numpy as np
-    from sklearn.pipeline import Pipeline
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.linear_model import LogisticRegression
-    from yobx.sklearn import to_onnx
-    from yobx.helpers.dot_helper import to_dot
-
-    rng = np.random.default_rng(0)
-    X = rng.standard_normal((20, 4)).astype(np.float32)
-    y = (X[:, 0] > 0).astype(np.int64)
-
-    pipe = Pipeline([
-        ("scaler", StandardScaler()),
-        ("clf", LogisticRegression()),
-    ]).fit(X, y)
-
-    model = to_onnx(pipe, (X,))
-    print("DOT-SECTION", to_dot(model))
 
 Models based on :epkg:`scikit-learn` are made of a custom collection of known
 transformers or estimators. The main function functions has to call
@@ -88,3 +56,58 @@ Known LLMs now provides a good first draft when it comes to implement a new conv
 for a model not already covered but this library. This package includes
 a function able to query *Copilot* to get that first draft.
 That saves quite some time.
+
+.. toctree::
+   :maxdepth: 1
+
+   expected_api
+   sklearn_converter
+   supported_converters
+   custom_converter
+   copilot_draft
+
+Finally, the example given at the top of the page would be converted
+into the mode which follows.
+
+.. code-block:: python
+
+    import numpy as np
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.linear_model import LogisticRegression
+    from yobx.sklearn import to_onnx
+    from yobx.helpers.dot_helper import to_dot
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((20, 4)).astype(np.float32)
+    y = (X[:, 0] > 0).astype(np.int64)
+
+    pipe = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", LogisticRegression()),
+    ]).fit(X, y)
+
+    model = to_onnx(pipe, (X,))
+    print("DOT-SECTION", to_dot(model))    
+
+.. gdot::
+    :script: DOT-SECTION
+
+    import numpy as np
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.linear_model import LogisticRegression
+    from yobx.sklearn import to_onnx
+    from yobx.helpers.dot_helper import to_dot
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((20, 4)).astype(np.float32)
+    y = (X[:, 0] > 0).astype(np.int64)
+
+    pipe = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", LogisticRegression()),
+    ]).fit(X, y)
+
+    model = to_onnx(pipe, (X,))
+    print("DOT-SECTION", to_dot(model))

@@ -320,6 +320,11 @@ dependency patch that replaces
 ``transformers.modeling_rope_utils.dynamic_rope_update`` with a traceable
 version.
 
+List of Patches
+===============
+
+See :ref:`patches-torch`.
+
 .. seealso::
 
     :ref:`l-design-flatten` — registering pytree nodes for ``DynamicCache``

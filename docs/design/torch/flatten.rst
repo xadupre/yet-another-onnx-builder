@@ -277,6 +277,11 @@ preserved:
         print("layer types:", [type(layer).__name__ for layer in rebuilt.layers])
         print("sliding_window:", rebuilt.layers[1].sliding_window)
 
+List of supported classes
+-------------------------
+
+See :ref:`flattened-classes`.
+
 .. seealso::
 
     :ref:`l-plot-flattening` — sphinx-gallery example demonstrating
