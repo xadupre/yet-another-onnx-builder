@@ -246,5 +246,80 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
 
+    def test_custom_estimator_with_extra_converters(self):
+        from sklearn.base import BaseEstimator, TransformerMixin
+        from yobx.sklearn import to_onnx
+
+        class ScaleByConstant(TransformerMixin, BaseEstimator):
+            """Custom transformer that multiplies inputs by a constant."""
+
+            def __init__(self, scale=2.0):
+                self.scale = scale
+
+            def fit(self, X, y=None):
+                return self
+
+            def transform(self, X):
+                return X * self.scale
+
+        def convert_scale_by_constant(g, sts, outputs, estimator, X, name="scale"):
+            import numpy as np
+
+            scale = np.array([estimator.scale], dtype=np.float32)
+            res = g.op.Mul(X, scale, name=name, outputs=outputs)
+            if not sts:
+                g.set_type(res, g.get_type(X))
+                g.set_shape(res, g.get_shape(X))
+                if g.has_device(X):
+                    g.set_device(res, g.get_device(X))
+            return res
+
+        X = np.array([[1, 2], [3, 4]], dtype=np.float32)
+        est = ScaleByConstant(scale=3.0)
+        est.fit(X)
+
+        onx = to_onnx(
+            est, (X,), extra_converters={ScaleByConstant: convert_scale_by_constant}
+        )
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Mul", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X": X})[0]
+        expected = est.transform(X).astype(np.float32)
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_extra_converters_overrides_builtin(self):
+        """extra_converters entries take priority over built-in converters."""
+        from sklearn.preprocessing import StandardScaler
+        from yobx.sklearn import to_onnx
+
+        called = []
+
+        def custom_scaler_converter(g, sts, outputs, estimator, X, name="scaler"):
+            called.append(True)
+            res = g.op.Identity(X, name=name, outputs=outputs)
+            if not sts:
+                g.set_type(res, g.get_type(X))
+                g.set_shape(res, g.get_shape(X))
+                if g.has_device(X):
+                    g.set_device(res, g.get_device(X))
+            return res
+
+        X = np.array([[1, 2], [3, 4]], dtype=np.float32)
+        ss = StandardScaler()
+        ss.fit(X)
+
+        onx = to_onnx(
+            ss, (X,), extra_converters={StandardScaler: custom_scaler_converter}
+        )
+
+        self.assertTrue(called, "custom converter was not called")
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Identity", op_types)
+        self.assertNotIn("Sub", op_types)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
