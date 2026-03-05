@@ -449,7 +449,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         onx = to_onnx(mlp, (X,))
 
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("Gemm", op_types)
+        self.assertIn("MatMul", op_types)
         self.assertIn("Sigmoid", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -471,7 +471,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         onx = to_onnx(mlp, (X,))
 
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("Gemm", op_types)
+        self.assertIn("MatMul", op_types)
         self.assertIn("Softmax", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -514,7 +514,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         onx = to_onnx(mlp, (X,))
 
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("Gemm", op_types)
+        self.assertIn("MatMul", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -535,7 +535,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         onx = to_onnx(mlp, (X,))
 
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("Gemm", op_types)
+        self.assertIn("MatMul", op_types)
         self.assertIn("Tanh", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -565,7 +565,7 @@ class TestSklearnBaseConverters(ExtTestCase):
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Sub", op_types)
-        self.assertIn("Gemm", op_types)
+        self.assertIn("MatMul", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

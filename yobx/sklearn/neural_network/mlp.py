@@ -1,85 +1,179 @@
-from typing import Tuple, Dict, List, Union
-import numpy as np
+import copy
+from typing import Tuple, Dict, List
+
 import onnx
+import onnx.helper as oh
+from onnx import shape_inference
 from sklearn.neural_network import MLPClassifier, MLPRegressor
+
 from ..register import register_sklearn_converter
 from ...xbuilder import GraphBuilder
 
 
-def _apply_activation(g: GraphBuilder, x: str, activation: str, name: str) -> str:
+# Operator attributes that must always be set explicitly because the yobx
+# optimizer patterns cannot handle ONNX-spec defaults (i.e. the absence of
+# the attribute).  Maps op_type -> {attr_name: default_value}.
+_REQUIRED_ATTRS: Dict[str, Dict[str, int]] = {
+    "Softmax": {"axis": -1},
+    "LogSoftmax": {"axis": -1},
+    "Hardmax": {"axis": -1},
+}
+
+
+def _ensure_required_attrs(node: onnx.NodeProto) -> onnx.NodeProto:
     """
-    Applies the given activation function to *x* and returns the result name.
+    Return a (possibly modified) copy of *node* with all required
+    attributes present.  Some yobx optimizer patterns call
+    ``get_attribute(node, attr, exc=True)`` and raise an
+    :exc:`AssertionError` when the attribute is missing even though it has
+    a well-defined ONNX default value.  Adding the attribute explicitly
+    prevents those assertion errors.
 
-    Supported activations:
-
-    * ``'relu'`` → ``Relu``
-    * ``'tanh'`` → ``Tanh``
-    * ``'logistic'`` → ``Sigmoid``
-    * ``'identity'`` → ``Identity`` (pass-through)
-
-    :param g: the graph builder
-    :param x: input tensor name
-    :param activation: activation name as stored in the sklearn estimator
-    :param name: node name prefix
-    :return: output tensor name
+    :param node: the original NodeProto (not modified in-place)
+    :return: the same node if no attributes needed to be added, otherwise
+        a deep copy with the missing attributes appended
     """
-    if activation == "relu":
-        return g.op.Relu(x, name=name)
-    if activation == "tanh":
-        return g.op.Tanh(x, name=name)
-    if activation in ("logistic", "sigmoid"):
-        return g.op.Sigmoid(x, name=name)
-    if activation == "identity":
-        return g.op.Identity(x, name=name)
+    defaults = _REQUIRED_ATTRS.get(node.op_type)
+    if not defaults:
+        return node
+    existing = {a.name for a in node.attribute}
+    missing = {k: v for k, v in defaults.items() if k not in existing}
+    if not missing:
+        return node
+    node_copy = copy.deepcopy(node)
+    for attr_name, attr_val in missing.items():
+        node_copy.attribute.append(oh.make_attribute(attr_name, attr_val))
+    return node_copy
+
+
+def _to_skl2onnx_input_type(elem_type: int, n_features: int):
+    """
+    Convert an ONNX ``elem_type`` integer into the matching skl2onnx input-type
+    object for ``initial_types``.
+
+    :param elem_type: ONNX element type (e.g. ``onnx.TensorProto.FLOAT``)
+    :param n_features: number of input features
+    :return: ``FloatTensorType`` or ``DoubleTensorType`` instance
+    :raises NotImplementedError: for unsupported element types
+    """
+    from skl2onnx.common.data_types import DoubleTensorType, FloatTensorType
+
+    if elem_type == onnx.TensorProto.FLOAT:
+        return FloatTensorType([None, n_features])
+    if elem_type == onnx.TensorProto.DOUBLE:
+        return DoubleTensorType([None, n_features])
     raise NotImplementedError(
-        f"Activation {activation!r} is not supported. "
-        "Supported activations: 'relu', 'tanh', 'logistic', 'identity'."
+        f"Input elem_type {elem_type} is not supported. "
+        "Only FLOAT (1) and DOUBLE (11) are supported by the skl2onnx MLP converter."
     )
 
 
-def _forward_hidden_layers(
+def _inject_skl2onnx_nodes(
     g: GraphBuilder,
-    X: str,
-    coefs: List[np.ndarray],
-    intercepts: List[np.ndarray],
-    activation: str,
-    dtype,
+    onx_model: onnx.ModelProto,
+    x_name: str,
+    output_mapping: Dict[str, str],
+    skip_op_types: set,
     name: str,
-) -> str:
+) -> None:
     """
-    Emits ONNX nodes for all hidden layers of an MLP.
+    Injects all nodes and initializers from a :epkg:`sklearn-onnx`
+    :class:`onnx.ModelProto` into an existing :class:`GraphBuilder`.
 
-    Each hidden layer *i* computes::
+    The function performs the following steps:
 
-        h_i = activation(Gemm(h_{i-1}, coefs[i], intercepts[i]))
+    1. Runs ONNX shape inference on *onx_model* to populate
+       ``graph.value_info`` with element-type information for every
+       intermediate result.
+    2. Adds all initializers from *onx_model* under prefixed names.
+    3. Adds all nodes from *onx_model* (except those whose ``op_type`` is in
+       *skip_op_types*), renaming inputs and outputs according to
+       *output_mapping* and a freshly generated unique-name prefix.
+    4. Propagates element-type information from the shape-inferred
+       ``value_info`` so that the yobx optimizer patterns can inspect tensor
+       types without raising errors.
 
-    sklearn MLP coefficient matrices are already stored in ``(in_features,
-    out_features)`` order, so no ``transB`` transpose is required.
-
-    The input layer (index 0) reads from *X*.  The *last* weight/bias pair
-    (``coefs[-1]`` / ``intercepts[-1]``) is **not** processed here; it is
-    handled by the caller together with the output activation.
-
-    :param g: graph builder
-    :param X: name of the input tensor
-    :param coefs: list of all weight matrices (including the output layer)
-    :param intercepts: list of all bias vectors (including the output layer)
-    :param activation: hidden-layer activation name
-    :param dtype: numpy dtype matching the input tensor
-    :param name: node name prefix
-    :return: name of the last hidden-layer output tensor
+    :param g: target graph builder
+    :param onx_model: ONNX model produced by :epkg:`sklearn-onnx`
+    :param x_name: name of the input tensor already registered in *g*
+    :param output_mapping: mapping from skl2onnx tensor names (which should
+        map to specific outputs) to the desired result names in *g*
+    :param skip_op_types: set of operator type strings to omit (e.g.
+        ``{'ZipMap'}`` for classifiers)
+    :param name: node-name prefix used for all injected nodes
     """
-    h = X
-    # Iterate over hidden layers only (all but the last weight matrix).
-    for i, (coef, bias) in enumerate(zip(coefs[:-1], intercepts[:-1])):
-        linear = g.op.Gemm(
-            h,
-            coef.astype(dtype),
-            bias.astype(dtype),
-            name=f"{name}_layer{i}",
+    # Run ONNX shape inference so that value_info is populated with types.
+    onx_model = shape_inference.infer_shapes(onx_model)
+
+    skl_input_name = onx_model.graph.input[0].name
+
+    # Build the renaming table: skl2onnx name → target name in g.
+    renaming: Dict[str, str] = {skl_input_name: x_name}
+    renaming.update(output_mapping)
+
+    def rename(orig: str) -> str:
+        if orig in renaming:
+            return renaming[orig]
+        new_name = g.unique_name(f"{name}_{orig}")
+        renaming[orig] = new_name
+        return new_name
+
+    # Collect element-type information for all tensors (after shape inference).
+    type_info: Dict[str, int] = {}
+    for vi in (
+        list(onx_model.graph.value_info)
+        + list(onx_model.graph.output)
+        + list(onx_model.graph.input)
+    ):
+        if vi.type.HasField("tensor_type") and vi.type.tensor_type.elem_type:
+            type_info[vi.name] = vi.type.tensor_type.elem_type
+    for init in onx_model.graph.initializer:
+        type_info[init.name] = init.data_type
+
+    # --- Initializers ---
+    for init in onx_model.graph.initializer:
+        new_name = rename(init.name)
+        init_copy = copy.deepcopy(init)
+        init_copy.name = new_name
+        g.add_initializer(
+            new_name,
+            init_copy,
+            itype=init.data_type,
+            shape=tuple(init.dims),
+            source="_inject_skl2onnx_nodes",
         )
-        h = _apply_activation(g, linear, activation, name=f"{name}_act{i}")
-    return h
+
+    # Register non-default opset domains (e.g. ai.onnx.ml).
+    for opset in onx_model.opset_import:
+        if opset.domain and opset.domain not in g.opsets:
+            g.opsets[opset.domain] = opset.version
+
+    # --- Nodes ---
+    for node in onx_model.graph.node:
+        if node.op_type in skip_op_types:
+            continue
+        # Ensure all attributes that must be explicit are present.
+        node = _ensure_required_attrs(node)
+        new_inputs = [rename(i) if i else "" for i in node.input]
+        new_outputs = [rename(o) if o else "" for o in node.output]
+        g.make_node(
+            node.op_type,
+            new_inputs,
+            new_outputs,
+            domain=node.domain or "",
+            attributes=list(node.attribute),
+            name=name,
+        )
+        # Propagate element types so that optimizer patterns can inspect them.
+        for orig_o, new_o in zip(node.output, new_outputs):
+            if orig_o in type_info and type_info[orig_o]:
+                try:
+                    g.set_type(new_o, type_info[orig_o])
+                except AssertionError:
+                    # set_type raises AssertionError when the type is already
+                    # known and conflicts; skip silently since GraphBuilder's own
+                    # type inference may already have set a consistent type.
+                    pass
 
 
 @register_sklearn_converter((MLPClassifier,))
@@ -92,31 +186,19 @@ def sklearn_mlp_classifier(
     name: str = "mlp_classifier",
 ) -> Tuple[str, str]:
     """
-    Converts a :class:`sklearn.neural_network.MLPClassifier` into ONNX.
+    Converts a :class:`sklearn.neural_network.MLPClassifier` into ONNX
+    by delegating to the :epkg:`sklearn-onnx` (``skl2onnx``) converter.
 
-    The graph mirrors the forward pass of sklearn's MLP, applying ``Gemm``
-    for each fully-connected layer followed by the hidden activation, and
-    finally the output activation (``Softmax`` for multi-class,
-    ``Sigmoid`` + ``Concat`` for binary):
+    The sklearn-onnx conversion is used as the reference implementation.
+    Its output is injected into the current :class:`GraphBuilder` with
+    appropriate input / output name remapping.
 
-    **Binary** (``out_activation_ == 'logistic'``):
+    The ``ZipMap`` node (which produces a sequence-of-maps probability
+    output used by sklearn-onnx) is discarded; the upstream probability
+    tensor (a plain ``[N, n_classes]`` float matrix) is exposed directly
+    as ``outputs[1]`` instead.
 
-    .. code-block:: text
-
-        X ──hidden layers──► h
-           ──Gemm(coefs[-1], intercepts[-1])──► raw
-           ──Sigmoid──► proba_pos
-           ──Sub(1, ·) + Concat──► probabilities  ──ArgMax──Cast──Gather──► label
-
-    **Multi-class** (``out_activation_ == 'softmax'``):
-
-    .. code-block:: text
-
-        X ──hidden layers──► h
-           ──Gemm(coefs[-1], intercepts[-1])──► raw
-           ──Softmax──► probabilities  ──ArgMax──Cast──Gather──► label
-
-    :param g: graph builder
+    :param g: graph builder to add nodes to
     :param sts: shapes defined by :epkg:`scikit-learn`
     :param outputs: desired output names ``[label, probabilities]``
     :param estimator: a fitted ``MLPClassifier``
@@ -129,81 +211,39 @@ def sklearn_mlp_classifier(
     ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
+    from skl2onnx import convert_sklearn
+
     itype = g.get_type(X)
-    dtype = g.onnx_dtype_to_np_dtype(itype)
+    n_features = estimator.coefs_[0].shape[0]
 
-    coefs = estimator.coefs_
-    intercepts = estimator.intercepts_
-    hidden_activation = estimator.activation
-    out_activation = estimator.out_activation_
-    classes = estimator.classes_
-
-    # ------------------------------------------------------------------ #
-    # Hidden layers                                                        #
-    # ------------------------------------------------------------------ #
-    h = _forward_hidden_layers(g, X, coefs, intercepts, hidden_activation, dtype, name)
-
-    # ------------------------------------------------------------------ #
-    # Output layer: linear part                                           #
-    # ------------------------------------------------------------------ #
-    raw = g.op.Gemm(
-        h,
-        coefs[-1].astype(dtype),
-        intercepts[-1].astype(dtype),
-        name=f"{name}_out",
+    onx = convert_sklearn(
+        estimator,
+        initial_types=[("X", _to_skl2onnx_input_type(itype, n_features))],
     )
 
-    # ------------------------------------------------------------------ #
-    # Output activation + probabilities                                   #
-    # ------------------------------------------------------------------ #
-    is_binary = out_activation == "logistic"
+    # Find the probability tensor (the input consumed by ZipMap).
+    prob_tensor = next(
+        (node.input[0] for node in onx.graph.node if node.op_type == "ZipMap"),
+        None,
+    )
+    assert prob_tensor is not None, (
+        "sklearn-onnx did not produce a ZipMap node for MLPClassifier; "
+        "cannot locate the probability tensor."
+    )
 
-    if is_binary:
-        proba_pos = g.op.Sigmoid(raw, name=f"{name}_sigmoid")
-        proba_neg = g.op.Sub(
-            np.array([1], dtype=dtype), proba_pos, name=f"{name}_neg"
-        )
-        proba = g.op.Concat(
-            proba_neg, proba_pos, axis=-1, name=f"{name}_concat", outputs=outputs[1:]
-        )
-    else:
-        # Softmax (or any other out_activation treated as softmax for classifiers)
-        proba = g.op.Softmax(raw, axis=1, name=f"{name}_softmax", outputs=outputs[1:])
+    _inject_skl2onnx_nodes(
+        g,
+        onx,
+        X,
+        output_mapping={
+            "output_label": outputs[0],
+            prob_tensor: outputs[1],
+        },
+        skip_op_types={"ZipMap"},
+        name=name,
+    )
 
-    assert isinstance(proba, str)
-
-    # ------------------------------------------------------------------ #
-    # Label: ArgMax + Gather over classes                                 #
-    # ------------------------------------------------------------------ #
-    label_idx = g.op.ArgMax(proba, axis=1, keepdims=0, name=f"{name}_argmax")
-    label_idx_cast = g.op.Cast(label_idx, to=onnx.TensorProto.INT64, name=f"{name}_cast")
-
-    if np.issubdtype(classes.dtype, np.integer):
-        classes_arr = classes.astype(np.int64)
-        label = g.op.Gather(
-            classes_arr,
-            label_idx_cast,
-            axis=0,
-            name=f"{name}_label",
-            outputs=outputs[:1],
-        )
-        assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.INT64)
-    else:
-        classes_arr = np.array(classes.astype(str))
-        label = g.op.Gather(
-            classes_arr,
-            label_idx_cast,
-            axis=0,
-            name=f"{name}_label_string",
-            outputs=outputs[:1],
-        )
-        assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.STRING)
-
-    return label, proba
+    return outputs[0], outputs[1]
 
 
 @register_sklearn_converter((MLPRegressor,))
@@ -216,18 +256,14 @@ def sklearn_mlp_regressor(
     name: str = "mlp_regressor",
 ) -> str:
     """
-    Converts a :class:`sklearn.neural_network.MLPRegressor` into ONNX.
+    Converts a :class:`sklearn.neural_network.MLPRegressor` into ONNX
+    by delegating to the :epkg:`sklearn-onnx` (``skl2onnx``) converter.
 
-    The graph mirrors the forward pass of sklearn's MLP, applying ``Gemm``
-    for each fully-connected layer followed by the hidden activation,
-    and finally the output activation (typically ``identity`` for regression):
+    The sklearn-onnx conversion is used as the reference implementation.
+    Its output is injected into the current :class:`GraphBuilder` with
+    appropriate input / output name remapping.
 
-    .. code-block:: text
-
-        X ──hidden layers──► h
-           ──Gemm(coefs[-1], intercepts[-1])──► raw  ──[out_activation]──► predictions
-
-    :param g: graph builder
+    :param g: graph builder to add nodes to
     :param sts: shapes defined by :epkg:`scikit-learn`
     :param outputs: desired output names ``[predictions]``
     :param estimator: a fitted ``MLPRegressor``
@@ -240,40 +276,25 @@ def sklearn_mlp_regressor(
     ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
+    from skl2onnx import convert_sklearn
+
     itype = g.get_type(X)
-    dtype = g.onnx_dtype_to_np_dtype(itype)
+    n_features = estimator.coefs_[0].shape[0]
 
-    coefs = estimator.coefs_
-    intercepts = estimator.intercepts_
-    hidden_activation = estimator.activation
-    out_activation = estimator.out_activation_
+    onx = convert_sklearn(
+        estimator,
+        initial_types=[("X", _to_skl2onnx_input_type(itype, n_features))],
+    )
 
-    # ------------------------------------------------------------------ #
-    # Hidden layers                                                        #
-    # ------------------------------------------------------------------ #
-    h = _forward_hidden_layers(g, X, coefs, intercepts, hidden_activation, dtype, name)
+    last_output = onx.graph.output[0].name
 
-    # ------------------------------------------------------------------ #
-    # Output layer                                                         #
-    # ------------------------------------------------------------------ #
-    if out_activation == "identity":
-        result = g.op.Gemm(
-            h,
-            coefs[-1].astype(dtype),
-            intercepts[-1].astype(dtype),
-            name=f"{name}_out",
-            outputs=outputs,
-        )
-    else:
-        raw = g.op.Gemm(
-            h,
-            coefs[-1].astype(dtype),
-            intercepts[-1].astype(dtype),
-            name=f"{name}_out",
-        )
-        result = _apply_activation(g, raw, out_activation, name=f"{name}_out_act")
-        # Rename to the desired output name.
-        result = g.op.Identity(result, name=f"{name}_identity", outputs=outputs)
+    _inject_skl2onnx_nodes(
+        g,
+        onx,
+        X,
+        output_mapping={last_output: outputs[0]},
+        skip_op_types=set(),
+        name=name,
+    )
 
-    assert isinstance(result, str)
-    return result
+    return outputs[0]
