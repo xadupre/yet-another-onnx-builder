@@ -99,7 +99,8 @@ Shape and type API
 Converters are expected to propagate shape and type information after each
 node so that downstream converters (e.g. pipeline steps) can query them
 without re-running inference. The model may be different given that information.
-The required methods are:
+Below, the required methods are where ``g`` defines the ``GraphBuilder``
+implemented the expected API.
 
 .. list-table::
    :header-rows: 1
@@ -139,6 +140,26 @@ In addition, it is usually useful to implement the following methods.
        anywhere in the graph.
    * - ``g.set_type_shape_unary_op(name, input_name, itype: int = None)``
      - Defines shape, type, device for `name` equal the one defined for `input_name`, `itype` can be used the change the type
+
+The API should be extended to support common operations on shapes, ``+, -, //, *, %, min, max``,
+to make sure a concatenation leads to the same expression indenpendant from the GraphBuilder
+implementation.
+
+**... in progress...**
+
+Shape and Type representation
+-----------------------------
+
+This API follows ONNX standard.
+
+* A name is a string: it is a unique identifier.
+* A type is an integer: see `supported types <https://onnx.ai/onnx/intro/concepts.html#supported-types>`_.
+* A shape is a tuple, empty or filled with integers (static dimension) or strings (dynamic dimension).
+
+Additionnaly:
+
+* A device is an integer, -1 for CPU, a value >= 0 for a CUDA device.
+* A rank is an integer and equal to ``len(shape)``.
 
 Propagating shape and type in a converter
 -----------------------------------------

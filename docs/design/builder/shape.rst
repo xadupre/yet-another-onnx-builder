@@ -397,47 +397,8 @@ Every shape function receives two arguments:
   instance that holds all currently known shapes, types, ranks, and devices.
 * ``node`` — the :class:`onnx.NodeProto` being processed.
 
-The function must call the appropriate setters on ``g`` for every output of
-the node, then return a truthy value (typically the computed shape or
-``True``) to signal success, or ``None`` to signal that no shape could be
-determined.
-
-Key methods available on ``g``
---------------------------------
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 75
-
-   * - Method
-     - Description
-   * - ``g.has_shape(name)``
-     - Returns ``True`` if the shape is known for result ``name``.
-   * - ``g.get_shape(name)``
-     - Returns the shape as a tuple of integers / symbolic strings.
-   * - ``g.set_shape(name, shape)``
-     - Stores the computed shape for result ``name``.
-   * - ``g.has_type(name)``
-     - Returns ``True`` if the element type is known for result ``name``.
-   * - ``g.get_type(name)``
-     - Returns the element type as an ONNX integer
-       (e.g. ``onnx.TensorProto.FLOAT == 1``).
-   * - ``g.set_type(name, itype)``
-     - Stores the element type for result ``name``.
-   * - ``g.has_rank(name)``
-     - Returns ``True`` if the rank (number of dimensions) is known.
-   * - ``g.get_rank(name)``
-     - Returns the rank as an integer.
-   * - ``g.set_rank(name, rank)``
-     - Stores the rank when the full shape is not yet known.
-   * - ``g.has_device(name)``
-     - Returns ``True`` if a device is known for result ``name``.
-   * - ``g.get_device(name)``
-     - Returns the device as an integer (``-1`` for CPU, index for GPU).
-   * - ``g.set_device(name, device)``
-     - Propagates the device to result ``name``.     
-
-A minimal shape function should:
+A minimal shape function expects to see the following API :ref:`l-design-expected-api`
+and it should do:
 
 1. **Propagate device** — if ``g.has_device(input)`` is true, copy the
    device to the output with ``set_device``.

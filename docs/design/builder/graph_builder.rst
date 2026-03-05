@@ -161,54 +161,7 @@ Shape and type tracking
 :class:`ShapeBuilder <yobx.xshape.ShapeBuilder>` interface.  Shapes and types
 are registered for every intermediate result as nodes are added, and are used
 during optimization and for populating ``value_info`` in the exported proto.
-
-Key methods:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 30 70
-
-   * - Method
-     - Description
-   * - ``g.set_shape(name, shape)``
-     - Register the shape of result ``name``.
-       Shape dimensions may be integers (static) or strings (symbolic).
-   * - ``g.get_shape(name)``
-     - Return the shape as a tuple of integers / symbolic strings.
-   * - ``g.has_shape(name)``
-     - Return ``True`` if the shape is already known.
-   * - ``g.set_type(name, itype)``
-     - Register the element type (an ONNX ``TensorProto.*`` integer).
-   * - ``g.get_type(name)``
-     - Return the element type.
-   * - ``g.has_type(name)``
-     - Return ``True`` if the element type is already known.
-   * - ``g.set_rank(name, rank)``
-     - Register only the rank when the full shape is not yet available.
-   * - ``g.get_rank(name)``
-     - Return the rank as an integer.
-   * - ``g.has_rank(name)``
-     - Return ``True`` if the rank is known.
-   * - ``g.set_device(name, device)``
-     - Register the device for result ``name``.
-       ``-1`` denotes CPU; non-negative integers are GPU indices.
-   * - ``g.get_device(name)``
-     - Return the device as an integer (``-1`` for CPU).
-   * - ``g.has_device(name)``
-     - Return ``True`` if a device is known for result ``name``.
-
-Optional but usually needed:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 75
-
-   * - ``g.unique_name(prefix)``
-     - Returns a unique name starting with prefix and not already taken.
-   * - ``g.get_attribute_with_default(node, attr, default)``
-     - Convenience helper to read a node attribute with a fallback default.
-   * - ``g.set_type_shape_unary_op(name, input_name, itype: int = None)``
-     - Defines shape, type, device for `name` equal the one defined for `input_name`, `itype` can be used the change the type
+See :ref:`l-design-expected-api`.
 
 Dynamic shapes
 ==============
