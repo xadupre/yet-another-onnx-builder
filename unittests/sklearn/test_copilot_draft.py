@@ -1,5 +1,5 @@
 """
-Unit tests for yobx.sklearn.copilot_draft.
+Unit tests for yobx.helpers.copilot.
 """
 
 import json
@@ -19,7 +19,7 @@ class TestExtractPythonCode(ExtTestCase):
     """Tests for _extract_python_code."""
 
     def _fct(self, text: str) -> str:
-        from yobx.sklearn.copilot_draft import _extract_python_code
+        from yobx.helpers.copilot import _extract_python_code
 
         return _extract_python_code(text)
 
@@ -50,7 +50,7 @@ class TestInferSubmodule(ExtTestCase):
     """Tests for _infer_submodule."""
 
     def _fct(self, cls) -> str:
-        from yobx.sklearn.copilot_draft import _infer_submodule
+        from yobx.helpers.copilot import _infer_submodule
 
         return _infer_submodule(cls)
 
@@ -81,7 +81,7 @@ class TestBuildConverterPrompt(ExtTestCase):
     """Tests for _build_converter_prompt."""
 
     def _fct(self, cls) -> str:
-        from yobx.sklearn.copilot_draft import _build_converter_prompt
+        from yobx.helpers.copilot import _build_converter_prompt
 
         return _build_converter_prompt(cls)
 
@@ -168,7 +168,7 @@ class TestDraftConverterWithCopilot(ExtTestCase):
 
     def test_dry_run_no_file_written(self):
         """dry_run=True should return code without touching the filesystem."""
-        from yobx.sklearn.copilot_draft import draft_converter_with_copilot
+        from yobx.helpers.copilot import draft_converter_with_copilot
         from sklearn.linear_model import Ridge
 
         fake_token_resp = self._make_fake_token_response()
@@ -203,7 +203,7 @@ class TestDraftConverterWithCopilot(ExtTestCase):
         """Without dry_run, the code should be written to output_dir."""
         import tempfile
 
-        from yobx.sklearn.copilot_draft import draft_converter_with_copilot
+        from yobx.helpers.copilot import draft_converter_with_copilot
         from sklearn.linear_model import Ridge
 
         fake_token_resp = self._make_fake_token_response()
@@ -240,7 +240,7 @@ class TestDraftConverterWithCopilot(ExtTestCase):
         """When output_dir is a new (empty) directory, an __init__.py is created."""
         import tempfile
 
-        from yobx.sklearn.copilot_draft import draft_converter_with_copilot
+        from yobx.helpers.copilot import draft_converter_with_copilot
         from sklearn.linear_model import Ridge
 
         fake_token_resp = self._make_fake_token_response()
@@ -271,7 +271,7 @@ class TestDraftConverterWithCopilot(ExtTestCase):
 
     def test_raises_without_token(self):
         """ValueError should be raised when no token is available."""
-        from yobx.sklearn.copilot_draft import draft_converter_with_copilot
+        from yobx.helpers.copilot import draft_converter_with_copilot
         from sklearn.linear_model import Ridge
 
         # Ensure env vars are unset
@@ -282,7 +282,7 @@ class TestDraftConverterWithCopilot(ExtTestCase):
 
     def test_token_from_env_var(self):
         """Token should be read from the GITHUB_TOKEN env var when not passed."""
-        from yobx.sklearn.copilot_draft import draft_converter_with_copilot
+        from yobx.helpers.copilot import draft_converter_with_copilot
         from sklearn.linear_model import Ridge
 
         fake_token_resp = self._make_fake_token_response()
