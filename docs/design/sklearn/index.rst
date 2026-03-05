@@ -1,6 +1,29 @@
 Scikit-learn Export to ONNX
 ===========================
 
+.. runpython::
+    :rst:
+
+    import numpy as np
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.linear_model import LogisticRegression
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((20, 4)).astype(np.float32)
+    y = (X[:, 0] > 0).astype(np.int64)
+
+    pipe = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", LogisticRegression()),
+    ]).fit(X, y)
+
+    html = pipe._repr_html_()
+    print(".. raw:: html")
+    print()
+    for line in html.split("\n"):
+        print(f"    {line}")
+
 .. gdot::
     :script: DOT-SECTION
 
