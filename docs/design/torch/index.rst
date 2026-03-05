@@ -8,4 +8,5 @@ Torch Export to ONNX
    input_observer
    patches
 
-@copilot add code to produce the list of flattened classes and the list of the diff of the patches
+See :ref:`l-design-flatten` for the list of flattened classes and
+:ref:`l-design-patches` for the list of patch diffs.
