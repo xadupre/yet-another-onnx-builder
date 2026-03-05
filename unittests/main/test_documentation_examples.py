@@ -80,7 +80,12 @@ class TestDocumentationExamples(ExtTestCase):
                 continue
             reason = None
 
-            if not reason and not has_dot and name in {"plot_dump_intermediate_results.py"}:
+            if (
+                not reason
+                and not has_dot
+                and name
+                in {"plot_dump_intermediate_results.py", "plot_sklearn_with_sklearn_onnx.py"}
+            ):
                 reason = "dot not installed"
 
             if (
