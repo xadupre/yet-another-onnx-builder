@@ -6,3 +6,4 @@ yobx.builder
     :caption: modules
 
     light/index
+    onnxscript/index
