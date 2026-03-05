@@ -21,7 +21,7 @@ def proto_from_array(
     :param verbose: display the type and shape
     :return: a onnx.TensorProto
     """
-    if arr.__class__.__name__ != "Tensor":
+    if arr.__class__.__name__ not in ("Tensor", "Parameter"):
         raise TypeError(f"Unexpected type {type(arr)}.")
 
     import torch
