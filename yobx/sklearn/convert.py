@@ -11,7 +11,7 @@ def to_onnx(
     args: Tuple[Any],
     input_names: Optional[Sequence[str]] = None,
     dynamic_shapes: Optional[Tuple[Dict[int, str]]] = None,
-    target_opset: int = 20,
+    target_opset: Union[int, Dict[str, int]] = 20,
     verbose: int = 0,
     builder_cls: Union[type, Callable] = GraphBuilder,
     extra_converters: Optional[Dict[type, Callable]] = None,
@@ -25,7 +25,11 @@ def to_onnx(
     :param args: dummy inputs
     :param dynamic_shapes: dynamic shapes, if not specified, the first dimension
         is dynamic, the others are static
-    :param target_opset: opset to use, it must be specified
+    :param target_opset: opset to use; either an integer for the default domain
+        (``""``), or a dictionary mapping domain names to opset versions,
+        e.g. ``{"": 20, "ai.onnx.ml": 5}``.  When ``"ai.onnx.ml"`` is set to
+        ``5`` the converter emits the unified ``TreeEnsemble`` operator
+        introduced in that opset instead of the older per-task operators.
     :param verbose: verbosity
     :param builder_cls: by default the graph builder is a
         :class:`yobx.xbuilder.GraphBuilder` but any builder can
