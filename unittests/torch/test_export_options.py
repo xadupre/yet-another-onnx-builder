@@ -1,5 +1,3 @@
-"""Tests for ExportOptions in yobx.torch.export_options."""
-
 import os
 import tempfile
 import unittest
@@ -67,10 +65,12 @@ class TestExportOptions(ExtTestCase):
         opts = ExportOptions(strategy="jit")
         self.assertTrue(opts.jit)
 
+    @ignore_warnings(FutureWarning)
     def test_strategy_dec(self):
         opts = ExportOptions(strategy="dec")
         self.assertEqual(opts.decomposition_table, "default")
 
+    @ignore_warnings(FutureWarning)
     def test_strategy_decall(self):
         opts = ExportOptions(strategy="decall")
         self.assertEqual(opts.decomposition_table, "all")
@@ -163,6 +163,7 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
+    @ignore_warnings(FutureWarning)
     def test_export_strict_true(self):
         class SimpleModel(torch.nn.Module):
             def forward(self, x):
@@ -232,6 +233,7 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
+    @ignore_warnings(FutureWarning)
     def test_export_with_decomposition_default(self):
         """Export with dec strategy applies default decompositions."""
         model = _Neuron()
@@ -247,6 +249,7 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
+    @ignore_warnings(FutureWarning)
     def test_export_with_decomposition_all(self):
         """Export with decall strategy applies all decompositions."""
         model = _Neuron()
@@ -292,6 +295,7 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
+    @ignore_warnings(FutureWarning)
     def test_export_strategy_strict_dec(self):
         """Strategy 'strict-dec' exports with strict=True and default decompositions."""
         model = _Neuron()
@@ -307,6 +311,7 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
+    @ignore_warnings(FutureWarning)
     def test_export_strategy_strict_decall(self):
         """Strategy 'strict-decall' exports with strict=True and all decompositions."""
         model = _Neuron()
@@ -322,6 +327,7 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
+    @ignore_warnings(FutureWarning)
     def test_export_strategy_nostrict_dec(self):
         """Strategy 'nostrict-dec' exports with strict=False and default decompositions."""
         model = _Neuron()
@@ -337,6 +343,7 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
+    @ignore_warnings(FutureWarning)
     def test_export_strategy_nostrict_decall(self):
         """Strategy 'nostrict-decall' exports with strict=False and all decompositions."""
         model = _Neuron()
@@ -352,7 +359,7 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
-    @ignore_warnings(UserWarning)
+    @ignore_warnings((UserWarning, FutureWarning))
     def test_export_strategy_jit_dec(self):
         """Strategy 'jit-dec' exports via JIT with default decompositions."""
         try:
@@ -372,7 +379,7 @@ class TestExportOptions(ExtTestCase):
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
-    @ignore_warnings(UserWarning)
+    @ignore_warnings((UserWarning, FutureWarning))
     def test_export_strategy_jit_decall(self):
         """Strategy 'jit-decall' exports via JIT with all decompositions."""
         try:
@@ -407,6 +414,7 @@ class TestExportOptions(ExtTestCase):
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
     @hide_stdout()
+    @ignore_warnings(FutureWarning)
     def test_export_with_verbosity(self):
         """Export a simple model with verbose=1 to exercise the verbose code paths."""
         model = _Neuron()
@@ -424,6 +432,7 @@ class TestExportOptions(ExtTestCase):
         self.assertIsInstance(ep, torch.export.ExportedProgram)
 
     @hide_stdout()
+    @ignore_warnings(FutureWarning)
     def test_post_process_with_verbosity(self):
         """post_process_exported_program with verbose=1 exercises the verbose code paths."""
         model = _Neuron()
@@ -481,19 +490,18 @@ class TestExportOptions(ExtTestCase):
 @requires_torch("2.0")
 class TestApplyDecompositions(ExtTestCase):
     def test_apply_decompositions_none(self):
-        """apply_decompositions with None table is a no-op and returns the same object."""
         ep = torch.export.export(_Neuron(), (torch.rand(2, 5),))
         result = apply_decompositions(ep, None, False)
         self.assertIs(result, ep)
 
+    @ignore_warnings(FutureWarning)
     def test_apply_decompositions_default(self):
-        """apply_decompositions with 'default' table produces an ExportedProgram."""
         ep = torch.export.export(_Neuron(), (torch.rand(2, 5),))
         result = apply_decompositions(ep, "default", False)
         self.assertIsInstance(result, torch.export.ExportedProgram)
 
+    @ignore_warnings(FutureWarning)
     def test_apply_decompositions_all(self):
-        """apply_decompositions with 'all' runs full decompositions."""
         ep = torch.export.export(_Neuron(), (torch.rand(2, 5),))
         result = apply_decompositions(ep, "all", False)
         self.assertIsInstance(result, torch.export.ExportedProgram)
@@ -508,6 +516,7 @@ class TestPostProcessExportedProgram(ExtTestCase):
         result = opts.post_process_exported_program(ep)
         self.assertIsInstance(result, torch.export.ExportedProgram)
 
+    @ignore_warnings(FutureWarning)
     def test_post_process_with_decomposition(self):
         """post_process_exported_program with decomposition applies decompositions."""
         ep = torch.export.export(_Neuron(), (torch.rand(2, 5),))
@@ -740,6 +749,7 @@ class TestGetSigKwargs(ExtTestCase):
 
 class TestRemoveInline(ExtTestCase):
     @hide_stdout()
+    @ignore_warnings(FutureWarning)
     def test_remove_inline_slice_tensor(self):
         class Model(torch.nn.Module):
             def forward(self, x, sumx):
@@ -760,7 +770,6 @@ class TestRemoveInline(ExtTestCase):
             )
 
             _opts = _ExportOptions()
-            print("-------------")
             _ep = _opts.export(
                 model,
                 args=xs,
@@ -770,7 +779,6 @@ class TestRemoveInline(ExtTestCase):
                 same_signature=False,
                 verbose=10,
             )
-            print(_ep.graph)
             for node in _ep.graph.nodes:
                 if node.op == "output":
                     continue
@@ -779,7 +787,6 @@ class TestRemoveInline(ExtTestCase):
                     0,
                     msg=lambda: f"node with no users {node.name!r}\n{str(_ep.graph)}",
                 )
-            print("-------------")
         except ImportError:
             _ep = None
 
@@ -793,7 +800,6 @@ class TestRemoveInline(ExtTestCase):
             same_signature=False,
             verbose=10,
         )
-        print(ep.graph)
         for node in ep.graph.nodes:
             if node.op == "output":
                 continue

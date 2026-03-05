@@ -287,14 +287,14 @@ class DynamoInterpreter:
                 # We should not raise an exception if the result is not used.
                 shape = self.builder.get_shape(name)
                 self.builder._check_two_shapes_are_compatible(
-                    shape,  # new_shape (or shape infered with onnx node)
+                    shape,  # new_shape (or shape inferred with onnx node)
                     tuple(exp_shape),  # old_shape
                     name=name,
                     register_int=False,
                 )
                 old_shape = self.builder.verify_dynamic_shape(exp_shape, add=False)
                 self.builder._check_two_shapes_are_compatible(
-                    shape,  # new_shape (or shape infered with onnx node)
+                    shape,  # new_shape (or shape inferred with onnx node)
                     old_shape,  # old_shape
                     name=name,
                     register_int=False,
@@ -2086,7 +2086,7 @@ class DynamoInterpreter:
                         "aten::_scaled_dot_product_efficient_attention",
                         "aten::_scaled_dot_product_flash_attention",
                     }:
-                        # It seems the type is not very consistant
+                        # It seems the type is not very consistent
                         # and the output might not be used.
                         self.builder.set_type(r, dtype, exc=False)
                     else:

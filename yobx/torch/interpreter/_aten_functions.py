@@ -3046,7 +3046,7 @@ def aten_embedding_bag_padding_idx(
         dim_1 = g.op.Shape(weight, start=1, end=2, name=name)
         max_indices_shape = g.op.Concat(dim_0, dim_1, axis=0, name=name)
     else:
-        raise AssertionError(f"Unexpeted op_type={op_type!r}{g.get_debug_msg()}")
+        raise AssertionError(f"Unexpected op_type={op_type!r}{g.get_debug_msg()}")
 
     offset2bag = g.op.ConstantOfShape(
         offset2bag_shape,
@@ -4987,7 +4987,7 @@ def _get_im2col_indices_along_dim(
         block_mask = blocks_d_indices + kernel_mask
         return block_mask
 
-    raise AssertionError(f"Not impelmented yet for dynamic shapes, input_d={input_d!r}")
+    raise AssertionError(f"Not implemented yet for dynamic shapes, input_d={input_d!r}")
 
 
 def aten_im2col(
@@ -5685,7 +5685,7 @@ def aten_index_put(
         and g.get_rank(indices[n_none[0]]) == 1
         and g.get_rank(x) == g.get_rank(values)
     ):
-        name = f"{name}.nd"
+        name = f"{name}.ndi"
         unsq = g.op.Unsqueeze(indices[n_none[0]], g.ONE, name=name)
         if n_none[0] == 0:
             name = f"{name}.0"
@@ -6818,7 +6818,7 @@ def aten_linalg_vector_norm(
     """reduce *"""
     assert (
         dtype is None
-    ), f"aten_linalg_vector_norm not implementd when dtype={dtype}{g.get_debug_msg()}"
+    ), f"aten_linalg_vector_norm not implemented when dtype={dtype}{g.get_debug_msg()}"
     assert (
         g.has_rank(x) and g.get_rank(x) > 0
     ), f"Rank of {x!r} is unknown or null{g.get_debug_msg()}"
@@ -7463,9 +7463,11 @@ def _aten_max_pool_with_indices_onnx(
 
     if outputs:
         if not isinstance(outputs, (tuple, list)):
-            raise TypeError(f"Multiple outputs are expeted but type(outputs) is {type(outputs)}.")
+            raise TypeError(
+                f"Multiple outputs are expected but type(outputs) is {type(outputs)}."
+            )
         if len(outputs) != 2:
-            raise ValueError(f"Multiple outputs are expeted but outputs is {outputs}.")
+            raise ValueError(f"Multiple outputs are expected but outputs is {outputs}.")
         return (
             g.op.Identity(pool_result, outputs=outputs[0], name=name),
             g.op.Identity(indices, outputs=outputs[1], name=name),
@@ -9509,8 +9511,8 @@ def aten_masked_scatter(
     name: str = "masked_scatter",
 ) -> T:
     """masked_scatter"""
-    assert g.has_rank(x), f"mssing rank for {x!r}{g.get_debug_msg()}"
-    assert g.has_rank(mask), f"mssing rank for {x!r}{g.get_debug_msg()}"
+    assert g.has_rank(x), f"missing rank for {x!r}{g.get_debug_msg()}"
+    assert g.has_rank(mask), f"missing rank for {x!r}{g.get_debug_msg()}"
 
     rkx = g.get_rank(x)
     rkm = g.get_rank(mask)
@@ -12870,8 +12872,8 @@ def aten_upsample_nearest2d(
 ) -> T:
     """resize"""
     assert output_size is not None, "Not implemented when size is None"
-    assert scale_h is None, f"Not impelmented when scale_h={scale_h}"
-    assert scale_w is None, f"Not impelmented when scale_w={scale_w}"
+    assert scale_h is None, f"Not implemented when scale_h={scale_h}"
+    assert scale_w is None, f"Not implemented when scale_w={scale_w}"
 
     return _aten_upsample_output_size(
         g,
@@ -12899,9 +12901,9 @@ def aten_upsample_nearest3d(
 ) -> T:
     """resize"""
     assert output_size is not None, "Not implemented when size is None"
-    assert scale_d is None, f"Not impelmented when scale_h={scale_h}"
-    assert scale_h is None, f"Not impelmented when scale_h={scale_h}"
-    assert scale_w is None, f"Not impelmented when scale_h={scale_w}"
+    assert scale_d is None, f"Not implemented when scale_h={scale_h}"
+    assert scale_h is None, f"Not implemented when scale_h={scale_h}"
+    assert scale_w is None, f"Not implemented when scale_h={scale_w}"
 
     return _aten_upsample_output_size(
         g,
@@ -12948,8 +12950,8 @@ def aten_upsample_bicubic2d(
 ) -> T:
     """resize"""
     assert output_size is not None, "Not implemented when size is None"
-    assert scale_d is None, f"Not impelmented when scale_h={scale_h}"
-    assert scale_h is None, f"Not impelmented when scale_h={scale_h}"
+    assert scale_d is None, f"Not implemented when scale_h={scale_h}"
+    assert scale_h is None, f"Not implemented when scale_h={scale_h}"
 
     return _aten_upsample_output_size(
         g,
@@ -12979,8 +12981,8 @@ def aten_upsample_bilinear2d(
 ) -> T:
     """resize"""
     assert output_size is not None, "Not implemented when size is None"
-    assert scale_d is None, f"Not impelmented when scale_h={scale_h}"
-    assert scale_h is None, f"Not impelmented when scale_h={scale_h}"
+    assert scale_d is None, f"Not implemented when scale_h={scale_h}"
+    assert scale_h is None, f"Not implemented when scale_h={scale_h}"
 
     return _aten_upsample_output_size(
         g,
@@ -13097,9 +13099,9 @@ def aten_upsample_trilinear3d(
 ) -> T:
     """resize"""
     assert output_size is not None, "Not implemented when size is None"
-    assert scale_d is None, f"Not impelmented when scale_d={scale_d}"
-    assert scale_h is None, f"Not impelmented when scale_h={scale_h}"
-    assert scale_w is None, f"Not impelmented when scale_w={scale_w}"
+    assert scale_d is None, f"Not implemented when scale_d={scale_d}"
+    assert scale_h is None, f"Not implemented when scale_h={scale_h}"
+    assert scale_w is None, f"Not implemented when scale_w={scale_w}"
 
     return _aten_upsample_output_size(
         g,

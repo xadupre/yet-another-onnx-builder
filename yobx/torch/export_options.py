@@ -23,7 +23,6 @@ class ExportOptions:
         :func:`get_decomposition_table
         <ybox.torch.export_options.get_decomposition_table>`,
         it can ``'all'``, ``'default'`` or a decomposition list
-
     :param dynamo: to use ``torch._dynamo.export`` instead of :func:`torch.export.export`
     :param tracing: use symbolic tracing
     :param jit: use jit to get a graph then converts it into a fx graph
@@ -49,7 +48,7 @@ class ExportOptions:
     :param prefer_deferred_runtime_asserts_over_guards:
         see :func:`torch.export.export`
     :param fake: use fake tensors as inputs
-        :param tracing_module_leaves: this option is used when the module is traced
+    :param tracing_module_leaves: this option is used when the module is traced
         (``tracing=True``), it specifies which modules should remain a *call_module*,
         see :class:`yobx.torch.tracing.CustomTracer`.
     """
@@ -647,6 +646,27 @@ class ExportOptions:
                 print(f"[ExportOptions.export] inplaces: {modified} inplaced nodes were removed")
             graph.lint()
         return modified
+
+    def use_str_not_dyn(self, dynamic_shapes: Any, default_value=None) -> Any:
+        if not hasattr(self, "_c_use_str_not_dyn"):
+            self._c_use_str_not_dyn = 0
+        if isinstance(dynamic_shapes, list):
+            return [self.use_str_not_dyn(a, default_value=default_value) for a in dynamic_shapes]
+        if isinstance(dynamic_shapes, tuple):
+            return tuple(
+                self.use_str_not_dyn(a, default_value=default_value) for a in dynamic_shapes
+            )
+        if isinstance(dynamic_shapes, dict):
+            return {
+                k: self.use_str_not_dyn(v, default_value=default_value)
+                for k, v in dynamic_shapes.items()
+            }
+        if isinstance(dynamic_shapes, set):
+            return {self.use_str_not_dyn(a, default_value=default_value) for a in dynamic_shapes}
+        if not isinstance(dynamic_shapes, (int, str)) and dynamic_shapes is not None:
+            self._c_use_str_not_dyn += 1
+            return f"udim{self._c_use_str_not_dyn}"
+        return dynamic_shapes
 
 
 def _get_decomposition_table_by_name(

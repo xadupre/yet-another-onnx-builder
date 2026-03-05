@@ -66,7 +66,7 @@ class TestOnnxExportLarge(ExtTestCase):
         if expected_weights is not None:
             assert len(large_onx.model_proto.graph.initializer) == expected_weights, (
                 f"The model has {len(large_onx.model_proto.graph.initializer)} "
-                f"initiliazers, expecting {expected_weights}, inputs are "
+                f"initializers, expecting {expected_weights}, inputs are "
                 f"{[_.name for _ in large_onx.model_proto.graph.input]}."
             )
         large_onx.save(name)

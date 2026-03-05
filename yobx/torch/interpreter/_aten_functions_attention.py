@@ -339,7 +339,7 @@ def aten__scaled_dot_product_flash_attention(
         name=name,
     )
 
-    # The followings are not comsumed by the graph.
+    # The following are not consumed by the graph.
     (
         logsumexp,
         empty_tensor_int,
@@ -398,7 +398,7 @@ def aten__scaled_dot_product_flash_attention_for_cpu(
     )
     assert isinstance(result, str), f"Unexpected type {type(result)}{g.get_debug_msg()}"
 
-    # The followings are not comsumed by the graph on llama 3 at least.
+    # The following are not consumed by the graph on llama 3 at least.
     if len(outputs) == 2:
         # only need 2
         query_first_three_dims = g.op.Slice(
@@ -488,7 +488,7 @@ def aten__scaled_dot_product_efficient_attention(
         outputs=[outputs[1]],
     )
 
-    # The followings are not comsumed by the graph on llama 3 at least.
+    # The following are not consumed by the graph on llama 3 at least.
     if len(outputs) == 2:
         return result, logsumexp
 

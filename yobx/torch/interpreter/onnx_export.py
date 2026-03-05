@@ -313,7 +313,7 @@ class ParameterNaming:
                     use_mod = exported_program
                 else:
                     # It means we probably needs to add an alias.
-                    # We assume all used parametes in the exported program
+                    # We assume all used parameters in the exported program
                     # are part of the exported program.
                     # Maybe the conversion had to add a name.
                     for m in exp_names:
@@ -381,7 +381,7 @@ class ParameterNaming:
             from_node = node.meta["from_node"]
             assert (
                 len(from_node) == 1
-            ), f"Parameter {name!r} seems shared accross multiple objects{from_node}"
+            ), f"Parameter {name!r} seems shared across multiple objects{from_node}"
         key = None
         if name.startswith("p_") and name[2:] in self._idmap:
             key = name[2:]
@@ -489,7 +489,7 @@ def _make_builder_interpreter(
     :param optimization_options: optimization options
     :param verbose: verbosity level
     :param raise_list: the builder stops any time a name falls into that list,
-        this is a debbuging tool
+        this is a debugging tool
     :param dynamic_shapes: see :epkg:`torch.export.export` or ``torch._dynamo.export``
     :param same_signature: same signature
     :param tracing_mode: tracing model
@@ -587,7 +587,7 @@ def _make_builder_interpreter(
                     f"tracing_mode={tracing_mode}"
                 )
 
-            # Let's rewrite the dyanmic shapes in case string replaced
+            # Let's rewrite the dynamic shapes in case string replaced
             # torch.export.Dim.
             # If this step fails, try torch_export_patches.
             exported_program = export_options.export(
@@ -972,7 +972,7 @@ def to_onnx(
     :param verbose: verbosity level
     :param return_builder: returns the builder as well
     :param raise_list: the builder stops any time a name falls into that list,
-        this is a debbuging tool
+        this is a debugging tool
     :param dynamic_shapes: see :epkg:`torch.export.export`
     :param optimize: optimize the model before exporting into onnx
     :param dispatcher: see :class:`yobx.torch.interpreter.Dispatcher`
@@ -985,7 +985,7 @@ def to_onnx(
     :param filename: if specified, stores the model into that file
     :param inline: inline the model before converting to onnx, this is done before
             any optimization takes place
-    :param export_options: to apply differents options before to get the exported program
+    :param export_options: to apply different options before to get the exported program
     :param export_modules_as_functions: export submodules as local functions,
         this parameter can be filled with a set of class to preserve,
         all this other will be exported as usual

@@ -119,7 +119,7 @@ def export_utils(
     )
     if expected_weights is not None:
         assert len(onx.graph.initializer) == expected_weights, (
-            f"The model has {len(onx.graph.initializer)} initiliazers, "
+            f"The model has {len(onx.graph.initializer)} initializers, "
             f"expecting {expected_weights}, inputs are "
             f"{[_.name for _ in onx.graph.input]}, "
             f"op_type are {[n.op_type for n in onx.graph.node]}"
