@@ -152,7 +152,7 @@ creating a duplicate node.
     print("initializer name :", list(g.initializers_dict)[0])
     print("initializer shape:", list(g.initializers_dict.values())[0].shape)
 
-.. _buillder-api:
+.. _builder-api:
 
 Shape and type tracking
 =======================
@@ -196,6 +196,19 @@ Key methods:
      - Return the device as an integer (``-1`` for CPU).
    * - ``g.has_device(name)``
      - Return ``True`` if a device is known for result ``name``.
+
+Optional but usually needed:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - ``g.unique_name(prefix)``
+     - Returns a unique name starting with prefix and not already taken.
+   * - ``g.get_attribute_with_default(node, attr, default)``
+     - Convenience helper to read a node attribute with a fallback default.
+   * - ``g.set_type_shape_unary_op(name, input_name, itype: int = None)``
+     - Defines shape, type, device for `name` equal the one defined for `input_name`, `itype` can be used the change the type
 
 Dynamic shapes
 ==============

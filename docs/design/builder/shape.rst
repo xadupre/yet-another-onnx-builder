@@ -435,9 +435,7 @@ Key methods available on ``g``
    * - ``g.get_device(name)``
      - Returns the device as an integer (``-1`` for CPU, index for GPU).
    * - ``g.set_device(name, device)``
-     - Propagates the device to result ``name``.
-   * - ``g.get_attribute_with_default(node, attr, default)``
-     - Convenience helper to read a node attribute with a fallback default.
+     - Propagates the device to result ``name``.     
 
 A minimal shape function should:
 

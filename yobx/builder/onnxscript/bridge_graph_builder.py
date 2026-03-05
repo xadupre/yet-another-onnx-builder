@@ -181,7 +181,7 @@ class OnnxScriptGraphBuilder:
                 new_args.append(self._name_to_value[a])
             elif a is None:
                 # Represent missing optional inputs as None, not as an initializer.
-                new_args.append(None)
+                new_args.append(None)  # type: ignore
             else:
                 # Create an initializer and pass its corresponding ir.Value to the op.
                 init_name = self.make_initializer("", a)
@@ -255,7 +255,7 @@ class OnnxScriptGraphBuilder:
         dtype = value.type
         if not dtype:
             return 0
-        return int(dtype.elem_type)
+        return int(dtype.elem_type)  # type: ignore
 
     def set_type(self, name: str, itype: int):
         """Sets the type."""
@@ -264,7 +264,7 @@ class OnnxScriptGraphBuilder:
         value = self._name_to_value[name]
         value.type = ir.TensorType(ir.DataType(itype))
 
-    def has_shape(self, name: str) -> int:
+    def has_shape(self, name: str) -> bool:
         """Tells if a value has a shape."""
         if name not in self._name_to_value:
             return False
@@ -276,14 +276,15 @@ class OnnxScriptGraphBuilder:
 
     def get_shape(self, name: str) -> DYNAMIC_SHAPE:
         """Returns the shape."""
-        if name not in self._name_to_value:
-            return False
+        assert name in self._name_to_value, f"Name {name!r} is not registered."
         value = self._name_to_value[name]
+        assert value is not None, f"Name {name!r} has a shape but it is None."
         # A dynamic dimension is a ir.SymbolicDim.
-        return tuple(s if isinstance(s, (int, str)) else s.value for s in value.shape)
+        return tuple(s if isinstance(s, (int, str)) else s.value for s in value.shape)  # type: ignore
 
     def set_shape(self, name: str, shape: DYNAMIC_SHAPE, allow_zero: bool = False):
         """Sets the shape."""
+        assert shape is not None, f"shape cannot be empty for name={name!r}"
         if name not in self._name_to_value:
             return False
         value = self._name_to_value[name]
@@ -331,7 +332,7 @@ class OnnxScriptGraphBuilder:
         input_name: str,
         itype: Optional[int] = None,
     ) -> bool:
-        set_type_shape_unary_op(self, name, input_name, itype)
+        return set_type_shape_unary_op(self, name, input_name, itype)  # type: ignore[arg-type]
 
     def _register(self, name: str, value: ir.Value) -> None:
         """Register *value* under *name* in the internal name registry."""

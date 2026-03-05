@@ -10128,4 +10128,4 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         input_name: str,
         itype: Optional[int] = None,
     ) -> bool:
-        set_type_shape_unary_op(self, name, input_name, itype)
+        return set_type_shape_unary_op(self, name, input_name, itype)  # type: ignore
