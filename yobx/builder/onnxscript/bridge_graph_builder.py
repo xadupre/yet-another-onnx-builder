@@ -1,6 +1,6 @@
 from __future__ import annotations
 from functools import partial
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Set, Union
 import numpy as np
 import onnx
 import onnx_ir as ir
@@ -142,7 +142,7 @@ class OnnxScriptGraphBuilder:
         self._name_to_value: Dict[str, ir.Value] = {}
         # Counter for auto-generating output names
         self._output_counter: int = 0
-        self._unique_names = set()
+        self._unique_names: Set[str] = set()
         self.op = _OnnxScriptGraphBuilderOpset(self)
 
     @property
