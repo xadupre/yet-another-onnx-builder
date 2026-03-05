@@ -151,6 +151,33 @@ class TestOnnxScriptBridge(ExtTestCase):
         result = gr.make_node("Relu", ["X"], ["Y"])
         self.assertEqual(result, "Y")
 
+    def test_make_node_ir_value_name_matches_requested_output_single(self):
+        """ir.Value.name must equal the requested output name (single output)."""
+        gr = self._make_builder()
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
+        gr.make_node("Relu", ["X"], ["my_output"])
+        v = gr.get_value("my_output")
+        self.assertEqual(v.name, "my_output")
+
+    def test_make_node_ir_value_name_matches_requested_output_multiple(self):
+        """ir.Value.name must equal the requested output names (multiple outputs)."""
+        gr = self._make_builder()
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (5,))
+        k = gr.make_initializer("k", np.array([3], dtype=np.int64))
+        gr.make_node("TopK", ["X", k], ["vals", "idxs"])
+        self.assertEqual(gr.get_value("vals").name, "vals")
+        self.assertEqual(gr.get_value("idxs").name, "idxs")
+
+    def test_make_node_output_names_appear_in_proto(self):
+        """Requested output names must appear as node output names in the ONNX proto."""
+        gr = self._make_builder()
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
+        gr.make_node("Relu", ["X"], ["my_relu_out"])
+        gr.make_tensor_output("my_relu_out", onnx.TensorProto.FLOAT)
+        proto = gr.to_onnx()
+        check_model(proto)
+        self.assertEqual(proto.graph.node[0].output[0], "my_relu_out")
+
     def test_make_node_single_output_int(self):
         gr = self._make_builder()
         gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))

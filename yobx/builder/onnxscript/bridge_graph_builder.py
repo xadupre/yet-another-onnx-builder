@@ -337,6 +337,7 @@ class OnnxScriptGraphBuilder:
     def _register(self, name: str, value: ir.Value) -> None:
         """Register *value* under *name* in the internal name registry."""
         assert isinstance(value, ir.Value), f"Unexpected type {type(value)} for name={name!r}"
+        value.name = name
         self._name_to_value[name] = value
 
     # ------------------------------------------------------------------
