@@ -5,6 +5,7 @@ yobx.helpers
     :maxdepth: 1
     :caption: modules
 
+    copilot
     cube_helper
     dot_helper
     helper

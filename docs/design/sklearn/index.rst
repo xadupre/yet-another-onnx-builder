@@ -6,3 +6,4 @@ Scikit-learn Export to ONNX
 
    sklearn_converter
    custom_converter
+   copilot_draft
