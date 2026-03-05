@@ -1,35 +1,31 @@
-from typing import Dict, Callable, Tuple, Union
+from typing import Callable, Dict, Optional, Tuple, Union
 
-TENSORFLOW_CONVERTERS: Dict[type, Callable] = {}
+# Maps TF op-type string (e.g. "MatMul", "Relu") to a converter function.
+TF_OP_CONVERTERS: Dict[str, Callable] = {}
 
 
-def register_tensorflow_converter(cls: Union[type, Tuple[type, ...]]):
+def register_tf_op_converter(op_type: Union[str, Tuple[str, ...]]):
+    """Decorator that registers a converter for one or more TF op-type strings."""
+
     def decorator(fct: Callable):
-        """Registers a function to convert a TensorFlow/Keras layer or model."""
-        global TENSORFLOW_CONVERTERS
-        if isinstance(cls, tuple):
-            for c in cls:
-                if c in TENSORFLOW_CONVERTERS:
-                    raise TypeError(f"A converter is already registered for {c}.")
-                TENSORFLOW_CONVERTERS[c] = fct
-        else:
-            if cls in TENSORFLOW_CONVERTERS:
-                raise TypeError(f"A converter is already registered for {cls}.")
-            TENSORFLOW_CONVERTERS[cls] = fct
+        global TF_OP_CONVERTERS
+        types = (op_type,) if isinstance(op_type, str) else op_type
+        for t in types:
+            if t in TF_OP_CONVERTERS:
+                raise TypeError(f"A converter is already registered for op type {t!r}.")
+            TF_OP_CONVERTERS[t] = fct
         return fct
 
     return decorator
 
 
-def get_tensorflow_converter(cls: type):
-    """Returns the converter for a specific type."""
-    global TENSORFLOW_CONVERTERS
-    if cls in TENSORFLOW_CONVERTERS:
-        return TENSORFLOW_CONVERTERS[cls]
-    raise ValueError(f"Unable to find a converter for type {cls}.")
+def get_tf_op_converter(op_type: str) -> Optional[Callable]:
+    """Returns the converter for a TF op type, or ``None`` if not found."""
+    global TF_OP_CONVERTERS
+    return TF_OP_CONVERTERS.get(op_type)
 
 
-def get_tensorflow_converters():
-    """Returns all registered converters as a mapping from type to converter function."""
-    global TENSORFLOW_CONVERTERS
-    return dict(TENSORFLOW_CONVERTERS)
+def get_tf_op_converters() -> Dict[str, Callable]:
+    """Returns all registered TF op converters."""
+    global TF_OP_CONVERTERS
+    return dict(TF_OP_CONVERTERS)

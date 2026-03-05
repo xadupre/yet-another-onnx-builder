@@ -119,44 +119,36 @@ class TestTensorflowBaseConverters(ExtTestCase):
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
 
-    def test_custom_layer_with_extra_converters(self):
-        """extra_converters allows converting unsupported custom layers at the top level."""
+    def test_custom_op_converter_with_extra_converters(self):
+        """extra_converters can override how a specific TF op type is converted."""
         import tensorflow as tf
         from yobx.tensorflow import to_onnx
 
-        class ScaleLayer(tf.keras.layers.Layer):
-            """Custom layer that multiplies inputs by a scalar."""
+        model = tf.keras.Sequential(
+            [tf.keras.layers.Dense(4, activation="relu", input_shape=(3,))]
+        )
+        X = np.random.rand(5, 3).astype(np.float32)
 
-            def __init__(self, scale=2.0, **kwargs):
-                super().__init__(**kwargs)
-                self.scale = scale
+        called = []
 
-            def call(self, inputs):
-                return inputs * self.scale
+        def custom_relu_converter(g, op, ctx, verbose=0):
+            """Override: apply Relu but also track the call."""
+            called.append(True)
+            a = ctx.get(op.inputs[0].name)
+            if a is not None:
+                result = g.op.Relu(a, name="custom_relu")
+                assert isinstance(result, str)
+                ctx[op.outputs[0].name] = result
 
-        def convert_scale_layer(g, sts, outputs, layer, X, name="scale"):
-            scale = np.array([layer.scale], dtype=np.float32)
-            res = g.op.Mul(X, scale, name=name, outputs=outputs)
-            if not sts:
-                g.set_type(res, g.get_type(X))
-                g.set_shape(res, g.get_shape(X))
-                if g.has_device(X):
-                    g.set_device(res, g.get_device(X))
-            return res
+        onx = to_onnx(model, (X,), extra_converters={"Relu": custom_relu_converter})
 
-        # Call the layer once to build it (establishes its input/output shapes).
-        layer = ScaleLayer(scale=3.0)
-        X = np.array([[1, 2, 3, 4]], dtype=np.float32)
-        _ = layer(X)
-
-        onx = to_onnx(layer, (X,), extra_converters={ScaleLayer: convert_scale_layer})
-
+        self.assertTrue(called, "custom Relu converter was not called")
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("Mul", op_types)
+        self.assertIn("Relu", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
-        expected = layer(X).numpy()
+        expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
 
 
