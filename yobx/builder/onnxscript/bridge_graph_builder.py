@@ -84,6 +84,9 @@ class _OnnxScriptGraphBuilderOpset:
 class OnnxScriptGraphBuilder:
     """
     Bridge builder that exposes a yobx-compatible API over onnxscript's IR.
+    It takes onnxscript `GraphBuilder
+    <https://github.com/microsoft/onnxscript/blob/main/onnxscript/_internal/builder.py#L104>`_
+    implements the API :ref:`l-design-expected-api`.
 
     :param target_opset_or_existing_proto: Either a single opset version (``int``) or
         a mapping ``{domain: version}`` (``Dict[str, int]``).  For example
