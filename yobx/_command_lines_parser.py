@@ -515,7 +515,7 @@ def get_parser_run_doc_examples() -> ArgumentParser:
         description=textwrap.dedent("""
             Extracts all ``.. runpython::`` and ``.. gdot::`` code blocks from
             RST documentation files or Python source files (docstrings) and
-            executes each one in an isolated subprocess.  Exits with a non-zero
+            executes each one in an isolated subprocess. Exits with a non-zero
             status when at least one block fails.
             """),
         epilog=textwrap.dedent("""

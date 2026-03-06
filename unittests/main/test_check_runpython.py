@@ -1,5 +1,4 @@
 import os
-import sys
 import tempfile
 import unittest
 from yobx.ext_test_case import ExtTestCase

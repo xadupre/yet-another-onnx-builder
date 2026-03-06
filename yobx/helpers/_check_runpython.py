@@ -2,6 +2,8 @@
 Utilities for extracting and running ``.. runpython::`` and ``.. gdot::``
 examples embedded in RST documentation files or Python docstrings.
 """
+
+import contextlib
 import os
 import re
 import subprocess
@@ -22,11 +24,11 @@ def extract_runpython_blocks(filename: str) -> List[Dict[str, Any]]:
     :param filename: path to the file to parse
     :return: list of dicts, each with keys
 
-        * ``filename`` – path to the source file
-        * ``lineno`` – 1-based line number of the directive
-        * ``directive`` – directive name, e.g. ``'runpython'`` or ``'gdot'``
-        * ``code`` – dedented source code string ready to execute
-        * ``options`` – dict of directive options (e.g. ``{'showcode': ''}``),
+        * ``filename`` - path to the source file
+        * ``lineno`` - 1-based line number of the directive
+        * ``directive`` - directive name, e.g. ``'runpython'`` or ``'gdot'``
+        * ``code`` - dedented source code string ready to execute
+        * ``options`` - dict of directive options (e.g. ``{'showcode': ''}``),
           or ``{'exception': ''}`` when the example is expected to raise
 
     .. runpython::
@@ -44,9 +46,7 @@ def extract_runpython_blocks(filename: str) -> List[Dict[str, Any]]:
     with open(filename, "r", encoding="utf-8", errors="replace") as fh:
         lines = fh.readlines()
 
-    directive_pattern = re.compile(
-        r"^(\s*)\.\.\s+(" + "|".join(_EXECUTABLE_DIRECTIVES) + r")::"
-    )
+    directive_pattern = re.compile(r"^(\s*)\.\.\s+(" + "|".join(_EXECUTABLE_DIRECTIVES) + r")::")
 
     blocks: List[Dict[str, Any]] = []
     i = 0
@@ -68,15 +68,19 @@ def extract_runpython_blocks(filename: str) -> List[Dict[str, Any]]:
         while i < len(lines):
             stripped = lines[i].rstrip("\n\r")
             if not stripped.strip():
-                # blank line – end of options section; skip it and move on
+                # blank line - end of options section; skip it and move on
                 i += 1
                 break
             opt_m = re.match(r"^\s+:([\w-]+):\s*(.*)", lines[i])
-            if opt_m and len(re.match(r"^(\s*)", lines[i]).group(1)) > directive_indent:
-                options[opt_m.group(1)] = opt_m.group(2).strip()
-                i += 1
+            if opt_m:
+                opt_m_i = re.match(r"^(\s*)", lines[i])
+                if opt_m_i and len(opt_m_i.group(1)) > directive_indent:
+                    options[opt_m.group(1)] = opt_m.group(2).strip()
+                    i += 1
+                else:
+                    break
             else:
-                # Not an option line and not blank – code starts immediately
+                # Not an option line and not blank - code starts immediately
                 break
 
         # Collect code lines.  A line belongs to the block when it is blank OR
@@ -103,9 +107,7 @@ def extract_runpython_blocks(filename: str) -> List[Dict[str, Any]]:
             continue
 
         # Dedent: remove the common leading whitespace shared by all non-blank lines
-        min_indent = min(
-            len(ln) - len(ln.lstrip()) for ln in code_lines if ln
-        )
+        min_indent = min(len(ln) - len(ln.lstrip()) for ln in code_lines if ln)
         dedented = [ln[min_indent:] for ln in code_lines]
         code = "\n".join(dedented) + "\n"
 
@@ -158,7 +160,7 @@ def run_runpython_blocks(
             n_failed += 1
             continue
 
-        for block in blocks:
+        for i_b, block in enumerate(blocks):
             label = f"{block['filename']}:{block['lineno']}"
 
             if verbose >= 2:
@@ -195,7 +197,7 @@ def run_runpython_blocks(
                 if success:
                     n_passed += 1
                     if verbose >= 1:
-                        print(f"[run-doc-examples] PASS  {label}")
+                        print(f"[run-doc-examples] PASS  {i_b+1: d}/{len(blocks)} {label}")
                 else:
                     n_failed += 1
                     if "exception" in block["options"] and not raised:
@@ -204,7 +206,7 @@ def run_runpython_blocks(
                             " (expected an exception but none was raised)"
                         )
                     else:
-                        print(f"[run-doc-examples] FAIL  {label}")
+                        print(f"[run-doc-examples] FAIL  {i_b+1: d}/{len(blocks)} {label}")
                     if result.stdout:
                         print(textwrap.indent(result.stdout.rstrip(), "    stdout: "))
                     if result.stderr:
@@ -214,10 +216,8 @@ def run_runpython_blocks(
                 n_failed += 1
                 print(f"[run-doc-examples] TIMEOUT  {label}")
             finally:
-                try:
+                with contextlib.suppress(OSError):
                     os.unlink(tmp_path)
-                except OSError:
-                    pass
 
     if verbose >= 1:
         total = n_passed + n_failed
@@ -230,4 +230,3 @@ def run_runpython_blocks(
         )
 
     return n_passed, n_failed
-
