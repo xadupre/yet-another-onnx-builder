@@ -1,6 +1,5 @@
 from typing import Dict, List, Union
 import numpy as np
-import onnx
 from sklearn.linear_model import (
     ARDRegression,
     BayesianRidge,

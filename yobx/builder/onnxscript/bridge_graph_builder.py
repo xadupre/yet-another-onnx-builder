@@ -162,9 +162,9 @@ class OnnxScriptGraphBuilder:
         :return: version
         """
         if exc:
-            assert domain in self.opsets, (
-                f"Domain {domain!r} is not registered in opsets={self.opsets!r}."
-            )
+            assert (
+                domain in self.opsets
+            ), f"Domain {domain!r} is not registered in opsets={self.opsets!r}."
         return self.opsets.get(domain, None)
 
     def add_domain(self, domain: str, version: int = 1) -> None:
