@@ -189,7 +189,7 @@ class Opset:
                 )
 
         assert None not in new_inputs
-        if self.allow_unknown and not self.builder.get_opset(domain):
+        if self.allow_unknown and not self.builder.has_opset(domain):
             self.builder.add_domain(domain)
         return self.builder.make_node(
             op_type,
