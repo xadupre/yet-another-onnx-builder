@@ -191,8 +191,8 @@ class TestOnnxScriptBridge(ExtTestCase):
         gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (5,))
         k = gr.make_initializer("k", np.array([3], dtype=np.int64))
         result = gr.make_node("TopK", ["X", k], ["vals", "idxs"])
-        self.assertIsInstance(result, list)
-        self.assertEqual(result, ["vals", "idxs"])
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(result, ("vals", "idxs"))
 
     def test_make_node_chained(self):
         gr = self._make_builder()

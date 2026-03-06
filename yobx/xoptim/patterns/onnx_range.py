@@ -23,7 +23,8 @@ class SwapRangeAddScalarPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['one'],
+                                 value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
                     oh.make_node('Range', ['START', 'END', 'one'], ['arange']),
                     oh.make_node('Add', ['arange', 'PLUS'], ['Y']),
                 ],
@@ -58,9 +59,14 @@ class SwapRangeAddScalarPattern(PatternOptimization):
             oh.make_graph(
                 [
                     oh.make_node('Squeeze', ['PLUS'], ['SwapRangeAddScalarPattern--PLUS']),
-                    oh.make_node('Add', ['END', 'SwapRangeAddScalarPattern--PLUS'], ['SwapRangeAddScalarPattern--END']),
-                    oh.make_node('Add', ['START', 'SwapRangeAddScalarPattern--PLUS'], ['SwapRangeAddScalarPattern--START']),
-                    oh.make_node('Range', ['SwapRangeAddScalarPattern--START', 'SwapRangeAddScalarPattern--END', 'one'], ['Y']),
+                    oh.make_node('Add', ['END', 'SwapRangeAddScalarPattern--PLUS'],
+                                 ['SwapRangeAddScalarPattern--END']),
+                    oh.make_node('Add', ['START', 'SwapRangeAddScalarPattern--PLUS'],
+                                 ['SwapRangeAddScalarPattern--START']),
+                    oh.make_node('Range',
+                        ['SwapRangeAddScalarPattern--START',
+                         'SwapRangeAddScalarPattern--END', 'one'],
+                        ['Y']),
                 ],
                 'pattern',
                 [

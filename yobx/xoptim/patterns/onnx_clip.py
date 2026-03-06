@@ -23,8 +23,12 @@ class ClipClipPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0.0], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([1.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['zero'],
+                                 value=onh.from_array(np.array([0.0], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['one'],
+                                 value=onh.from_array(np.array([1.0], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Clip', ['X', 'zero'], ['x1']),
                     oh.make_node('Clip', ['x1', '', 'one'], ['Y']),
                 ],

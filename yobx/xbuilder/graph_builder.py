@@ -4256,7 +4256,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         insert_position: Optional[Union[int, str]] = None,
         metadata_props: Optional[Dict[str, str]] = None,
         **kwargs,
-    ) -> Union[str, List[str]]:
+    ) -> Union[str, Tuple[str, ...]]:
         """
         Adds a node in the graph.
 
@@ -4474,7 +4474,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         if len(output_names) == 1:
             return output_names[0]
-        return output_names
+        return tuple(output_names)
 
     def _another_pass_at_shape_inference(self):
         for node in self.nodes:
@@ -4673,7 +4673,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         function_options: Optional[FunctionOptions] = None,
         optimize: bool = False,
         force_rename_with_prefix: Optional[str] = None,
-    ) -> Union[str, List[str]]:
+    ) -> Union[str, Tuple[str, ...]]:
         """
         Appends all nodes and initializers from another builder.
         Handles the renaming of results.
@@ -4853,7 +4853,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         if len(output_names) == 1:
             return output_names[0]
-        return output_names
+        return tuple(output_names)
 
     def _build_large_initializers(
         self,

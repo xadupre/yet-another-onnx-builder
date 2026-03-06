@@ -160,8 +160,6 @@ module = [
 ignore_errors = true
 
 [tool.pyrefly]
-ignore-implicit-imports = ["*"]
-ignore-missing-imports = ["*"]
 project-includes = ["yobx/**/*.py"]
 project-excludes = [
     "yobx/doc.py",
@@ -191,3 +189,20 @@ project-excludes = [
     "yobx/xshape/expressions/evaluate_expressions.py",
     "yobx/xshape/expressions/simplify_expressions.py",
 ]
+
+[tool.pyrefly.errors]
+implicit-import = false
+
+[[tool.pyrefly.sub-config]]
+matches = "yobx/sklearn/**/*.py"
+[tool.pyrefly.sub-config.errors]
+bad-argument-type = false
+bad-return = false
+missing-attribute = false
+
+[[tool.pyrefly.sub-config]]
+matches = "yobx/xbuilder/graph_builder_opset.py"
+[tool.pyrefly.sub-config.errors]
+bad-argument-type = false
+bad-return = false
+missing-attribute = false

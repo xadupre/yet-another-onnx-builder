@@ -168,7 +168,7 @@ We consider the following simple model:
     import torch
     from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.xbuilder import OptimizationOptions
-    from yobx.torch_interpreter import to_onnx
+    from yobx.torch.interpreter import to_onnx
 
 
     class MLP(torch.nn.Module):
