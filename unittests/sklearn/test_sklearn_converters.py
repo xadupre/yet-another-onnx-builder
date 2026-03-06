@@ -6,14 +6,18 @@ import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from yobx.sklearn import to_onnx
 
 
 @requires_sklearn("1.4")
 class TestSklearnBaseConverters(ExtTestCase):
     def test_standard_scaler(self):
-        from sklearn.preprocessing import StandardScaler
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         ss = StandardScaler()
         ss.fit(X)
@@ -32,10 +36,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-5)
 
     def test_logistic_regression_binary(self):
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.linear_model import LogisticRegression
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
         ss = StandardScaler()
@@ -58,9 +58,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(lr.predict_proba(X_scaled).astype(np.float32), proba, atol=1e-5)
 
     def test_logistic_regression_multiclass(self):
-        from sklearn.linear_model import LogisticRegression
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
         y = np.array([0, 0, 1, 1, 2, 2])
         lr = LogisticRegression(max_iter=200)
@@ -82,11 +79,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(lr.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_pipeline_standard_scaler_logistic_regression(self):
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.pipeline import Pipeline
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression())])
@@ -110,10 +102,6 @@ class TestSklearnBaseConverters(ExtTestCase):
 
     @requires_sklearn("1.4")
     def test_pipeline_standard_scaler_only(self):
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.pipeline import Pipeline
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         pipe = Pipeline([("scaler", StandardScaler())])
         pipe.fit(X)
@@ -127,11 +115,6 @@ class TestSklearnBaseConverters(ExtTestCase):
 
     @requires_sklearn("1.4")
     def test_pipeline_multiclass(self):
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.pipeline import Pipeline
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
         y = np.array([0, 0, 1, 1, 2, 2])
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression(max_iter=200))])
@@ -147,9 +130,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_decision_tree_classifier_binary(self):
-        from sklearn.tree import DecisionTreeClassifier
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
         dt = DecisionTreeClassifier(random_state=0)
@@ -170,9 +150,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_decision_tree_classifier_multiclass(self):
-        from sklearn.tree import DecisionTreeClassifier
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
         y = np.array([0, 0, 1, 1, 2, 2])
         dt = DecisionTreeClassifier(random_state=0)
@@ -193,9 +170,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_decision_tree_regressor(self):
-        from sklearn.tree import DecisionTreeRegressor
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
         dt = DecisionTreeRegressor(random_state=0)
@@ -217,11 +191,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         )
 
     def test_pipeline_decision_tree_classifier(self):
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.tree import DecisionTreeClassifier
-        from sklearn.pipeline import Pipeline
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
         pipe = Pipeline(
@@ -247,9 +216,6 @@ class TestSklearnBaseConverters(ExtTestCase):
 
     def test_decision_tree_classifier_binary_v5(self):
         """TreeEnsemble (ai.onnx.ml opset 5) - binary classification."""
-        from sklearn.tree import DecisionTreeClassifier
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
         dt = DecisionTreeClassifier(random_state=0)
@@ -272,9 +238,6 @@ class TestSklearnBaseConverters(ExtTestCase):
 
     def test_decision_tree_classifier_multiclass_v5(self):
         """TreeEnsemble (ai.onnx.ml opset 5) - multi-class classification."""
-        from sklearn.tree import DecisionTreeClassifier
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
         y = np.array([0, 0, 1, 1, 2, 2])
         dt = DecisionTreeClassifier(random_state=0)
@@ -295,9 +258,6 @@ class TestSklearnBaseConverters(ExtTestCase):
 
     def test_decision_tree_regressor_v5(self):
         """TreeEnsemble (ai.onnx.ml opset 5) - regression."""
-        from sklearn.tree import DecisionTreeRegressor
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
         dt = DecisionTreeRegressor(random_state=0)
@@ -319,9 +279,6 @@ class TestSklearnBaseConverters(ExtTestCase):
 
     def test_decision_tree_legacy_opset_unchanged(self):
         """Passing an integer target_opset still emits legacy operators."""
-        from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y_cls = np.array([0, 0, 1, 1])
         y_reg = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
@@ -342,11 +299,6 @@ class TestSklearnBaseConverters(ExtTestCase):
 
     def test_pipeline_decision_tree_classifier_v5(self):
         """Pipeline with TreeEnsemble (ai.onnx.ml opset 5)."""
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.tree import DecisionTreeClassifier
-        from sklearn.pipeline import Pipeline
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
         pipe = Pipeline(
@@ -368,9 +320,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_custom_estimator_with_extra_converters(self):
-        from sklearn.base import BaseEstimator, TransformerMixin
-        from yobx.sklearn import to_onnx
-
         class ScaleByConstant(TransformerMixin, BaseEstimator):
             """Custom transformer that multiplies inputs by a constant."""
 
@@ -411,9 +360,6 @@ class TestSklearnBaseConverters(ExtTestCase):
 
     def test_extra_converters_overrides_builtin(self):
         """extra_converters entries take priority over built-in converters."""
-        from sklearn.preprocessing import StandardScaler
-        from yobx.sklearn import to_onnx
-
         called = []
 
         def custom_scaler_converter(g, sts, outputs, estimator, X, name="scaler"):
@@ -439,10 +385,6 @@ class TestSklearnBaseConverters(ExtTestCase):
 
 
     def test_column_transformer_scaler_and_passthrough(self):
-        from sklearn.compose import ColumnTransformer
-        from sklearn.preprocessing import StandardScaler
-        from yobx.sklearn import to_onnx
-
         X = np.array(
             [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
             dtype=np.float32,
@@ -465,10 +407,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-5)
 
     def test_column_transformer_two_scalers(self):
-        from sklearn.compose import ColumnTransformer
-        from sklearn.preprocessing import StandardScaler, MinMaxScaler
-        from yobx.sklearn import to_onnx
-
         X = np.array(
             [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
             dtype=np.float32,
@@ -486,10 +424,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-5)
 
     def test_column_transformer_drop(self):
-        from sklearn.compose import ColumnTransformer
-        from sklearn.preprocessing import StandardScaler
-        from yobx.sklearn import to_onnx
-
         X = np.array(
             [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
             dtype=np.float32,
@@ -508,10 +442,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqual(result.shape[1], 2)
 
     def test_column_transformer_remainder_passthrough(self):
-        from sklearn.compose import ColumnTransformer
-        from sklearn.preprocessing import StandardScaler
-        from yobx.sklearn import to_onnx
-
         X = np.array(
             [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
             dtype=np.float32,
@@ -529,10 +459,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqual(result.shape[1], 4)
 
     def test_column_transformer_slice_columns(self):
-        from sklearn.compose import ColumnTransformer
-        from sklearn.preprocessing import StandardScaler, MinMaxScaler
-        from yobx.sklearn import to_onnx
-
         X = np.array(
             [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
             dtype=np.float32,
@@ -550,12 +476,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-5)
 
     def test_pipeline_with_column_transformer(self):
-        from sklearn.compose import ColumnTransformer
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.pipeline import Pipeline
-        from yobx.sklearn import to_onnx
-
         X = np.array(
             [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16],
              [2, 3, 4, 5], [6, 7, 8, 9]],
