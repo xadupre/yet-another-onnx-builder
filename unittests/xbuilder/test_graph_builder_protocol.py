@@ -47,7 +47,6 @@ class TestGraphBuilderProtocolExists(ExtTestCase):
             "get_opset",
             "add_domain",
             "has_opset",
-            "unique_name",
             "has_name",
             "has_type",
             "get_type",
@@ -221,6 +220,7 @@ class TestGraphBuilderExtendedProtocol(ExtTestCase):
     """GraphBuilder satisfies GraphBuilderExtendedProtocol."""
 
     EXTENDED_ATTRS = [
+        "unique_name",
         "op",
         "set_type_shape_unary_op",
     ]

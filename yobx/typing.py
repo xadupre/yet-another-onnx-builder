@@ -59,14 +59,6 @@ class GraphBuilderProtocol(Protocol):
         """
         ...
 
-    def unique_name(self, prefix: str) -> str:
-        """Returns a unique name derived from *prefix*.
-
-        :param prefix: name prefix
-        :return: a name that has not been used yet in this graph
-        """
-        ...
-
     def has_name(self, name: str) -> bool:
         """Returns ``True`` when *name* is a known value in this graph.
 
@@ -296,6 +288,14 @@ class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
     * :meth:`set_type_shape_unary_op` — propagates type and shape from an
       input to an output for unary operators such as ``Abs``, ``Relu``, etc.
     """
+
+    def unique_name(self, prefix: str) -> str:
+        """Returns a unique name derived from *prefix*.
+
+        :param prefix: name prefix
+        :return: a name that has not been used yet in this graph
+        """
+        ...
 
     @property
     def op(self) -> "OpsetProtocol":
