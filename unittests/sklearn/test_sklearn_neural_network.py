@@ -122,6 +122,84 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
             mlp.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
         )
 
+    def test_mlp_classifier_float32(self):
+        from sklearn.neural_network import MLPClassifier
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1, 2, 2])
+        mlp = MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
+        mlp.fit(X, y)
+
+        onx = to_onnx(mlp, (X,))
+
+        self.assertEqual(onx.graph.input[0].type.tensor_type.elem_type, 1)  # FLOAT
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(mlp.predict(X), label)
+        self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+    def test_mlp_classifier_float64(self):
+        from sklearn.neural_network import MLPClassifier
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float64)
+        y = np.array([0, 0, 1, 1, 2, 2])
+        mlp = MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
+        mlp.fit(X, y)
+
+        onx = to_onnx(mlp, (X,))
+
+        self.assertEqual(onx.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(mlp.predict(X), label)
+        self.assertEqualArray(mlp.predict_proba(X).astype(np.float64), proba, atol=1e-5)
+
+    def test_mlp_regressor_float32(self):
+        from sklearn.neural_network import MLPRegressor
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
+        mlp = MLPRegressor(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
+        mlp.fit(X, y)
+
+        onx = to_onnx(mlp, (X,))
+
+        self.assertEqual(onx.graph.input[0].type.tensor_type.elem_type, 1)  # FLOAT
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        self.assertEqualArray(
+            mlp.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
+        )
+
+    def test_mlp_regressor_float64(self):
+        from sklearn.neural_network import MLPRegressor
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float64)
+        y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float64)
+        mlp = MLPRegressor(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
+        mlp.fit(X, y)
+
+        onx = to_onnx(mlp, (X,))
+
+        self.assertEqual(onx.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        self.assertEqualArray(
+            mlp.predict(X).astype(np.float64).reshape(-1, 1), predictions, atol=1e-10
+        )
+
     def test_pipeline_mlp_classifier(self):
         from sklearn.preprocessing import StandardScaler
         from sklearn.neural_network import MLPClassifier
