@@ -246,7 +246,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_decision_tree_classifier_binary_v5(self):
-        """TreeEnsemble (ai.onnx.ml opset 5) – binary classification."""
+        """TreeEnsemble (ai.onnx.ml opset 5) - binary classification."""
         from sklearn.tree import DecisionTreeClassifier
         from yobx.sklearn import to_onnx
 
@@ -271,7 +271,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_decision_tree_classifier_multiclass_v5(self):
-        """TreeEnsemble (ai.onnx.ml opset 5) – multi-class classification."""
+        """TreeEnsemble (ai.onnx.ml opset 5) - multi-class classification."""
         from sklearn.tree import DecisionTreeClassifier
         from yobx.sklearn import to_onnx
 
@@ -294,7 +294,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_decision_tree_regressor_v5(self):
-        """TreeEnsemble (ai.onnx.ml opset 5) – regression."""
+        """TreeEnsemble (ai.onnx.ml opset 5) - regression."""
         from sklearn.tree import DecisionTreeRegressor
         from yobx.sklearn import to_onnx
 

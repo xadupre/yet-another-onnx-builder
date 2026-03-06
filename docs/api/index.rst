@@ -4,6 +4,9 @@ API Reference
 .. toctree::
    :maxdepth: 2
 
+   doc
+   ext_test_case
+   typing
    builder/index
    container/index
    helpers/index

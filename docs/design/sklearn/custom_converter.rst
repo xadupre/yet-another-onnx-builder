@@ -26,19 +26,19 @@ A converter follows the same contract as all built-in ones:
 
 ``(g, sts, outputs, estimator, *input_names, name) → output_name(s)``
 
-=============  =====================================================
-Parameter      Description
-=============  =====================================================
-``g``          :class:`GraphBuilder <yobx.xbuilder.GraphBuilder>` —
-               call ``g.op.<OpType>(…)`` to emit ONNX nodes.
-``sts``        ``Dict`` of metadata (empty ``{}`` in the default
-               path; reserved for future shape propagation).
-``outputs``    ``List[str]`` of pre-allocated output tensor names
-               that the converter **must** write to.
-``estimator``  The fitted :epkg:`scikit-learn` object.
+================  =====================================================
+Parameter         Description
+================  =====================================================
+``g``             :class:`GraphBuilder <yobx.xbuilder.GraphBuilder>` —
+                  call ``g.op.<OpType>(…)`` to emit ONNX nodes.
+``sts``           ``Dict`` of metadata (empty ``{}`` in the default
+                  path; reserved for future shape propagation).
+``outputs``       ``List[str]`` of pre-allocated output tensor names
+                  that the converter **must** write to.
+``estimator``     The fitted :epkg:`scikit-learn` object.
 ``*input_names``  One positional ``str`` per graph input tensor.
-``name``       String prefix for unique node-name generation.
-=============  =====================================================
+``name``          String prefix for unique node-name generation.
+================  =====================================================
 
 After writing the output tensor the converter should propagate type
 and shape information so that downstream nodes can use them:

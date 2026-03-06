@@ -312,6 +312,95 @@ def plot_dot(
     return ax
 
 
+def plot_text(
+    text: str,
+    ax: Optional["plt.axes"] = None,  # noqa: F821
+    title: str = "",
+    fontsize: int = 6,
+    line_color_map: Optional[dict] = None,
+    default_color: str = "#333333",
+    figsize: Optional[Tuple[int, int]] = None,
+) -> "matplotlib.axis.Axis":  # noqa: F821
+    """
+    Renders a block of text as a matplotlib figure, with optional per-line
+    colour coding based on the first character of each line.
+
+    Typical use-case: rendering a unified diff so that sphinx-gallery captures
+    the example as a figure.
+
+    :param text: the text to render (newlines split into rows)
+    :param ax: optional matplotlib axis; if *None* a new figure and axis are created
+    :param title: optional axis title
+    :param fontsize: font size for the rendered text
+    :param line_color_map: mapping from a line's first character to a colour
+        string (e.g. ``{"+": "green", "-": "red", "@": "blue"}``).
+        Lines whose first character is not in the map use *default_color*.
+    :param default_color: colour for lines not matched by *line_color_map*
+    :param figsize: ``(width, height)`` in inches; only used when *ax* is *None*
+    :return: the matplotlib axis
+
+    Example rendering a unified diff::
+
+        from yobx import doc
+        diff_text = some_patch.make_diff()
+        ax = doc.plot_text(
+            diff_text,
+            title="my patch",
+            line_color_map={"+": "#2a9d2a", "-": "#cc2222", "@": "#1a6fbf"},
+        )
+
+    .. plot::
+
+        import matplotlib.pyplot as plt
+        from yobx.doc import plot_text
+
+        sample = \"\"\"--- a/foo.py
++++ b/foo.py
+@@ -1,3 +1,3 @@
+ def foo():
+-    return 1
++    return 2
+\"\"\"
+        ax = plot_text(
+            sample,
+            title="sample diff",
+            line_color_map={"+": "#2a9d2a", "-": "#cc2222", "@": "#1a6fbf"},
+        )
+        plt.show()
+    """
+    import matplotlib.pyplot as plt
+
+    lines = text.splitlines()
+    n_lines = max(len(lines), 1)
+
+    if ax is None:
+        if figsize is None:
+            figsize = (10, max(2, n_lines * 0.18 + 0.5))
+        _, ax = plt.subplots(1, 1, figsize=figsize)
+
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, n_lines)
+    ax.axis("off")
+    if title:
+        ax.set_title(title, fontsize=fontsize + 2, loc="left", pad=3)
+
+    color_map = line_color_map or {}
+    for i, line in enumerate(lines):
+        color = color_map.get(line[:1], default_color)
+        ax.text(
+            0.01,
+            n_lines - i - 0.5,
+            line,
+            fontsize=fontsize,
+            color=color,
+            fontfamily="monospace",
+            va="center",
+            transform=ax.transData,
+        )
+
+    return ax
+
+
 def demo_mlp_model(filename: str) -> onnx.ModelProto:
     """
     One model obtained with the following.

@@ -67,7 +67,11 @@ from ..xshape._shape_helper import (
     is_static_dimension,
     is_static_shape,
 )
-from ..xshape.shape_type_compute import set_shape_type_op_any, set_shape_type_custom
+from ..xshape.shape_type_compute import (
+    set_shape_type_op_any,
+    set_shape_type_custom,
+    set_type_shape_unary_op,
+)
 from ..xshape._builder_runtime import _BuilderRuntime
 from ..xshape._shape_runtime import _ShapeRuntime
 from ..xshape._inference_runtime import _InferenceRuntime
@@ -1070,6 +1074,15 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         "Returns the opset for the main domain (assuming it is used)."
         return self.opsets[""]
 
+    def has_opset(self, domain: str) -> int:
+        """
+        Returns the opset version for a specific domain.
+
+        :param domain: domain name
+        :return: version or 0 if missing
+        """
+        return self.opsets.get(domain, 0)
+
     def get_opset(self, domain: str, exc: bool = True) -> Optional[int]:
         """
         Returns the opset version for a specific domain.
@@ -1079,7 +1092,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         :return: version
         """
         assert (
-            exc or domain in self.opsets
+            not exc or domain in self.opsets
         ), f"Domain {domain!r} is not registered{self.get_debug_msg()}."
         return self.opsets.get(domain, None)
 
@@ -2320,6 +2333,18 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def _set_known_value_shape(self, name: str, value: DYNAMIC_SHAPE):
         self._known_value_shape[name] = value
+
+    def unique_function_name(self, prefix: str) -> str:
+        """Returns a function which does not exist yet."""
+        if prefix in self.functions:
+            return prefix
+        sug = prefix
+        i = 0
+        while sug in self.functions:
+            i += 1
+            sug = f"{prefix}{i}"
+        self._unique_names.add(sug)
+        return sug
 
     def unique_dimension_name(self, prefix: str) -> str:
         """
@@ -10117,3 +10142,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             f"Unable to evaluate expression with dimension={dimension!r}, "
             f"args={args!r}, constraints={self.constraints_}{self.get_debug_msg()}"
         )
+
+    def set_type_shape_unary_op(
+        self,
+        name: str,
+        input_name: str,
+        itype: Optional[int] = None,
+    ) -> bool:
+        return set_type_shape_unary_op(self, name, input_name, itype)  # type: ignore

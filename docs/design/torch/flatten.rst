@@ -154,14 +154,10 @@ undone when the ``with`` block exits:
 
     from yobx.torch import register_flattening_functions
 
-    with register_flattening_functions(patch_transformers=True) as fix_inputs:
+    with register_flattening_functions(patch_transformers=True):
         # Inside this block:
-        # * DynamicCache, StaticCache, EncoderDecoderCache, and BaseModelOutput
-        #   are registered as pytree nodes.
-        # * fix_inputs is a callable that replaces non-standard containers in
-        #   a nested input structure with their plain Python equivalents before
-        #   handing them to torch.export.export.
-        inputs = fix_inputs(my_inputs)
+        # DynamicCache, StaticCache, EncoderDecoderCache, and BaseModelOutput
+        # are registered as pytree nodes.
         exported = torch.export.export(model, (inputs,))
 
 After the ``with`` block all registrations are rolled back, leaving
@@ -276,6 +272,11 @@ preserved:
         rebuilt = unflatten_dynamic_cache(flat, context)
         print("layer types:", [type(layer).__name__ for layer in rebuilt.layers])
         print("sliding_window:", rebuilt.layers[1].sliding_window)
+
+List of supported classes
+-------------------------
+
+See :ref:`flattened-classes`.
 
 .. seealso::
 

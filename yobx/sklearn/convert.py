@@ -13,20 +13,28 @@ def to_onnx(
     dynamic_shapes: Optional[Tuple[Dict[int, str]]] = None,
     target_opset: Union[int, Dict[str, int]] = 20,
     verbose: int = 0,
+    builder_cls: Union[type, Callable] = GraphBuilder,
     extra_converters: Optional[Dict[type, Callable]] = None,
 ):
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
+    By default, the first dimension is considered as dynamic,
+    the others are static.
 
     :param estimator: estimator
     :param args: dummy inputs
-    :param dynamic_shapes: dynamic shapes
+    :param dynamic_shapes: dynamic shapes, if not specified, the first dimension
+        is dynamic, the others are static
     :param target_opset: opset to use; either an integer for the default domain
         (``""``), or a dictionary mapping domain names to opset versions,
         e.g. ``{"": 20, "ai.onnx.ml": 5}``.  When ``"ai.onnx.ml"`` is set to
         ``5`` the converter emits the unified ``TreeEnsemble`` operator
         introduced in that opset instead of the older per-task operators.
     :param verbose: verbosity
+    :param builder_cls: by default the graph builder is a
+        :class:`yobx.xbuilder.GraphBuilder` but any builder can
+        be used as long it implements the apis :ref:`builder-api`
+        and :ref:`builder-api-make`
     :param extra_converters: optional mapping from estimator type to converter
         function; entries here take priority over the built-in converters and
         allow converting custom estimators that are not natively supported
@@ -35,7 +43,8 @@ def to_onnx(
     from . import register_sklearn_converters
 
     register_sklearn_converters()
-    g = GraphBuilder(target_opset)
+    g = builder_cls(target_opset)
+
     cls = type(estimator)
     if extra_converters and cls in extra_converters:
         fct = extra_converters[cls]

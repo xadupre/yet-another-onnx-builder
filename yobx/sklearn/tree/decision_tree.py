@@ -402,7 +402,7 @@ def _sklearn_decision_tree_classifier_v5(
     """
     attrs = _extract_tree_attributes_v5(tree, n_classes, is_classifier=True)
 
-    # scores: [N, n_classes] float32 – class probabilities
+    # scores: [N, n_classes] float32 - class probabilities
     scores = g.make_node(
         "TreeEnsemble",
         [X],

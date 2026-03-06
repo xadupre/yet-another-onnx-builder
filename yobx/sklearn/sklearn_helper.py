@@ -3,10 +3,28 @@ from sklearn.base import BaseEstimator, is_classifier, is_regressor
 from sklearn.pipeline import Pipeline
 
 
+def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
+    """
+    Returns True when *estimator* is a fitted classifier that genuinely
+    supports :meth:`predict_proba`.
+
+    For most classifiers, checking ``hasattr(estimator, 'predict_proba')``
+    is sufficient.  However, :class:`sklearn.linear_model.SGDClassifier`
+    (and its subclasses such as :class:`~sklearn.linear_model.Perceptron`)
+    defines ``predict_proba`` as a method that raises :exc:`AttributeError`
+    at runtime for non-probabilistic loss functions (e.g. ``'hinge'``).
+    Because Python's ``hasattr`` catches :exc:`AttributeError`, it returns
+    ``False`` in those cases — so the plain ``hasattr`` check already works
+    correctly for fitted :class:`~sklearn.linear_model.SGDClassifier`
+    instances.
+    """
+    return hasattr(estimator, "predict_proba")
+
+
 def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
     if is_classifier(estimator):
-        return 2
+        return 2 if _classifier_has_predict_proba(estimator) else 1
     return 1
 
 
@@ -28,7 +46,9 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
             except AttributeError:
                 pass
     if is_classifier(estimator):
-        return ["label", "probabilities"]
+        if _classifier_has_predict_proba(estimator):
+            return ["label", "probabilities"]
+        return ["label"]
     if is_regressor(estimator):
         return ["predictions"]
     return ["Y"]

@@ -21,12 +21,24 @@ yet-another-onnx-builder documentation
 
 `yet-another-onnx-builder on GitHub <https://github.com/xadupre/yet-another-onnx-builder>`_
 
+**yet-another-onnx-builder** (``yobx``) is a toolkit for converting machine learning models
+to `ONNX <https://onnx.ai>`_ format and manipulating ONNX graphs programmatically.
+It provides:
+
+- A :ref:`graph builder API <l-design-graph-builder>` for constructing and optimizing ONNX graphs,
+  with built-in shape inference and a pattern-based
+  :ref:`graph optimizer <l-design-pattern-optimizer-patterns>`.
+- Converters for **scikit-learn** estimators and pipelines (``yobx.sklearn``).
+- Utilities for **PyTorch** export, including model patching and input flattening (``yobx.torch``).
+- A symbolic :ref:`shape expression system <l-design-shape>` for dynamic shape handling at export time.
+- A :ref:`translation tool <l-design-translate>` that converts ONNX graphs back to executable Python code.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents
 
-   cmds/index
    design/index
+   cmds/index
    auto_examples/index
 
 .. toctree::

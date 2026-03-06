@@ -17,60 +17,34 @@ class UnsqueezeEqualPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 1, "b"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['axis'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['m_one'], value=onh.from_array(np.array([-1.0], dtype=np.float32), name='value')),
+                    oh.make_node('Unsqueeze', ['X', 'axis'], ['Y']),
+                    oh.make_node('Equal', ['X', 'm_one'], ['xe']),
+                    oh.make_node('Unsqueeze', ['xe', 'axis'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 'b')),
+                    oh.make_tensor_value_info('m_one', onnx.TensorProto.FLOAT, (1,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 'b')),
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.BOOL, ('a', 1, 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        inputs.append(oh.make_tensor_value_info("m_one", onnx.TensorProto.FLOAT, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("axis", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["axis"],
-                value=onh.from_array(np.array([1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["m_one"],
-                value=onh.from_array(np.array([-1.0], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Unsqueeze", ["X", "axis"], ["Y"]))
-        nodes.append(oh.make_node("Equal", ["X", "m_one"], ["xe"]))
-        nodes.append(oh.make_node("Unsqueeze", ["xe", "axis"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 1, "b"))
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.BOOL, shape=("a", 1, "b"))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -81,44 +55,30 @@ class UnsqueezeEqualPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 1, "b"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Unsqueeze', ['X', 'axis'], ['Y']),
+                    oh.make_node('Equal', ['Y', 'm_one'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 'b')),
+                    oh.make_tensor_value_info('m_one', onnx.TensorProto.FLOAT, (1,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 'b')),
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.BOOL, ('a', 1, 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        inputs.append(oh.make_tensor_value_info("m_one", onnx.TensorProto.FLOAT, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("axis", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(oh.make_node("Unsqueeze", ["X", "axis"], ["Y"]))
-        nodes.append(oh.make_node("Equal", ["Y", "m_one"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 1, "b"))
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.BOOL, shape=("a", 1, "b"))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """

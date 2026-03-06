@@ -21,87 +21,38 @@ class GeluPattern(EasyPatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 20),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "linear_5", onnx.TensorProto.FLOAT16, shape=(4, 512, 16384)
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init10_s1_5'], value=onh.from_array(np.array([3.0], dtype=np.float16), name='value')),
+                    oh.make_node('Constant', [], ['init10_s_8'], value=onh.from_array(np.array(0.044708251953125, dtype=np.float16), name='value')),
+                    oh.make_node('Constant', [], ['init10_s_9'], value=onh.from_array(np.array(0.7978515625, dtype=np.float16), name='value')),
+                    oh.make_node('Constant', [], ['init10_s_10'], value=onh.from_array(np.array(1.0, dtype=np.float16), name='value')),
+                    oh.make_node('Constant', [], ['init10_s_7'], value=onh.from_array(np.array(0.5, dtype=np.float16), name='value')),
+                    oh.make_node('Pow', ['linear_5', 'init10_s1_5'], ['pow_1']),
+                    oh.make_node('Mul', ['pow_1', 'init10_s_8'], ['_onx_mul05']),
+                    oh.make_node('Add', ['linear_5', '_onx_mul05'], ['add_4']),
+                    oh.make_node('Mul', ['add_4', 'init10_s_9'], ['_onx_mul06']),
+                    oh.make_node('Tanh', ['_onx_mul06'], ['tanh']),
+                    oh.make_node('Add', ['tanh', 'init10_s_10'], ['add_5']),
+                    oh.make_node('Mul', ['linear_5', 'init10_s_7'], ['_onx_mul04']),
+                    oh.make_node('Mul', ['_onx_mul04', 'add_5'], ['mul_4']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('linear_5', onnx.TensorProto.FLOAT16, (4, 512, 16384)),
+                ],
+                [
+                    oh.make_tensor_value_info('mul_4', onnx.TensorProto.FLOAT16, (4, 512, 16384)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 20)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init10_s1_5"],
-                value=onh.from_array(np.array([3.0], dtype=np.float16), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init10_s_8"],
-                value=onh.from_array(
-                    np.array(0.044708251953125, dtype=np.float16), name="value"
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init10_s_9"],
-                value=onh.from_array(np.array(0.7978515625, dtype=np.float16), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init10_s_10"],
-                value=onh.from_array(np.array(1.0, dtype=np.float16), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init10_s_7"],
-                value=onh.from_array(np.array(0.5, dtype=np.float16), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Pow", ["linear_5", "init10_s1_5"], ["pow_1"]))
-        nodes.append(oh.make_node("Mul", ["pow_1", "init10_s_8"], ["_onx_mul05"]))
-        nodes.append(oh.make_node("Add", ["linear_5", "_onx_mul05"], ["add_4"]))
-        nodes.append(oh.make_node("Mul", ["add_4", "init10_s_9"], ["_onx_mul06"]))
-        nodes.append(oh.make_node("Tanh", ["_onx_mul06"], ["tanh"]))
-        nodes.append(oh.make_node("Add", ["tanh", "init10_s_10"], ["add_5"]))
-        nodes.append(oh.make_node("Mul", ["linear_5", "init10_s_7"], ["_onx_mul04"]))
-        nodes.append(oh.make_node("Mul", ["_onx_mul04", "add_5"], ["mul_4"]))
-        outputs.append(
-            oh.make_tensor_value_info("mul_4", onnx.TensorProto.FLOAT16, shape=(4, 512, 16384))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -112,39 +63,25 @@ class GeluPattern(EasyPatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 20),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "linear_5", onnx.TensorProto.FLOAT16, shape=(4, 512, 16384)
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Gelu', ['linear_5'], ['mul_4'], approximate='tanh'),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('linear_5', onnx.TensorProto.FLOAT16, (4, 512, 16384)),
+                ],
+                [
+                    oh.make_tensor_value_info('mul_4', onnx.TensorProto.FLOAT16, (4, 512, 16384)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 20)],
         )
-        nodes.append(oh.make_node("Gelu", ["linear_5"], ["mul_4"], approximate="tanh"))
-        outputs.append(
-            oh.make_tensor_value_info("mul_4", onnx.TensorProto.FLOAT16, shape=(4, 512, 16384))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -225,52 +162,30 @@ class LeakyReluPattern(EasyPatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("X1", onnx.TensorProto.FLOAT, shape=(3, 3)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["zero"],
-                value=onh.from_array(np.array([0.0], dtype=np.float32), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['slope2'], value=onh.from_array(np.array([-0.33000001311302185], dtype=np.float32), name='value')),
+                    oh.make_node('Greater', ['X1', 'zero'], ['xpos2']),
+                    oh.make_node('Mul', ['X1', 'slope2'], ['xmul2']),
+                    oh.make_node('Where', ['xpos2', 'X1', 'xmul2'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X1', onnx.TensorProto.FLOAT, (3, 3)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (3, 3)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["slope2"],
-                value=onh.from_array(
-                    np.array([-0.33000001311302185], dtype=np.float32), name="value"
-                ),
-            )
-        )
-        nodes.append(oh.make_node("Greater", ["X1", "zero"], ["xpos2"]))
-        nodes.append(oh.make_node("Mul", ["X1", "slope2"], ["xmul2"]))
-        nodes.append(oh.make_node("Where", ["xpos2", "X1", "xmul2"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(3, 3)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -281,33 +196,25 @@ class LeakyReluPattern(EasyPatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("X1", onnx.TensorProto.FLOAT, shape=(3, 3)))
-        nodes.append(oh.make_node("LeakyRelu", ["X1"], ["Y"], alpha=-0.33000001311302185))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(3, 3)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('LeakyRelu', ['X1'], ['Y'], alpha=-0.33000001311302185),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X1', onnx.TensorProto.FLOAT, (3, 3)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (3, 3)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -364,90 +271,46 @@ class SoftmaxCrossEntropyLossCastPattern(EasyPatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("I", onnx.TensorProto.INT64, shape=("A",)))
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT16, shape=("A", "B"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['B'], value=onh.from_array(np.array([-100], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zeroi'], value=onh.from_array(np.array([0], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zerof'], value=onh.from_array(np.array([0.0], dtype=np.float16), name='value')),
+                    oh.make_node('Equal', ['I', 'B'], ['eq1']),
+                    oh.make_node('Not', ['eq1'], ['neq1']),
+                    oh.make_node('Where', ['neq1', 'I', 'zeroi'], ['ind']),
+                    oh.make_node('Unsqueeze', ['ind', 'one'], ['flat_ind']),
+                    oh.make_node('LogSoftmax', ['X'], ['logX'], axis=1),
+                    oh.make_node('GatherElements', ['logX', 'flat_ind'], ['gx'], axis=1),
+                    oh.make_node('Squeeze', ['gx', 'one'], ['flat_gx']),
+                    oh.make_node('Neg', ['flat_gx'], ['neg_gx']),
+                    oh.make_node('Where', ['neq1', 'neg_gx', 'zerof'], ['w2']),
+                    oh.make_node('Cast', ['neq1'], ['neq1f'], to=1),
+                    oh.make_node('ReduceSum', ['neq1f'], ['red2'], keepdims=0, noop_with_empty_axes=0),
+                    oh.make_node('Cast', ['red2'], ['red2_16'], to=10),
+                    oh.make_node('Cast', ['w2'], ['w2f'], to=1),
+                    oh.make_node('ReduceSum', ['w2f'], ['red1'], keepdims=0, noop_with_empty_axes=0),
+                    oh.make_node('Cast', ['red1'], ['red1_16'], to=10),
+                    oh.make_node('Div', ['red1_16', 'red2_16'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('I', onnx.TensorProto.INT64, ('A',)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, ('A', 'B')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, ()),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["B"],
-                value=onh.from_array(np.array([-100], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["zeroi"],
-                value=onh.from_array(np.array([0], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["one"],
-                value=onh.from_array(np.array([1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["zerof"],
-                value=onh.from_array(np.array([0.0], dtype=np.float16), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Equal", ["I", "B"], ["eq1"]))
-        nodes.append(oh.make_node("Not", ["eq1"], ["neq1"]))
-        nodes.append(oh.make_node("Where", ["neq1", "I", "zeroi"], ["ind"]))
-        nodes.append(oh.make_node("Unsqueeze", ["ind", "one"], ["flat_ind"]))
-        nodes.append(oh.make_node("LogSoftmax", ["X"], ["logX"], axis=1))
-        nodes.append(oh.make_node("GatherElements", ["logX", "flat_ind"], ["gx"], axis=1))
-        nodes.append(oh.make_node("Squeeze", ["gx", "one"], ["flat_gx"]))
-        nodes.append(oh.make_node("Neg", ["flat_gx"], ["neg_gx"]))
-        nodes.append(oh.make_node("Where", ["neq1", "neg_gx", "zerof"], ["w2"]))
-        nodes.append(oh.make_node("Cast", ["neq1"], ["neq1f"], to=1))
-        nodes.append(
-            oh.make_node(
-                "ReduceSum", ["neq1f"], ["red2"], keepdims=0, noop_with_empty_axes=0
-            )
-        )
-        nodes.append(oh.make_node("Cast", ["red2"], ["red2_16"], to=10))
-        nodes.append(oh.make_node("Cast", ["w2"], ["w2f"], to=1))
-        nodes.append(
-            oh.make_node(
-                "ReduceSum", ["w2f"], ["red1"], keepdims=0, noop_with_empty_axes=0
-            )
-        )
-        nodes.append(oh.make_node("Cast", ["red1"], ["red1_16"], to=10))
-        nodes.append(oh.make_node("Div", ["red1_16", "red2_16"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT16, shape=[]))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -458,44 +321,26 @@ class SoftmaxCrossEntropyLossCastPattern(EasyPatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("I", onnx.TensorProto.INT64, shape=("A",)))
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT16, shape=("A", "B"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('SoftmaxCrossEntropyLoss', ['X', 'I'], ['Y'], ignore_index=-100, reduction='mean'),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('I', onnx.TensorProto.INT64, ('A',)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, ('A', 'B')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, ()),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "SoftmaxCrossEntropyLoss",
-                ["X", "I"],
-                ["Y"],
-                ignore_index=-100,
-                reduction="mean",
-            )
-        )
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT16, shape=[]))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
