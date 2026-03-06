@@ -17,7 +17,6 @@ from yobx.ext_test_case import ExtTestCase, requires_onnxscript
 from yobx.typing import GraphBuilderProtocol
 from yobx.xbuilder import GraphBuilder
 
-
 TFLOAT = TensorProto.FLOAT
 
 
@@ -129,8 +128,6 @@ class TestGraphBuilderSatisfiesProtocol(ExtTestCase):
         g = GraphBuilder(18, ir_version=9)
         g.make_tensor_input("x", TFLOAT, (None,))
         self.assertIsInstance(g, GraphBuilderProtocol)
-
-
 
     def test_to_onnx(self):
         g = self._make_simple_model()

@@ -2,7 +2,6 @@ from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 from sklearn.base import BaseEstimator
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
-from ..typing import GraphBuilderProtocol
 from .register import get_sklearn_converter
 from .sklearn_helper import get_output_names
 
