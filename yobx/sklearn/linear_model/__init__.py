@@ -1,2 +1,2 @@
 def register():
-    from . import logistic_regression
+    from . import glm, linear_classifier, linear_regressor, logistic_regression
