@@ -5,4 +5,7 @@ yobx.sklearn.linear_model
     :maxdepth: 1
     :caption: modules
 
+    glm
+    linear_classifier
+    linear_regressor
     logistic_regression
