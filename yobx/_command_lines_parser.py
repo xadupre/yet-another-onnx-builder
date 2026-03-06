@@ -509,6 +509,117 @@ def _cmd_print(argv: List[Any]):
         raise ValueError(f"Unexpected value fmt={args.fmt!r}")
 
 
+def get_parser_run_doc_examples() -> ArgumentParser:
+    parser = ArgumentParser(
+        prog="run-doc-examples",
+        description=textwrap.dedent("""
+            Extracts all ``.. runpython::`` code blocks from RST documentation
+            files or Python source files (docstrings) and executes each one in
+            an isolated subprocess.  Exits with a non-zero status when at least
+            one block fails.
+            """),
+        epilog=textwrap.dedent("""
+            examples:
+
+                # Check every runpython block in a single RST file
+                python -m yobx run-doc-examples docs/design/misc/helpers.rst
+
+                # Check all RST files in a directory tree
+                python -m yobx run-doc-examples docs/ -v 1
+
+                # Check Python source files (docstring examples)
+                python -m yobx run-doc-examples yobx/helpers/helper.py -v 2
+
+                # Multiple paths at once
+                python -m yobx run-doc-examples \\
+                    docs/design/misc/helpers.rst \\
+                    yobx/helpers/helper.py \\
+                    -v 1
+            """),
+        formatter_class=RawTextHelpFormatter,
+    )
+    parser.add_argument(
+        "inputs",
+        nargs="+",
+        help="RST or Python files (or directories) to scan for runpython:: blocks.",
+    )
+    parser.add_argument(
+        "--ext",
+        default=".rst,.py",
+        help="Comma-separated list of file extensions to include when a directory "
+        "is given (default: '.rst,.py').",
+    )
+    parser.add_argument(
+        "--timeout",
+        default=None,
+        type=int,
+        required=False,
+        help="Per-block execution timeout in seconds (no limit by default).",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        type=int,
+        default=0,
+        required=False,
+        help="Verbosity level: 0=failures only, 1=each block status, 2=also show code.",
+    )
+    return parser
+
+
+def _collect_files(inputs: List[str], extensions: List[str]) -> List[str]:
+    """Expand a mixed list of file paths and directories into individual file paths."""
+    collected: List[str] = []
+    for inp in inputs:
+        if os.path.isfile(inp):
+            collected.append(inp)
+        elif os.path.isdir(inp):
+            for dirpath, _dirnames, filenames in os.walk(inp):
+                for fname in sorted(filenames):
+                    if any(fname.endswith(ext) for ext in extensions):
+                        collected.append(os.path.join(dirpath, fname))
+        else:
+            # Try glob expansion so the caller can pass patterns like "docs/**/*.rst"
+            import glob as _glob
+
+            matched = sorted(_glob.glob(inp, recursive=True))
+            if matched:
+                for m in matched:
+                    if os.path.isfile(m):
+                        collected.append(m)
+            else:
+                # Keep it so run_runpython_blocks can emit a warning
+                collected.append(inp)
+    return collected
+
+
+def _cmd_run_doc_examples(argv: List[Any]):
+    from .helpers._check_runpython import run_runpython_blocks
+
+    parser = get_parser_run_doc_examples()
+    args = parser.parse_args(argv[1:])
+
+    extensions = [e.strip() for e in args.ext.split(",") if e.strip()]
+    files = _collect_files(args.inputs, extensions)
+
+    if not files:
+        print("[run-doc-examples] No files found.")
+        sys.exit(0)
+
+    if args.verbose:
+        print(f"[run-doc-examples] scanning {len(files)} file(s) ...")
+
+    _, n_failed = run_runpython_blocks(
+        files,
+        verbose=args.verbose,
+        raise_on_error=False,
+        timeout=args.timeout,
+    )
+
+    if n_failed:
+        sys.exit(1)
+
+
 #############
 # main parser
 #############
@@ -625,12 +736,13 @@ def get_main_parser() -> ArgumentParser:
             Type 'python -m yobx <cmd> --help'
             to get help for a specific command.
 
-            agg            - aggregates statistics from multiple files
-            copilot-draft  - draft a sklearn→ONNX converter via GitHub Copilot
-            dot            - converts an onnx model into dot format
-            find           - find node consuming or producing a result
-            partition      - partition a model, each partition appears as local function
-            print          - prints the model on standard output
+            agg               - aggregates statistics from multiple files
+            copilot-draft     - draft a sklearn→ONNX converter via GitHub Copilot
+            dot               - converts an onnx model into dot format
+            find              - find node consuming or producing a result
+            partition         - partition a model, each partition appears as local function
+            print             - prints the model on standard output
+            run-doc-examples  - run all runpython:: examples in RST/Python files
             """),
     )
     parser.add_argument(
@@ -642,6 +754,7 @@ def get_main_parser() -> ArgumentParser:
             "find",
             "partition",
             "print",
+            "run-doc-examples",
         ],
         help="Selects a command.",
     )
@@ -656,6 +769,7 @@ def main(argv: Optional[List[Any]] = None):
         find=_cmd_find,
         partition=_cmd_partition,
         print=_cmd_print,
+        **{"run-doc-examples": _cmd_run_doc_examples},
     )
 
     if argv is None:
@@ -672,6 +786,7 @@ def main(argv: Optional[List[Any]] = None):
                 find=get_parser_find,
                 partition=get_parser_partition,
                 print=get_parser_print,
+                **{"run-doc-examples": get_parser_run_doc_examples},
             )
             cmd = argv[0]
             if cmd not in parsers:

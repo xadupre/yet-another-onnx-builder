@@ -20,3 +20,4 @@ Command Lines
     find
     partition
     print
+    run_doc_examples
