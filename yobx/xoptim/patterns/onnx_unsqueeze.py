@@ -24,8 +24,12 @@ class SqueezeUnsqueezePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['axes1'], value=onh.from_array(np.array([1, 2], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['axes2'], value=onh.from_array(np.array([1, 2], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['axes1'],
+                                 value=onh.from_array(np.array([1, 2], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['axes2'],
+                                 value=onh.from_array(np.array([1, 2], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Unsqueeze', ['X', 'axes1'], ['mm']),
                     oh.make_node('Squeeze', ['mm', 'axes2'], ['Y']),
                 ],
@@ -202,8 +206,12 @@ class UnsqueezeUnsqueezePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['ii'], value=onh.from_array(np.array([2], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['jj'], value=onh.from_array(np.array([3], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['ii'],
+                                 value=onh.from_array(np.array([2],
+                                 dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['jj'],
+                                 value=onh.from_array(np.array([3],
+                                 dtype=np.int64), name='value')),
                     oh.make_node('Unsqueeze', ['X', 'ii'], ['x1']),
                     oh.make_node('Unsqueeze', ['x1', 'jj'], ['Y']),
                 ],
@@ -236,7 +244,9 @@ class UnsqueezeUnsqueezePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s2_2_3'], value=onh.from_array(np.array([2, 3], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s2_2_3'],
+                                 value=onh.from_array(np.array([2, 3], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Unsqueeze', ['X', 'init7_s2_2_3'], ['Y']),
                 ],
                 'pattern',
@@ -512,8 +522,11 @@ class SqueezeBinaryUnsqueezePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['two'], value=onh.from_array(np.array(2, dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['two'],
+                                 value=onh.from_array(np.array(2, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zero'],
+                                 value=onh.from_array(np.array([0], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Squeeze', ['d'], ['d0']),
                     oh.make_node('Div', ['d0', 'two'], ['d1']),
                     oh.make_node('Unsqueeze', ['d1', 'zero'], ['e']),
@@ -547,7 +560,8 @@ class SqueezeBinaryUnsqueezePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Unsqueeze', ['two', 'zero'], ['SqueezeBinaryUnsqueezePattern_two']),
+                    oh.make_node('Unsqueeze', ['two', 'zero'],
+                                 ['SqueezeBinaryUnsqueezePattern_two']),
                     oh.make_node('Div', ['d', 'SqueezeBinaryUnsqueezePattern_two'], ['e']),
                 ],
                 'pattern',

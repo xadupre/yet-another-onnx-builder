@@ -65,38 +65,32 @@ class AddAddMulMulPattern(PatternOptimization, _common):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("d",)))
-        nodes.append(oh.make_node("Add", ["X", "Y"], ["xy"]))
-        nodes.append(oh.make_node("Add", ["xy", "Z"], ["F"]))
-        outputs.append(oh.make_tensor_value_info("F", onnx.TensorProto.FLOAT, shape=("d",)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Add', ['X', 'Y'], ['xy']),
+                    oh.make_node('Add', ['xy', 'Z'], ['F']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+                [
+                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -107,41 +101,36 @@ class AddAddMulMulPattern(PatternOptimization, _common):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("d",)))
-        nodes.append(
-            oh.make_node(
-                "AddAdd", ["X", "Y", "Z"], ["F"], domain="onnx_extended.ortops.optim.cuda"
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'AddAdd',
+                        ['X', 'Y', 'Z'],
+                        ['F'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+                [
+                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        outputs.append(oh.make_tensor_value_info("F", onnx.TensorProto.FLOAT, shape=("d",)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -244,38 +233,32 @@ class AddMulPattern(PatternOptimization, _common):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("d",)))
-        nodes.append(oh.make_node("Add", ["X", "Y"], ["xy"]))
-        nodes.append(oh.make_node("Mul", ["xy", "Z"], ["F"]))
-        outputs.append(oh.make_tensor_value_info("F", onnx.TensorProto.FLOAT, shape=("d",)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Add', ['X', 'Y'], ['xy']),
+                    oh.make_node('Mul', ['xy', 'Z'], ['F']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+                [
+                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -286,41 +269,36 @@ class AddMulPattern(PatternOptimization, _common):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("d",)))
-        nodes.append(
-            oh.make_node(
-                "AddMul", ["X", "Y", "Z"], ["F"], domain="onnx_extended.ortops.optim.cuda"
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'AddMul',
+                        ['X', 'Y', 'Z'],
+                        ['F'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+                [
+                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        outputs.append(oh.make_tensor_value_info("F", onnx.TensorProto.FLOAT, shape=("d",)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -421,43 +399,37 @@ class MulSigmoidPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "X", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM", "UNKNOWNDIM1")
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Sigmoid', ['X'], ['xs']),
+                    oh.make_node('Mul', ['X', 'xs'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
+                ],
+                [
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        nodes.append(oh.make_node("Sigmoid", ["X"], ["xs"]))
-        nodes.append(oh.make_node("Mul", ["X", "xs"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM2", "UNKNOWNDIM3")
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -468,46 +440,41 @@ class MulSigmoidPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "X", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM", "UNKNOWNDIM1")
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'MulSigmoid',
+                        ['X'],
+                        ['Y'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
+                ],
+                [
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        nodes.append(
-            oh.make_node(
-                "MulSigmoid", ["X"], ["Y"], domain="onnx_extended.ortops.optim.cuda"
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM2", "UNKNOWNDIM3")
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -566,50 +533,42 @@ class NegXplus1Pattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
+        import numpy as np
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "X", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM", "UNKNOWNDIM1")
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'Constant', [], ['one'],
+                        value=onh.from_array(np.array([1.0], dtype=np.float32), name='value'),
+                    ),
+                    oh.make_node('Sub', ['one', 'X'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
+                ],
+                [
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["one"],
-                value=onh.from_array(np.array([1.0], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Sub", ["one", "X"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM2", "UNKNOWNDIM3")
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -620,46 +579,41 @@ class NegXplus1Pattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "X", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM", "UNKNOWNDIM1")
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'NegXplus1',
+                        ['X'],
+                        ['Y'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
+                ],
+                [
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        nodes.append(
-            oh.make_node(
-                "NegXplus1", ["X"], ["Y"], domain="onnx_extended.ortops.optim.cuda"
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM2", "UNKNOWNDIM3")
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -716,38 +670,32 @@ class SubMulPattern(PatternOptimization, _common):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("d",)))
-        nodes.append(oh.make_node("Sub", ["X", "Y"], ["xy"]))
-        nodes.append(oh.make_node("Mul", ["xy", "Z"], ["F"]))
-        outputs.append(oh.make_tensor_value_info("F", onnx.TensorProto.FLOAT, shape=("d",)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Sub', ['X', 'Y'], ['xy']),
+                    oh.make_node('Mul', ['xy', 'Z'], ['F']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+                [
+                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -758,41 +706,36 @@ class SubMulPattern(PatternOptimization, _common):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("d",)))
-        nodes.append(
-            oh.make_node(
-                "SubMul", ["X", "Y", "Z"], ["F"], domain="onnx_extended.ortops.optim.cuda"
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'SubMul',
+                        ['X', 'Y', 'Z'],
+                        ['F'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+                [
+                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        outputs.append(oh.make_tensor_value_info("F", onnx.TensorProto.FLOAT, shape=("d",)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -901,39 +844,33 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("d",)))
-        nodes.append(oh.make_node("Add", ["X", "Y"], ["F1"]))
-        nodes.append(oh.make_node("Add", ["X", "Z"], ["F2"]))
-        outputs.append(oh.make_tensor_value_info("F1", onnx.TensorProto.FLOAT, shape=("d",)))
-        outputs.append(oh.make_tensor_value_info("F2", onnx.TensorProto.FLOAT, shape=("d",)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Add', ['X', 'Y'], ['F1']),
+                    oh.make_node('Add', ['X', 'Z'], ['F2']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+                [
+                    oh.make_tensor_value_info('F1', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('F2', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -944,45 +881,37 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("d",)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("d",)))
-        nodes.append(
-            oh.make_node(
-                "AddSharedInput",
-                ["X", "Y", "Z"],
-                ["F1", "F2"],
-                domain="onnx_extended.ortops.optim.cuda",
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'AddSharedInput',
+                        ['X', 'Y', 'Z'],
+                        ['F1', 'F2'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+                [
+                    oh.make_tensor_value_info('F1', onnx.TensorProto.FLOAT, shape=('d',)),
+                    oh.make_tensor_value_info('F2', onnx.TensorProto.FLOAT, shape=('d',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        outputs.append(oh.make_tensor_value_info("F1", onnx.TensorProto.FLOAT, shape=("d",)))
-        outputs.append(oh.make_tensor_value_info("F2", onnx.TensorProto.FLOAT, shape=("d",)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1109,51 +1038,52 @@ class AddMulTransposePattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'AddMul',
+                        ['X', 'Y', 'Z'],
+                        ['F1'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
+                    oh.make_node('Transpose', ['F1'], ['final'], perm=[0, 2, 1, 3]),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info(
+                        'Z',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
+                ],
+                [
+                    oh.make_tensor_value_info(
+                        'final',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d"))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d"))
-        )
-        nodes.append(
-            oh.make_node(
-                "AddMul", ["X", "Y", "Z"], ["F1"], domain="onnx_extended.ortops.optim.cuda"
-            )
-        )
-        nodes.append(oh.make_node("Transpose", ["F1"], ["final"], perm=[0, 2, 1, 3]))
-        outputs.append(
-            oh.make_tensor_value_info(
-                "final", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d")
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1164,54 +1094,52 @@ class AddMulTransposePattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'AddMul',
+                        ['X', 'Y', 'Z'],
+                        ['final'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                        transposeMiddle=1,
+                    ),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info(
+                        'Z',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
+                ],
+                [
+                    oh.make_tensor_value_info(
+                        'final',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d"))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d"))
-        )
-        nodes.append(
-            oh.make_node(
-                "AddMul",
-                ["X", "Y", "Z"],
-                ["final"],
-                domain="onnx_extended.ortops.optim.cuda",
-                transposeMiddle=1,
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "final", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d")
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """

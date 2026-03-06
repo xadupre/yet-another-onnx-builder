@@ -24,8 +24,10 @@ class SequenceConstructAtPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['i0'], value=onh.from_array(np.array(0, dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['i1'], value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['i0'],
+                                 value=onh.from_array(np.array(0, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['i1'],
+                                 value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
                     oh.make_node('SequenceConstruct', ['X1', 'X2'], ['seq']),
                     oh.make_node('SequenceAt', ['seq', 'i0'], ['Y1']),
                     oh.make_node('SequenceAt', ['seq', 'i1'], ['Y2']),

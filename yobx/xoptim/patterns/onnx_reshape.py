@@ -71,7 +71,9 @@ class ShapedBasedReshapePattern(ReshapePattern):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['shape2'], value=onh.from_array(np.array([0, 0, -1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape2'],
+                                 value=onh.from_array(np.array([0, 0, -1], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Reshape', ['X', 'shape2'], ['xrr']),
                 ],
                 'pattern',
@@ -164,7 +166,9 @@ class ReduceReshapePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['shape'], value=onh.from_array(np.array([3], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape'],
+                                 value=onh.from_array(np.array([3], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('ReduceSum', ['X'], ['xr'], axes=[1], keepdims=1),
                     oh.make_node('Reshape', ['xr', 'shape'], ['Y']),
                 ],
@@ -314,8 +318,12 @@ class ReshapeReshapePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['sh1'], value=onh.from_array(np.array([4096, 7, 7, 128], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['sh2'], value=onh.from_array(np.array([4096, 49, 128], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['sh1'],
+                                 value=onh.from_array(np.array([4096, 7, 7, 128], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['sh2'],
+                                 value=onh.from_array(np.array([4096, 49, 128], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Reshape', ['X', 'sh1'], ['s1']),
                     oh.make_node('Reshape', ['s1', 'sh2'], ['s2']),
                 ],
@@ -628,9 +636,15 @@ class Reshape2Of3Pattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['shape1'], value=onh.from_array(np.array([-1, 8], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['shape2'], value=onh.from_array(np.array([3, -1], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['shape3'], value=onh.from_array(np.array([2, 3, 4], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape1'],
+                                 value=onh.from_array(np.array([-1, 8], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['shape2'],
+                                 value=onh.from_array(np.array([3, -1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['shape3'],
+                                 value=onh.from_array(np.array([2, 3, 4], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Reshape', ['X', 'shape1'], ['xr']),
                     oh.make_node('Reshape', ['Y', 'shape2'], ['yr']),
                     oh.make_node('Reshape', ['xrr', 'shape3'], ['Z']),
@@ -890,8 +904,12 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['sh1'], value=onh.from_array(np.array([-1, 8], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['sh2'], value=onh.from_array(np.array([-1, 8], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['sh1'],
+                                 value=onh.from_array(np.array([-1, 8], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['sh2'],
+                                 value=onh.from_array(np.array([-1, 8], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Reshape', ['X', 'sh1'], ['xc']),
                     oh.make_node('Reshape', ['Y', 'sh2'], ['yc']),
                     oh.make_node('Add', ['xc', 'yc'], ['Z']),
@@ -1035,8 +1053,12 @@ class ConcatReshapePattern(PatternOptimization):
                 [
                     oh.make_node('Shape', ['X'], ['D2'], end=3, start=2),
                     oh.make_node('Shape', ['X'], ['D1'], end=4, start=3),
-                    oh.make_node('Constant', [], ['I1'], value=onh.from_array(np.array([2], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['I2'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['I1'],
+                                 value=onh.from_array(np.array([2], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['I2'],
+                                 value=onh.from_array(np.array([1], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Concat', ['I1', 'I2', 'D1', 'D2'], ['d'], axis=0),
                     oh.make_node('Reshape', ['X', 'd'], ['Y']),
                 ],
@@ -1072,8 +1094,11 @@ class ConcatReshapePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s1_-1'], value=onh.from_array(np.array([-1], dtype=np.int64), name='value')),
-                    oh.make_node('Concat', ['I1', 'I2', 'D1', 'init7_s1_-1'], ['d--concat'], axis=0),
+                    oh.make_node('Constant', [], ['init7_s1_-1'],
+                                 value=onh.from_array(np.array([-1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Concat', ['I1', 'I2', 'D1', 'init7_s1_-1'], ['d--concat'],
+                                 axis=0),
                     oh.make_node('Reshape', ['X', 'd--concat'], ['Y']),
                 ],
                 'pattern',
@@ -1220,7 +1245,9 @@ class StaticConcatReshapePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['I1'], value=onh.from_array(np.array([6], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['I1'],
+                                 value=onh.from_array(np.array([6], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Shape', ['X'], ['D2'], end=3, start=2),
                     oh.make_node('Concat', ['I1', 'D2'], ['dc'], axis=0),
                     oh.make_node('Reshape', ['X', 'dc'], ['Y']),
@@ -1255,7 +1282,9 @@ class StaticConcatReshapePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s1_-1'], value=onh.from_array(np.array([-1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s1_-1'],
+                                 value=onh.from_array(np.array([-1], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Concat', ['I1', 'init7_s1_-1'], ['d--concat'], axis=0),
                     oh.make_node('Reshape', ['X', 'd--concat'], ['Y']),
                 ],
@@ -1423,7 +1452,9 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s2_6_-1'], value=onh.from_array(np.array([6, -1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s2_6_-1'],
+                                 value=onh.from_array(np.array([6, -1], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Reshape', ['X', 'init7_s2_6_-1'], ['Y']),
                 ],
                 'pattern',
@@ -1662,7 +1693,9 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s2_0_4'], value=onh.from_array(np.array([0, 4], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s2_0_4'],
+                                 value=onh.from_array(np.array([0, 4], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Unsqueeze', ['X', 'init7_s2_0_4'], ['Y']),
                 ],
                 'pattern',
@@ -1790,8 +1823,12 @@ class UnsqueezeReshapePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([2], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['shape3'], value=onh.from_array(np.array([0, 1, -1, 0], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zero'],
+                                 value=onh.from_array(np.array([2], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['shape3'],
+                                 value=onh.from_array(np.array([0, 1, -1, 0], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Unsqueeze', ['X', 'zero'], ['xu0']),
                     oh.make_node('Reshape', ['xu0', 'shape3'], ['Z']),
                 ],
@@ -1824,7 +1861,9 @@ class UnsqueezeReshapePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s1_1'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s1_1'],
+                                 value=onh.from_array(np.array([1], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Unsqueeze', ['X', 'init7_s1_1'], ['Z']),
                 ],
                 'pattern',
@@ -1927,8 +1966,12 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['shape3'], value=onh.from_array(np.array([-1, 128], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zero'],
+                                 value=onh.from_array(np.array([0], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['shape3'],
+                                 value=onh.from_array(np.array([-1, 128], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Unsqueeze', ['X', 'zero'], ['xu0']),
                     oh.make_node('Reshape', ['xu0', 'shape3'], ['Z']),
                 ],

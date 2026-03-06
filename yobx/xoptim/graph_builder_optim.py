@@ -683,7 +683,7 @@ class GraphBuilderPatternOptimization:
         attributes: Optional[List[AttributeProto]] = None,
         name: Optional[str] = None,
         **kwargs,
-    ):
+    ) -> NodeProto:
         """
         Creates a node without adding it to the graph but
         adapt for some known operators changing over

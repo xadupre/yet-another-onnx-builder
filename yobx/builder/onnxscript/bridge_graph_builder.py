@@ -1,6 +1,6 @@
 from __future__ import annotations
 from functools import partial
-from typing import Any, Dict, List, Optional, Sequence, Set, Union
+from typing import Any, Dict, List, Optional, Sequence, Set, Union, Tuple
 import numpy as np
 import onnx
 import onnx_ir as ir
@@ -486,7 +486,7 @@ class OnnxScriptGraphBuilder:
         attributes: Optional[List[onnx.AttributeProto]] = None,
         name: Optional[str] = None,
         **kwargs: Any,
-    ) -> Union[str, List[str]]:
+    ) -> Union[str, Tuple[str, ...]]:
         """
         Creates an ONNX node and return its output name(s).
 
@@ -572,7 +572,7 @@ class OnnxScriptGraphBuilder:
 
         if len(final_names) == 1:
             return final_names[0]
-        return final_names
+        return tuple(final_names)
 
     # ------------------------------------------------------------------
     # Export

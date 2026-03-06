@@ -351,16 +351,19 @@ def plot_text(
 
     .. plot::
 
+        import textwrap
         import matplotlib.pyplot as plt
         from yobx.doc import plot_text
 
-        sample = \"\"\"--- a/foo.py
-+++ b/foo.py
-@@ -1,3 +1,3 @@
- def foo():
--    return 1
-+    return 2
-\"\"\"
+        sample = textwrap.dedent(
+            \"\"\"
+            --- a/foo.py
+            +++ b/foo.py
+            @@ -1,3 +1,3 @@
+            def foo():
+            -    return 1
+            +    return 2
+            \"\"\")
         ax = plot_text(
             sample,
             title="sample diff",
@@ -405,12 +408,12 @@ def demo_mlp_model(filename: str) -> onnx.ModelProto:
     """
     One model obtained with the following.
 
-    .. code-black:: python
+    .. code-block:: python
 
         import torch
         from yobx.helpers.onnx_helper import pretty_onnx
         from yobx.xbuilder import OptimizationOptions
-        from yobx.torch_interpreter import to_onnx
+        from yobx.torch.interpreter import to_onnx
         from yobx.translate import translate
 
 
@@ -431,13 +434,9 @@ def demo_mlp_model(filename: str) -> onnx.ModelProto:
         onx = to_onnx(
             MLP(), (x,), input_names=["x"], options=OptimizationOptions(patterns=None)
         )
-        with open("temp_doc_mlp.onnx", "wb") as f:
-            f.write(onx.SerializeToString())
         print(pretty_onnx(onx))
         print(translate(onx, api="onnx-short"))
     """
-    if os.path.exists(filename):
-        return onnx.load(filename)
     return oh.make_model(
         oh.make_graph(
             [

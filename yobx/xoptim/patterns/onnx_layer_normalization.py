@@ -26,13 +26,21 @@ class LayerNormalizationPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s1_-1'], value=onh.from_array(np.array([-1], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['init10_s1_'], value=onh.from_array(np.array([2.0], dtype=np.float16), name='value')),
-                    oh.make_node('Constant', [], ['init10_s1_2'], value=onh.from_array(np.array([0.0], dtype=np.float16), name='value')),
-                    oh.make_node('ReduceMean', ['add_1', 'init7_s1_-1'], ['_onx_reducemean0'], keepdims=1),
+                    oh.make_node('Constant', [], ['init7_s1_-1'],
+                                 value=onh.from_array(np.array([-1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init10_s1_'],
+                                 value=onh.from_array(np.array([2.0], dtype=np.float16),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init10_s1_2'],
+                                 value=onh.from_array(np.array([0.0], dtype=np.float16),
+                                 name='value')),
+                    oh.make_node('ReduceMean', ['add_1', 'init7_s1_-1'], ['_onx_reducemean0'],
+                                 keepdims=1),
                     oh.make_node('Sub', ['add_1', '_onx_reducemean0'], ['_onx_sub0']),
                     oh.make_node('Pow', ['_onx_sub0', 'init10_s1_'], ['_onx_pow0']),
-                    oh.make_node('ReduceMean', ['_onx_pow0', 'init7_s1_-1'], ['_onx_reducemean02'], keepdims=1),
+                    oh.make_node('ReduceMean', ['_onx_pow0', 'init7_s1_-1'],
+                                 ['_onx_reducemean02'], keepdims=1),
                     oh.make_node('Add', ['_onx_reducemean02', 'init10_s1_2'], ['_onx_add0']),
                     oh.make_node('Sqrt', ['_onx_add0'], ['_onx_sqrt0']),
                     oh.make_node('Div', ['_onx_sub0', '_onx_sqrt0'], ['_onx_div0']),
@@ -42,7 +50,8 @@ class LayerNormalizationPattern(PatternOptimization):
                     oh.make_tensor_value_info('add_1', onnx.TensorProto.FLOAT16, (4, 512, 128)),
                 ],
                 [
-                    oh.make_tensor_value_info('_onx_div0', onnx.TensorProto.FLOAT16, (4, 512, 128)),
+                    oh.make_tensor_value_info('_onx_div0', onnx.TensorProto.FLOAT16,
+                                              (4, 512, 128)),
                 ],
             ),
             functions=[],
@@ -66,16 +75,68 @@ class LayerNormalizationPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['p_model_albert_embeddings_layernorm_weight'], value=onh.from_array(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float16), name='value')),
-                    oh.make_node('Constant', [], ['p_model_albert_embeddings_layernorm_bias'], value=onh.from_array(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float16), name='value')),
-                    oh.make_node('LayerNormalization', ['add_1', 'p_model_albert_embeddings_layernorm_weight', 'p_model_albert_embeddings_layernorm_bias'], ['_onx_div0'], axis=-1, epsilon=0.0, stash_type=1),
+                    oh.make_node('Constant', [], ['p_model_albert_embeddings_layernorm_weight'],
+                                 value=onh.from_array(
+                                     np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0], dtype=np.float16),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['p_model_albert_embeddings_layernorm_bias'],
+                                 value=onh.from_array(
+                                     np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0], dtype=np.float16),
+                                 name='value')),
+                    oh.make_node('LayerNormalization',
+                        ['add_1', 'p_model_albert_embeddings_layernorm_weight',
+                         'p_model_albert_embeddings_layernorm_bias'],
+                        ['_onx_div0'], axis=-1, epsilon=0.0, stash_type=1),
                 ],
                 'pattern',
                 [
                     oh.make_tensor_value_info('add_1', onnx.TensorProto.FLOAT16, (4, 512, 128)),
                 ],
                 [
-                    oh.make_tensor_value_info('_onx_div0', onnx.TensorProto.FLOAT16, (4, 512, 128)),
+                    oh.make_tensor_value_info('_onx_div0', onnx.TensorProto.FLOAT16,
+                                              (4, 512, 128)),
                 ],
             ),
             functions=[],
@@ -281,9 +342,17 @@ class LayerNormalizationScalePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['s0'], value=onh.from_array(np.array([-0.10000000149011612, -0.009999999776482582, -0.05000000074505806], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['scale'], value=onh.from_array(np.array([2.0, 3.0, 4.0], dtype=np.float32), name='value')),
-                    oh.make_node('LayerNormalization', ['X', 's0'], ['norm'], epsilon=0.10000000149011612),
+                    oh.make_node('Constant', [], ['s0'],
+                                 value=onh.from_array(
+                                     np.array([-0.10000000149011612,
+                                               -0.009999999776482582,
+                                               -0.05000000074505806], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['scale'],
+                                 value=onh.from_array(np.array([2.0, 3.0, 4.0], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('LayerNormalization', ['X', 's0'], ['norm'],
+                                 epsilon=0.10000000149011612),
                     oh.make_node('Mul', ['norm', 'scale'], ['Y']),
                 ],
                 'pattern',
@@ -316,7 +385,8 @@ class LayerNormalizationScalePattern(PatternOptimization):
             oh.make_graph(
                 [
                     oh.make_node('Mul', ['s0', 'scale'], ['LayerNormalizationScalePattern_s0']),
-                    oh.make_node('LayerNormalization', ['X', 'LayerNormalizationScalePattern_s0'], ['Y'], epsilon=0.10000000149011612),
+                    oh.make_node('LayerNormalization', ['X', 'LayerNormalizationScalePattern_s0'],
+                                 ['Y'], epsilon=0.10000000149011612),
                 ],
                 'pattern',
                 [
@@ -493,10 +563,21 @@ class CastLayerNormalizationCastPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['scale'], value=onh.from_array(np.array([0.5, 0.6000000238418579, 0.699999988079071], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['bias'], value=onh.from_array(np.array([-0.5, -0.6000000238418579, -0.699999988079071], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['scale'],
+                                 value=onh.from_array(
+                                     np.array([0.5,
+                                               0.6000000238418579,
+                                               0.699999988079071], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['bias'],
+                                 value=onh.from_array(
+                                     np.array([-0.5,
+                                               -0.6000000238418579,
+                                               -0.699999988079071], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Cast', ['X'], ['xc'], to=1),
-                    oh.make_node('LayerNormalization', ['xc', 'scale', 'bias'], ['norm'], stash_type=1),
+                    oh.make_node('LayerNormalization', ['xc', 'scale', 'bias'], ['norm'],
+                                 stash_type=1),
                     oh.make_node('Cast', ['norm'], ['Y'], to=10),
                 ],
                 'pattern',
@@ -528,9 +609,14 @@ class CastLayerNormalizationCastPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Cast', ['scale'], ['CastLayerNormalizationCastPattern_scale::C10'], to=10),
-                    oh.make_node('Cast', ['bias'], ['CastLayerNormalizationCastPattern_bias::C10'], to=10),
-                    oh.make_node('LayerNormalization', ['X', 'CastLayerNormalizationCastPattern_scale::C10', 'CastLayerNormalizationCastPattern_bias::C10'], ['Y'], stash_type=1),
+                    oh.make_node('Cast', ['scale'],
+                                 ['CastLayerNormalizationCastPattern_scale::C10'], to=10),
+                    oh.make_node('Cast', ['bias'],
+                                 ['CastLayerNormalizationCastPattern_bias::C10'], to=10),
+                    oh.make_node('LayerNormalization',
+                        ['X', 'CastLayerNormalizationCastPattern_scale::C10',
+                         'CastLayerNormalizationCastPattern_bias::C10'],
+                        ['Y'], stash_type=1),
                 ],
                 'pattern',
                 [
@@ -648,11 +734,33 @@ class BatchNormalizationPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['scale'], value=onh.from_array(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['B'], value=onh.from_array(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['input_mean'], value=onh.from_array(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['input_var'], value=onh.from_array(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32), name='value')),
-                    oh.make_node('BatchNormalization', ['X', 'scale', 'B', 'input_mean', 'input_var'], ['Y'], epsilon=0.0),
+                    oh.make_node('Constant', [], ['scale'],
+                                 value=onh.from_array(
+                                     np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['B'],
+                                 value=onh.from_array(
+                                     np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['input_mean'],
+                                 value=onh.from_array(
+                                     np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                               0.0, 0.0, 0.0, 0.0], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['input_var'],
+                                 value=onh.from_array(
+                                     np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                               1.0, 1.0, 1.0, 1.0], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('BatchNormalization',
+                                 ['X', 'scale', 'B', 'input_mean', 'input_var'], ['Y'],
+                                 epsilon=0.0),
                 ],
                 'pattern',
                 [
@@ -906,10 +1014,19 @@ class RMSNormalizationPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['exp'], value=onh.from_array(np.array([2.0], dtype=np.float16), name='value')),
-                    oh.make_node('Constant', [], ['axis'], value=onh.from_array(np.array([-1], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['eps'], value=onh.from_array(np.array([9.999999974752427e-07], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([1.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['exp'],
+                                 value=onh.from_array(np.array([2.0], dtype=np.float16),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['axis'],
+                                 value=onh.from_array(np.array([-1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['eps'],
+                                 value=onh.from_array(
+                                     np.array([9.999999974752427e-07], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['one'],
+                                 value=onh.from_array(np.array([1.0], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Cast', ['X'], ['Xc'], to=1),
                     oh.make_node('Pow', ['Xc', 'exp'], ['x2']),
                     oh.make_node('ReduceMean', ['x2', 'axis'], ['xr']),
@@ -951,8 +1068,12 @@ class RMSNormalizationPattern(PatternOptimization):
                 [
                     oh.make_node('Shape', ['X'], ['shape-X']),
                     oh.make_node('Gather', ['shape-X', 'axis'], ['gather-shape-X']),
-                    oh.make_node('ConstantOfShape', ['gather-shape-X'], ['constantofshape-gather-shape-X'], value=onh.from_array(np.array([1.0], dtype=np.float16), name='value')),
-                    oh.make_node('RMSNormalization', ['X', 'constantofshape-gather-shape-X'], ['Y'], axis=-1, epsilon=9.999999974752427e-07, stash_type=1),
+                    oh.make_node('ConstantOfShape', ['gather-shape-X'],
+                                 ['constantofshape-gather-shape-X'], value=onh.from_array(
+                                     np.array([1.0], dtype=np.float16),
+                                 name='value')),
+                    oh.make_node('RMSNormalization', ['X', 'constantofshape-gather-shape-X'],
+                                 ['Y'], axis=-1, epsilon=9.999999974752427e-07, stash_type=1),
                 ],
                 'pattern',
                 [
@@ -1157,8 +1278,12 @@ class RMSNormalizationMulPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['scale'], value=onh.from_array(np.array([3.0, 4.0], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['scale2'], value=onh.from_array(np.array([3.0, 4.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['scale'],
+                                 value=onh.from_array(np.array([3.0, 4.0], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['scale2'],
+                                 value=onh.from_array(np.array([3.0, 4.0], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('RMSNormalization', ['X', 'scale'], ['xs']),
                     oh.make_node('Mul', ['xs', 'scale2'], ['Y']),
                 ],
@@ -1191,7 +1316,9 @@ class RMSNormalizationMulPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init1_s2_'], value=onh.from_array(np.array([9.0, 16.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['init1_s2_'],
+                                 value=onh.from_array(np.array([9.0, 16.0], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('RMSNormalization', ['X', 'init1_s2_'], ['Y']),
                 ],
                 'pattern',

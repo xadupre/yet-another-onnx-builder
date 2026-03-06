@@ -123,8 +123,12 @@ class WhereAddPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0.0], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['inf'], value=onh.from_array(np.array([-float('inf')], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['zero'],
+                                 value=onh.from_array(np.array([0.0], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['inf'],
+                                 value=onh.from_array(np.array([-float('inf')], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Where', ['mask', 'zero', 'inf'], ['fmask']),
                     oh.make_node('Add', ['fmask', 'X'], ['Y']),
                 ],

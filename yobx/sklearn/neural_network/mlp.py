@@ -201,6 +201,7 @@ def sklearn_mlp_regressor(
         bias = intercepts[i].astype(dtype)
         z = g.op.MatMul(h, coef, name=f"{name}_mm{i}")
         z = g.op.Add(z, bias, name=f"{name}_add{i}")
+        assert isinstance(z, str)  # type happiness
         h = _apply_activation(g, z, hidden_activation, name=f"{name}_act{i}")
 
     # Output layer: linear (identity activation).
