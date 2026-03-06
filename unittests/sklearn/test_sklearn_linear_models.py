@@ -310,9 +310,7 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
     _X_bin = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
     _y_bin = np.array([0, 0, 1, 1])
 
-    _X_multi = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32
-    )
+    _X_multi = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
     _y_multi = np.array([0, 0, 1, 1, 2, 2])
 
     def _check_label_only_classifier(self, estimator, X, y):
@@ -334,9 +332,7 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
         self._check_label_only_classifier(RidgeClassifier(), self._X_bin, self._y_bin)
 
     def test_ridge_classifier_multiclass(self):
-        self._check_label_only_classifier(
-            RidgeClassifier(), self._X_multi, self._y_multi
-        )
+        self._check_label_only_classifier(RidgeClassifier(), self._X_multi, self._y_multi)
 
     def test_ridge_classifier_cv_binary(self):
         X = np.concatenate([self._X_bin] * 3, axis=0)
@@ -386,9 +382,7 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
             label, proba = results[0], results[1]
 
             self.assertEqualArray(m.predict(Xd), label)
-            self.assertEqualArray(
-                m.predict_proba(Xd).astype(dtype), proba, atol=1e-5
-            )
+            self.assertEqualArray(m.predict_proba(Xd).astype(dtype), proba, atol=1e-5)
 
     def test_sgd_classifier_log_loss_multiclass(self):
         """SGDClassifier with log_loss multiclass → label + proba."""
@@ -407,9 +401,7 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
             label, proba = results[0], results[1]
 
             self.assertEqualArray(m.predict(Xd), label)
-            self.assertEqualArray(
-                m.predict_proba(Xd).astype(dtype), proba, atol=1e-5
-            )
+            self.assertEqualArray(m.predict_proba(Xd).astype(dtype), proba, atol=1e-5)
 
     def test_ridge_classifier_in_pipeline(self):
         """RidgeClassifier at the end of a Pipeline."""

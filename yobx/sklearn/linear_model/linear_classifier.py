@@ -85,7 +85,7 @@ def sklearn_linear_classifier(
 
     .. code-block:: text
 
-        X  ──Gemm(coef, intercept)──►  decision (N×1)
+        X  ──Gemm(coef, intercept)──►  decision (Nx1)
                                             │
                                         Flatten  ──►  decision_1d (N,)
                                             │
@@ -93,7 +93,7 @@ def sklearn_linear_classifier(
                                   │                 (if proba)
                               Greater(0)           Sigmoid ──Sub(1,·)──Concat
                                   │                                        │
-                                 Cast(INT64)                            proba (N×2)
+                                 Cast(INT64)                            proba (Nx2)
                                   │
                              Gather(classes) ──►  label
 
@@ -101,11 +101,11 @@ def sklearn_linear_classifier(
 
     .. code-block:: text
 
-        X  ──Gemm(coef, intercept)──►  decision (N×C)
+        X  ──Gemm(coef, intercept)──►  decision (NxC)
                                             │
                                   ┌─────────┴──────────┐
                                   │                 (if proba)
-                               ArgMax              Softmax ──►  proba (N×C)
+                               ArgMax              Softmax ──►  proba (NxC)
                                   │
                               Cast(INT64)
                                   │
@@ -160,9 +160,7 @@ def sklearn_linear_classifier(
             # decision has shape (N, 1); Sigmoid gives (N, 1); 1-sigmoid is (N, 1).
             # Concat along axis=1 → (N, 2).
             proba_pos = g.op.Sigmoid(decision, name=f"{name}_sigmoid")
-            proba_neg = g.op.Sub(
-                np.array([1], dtype=dtype), proba_pos, name=f"{name}_proba_neg"
-            )
+            proba_neg = g.op.Sub(np.array([1], dtype=dtype), proba_pos, name=f"{name}_proba_neg")
             proba = g.op.Concat(
                 proba_neg, proba_pos, axis=1, name=f"{name}_concat", outputs=outputs[1:]
             )
@@ -170,9 +168,7 @@ def sklearn_linear_classifier(
             return label, proba
     else:
         label_idx_raw = g.op.ArgMax(decision, axis=1, keepdims=0, name=f"{name}_argmax")
-        label_idx = g.op.Cast(
-            label_idx_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast"
-        )
+        label_idx = g.op.Cast(label_idx_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast")
 
         label = _build_label(g, classes, label_idx, name, outputs, sts)
 
