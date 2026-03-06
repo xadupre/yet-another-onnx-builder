@@ -4,6 +4,9 @@ Unit tests for yobx.sklearn.neural_network converters (MLP).
 
 import unittest
 import numpy as np
+from sklearn.neural_network import MLPClassifier, MLPRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
@@ -12,8 +15,6 @@ from yobx.sklearn import to_onnx
 @requires_sklearn("1.4")
 class TestSklearnNeuralNetworkConverters(ExtTestCase):
     def test_mlp_classifier_binary(self):
-        from sklearn.neural_network import MLPClassifier
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
         mlp = MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
@@ -36,8 +37,6 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_mlp_classifier_multiclass(self):
-        from sklearn.neural_network import MLPClassifier
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
         y = np.array([0, 0, 1, 1, 2, 2])
         mlp = MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
@@ -60,8 +59,6 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_mlp_classifier_multiple_hidden_layers(self):
-        from sklearn.neural_network import MLPClassifier
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
         y = np.array([0, 0, 1, 1, 2, 2])
         mlp = MLPClassifier(hidden_layer_sizes=(8, 4), max_iter=500, random_state=0)
@@ -77,8 +74,6 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_mlp_classifier_tanh_activation(self):
-        from sklearn.neural_network import MLPClassifier
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
         mlp = MLPClassifier(
@@ -99,8 +94,6 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_mlp_regressor(self):
-        from sklearn.neural_network import MLPRegressor
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
         mlp = MLPRegressor(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
@@ -123,8 +116,6 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         )
 
     def test_mlp_classifier_float32(self):
-        from sklearn.neural_network import MLPClassifier
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
         y = np.array([0, 0, 1, 1, 2, 2])
         mlp = MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
@@ -142,8 +133,6 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_mlp_classifier_float64(self):
-        from sklearn.neural_network import MLPClassifier
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float64)
         y = np.array([0, 0, 1, 1, 2, 2])
         mlp = MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
@@ -161,8 +150,6 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         self.assertEqualArray(mlp.predict_proba(X).astype(np.float64), proba, atol=1e-5)
 
     def test_mlp_regressor_float32(self):
-        from sklearn.neural_network import MLPRegressor
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
         mlp = MLPRegressor(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
@@ -181,8 +168,6 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         )
 
     def test_mlp_regressor_float64(self):
-        from sklearn.neural_network import MLPRegressor
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float64)
         y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float64)
         mlp = MLPRegressor(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
@@ -201,10 +186,6 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         )
 
     def test_pipeline_mlp_classifier(self):
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.neural_network import MLPClassifier
-        from sklearn.pipeline import Pipeline
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
         pipe = Pipeline(

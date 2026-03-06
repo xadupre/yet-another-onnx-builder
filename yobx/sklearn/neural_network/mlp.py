@@ -1,4 +1,4 @@
-from typing import Tuple, Dict, List, Union
+from typing import Tuple, Dict, List
 import numpy as np
 import onnx
 from sklearn.neural_network import MLPClassifier, MLPRegressor
