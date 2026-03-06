@@ -212,6 +212,31 @@ class GraphBuilderProtocol(Protocol):
 
 
 @runtime_checkable
+class TensorProtocol(Protocol):
+    """Protocol for named tensor values that can be passed as inputs to opset helpers.
+
+    Objects satisfying this protocol carry a string :attr:`name` that identifies
+    the corresponding tensor (or node output) inside the graph being built.
+    Typical concrete types that satisfy this protocol include:
+
+    * :class:`torch.fx.Node` — a node in a :mod:`torch.fx` traced graph whose
+      ``.name`` attribute is the SSA name of its output value.
+    * Any graph-IR value object that exposes a ``.name`` property.
+
+    Plain ``str`` tensor names and ``numpy.ndarray`` constants are handled
+    separately as concrete types rather than via this protocol.
+    """
+
+    @property
+    def name(self) -> str:
+        """The string name identifying this tensor in the graph.
+
+        :return: the tensor/node output name as registered in the graph builder
+        """
+        ...
+
+
+@runtime_checkable
 class OpsetProtocol(Protocol):
     """Protocol describing the API of an opset helper object.
 
@@ -231,7 +256,7 @@ class OpsetProtocol(Protocol):
     def make_node(
         self,
         op_type: str,
-        *inputs: Any,
+        *inputs: Union[str, "TensorProtocol"],
         outputs: Optional[Union[int, List[str], str]] = None,
         domain: str = "",
         name: Optional[str] = None,
@@ -240,7 +265,9 @@ class OpsetProtocol(Protocol):
         """Creates an ONNX node and returns its output name(s).
 
         :param op_type: ONNX operator type (e.g. ``"Relu"``, ``"MatMul"``)
-        :param inputs: input tensor names or constant arrays
+        :param inputs: input tensor names (``str``) or named tensor values
+            (:class:`TensorProtocol`) — concrete implementations also accept
+            ``numpy.ndarray`` constants and ``None`` for optional inputs
         :param outputs: number of outputs (``int``), a single output name
             (``str``), or a list of output names; ``None`` uses a default
             inferred from *op_type* when supported

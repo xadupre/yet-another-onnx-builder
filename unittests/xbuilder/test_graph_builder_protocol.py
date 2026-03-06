@@ -15,7 +15,7 @@ from onnx import TensorProto
 
 from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
-from yobx.typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol, OpsetProtocol
+from yobx.typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol, OpsetProtocol, TensorProtocol
 from yobx.xbuilder import GraphBuilder
 
 TFLOAT = TensorProto.FLOAT
@@ -310,6 +310,42 @@ class TestOnnxScriptOpsetProtocol(ExtTestCase):
     def test_onnxscript_op_satisfies_protocol(self):
         g = OnnxScriptGraphBuilder(18)
         self.assertIsInstance(g.op, OpsetProtocol)
+
+
+class TestTensorProtocol(ExtTestCase):
+    """TensorProtocol is importable, has the required ``name`` property, and
+    can be satisfied by any object exposing ``.name: str``."""
+
+    def test_tensor_protocol_has_name(self):
+        self.assertIn(
+            "name",
+            dir(TensorProtocol),
+            msg="TensorProtocol is missing 'name'",
+        )
+
+    def test_import_from_xbuilder(self):
+        from yobx.xbuilder import TensorProtocol as P
+
+        self.assertIs(P, TensorProtocol)
+
+    def test_import_from_root(self):
+        from yobx import TensorProtocol as P
+
+        self.assertIs(P, TensorProtocol)
+
+    def test_named_object_satisfies_protocol(self):
+        """Any object with a .name str attribute satisfies TensorProtocol."""
+
+        class _FakeTensor:
+            @property
+            def name(self) -> str:
+                return "x"
+
+        self.assertIsInstance(_FakeTensor(), TensorProtocol)
+
+    def test_plain_string_does_not_satisfy_protocol(self):
+        """A plain str does NOT satisfy TensorProtocol (it has no .name)."""
+        self.assertNotIsInstance("x", TensorProtocol)
 
 
 if __name__ == "__main__":
