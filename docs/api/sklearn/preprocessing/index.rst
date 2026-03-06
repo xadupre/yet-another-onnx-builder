@@ -5,4 +5,5 @@ yobx.sklearn.preprocessing
     :maxdepth: 1
     :caption: modules
 
+    min_max_scaler
     standard_scaler
