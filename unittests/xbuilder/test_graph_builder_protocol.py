@@ -14,7 +14,7 @@ import unittest
 from onnx import TensorProto
 
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
-from yobx.typing import GraphBuilderProtocol
+from yobx.typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol
 from yobx.xbuilder import GraphBuilder
 
 TFLOAT = TensorProto.FLOAT
@@ -30,6 +30,16 @@ class TestGraphBuilderProtocolExists(ExtTestCase):
 
     def test_import_from_xbuilder(self):
         from yobx.xbuilder import GraphBuilderProtocol as P  # noqa: F401
+
+        self.assertIsNotNone(P)
+
+    def test_extended_import_from_typing(self):
+        from yobx.typing import GraphBuilderExtendedProtocol as P  # noqa: F401
+
+        self.assertIsNotNone(P)
+
+    def test_extended_import_from_xbuilder(self):
+        from yobx.xbuilder import GraphBuilderExtendedProtocol as P  # noqa: F401
 
         self.assertIsNotNone(P)
 
@@ -222,6 +232,71 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
     def test_to_onnx(self):
         model = self._make_simple_model().to_onnx()
         self.assertIsNotNone(model)
+
+
+class TestGraphBuilderExtendedProtocol(ExtTestCase):
+    """GraphBuilder satisfies GraphBuilderExtendedProtocol."""
+
+    EXTENDED_ATTRS = [
+        "op",
+        "set_type_shape_unary_op",
+    ]
+
+    def test_extended_protocol_has_required_methods(self):
+        for name in self.EXTENDED_ATTRS:
+            self.assertIn(
+                name,
+                dir(GraphBuilderExtendedProtocol),
+                msg=f"GraphBuilderExtendedProtocol is missing '{name}'",
+            )
+
+    def test_extended_inherits_base(self):
+        self.assertTrue(issubclass(GraphBuilderExtendedProtocol, GraphBuilderProtocol))
+
+    def test_graphbuilder_has_extended_attrs(self):
+        g = GraphBuilder(18, ir_version=9)
+        for attr in self.EXTENDED_ATTRS:
+            self.assertTrue(
+                hasattr(g, attr),
+                msg=f"GraphBuilder missing extended attribute '{attr}'",
+            )
+
+    def test_graphbuilder_is_instance_extended(self):
+        g = GraphBuilder(18, ir_version=9)
+        self.assertIsInstance(g, GraphBuilderExtendedProtocol)
+
+    def test_set_type_shape_unary_op(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("x", TensorProto.FLOAT, (2, 3))
+        g.make_node("Relu", ["x"], ["y"], name="Relu_0")
+        g.set_type_shape_unary_op("y", "x")
+        self.assertEqual(g.get_type("y"), TensorProto.FLOAT)
+        self.assertEqual(g.get_shape("y"), (2, 3))
+
+    def test_op_attribute_exists(self):
+        g = GraphBuilder(18, ir_version=9)
+        self.assertIsNotNone(g.op)
+
+
+@requires_onnxscript()
+class TestOnnxScriptGraphBuilderExtendedProtocol(ExtTestCase):
+    """OnnxScriptGraphBuilder satisfies GraphBuilderExtendedProtocol."""
+
+    def test_onnxscript_has_extended_attrs(self):
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+
+        g = OnnxScriptGraphBuilder(18)
+        for attr in ["op", "set_type_shape_unary_op"]:
+            self.assertTrue(
+                hasattr(g, attr),
+                msg=f"OnnxScriptGraphBuilder missing extended attribute '{attr}'",
+            )
+
+    def test_onnxscript_is_instance_extended(self):
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+
+        g = OnnxScriptGraphBuilder(18)
+        self.assertIsInstance(g, GraphBuilderExtendedProtocol)
 
 
 if __name__ == "__main__":

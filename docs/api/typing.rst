@@ -12,3 +12,10 @@ GraphBuilderProtocol
     :members:
     :no-undoc-members:
 
+GraphBuilderExtendedProtocol
+++++++++++++++++++++++++++++
+
+.. autoclass:: yobx.typing.GraphBuilderExtendedProtocol
+    :members:
+    :no-undoc-members:
+

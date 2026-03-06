@@ -209,3 +209,56 @@ class GraphBuilderProtocol(Protocol):
             :class:`~onnx.FunctionProto`, or a model container object
         """
         ...
+
+
+@runtime_checkable
+class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
+    """Extended protocol for graph builders that support opset helpers and
+    shape/type inference for common operator patterns.
+
+    This protocol extends :class:`GraphBuilderProtocol` with additional methods
+    present on :class:`yobx.xbuilder.GraphBuilder` and
+    :class:`yobx.builder.onnxscript.OnnxScriptGraphBuilder` that are useful for
+    advanced graph construction:
+
+    * ``op`` — an opset helper that allows constructing nodes with
+      ``g.op.Add(x, y)``-style syntax instead of calling :meth:`make_node`
+      directly.
+    * :meth:`set_type_shape_unary_op` — propagates type and shape from an
+      input to an output for unary operators such as ``Abs``, ``Relu``, etc.
+    """
+
+    @property
+    def op(self) -> Any:
+        """Returns the opset helper for this graph builder.
+
+        The opset helper allows constructing ONNX nodes using attribute-access
+        syntax.  For example::
+
+            out = g.op.Relu(x)
+
+        :return: an :class:`~yobx.xbuilder.graph_builder_opset.Opset`-compatible
+            object
+        """
+        ...
+
+    def set_type_shape_unary_op(
+        self,
+        name: str,
+        input_name: str,
+        itype: Optional[int] = None,
+    ) -> bool:
+        """Propagates type and shape from *input_name* to *name* for a unary op.
+
+        This is a convenience helper used when emitting elementwise unary
+        operators (``Abs``, ``Exp``, ``Relu``, etc.) where the output has the
+        same type and shape as the input.
+
+        :param name: output tensor name whose type/shape should be set
+        :param input_name: input tensor name to copy type/shape from
+        :param itype: override element type; if ``None`` the input's element
+            type is used
+        :return: ``True`` when shape information was available and set,
+            ``None``/falsy when it could not be determined
+        """
+        ...

@@ -3,6 +3,6 @@ from .function_options import FunctionOptions
 from .infer_shapes_options import InferShapesOptions
 from .optimization_options import OptimizationOptions
 from .order_optim import OrderAlgorithm
-from ..typing import GraphBuilderProtocol
+from ..typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol
 
 TEMPLATE_TYPE = 999
