@@ -3,7 +3,6 @@ Converters for TF ops that act as pass-throughs or supply constant values:
 ``ReadVariableOp``, ``Const``, ``Identity``, and ``NoOp``.
 """
 
-import numpy as np
 import tensorflow as tf
 from ..register import register_tf_op_converter
 from ...xbuilder import GraphBuilder

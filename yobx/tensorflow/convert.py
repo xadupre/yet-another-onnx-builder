@@ -1,7 +1,6 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
 import tensorflow as tf
-from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
 from .register import get_tf_op_converter
 from .tensorflow_helper import tf_dtype_to_np_dtype
@@ -116,8 +115,8 @@ def _convert_concrete_function(
     #    output tensor name seen in cf.graph.get_operations().
     # ------------------------------------------------------------------
     initializer_values: Dict[str, np.ndarray] = {}
-    for captured_tensor, var in zip(cf.captured_inputs, cf.variables):
-        initializer_values[captured_tensor.name] = var.numpy()
+    for _captured_tensor, var in zip(cf.captured_inputs, cf.variables):
+        initializer_values[var.name] = var.numpy()
 
     # ------------------------------------------------------------------
     # 2. Register ONNX inputs for each non-captured Placeholder op.
@@ -141,6 +140,11 @@ def _convert_concrete_function(
                     name, initializer_values[name], source="_convert_concrete_function"
                 )
                 continue
+            raise AssertionError(
+                f"name={name!r} could not be handled as a placeholder, {type(tensor)=}, "
+                f"initializer_values={sorted(initializer_values)}, "
+                f"input_names={sorted(set_input_names)}{g.get_debug_msg()}"
+            )
 
         op_type = op.type
         # extra_converters take priority over built-in ones.
@@ -150,9 +154,10 @@ def _convert_concrete_function(
 
         op_outputs = [t.name for t in op.outputs]
         fct(g, {}, op_outputs, op)
-        assert all(
-            g.has_name(o) for o in op_outputs
-        ), f"Issue with node {op.type}({[i.name for i in op.inputs]}) -> {[o.name for o in op.outputs]} ({fct=}){g.get_debug_msg()}"
+        assert all(g.has_name(o) for o in op_outputs), (
+            f"Issue with node {op.type}({[i.name for i in op.inputs]}) -> "
+            f"{[o.name for o in op.outputs]} ({fct=}){g.get_debug_msg()}"
+        )
 
     # ------------------------------------------------------------------
     # 4. Register ONNX outputs.
