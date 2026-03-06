@@ -16,7 +16,9 @@ This example shows how to:
 3. Display a unified diff for each
    :class:`PatchInfo <yobx.helpers.patch_helper.PatchInfo>` so you can see
    exactly what changed in the original PyTorch internals.
-4. Show which patches were actually exercised when exporting a real model
+4. Visualise the diff sizes per patch with a matplotlib bar chart so that
+   sphinx-gallery captures the example.
+5. Show which patches were actually exercised when exporting a real model
    (`arnir0/Tiny-LLM`).
 
 The context manager both **applies** the patches on entry and **removes** them
@@ -64,7 +66,38 @@ for patch in details:
     print()
 
 # %%
-# 3. Show which patches apply when exporting arnir0/Tiny-LLM
+# 3. Visualise the diff sizes
+# ----------------------------
+#
+# The bar chart below shows, for each patch, how many lines were **added** (+)
+# and **removed** (−) with respect to the original implementation.
+
+import matplotlib.pyplot as plt  # noqa: E402
+
+names, added, removed = [], [], []
+for patch in details:
+    lines = patch.make_diff().splitlines()
+    n_added = sum(1 for line in lines if line.startswith("+") and not line.startswith("+++"))
+    n_removed = sum(1 for line in lines if line.startswith("-") and not line.startswith("---"))
+    names.append(patch.name.replace("patched_", "").replace("patch_", ""))
+    added.append(n_added)
+    removed.append(-n_removed)
+
+y = list(range(len(names)))
+fig, ax = plt.subplots(figsize=(8, max(3, len(names) * 0.6 + 1)))
+ax.barh(y, added, color="#4c72b0", label="lines added")
+ax.barh(y, removed, color="#dd8452", label="lines removed")
+ax.set_yticks(y)
+ax.set_yticklabels(names, fontsize=9)
+ax.axvline(0, color="black", linewidth=0.8)
+ax.set_xlabel("lines")
+ax.set_title(f"Diff size per patch ({details.n_patches} patches applied)", fontsize=11)
+ax.legend(loc="lower right", fontsize=9)
+plt.tight_layout()
+plt.show()
+
+# %%
+# 4. Show which patches apply when exporting arnir0/Tiny-LLM
 # -----------------------------------------------------------
 #
 # When exporting a real transformers model we can find out exactly which
