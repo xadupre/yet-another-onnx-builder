@@ -8,6 +8,10 @@ The following :epkg:`scikit-learn` estimators and transformers have a
 registered converter in :mod:`yobx.sklearn`.  The list is generated
 programmatically from the live converter registry.
 
+The following list can be extended by levering existing converters,
+example :ref:`l-plot-sklearn-with-sklearn-onnx` shows how to plug
+:epkg:`sklearn-onnx`.
+
 .. runpython::
     :showcode:
     :rst:
