@@ -153,6 +153,38 @@ class OnnxScriptGraphBuilder:
         "Returns the opset for the main domain (assuming it is used)."
         return self.opsets[""]
 
+    def get_opset(self, domain: str, exc: bool = True) -> Optional[int]:
+        """
+        Returns the opset version for a specific domain.
+
+        :param domain: domain name
+        :param exc: raise an exception if missing
+        :return: version
+        """
+        if exc:
+            assert domain in self.opsets, (
+                f"Domain {domain!r} is not registered in opsets={self.opsets!r}."
+            )
+        return self.opsets.get(domain, None)
+
+    def add_domain(self, domain: str, version: int = 1) -> None:
+        """
+        Adds a domain to the list of supported ones.
+        Checks the version is the same if it exists.
+
+        :param domain: domain name to register
+        :param version: opset version for the domain
+        """
+        if domain in self.opsets:
+            assert version == self.opsets[domain], (
+                f"Version mismatch for domain={domain!r}, current is "
+                f"{self.opsets[domain]}, new is {version}."
+            )
+            return
+        self.opsets[domain] = version
+        # Keep the underlying graph's opset_imports in sync.
+        self._graph.opset_imports[domain] = version
+
     @property
     def inner_builder(self):
         """
