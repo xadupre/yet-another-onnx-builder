@@ -40,6 +40,7 @@ from sklearn.linear_model import (
     TheilSenRegressor,
     TweedieRegressor,
 )
+from sklearn.base import clone
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
@@ -56,16 +57,19 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
     # --------------------------------------------------------------------- #
 
     def _check_single_regressor(self, estimator, X, y, atol=1e-4):
-        estimator.fit(X, y)
-        onx = to_onnx(estimator, (X,))
+        for dtype in (np.float32, np.float64):
+            Xd = X.astype(dtype)
+            est = clone(estimator)
+            est.fit(Xd, y)
+            onx = to_onnx(est, (Xd,))
 
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("Gemm", op_types)
+            op_types = [n.op_type for n in onx.graph.node]
+            self.assertIn("Gemm", op_types)
 
-        ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X": X})[0]
-        expected = estimator.predict(X).astype(np.float32).reshape(-1, 1)
-        self.assertEqualArray(expected, result, atol=atol)
+            ref = ExtendedReferenceEvaluator(onx)
+            result = ref.run(None, {"X": Xd})[0]
+            expected = est.predict(Xd).astype(dtype).reshape(-1, 1)
+            self.assertEqualArray(expected, result, atol=atol)
 
     def test_linear_regression(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -198,17 +202,19 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
             dtype=np.float32,
         )
         y = np.array([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0], [4.0, 5.0], [1.5, 2.5], [2.5, 3.5]])
-        m = MultiTaskLasso()
-        m.fit(X, y)
+        for dtype in (np.float32, np.float64):
+            Xd = X.astype(dtype)
+            m = MultiTaskLasso()
+            m.fit(Xd, y)
 
-        onx = to_onnx(m, (X,))
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("Gemm", op_types)
+            onx = to_onnx(m, (Xd,))
+            op_types = [n.op_type for n in onx.graph.node]
+            self.assertIn("Gemm", op_types)
 
-        ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X": X})[0]
-        expected = m.predict(X).astype(np.float32)
-        self.assertEqualArray(expected, result, atol=1e-4)
+            ref = ExtendedReferenceEvaluator(onx)
+            result = ref.run(None, {"X": Xd})[0]
+            expected = m.predict(Xd).astype(dtype)
+            self.assertEqualArray(expected, result, atol=1e-4)
 
     def test_multi_task_elastic_net(self):
         X = np.array(
@@ -216,14 +222,16 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
             dtype=np.float32,
         )
         y = np.array([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0], [4.0, 5.0], [1.5, 2.5], [2.5, 3.5]])
-        m = MultiTaskElasticNet()
-        m.fit(X, y)
+        for dtype in (np.float32, np.float64):
+            Xd = X.astype(dtype)
+            m = MultiTaskElasticNet()
+            m.fit(Xd, y)
 
-        onx = to_onnx(m, (X,))
-        ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X": X})[0]
-        expected = m.predict(X).astype(np.float32)
-        self.assertEqualArray(expected, result, atol=1e-4)
+            onx = to_onnx(m, (Xd,))
+            ref = ExtendedReferenceEvaluator(onx)
+            result = ref.run(None, {"X": Xd})[0]
+            expected = m.predict(Xd).astype(dtype)
+            self.assertEqualArray(expected, result, atol=1e-4)
 
 
 @requires_sklearn("1.4")
@@ -238,17 +246,20 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
     _y = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
 
     def _check_glm(self, estimator, atol=1e-4):
-        X, y = self._X, self._y
-        estimator.fit(X, y)
-        onx = to_onnx(estimator, (X,))
+        for dtype in (np.float32, np.float64):
+            X = self._X.astype(dtype)
+            y = self._y
+            est = clone(estimator)
+            est.fit(X, y)
+            onx = to_onnx(est, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("Gemm", op_types)
+            op_types = [n.op_type for n in onx.graph.node]
+            self.assertIn("Gemm", op_types)
 
-        ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X": X})[0]
-        expected = estimator.predict(X).astype(np.float32).reshape(-1, 1)
-        self.assertEqualArray(expected, result, atol=atol)
+            ref = ExtendedReferenceEvaluator(onx)
+            result = ref.run(None, {"X": X})[0]
+            expected = est.predict(X).astype(dtype).reshape(-1, 1)
+            self.assertEqualArray(expected, result, atol=atol)
 
     def test_poisson_regressor(self):
         self._check_glm(PoissonRegressor())
@@ -270,22 +281,26 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
 
     def test_glm_op_type_identity(self):
         """TweedieRegressor with identity link should NOT produce Exp node."""
-        X, y = self._X, self._y
-        m = TweedieRegressor(power=0)
-        m.fit(X, y)
-        onx = to_onnx(m, (X,))
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("Gemm", op_types)
-        self.assertNotIn("Exp", op_types)
+        for dtype in (np.float32, np.float64):
+            X = self._X.astype(dtype)
+            y = self._y
+            m = TweedieRegressor(power=0)
+            m.fit(X, y)
+            onx = to_onnx(m, (X,))
+            op_types = [n.op_type for n in onx.graph.node]
+            self.assertIn("Gemm", op_types)
+            self.assertNotIn("Exp", op_types)
 
     def test_glm_op_type_exp(self):
         """PoissonRegressor with log link should produce Exp node."""
-        X, y = self._X, self._y
-        m = PoissonRegressor()
-        m.fit(X, y)
-        onx = to_onnx(m, (X,))
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("Exp", op_types)
+        for dtype in (np.float32, np.float64):
+            X = self._X.astype(dtype)
+            y = self._y
+            m = PoissonRegressor()
+            m.fit(X, y)
+            onx = to_onnx(m, (X,))
+            op_types = [n.op_type for n in onx.graph.node]
+            self.assertIn("Exp", op_types)
 
 
 @requires_sklearn("1.4")
@@ -301,16 +316,19 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
     _y_multi = np.array([0, 0, 1, 1, 2, 2])
 
     def _check_label_only_classifier(self, estimator, X, y):
-        estimator.fit(X, y)
-        onx = to_onnx(estimator, (X,))
+        for dtype in (np.float32, np.float64):
+            Xd = X.astype(dtype)
+            est = clone(estimator)
+            est.fit(Xd, y)
+            onx = to_onnx(est, (Xd,))
 
-        # Should only produce a single (label) output
-        output_names = [o.name for o in onx.graph.output]
-        self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
+            # Should only produce a single (label) output
+            output_names = [o.name for o in onx.graph.output]
+            self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
 
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": X})
-        self.assertEqualArray(estimator.predict(X), results[0])
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": Xd})
+            self.assertEqualArray(est.predict(Xd), results[0])
 
     def test_ridge_classifier_binary(self):
         self._check_label_only_classifier(RidgeClassifier(), self._X_bin, self._y_bin)
@@ -352,54 +370,60 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
 
     def test_sgd_classifier_log_loss_binary(self):
         """SGDClassifier with log_loss (has predict_proba) → label + proba."""
-        m = SGDClassifier(loss="log_loss", random_state=0, max_iter=1000)
-        m.fit(self._X_bin, self._y_bin)
+        for dtype in (np.float32, np.float64):
+            Xd = self._X_bin.astype(dtype)
+            m = SGDClassifier(loss="log_loss", random_state=0, max_iter=1000)
+            m.fit(Xd, self._y_bin)
 
-        onx = to_onnx(m, (self._X_bin,))
+            onx = to_onnx(m, (Xd,))
 
-        # Should produce two outputs: label + probabilities
-        output_names = [o.name for o in onx.graph.output]
-        self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
+            # Should produce two outputs: label + probabilities
+            output_names = [o.name for o in onx.graph.output]
+            self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
 
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": self._X_bin})
-        label, proba = results[0], results[1]
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": Xd})
+            label, proba = results[0], results[1]
 
-        self.assertEqualArray(m.predict(self._X_bin), label)
-        self.assertEqualArray(
-            m.predict_proba(self._X_bin).astype(np.float32), proba, atol=1e-5
-        )
+            self.assertEqualArray(m.predict(Xd), label)
+            self.assertEqualArray(
+                m.predict_proba(Xd).astype(dtype), proba, atol=1e-5
+            )
 
     def test_sgd_classifier_log_loss_multiclass(self):
         """SGDClassifier with log_loss multiclass → label + proba."""
-        m = SGDClassifier(loss="log_loss", random_state=0, max_iter=1000)
-        m.fit(self._X_multi, self._y_multi)
+        for dtype in (np.float32, np.float64):
+            Xd = self._X_multi.astype(dtype)
+            m = SGDClassifier(loss="log_loss", random_state=0, max_iter=1000)
+            m.fit(Xd, self._y_multi)
 
-        onx = to_onnx(m, (self._X_multi,))
+            onx = to_onnx(m, (Xd,))
 
-        output_names = [o.name for o in onx.graph.output]
-        self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
+            output_names = [o.name for o in onx.graph.output]
+            self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
 
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": self._X_multi})
-        label, proba = results[0], results[1]
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": Xd})
+            label, proba = results[0], results[1]
 
-        self.assertEqualArray(m.predict(self._X_multi), label)
-        self.assertEqualArray(
-            m.predict_proba(self._X_multi).astype(np.float32), proba, atol=1e-5
-        )
+            self.assertEqualArray(m.predict(Xd), label)
+            self.assertEqualArray(
+                m.predict_proba(Xd).astype(dtype), proba, atol=1e-5
+            )
 
     def test_ridge_classifier_in_pipeline(self):
         """RidgeClassifier at the end of a Pipeline."""
-        X, y = self._X_bin, self._y_bin
-        pipe = Pipeline([("scaler", StandardScaler()), ("clf", RidgeClassifier())])
-        pipe.fit(X, y)
+        for dtype in (np.float32, np.float64):
+            Xd = self._X_bin.astype(dtype)
+            y = self._y_bin
+            pipe = Pipeline([("scaler", StandardScaler()), ("clf", RidgeClassifier())])
+            pipe.fit(Xd, y)
 
-        onx = to_onnx(pipe, (X,))
+            onx = to_onnx(pipe, (Xd,))
 
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": X})
-        self.assertEqualArray(pipe.predict(X), results[0])
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": Xd})
+            self.assertEqualArray(pipe.predict(Xd), results[0])
 
 
 if __name__ == "__main__":
