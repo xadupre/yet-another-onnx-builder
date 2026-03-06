@@ -108,23 +108,22 @@ def _convert_concrete_function(
     """
     # ------------------------------------------------------------------
     # 1. Seed the context with captured variable values.
-    #    cf.captured_inputs — list of TF tensors (resource handles or values)
-    #    captured from outside the function (one per trainable variable).
+    #    cf.captured_inputs — list of TF tensors (resource handles) captured
+    #    from outside the function (one per trainable variable).
     #    cf.variables        — corresponding tf.Variable objects.
+    #
+    #    Key by the captured tensor's name, which matches the Placeholder
+    #    output tensor name seen in cf.graph.get_operations().
     # ------------------------------------------------------------------
-    initializer_names = {}
-    for tensor, var in zip(cf.captured_inputs, cf.variables):
-        name = var.name
-        assert name not in initializer_names, f"name {name!r} already used"
-        initializer_names[name] = (tensor, var)
+    initializer_values: Dict[str, np.ndarray] = {}
+    for captured_tensor, var in zip(cf.captured_inputs, cf.variables):
+        initializer_values[captured_tensor.name] = var.numpy()
 
-    print("***", initializer_names)
     # ------------------------------------------------------------------
     # 2. Register ONNX inputs for each non-captured Placeholder op.
     # 3. Convert each operation in topological (graph-definition) order.
     # ------------------------------------------------------------------
     set_input_names = {f"{i.name}:0": (ind, i) for ind, i in enumerate(input_specs)}
-    input_idx = 0
     for op in cf.graph.get_operations():
         if op.type == "Placeholder":
             tensor = op.outputs[0]
@@ -135,16 +134,13 @@ def _convert_concrete_function(
                     name, tf_dtype_to_np_dtype(spec.dtype), _shape_to_tuple(g, spec.shape)
                 )
                 continue
-            if name in initializer_names:
-                g.make_initializer(name, tensor, source="_convert_concrete_function")
-                continue  # captured variable handle — already in ctx as numpy array
-            assert "SymbolicTensor" in str(
-                type(tensor)
-            ), f"Unexpected type for tensor {name!r}: {type(tensor)}"
-            g.make_tensor_input(
-                name, tf_dtype_to_np_dtype(spec.dtype), _shape_to_tuple(g, spec.shape)
-            )
-            continue
+            if name in initializer_values:
+                # Captured variable resource handle — register its numpy value
+                # as an ONNX initializer so downstream ReadVariableOp can use it.
+                g.make_initializer(
+                    name, initializer_values[name], source="_convert_concrete_function"
+                )
+                continue
 
         op_type = op.type
         # extra_converters take priority over built-in ones.
