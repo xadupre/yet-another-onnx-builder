@@ -16,22 +16,16 @@ class CastPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info(
                 "_onx_mul045", onnx.TensorProto.FLOAT16, shape=(4, 512, 16384)
@@ -41,15 +35,7 @@ class CastPattern(PatternOptimization):
         outputs.append(
             oh.make_tensor_value_info("mul_34", onnx.TensorProto.FLOAT16, shape=(4, 512, 16384))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -59,22 +45,16 @@ class CastPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info(
                 "_onx_mul045", onnx.TensorProto.FLOAT16, shape=(4, 512, 16384)
@@ -84,15 +64,7 @@ class CastPattern(PatternOptimization):
         outputs.append(
             oh.make_tensor_value_info("mul_34", onnx.TensorProto.FLOAT16, shape=(4, 512, 16384))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -148,37 +120,23 @@ class CastCastPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("x1", onnx.TensorProto.FLOAT16, shape=("b", "c"))
         )
         nodes.append(oh.make_node("Cast", ["x1"], ["x2"], to=1))
         nodes.append(oh.make_node("Cast", ["x2"], ["Y"], to=1))
         outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("b", "c")))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -188,36 +146,22 @@ class CastCastPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("x1", onnx.TensorProto.FLOAT16, shape=("b", "c"))
         )
         nodes.append(oh.make_node("Cast", ["x1"], ["Y"], to=1))
         outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("b", "c")))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -309,37 +253,23 @@ class CastCastBinaryPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 4)))
         inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 4)))
         nodes.append(oh.make_node("Cast", ["X"], ["xc"], to=10))
         nodes.append(oh.make_node("Cast", ["Y"], ["yc"], to=10))
         nodes.append(oh.make_node("Add", ["xc", "yc"], ["Z"]))
         outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT16, shape=("a", 4)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -349,36 +279,22 @@ class CastCastBinaryPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 4)))
         inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 4)))
         nodes.append(oh.make_node("Add", ["X", "Y"], ["add-X"]))
         nodes.append(oh.make_node("Cast", ["add-X"], ["Z"], to=10))
         outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT16, shape=("a", 4)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -472,22 +388,16 @@ class CastOpCastPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT16, shape=("a", "b"))
         )
@@ -498,15 +408,7 @@ class CastOpCastPattern(PatternOptimization):
         outputs.append(
             oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT16, shape=("a", "b"))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -516,22 +418,16 @@ class CastOpCastPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT16, shape=("a", "b"))
         )
@@ -541,15 +437,7 @@ class CastOpCastPattern(PatternOptimization):
         outputs.append(
             oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT16, shape=("a", "b"))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -722,22 +610,16 @@ class ComputationCastOpCastPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT16, shape=("a", "b"))
         )
@@ -745,15 +627,7 @@ class ComputationCastOpCastPattern(PatternOptimization):
         nodes.append(oh.make_node("Cast", ["Y"], ["yc"], to=1))
         nodes.append(oh.make_node("Add", ["X", "yc"], ["Z"]))
         outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -763,22 +637,16 @@ class ComputationCastOpCastPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT16, shape=("a", "b"))
         )
@@ -797,15 +665,7 @@ class ComputationCastOpCastPattern(PatternOptimization):
             oh.make_node("Cast", ["ComputationCastOpCastPattern--Z"], ["Z"], to=1)
         )
         outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
     """

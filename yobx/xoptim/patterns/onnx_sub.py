@@ -15,22 +15,16 @@ class Sub1MulPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(oh.make_tensor_value_info("input3", onnx.TensorProto.FLOAT, shape=(1,)))
         nodes.append(
             oh.make_node(
@@ -45,15 +39,7 @@ class Sub1MulPattern(PatternOptimization):
         outputs.append(
             oh.make_tensor_value_info("_onx_mul0", onnx.TensorProto.FLOAT, shape=(1,))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -63,22 +49,16 @@ class Sub1MulPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(oh.make_tensor_value_info("input3", onnx.TensorProto.FLOAT, shape=(1,)))
         nodes.append(
             oh.make_node("Mul", ["input3", "input3"], ["Sub1MulPattern--_onx_mul0"])
@@ -89,15 +69,7 @@ class Sub1MulPattern(PatternOptimization):
         outputs.append(
             oh.make_tensor_value_info("_onx_mul0", onnx.TensorProto.FLOAT, shape=(1,))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """

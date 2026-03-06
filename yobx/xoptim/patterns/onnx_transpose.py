@@ -16,22 +16,16 @@ class TransposeTransposePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("xs", onnx.TensorProto.FLOAT, shape=(1, 1, 32, 128))
         )
@@ -40,15 +34,7 @@ class TransposeTransposePattern(PatternOptimization):
         outputs.append(
             oh.make_tensor_value_info("xm1", onnx.TensorProto.FLOAT, shape=(1, 1, 32, 128))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -58,22 +44,16 @@ class TransposeTransposePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("xs", onnx.TensorProto.FLOAT, shape=(1, 1, 32, 128))
         )
@@ -81,15 +61,7 @@ class TransposeTransposePattern(PatternOptimization):
         outputs.append(
             oh.make_tensor_value_info("xm1", onnx.TensorProto.FLOAT, shape=(1, 1, 32, 128))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -207,22 +179,16 @@ class TransposeReshapeTransposePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info(
                 "xts", onnx.TensorProto.FLOAT, shape=(32, 2, 14, 2, 13, 256)
@@ -254,15 +220,7 @@ class TransposeReshapeTransposePattern(PatternOptimization):
                 "Y", onnx.TensorProto.FLOAT, shape=(32, 2, 2, 14, 13, 256)
             )
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -272,22 +230,16 @@ class TransposeReshapeTransposePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info(
                 "xts", onnx.TensorProto.FLOAT, shape=(32, 2, 14, 2, 13, 256)
@@ -330,15 +282,7 @@ class TransposeReshapeTransposePattern(PatternOptimization):
                 "Y", onnx.TensorProto.FLOAT, shape=(32, 2, 2, 14, 13, 256)
             )
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -539,22 +483,16 @@ class TransposeEqualReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(3, 2, 1, 5))
         )
@@ -562,15 +500,7 @@ class TransposeEqualReshapePattern(PatternOptimization):
         outputs.append(
             oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d"))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -580,22 +510,16 @@ class TransposeEqualReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(3, 2, 1, 5))
         )
@@ -611,15 +535,7 @@ class TransposeEqualReshapePattern(PatternOptimization):
         outputs.append(
             oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d"))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -705,22 +621,16 @@ class TransposeGatherPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", 16, 80))
         )
@@ -738,15 +648,7 @@ class TransposeGatherPattern(PatternOptimization):
         outputs.append(
             oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 16, 80))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -756,22 +658,16 @@ class TransposeGatherPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", 16, 80))
         )
@@ -780,15 +676,7 @@ class TransposeGatherPattern(PatternOptimization):
         outputs.append(
             oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 16, 80))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -853,22 +741,16 @@ class SwapUnsqueezeTransposePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", "c"))
         )
@@ -888,15 +770,7 @@ class SwapUnsqueezeTransposePattern(PatternOptimization):
                 "Y", onnx.TensorProto.FLOAT, shape=("e", "f", "g", "h", "i")
             )
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -906,22 +780,16 @@ class SwapUnsqueezeTransposePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", "c"))
         )
@@ -939,15 +807,7 @@ class SwapUnsqueezeTransposePattern(PatternOptimization):
                 "Y", onnx.TensorProto.FLOAT, shape=("e", "f", "g", "h", "i")
             )
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """

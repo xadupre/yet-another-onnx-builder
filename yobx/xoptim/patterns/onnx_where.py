@@ -13,37 +13,23 @@ class NotWherePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(oh.make_tensor_value_info("A", onnx.TensorProto.INT64, shape=("a", "b")))
         inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.BOOL, shape=("a", "b")))
         inputs.append(oh.make_tensor_value_info("B", onnx.TensorProto.INT64, shape=("a", "b")))
         nodes.append(oh.make_node("Not", ["X"], ["nx"]))
         nodes.append(oh.make_node("Where", ["nx", "A", "B"], ["Y"]))
         outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.INT64, shape=("a", "b")))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -53,36 +39,22 @@ class NotWherePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(oh.make_tensor_value_info("A", onnx.TensorProto.INT64, shape=("a", "b")))
         inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.BOOL, shape=("a", "b")))
         inputs.append(oh.make_tensor_value_info("B", onnx.TensorProto.INT64, shape=("a", "b")))
         nodes.append(oh.make_node("Where", ["X", "B", "A"], ["Y"]))
         outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.INT64, shape=("a", "b")))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -130,22 +102,16 @@ class WhereAddPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(oh.make_tensor_value_info("inf", onnx.TensorProto.FLOAT, shape=(1,)))
         inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
         inputs.append(
@@ -170,15 +136,7 @@ class WhereAddPattern(PatternOptimization):
         nodes.append(oh.make_node("Where", ["mask", "zero", "inf"], ["fmask"]))
         nodes.append(oh.make_node("Add", ["fmask", "X"], ["Y"]))
         outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -188,22 +146,16 @@ class WhereAddPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(oh.make_tensor_value_info("inf", onnx.TensorProto.FLOAT, shape=(1,)))
         inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
         inputs.append(
@@ -211,15 +163,7 @@ class WhereAddPattern(PatternOptimization):
         )
         nodes.append(oh.make_node("Where", ["mask", "X", "inf"], ["Y"]))
         outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
     """

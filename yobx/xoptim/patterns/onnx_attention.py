@@ -20,23 +20,16 @@ class FunctionAttentionPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("intermediate", 1),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info(
                 "values", onnx.TensorProto.FLOAT, shape=("av", "bv", "cv", "dv")
@@ -105,15 +98,7 @@ class FunctionAttentionPattern(PatternOptimization):
                 "Y", onnx.TensorProto.FLOAT, shape=("ay", "by", "cy", "dy")
             )
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
 
@@ -123,23 +108,16 @@ class FunctionAttentionPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("intermediate", 1),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info(
                 "values", onnx.TensorProto.FLOAT, shape=("av", "bv", "cv", "dv")
@@ -176,15 +154,7 @@ class FunctionAttentionPattern(PatternOptimization):
                 "Y", onnx.TensorProto.FLOAT, shape=("ay", "by", "cy", "dy")
             )
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
 
@@ -195,23 +165,16 @@ class FunctionAttentionPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("intermediate", 1),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("init1_s_::RSh1", onnx.TensorProto.FLOAT, shape=(1,))
         )
@@ -367,15 +330,7 @@ class FunctionAttentionPattern(PatternOptimization):
                 "output_0", onnx.TensorProto.FLOAT, shape=("batch", 8, "seq_length", 32)
             )
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
 
@@ -385,23 +340,16 @@ class FunctionAttentionPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("intermediate", 1),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("init1_s_::RSh1", onnx.TensorProto.FLOAT, shape=(1,))
         )
@@ -454,15 +402,7 @@ class FunctionAttentionPattern(PatternOptimization):
                 "output_0", onnx.TensorProto.FLOAT, shape=("batch", 8, "seq_length", 32)
             )
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
 
@@ -473,23 +413,16 @@ class FunctionAttentionPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("intermediate", 1),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info(
                 "values_t", onnx.TensorProto.FLOAT, shape=("av", 8, "cv", 64)
@@ -594,15 +527,7 @@ class FunctionAttentionPattern(PatternOptimization):
                 "Y", onnx.TensorProto.FLOAT, shape=("ay", "by", "cy", "dy")
             )
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
 
@@ -612,23 +537,16 @@ class FunctionAttentionPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("intermediate", 1),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info(
                 "values_t", onnx.TensorProto.FLOAT, shape=("av", 8, "cv", 64)
@@ -702,15 +620,7 @@ class FunctionAttentionPattern(PatternOptimization):
                 "Y", onnx.TensorProto.FLOAT, shape=("ay", "by", "cy", "dy")
             )
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1264,23 +1174,16 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("intermediate", 1),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info(
                 "cat", onnx.TensorProto.FLOAT, shape=("batch", 4, "past_length+seq_length", 32)
@@ -1385,15 +1288,7 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
                 "output_0", onnx.TensorProto.FLOAT, shape=("batch", 8, "seq_length", 32)
             )
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1403,23 +1298,16 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("intermediate", 1),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info(
                 "cat", onnx.TensorProto.FLOAT, shape=("batch", 4, "past_length+seq_length", 32)
@@ -1472,15 +1360,7 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
                 "output_0", onnx.TensorProto.FLOAT, shape=("batch", 8, "seq_length", 32)
             )
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1592,22 +1472,16 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 24),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("key", onnx.TensorProto.FLOAT, shape=("a", 2, "c", 8))
         )
@@ -1685,15 +1559,7 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
         outputs.append(
             oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 4, "c_", 8))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=24)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1703,22 +1569,16 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot
+        from yobx.doc import to_dot, make_pattern_model
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 24),
-        ]
         inputs = []
         outputs = []
         nodes = []
         initializers = []
-        sparse_initializers = []
-        functions = []
         inputs.append(
             oh.make_tensor_value_info("key", onnx.TensorProto.FLOAT, shape=("a", 2, "c", 8))
         )
@@ -1763,15 +1623,7 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
         outputs.append(
             oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 4, "c_", 8))
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
+        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=24)
 
         print("DOT-SECTION", to_dot(model))
     """
