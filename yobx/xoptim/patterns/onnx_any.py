@@ -35,8 +35,7 @@ class SameChildrenPattern(PatternOptimization):
                     oh.make_tensor_value_info('y2', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
                     oh.make_tensor_value_info('y1', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
                 ],
-            ),
-            functions=[],
+            ), # 1
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
@@ -68,8 +67,7 @@ class SameChildrenPattern(PatternOptimization):
                     oh.make_tensor_value_info('y2', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
                     oh.make_tensor_value_info('y1', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
                 ],
-            ),
-            functions=[],
+            ), # 2
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
@@ -353,8 +351,7 @@ class SameChildrenFromInputPattern(SameChildrenPattern):
                     oh.make_tensor_value_info('xy1', onnx.TensorProto.FLOAT16, ('a', 2, 3, 4)),
                     oh.make_tensor_value_info('xy2', onnx.TensorProto.FLOAT16, ('a', 2, 3, 4)),
                 ],
-            ),
-            functions=[],
+            ), # 5
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
@@ -385,8 +382,7 @@ class SameChildrenFromInputPattern(SameChildrenPattern):
                     oh.make_tensor_value_info('xy1', onnx.TensorProto.FLOAT16, ('a', 2, 3, 4)),
                     oh.make_tensor_value_info('xy2', onnx.TensorProto.FLOAT16, ('a', 2, 3, 4)),
                 ],
-            ),
-            functions=[],
+            ), # 6
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
@@ -444,8 +440,7 @@ class ShapeBasedSameChildrenPattern(PatternOptimization):
                     oh.make_tensor_value_info('y1', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
                     oh.make_tensor_value_info('y2', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
                 ],
-            ),
-            functions=[],
+            ), # 7
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
@@ -477,8 +472,7 @@ class ShapeBasedSameChildrenPattern(PatternOptimization):
                     oh.make_tensor_value_info('y1', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
                     oh.make_tensor_value_info('y2', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
                 ],
-            ),
-            functions=[],
+            ), # 8
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
@@ -567,18 +561,11 @@ class IdentityPattern(PatternOptimization):
 
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node('Transpose', ['x3'], ['Y'], perm=[0, 1, 2]),
-                ],
+                [oh.make_node('Transpose', ['x3'], ['Y'], perm=[0, 1, 2])],
                 'pattern',
-                [
-                    oh.make_tensor_value_info('x3', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-            ),
-            functions=[],
+                [oh.make_tensor_value_info('x3', onnx.TensorProto.FLOAT, ('a', 'b', 'c'))],
+                [oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'c'))],
+            ), # 9
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
@@ -596,17 +583,11 @@ class IdentityPattern(PatternOptimization):
 
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node('Identity', ['x3'], ['Y']),
-                ],
+                [oh.make_node('Identity', ['x3'], ['Y'])],
                 'pattern',
-                [
-                    oh.make_tensor_value_info('x3', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-            ),
+                [oh.make_tensor_value_info('x3', onnx.TensorProto.FLOAT, ('a', 'b', 'c'))],
+                [oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'c'))],
+            ), # 11
             functions=[],
             opset_imports=[oh.make_opsetid('', 26)],
         )
@@ -850,23 +831,22 @@ class ShapeBasedIdentityPattern(PatternOptimization):
             oh.make_graph(
                 [
                     oh.make_node('Shape', ['X'], ['N'], end=1, start=0),
-                    oh.make_node('Constant', [], ['zero'],
-                                 value=onh.from_array(np.array([0], dtype=np.int64),
-                                 name='value')),
+                    oh.make_node(
+                        'Constant',
+                        [],
+                        ['zero'],
+                        value=onh.from_array(
+                            np.array([0], dtype=np.int64),
+                            name='value',
+                        ), # 13
+                    ), # 12
                     oh.make_node('Slice', ['X', 'zero', 'N', 'zero'], ['Y']),
                 ],
                 'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a',)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a',)),
-                ],
-                [
-                    onh.from_array(np.array([0], dtype=np.int64), name='zero'),
-                ],
-            ),
-            functions=[],
+                [oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a',))],
+                [oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a',))],
+                [onh.from_array(np.array([0], dtype=np.int64), name='zero')],
+            ), # 14
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
@@ -884,18 +864,11 @@ class ShapeBasedIdentityPattern(PatternOptimization):
 
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node('Identity', ['X'], ['Y']),
-                ],
+                [oh.make_node('Identity', ['X'], ['Y'])],
                 'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a',)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a',)),
-                ],
-            ),
-            functions=[],
+                [oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a',))],
+                [oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a',))],
+            ), # 15
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
@@ -980,11 +953,8 @@ class SwapUnaryPattern(PatternOptimization):
                     oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
                     oh.make_tensor_value_info('cst', onnx.TensorProto.FLOAT, (1,)),
                 ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'c', 'b', 'd')),
-                ],
-            ),
-            functions=[],
+                [oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'c', 'b', 'd'))],
+            ), # 16
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
@@ -1014,8 +984,7 @@ class SwapUnaryPattern(PatternOptimization):
                 [
                     oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'c', 'b', 'd')),
                 ],
-            ),
-            functions=[],
+            ), # 17
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
@@ -1100,14 +1069,9 @@ class NotNotPattern(PatternOptimization):
                     oh.make_node('Not', ['xs'], ['Y']),
                 ],
                 'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.BOOL, ('a', 2)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.BOOL, ('a', 2)),
-                ],
-            ),
-            functions=[],
+                [oh.make_tensor_value_info('X', onnx.TensorProto.BOOL, ('a', 2))],
+                [oh.make_tensor_value_info('Y', onnx.TensorProto.BOOL, ('a', 2))],
+            ), # 19
             opset_imports=[oh.make_opsetid('', 23)],
         )
 
@@ -1125,18 +1089,11 @@ class NotNotPattern(PatternOptimization):
 
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node('Identity', ['X'], ['Y']),
-                ],
+                [oh.make_node('Identity', ['X'], ['Y'])],
                 'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.BOOL, ('a', 2)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.BOOL, ('a', 2)),
-                ],
-            ),
-            functions=[],
+                [oh.make_tensor_value_info('X', onnx.TensorProto.BOOL, ('a', 2))],
+                [oh.make_tensor_value_info('Y', onnx.TensorProto.BOOL, ('a', 2))],
+            ),  # 20
             opset_imports=[oh.make_opsetid('', 23)],
         )
 
