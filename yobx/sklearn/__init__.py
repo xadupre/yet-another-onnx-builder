@@ -10,6 +10,7 @@ def register_sklearn_converters():
         return
     from .compose import register as register_compose
     from .linear_model import register as register_linear_model
+    from .multiclass import register as register_multiclass
     from .neural_network import register as register_neural_network
     from .pipeline import register as register_pipeline
     from .preprocessing import register as register_preprocessing
@@ -17,6 +18,7 @@ def register_sklearn_converters():
 
     register_compose()
     register_linear_model()
+    register_multiclass()
     register_neural_network()
     register_pipeline()
     register_preprocessing()
