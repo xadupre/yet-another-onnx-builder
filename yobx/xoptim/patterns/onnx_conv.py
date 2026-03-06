@@ -16,51 +16,43 @@ class ConvBiasNullPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(512, 3, 64, 64))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Conv', ['X', 'W', 'B2'], ['Y'],
+                                 dilations=[1, 1], group=1, kernel_shape=[4, 4],
+                                 pads=[1, 1, 1, 1], strides=[2, 2]),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (512, 3, 64, 64)),
+                    oh.make_tensor_value_info('W', onnx.TensorProto.FLOAT, (64, 3, 4, 4)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (512, 64, 32, 32)),
+                ],
+                [
+                    onh.from_array(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0], dtype=np.float32),
+                                   name='B2'),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("W", onnx.TensorProto.FLOAT, shape=(64, 3, 4, 4))
-        )
-        initializers.append(onh.from_array(np.zeros((64,), dtype=np.float32), name="B2"))
-        nodes.append(
-            oh.make_node(
-                "Conv",
-                ["X", "W", "B2"],
-                ["Y"],
-                dilations=[1, 1],
-                group=1,
-                kernel_shape=[4, 4],
-                pads=[1, 1, 1, 1],
-                strides=[2, 2],
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(512, 64, 32, 32))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -71,51 +63,28 @@ class ConvBiasNullPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(512, 3, 64, 64))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Conv', ['X', 'W'], ['Y'],
+                                 dilations=[1, 1], group=1, kernel_shape=[4, 4],
+                                 pads=[1, 1, 1, 1], strides=[2, 2]),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (512, 3, 64, 64)),
+                    oh.make_tensor_value_info('W', onnx.TensorProto.FLOAT, (64, 3, 4, 4)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (512, 64, 32, 32)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("W", onnx.TensorProto.FLOAT, shape=(64, 3, 4, 4))
-        )
-        nodes.append(
-            oh.make_node(
-                "Conv",
-                ["X", "W"],
-                ["Y"],
-                dilations=[1, 1],
-                group=1,
-                kernel_shape=[4, 4],
-                pads=[1, 1, 1, 1],
-                strides=[2, 2],
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(512, 64, 32, 32))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """

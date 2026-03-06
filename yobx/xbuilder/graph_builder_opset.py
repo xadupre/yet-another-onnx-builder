@@ -1,5 +1,5 @@
 from functools import partial
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import cast, TYPE_CHECKING, Any, Callable, List, Optional, Tuple, Union
 import numpy as np
 
 if TYPE_CHECKING:
@@ -35,6 +35,7 @@ class Opset:
         "Cosh": 1,
         "CumSum": 1,
         "Div": 1,
+        "DFT": 1,
         "Dropout": 2,
         "Elu": 1,
         "Equal": 1,
@@ -96,7 +97,12 @@ class Opset:
 
     def __getattr__(self, name):
         if name in self._implemented:
-            return partial(self.make_node, name)
+            n_outputs = self._implemented[name]
+            if n_outputs == 1:
+                return cast(Callable[..., str], partial(self.make_node, name))
+            if n_outputs == 2:
+                return cast(Callable[..., Tuple[str, str]], partial(self.make_node, name))
+            return cast(Callable[..., Tuple[str, ...]], partial(self.make_node, name))
         if name in self.__dict__:
             return self.__dict__[name]
         return partial(self._make_node, name)
@@ -125,7 +131,7 @@ class Opset:
         name: Optional[str] = None,
         allow_empty_shape: bool = False,
         **kwargs,
-    ):
+    ) -> Union[str, Tuple[str, ...]]:
         assert (
             op_type != "Split" or outputs != 1
         ), f"Operator Split is useless with one output, inputs={inputs}, outputs={outputs}"
@@ -189,7 +195,7 @@ class Opset:
                 )
 
         assert None not in new_inputs
-        if self.allow_unknown and not self.builder.get_opset(domain):
+        if self.allow_unknown and not self.builder.has_opset(domain):
             self.builder.add_domain(domain)
         return self.builder.make_node(
             op_type,
@@ -210,7 +216,7 @@ class Opset:
             raise RuntimeError(f"Unable to call {op_type} on a dynamic input axis={axes}")
         return iaxes
 
-    def ReduceMaxAnyOpset(self, *args, name: str = "ReduceMaxAnyOpset", **kwargs):
+    def ReduceMaxAnyOpset(self, *args, name: str = "ReduceMaxAnyOpset", **kwargs) -> str:
         if len(args) == 1:
             return self.ReduceMax(*args, name=name, **kwargs)
         assert len(args) == 2, f"ReduceMaxAnyOpset expects 2 arguments not {len(args)}"
@@ -220,7 +226,7 @@ class Opset:
             args[0], axes=self._iaxes("ReduceMax", args[1]), name=name, **kwargs
         )
 
-    def ReduceMinAnyOpset(self, *args, name: str = "ReduceMinAnyOpset", **kwargs):
+    def ReduceMinAnyOpset(self, *args, name: str = "ReduceMinAnyOpset", **kwargs) -> str:
         if len(args) == 1:
             return self.ReduceMin(*args, name=name, **kwargs)
         assert len(args) == 2, f"ReduceMinAnyOpset expects 2 arguments not {len(args)}"
@@ -230,7 +236,7 @@ class Opset:
             args[0], axes=self._iaxes("ReduceMin", args[1]), name=name, **kwargs
         )
 
-    def ReduceMeanAnyOpset(self, *args, name: str = "ReduceMeanAnyOpset", **kwargs):
+    def ReduceMeanAnyOpset(self, *args, name: str = "ReduceMeanAnyOpset", **kwargs) -> str:
         if len(args) == 1:
             return self.ReduceMean(*args, name=name, **kwargs)
         assert len(args) == 2, f"ReduceMeanAnyOpset expects 2 arguments not {len(args)}"
@@ -240,7 +246,7 @@ class Opset:
             args[0], axes=self._iaxes("ReduceMean", args[1]), name=name, **kwargs
         )
 
-    def ReduceProdAnyOpset(self, *args, name: str = "ReduceProdAnyOpset", **kwargs):
+    def ReduceProdAnyOpset(self, *args, name: str = "ReduceProdAnyOpset", **kwargs) -> str:
         if len(args) == 1:
             return self.ReduceProd(*args, name=name, **kwargs)
         assert len(args) == 2, f"ReduceProdAnyOpset expects 2 arguments not {len(args)}"
@@ -250,7 +256,7 @@ class Opset:
             args[0], axes=self._iaxes("ReduceProd", args[1]), name=name, **kwargs
         )
 
-    def ReduceSumAnyOpset(self, *args, name: str = "ReduceSumAnyOpset", **kwargs):
+    def ReduceSumAnyOpset(self, *args, name: str = "ReduceSumAnyOpset", **kwargs) -> str:
         if len(args) == 1:
             return self.ReduceSum(*args, name=name, **kwargs)
         assert len(args) == 2, f"ReduceSumAnyOpset expects 2 arguments not {len(args)}"
@@ -260,7 +266,7 @@ class Opset:
             args[0], axes=self._iaxes("ReduceSum", args[1]), name=name, **kwargs
         )
 
-    def ReduceLogSumExpAnyOpset(self, *args, name: str = "ReduceLogSumExpOpset", **kwargs):
+    def ReduceLogSumExpAnyOpset(self, *args, name: str = "ReduceLogSumExpOpset", **kwargs) -> str:
         if len(args) == 1:
             return self.ReduceLogSumExp(*args, name=name, **kwargs)
         assert len(args) == 2, f"ReduceLogSumExpAnyOpset expects 2 arguments not {len(args)}"
@@ -270,7 +276,7 @@ class Opset:
             args[0], axes=self._iaxes("ReduceLogSumExp", args[1]), name=name, **kwargs
         )
 
-    def SqueezeAnyOpset(self, *args, name: str = "SqueezeAnyOpset", **kwargs):
+    def SqueezeAnyOpset(self, *args, name: str = "SqueezeAnyOpset", **kwargs) -> str:
         named_kwargs = set(k for k in kwargs if k != "outputs")
         if len(args) == 1 and len(named_kwargs) == 0:
             return self.Squeeze(*args, name=name)
@@ -279,7 +285,7 @@ class Opset:
             return self.Squeeze(*args, name=name, **kwargs)
         return self.Squeeze(args[0], axes=self._iaxes("Squeeze", args[1]), name=name, **kwargs)
 
-    def UnsqueezeAnyOpset(self, *args, name: str = "UnsqueezeAnyOpset", **kwargs):
+    def UnsqueezeAnyOpset(self, *args, name: str = "UnsqueezeAnyOpset", **kwargs) -> str:
         assert len(args) == 2, f"UnsqueezeAnyOpset expects 2 arguments not {len(args)}"
         if self.builder.main_opset >= 13:
             return self.Unsqueeze(*args, name=name, **kwargs)
@@ -287,7 +293,7 @@ class Opset:
             args[0], axes=self._iaxes("Unsqueeze", args[1]), name=name, **kwargs
         )
 
-    def DFTAnyOpset(self, *args, name: str = "DFTAnyOpset", **kwargs):
+    def DFTAnyOpset(self, *args, name: str = "DFTAnyOpset", **kwargs) -> str:
         # For opset < 20, DFT uses a single integer 'axis' attribute.
         # We convert the axes tensor input to a Python list via _iaxes(),
         # then extract the single axis value.

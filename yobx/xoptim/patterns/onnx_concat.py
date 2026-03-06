@@ -18,42 +18,31 @@ class ConcatGatherPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("D1", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("D2", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["un"],
-                value=onh.from_array(np.array([1], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['un'],
+                                 value=onh.from_array(np.array([1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Concat', ['D1', 'D2'], ['d'], axis=0),
+                    oh.make_node('Gather', ['d', 'un'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('D1', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('D2', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.INT64, (1,)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Concat", ["D1", "D2"], ["d"], axis=0))
-        nodes.append(oh.make_node("Gather", ["d", "un"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.INT64, shape=(1,)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -64,33 +53,25 @@ class ConcatGatherPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("D2", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(oh.make_node("Identity", ["D2"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.INT64, shape=(1,)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Identity', ['D2'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('D2', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.INT64, (1,)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -171,41 +152,30 @@ class ConcatEmptyPattern(_CommonConcatPattern):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.INT64, shape=("b",)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.INT64, shape=("a",)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["I"],
-                value=onh.from_array(np.array([], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['I'],
+                                 value=onh.from_array(np.array([], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Concat', ['X', 'Y', 'I'], ['Z'], axis=0),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.INT64, ('b',)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.INT64, ('a',)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.INT64, ('c',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Concat", ["X", "Y", "I"], ["Z"], axis=0))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.INT64, shape=("c",)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -216,34 +186,26 @@ class ConcatEmptyPattern(_CommonConcatPattern):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.INT64, shape=("b",)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.INT64, shape=("a",)))
-        nodes.append(oh.make_node("Concat", ["X", "Y"], ["Z"], axis=0))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.INT64, shape=("c",)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Concat', ['X', 'Y'], ['Z'], axis=0),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.INT64, ('b',)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.INT64, ('a',)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.INT64, ('c',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -298,36 +260,26 @@ class ConcatTwiceUnaryPattern(_CommonConcatPattern):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("b", "c")))
-        nodes.append(oh.make_node("Concat", ["X", "X"], ["xx"], axis=0))
-        nodes.append(oh.make_node("Sin", ["xx"], ["xsin"]))
-        outputs.append(
-            oh.make_tensor_value_info("xsin", onnx.TensorProto.FLOAT, shape=("2*b", "c"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Concat', ['X', 'X'], ['xx'], axis=0),
+                    oh.make_node('Sin', ['xx'], ['xsin']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('b', 'c')),
+                ],
+                [
+                    oh.make_tensor_value_info('xsin', onnx.TensorProto.FLOAT, ('2*b', 'c')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -338,36 +290,26 @@ class ConcatTwiceUnaryPattern(_CommonConcatPattern):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("b", "c")))
-        nodes.append(oh.make_node("Sin", ["X"], ["uxsin"]))
-        nodes.append(oh.make_node("Concat", ["uxsin", "uxsin"], ["xsin"], axis=0))
-        outputs.append(
-            oh.make_tensor_value_info("xsin", onnx.TensorProto.FLOAT, shape=("2*b", "c"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Sin', ['X'], ['uxsin']),
+                    oh.make_node('Concat', ['uxsin', 'uxsin'], ['xsin'], axis=0),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('b', 'c')),
+                ],
+                [
+                    oh.make_tensor_value_info('xsin', onnx.TensorProto.FLOAT, ('2*b', 'c')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """

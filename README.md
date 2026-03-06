@@ -10,3 +10,14 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 yet another onnx builder, patches, flattening functions...
+
+**yet-another-onnx-builder** (`yobx`) is a toolkit for converting machine learning models
+to [ONNX](https://onnx.ai) format and manipulating ONNX graphs programmatically.
+It provides:
+
+- A **graph builder API** for constructing and optimizing ONNX graphs, with built-in shape
+  inference and a pattern-based graph optimizer.
+- **Converters** for scikit-learn estimators and pipelines (`yobx.sklearn`).
+- **Utilities** for PyTorch export, including model patching and input flattening (`yobx.torch`).
+- A **symbolic shape expression system** for dynamic shape handling at export time (`yobx.xshape`).
+- A **translation tool** that converts ONNX graphs back to executable Python code (`yobx.translate`).

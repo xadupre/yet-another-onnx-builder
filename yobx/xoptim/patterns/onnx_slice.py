@@ -17,51 +17,35 @@ class SliceSlicePattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("one", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("zero", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["zero"],
-                value=onh.from_array(np.array([0], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['zero'],
+                                 value=onh.from_array(np.array([0], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['one'],
+                                 value=onh.from_array(np.array([1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Slice', ['X', 'zero', 'one', 'zero'], ['x1']),
+                    oh.make_node('Slice', ['x1', 'zero', 'one', 'one'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('one', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('zero', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('c', 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["one"],
-                value=onh.from_array(np.array([1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Slice", ["X", "zero", "one", "zero"], ["x1"]))
-        nodes.append(oh.make_node("Slice", ["x1", "zero", "one", "one"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("c", "d")))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -72,59 +56,35 @@ class SliceSlicePattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("one", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("zero", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Concat", ["zero", "zero"], ["SliceSlicePattern_zero_start"], axis=0
-            )
-        )
-        nodes.append(
-            oh.make_node("Concat", ["one", "one"], ["SliceSlicePattern_one_end"], axis=0)
-        )
-        nodes.append(
-            oh.make_node(
-                "Concat", ["zero", "one"], ["SliceSlicePattern_one_axis"], axis=0
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Slice",
+        model = oh.make_model(
+            oh.make_graph(
                 [
-                    "X",
-                    "SliceSlicePattern_zero_start",
-                    "SliceSlicePattern_one_end",
-                    "SliceSlicePattern_one_axis",
+                    oh.make_node('Concat', ['zero', 'zero'], ['SliceSlicePattern_zero_start'],
+                                 axis=0),
+                    oh.make_node('Concat', ['one', 'one'], ['SliceSlicePattern_one_end'], axis=0),
+                    oh.make_node('Concat', ['zero', 'one'], ['SliceSlicePattern_one_axis'],
+                                 axis=0),
+                    oh.make_node('Slice',
+                        ['X', 'SliceSlicePattern_zero_start', 'SliceSlicePattern_one_end',
+                         'SliceSlicePattern_one_axis'],
+                        ['Y']),
                 ],
-                ["Y"],
-            )
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('one', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('zero', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('c', 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("c", "d")))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """

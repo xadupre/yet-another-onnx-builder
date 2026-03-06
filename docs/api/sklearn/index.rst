@@ -9,8 +9,10 @@ yobx.sklearn
     register
     sklearn_helper
     linear_model/index
+    neural_network/index
     pipeline/index
     preprocessing/index
+    tree/index
 
 register_sklearn_converters
 +++++++++++++++++++++++++++

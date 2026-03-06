@@ -514,6 +514,108 @@ def _cmd_print(argv: List[Any]):
 #############
 
 
+def get_parser_copilot_draft() -> ArgumentParser:
+    parser = ArgumentParser(
+        prog="copilot-draft",
+        description=textwrap.dedent("""
+            Use the GitHub Copilot chat API to generate a first-draft ONNX
+            converter for a scikit-learn estimator and write it into the
+            yobx/sklearn/ sub-package tree.
+            """),
+        epilog=textwrap.dedent("""
+            Examples:
+
+                # Preview the generated code without writing anything
+                python -m yobx copilot-draft sklearn.linear_model.Ridge --dry-run
+
+                # Write to yobx/sklearn/linear_model/ridge.py
+                python -m yobx copilot-draft sklearn.preprocessing.MinMaxScaler \\
+                    --token ghp_...
+
+                # Write to a custom directory
+                python -m yobx copilot-draft sklearn.linear_model.Ridge \\
+                    --output-dir /tmp/my_converters
+
+            The GitHub token can also be supplied via the GITHUB_TOKEN or
+            GH_TOKEN environment variable.
+            """),
+        formatter_class=RawTextHelpFormatter,
+    )
+    parser.add_argument(
+        "estimator",
+        type=str,
+        help="Fully-qualified class name of the scikit-learn estimator, "
+        "e.g. sklearn.linear_model.Ridge",
+    )
+    parser.add_argument(
+        "--token",
+        default="",
+        type=str,
+        required=False,
+        help="GitHub PAT with the copilot scope. "
+        "Falls back to GITHUB_TOKEN / GH_TOKEN env-vars when not set.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="",
+        type=str,
+        required=False,
+        help="Directory to write the generated file. "
+        "Defaults to the appropriate yobx/sklearn/<submodule>/ directory.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        default=False,
+        action="store_true",
+        help="Print the generated code without writing any file.",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        type=int,
+        default=0,
+        required=False,
+        help="verbosity",
+    )
+    return parser
+
+
+def _cmd_copilot_draft(argv: List[Any]):
+    import importlib
+
+    parser = get_parser_copilot_draft()
+    args = parser.parse_args(argv[1:])
+
+    # Resolve the estimator class from its fully-qualified name
+    fqname: str = args.estimator
+    if "." not in fqname:
+        parser.error(
+            f"estimator must be a fully-qualified class name such as "
+            f"sklearn.linear_model.Ridge, got {fqname!r}"
+        )
+    module_path, class_name = fqname.rsplit(".", 1)
+    try:
+        module = importlib.import_module(module_path)
+    except ImportError as exc:
+        parser.error(f"Cannot import module {module_path!r}: {exc}")
+    estimator_class = getattr(module, class_name, None)
+    if estimator_class is None:
+        parser.error(f"Class {class_name!r} not found in module {module_path!r}")
+
+    token = args.token or None
+    output_dir = args.output_dir or None
+
+    from .helpers.copilot import draft_converter_with_copilot
+
+    draft_converter_with_copilot(
+        estimator_class,
+        token=token,
+        output_dir=output_dir,
+        dry_run=args.dry_run,
+        verbose=args.verbose,
+    )
+
+
 def get_main_parser() -> ArgumentParser:
     parser = ArgumentParser(
         prog="yobx",
@@ -523,17 +625,19 @@ def get_main_parser() -> ArgumentParser:
             Type 'python -m yobx <cmd> --help'
             to get help for a specific command.
 
-            agg          - aggregates statistics from multiple files
-            dot          - converts an onnx model into dot format
-            find         - find node consuming or producing a result
-            partition    - partition a model, each partition appears as local function
-            print        - prints the model on standard output
+            agg            - aggregates statistics from multiple files
+            copilot-draft  - draft a sklearn→ONNX converter via GitHub Copilot
+            dot            - converts an onnx model into dot format
+            find           - find node consuming or producing a result
+            partition      - partition a model, each partition appears as local function
+            print          - prints the model on standard output
             """),
     )
     parser.add_argument(
         "cmd",
         choices=[
             "agg",
+            "copilot-draft",
             "dot",
             "find",
             "partition",
@@ -547,6 +651,7 @@ def get_main_parser() -> ArgumentParser:
 def main(argv: Optional[List[Any]] = None):
     fcts = dict(
         agg=_cmd_agg,
+        **{"copilot-draft": _cmd_copilot_draft},
         dot=_cmd_dot,
         find=_cmd_find,
         partition=_cmd_partition,
@@ -562,6 +667,7 @@ def main(argv: Optional[List[Any]] = None):
         else:
             parsers = dict(
                 agg=get_parser_agg,
+                **{"copilot-draft": get_parser_copilot_draft},
                 dot=get_parser_dot,
                 find=get_parser_find,
                 partition=get_parser_partition,

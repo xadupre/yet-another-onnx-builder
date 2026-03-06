@@ -366,8 +366,10 @@ class CustomTracer(torch.fx.Tracer):
 
         Args:
 
-            m (Module): The module being queried about
-            module_qualified_name (str): The path to root of this module. For example,
+            m (Module):
+                The module being queried about
+            module_qualified_name (str):
+                The path to root of this module. For example,
                 if you have a module hierarchy where submodule ``foo`` contains
                 submodule ``bar``, which contains submodule ``baz``, that module will
                 appear with the qualified name ``foo.bar.baz`` here.

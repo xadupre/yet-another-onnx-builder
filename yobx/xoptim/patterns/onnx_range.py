@@ -16,46 +16,32 @@ class SwapRangeAddScalarPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("END", onnx.TensorProto.INT64, shape=[]))
-        inputs.append(oh.make_tensor_value_info("PLUS", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("one", onnx.TensorProto.INT64, shape=[]))
-        inputs.append(oh.make_tensor_value_info("START", onnx.TensorProto.INT64, shape=[]))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["one"],
-                value=onh.from_array(np.array(1, dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['one'],
+                                 value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
+                    oh.make_node('Range', ['START', 'END', 'one'], ['arange']),
+                    oh.make_node('Add', ['arange', 'PLUS'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('END', onnx.TensorProto.INT64, ()),
+                    oh.make_tensor_value_info('PLUS', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('one', onnx.TensorProto.INT64, ()),
+                    oh.make_tensor_value_info('START', onnx.TensorProto.INT64, ()),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.INT64, ('NEWDIM_range',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Range", ["START", "END", "one"], ["arange"]))
-        nodes.append(oh.make_node("Add", ["arange", "PLUS"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.INT64, shape=("NEWDIM_range",))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -66,61 +52,36 @@ class SwapRangeAddScalarPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("END", onnx.TensorProto.INT64, shape=[]))
-        inputs.append(oh.make_tensor_value_info("PLUS", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("one", onnx.TensorProto.INT64, shape=[]))
-        inputs.append(oh.make_tensor_value_info("START", onnx.TensorProto.INT64, shape=[]))
-        nodes.append(
-            oh.make_node("Squeeze", ["PLUS"], ["SwapRangeAddScalarPattern--PLUS"])
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Squeeze', ['PLUS'], ['SwapRangeAddScalarPattern--PLUS']),
+                    oh.make_node('Add', ['END', 'SwapRangeAddScalarPattern--PLUS'],
+                                 ['SwapRangeAddScalarPattern--END']),
+                    oh.make_node('Add', ['START', 'SwapRangeAddScalarPattern--PLUS'],
+                                 ['SwapRangeAddScalarPattern--START']),
+                    oh.make_node('Range',
+                        ['SwapRangeAddScalarPattern--START',
+                         'SwapRangeAddScalarPattern--END', 'one'],
+                        ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('END', onnx.TensorProto.INT64, ()),
+                    oh.make_tensor_value_info('PLUS', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('one', onnx.TensorProto.INT64, ()),
+                    oh.make_tensor_value_info('START', onnx.TensorProto.INT64, ()),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.INT64, ('NEWDIM_range',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Add",
-                ["END", "SwapRangeAddScalarPattern--PLUS"],
-                ["SwapRangeAddScalarPattern--END"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Add",
-                ["START", "SwapRangeAddScalarPattern--PLUS"],
-                ["SwapRangeAddScalarPattern--START"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Range",
-                ["SwapRangeAddScalarPattern--START", "SwapRangeAddScalarPattern--END", "one"],
-                ["Y"],
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.INT64, shape=("NEWDIM_range",))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """

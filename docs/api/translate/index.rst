@@ -11,6 +11,7 @@ yobx.translate
     light_emitter
     builder_emitter
     make_helper
+    reverse_graph_builder
 
 Top-level helpers
 +++++++++++++++++

@@ -5,12 +5,14 @@ yobx.helpers
     :maxdepth: 1
     :caption: modules
 
+    copilot
     cube_helper
     dot_helper
     helper
     mini_onnx_builder
     onnx_helper
     patch_helper
+    rt_helper
 
 Other functions
 +++++++++++++++

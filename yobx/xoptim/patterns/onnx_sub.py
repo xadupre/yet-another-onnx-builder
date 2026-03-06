@@ -17,43 +17,30 @@ class Sub1MulPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("input3", onnx.TensorProto.FLOAT, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init1_s1_"],
-                value=onh.from_array(np.array([1.0], dtype=np.float32), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init1_s1_'],
+                                 value=onh.from_array(np.array([1.0], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Mul', ['input3', '_onx_sub0'], ['_onx_mul0']),
+                    oh.make_node('Sub', ['init1_s1_', 'input3'], ['_onx_sub0']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('input3', onnx.TensorProto.FLOAT, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('_onx_mul0', onnx.TensorProto.FLOAT, (1,)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Mul", ["input3", "_onx_sub0"], ["_onx_mul0"]))
-        nodes.append(oh.make_node("Sub", ["init1_s1_", "input3"], ["_onx_sub0"]))
-        outputs.append(
-            oh.make_tensor_value_info("_onx_mul0", onnx.TensorProto.FLOAT, shape=(1,))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -64,40 +51,26 @@ class Sub1MulPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("input3", onnx.TensorProto.FLOAT, shape=(1,)))
-        nodes.append(
-            oh.make_node("Mul", ["input3", "input3"], ["Sub1MulPattern--_onx_mul0"])
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Mul', ['input3', 'input3'], ['Sub1MulPattern--_onx_mul0']),
+                    oh.make_node('Sub', ['input3', 'Sub1MulPattern--_onx_mul0'], ['_onx_mul0']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('input3', onnx.TensorProto.FLOAT, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('_onx_mul0', onnx.TensorProto.FLOAT, (1,)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node("Sub", ["input3", "Sub1MulPattern--_onx_mul0"], ["_onx_mul0"])
-        )
-        outputs.append(
-            oh.make_tensor_value_info("_onx_mul0", onnx.TensorProto.FLOAT, shape=(1,))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """

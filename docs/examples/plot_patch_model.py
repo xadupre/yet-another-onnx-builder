@@ -16,7 +16,9 @@ This example shows how to:
 3. Display a unified diff for each
    :class:`PatchInfo <yobx.helpers.patch_helper.PatchInfo>` so you can see
    exactly what changed in the original PyTorch internals.
-4. Show which patches were actually exercised when exporting a real model
+4. Render the diff text as a matplotlib figure so that sphinx-gallery
+   captures the example.
+5. Show which patches were actually exercised when exporting a real model
    (`arnir0/Tiny-LLM`).
 
 The context manager both **applies** the patches on entry and **removes** them
@@ -24,6 +26,7 @@ on exit, so the original functions are restored once the ``with`` block ends.
 """
 
 import torch
+from yobx import doc
 from yobx.helpers.patch_helper import PatchDetails
 from yobx.torch import apply_patches_for_model, register_flattening_functions, use_dyn_not_str
 from yobx.torch.tiny_models import get_tiny_model
@@ -64,7 +67,26 @@ for patch in details:
     print()
 
 # %%
-# 3. Show which patches apply when exporting arnir0/Tiny-LLM
+# 3. Plot the diff text as an image
+# -----------------------------------
+#
+# The first 10 lines of the shortest diff are rendered as a matplotlib figure
+# with colour-coded lines: ``-`` lines in red, ``+`` lines in green, and
+# ``@@`` hunk headers in blue.
+# This makes the figure capturable by sphinx-gallery.
+# :func:`yobx.doc.plot_text` automates this rendering.
+
+import matplotlib.pyplot as plt  # noqa: E402
+
+_DIFF_COLORS = {"+": "#2a9d2a", "-": "#cc2222", "@": "#1a6fbf"}
+
+smallest = min(details, key=lambda p: len(p.make_diff().splitlines()))
+diff_preview = "\n".join(smallest.make_diff().splitlines()[:10])
+doc.plot_text(diff_preview, title=smallest.name, line_color_map=_DIFF_COLORS)
+plt.show()
+
+# %%
+# 4. Show which patches apply when exporting arnir0/Tiny-LLM
 # -----------------------------------------------------------
 #
 # When exporting a real transformers model we can find out exactly which

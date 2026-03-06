@@ -47,7 +47,7 @@ def to_graph_builder_code(proto: onnx.ModelProto, function_name: str = "build_mo
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
-        from yobx.xbuilder.reverse_graph_builder import (
+        from yobx.translate.reverse_graph_builder import (
             to_graph_builder_code,
         )
 
@@ -116,7 +116,7 @@ def to_graph_pattern_matching(
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
-        from yobx.xbuilder.reverse_graph_builder import (
+        from yobx.translate.reverse_graph_builder import (
             to_graph_pattern_matching,
         )
 

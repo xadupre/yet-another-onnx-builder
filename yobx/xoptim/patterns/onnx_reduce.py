@@ -17,50 +17,35 @@ class ReduceSumNormalizePattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT16, shape=("a", "b"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['axis'],
+                                 value=onh.from_array(np.array(-1, dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Cast', ['X'], ['xc'], to=1),
+                    oh.make_node('ReduceSum', ['xc', 'axis'], ['red'], keepdims=1),
+                    oh.make_node('Mul', ['red', 'Y'], ['mul']),
+                    oh.make_node('Sub', ['xc', 'mul'], ['subc']),
+                    oh.make_node('Cast', ['subc'], ['Z'], to=10),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, ('a', 'b')),
+                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, ()),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT16, ('a', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        inputs.append(oh.make_tensor_value_info("axis", onnx.TensorProto.INT64, shape=[]))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["axis"],
-                value=onh.from_array(np.array(-1, dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Cast", ["X"], ["xc"], to=1))
-        nodes.append(oh.make_node("ReduceSum", ["xc", "axis"], ["red"], keepdims=1))
-        nodes.append(oh.make_node("Mul", ["red", "Y"], ["mul"]))
-        nodes.append(oh.make_node("Sub", ["xc", "mul"], ["subc"]))
-        nodes.append(oh.make_node("Cast", ["subc"], ["Z"], to=10))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT16, shape=("a", "b"))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -71,52 +56,33 @@ class ReduceSumNormalizePattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT16, shape=("a", "b"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('ReduceSum', ['X', 'axis'], ['ReduceSumNormalizePattern_red'],
+                                 keepdims=1),
+                    oh.make_node('Cast', ['Y'], ['ReduceSumNormalizePattern_Y'], to=10),
+                    oh.make_node('Mul',
+                                 ['ReduceSumNormalizePattern_red', 'ReduceSumNormalizePattern_Y'],
+                                 ['ReduceSumNormalizePattern_mul']),
+                    oh.make_node('Sub', ['X', 'ReduceSumNormalizePattern_mul'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, ('a', 'b')),
+                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, ()),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT16, ('a', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        inputs.append(oh.make_tensor_value_info("axis", onnx.TensorProto.INT64, shape=[]))
-        nodes.append(
-            oh.make_node(
-                "ReduceSum", ["X", "axis"], ["ReduceSumNormalizePattern_red"], keepdims=1
-            )
-        )
-        nodes.append(oh.make_node("Cast", ["Y"], ["ReduceSumNormalizePattern_Y"], to=10))
-        nodes.append(
-            oh.make_node(
-                "Mul",
-                ["ReduceSumNormalizePattern_red", "ReduceSumNormalizePattern_Y"],
-                ["ReduceSumNormalizePattern_mul"],
-            )
-        )
-        nodes.append(oh.make_node("Sub", ["X", "ReduceSumNormalizePattern_mul"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT16, shape=("a", "b"))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -218,43 +184,32 @@ class ReduceArgTopKPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 22),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("one", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["one"],
-                value=onh.from_array(np.array([1], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['one'],
+                                 value=onh.from_array(np.array([1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('ReduceMin', ['X', 'one'], ['Y1'], keepdims=0),
+                    oh.make_node('ArgMin', ['X'], ['Y2'], axis=1, keepdims=0),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('one', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y2', onnx.TensorProto.INT64, ('a',)),
+                    oh.make_tensor_value_info('Y1', onnx.TensorProto.FLOAT, ('a',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 22)],
         )
-        nodes.append(oh.make_node("ReduceMin", ["X", "one"], ["Y1"], keepdims=0))
-        nodes.append(oh.make_node("ArgMin", ["X"], ["Y2"], axis=1, keepdims=0))
-        outputs.append(oh.make_tensor_value_info("Y2", onnx.TensorProto.INT64, shape=("a",)))
-        outputs.append(oh.make_tensor_value_info("Y1", onnx.TensorProto.FLOAT, shape=("a",)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -265,45 +220,31 @@ class ReduceArgTopKPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 22),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("one", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "TopK",
-                ["X", "one"],
-                ["ReduceArgTopKPattern_Y1", "ReduceArgTopKPattern_Y2"],
-                axis=1,
-                largest=0,
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('TopK', ['X', 'one'],
+                                 ['ReduceArgTopKPattern_Y1', 'ReduceArgTopKPattern_Y2'], axis=1,
+                                 largest=0),
+                    oh.make_node('Squeeze', ['ReduceArgTopKPattern_Y1', 'one'], ['Y1']),
+                    oh.make_node('Squeeze', ['ReduceArgTopKPattern_Y2', 'one'], ['Y2']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('one', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y2', onnx.TensorProto.INT64, ('a',)),
+                    oh.make_tensor_value_info('Y1', onnx.TensorProto.FLOAT, ('a',)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 22)],
         )
-        nodes.append(oh.make_node("Squeeze", ["ReduceArgTopKPattern_Y1", "one"], ["Y1"]))
-        nodes.append(oh.make_node("Squeeze", ["ReduceArgTopKPattern_Y2", "one"], ["Y2"]))
-        outputs.append(oh.make_tensor_value_info("Y2", onnx.TensorProto.INT64, shape=("a",)))
-        outputs.append(oh.make_tensor_value_info("Y1", onnx.TensorProto.FLOAT, shape=("a",)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
