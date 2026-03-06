@@ -1,11 +1,10 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
-
 import numpy as np
-
+import tensorflow as tf
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
 from .register import get_tf_op_converter
-from .tensorflow_helper import sanitize_name
+from .tensorflow_helper import tf_dtype_to_np_dtype
 
 
 def to_onnx(
@@ -37,8 +36,6 @@ def to_onnx(
         entries here take priority over the built-in op converters
     :return: onnx model
     """
-    import tensorflow as tf
-
     from . import register_tensorflow_converters
 
     register_tensorflow_converters()
@@ -49,7 +46,7 @@ def to_onnx(
         input_names = ["X"] if len(args) == 1 else [f"X{i}" for i in range(len(args))]
 
     # Build TensorSpec objects for tracing (make batch dim dynamic by default).
-    input_specs = _build_input_specs(args, dynamic_shapes)
+    input_specs = _build_input_specs(input_names, args, dynamic_shapes)
 
     # Trace the model to obtain a concrete TF computation graph.
     if hasattr(model, "get_concrete_function"):
@@ -60,7 +57,7 @@ def to_onnx(
 
     # Populate an ONNX GraphBuilder by walking the concrete-function graph.
     g = GraphBuilder(target_opset)
-    _convert_concrete_function(cf, g, args, input_names, verbose, extra_converters or {})
+    _convert_concrete_function(cf, g, args, input_specs, verbose, extra_converters or {})
     return g.to_onnx()
 
 
@@ -69,12 +66,10 @@ def to_onnx(
 # ---------------------------------------------------------------------------
 
 
-def _build_input_specs(args, dynamic_shapes):
+def _build_input_specs(input_names, args, dynamic_shapes):
     """Builds a :class:`tensorflow.TensorSpec` for each dummy input."""
-    import tensorflow as tf
-
     specs = []
-    for i, arg in enumerate(args):
+    for i, (name, arg) in enumerate(zip(input_names, args)):
         arr = np.asarray(arg)
         shape = list(arr.shape)
         if dynamic_shapes and i < len(dynamic_shapes):
@@ -82,15 +77,19 @@ def _build_input_specs(args, dynamic_shapes):
                 shape[axis] = None
         elif shape:
             shape[0] = None  # default: make the batch dimension dynamic
-        specs.append(tf.TensorSpec(shape=shape, dtype=tf.as_dtype(arr.dtype)))
+        specs.append(tf.TensorSpec(shape=shape, dtype=tf.as_dtype(arr.dtype), name=name))
     return specs
+
+
+def _shape_to_tuple(g: GraphBuilder, shape: tf.TensorShape) -> Tuple[Union[int, str], ...]:
+    return tuple(dim if dim is not None else g.unique_dimension_name("dim") for dim in shape)
 
 
 def _convert_concrete_function(
     cf,
     g: GraphBuilder,
     args,
-    input_names,
+    input_specs,
     verbose: int,
     extra_converters: Dict[str, Callable],
 ) -> None:
@@ -113,63 +112,54 @@ def _convert_concrete_function(
     #    captured from outside the function (one per trainable variable).
     #    cf.variables        — corresponding tf.Variable objects.
     # ------------------------------------------------------------------
-    ctx: Dict[str, Any] = {}
-    captured_names: set = set()
+    initializer_names = {}
     for tensor, var in zip(cf.captured_inputs, cf.variables):
-        ctx[tensor.name] = var.numpy()
-        captured_names.add(tensor.name)
+        name = var.name
+        assert name not in initializer_names, f"name {name!r} already used"
+        initializer_names[name] = (tensor, var)
 
+    print("***", initializer_names)
     # ------------------------------------------------------------------
     # 2. Register ONNX inputs for each non-captured Placeholder op.
-    # ------------------------------------------------------------------
-    input_idx = 0
-    for op in cf.graph.get_operations():
-        if op.type != "Placeholder":
-            continue
-        tensor = op.outputs[0]
-        if tensor.name in captured_names:
-            continue  # captured variable handle — already in ctx as numpy array
-        if input_idx >= len(input_names):
-            break
-        name = input_names[input_idx]
-        arr = np.asarray(args[input_idx])
-        # Use the traced shape (may contain None for dynamic dims).
-        if tensor.shape.rank is not None:
-            onnx_shape = tuple(
-                f"dim_{j}" if (dim is None) else dim
-                for j, dim in enumerate(tensor.shape.as_list())
-            )
-        else:
-            onnx_shape = tuple(arr.shape)
-        g.make_tensor_input(name, np_dtype_to_tensor_dtype(arr.dtype), onnx_shape, device=-1)
-        ctx[tensor.name] = name
-        input_idx += 1
-
-    # ------------------------------------------------------------------
     # 3. Convert each operation in topological (graph-definition) order.
     # ------------------------------------------------------------------
+    set_input_names = {f"{i.name}:0": (ind, i) for ind, i in enumerate(input_specs)}
+    input_idx = 0
     for op in cf.graph.get_operations():
         if op.type == "Placeholder":
-            continue  # already handled above
+            tensor = op.outputs[0]
+            name = tensor.name
+            if name in set_input_names:
+                spec = set_input_names[name][1]
+                g.make_tensor_input(
+                    name, tf_dtype_to_np_dtype(spec.dtype), _shape_to_tuple(g, spec.shape)
+                )
+                continue
+            if name in initializer_names:
+                g.make_initializer(name, tensor, source="_convert_concrete_function")
+                continue  # captured variable handle — already in ctx as numpy array
+            assert "SymbolicTensor" in str(
+                type(tensor)
+            ), f"Unexpected type for tensor {name!r}: {type(tensor)}"
+            g.make_tensor_input(
+                name, tf_dtype_to_np_dtype(spec.dtype), _shape_to_tuple(g, spec.shape)
+            )
+            continue
 
         op_type = op.type
         # extra_converters take priority over built-in ones.
         fct = extra_converters.get(op_type) or get_tf_op_converter(op_type)
         if fct is None:
-            if verbose:
-                print(
-                    f"[tensorflow.to_onnx] skipping unsupported op: "
-                    f"{op_type} ({op.name!r})"
-                )
-            continue
+            raise RuntimeError(f"Type {op_type!r} has no converting function mapped to it.")
 
-        op_outputs = [sanitize_name(t.name) for t in op.outputs]
-        fct(g, ctx, op_outputs, op, verbose=verbose)
+        op_outputs = [t.name for t in op.outputs]
+        fct(g, {}, op_outputs, op)
+        assert all(
+            g.has_name(o) for o in op_outputs
+        ), f"Issue with node {op.type}({[i.name for i in op.inputs]}) -> {[o.name for o in op.outputs]} ({fct=}){g.get_debug_msg()}"
 
     # ------------------------------------------------------------------
     # 4. Register ONNX outputs.
     # ------------------------------------------------------------------
     for tensor in cf.outputs:
-        onnx_name = ctx.get(tensor.name)
-        if isinstance(onnx_name, str):
-            g.make_tensor_output(onnx_name, indexed=False, allow_untyped_output=True)
+        g.make_tensor_output(tensor.name, indexed=False, allow_untyped_output=True)

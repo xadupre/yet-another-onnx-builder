@@ -3,7 +3,8 @@ from typing import Sequence
 
 
 def get_output_names(model) -> Sequence[str]:
-    """Returns output names for a Keras model or layer.
+    """
+    Returns output names for a Keras model or layer.
 
     .. note::
         This POC implementation always returns a single output named ``"output"``.
@@ -37,7 +38,8 @@ def tf_dtype_to_np_dtype(tf_dtype):
 
 
 def sanitize_name(tf_name: str) -> str:
-    """Converts a TF tensor or op name to a valid ONNX tensor name.
+    """
+    Converts a TF tensor or op name to a valid ONNX tensor name.
 
     TF names like ``"dense/MatMul:0"`` are converted to ``"dense_MatMul"``
     (the ``":N"`` output-index suffix is stripped, ``"/"`` is replaced with
