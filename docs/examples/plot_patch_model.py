@@ -70,8 +70,9 @@ for patch in details:
 # 3. Plot the diff text as an image
 # -----------------------------------
 #
-# Each unified diff is rendered as a matplotlib figure with colour-coded lines:
-# ``-`` lines in red, ``+`` lines in green, and ``@@`` hunk headers in blue.
+# The first 10 lines of the shortest diff are rendered as a matplotlib figure
+# with colour-coded lines: ``-`` lines in red, ``+`` lines in green, and
+# ``@@`` hunk headers in blue.
 # This makes the figure capturable by sphinx-gallery.
 # :func:`yobx.doc.plot_text` automates this rendering.
 
@@ -79,18 +80,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 _DIFF_COLORS = {"+": "#2a9d2a", "-": "#cc2222", "@": "#1a6fbf"}
 
-n = details.n_patches
-fig, axes = plt.subplots(n, 1, figsize=(10, min(n * 4, 30)))
-if n == 1:
-    axes = [axes]
-for ax, patch in zip(axes, details):
-    doc.plot_text(
-        patch.make_diff(),
-        ax=ax,
-        title=patch.name,
-        line_color_map=_DIFF_COLORS,
-    )
-plt.tight_layout()
+smallest = min(details, key=lambda p: len(p.make_diff().splitlines()))
+diff_preview = "\n".join(smallest.make_diff().splitlines()[:10])
+doc.plot_text(diff_preview, title=smallest.name, line_color_map=_DIFF_COLORS)
 plt.show()
 
 # %%
