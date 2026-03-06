@@ -1,2 +1,2 @@
 def register():
-    from . import pipeline
+    from . import column_transformer, pipeline
