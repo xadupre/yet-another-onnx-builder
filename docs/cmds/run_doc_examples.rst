@@ -1,9 +1,9 @@
--m yobx run-doc-examples ... run all runpython:: examples
-==========================================================
+-m yobx run-doc-examples ... run all runpython:: and gdot:: examples
+======================================================================
 
 The command scans RST documentation files and/or Python source files for
-``.. runpython::`` directives, executes each embedded code block in an
-isolated subprocess, and reports which blocks pass and which fail.
+``.. runpython::`` and ``.. gdot::`` directives, executes each embedded code
+block in an isolated subprocess, and reports which blocks pass and which fail.
 
 Description
 +++++++++++

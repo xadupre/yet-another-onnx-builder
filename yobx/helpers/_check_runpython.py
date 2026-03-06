@@ -1,6 +1,6 @@
 """
-Utilities for extracting and running ``.. runpython::`` examples embedded in
-RST documentation files or Python docstrings.
+Utilities for extracting and running ``.. runpython::`` and ``.. gdot::``
+examples embedded in RST documentation files or Python docstrings.
 """
 import os
 import re
@@ -10,16 +10,21 @@ import tempfile
 import textwrap
 from typing import Any, Dict, List, Optional, Tuple
 
+#: Sphinx directives whose body is executable Python code.
+_EXECUTABLE_DIRECTIVES = ("runpython", "gdot")
+
 
 def extract_runpython_blocks(filename: str) -> List[Dict[str, Any]]:
     """
-    Extracts all ``.. runpython::`` code blocks from an RST or Python file.
+    Extracts all ``.. runpython::`` and ``.. gdot::`` code blocks from an RST
+    or Python file.
 
     :param filename: path to the file to parse
     :return: list of dicts, each with keys
 
         * ``filename`` – path to the source file
         * ``lineno`` – 1-based line number of the directive
+        * ``directive`` – directive name, e.g. ``'runpython'`` or ``'gdot'``
         * ``code`` – dedented source code string ready to execute
         * ``options`` – dict of directive options (e.g. ``{'showcode': ''}``),
           or ``{'exception': ''}`` when the example is expected to raise
@@ -34,21 +39,26 @@ def extract_runpython_blocks(filename: str) -> List[Dict[str, Any]]:
         rst = os.path.join(here, "..", "..", "docs", "cmds", "run_doc_examples.rst")
         if os.path.exists(rst):
             blocks = extract_runpython_blocks(rst)
-            print(f"Found {len(blocks)} runpython block(s) in run_doc_examples.rst")
+            print(f"Found {len(blocks)} runpython/gdot block(s) in run_doc_examples.rst")
     """
     with open(filename, "r", encoding="utf-8", errors="replace") as fh:
         lines = fh.readlines()
+
+    directive_pattern = re.compile(
+        r"^(\s*)\.\.\s+(" + "|".join(_EXECUTABLE_DIRECTIVES) + r")::"
+    )
 
     blocks: List[Dict[str, Any]] = []
     i = 0
     while i < len(lines):
         line = lines[i]
-        m = re.match(r"^(\s*)\.\. runpython::", line)
+        m = directive_pattern.match(line)
         if not m:
             i += 1
             continue
 
         directive_indent = len(m.group(1))
+        directive_name = m.group(2)
         lineno = i + 1
         options: Dict[str, str] = {}
         i += 1
@@ -103,6 +113,7 @@ def extract_runpython_blocks(filename: str) -> List[Dict[str, Any]]:
             {
                 "filename": filename,
                 "lineno": lineno,
+                "directive": directive_name,
                 "code": code,
                 "options": options,
             }
@@ -118,7 +129,7 @@ def run_runpython_blocks(
     timeout: Optional[int] = None,
 ) -> Tuple[int, int]:
     """
-    Runs all ``.. runpython::`` code blocks found in *files*.
+    Runs all ``.. runpython::`` and ``.. gdot::`` code blocks found in *files*.
 
     Each block is executed in a fresh subprocess so that failures are isolated.
 
@@ -151,7 +162,7 @@ def run_runpython_blocks(
             label = f"{block['filename']}:{block['lineno']}"
 
             if verbose >= 2:
-                print(f"\n[run-doc-examples] --- {label} ---")
+                print(f"\n[run-doc-examples] --- {label} ({block['directive']}) ---")
                 print(textwrap.indent(block["code"], "    "))
 
             # Write code to a temporary file and run it
@@ -214,8 +225,9 @@ def run_runpython_blocks(
 
     if raise_on_error and n_failed:
         raise AssertionError(
-            f"{n_failed} runpython block(s) failed. "
+            f"{n_failed} runpython/gdot block(s) failed. "
             "Re-run with -v 2 to see the code of each block."
         )
 
     return n_passed, n_failed
+

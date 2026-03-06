@@ -513,10 +513,10 @@ def get_parser_run_doc_examples() -> ArgumentParser:
     parser = ArgumentParser(
         prog="run-doc-examples",
         description=textwrap.dedent("""
-            Extracts all ``.. runpython::`` code blocks from RST documentation
-            files or Python source files (docstrings) and executes each one in
-            an isolated subprocess.  Exits with a non-zero status when at least
-            one block fails.
+            Extracts all ``.. runpython::`` and ``.. gdot::`` code blocks from
+            RST documentation files or Python source files (docstrings) and
+            executes each one in an isolated subprocess.  Exits with a non-zero
+            status when at least one block fails.
             """),
         epilog=textwrap.dedent("""
             examples:
@@ -742,7 +742,7 @@ def get_main_parser() -> ArgumentParser:
             find              - find node consuming or producing a result
             partition         - partition a model, each partition appears as local function
             print             - prints the model on standard output
-            run-doc-examples  - run all runpython:: examples in RST/Python files
+            run-doc-examples  - run all runpython:: and gdot:: examples in RST/Python files
             """),
     )
     parser.add_argument(

@@ -115,6 +115,74 @@ class Foo:
         first_line = blocks[0]["code"].splitlines()[0]
         self.assertFalse(first_line.startswith(" "), first_line)
 
+    def test_extract_directive_field(self):
+        """Each block dict should carry the directive name."""
+        content = """\
+.. runpython::
+
+    print("rp")
+
+.. gdot::
+    :script: DOT-SECTION
+
+    print("DOT-SECTION digraph G {}")
+"""
+        path = self._write_tmp(content)
+        blocks = extract_runpython_blocks(path)
+        self.assertEqual(len(blocks), 2)
+        self.assertEqual(blocks[0]["directive"], "runpython")
+        self.assertEqual(blocks[1]["directive"], "gdot")
+
+    def test_extract_gdot_block(self):
+        """.. gdot:: blocks are extracted just like runpython blocks."""
+        content = """\
+Some text.
+
+.. gdot::
+    :script: DOT-SECTION
+
+    print("DOT-SECTION", "digraph G { A -> B }")
+
+More text.
+"""
+        path = self._write_tmp(content)
+        blocks = extract_runpython_blocks(path)
+        self.assertEqual(len(blocks), 1)
+        block = blocks[0]
+        self.assertEqual(block["directive"], "gdot")
+        self.assertEqual(block["options"], {"script": "DOT-SECTION"})
+        self.assertIn("DOT-SECTION", block["code"])
+
+    def test_run_gdot_block(self):
+        """gdot blocks are executed and contribute to pass/fail counts."""
+        content = """\
+.. gdot::
+    :script: DOT-SECTION
+
+    print("DOT-SECTION", "digraph G { A -> B }")
+"""
+        path = self._write_tmp(content)
+        passed, failed = run_runpython_blocks([path], verbose=0, timeout=30)
+        self.assertEqual(passed, 1)
+        self.assertEqual(failed, 0)
+
+    def test_run_gdot_and_runpython_mixed(self):
+        """Files containing both directive types are handled correctly."""
+        content = """\
+.. runpython::
+
+    print("hello")
+
+.. gdot::
+    :script: DOT-SECTION
+
+    print("DOT-SECTION", "digraph G { A -> B }")
+"""
+        path = self._write_tmp(content)
+        passed, failed = run_runpython_blocks([path], verbose=0, timeout=30)
+        self.assertEqual(passed, 2)
+        self.assertEqual(failed, 0)
+
     # ------------------------------------------------------------------
     # run_runpython_blocks
     # ------------------------------------------------------------------
