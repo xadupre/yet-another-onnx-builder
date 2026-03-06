@@ -95,7 +95,6 @@ def sklearn_column_transformer(
     ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
-    itype = g.get_type(X)
     n_features = estimator.n_features_in_
 
     parts: List[str] = []
@@ -107,13 +106,6 @@ def sklearn_column_transformer(
 
         # Select the subset of features for this transformer.
         X_sub = g.op.Gather(X, col_indices, axis=1, name=f"{name}__{trans_name}")
-        if not sts:
-            g.set_type(X_sub, itype)
-            if g.has_shape(X):
-                in_shape = g.get_shape(X)
-                g.set_shape(X_sub, (in_shape[0], len(col_indices)))
-            if g.has_device(X):
-                g.set_device(X_sub, g.get_device(X))
 
         if _is_passthrough(transformer):
             parts.append(X_sub)
@@ -141,8 +133,4 @@ def sklearn_column_transformer(
         res = g.op.Concat(*parts, axis=-1, name=name, outputs=outputs)
 
     assert isinstance(res, str)
-    if not sts:
-        g.set_type(res, itype)
-        if g.has_device(X):
-            g.set_device(res, g.get_device(X))
     return res
