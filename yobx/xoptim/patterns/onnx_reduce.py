@@ -24,7 +24,9 @@ class ReduceSumNormalizePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['axis'], value=onh.from_array(np.array(-1, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['axis'],
+                                 value=onh.from_array(np.array(-1, dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Cast', ['X'], ['xc'], to=1),
                     oh.make_node('ReduceSum', ['xc', 'axis'], ['red'], keepdims=1),
                     oh.make_node('Mul', ['red', 'Y'], ['mul']),
@@ -60,9 +62,12 @@ class ReduceSumNormalizePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('ReduceSum', ['X', 'axis'], ['ReduceSumNormalizePattern_red'], keepdims=1),
+                    oh.make_node('ReduceSum', ['X', 'axis'], ['ReduceSumNormalizePattern_red'],
+                                 keepdims=1),
                     oh.make_node('Cast', ['Y'], ['ReduceSumNormalizePattern_Y'], to=10),
-                    oh.make_node('Mul', ['ReduceSumNormalizePattern_red', 'ReduceSumNormalizePattern_Y'], ['ReduceSumNormalizePattern_mul']),
+                    oh.make_node('Mul',
+                                 ['ReduceSumNormalizePattern_red', 'ReduceSumNormalizePattern_Y'],
+                                 ['ReduceSumNormalizePattern_mul']),
                     oh.make_node('Sub', ['X', 'ReduceSumNormalizePattern_mul'], ['Z']),
                 ],
                 'pattern',
@@ -186,7 +191,9 @@ class ReduceArgTopKPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['one'],
+                                 value=onh.from_array(np.array([1], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('ReduceMin', ['X', 'one'], ['Y1'], keepdims=0),
                     oh.make_node('ArgMin', ['X'], ['Y2'], axis=1, keepdims=0),
                 ],
@@ -219,7 +226,9 @@ class ReduceArgTopKPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('TopK', ['X', 'one'], ['ReduceArgTopKPattern_Y1', 'ReduceArgTopKPattern_Y2'], axis=1, largest=0),
+                    oh.make_node('TopK', ['X', 'one'],
+                                 ['ReduceArgTopKPattern_Y1', 'ReduceArgTopKPattern_Y2'], axis=1,
+                                 largest=0),
                     oh.make_node('Squeeze', ['ReduceArgTopKPattern_Y1', 'one'], ['Y1']),
                     oh.make_node('Squeeze', ['ReduceArgTopKPattern_Y2', 'one'], ['Y2']),
                 ],

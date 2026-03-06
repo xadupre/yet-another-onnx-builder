@@ -23,7 +23,9 @@ class ConstantToInitializerPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['cst'], value=onh.from_array(np.array([1.0, 2.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['cst'],
+                                 value=onh.from_array(np.array([1.0, 2.0], dtype=np.float32),
+                                 name='value')),
                 ],
                 'pattern',
                 [
@@ -53,7 +55,9 @@ class ConstantToInitializerPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['cst_cst2init'], value=onh.from_array(np.array([1.0, 2.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['cst_cst2init'],
+                                 value=onh.from_array(np.array([1.0, 2.0], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Identity', ['cst_cst2init'], ['cst']),
                 ],
                 'pattern',

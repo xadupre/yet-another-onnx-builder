@@ -23,7 +23,9 @@ class ConvBiasNullPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Conv', ['X', 'W', 'B2'], ['Y'], dilations=[1, 1], group=1, kernel_shape=[4, 4], pads=[1, 1, 1, 1], strides=[2, 2]),
+                    oh.make_node('Conv', ['X', 'W', 'B2'], ['Y'],
+                                 dilations=[1, 1], group=1, kernel_shape=[4, 4],
+                                 pads=[1, 1, 1, 1], strides=[2, 2]),
                 ],
                 'pattern',
                 [
@@ -34,7 +36,18 @@ class ConvBiasNullPattern(PatternOptimization):
                     oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (512, 64, 32, 32)),
                 ],
                 [
-                    onh.from_array(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32), name='B2'),
+                    onh.from_array(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                             0.0, 0.0, 0.0, 0.0], dtype=np.float32),
+                                   name='B2'),
                 ],
             ),
             functions=[],
@@ -56,7 +69,9 @@ class ConvBiasNullPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Conv', ['X', 'W'], ['Y'], dilations=[1, 1], group=1, kernel_shape=[4, 4], pads=[1, 1, 1, 1], strides=[2, 2]),
+                    oh.make_node('Conv', ['X', 'W'], ['Y'],
+                                 dilations=[1, 1], group=1, kernel_shape=[4, 4],
+                                 pads=[1, 1, 1, 1], strides=[2, 2]),
                 ],
                 'pattern',
                 [
