@@ -1,6 +1,6 @@
-yobx.sklearn.pipeline.column_transformer
+yobx.sklearn.compose.column_transformer
 ========================================
 
-.. automodule:: yobx.sklearn.pipeline.column_transformer
+.. automodule:: yobx.sklearn.compose.column_transformer
     :members:
     :no-undoc-members:
