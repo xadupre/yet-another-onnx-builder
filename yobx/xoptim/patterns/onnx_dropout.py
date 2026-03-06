@@ -16,58 +16,28 @@ class DropoutPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "_onx_add02", onnx.TensorProto.FLOAT16, shape=(4, 512, 128)
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init10_s_3'], value=onh.from_array(np.array(0.0, dtype=np.float16), name='value')),
+                    oh.make_node('Constant', [], ['init9_s_'], value=onh.from_array(np.array(False, dtype=np.bool_), name='value')),
+                    oh.make_node('Dropout', ['_onx_add02', 'init10_s_3', 'init9_s_'], ['dropout', '']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('_onx_add02', onnx.TensorProto.FLOAT16, (4, 512, 128)),
+                ],
+                [
+                    oh.make_tensor_value_info('dropout', onnx.TensorProto.FLOAT16, (4, 512, 128)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init10_s_3"],
-                value=onh.from_array(np.array(0.0, dtype=np.float16), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init9_s_"],
-                value=onh.from_array(np.array(False, dtype=np.bool_), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Dropout", ["_onx_add02", "init10_s_3", "init9_s_"], ["dropout", ""]
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("dropout", onnx.TensorProto.FLOAT16, shape=(4, 512, 128))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -78,39 +48,25 @@ class DropoutPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "_onx_add02", onnx.TensorProto.FLOAT16, shape=(4, 512, 128)
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Identity', ['_onx_add02'], ['dropout']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('_onx_add02', onnx.TensorProto.FLOAT16, (4, 512, 128)),
+                ],
+                [
+                    oh.make_tensor_value_info('dropout', onnx.TensorProto.FLOAT16, (4, 512, 128)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Identity", ["_onx_add02"], ["dropout"]))
-        outputs.append(
-            oh.make_tensor_value_info("dropout", onnx.TensorProto.FLOAT16, shape=(4, 512, 128))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
