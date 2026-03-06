@@ -1,0 +1,158 @@
+"""
+Unit tests for yobx.sklearn.neural_network converters (MLP).
+"""
+
+import unittest
+import numpy as np
+from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.reference import ExtendedReferenceEvaluator
+from yobx.sklearn import to_onnx
+
+
+@requires_sklearn("1.4")
+class TestSklearnNeuralNetworkConverters(ExtTestCase):
+    def test_mlp_classifier_binary(self):
+        from sklearn.neural_network import MLPClassifier
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        mlp = MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
+        mlp.fit(X, y)
+
+        onx = to_onnx(mlp, (X,))
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertTrue(
+            "MatMul" in op_types or "Gemm" in op_types,
+            f"Expected MatMul or Gemm in {op_types}",
+        )
+        self.assertIn("Sigmoid", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(mlp.predict(X), label)
+        self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+    def test_mlp_classifier_multiclass(self):
+        from sklearn.neural_network import MLPClassifier
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1, 2, 2])
+        mlp = MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
+        mlp.fit(X, y)
+
+        onx = to_onnx(mlp, (X,))
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertTrue(
+            "MatMul" in op_types or "Gemm" in op_types,
+            f"Expected MatMul or Gemm in {op_types}",
+        )
+        self.assertIn("Softmax", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(mlp.predict(X), label)
+        self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+    def test_mlp_classifier_multiple_hidden_layers(self):
+        from sklearn.neural_network import MLPClassifier
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1, 2, 2])
+        mlp = MLPClassifier(hidden_layer_sizes=(8, 4), max_iter=500, random_state=0)
+        mlp.fit(X, y)
+
+        onx = to_onnx(mlp, (X,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(mlp.predict(X), label)
+        self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+    def test_mlp_classifier_tanh_activation(self):
+        from sklearn.neural_network import MLPClassifier
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        mlp = MLPClassifier(
+            hidden_layer_sizes=(4,), activation="tanh", max_iter=500, random_state=0
+        )
+        mlp.fit(X, y)
+
+        onx = to_onnx(mlp, (X,))
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Tanh", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(mlp.predict(X), label)
+        self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+    def test_mlp_regressor(self):
+        from sklearn.neural_network import MLPRegressor
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
+        mlp = MLPRegressor(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
+        mlp.fit(X, y)
+
+        onx = to_onnx(mlp, (X,))
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertTrue(
+            "MatMul" in op_types or "Gemm" in op_types,
+            f"Expected MatMul or Gemm in {op_types}",
+        )
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        self.assertEqualArray(
+            mlp.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
+        )
+
+    def test_pipeline_mlp_classifier(self):
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.neural_network import MLPClassifier
+        from sklearn.pipeline import Pipeline
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        pipe = Pipeline(
+            [
+                ("scaler", StandardScaler()),
+                ("clf", MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)),
+            ]
+        )
+        pipe.fit(X, y)
+
+        onx = to_onnx(pipe, (X,))
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Sub", op_types)
+        self.assertTrue(
+            "MatMul" in op_types or "Gemm" in op_types,
+            f"Expected MatMul or Gemm in {op_types}",
+        )
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(pipe.predict(X), label)
+        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
