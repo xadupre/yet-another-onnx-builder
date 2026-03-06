@@ -4,8 +4,14 @@ Unit tests for the OneVsRestClassifier ONNX converter.
 
 import unittest
 import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeClassifier
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
+from yobx.sklearn import to_onnx
 
 
 @requires_sklearn("1.4")
@@ -20,10 +26,6 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
 
     def test_binary_logistic_regression(self):
         """OVR wrapping binary LogisticRegression."""
-        from sklearn.multiclass import OneVsRestClassifier
-        from sklearn.linear_model import LogisticRegression
-        from yobx.sklearn import to_onnx
-
         clf = OneVsRestClassifier(LogisticRegression(max_iter=200))
         clf.fit(self._X_bin, self._y_bin)
 
@@ -40,10 +42,6 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
 
     def test_multiclass_logistic_regression(self):
         """OVR wrapping multi-class LogisticRegression (3 classes)."""
-        from sklearn.multiclass import OneVsRestClassifier
-        from sklearn.linear_model import LogisticRegression
-        from yobx.sklearn import to_onnx
-
         clf = OneVsRestClassifier(LogisticRegression(max_iter=200))
         clf.fit(self._X_multi, self._y_multi)
 
@@ -60,10 +58,6 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
 
     def test_float64_input(self):
         """OVR converter works with float64 input."""
-        from sklearn.multiclass import OneVsRestClassifier
-        from sklearn.linear_model import LogisticRegression
-        from yobx.sklearn import to_onnx
-
         X64 = self._X_multi.astype(np.float64)
         clf = OneVsRestClassifier(LogisticRegression(max_iter=200))
         clf.fit(X64, self._y_multi)
@@ -79,12 +73,6 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
 
     def test_pipeline_with_one_vs_rest(self):
         """OVR at the end of a Pipeline."""
-        from sklearn.multiclass import OneVsRestClassifier
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.pipeline import Pipeline
-        from yobx.sklearn import to_onnx
-
         pipe = Pipeline(
             [
                 ("scaler", StandardScaler()),
@@ -106,10 +94,6 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
 
     def test_multilabel_raises(self):
         """OVR with multilabel_ = True should raise NotImplementedError."""
-        from sklearn.multiclass import OneVsRestClassifier
-        from sklearn.linear_model import LogisticRegression
-        from yobx.sklearn import to_onnx
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         # Multi-label target: each sample can belong to multiple classes
         y = np.array([[1, 0], [0, 1], [1, 1], [0, 0]])
@@ -121,10 +105,6 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
 
     def test_multiclass_decision_tree(self):
         """OVR wrapping DecisionTreeClassifier (3 classes)."""
-        from sklearn.multiclass import OneVsRestClassifier
-        from sklearn.tree import DecisionTreeClassifier
-        from yobx.sklearn import to_onnx
-
         clf = OneVsRestClassifier(DecisionTreeClassifier(max_depth=3, random_state=0))
         clf.fit(self._X_multi, self._y_multi)
 
@@ -145,10 +125,6 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
 
     def test_graph_structure_multiclass(self):
         """Check ONNX graph contains expected op types for multiclass OVR."""
-        from sklearn.multiclass import OneVsRestClassifier
-        from sklearn.linear_model import LogisticRegression
-        from yobx.sklearn import to_onnx
-
         clf = OneVsRestClassifier(LogisticRegression(max_iter=200))
         clf.fit(self._X_multi, self._y_multi)
 
