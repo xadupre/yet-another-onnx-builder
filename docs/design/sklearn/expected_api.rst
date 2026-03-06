@@ -93,6 +93,55 @@ The snippet below builds the same ``Sub`` / ``Div`` graph emitted by the
     model = g.to_onnx()
     print(pretty_onnx(model))
 
+Opset API
+=========
+
+Converters frequently need to know which opset versions are active so they
+can choose the right operator variant or register an additional domain
+(e.g. ``"ai.onnx.ml"`` for scikit-learn models).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Method / attribute
+     - Description
+   * - ``main_opset``
+     - Read-only property.  Returns the opset version for the main ONNX
+       domain (``""``).  Equivalent to ``g.opsets[""]``.
+   * - ``get_opset(domain, exc=True)``
+     - Returns the opset version for *domain*.  When ``exc=True`` (default)
+       an :exc:`AssertionError` is raised if the domain is not registered;
+       set ``exc=False`` to get ``None`` instead.
+   * - ``add_domain(domain, version=1)``
+     - Registers *domain* with the given *version*.  If the domain is already
+       registered, the call is a no-op (provided *version* matches).
+
+A converter that targets the main ONNX domain only needs to read
+``g.main_opset``.  A converter that also emits nodes from a secondary domain
+(e.g. ``"ai.onnx.ml"``) should first call ``g.add_domain(domain, version)``
+to ensure the domain is recorded in the exported model, then query its
+version with ``g.get_opset(domain)``.
+
+.. code-block:: python
+
+    from yobx.xbuilder import GraphBuilder
+
+    def convert_my_estimator(g: GraphBuilder, sts, outputs, estimator, X):
+        # Read the main opset to pick the right operator variant.
+        opset = g.main_opset
+
+        # Register and query the ai.onnx.ml domain when needed.
+        g.add_domain("ai.onnx.ml", 3)
+        ml_opset = g.get_opset("ai.onnx.ml")
+
+        if opset >= 20:
+            result = g.op.SomeNewOp(X)
+        else:
+            result = g.op.SomeLegacyOp(X)
+        ...
+        return result
+
 Shape and type API
 ==================
 
