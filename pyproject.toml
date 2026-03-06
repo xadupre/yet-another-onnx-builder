@@ -161,10 +161,10 @@ ignore_errors = true
 
 [tool.pyrefly]
 ignore-implicit-imports = ["*"]
-ignore-missing-attribute = ["yobx/sklearn/**/*.py"]
 ignore-missing-imports = ["*"]
 project-includes = ["yobx/**/*.py"]
 project-excludes = [
+    "yobx/sklearn/**",
     "yobx/doc.py",
     "yobx/ext_test_case.py",
     "yobx/builder/light/*",
