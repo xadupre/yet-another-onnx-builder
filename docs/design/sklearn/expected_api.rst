@@ -111,7 +111,7 @@ can choose the right operator variant or register an additional domain
        domain (``""``).  Equivalent to ``g.opsets[""]``.
    * - ``get_opset(domain, exc=True)``
      - Returns the opset version for *domain*.  When ``exc=True`` (default)
-       an :exc:`AssertionError` is raised if the domain is not registered;
+       an ``AssertionError`` is raised if the domain is not registered;
        set ``exc=False`` to get ``None`` instead.
    * - ``add_domain(domain, version=1)``
      - Registers *domain* with the given *version*.  If the domain is already

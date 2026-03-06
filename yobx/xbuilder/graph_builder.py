@@ -1083,7 +1083,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         :return: version
         """
         assert (
-            exc or domain in self.opsets
+            not exc or domain in self.opsets
         ), f"Domain {domain!r} is not registered{self.get_debug_msg()}."
         return self.opsets.get(domain, None)
 
