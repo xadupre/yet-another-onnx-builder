@@ -5,4 +5,5 @@ yobx.sklearn.pipeline
     :maxdepth: 1
     :caption: modules
 
+    column_transformer
     pipeline
