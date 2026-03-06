@@ -43,9 +43,7 @@ def sklearn_glm_regressor(
     :return: output tensor name
     :raises NotImplementedError: when an unsupported link function is encountered
     """
-    assert isinstance(
-        estimator, _GLM_TYPES
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, _GLM_TYPES), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)

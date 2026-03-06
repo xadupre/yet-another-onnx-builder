@@ -29,7 +29,7 @@ Construction API
 
    * - Method / attribute
      - Description
-   * - ``__init__(target_opset)``
+   * - ``__init__(target_opset or existing ModelProto or FunctionProto)``
      - Constructor.  *target_opset* is either an ``int`` (main domain) or
        a ``Dict[str, int]`` mapping domain names to versions.
    * - ``make_tensor_input(name, elem_type, shape, device=-1)``
