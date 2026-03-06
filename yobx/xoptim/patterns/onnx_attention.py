@@ -220,6 +220,9 @@ class FunctionAttentionPattern(PatternOptimization):
                         ['query', 'cat', 'cat_1', 'to', 'init1_s_::RSh1',
                          'init7_s5_1_1_2_1_1', 'init7_s4_0_8_-1_32'],
                         ['output_0'], domain='intermediate'),
+                ],
+                "fused",
+                [
                     oh.make_tensor_value_info('query', onnx.TensorProto.FLOAT,
                                               ('batch', 8, 'seq_length', 32)),
                     oh.make_tensor_value_info('cat_1', onnx.TensorProto.FLOAT,

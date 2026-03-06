@@ -36,9 +36,7 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         label, proba = results[0], results[1]
 
         self.assertEqualArray(clf.predict(self._X_bin), label)
-        self.assertEqualArray(
-            clf.predict_proba(self._X_bin).astype(np.float32), proba, atol=1e-5
-        )
+        self.assertEqualArray(clf.predict_proba(self._X_bin).astype(np.float32), proba, atol=1e-5)
 
     def test_multiclass_logistic_regression(self):
         """OVR wrapping multi-class LogisticRegression (3 classes)."""

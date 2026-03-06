@@ -41,7 +41,7 @@ def sklearn_one_vs_rest_classifier(
                                                              │
                                                         Div(scores, sum_) ──► proba (NxC)
                                                              │
-                                              ┌─────────────┘
+                                               ┌─────────────┘
                                            ArgMax(axis=1) ──Cast──Gather(classes) ──► label
 
     **Binary** (``len(estimators_) == 1``):
@@ -53,9 +53,9 @@ def sklearn_one_vs_rest_classifier(
                                             Sub(1, pos) ──┤
                                                   │       │
                                               neg (Nx1)   │
-                                                  └──Concat(axis=1)──► proba (Nx2)
-                                                             │
-                                                       ArgMax(axis=1) ──Cast──Gather(classes) ──► label
+                          Concat(axis=1)──► proba (Nx2) ──┘
+                               │
+                             ArgMax(axis=1) ──Cast──Gather(classes) ──► label
 
     :param g: the graph builder to add nodes to
     :param sts: shapes and types defined by :epkg:`scikit-learn`
@@ -121,9 +121,7 @@ def sklearn_one_vs_rest_classifier(
     if len(pos_probs) == 1:
         # Binary case (single sub-estimator): build [1 - p, p] matrix.
         pos = pos_probs[0]  # shape [n, 1]
-        neg = g.op.Sub(
-            np.array([1], dtype=dtype), pos, name=f"{name}_neg"
-        )  # shape [n, 1]
+        neg = g.op.Sub(np.array([1], dtype=dtype), pos, name=f"{name}_neg")  # shape [n, 1]
         scores = g.op.Concat(neg, pos, axis=1, name=f"{name}_scores")  # [n, 2]
     else:
         # Multiclass: stack positive-class probabilities, then normalise.
