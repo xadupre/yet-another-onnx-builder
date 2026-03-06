@@ -15,7 +15,7 @@ from onnx import TensorProto
 
 from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
-from yobx.typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol
+from yobx.typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol, OpsetProtocol
 from yobx.xbuilder import GraphBuilder
 
 TFLOAT = TensorProto.FLOAT
@@ -276,6 +276,40 @@ class TestOnnxScriptGraphBuilderExtendedProtocol(ExtTestCase):
     def test_onnxscript_is_instance_extended(self):
         g = OnnxScriptGraphBuilder(18)
         self.assertIsInstance(g, GraphBuilderExtendedProtocol)
+
+
+class TestOpsetProtocol(ExtTestCase):
+    """OpsetProtocol is importable and has the required make_node method."""
+
+    def test_opset_protocol_has_make_node(self):
+        self.assertIn(
+            "make_node",
+            dir(OpsetProtocol),
+            msg="OpsetProtocol is missing 'make_node'",
+        )
+
+    def test_graphbuilder_op_satisfies_protocol(self):
+        g = GraphBuilder(18, ir_version=9)
+        self.assertIsInstance(g.op, OpsetProtocol)
+
+    def test_import_from_xbuilder(self):
+        from yobx.xbuilder import OpsetProtocol as P
+
+        self.assertIs(P, OpsetProtocol)
+
+    def test_import_from_root(self):
+        from yobx import OpsetProtocol as P
+
+        self.assertIs(P, OpsetProtocol)
+
+
+@requires_onnxscript()
+class TestOnnxScriptOpsetProtocol(ExtTestCase):
+    """OnnxScriptGraphBuilder's op helper satisfies OpsetProtocol."""
+
+    def test_onnxscript_op_satisfies_protocol(self):
+        g = OnnxScriptGraphBuilder(18)
+        self.assertIsInstance(g.op, OpsetProtocol)
 
 
 if __name__ == "__main__":

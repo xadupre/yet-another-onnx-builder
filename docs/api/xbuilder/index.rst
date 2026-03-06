@@ -36,6 +36,13 @@ GraphBuilderExtendedProtocol
     :members:
     :no-undoc-members:
 
+OpsetProtocol
++++++++++++++
+
+.. autoclass:: yobx.typing.OpsetProtocol
+    :members:
+    :no-undoc-members:
+
 FunctionOptions
 +++++++++++++++
 

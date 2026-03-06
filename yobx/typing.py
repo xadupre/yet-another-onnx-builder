@@ -212,6 +212,48 @@ class GraphBuilderProtocol(Protocol):
 
 
 @runtime_checkable
+class OpsetProtocol(Protocol):
+    """Protocol describing the API of an opset helper object.
+
+    Both :class:`~yobx.xbuilder.graph_builder_opset.Opset` (used by
+    :class:`~yobx.xbuilder.GraphBuilder`) and the internal opset helper
+    in :class:`~yobx.builder.onnxscript.OnnxScriptGraphBuilder` satisfy this
+    protocol.
+
+    The primary usage pattern is attribute-access dispatch::
+
+        out = g.op.Relu(x)   # equivalent to g.op.make_node("Relu", x)
+
+    :meth:`make_node` is the core method that all opset helper implementations
+    must provide.
+    """
+
+    def make_node(
+        self,
+        op_type: str,
+        *inputs: Any,
+        outputs: Optional[Union[int, List[str], str]] = None,
+        domain: str = "",
+        name: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Union[str, Tuple[str, ...]]:
+        """Creates an ONNX node and returns its output name(s).
+
+        :param op_type: ONNX operator type (e.g. ``"Relu"``, ``"MatMul"``)
+        :param inputs: input tensor names or constant arrays
+        :param outputs: number of outputs (``int``), a single output name
+            (``str``), or a list of output names; ``None`` uses a default
+            inferred from *op_type* when supported
+        :param domain: operator domain (default ``""`` = standard ONNX)
+        :param name: optional node name for debugging
+        :param kwargs: operator attributes as Python primitives
+        :return: output name when a single output is created, otherwise a
+            tuple of names
+        """
+        ...
+
+
+@runtime_checkable
 class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
     """Extended protocol for graph builders that support opset helpers and
     shape/type inference for common operator patterns.
@@ -229,7 +271,7 @@ class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
     """
 
     @property
-    def op(self) -> Any:
+    def op(self) -> "OpsetProtocol":
         """Returns the opset helper for this graph builder.
 
         The opset helper allows constructing ONNX nodes using attribute-access
@@ -237,8 +279,7 @@ class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
 
             out = g.op.Relu(x)
 
-        :return: an :class:`~yobx.xbuilder.graph_builder_opset.Opset`-compatible
-            object
+        :return: an :class:`OpsetProtocol`-compatible object
         """
         ...
 
