@@ -108,14 +108,18 @@ class TestSklearnColumnTransformer(ExtTestCase):
 
     def test_pipeline_with_column_transformer(self):
         X = np.array(
-            [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16],
-             [2, 3, 4, 5], [6, 7, 8, 9]],
+            [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+                [2, 3, 4, 5],
+                [6, 7, 8, 9],
+            ],
             dtype=np.float32,
         )
         y = np.array([0, 0, 1, 1, 0, 1])
-        ct = ColumnTransformer(
-            [("scaler", StandardScaler(), [0, 1, 2, 3])]
-        )
+        ct = ColumnTransformer([("scaler", StandardScaler(), [0, 1, 2, 3])])
         pipe = Pipeline([("preprocessor", ct), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
