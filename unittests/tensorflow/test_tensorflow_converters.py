@@ -4,17 +4,16 @@ Unit tests for yobx.tensorflow converters.
 
 import unittest
 import numpy as np
+import tensorflow as tf
 from yobx.ext_test_case import ExtTestCase, requires_tensorflow
 from yobx.reference import ExtendedReferenceEvaluator
+from yobx.tensorflow import to_onnx
 
 
 @requires_tensorflow("2.0")
 class TestTensorflowBaseConverters(ExtTestCase):
     def test_dense_linear(self):
         """Dense layer with no activation (linear) converts to MatMul+Add."""
-        import tensorflow as tf
-        from yobx.tensorflow import to_onnx
-
         model = tf.keras.Sequential([tf.keras.layers.Dense(4, input_shape=(3,))])
         X = np.random.rand(5, 3).astype(np.float32)
 
@@ -31,9 +30,6 @@ class TestTensorflowBaseConverters(ExtTestCase):
 
     def test_dense_relu(self):
         """Dense layer with relu activation."""
-        import tensorflow as tf
-        from yobx.tensorflow import to_onnx
-
         model = tf.keras.Sequential(
             [tf.keras.layers.Dense(8, activation="relu", input_shape=(4,))]
         )
@@ -52,9 +48,6 @@ class TestTensorflowBaseConverters(ExtTestCase):
 
     def test_dense_sigmoid(self):
         """Dense layer with sigmoid activation."""
-        import tensorflow as tf
-        from yobx.tensorflow import to_onnx
-
         model = tf.keras.Sequential(
             [tf.keras.layers.Dense(2, activation="sigmoid", input_shape=(3,))]
         )
@@ -72,9 +65,6 @@ class TestTensorflowBaseConverters(ExtTestCase):
 
     def test_sequential_multi_layer(self):
         """Sequential model with multiple Dense layers."""
-        import tensorflow as tf
-        from yobx.tensorflow import to_onnx
-
         model = tf.keras.Sequential(
             [
                 tf.keras.layers.Dense(8, activation="relu", input_shape=(4,)),
@@ -97,9 +87,6 @@ class TestTensorflowBaseConverters(ExtTestCase):
 
     def test_sequential_dynamic_shape(self):
         """Sequential model with an explicit dynamic batch dimension."""
-        import tensorflow as tf
-        from yobx.tensorflow import to_onnx
-
         model = tf.keras.Sequential(
             [
                 tf.keras.layers.Dense(4, activation="relu", input_shape=(3,)),
@@ -121,9 +108,6 @@ class TestTensorflowBaseConverters(ExtTestCase):
 
     def test_custom_op_converter_with_extra_converters(self):
         """extra_converters can override how a specific TF op type is converted."""
-        import tensorflow as tf
-        from yobx.tensorflow import to_onnx
-
         model = tf.keras.Sequential(
             [tf.keras.layers.Dense(4, activation="relu", input_shape=(3,))]
         )
