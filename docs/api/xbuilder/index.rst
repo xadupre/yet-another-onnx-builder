@@ -22,6 +22,13 @@ GraphBuilder
     :no-undoc-members:
     :exclude-members: WrapSym, WrapDim, VirtualTensor
 
+GraphBuilderProtocol
+++++++++++++++++++++
+
+.. autoclass:: yobx.typing.GraphBuilderProtocol
+    :members:
+    :no-undoc-members:
+
 FunctionOptions
 +++++++++++++++
 
