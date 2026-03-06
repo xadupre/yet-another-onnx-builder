@@ -23,42 +23,28 @@ class MatMulAddPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("B", onnx.TensorProto.FLOAT, shape=("a", "b", "d"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('MatMul', ['X1', 'X2'], ['Y']),
+                    oh.make_node('Add', ['Y', 'B'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('B', onnx.TensorProto.FLOAT, ('a', 'b', 'd')),
+                    oh.make_tensor_value_info('X1', onnx.TensorProto.FLOAT, ('a', 'b', 3)),
+                    oh.make_tensor_value_info('X2', onnx.TensorProto.FLOAT, (3, 'd')),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b', 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X1", onnx.TensorProto.FLOAT, shape=("a", "b", 3))
-        )
-        inputs.append(oh.make_tensor_value_info("X2", onnx.TensorProto.FLOAT, shape=(3, "d")))
-        nodes.append(oh.make_node("MatMul", ["X1", "X2"], ["Y"]))
-        nodes.append(oh.make_node("Add", ["Y", "B"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "b", "d"))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -70,95 +56,37 @@ class MatMulAddPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("B", onnx.TensorProto.FLOAT, shape=("a", "b", "d"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s2_-1_3'], value=onh.from_array(np.array([-1, 3], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s1_-1'], value=onh.from_array(np.array([-1], dtype=np.int64), name='value')),
+                    oh.make_node('Reshape', ['X1', 'init7_s2_-1_3'], ['MatMulAddPattern--X1']),
+                    oh.make_node('Shape', ['B'], ['MatMulAddPattern--X12'], start=-1),
+                    oh.make_node('Concat', ['init7_s1_-1', 'MatMulAddPattern--X12'], ['MatMulAddPattern--X13'], axis=0),
+                    oh.make_node('Reshape', ['B', 'MatMulAddPattern--X13'], ['MatMulAddPattern--X14']),
+                    oh.make_node('Shape', ['X1'], ['MatMulAddPattern--X16'], end=-1, start=0),
+                    oh.make_node('Concat', ['MatMulAddPattern--X16', 'init7_s1_-1'], ['MatMulAddPattern--X17'], axis=0),
+                    oh.make_node('Gemm', ['MatMulAddPattern--X1', 'X2', 'MatMulAddPattern--X14'], ['MatMulAddPattern--X15']),
+                    oh.make_node('Reshape', ['MatMulAddPattern--X15', 'MatMulAddPattern--X17'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('B', onnx.TensorProto.FLOAT, ('a', 'b', 'd')),
+                    oh.make_tensor_value_info('X1', onnx.TensorProto.FLOAT, ('a', 'b', 3)),
+                    oh.make_tensor_value_info('X2', onnx.TensorProto.FLOAT, (3, 'd')),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b', 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X1", onnx.TensorProto.FLOAT, shape=("a", "b", 3))
-        )
-        inputs.append(oh.make_tensor_value_info("X2", onnx.TensorProto.FLOAT, shape=(3, "d")))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s2_-1_3"],
-                value=onh.from_array(np.array([-1, 3], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s1_-1"],
-                value=onh.from_array(np.array([-1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node("Reshape", ["X1", "init7_s2_-1_3"], ["MatMulAddPattern--X1"])
-        )
-        nodes.append(oh.make_node("Shape", ["B"], ["MatMulAddPattern--X12"], start=-1))
-        nodes.append(
-            oh.make_node(
-                "Concat",
-                ["init7_s1_-1", "MatMulAddPattern--X12"],
-                ["MatMulAddPattern--X13"],
-                axis=0,
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Reshape", ["B", "MatMulAddPattern--X13"], ["MatMulAddPattern--X14"]
-            )
-        )
-        nodes.append(
-            oh.make_node("Shape", ["X1"], ["MatMulAddPattern--X16"], end=-1, start=0)
-        )
-        nodes.append(
-            oh.make_node(
-                "Concat",
-                ["MatMulAddPattern--X16", "init7_s1_-1"],
-                ["MatMulAddPattern--X17"],
-                axis=0,
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Gemm",
-                ["MatMulAddPattern--X1", "X2", "MatMulAddPattern--X14"],
-                ["MatMulAddPattern--X15"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Reshape", ["MatMulAddPattern--X15", "MatMulAddPattern--X17"], ["Z"]
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "b", "d"))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -426,51 +354,28 @@ class GemmTransposePattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("B", onnx.TensorProto.FLOAT, shape=(3, 2)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 3)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["B"],
-                value=onh.from_array(
-                    np.array(
-                        [
-                            [0.0, 0.1666666716337204],
-                            [0.3333333432674408, 0.5],
-                            [0.6666666865348816, 0.8333333134651184],
-                        ],
-                        dtype=np.float32,
-                    ),
-                    name="value",
-                ),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['B'], value=onh.from_array(np.array([[0.0, 0.1666666716337204], [0.3333333432674408, 0.5], [0.6666666865348816, 0.8333333134651184]], dtype=np.float32), name='value')),
+                    oh.make_node('Gemm', ['X', 'B'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('B', onnx.TensorProto.FLOAT, (3, 2)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 2)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Gemm", ["X", "B"], ["Z"]))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(2, 2)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -481,39 +386,27 @@ class GemmTransposePattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("B", onnx.TensorProto.FLOAT, shape=(3, 2)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 3)))
-        nodes.append(
-            oh.make_node("Transpose", ["B"], ["GemmTransposePattern--B"], perm=[1, 0])
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Transpose', ['B'], ['GemmTransposePattern--B'], perm=[1, 0]),
+                    oh.make_node('Gemm', ['X', 'GemmTransposePattern--B'], ['Z'], transB=1),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('B', onnx.TensorProto.FLOAT, (3, 2)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 2)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node("Gemm", ["X", "GemmTransposePattern--B"], ["Z"], transB=1)
-        )
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(2, 2)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -577,62 +470,32 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("div_5", onnx.TensorProto.FLOAT, shape=(13, 4, 7, 7))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s3_52_7_7'], value=onh.from_array(np.array([52, 7, 7], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s4_13_4_7_8'], value=onh.from_array(np.array([13, 4, 7, 8], dtype=np.int64), name='value')),
+                    oh.make_node('Reshape', ['div_5', 'init7_s3_52_7_7'], ['view_83']),
+                    oh.make_node('MatMul', ['view_83', 'transpose_23'], ['bmm_11']),
+                    oh.make_node('Reshape', ['bmm_11', 'init7_s4_13_4_7_8'], ['view_85']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('div_5', onnx.TensorProto.FLOAT, (13, 4, 7, 7)),
+                    oh.make_tensor_value_info('transpose_23', onnx.TensorProto.FLOAT, (52, 7, 8)),
+                    oh.make_tensor_value_info('init7_s4_13_4_7_8', onnx.TensorProto.INT64, (4,)),
+                ],
+                [
+                    oh.make_tensor_value_info('view_85', onnx.TensorProto.FLOAT, (13, 4, 7, 8)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("transpose_23", onnx.TensorProto.FLOAT, shape=(52, 7, 8))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("init7_s4_13_4_7_8", onnx.TensorProto.INT64, shape=(4,))
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s3_52_7_7"],
-                value=onh.from_array(np.array([52, 7, 7], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s4_13_4_7_8"],
-                value=onh.from_array(np.array([13, 4, 7, 8], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Reshape", ["div_5", "init7_s3_52_7_7"], ["view_83"]))
-        nodes.append(oh.make_node("MatMul", ["view_83", "transpose_23"], ["bmm_11"]))
-        nodes.append(
-            oh.make_node("Reshape", ["bmm_11", "init7_s4_13_4_7_8"], ["view_85"])
-        )
-        outputs.append(
-            oh.make_tensor_value_info("view_85", onnx.TensorProto.FLOAT, shape=(13, 4, 7, 8))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -643,54 +506,28 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("div_5", onnx.TensorProto.FLOAT, shape=(13, 4, 7, 7))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Reshape', ['transpose_23', 'init7_s4_13_4_7_8'], ['MatMulReshape2Of3PatternL_view_83']),
+                    oh.make_node('MatMul', ['div_5', 'MatMulReshape2Of3PatternL_view_83'], ['view_85']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('div_5', onnx.TensorProto.FLOAT, (13, 4, 7, 7)),
+                    oh.make_tensor_value_info('transpose_23', onnx.TensorProto.FLOAT, (52, 7, 8)),
+                    oh.make_tensor_value_info('init7_s4_13_4_7_8', onnx.TensorProto.INT64, (4,)),
+                ],
+                [
+                    oh.make_tensor_value_info('view_85', onnx.TensorProto.FLOAT, (13, 4, 7, 8)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("transpose_23", onnx.TensorProto.FLOAT, shape=(52, 7, 8))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("init7_s4_13_4_7_8", onnx.TensorProto.INT64, shape=(4,))
-        )
-        nodes.append(
-            oh.make_node(
-                "Reshape",
-                ["transpose_23", "init7_s4_13_4_7_8"],
-                ["MatMulReshape2Of3PatternL_view_83"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "MatMul", ["div_5", "MatMulReshape2Of3PatternL_view_83"], ["view_85"]
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("view_85", onnx.TensorProto.FLOAT, shape=(13, 4, 7, 8))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1057,55 +894,31 @@ class MulMulMatMulPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(16, 64)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(32, 16)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["c"],
-                value=onh.from_array(
-                    np.array([0.4000000059604645], dtype=np.float32), name="value"
-                ),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['c'], value=onh.from_array(np.array([0.4000000059604645], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['d'], value=onh.from_array(np.array([0.6000000238418579], dtype=np.float32), name='value')),
+                    oh.make_node('Mul', ['X', 'c'], ['a']),
+                    oh.make_node('Mul', ['d', 'Y'], ['b']),
+                    oh.make_node('MatMul', ['a', 'b'], ['z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (16, 64)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (32, 16)),
+                ],
+                [
+                    oh.make_tensor_value_info('z', onnx.TensorProto.FLOAT, (32, 64)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["d"],
-                value=onh.from_array(
-                    np.array([0.6000000238418579], dtype=np.float32), name="value"
-                ),
-            )
-        )
-        nodes.append(oh.make_node("Mul", ["X", "c"], ["a"]))
-        nodes.append(oh.make_node("Mul", ["d", "Y"], ["b"]))
-        nodes.append(oh.make_node("MatMul", ["a", "b"], ["z"]))
-        outputs.append(oh.make_tensor_value_info("z", onnx.TensorProto.FLOAT, shape=(32, 64)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1117,44 +930,29 @@ class MulMulMatMulPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(16, 64)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(32, 16)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init1_s1_"],
-                value=onh.from_array(
-                    np.array([0.24000000953674316], dtype=np.float32), name="value"
-                ),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init1_s1_'], value=onh.from_array(np.array([0.24000000953674316], dtype=np.float32), name='value')),
+                    oh.make_node('MatMul', ['X', 'Y'], ['MulMulMatMulPattern_z']),
+                    oh.make_node('Mul', ['MulMulMatMulPattern_z', 'init1_s1_'], ['z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (16, 64)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (32, 16)),
+                ],
+                [
+                    oh.make_tensor_value_info('z', onnx.TensorProto.FLOAT, (32, 64)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        nodes.append(oh.make_node("MatMul", ["X", "Y"], ["MulMulMatMulPattern_z"]))
-        nodes.append(oh.make_node("Mul", ["MulMulMatMulPattern_z", "init1_s1_"], ["z"]))
-        outputs.append(oh.make_tensor_value_info("z", onnx.TensorProto.FLOAT, shape=(32, 64)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1225,66 +1023,33 @@ class ReshapeMatMulReshapePattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("xu2", onnx.TensorProto.FLOAT, shape=(1, 1, 32, 128))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['shape1'], value=onh.from_array(np.array([1, 32, 128], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape2'], value=onh.from_array(np.array([15, 128, 64], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape3'], value=onh.from_array(np.array([3, 5, 32, 64], dtype=np.int64), name='value')),
+                    oh.make_node('Reshape', ['xu2', 'shape1'], ['xm1']),
+                    oh.make_node('Reshape', ['Y', 'shape2'], ['xm2c']),
+                    oh.make_node('MatMul', ['xm1', 'xm2c'], ['xm']),
+                    oh.make_node('Reshape', ['xm', 'shape3'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('xu2', onnx.TensorProto.FLOAT, (1, 1, 32, 128)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (3, 5, 128, 64)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (3, 5, 32, 64)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(3, 5, 128, 64))
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape1"],
-                value=onh.from_array(np.array([1, 32, 128], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape2"],
-                value=onh.from_array(np.array([15, 128, 64], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape3"],
-                value=onh.from_array(np.array([3, 5, 32, 64], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Reshape", ["xu2", "shape1"], ["xm1"]))
-        nodes.append(oh.make_node("Reshape", ["Y", "shape2"], ["xm2c"]))
-        nodes.append(oh.make_node("MatMul", ["xm1", "xm2c"], ["xm"]))
-        nodes.append(oh.make_node("Reshape", ["xm", "shape3"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(3, 5, 32, 64))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1295,40 +1060,26 @@ class ReshapeMatMulReshapePattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("xu2", onnx.TensorProto.FLOAT, shape=(1, 1, 32, 128))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('MatMul', ['xu2', 'Y'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('xu2', onnx.TensorProto.FLOAT, (1, 1, 32, 128)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (3, 5, 128, 64)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (3, 5, 32, 64)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(3, 5, 128, 64))
-        )
-        nodes.append(oh.make_node("MatMul", ["xu2", "Y"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(3, 5, 32, 64))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1444,35 +1195,27 @@ class TransposeMatMulPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(128, 64)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(128, 32)))
-        nodes.append(oh.make_node("Transpose", ["X"], ["xm1"], perm=[1, 0]))
-        nodes.append(oh.make_node("MatMul", ["xm1", "Y"], ["Z"]))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(32, 64)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Transpose', ['X'], ['xm1'], perm=[1, 0]),
+                    oh.make_node('MatMul', ['xm1', 'Y'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (128, 64)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (128, 32)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (32, 64)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1483,34 +1226,26 @@ class TransposeMatMulPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(128, 64)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(128, 32)))
-        nodes.append(oh.make_node("Gemm", ["X", "Y"], ["Z"], transA=1, transB=0))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(32, 64)))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Gemm', ['X', 'Y'], ['Z'], transA=1, transB=0),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (128, 64)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (128, 32)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (32, 64)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1647,53 +1382,32 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("yts", onnx.TensorProto.FLOAT, shape=(2, 2, 7, 3))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['shape'], value=onh.from_array(np.array([2, 2, 7, 3], dtype=np.int64), name='value')),
+                    oh.make_node('MatMul', ['X', 'yts'], ['Z']),
+                    oh.make_node('Reshape', ['yt', 'shape'], ['yts']),
+                    oh.make_node('Transpose', ['Y'], ['yt'], perm=[0, 2, 1]),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('yts', onnx.TensorProto.FLOAT, (2, 2, 7, 3)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (4, 3, 7)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 2, 5, 7)),
+                ],
+                [
+                    oh.make_tensor_value_info('yts', onnx.TensorProto.FLOAT, (2, 2, 7, 3)),
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 2, 5, 3)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(4, 3, 7)))
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 2, 5, 7))
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape"],
-                value=onh.from_array(np.array([2, 2, 7, 3], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("MatMul", ["X", "yts"], ["Z"]))
-        nodes.append(oh.make_node("Reshape", ["yt", "shape"], ["yts"]))
-        nodes.append(oh.make_node("Transpose", ["Y"], ["yt"], perm=[0, 2, 1]))
-        outputs.append(
-            oh.make_tensor_value_info("yts", onnx.TensorProto.FLOAT, shape=(2, 2, 7, 3))
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(2, 2, 5, 3))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1705,61 +1419,32 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 26),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("yts", onnx.TensorProto.FLOAT, shape=(2, 2, 7, 3))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s4_2_2_3_7'], value=onh.from_array(np.array([2, 2, 3, 7], dtype=np.int64), name='value')),
+                    oh.make_node('Reshape', ['Y', 'init7_s4_2_2_3_7'], ['TransposeReshapeMatMulPatternL_Y']),
+                    oh.make_node('Transpose', ['TransposeReshapeMatMulPatternL_Y'], ['yts'], perm=[0, 1, 3, 2]),
+                    oh.make_node('MatMul', ['X', 'yts'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('yts', onnx.TensorProto.FLOAT, (2, 2, 7, 3)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (4, 3, 7)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 2, 5, 7)),
+                ],
+                [
+                    oh.make_tensor_value_info('yts', onnx.TensorProto.FLOAT, (2, 2, 7, 3)),
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 2, 5, 3)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(4, 3, 7)))
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 2, 5, 7))
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s4_2_2_3_7"],
-                value=onh.from_array(np.array([2, 2, 3, 7], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Reshape", ["Y", "init7_s4_2_2_3_7"], ["TransposeReshapeMatMulPatternL_Y"]
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Transpose", ["TransposeReshapeMatMulPatternL_Y"], ["yts"], perm=[0, 1, 3, 2]
-            )
-        )
-        nodes.append(oh.make_node("MatMul", ["X", "yts"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("yts", onnx.TensorProto.FLOAT, shape=(2, 2, 7, 3))
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(2, 2, 5, 3))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1914,42 +1599,28 @@ class SwitchReshapeActivationPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(3, 2, 5, 6))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('MatMul', ['X', 'Y'], ['mm']),
+                    oh.make_node('Transpose', ['mm'], ['tmm'], perm=[0, 2, 1, 3]),
+                    oh.make_node('Relu', ['tmm'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (3, 2, 5, 6)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (3, 2, 6, 5)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(3, 2, 6, 5))
-        )
-        nodes.append(oh.make_node("MatMul", ["X", "Y"], ["mm"]))
-        nodes.append(oh.make_node("Transpose", ["mm"], ["tmm"], perm=[0, 2, 1, 3]))
-        nodes.append(oh.make_node("Relu", ["tmm"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d"))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1960,54 +1631,28 @@ class SwitchReshapeActivationPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(3, 2, 5, 6))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('MatMul', ['X', 'Y'], ['SwitchReshapeActivationPatternL_mm']),
+                    oh.make_node('Relu', ['SwitchReshapeActivationPatternL_mm'], ['SwitchReshapeActivationPatternL_tmm']),
+                    oh.make_node('Transpose', ['SwitchReshapeActivationPatternL_tmm'], ['Z'], perm=[0, 2, 1, 3]),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (3, 2, 5, 6)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (3, 2, 6, 5)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(3, 2, 6, 5))
-        )
-        nodes.append(
-            oh.make_node("MatMul", ["X", "Y"], ["SwitchReshapeActivationPatternL_mm"])
-        )
-        nodes.append(
-            oh.make_node(
-                "Relu",
-                ["SwitchReshapeActivationPatternL_mm"],
-                ["SwitchReshapeActivationPatternL_tmm"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Transpose", ["SwitchReshapeActivationPatternL_tmm"], ["Z"], perm=[0, 2, 1, 3]
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d"))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -2113,41 +1758,27 @@ class ShapeBasedMatMulToMulPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 1, "c"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('MatMul', ['X', 'Y'], ['Zt']),
+                    oh.make_node('Transpose', ['Zt'], ['Z'], perm=[0, 2, 1]),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 'c')),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 1)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'c', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", 1))
-        )
-        nodes.append(oh.make_node("MatMul", ["X", "Y"], ["Zt"]))
-        nodes.append(oh.make_node("Transpose", ["Zt"], ["Z"], perm=[0, 2, 1]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "c", "b"))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -2159,57 +1790,31 @@ class ShapeBasedMatMulToMulPattern(PatternOptimization):
 
         from yobx.doc import to_dot
         import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 1, "c"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['X-ZEROS2'], value=onh.from_array(np.array([0, 1, -1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['Y-ZEROS2'], value=onh.from_array(np.array([0, -1, 1], dtype=np.int64), name='value')),
+                    oh.make_node('Reshape', ['X', 'X-ZEROS2'], ['X2']),
+                    oh.make_node('Reshape', ['Y', 'Y-ZEROS2'], ['Y2']),
+                    oh.make_node('Mul', ['X2', 'Y2'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 'c')),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 1)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'c', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", 1))
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["X-ZEROS2"],
-                value=onh.from_array(np.array([0, 1, -1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["Y-ZEROS2"],
-                value=onh.from_array(np.array([0, -1, 1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Reshape", ["X", "X-ZEROS2"], ["X2"]))
-        nodes.append(oh.make_node("Reshape", ["Y", "Y-ZEROS2"], ["Y2"]))
-        nodes.append(oh.make_node("Mul", ["X2", "Y2"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "c", "b"))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
