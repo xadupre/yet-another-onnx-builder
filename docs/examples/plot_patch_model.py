@@ -16,8 +16,8 @@ This example shows how to:
 3. Display a unified diff for each
    :class:`PatchInfo <yobx.helpers.patch_helper.PatchInfo>` so you can see
    exactly what changed in the original PyTorch internals.
-4. Visualise the diff sizes per patch with a matplotlib bar chart so that
-   sphinx-gallery captures the example.
+4. Render the diff text as a matplotlib figure so that sphinx-gallery
+   captures the example.
 5. Show which patches were actually exercised when exporting a real model
    (`arnir0/Tiny-LLM`).
 
@@ -66,33 +66,51 @@ for patch in details:
     print()
 
 # %%
-# 3. Visualise the diff sizes
-# ----------------------------
+# 3. Plot the diff text as an image
+# -----------------------------------
 #
-# The bar chart below shows, for each patch, how many lines were **added** (+)
-# and **removed** (−) with respect to the original implementation.
+# Each unified diff is rendered as a matplotlib figure with colour-coded lines:
+# ``-`` lines in red, ``+`` lines in green, and ``@@`` hunk headers in blue.
+# This makes the figure capturable by sphinx-gallery.
 
 import matplotlib.pyplot as plt  # noqa: E402
 
-names, added, removed = [], [], []
-for patch in details:
-    lines = patch.make_diff().splitlines()
-    n_added = sum(1 for line in lines if line.startswith("+") and not line.startswith("+++"))
-    n_removed = sum(1 for line in lines if line.startswith("-") and not line.startswith("---"))
-    names.append(patch.name.replace("patched_", "").replace("patch_", ""))
-    added.append(n_added)
-    removed.append(-n_removed)
+_LINE_COLORS = {"+": "#2a9d2a", "-": "#cc2222", "@": "#1a6fbf"}
+_DEFAULT_LINE_COLOR = "#333333"
+_MAX_FIG_HEIGHT = 30  # cap total figure height in inches
 
-y = list(range(len(names)))
-fig, ax = plt.subplots(figsize=(8, max(3, len(names) * 0.6 + 1)))
-ax.barh(y, added, color="#4c72b0", label="lines added")
-ax.barh(y, removed, color="#dd8452", label="lines removed")
-ax.set_yticks(y)
-ax.set_yticklabels(names, fontsize=9)
-ax.axvline(0, color="black", linewidth=0.8)
-ax.set_xlabel("lines")
-ax.set_title(f"Diff size per patch ({details.n_patches} patches applied)", fontsize=11)
-ax.legend(loc="lower right", fontsize=9)
+
+def _plot_diff(patch_info, ax):
+    """Render one unified-diff as coloured text on *ax*."""
+    title = patch_info.name
+    diff_text = patch_info.make_diff()
+    lines = diff_text.splitlines()
+
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, max(len(lines), 1))
+    ax.axis("off")
+    ax.set_title(title, fontsize=8, loc="left", pad=3)
+
+    for i, line in enumerate(lines):
+        color = _LINE_COLORS.get(line[:1], _DEFAULT_LINE_COLOR)
+        ax.text(
+            0.01,
+            len(lines) - i - 0.5,
+            line,
+            fontsize=6,
+            color=color,
+            fontfamily="monospace",
+            va="center",
+            transform=ax.transData,
+        )
+
+
+n = details.n_patches
+fig, axes = plt.subplots(n, 1, figsize=(10, min(n * 4, _MAX_FIG_HEIGHT)))
+if n == 1:
+    axes = [axes]
+for ax, patch in zip(axes, details):
+    _plot_diff(patch, ax)
 plt.tight_layout()
 plt.show()
 
