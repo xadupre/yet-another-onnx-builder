@@ -27,10 +27,32 @@ class BiasGeluPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['B'], value=onh.from_array(np.array([0.10000000149011612, 0.20000000298023224, 0.30000001192092896, 0.4000000059604645, 0.5, 0.6000000238418579, -0.4000000059604645, -0.10000000149011612], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['sq2'], value=onh.from_array(np.array([1.4140625], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([1.0], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['half'], value=onh.from_array(np.array([0.5], dtype=np.float32), name='value')),
+                    oh.make_node(
+                        'Constant', [], ['B'],
+                        value=onh.from_array(
+                            np.array([
+                                0.10000000149011612, 0.20000000298023224, 0.30000001192092896,
+                                0.4000000059604645, 0.5, 0.6000000238418579, -0.4000000059604645,
+                                -0.10000000149011612,
+                            ], dtype=np.float32),
+                            name='value',
+                        ),
+                    ),
+                    oh.make_node(
+                        'Constant', [], ['sq2'],
+                        value=onh.from_array(
+                            np.array([1.4140625], dtype=np.float32),
+                            name='value',
+                        ),
+                    ),
+                    oh.make_node(
+                        'Constant', [], ['one'],
+                        value=onh.from_array(np.array([1.0], dtype=np.float32), name='value'),
+                    ),
+                    oh.make_node(
+                        'Constant', [], ['half'],
+                        value=onh.from_array(np.array([0.5], dtype=np.float32), name='value'),
+                    ),
                     oh.make_node('Add', ['X', 'B'], ['xb']),
                     oh.make_node('Div', ['xb', 'sq2'], ['xbinv']),
                     oh.make_node('Erf', ['xbinv'], ['xerf']),
@@ -190,11 +212,32 @@ class GeluOrtPattern(GeluPattern):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init10_s1_63'], value=onh.from_array(np.array([3.0], dtype=np.float16), name='value')),
-                    oh.make_node('Constant', [], ['init10_s_89'], value=onh.from_array(np.array(0.044708251953125, dtype=np.float16), name='value')),
-                    oh.make_node('Constant', [], ['init10_s_90'], value=onh.from_array(np.array(0.7978515625, dtype=np.float16), name='value')),
-                    oh.make_node('Constant', [], ['init10_s_91'], value=onh.from_array(np.array(1.0, dtype=np.float16), name='value')),
-                    oh.make_node('Constant', [], ['init10_s_88'], value=onh.from_array(np.array(0.5, dtype=np.float16), name='value')),
+                    oh.make_node(
+                        'Constant', [], ['init10_s1_63'],
+                        value=onh.from_array(np.array([3.0], dtype=np.float16), name='value'),
+                    ),
+                    oh.make_node(
+                        'Constant', [], ['init10_s_89'],
+                        value=onh.from_array(
+                            np.array(0.044708251953125, dtype=np.float16),
+                            name='value',
+                        ),
+                    ),
+                    oh.make_node(
+                        'Constant', [], ['init10_s_90'],
+                        value=onh.from_array(
+                            np.array(0.7978515625, dtype=np.float16),
+                            name='value',
+                        ),
+                    ),
+                    oh.make_node(
+                        'Constant', [], ['init10_s_91'],
+                        value=onh.from_array(np.array(1.0, dtype=np.float16), name='value'),
+                    ),
+                    oh.make_node(
+                        'Constant', [], ['init10_s_88'],
+                        value=onh.from_array(np.array(0.5, dtype=np.float16), name='value'),
+                    ),
                     oh.make_node('Pow', ['linear_73', 'init10_s1_63'], ['pow_13']),
                     oh.make_node('Mul', ['pow_13', 'init10_s_89'], ['_onx_mul064']),
                     oh.make_node('Add', ['linear_73', '_onx_mul064'], ['add_62']),
@@ -206,10 +249,18 @@ class GeluOrtPattern(GeluPattern):
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('linear_73', onnx.TensorProto.FLOAT16, shape=(4, 512, 128)),
+                    oh.make_tensor_value_info(
+                        'linear_73',
+                        onnx.TensorProto.FLOAT16,
+                        shape=(4, 512, 128),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('mul_52', onnx.TensorProto.FLOAT16, shape=(4, 512, 128)),
+                    oh.make_tensor_value_info(
+                        'mul_52',
+                        onnx.TensorProto.FLOAT16,
+                        shape=(4, 512, 128),
+                    ),
                 ],
             ),
             functions=[],
@@ -231,14 +282,28 @@ class GeluOrtPattern(GeluPattern):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Gelu', ['linear_73'], ['mul_52'], domain='com.microsoft', approximate='tanh'),
+                    oh.make_node(
+                        'Gelu',
+                        ['linear_73'],
+                        ['mul_52'],
+                        domain='com.microsoft',
+                        approximate='tanh',
+                    ),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('linear_73', onnx.TensorProto.FLOAT16, shape=(4, 512, 128)),
+                    oh.make_tensor_value_info(
+                        'linear_73',
+                        onnx.TensorProto.FLOAT16,
+                        shape=(4, 512, 128),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('mul_52', onnx.TensorProto.FLOAT16, shape=(4, 512, 128)),
+                    oh.make_tensor_value_info(
+                        'mul_52',
+                        onnx.TensorProto.FLOAT16,
+                        shape=(4, 512, 128),
+                    ),
                 ],
             ),
             functions=[],
@@ -278,9 +343,21 @@ class GeluErfPattern(EasyPatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['sq2'], value=onh.from_array(np.array([1.4140625], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([1.0], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['half'], value=onh.from_array(np.array([0.5], dtype=np.float32), name='value')),
+                    oh.make_node(
+                        'Constant', [], ['sq2'],
+                        value=onh.from_array(
+                            np.array([1.4140625], dtype=np.float32),
+                            name='value',
+                        ),
+                    ),
+                    oh.make_node(
+                        'Constant', [], ['one'],
+                        value=onh.from_array(np.array([1.0], dtype=np.float32), name='value'),
+                    ),
+                    oh.make_node(
+                        'Constant', [], ['half'],
+                        value=onh.from_array(np.array([0.5], dtype=np.float32), name='value'),
+                    ),
                     oh.make_node('Div', ['X', 'sq2'], ['xd']),
                     oh.make_node('Erf', ['xd'], ['exd']),
                     oh.make_node('Add', ['exd', 'one'], ['aexd']),
@@ -389,10 +466,18 @@ class FastGeluPattern(PatternOptimization):
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('linear_65', onnx.TensorProto.FLOAT16, shape=(4, 512, 16384)),
+                    oh.make_tensor_value_info(
+                        'linear_65',
+                        onnx.TensorProto.FLOAT16,
+                        shape=(4, 512, 16384),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('mul_44', onnx.TensorProto.FLOAT16, shape=(4, 512, 16384)),
+                    oh.make_tensor_value_info(
+                        'mul_44',
+                        onnx.TensorProto.FLOAT16,
+                        shape=(4, 512, 16384),
+                    ),
                 ],
             ),
             functions=[],
@@ -418,10 +503,18 @@ class FastGeluPattern(PatternOptimization):
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('linear_65', onnx.TensorProto.FLOAT16, shape=(4, 512, 16384)),
+                    oh.make_tensor_value_info(
+                        'linear_65',
+                        onnx.TensorProto.FLOAT16,
+                        shape=(4, 512, 16384),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('mul_44', onnx.TensorProto.FLOAT16, shape=(4, 512, 16384)),
+                    oh.make_tensor_value_info(
+                        'mul_44',
+                        onnx.TensorProto.FLOAT16,
+                        shape=(4, 512, 16384),
+                    ),
                 ],
             ),
             functions=[],
@@ -506,7 +599,14 @@ class BiasSoftmaxPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('BiasSoftmax', ['X', 'Y'], ['Z'], domain='com.microsoft', axis=-1, is_inner_broadcast=0),
+                    oh.make_node(
+                        'BiasSoftmax',
+                        ['X', 'Y'],
+                        ['Z'],
+                        domain='com.microsoft',
+                        axis=-1,
+                        is_inner_broadcast=0,
+                    ),
                 ],
                 'pattern',
                 [

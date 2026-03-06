@@ -21,7 +21,15 @@ class FusedConvPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Conv', ['X', 'W', 'B'], ['c'], dilations=[1, 1], group=1, pads=[1, 1, 1, 1], strides=[1, 1]),
+                    oh.make_node(
+                        'Conv',
+                        ['X', 'W', 'B'],
+                        ['c'],
+                        dilations=[1, 1],
+                        group=1,
+                        pads=[1, 1, 1, 1],
+                        strides=[1, 1],
+                    ),
                     oh.make_node('Relu', ['c'], ['Y']),
                 ],
                 'pattern',
@@ -53,7 +61,17 @@ class FusedConvPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('FusedConv', ['X', 'W', 'B'], ['Y'], domain='com.microsoft', activation='Relu', dilations=[1, 1], group=1, pads=[1, 1, 1, 1], strides=[1, 1]),
+                    oh.make_node(
+                        'FusedConv',
+                        ['X', 'W', 'B'],
+                        ['Y'],
+                        domain='com.microsoft',
+                        activation='Relu',
+                        dilations=[1, 1],
+                        group=1,
+                        pads=[1, 1, 1, 1],
+                        strides=[1, 1],
+                    ),
                 ],
                 'pattern',
                 [

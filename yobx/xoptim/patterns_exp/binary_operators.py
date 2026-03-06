@@ -85,7 +85,11 @@ class AddAddMulMulPattern(PatternOptimization, _common):
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -103,7 +107,12 @@ class AddAddMulMulPattern(PatternOptimization, _common):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('AddAdd', ['X', 'Y', 'Z'], ['F'], domain='onnx_extended.ortops.optim.cuda'),
+                    oh.make_node(
+                        'AddAdd',
+                        ['X', 'Y', 'Z'],
+                        ['F'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
                 ],
                 'pattern',
                 [
@@ -116,7 +125,11 @@ class AddAddMulMulPattern(PatternOptimization, _common):
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -240,7 +253,11 @@ class AddMulPattern(PatternOptimization, _common):
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -258,7 +275,12 @@ class AddMulPattern(PatternOptimization, _common):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('AddMul', ['X', 'Y', 'Z'], ['F'], domain='onnx_extended.ortops.optim.cuda'),
+                    oh.make_node(
+                        'AddMul',
+                        ['X', 'Y', 'Z'],
+                        ['F'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
                 ],
                 'pattern',
                 [
@@ -271,7 +293,11 @@ class AddMulPattern(PatternOptimization, _common):
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -384,14 +410,25 @@ class MulSigmoidPattern(PatternOptimization):
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM', 'UNKNOWNDIM1')),
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM2', 'UNKNOWNDIM3')),
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -409,18 +446,34 @@ class MulSigmoidPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('MulSigmoid', ['X'], ['Y'], domain='onnx_extended.ortops.optim.cuda'),
+                    oh.make_node(
+                        'MulSigmoid',
+                        ['X'],
+                        ['Y'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM', 'UNKNOWNDIM1')),
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM2', 'UNKNOWNDIM3')),
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -488,19 +541,33 @@ class NegXplus1Pattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([1.0], dtype=np.float32), name='value')),
+                    oh.make_node(
+                        'Constant', [], ['one'],
+                        value=onh.from_array(np.array([1.0], dtype=np.float32), name='value'),
+                    ),
                     oh.make_node('Sub', ['one', 'X'], ['Y']),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM', 'UNKNOWNDIM1')),
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM2', 'UNKNOWNDIM3')),
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -518,18 +585,34 @@ class NegXplus1Pattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('NegXplus1', ['X'], ['Y'], domain='onnx_extended.ortops.optim.cuda'),
+                    oh.make_node(
+                        'NegXplus1',
+                        ['X'],
+                        ['Y'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM', 'UNKNOWNDIM1')),
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM2', 'UNKNOWNDIM3')),
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -607,7 +690,11 @@ class SubMulPattern(PatternOptimization, _common):
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -625,7 +712,12 @@ class SubMulPattern(PatternOptimization, _common):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('SubMul', ['X', 'Y', 'Z'], ['F'], domain='onnx_extended.ortops.optim.cuda'),
+                    oh.make_node(
+                        'SubMul',
+                        ['X', 'Y', 'Z'],
+                        ['F'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
                 ],
                 'pattern',
                 [
@@ -638,7 +730,11 @@ class SubMulPattern(PatternOptimization, _common):
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -769,7 +865,11 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -787,7 +887,12 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('AddSharedInput', ['X', 'Y', 'Z'], ['F1', 'F2'], domain='onnx_extended.ortops.optim.cuda'),
+                    oh.make_node(
+                        'AddSharedInput',
+                        ['X', 'Y', 'Z'],
+                        ['F1', 'F2'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
                 ],
                 'pattern',
                 [
@@ -801,7 +906,11 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('com.microsoft', 1),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -935,21 +1044,45 @@ class AddMulTransposePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('AddMul', ['X', 'Y', 'Z'], ['F1'], domain='onnx_extended.ortops.optim.cuda'),
+                    oh.make_node(
+                        'AddMul',
+                        ['X', 'Y', 'Z'],
+                        ['F1'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
                     oh.make_node('Transpose', ['F1'], ['final'], perm=[0, 2, 1, 3]),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('a', 'b', 'c', 'd')),
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('a', 'b', 'c', 'd')),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('a', 'b', 'c', 'd')),
+                    oh.make_tensor_value_info(
+                        'Z',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('final', onnx.TensorProto.FLOAT, shape=('a', 'b', 'c', 'd')),
+                    oh.make_tensor_value_info(
+                        'final',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -967,20 +1100,45 @@ class AddMulTransposePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('AddMul', ['X', 'Y', 'Z'], ['final'], domain='onnx_extended.ortops.optim.cuda', transposeMiddle=1),
+                    oh.make_node(
+                        'AddMul',
+                        ['X', 'Y', 'Z'],
+                        ['final'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                        transposeMiddle=1,
+                    ),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('a', 'b', 'c', 'd')),
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('a', 'b', 'c', 'd')),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('a', 'b', 'c', 'd')),
+                    oh.make_tensor_value_info(
+                        'Z',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('final', onnx.TensorProto.FLOAT, shape=('a', 'b', 'c', 'd')),
+                    oh.make_tensor_value_info(
+                        'final',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))

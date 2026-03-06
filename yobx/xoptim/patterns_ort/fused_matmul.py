@@ -25,8 +25,17 @@ class FusedMatMulDivPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['deux'], value=onh.from_array(np.array([2.0], dtype=np.float32), name='value')),
-                    oh.make_node('FusedMatMul', ['X', 'Y'], ['zd'], domain='com.microsoft', alpha=1.2999999523162842),
+                    oh.make_node(
+                        'Constant', [], ['deux'],
+                        value=onh.from_array(np.array([2.0], dtype=np.float32), name='value'),
+                    ),
+                    oh.make_node(
+                        'FusedMatMul',
+                        ['X', 'Y'],
+                        ['zd'],
+                        domain='com.microsoft',
+                        alpha=1.2999999523162842,
+                    ),
                     oh.make_node('Div', ['zd', 'deux'], ['Z']),
                 ],
                 'pattern',
@@ -57,7 +66,13 @@ class FusedMatMulDivPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('FusedMatMul', ['X', 'Y'], ['Z'], domain='com.microsoft', alpha=0.6499999761581421),
+                    oh.make_node(
+                        'FusedMatMul',
+                        ['X', 'Y'],
+                        ['Z'],
+                        domain='com.microsoft',
+                        alpha=0.6499999761581421,
+                    ),
                 ],
                 'pattern',
                 [
@@ -185,7 +200,16 @@ class FusedMatMulPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('FusedMatMul', ['Y', 'X'], ['Z'], domain='com.microsoft', transA=0, transB=1, transBatchA=0, transBatchB=0),
+                    oh.make_node(
+                        'FusedMatMul',
+                        ['Y', 'X'],
+                        ['Z'],
+                        domain='com.microsoft',
+                        transA=0,
+                        transB=1,
+                        transBatchA=0,
+                        transBatchB=0,
+                    ),
                 ],
                 'pattern',
                 [
@@ -391,10 +415,27 @@ class FusedMatMulx2Pattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['deux'], value=onh.from_array(np.array([2.0], dtype=np.float32), name='value')),
+                    oh.make_node(
+                        'Constant', [], ['deux'],
+                        value=onh.from_array(np.array([2.0], dtype=np.float32), name='value'),
+                    ),
                     oh.make_node('Div', ['X', 'deux'], ['half']),
-                    oh.make_node('FusedMatMul', ['half', 'X'], ['x1'], domain='com.microsoft', alpha=50.099998474121094, transA=1),
-                    oh.make_node('FusedMatMul', ['X', 'half'], ['x2'], domain='com.microsoft', alpha=0.07000000029802322, transA=1),
+                    oh.make_node(
+                        'FusedMatMul',
+                        ['half', 'X'],
+                        ['x1'],
+                        domain='com.microsoft',
+                        alpha=50.099998474121094,
+                        transA=1,
+                    ),
+                    oh.make_node(
+                        'FusedMatMul',
+                        ['X', 'half'],
+                        ['x2'],
+                        domain='com.microsoft',
+                        alpha=0.07000000029802322,
+                        transA=1,
+                    ),
                 ],
                 'pattern',
                 [
@@ -424,8 +465,22 @@ class FusedMatMulx2Pattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('FusedMatMul', ['X', 'X'], ['x1'], domain='com.microsoft', alpha=25.049999237060547, transA=1),
-                    oh.make_node('FusedMatMul', ['X', 'X'], ['x2'], domain='com.microsoft', alpha=0.03500000014901161, transA=1),
+                    oh.make_node(
+                        'FusedMatMul',
+                        ['X', 'X'],
+                        ['x1'],
+                        domain='com.microsoft',
+                        alpha=25.049999237060547,
+                        transA=1,
+                    ),
+                    oh.make_node(
+                        'FusedMatMul',
+                        ['X', 'X'],
+                        ['x2'],
+                        domain='com.microsoft',
+                        alpha=0.03500000014901161,
+                        transA=1,
+                    ),
                 ],
                 'pattern',
                 [
@@ -534,7 +589,15 @@ class FusedMatMulTransposePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('FusedMatMul', ['X', 'Y'], ['xy'], domain='com.microsoft', alpha=50.099998474121094, transA=1, transB=1),
+                    oh.make_node(
+                        'FusedMatMul',
+                        ['X', 'Y'],
+                        ['xy'],
+                        domain='com.microsoft',
+                        alpha=50.099998474121094,
+                        transA=1,
+                        transB=1,
+                    ),
                     oh.make_node('Transpose', ['xy'], ['Z'], perm=[0, 1, 3, 2]),
                 ],
                 'pattern',
@@ -543,7 +606,11 @@ class FusedMatMulTransposePattern(PatternOptimization):
                     oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=(2, 2, 5, 6)),
                 ],
                 [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=(2, 2, 'UNKNOWNDIM', 'UNKNOWNDIM1')),
+                    oh.make_tensor_value_info(
+                        'Z',
+                        onnx.TensorProto.FLOAT,
+                        shape=(2, 2, 'UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
                 ],
             ),
             functions=[],
@@ -565,7 +632,13 @@ class FusedMatMulTransposePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('FusedMatMul', ['Y', 'X'], ['Z'], domain='com.microsoft', alpha=50.099998474121094),
+                    oh.make_node(
+                        'FusedMatMul',
+                        ['Y', 'X'],
+                        ['Z'],
+                        domain='com.microsoft',
+                        alpha=50.099998474121094,
+                    ),
                 ],
                 'pattern',
                 [
@@ -573,7 +646,11 @@ class FusedMatMulTransposePattern(PatternOptimization):
                     oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=(2, 2, 5, 6)),
                 ],
                 [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=(2, 2, 'UNKNOWNDIM', 'UNKNOWNDIM1')),
+                    oh.make_tensor_value_info(
+                        'Z',
+                        onnx.TensorProto.FLOAT,
+                        shape=(2, 2, 'UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
                 ],
             ),
             functions=[],
@@ -662,7 +739,10 @@ class ReshapeGemmPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['shape'], value=onh.from_array(np.array([-1, 8], dtype=np.int64), name='value')),
+                    oh.make_node(
+                        'Constant', [], ['shape'],
+                        value=onh.from_array(np.array([-1, 8], dtype=np.int64), name='value'),
+                    ),
                     oh.make_node('Reshape', ['A', 'shape'], ['xr']),
                     oh.make_node('Gemm', ['xr', 'B'], ['Y'], transB=1),
                 ],
@@ -696,8 +776,17 @@ class ReshapeGemmPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s2_-1_4'], value=onh.from_array(np.array([-1, 4], dtype=np.int64), name='value')),
-                    oh.make_node('FusedMatMul', ['A', 'B'], ['ReshapeGemmPattern--Y'], domain='com.microsoft', transB=1),
+                    oh.make_node(
+                        'Constant', [], ['init7_s2_-1_4'],
+                        value=onh.from_array(np.array([-1, 4], dtype=np.int64), name='value'),
+                    ),
+                    oh.make_node(
+                        'FusedMatMul',
+                        ['A', 'B'],
+                        ['ReshapeGemmPattern--Y'],
+                        domain='com.microsoft',
+                        transB=1,
+                    ),
                     oh.make_node('Reshape', ['ReshapeGemmPattern--Y', 'init7_s2_-1_4'], ['Y']),
                 ],
                 'pattern',
@@ -800,7 +889,10 @@ class ReshapeGemmReshapePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['shape'], value=onh.from_array(np.array([-1, 8], dtype=np.int64), name='value')),
+                    oh.make_node(
+                        'Constant', [], ['shape'],
+                        value=onh.from_array(np.array([-1, 8], dtype=np.int64), name='value'),
+                    ),
                     oh.make_node('Reshape', ['A', 'shape'], ['xr']),
                     oh.make_node('Gemm', ['xr', 'B'], ['y2'], transB=0),
                     oh.make_node('Reshape', ['y2', 'shapey'], ['Y']),
@@ -936,11 +1028,23 @@ class TransposeFusedMatMulBPattern(PatternOptimization):
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('B', onnx.TensorProto.FLOAT, shape=('i', 'j', 'k', 'l')),
-                    oh.make_tensor_value_info('A', onnx.TensorProto.FLOAT, shape=('a', 'b', 'c', 'd')),
+                    oh.make_tensor_value_info(
+                        'B',
+                        onnx.TensorProto.FLOAT,
+                        shape=('i', 'j', 'k', 'l'),
+                    ),
+                    oh.make_tensor_value_info(
+                        'A',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('m', 'n', 'o', 'p')),
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('m', 'n', 'o', 'p'),
+                    ),
                 ],
             ),
             functions=[],
@@ -962,16 +1066,39 @@ class TransposeFusedMatMulBPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Transpose', ['B'], ['TransposeFusedMatMulBPattern--xr'], perm=[0, 2, 1, 3]),
-                    oh.make_node('FusedMatMul', ['A', 'TransposeFusedMatMulBPattern--xr'], ['Y'], domain='com.microsoft', transB=1),
+                    oh.make_node(
+                        'Transpose',
+                        ['B'],
+                        ['TransposeFusedMatMulBPattern--xr'],
+                        perm=[0, 2, 1, 3],
+                    ),
+                    oh.make_node(
+                        'FusedMatMul',
+                        ['A', 'TransposeFusedMatMulBPattern--xr'],
+                        ['Y'],
+                        domain='com.microsoft',
+                        transB=1,
+                    ),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('B', onnx.TensorProto.FLOAT, shape=('i', 'j', 'k', 'l')),
-                    oh.make_tensor_value_info('A', onnx.TensorProto.FLOAT, shape=('a', 'b', 'c', 'd')),
+                    oh.make_tensor_value_info(
+                        'B',
+                        onnx.TensorProto.FLOAT,
+                        shape=('i', 'j', 'k', 'l'),
+                    ),
+                    oh.make_tensor_value_info(
+                        'A',
+                        onnx.TensorProto.FLOAT,
+                        shape=('a', 'b', 'c', 'd'),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('m', 'n', 'o', 'p')),
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('m', 'n', 'o', 'p'),
+                    ),
                 ],
             ),
             functions=[],

@@ -23,20 +23,37 @@ class ReplaceZeroPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['cst'], value=onh.from_array(np.array([5.670000076293945], dtype=np.float32), name='value')),
+                    oh.make_node(
+                        'Constant', [], ['cst'],
+                        value=onh.from_array(
+                            np.array([5.670000076293945], dtype=np.float32),
+                            name='value',
+                        ),
+                    ),
                     oh.make_node('Cast', ['X'], ['xb'], to=9),
                     oh.make_node('Where', ['xb', 'cst', 'X'], ['Y']),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM', 'UNKNOWNDIM1')),
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM2', 'UNKNOWNDIM3')),
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -54,18 +71,36 @@ class ReplaceZeroPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('ReplaceZero', ['X'], ['Y'], domain='onnx_extended.ortops.optim.cuda', by=5.670000076293945, equal=0),
+                    oh.make_node(
+                        'ReplaceZero',
+                        ['X'],
+                        ['Y'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                        by=5.670000076293945,
+                        equal=0,
+                    ),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM', 'UNKNOWNDIM1')),
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
                 ],
                 [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM2', 'UNKNOWNDIM3')),
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))

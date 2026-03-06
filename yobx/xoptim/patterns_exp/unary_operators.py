@@ -34,7 +34,10 @@ class TransposeCastPattern(PatternOptimization):
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
@@ -52,7 +55,12 @@ class TransposeCastPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Transpose2DCastFP16', ['X'], ['Y'], domain='onnx_extended.ortops.optim.cuda'),
+                    oh.make_node(
+                        'Transpose2DCastFP16',
+                        ['X'],
+                        ['Y'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                    ),
                 ],
                 'pattern',
                 [
@@ -63,7 +71,10 @@ class TransposeCastPattern(PatternOptimization):
                 ],
             ),
             functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
 
         print("DOT-SECTION", to_dot(model))
