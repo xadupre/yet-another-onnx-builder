@@ -205,25 +205,40 @@ class GraphBuilderProtocol(Protocol):
 
 @runtime_checkable
 class TensorProtocol(Protocol):
-    """Protocol for named tensor values that can be passed as inputs to opset helpers.
+    """Protocol for tensor-like values that can be passed as inputs to opset helpers.
 
-    Objects satisfying this protocol carry a string :attr:`name` that identifies
-    the corresponding tensor (or node output) inside the graph being built.
-    Typical concrete types that satisfy this protocol include:
+    Objects satisfying this protocol represent actual tensor values (e.g. constants
+    or traced tensors) that carry dtype, shape, and device information.  Typical
+    concrete types that satisfy this protocol include:
 
-    * :class:`torch.fx.Node` — a node in a :mod:`torch.fx` traced graph whose
-      ``.name`` attribute is the SSA name of its output value.
-    * Any graph-IR value object that exposes a ``.name`` property.
+    * :class:`torch.Tensor` — a PyTorch eager or :class:`torch.fx.proxy.Proxy` tensor.
+    * ``torch.FakeTensor`` — a symbolic tensor used during :mod:`torch.fx` tracing.
+    * Any framework tensor that exposes ``.dtype``, ``.shape``, and ``.device``.
 
-    Plain ``str`` tensor names and ``numpy.ndarray`` constants are handled
-    separately as concrete types rather than via this protocol.
+    Plain ``str`` tensor names are handled separately in :class:`OpsetProtocol`.
     """
 
     @property
-    def name(self) -> str:
-        """The string name identifying this tensor in the graph.
+    def dtype(self) -> Any:
+        """Element type of the tensor (e.g. ``torch.float32``).
 
-        :return: the tensor/node output name as registered in the graph builder
+        :return: framework-specific dtype object
+        """
+        ...
+
+    @property
+    def shape(self) -> Tuple[int, ...]:
+        """Shape of the tensor as a tuple of integer dimensions.
+
+        :return: shape tuple
+        """
+        ...
+
+    @property
+    def device(self) -> Any:
+        """Device on which the tensor resides (e.g. ``torch.device("cpu")``).
+
+        :return: framework-specific device object
         """
         ...
 
@@ -257,9 +272,10 @@ class OpsetProtocol(Protocol):
         """Creates an ONNX node and returns its output name(s).
 
         :param op_type: ONNX operator type (e.g. ``"Relu"``, ``"MatMul"``)
-        :param inputs: input tensor names (``str``) or named tensor values
-            (:class:`TensorProtocol`) — concrete implementations also accept
-            ``numpy.ndarray`` constants and ``None`` for optional inputs
+        :param inputs: input tensor names (``str``) or tensor values
+            (:class:`TensorProtocol`, e.g. ``torch.Tensor``) — concrete
+            implementations also accept ``numpy.ndarray`` constants and ``None``
+            for optional inputs
         :param outputs: number of outputs (``int``), a single output name
             (``str``), or a list of output names; ``None`` uses a default
             inferred from *op_type* when supported
