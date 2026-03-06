@@ -2,12 +2,12 @@ import numpy as np
 from typing import Dict, List
 from sklearn.preprocessing import MinMaxScaler
 from ..register import register_sklearn_converter
-from ...xbuilder import GraphBuilder
+from ...typing import GraphBuilderProtocol
 
 
 @register_sklearn_converter(MinMaxScaler)
 def sklearn_min_max_scaler(
-    g: GraphBuilder,
+    g: GraphBuilderProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: MinMaxScaler,

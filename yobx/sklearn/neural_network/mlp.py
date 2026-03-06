@@ -3,10 +3,10 @@ import numpy as np
 import onnx
 from sklearn.neural_network import MLPClassifier, MLPRegressor
 from ..register import register_sklearn_converter
-from ...xbuilder import GraphBuilder
+from ...typing import GraphBuilderProtocol
 
 
-def _apply_activation(g: GraphBuilder, x: str, activation: str, name: str) -> str:
+def _apply_activation(g: GraphBuilderProtocol, x: str, activation: str, name: str) -> str:
     """
     Applies an activation function in-place and returns the output tensor name.
 
@@ -32,7 +32,7 @@ def _apply_activation(g: GraphBuilder, x: str, activation: str, name: str) -> st
 
 @register_sklearn_converter((MLPClassifier,))
 def sklearn_mlp_classifier(
-    g: GraphBuilder,
+    g: GraphBuilderProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: MLPClassifier,
@@ -155,7 +155,7 @@ def sklearn_mlp_classifier(
 
 @register_sklearn_converter((MLPRegressor,))
 def sklearn_mlp_regressor(
-    g: GraphBuilder,
+    g: GraphBuilderProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: MLPRegressor,

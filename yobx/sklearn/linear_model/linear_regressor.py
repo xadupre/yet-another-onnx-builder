@@ -27,7 +27,7 @@ from sklearn.linear_model import (
     TheilSenRegressor,
 )
 from ..register import register_sklearn_converter
-from ...xbuilder import GraphBuilder
+from ...typing import GraphBuilderProtocol
 
 # Optional deprecated models
 _EXTRA_REGRESSOR_TYPES = []
@@ -69,7 +69,7 @@ _LINEAR_REGRESSOR_TYPES = (
 
 @register_sklearn_converter(_LINEAR_REGRESSOR_TYPES)
 def sklearn_linear_regressor(
-    g: GraphBuilder,
+    g: GraphBuilderProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: Union[LinearRegression, Ridge],

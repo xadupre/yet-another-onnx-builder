@@ -1,12 +1,12 @@
 from typing import Dict, List
 from sklearn.preprocessing import StandardScaler
 from ..register import register_sklearn_converter
-from ...xbuilder import GraphBuilder
+from ...typing import GraphBuilderProtocol
 
 
 @register_sklearn_converter(StandardScaler)
 def sklearn_standard_scaler(
-    g: GraphBuilder,
+    g: GraphBuilderProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: StandardScaler,

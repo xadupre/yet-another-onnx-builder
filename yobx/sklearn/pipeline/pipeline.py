@@ -1,13 +1,13 @@
 from typing import Tuple, Dict, List, Union
 from sklearn.pipeline import Pipeline
-from ...xbuilder import GraphBuilder
+from ...typing import GraphBuilderProtocol
 from ..register import register_sklearn_converter, get_sklearn_converter
 from ..sklearn_helper import get_output_names
 
 
 @register_sklearn_converter(Pipeline)
 def sklearn_pipeline(
-    g: GraphBuilder,
+    g: GraphBuilderProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: Pipeline,

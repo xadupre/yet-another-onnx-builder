@@ -3,12 +3,12 @@ import numpy as np
 import onnx
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from ..register import register_sklearn_converter
-from ...xbuilder import GraphBuilder
+from ...typing import GraphBuilderProtocol
 
 
 @register_sklearn_converter((LogisticRegression, LogisticRegressionCV))
 def sklearn_logistic_regression(
-    g: GraphBuilder,
+    g: GraphBuilderProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: Union[LogisticRegression, LogisticRegressionCV],

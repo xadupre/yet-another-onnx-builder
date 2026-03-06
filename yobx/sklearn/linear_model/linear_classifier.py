@@ -8,7 +8,7 @@ from sklearn.linear_model import (
     SGDClassifier,
 )
 from ..register import register_sklearn_converter
-from ...xbuilder import GraphBuilder
+from ...typing import GraphBuilderProtocol
 
 # Optional deprecated models
 _EXTRA_CLASSIFIER_TYPES = []
@@ -29,7 +29,7 @@ _LINEAR_CLASSIFIER_TYPES = (
 
 
 def _build_label(
-    g: GraphBuilder,
+    g: GraphBuilderProtocol,
     classes: np.ndarray,
     label_idx: str,
     name: str,
@@ -66,7 +66,7 @@ def _build_label(
 
 @register_sklearn_converter(_LINEAR_CLASSIFIER_TYPES)
 def sklearn_linear_classifier(
-    g: GraphBuilder,
+    g: GraphBuilderProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: Union[RidgeClassifier, SGDClassifier, Perceptron],
