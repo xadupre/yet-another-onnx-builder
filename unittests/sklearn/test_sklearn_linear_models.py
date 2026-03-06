@@ -9,8 +9,42 @@ Covers:
 
 import unittest
 import numpy as np
+from sklearn.linear_model import (
+    ARDRegression,
+    BayesianRidge,
+    ElasticNet,
+    ElasticNetCV,
+    GammaRegressor,
+    HuberRegressor,
+    Lars,
+    LarsCV,
+    Lasso,
+    LassoCV,
+    LassoLars,
+    LassoLarsCV,
+    LassoLarsIC,
+    LinearRegression,
+    MultiTaskElasticNet,
+    MultiTaskLasso,
+    OrthogonalMatchingPursuit,
+    OrthogonalMatchingPursuitCV,
+    Perceptron,
+    PoissonRegressor,
+    QuantileRegressor,
+    Ridge,
+    RidgeClassifier,
+    RidgeClassifierCV,
+    RidgeCV,
+    SGDClassifier,
+    SGDRegressor,
+    TheilSenRegressor,
+    TweedieRegressor,
+)
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
+from yobx.sklearn import to_onnx
 
 
 @requires_sklearn("1.4")
@@ -22,8 +56,6 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
     # --------------------------------------------------------------------- #
 
     def _check_single_regressor(self, estimator, X, y, atol=1e-4):
-        from yobx.sklearn import to_onnx
-
         estimator.fit(X, y)
         onx = to_onnx(estimator, (X,))
 
@@ -36,22 +68,16 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=atol)
 
     def test_linear_regression(self):
-        from sklearn.linear_model import LinearRegression
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(LinearRegression(), X, y)
 
     def test_ridge(self):
-        from sklearn.linear_model import Ridge
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(Ridge(), X, y)
 
     def test_ridge_cv(self):
-        from sklearn.linear_model import RidgeCV
-
         X = np.array(
             [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]],
             dtype=np.float32,
@@ -60,15 +86,11 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
         self._check_single_regressor(RidgeCV(cv=3), X, y)
 
     def test_lasso(self):
-        from sklearn.linear_model import Lasso
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(Lasso(), X, y)
 
     def test_lasso_cv(self):
-        from sklearn.linear_model import LassoCV
-
         X = np.array(
             [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]],
             dtype=np.float32,
@@ -77,15 +99,11 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
         self._check_single_regressor(LassoCV(cv=3), X, y)
 
     def test_elastic_net(self):
-        from sklearn.linear_model import ElasticNet
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(ElasticNet(), X, y)
 
     def test_elastic_net_cv(self):
-        from sklearn.linear_model import ElasticNetCV
-
         X = np.array(
             [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]],
             dtype=np.float32,
@@ -94,15 +112,11 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
         self._check_single_regressor(ElasticNetCV(cv=3), X, y)
 
     def test_lars(self):
-        from sklearn.linear_model import Lars
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(Lars(), X, y)
 
     def test_lars_cv(self):
-        from sklearn.linear_model import LarsCV
-
         X = np.array(
             [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]],
             dtype=np.float32,
@@ -111,15 +125,11 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
         self._check_single_regressor(LarsCV(cv=3), X, y)
 
     def test_lasso_lars(self):
-        from sklearn.linear_model import LassoLars
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(LassoLars(), X, y)
 
     def test_lasso_lars_cv(self):
-        from sklearn.linear_model import LassoLarsCV
-
         X = np.array(
             [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]],
             dtype=np.float32,
@@ -128,8 +138,6 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
         self._check_single_regressor(LassoLarsCV(cv=3), X, y)
 
     def test_lasso_lars_ic(self):
-        from sklearn.linear_model import LassoLarsIC
-
         X = np.array(
             [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]],
             dtype=np.float32,
@@ -138,50 +146,36 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
         self._check_single_regressor(LassoLarsIC(), X, y)
 
     def test_bayesian_ridge(self):
-        from sklearn.linear_model import BayesianRidge
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(BayesianRidge(), X, y)
 
     def test_ard_regression(self):
-        from sklearn.linear_model import ARDRegression
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(ARDRegression(), X, y)
 
     def test_huber_regressor(self):
-        from sklearn.linear_model import HuberRegressor
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(HuberRegressor(), X, y)
 
     def test_theil_sen_regressor(self):
-        from sklearn.linear_model import TheilSenRegressor
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(TheilSenRegressor(), X, y)
 
     def test_quantile_regressor(self):
-        from sklearn.linear_model import QuantileRegressor
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(QuantileRegressor(), X, y)
 
     def test_orthogonal_matching_pursuit(self):
-        from sklearn.linear_model import OrthogonalMatchingPursuit
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(OrthogonalMatchingPursuit(), X, y)
 
     def test_orthogonal_matching_pursuit_cv(self):
-        from sklearn.linear_model import OrthogonalMatchingPursuitCV
-
         X = np.array(
             [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]],
             dtype=np.float32,
@@ -190,8 +184,6 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
         self._check_single_regressor(OrthogonalMatchingPursuitCV(cv=3), X, y)
 
     def test_sgd_regressor(self):
-        from sklearn.linear_model import SGDRegressor
-
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
         self._check_single_regressor(SGDRegressor(random_state=0, max_iter=2000), X, y)
@@ -201,9 +193,6 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
     # --------------------------------------------------------------------- #
 
     def test_multi_task_lasso(self):
-        from sklearn.linear_model import MultiTaskLasso
-        from yobx.sklearn import to_onnx
-
         X = np.array(
             [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]],
             dtype=np.float32,
@@ -222,9 +211,6 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-4)
 
     def test_multi_task_elastic_net(self):
-        from sklearn.linear_model import MultiTaskElasticNet
-        from yobx.sklearn import to_onnx
-
         X = np.array(
             [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]],
             dtype=np.float32,
@@ -252,8 +238,6 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
     _y = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
 
     def _check_glm(self, estimator, atol=1e-4):
-        from yobx.sklearn import to_onnx
-
         X, y = self._X, self._y
         estimator.fit(X, y)
         onx = to_onnx(estimator, (X,))
@@ -267,38 +251,25 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=atol)
 
     def test_poisson_regressor(self):
-        from sklearn.linear_model import PoissonRegressor
-
         self._check_glm(PoissonRegressor())
 
     def test_gamma_regressor(self):
-        from sklearn.linear_model import GammaRegressor
-
         self._check_glm(GammaRegressor())
 
     def test_tweedie_regressor_identity_link(self):
-        from sklearn.linear_model import TweedieRegressor
-
         # power=0 → identity link (Gaussian equivalent)
         self._check_glm(TweedieRegressor(power=0))
 
     def test_tweedie_regressor_log_link(self):
-        from sklearn.linear_model import TweedieRegressor
-
         # power=1 → log link (Poisson equivalent)
         self._check_glm(TweedieRegressor(power=1))
 
     def test_tweedie_regressor_log_link_explicit(self):
-        from sklearn.linear_model import TweedieRegressor
-
         # power=0 but with explicit 'log' link
         self._check_glm(TweedieRegressor(power=0, link="log"))
 
     def test_glm_op_type_identity(self):
         """TweedieRegressor with identity link should NOT produce Exp node."""
-        from sklearn.linear_model import TweedieRegressor
-        from yobx.sklearn import to_onnx
-
         X, y = self._X, self._y
         m = TweedieRegressor(power=0)
         m.fit(X, y)
@@ -309,9 +280,6 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
 
     def test_glm_op_type_exp(self):
         """PoissonRegressor with log link should produce Exp node."""
-        from sklearn.linear_model import PoissonRegressor
-        from yobx.sklearn import to_onnx
-
         X, y = self._X, self._y
         m = PoissonRegressor()
         m.fit(X, y)
@@ -333,8 +301,6 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
     _y_multi = np.array([0, 0, 1, 1, 2, 2])
 
     def _check_label_only_classifier(self, estimator, X, y):
-        from yobx.sklearn import to_onnx
-
         estimator.fit(X, y)
         onx = to_onnx(estimator, (X,))
 
@@ -347,64 +313,45 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
         self.assertEqualArray(estimator.predict(X), results[0])
 
     def test_ridge_classifier_binary(self):
-        from sklearn.linear_model import RidgeClassifier
-
         self._check_label_only_classifier(RidgeClassifier(), self._X_bin, self._y_bin)
 
     def test_ridge_classifier_multiclass(self):
-        from sklearn.linear_model import RidgeClassifier
-
         self._check_label_only_classifier(
             RidgeClassifier(), self._X_multi, self._y_multi
         )
 
     def test_ridge_classifier_cv_binary(self):
-        from sklearn.linear_model import RidgeClassifierCV
-
         X = np.concatenate([self._X_bin] * 3, axis=0)
         y = np.concatenate([self._y_bin] * 3, axis=0)
         self._check_label_only_classifier(RidgeClassifierCV(cv=3), X, y)
 
     def test_ridge_classifier_cv_multiclass(self):
-        from sklearn.linear_model import RidgeClassifierCV
-
         X = np.concatenate([self._X_multi] * 3, axis=0)
         y = np.concatenate([self._y_multi] * 3, axis=0)
         self._check_label_only_classifier(RidgeClassifierCV(cv=3), X, y)
 
     def test_perceptron_binary(self):
-        from sklearn.linear_model import Perceptron
-
         self._check_label_only_classifier(
             Perceptron(random_state=0, max_iter=1000), self._X_bin, self._y_bin
         )
 
     def test_perceptron_multiclass(self):
-        from sklearn.linear_model import Perceptron
-
         self._check_label_only_classifier(
             Perceptron(random_state=0, max_iter=1000), self._X_multi, self._y_multi
         )
 
     def test_sgd_classifier_hinge_binary(self):
         """SGDClassifier with hinge loss (no predict_proba) → label only."""
-        from sklearn.linear_model import SGDClassifier
-
         m = SGDClassifier(loss="hinge", random_state=0, max_iter=1000)
         self._check_label_only_classifier(m, self._X_bin, self._y_bin)
 
     def test_sgd_classifier_hinge_multiclass(self):
         """SGDClassifier with hinge loss (no predict_proba) → label only."""
-        from sklearn.linear_model import SGDClassifier
-
         m = SGDClassifier(loss="hinge", random_state=0, max_iter=1000)
         self._check_label_only_classifier(m, self._X_multi, self._y_multi)
 
     def test_sgd_classifier_log_loss_binary(self):
         """SGDClassifier with log_loss (has predict_proba) → label + proba."""
-        from sklearn.linear_model import SGDClassifier
-        from yobx.sklearn import to_onnx
-
         m = SGDClassifier(loss="log_loss", random_state=0, max_iter=1000)
         m.fit(self._X_bin, self._y_bin)
 
@@ -425,9 +372,6 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
 
     def test_sgd_classifier_log_loss_multiclass(self):
         """SGDClassifier with log_loss multiclass → label + proba."""
-        from sklearn.linear_model import SGDClassifier
-        from yobx.sklearn import to_onnx
-
         m = SGDClassifier(loss="log_loss", random_state=0, max_iter=1000)
         m.fit(self._X_multi, self._y_multi)
 
@@ -447,11 +391,6 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
 
     def test_ridge_classifier_in_pipeline(self):
         """RidgeClassifier at the end of a Pipeline."""
-        from sklearn.linear_model import RidgeClassifier
-        from sklearn.pipeline import Pipeline
-        from sklearn.preprocessing import StandardScaler
-        from yobx.sklearn import to_onnx
-
         X, y = self._X_bin, self._y_bin
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", RidgeClassifier())])
         pipe.fit(X, y)
