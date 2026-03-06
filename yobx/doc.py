@@ -322,51 +322,54 @@ def plot_text(
     figsize: Optional[Tuple[int, int]] = None,
 ) -> "matplotlib.axis.Axis":  # noqa: F821
     """
-        Renders a block of text as a matplotlib figure, with optional per-line
-        colour coding based on the first character of each line.
+    Renders a block of text as a matplotlib figure, with optional per-line
+    colour coding based on the first character of each line.
 
-        Typical use-case: rendering a unified diff so that sphinx-gallery captures
-        the example as a figure.
+    Typical use-case: rendering a unified diff so that sphinx-gallery captures
+    the example as a figure.
 
-        :param text: the text to render (newlines split into rows)
-        :param ax: optional matplotlib axis; if *None* a new figure and axis are created
-        :param title: optional axis title
-        :param fontsize: font size for the rendered text
-        :param line_color_map: mapping from a line's first character to a colour
-            string (e.g. ``{"+": "green", "-": "red", "@": "blue"}``).
-            Lines whose first character is not in the map use *default_color*.
-        :param default_color: colour for lines not matched by *line_color_map*
-        :param figsize: ``(width, height)`` in inches; only used when *ax* is *None*
-        :return: the matplotlib axis
+    :param text: the text to render (newlines split into rows)
+    :param ax: optional matplotlib axis; if *None* a new figure and axis are created
+    :param title: optional axis title
+    :param fontsize: font size for the rendered text
+    :param line_color_map: mapping from a line's first character to a colour
+        string (e.g. ``{"+": "green", "-": "red", "@": "blue"}``).
+        Lines whose first character is not in the map use *default_color*.
+    :param default_color: colour for lines not matched by *line_color_map*
+    :param figsize: ``(width, height)`` in inches; only used when *ax* is *None*
+    :return: the matplotlib axis
 
-        Example rendering a unified diff::
+    Example rendering a unified diff::
 
-            from yobx import doc
-            diff_text = some_patch.make_diff()
-            ax = doc.plot_text(
-                diff_text,
-                title="my patch",
-                line_color_map={"+": "#2a9d2a", "-": "#cc2222", "@": "#1a6fbf"},
-            )
+        from yobx import doc
+        diff_text = some_patch.make_diff()
+        ax = doc.plot_text(
+            diff_text,
+            title="my patch",
+            line_color_map={"+": "#2a9d2a", "-": "#cc2222", "@": "#1a6fbf"},
+        )
 
-        .. plot::
+    .. plot::
 
-            import matplotlib.pyplot as plt
-            from yobx.doc import plot_text
+        import textwrap
+        import matplotlib.pyplot as plt
+        from yobx.doc import plot_text
 
-            sample = \"\"\"--- a/foo.py
-    +++ b/foo.py
-    @@ -1,3 +1,3 @@
-     def foo():
-    -    return 1
-    +    return 2
-    \"\"\"
-            ax = plot_text(
-                sample,
-                title="sample diff",
-                line_color_map={"+": "#2a9d2a", "-": "#cc2222", "@": "#1a6fbf"},
-            )
-            plt.show()
+        sample = textwrap.dedent(
+            \"\"\"
+            --- a/foo.py
+            +++ b/foo.py
+            @@ -1,3 +1,3 @@
+            def foo():
+            -    return 1
+            +    return 2
+            \"\"\")
+        ax = plot_text(
+            sample,
+            title="sample diff",
+            line_color_map={"+": "#2a9d2a", "-": "#cc2222", "@": "#1a6fbf"},
+        )
+        plt.show()
     """
     import matplotlib.pyplot as plt
 
@@ -405,12 +408,12 @@ def demo_mlp_model(filename: str) -> onnx.ModelProto:
     """
     One model obtained with the following.
 
-    .. code-black:: python
+    .. code-block:: python
 
         import torch
         from yobx.helpers.onnx_helper import pretty_onnx
         from yobx.xbuilder import OptimizationOptions
-        from yobx.torch_interpreter import to_onnx
+        from yobx.torch.interpreter import to_onnx
         from yobx.translate import translate
 
 
@@ -431,13 +434,9 @@ def demo_mlp_model(filename: str) -> onnx.ModelProto:
         onx = to_onnx(
             MLP(), (x,), input_names=["x"], options=OptimizationOptions(patterns=None)
         )
-        with open("temp_doc_mlp.onnx", "wb") as f:
-            f.write(onx.SerializeToString())
         print(pretty_onnx(onx))
         print(translate(onx, api="onnx-short"))
     """
-    if os.path.exists(filename):
-        return onnx.load(filename)
     return oh.make_model(
         oh.make_graph(
             [

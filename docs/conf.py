@@ -115,6 +115,7 @@ epkg_dictionary = {
     "JIT": "https://en.wikipedia.org/wiki/Just-in-time_compilation",
     "FunctionProto": "https://onnx.ai/onnx/api/classes.html#functionproto",
     "graph break": "https://docs.pytorch.org/docs/stable/torch.compiler_faq.html#graph-breaks",
+    "Graphviz": "https://graphviz.org/",
     "GraphModule": "https://docs.pytorch.org/docs/stable/fx.html#torch.fx.GraphModule",
     "HuggingFace": "https://huggingface.co/docs/hub/en/index",
     "huggingface_hub": "https://github.com/huggingface/huggingface_hub",
