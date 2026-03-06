@@ -51,6 +51,14 @@ class GraphBuilderProtocol(Protocol):
         """
         ...
 
+    def has_opset(self, domain: str) -> int:
+        """Returns the opset version for a domain, or 0 if the domain is not registered.
+
+        :param domain: domain name
+        :return: opset version, or ``0`` if the domain is unknown
+        """
+        ...
+
     def unique_name(self, prefix: str) -> str:
         """Returns a unique name derived from *prefix*.
 

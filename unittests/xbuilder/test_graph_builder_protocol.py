@@ -40,6 +40,7 @@ class TestGraphBuilderProtocolExists(ExtTestCase):
             "output_names",
             "get_opset",
             "add_domain",
+            "has_opset",
             "unique_name",
             "has_name",
             "has_type",
@@ -81,6 +82,7 @@ class TestGraphBuilderSatisfiesProtocol(ExtTestCase):
             "output_names",
             "get_opset",
             "add_domain",
+            "has_opset",
             "unique_name",
             "has_name",
             "has_type",
@@ -118,6 +120,11 @@ class TestGraphBuilderSatisfiesProtocol(ExtTestCase):
         g = GraphBuilder(18, ir_version=9)
         self.assertEqual(g.get_opset(""), 18)
 
+    def test_has_opset(self):
+        g = GraphBuilder(18, ir_version=9)
+        self.assertEqual(g.has_opset(""), 18)
+        self.assertEqual(g.has_opset("custom.domain"), 0)
+
     def test_graphbuilder_is_instance(self):
         g = GraphBuilder(18, ir_version=9)
         g.make_tensor_input("x", TFLOAT, (None,))
@@ -154,6 +161,7 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
             "output_names",
             "get_opset",
             "add_domain",
+            "has_opset",
             "unique_name",
             "has_name",
             "has_type",
@@ -206,6 +214,13 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
         g = OnnxScriptGraphBuilder(18)
         g.add_domain("custom", 1)
         self.assertEqual(g.get_opset("custom"), 1)
+
+    def test_has_opset(self):
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+
+        g = OnnxScriptGraphBuilder(18)
+        self.assertEqual(g.has_opset(""), 18)
+        self.assertEqual(g.has_opset("custom.domain"), 0)
 
     def test_to_onnx(self):
         model = self._make_simple_model().to_onnx()

@@ -185,6 +185,15 @@ class OnnxScriptGraphBuilder:
         # Keep the underlying graph's opset_imports in sync.
         self._graph.opset_imports[domain] = version
 
+    def has_opset(self, domain: str) -> int:
+        """
+        Returns the opset version for a domain, or 0 if the domain is not registered.
+
+        :param domain: domain name
+        :return: opset version, or ``0`` if the domain is unknown
+        """
+        return self.opsets.get(domain, 0)
+
     @property
     def inner_builder(self):
         """
