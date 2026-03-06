@@ -15,44 +15,34 @@ class SequenceConstructAtPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X1", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("X2", onnx.TensorProto.FLOAT, shape=("c", "d")))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["i0"],
-                value=onh.from_array(np.array(0, dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['i0'], value=onh.from_array(np.array(0, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['i1'], value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
+                    oh.make_node('SequenceConstruct', ['X1', 'X2'], ['seq']),
+                    oh.make_node('SequenceAt', ['seq', 'i0'], ['Y1']),
+                    oh.make_node('SequenceAt', ['seq', 'i1'], ['Y2']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X1', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('X2', onnx.TensorProto.FLOAT, ('c', 'd')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y1', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('Y2', onnx.TensorProto.FLOAT, ('c', 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["i1"],
-                value=onh.from_array(np.array(1, dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("SequenceConstruct", ["X1", "X2"], ["seq"]))
-        nodes.append(oh.make_node("SequenceAt", ["seq", "i0"], ["Y1"]))
-        nodes.append(oh.make_node("SequenceAt", ["seq", "i1"], ["Y2"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y1", onnx.TensorProto.FLOAT, shape=("a", "b"))
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Y2", onnx.TensorProto.FLOAT, shape=("c", "d"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -62,27 +52,29 @@ class SequenceConstructAtPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X1", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("X2", onnx.TensorProto.FLOAT, shape=("c", "d")))
-        nodes.append(oh.make_node("Identity", ["X1"], ["Y1"]))
-        nodes.append(oh.make_node("Identity", ["X2"], ["Y2"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y1", onnx.TensorProto.FLOAT, shape=("a", "b"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Identity', ['X1'], ['Y1']),
+                    oh.make_node('Identity', ['X2'], ['Y2']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X1', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('X2', onnx.TensorProto.FLOAT, ('c', 'd')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y1', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('Y2', onnx.TensorProto.FLOAT, ('c', 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        outputs.append(
-            oh.make_tensor_value_info("Y2", onnx.TensorProto.FLOAT, shape=("c", "d"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """

@@ -62,33 +62,30 @@ class ShapedBasedReshapePattern(ReshapePattern):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("shape2", onnx.TensorProto.INT64, shape=(3,)))
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", "c"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['shape2'], value=onh.from_array(np.array([0, 0, -1], dtype=np.int64), name='value')),
+                    oh.make_node('Reshape', ['X', 'shape2'], ['xrr']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (3,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
+                ],
+                [
+                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape2"],
-                value=onh.from_array(np.array([0, 0, -1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Reshape", ["X", "shape2"], ["xrr"]))
-        outputs.append(
-            oh.make_tensor_value_info("xrr", onnx.TensorProto.FLOAT, shape=("a", "b", "c"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -98,25 +95,27 @@ class ShapedBasedReshapePattern(ReshapePattern):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("shape2", onnx.TensorProto.INT64, shape=(3,)))
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", "c"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Identity', ['X', 'shape2'], ['xrr']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (3,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
+                ],
+                [
+                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        nodes.append(oh.make_node("Identity", ["X", "shape2"], ["xrr"]))
-        outputs.append(
-            oh.make_tensor_value_info("xrr", onnx.TensorProto.FLOAT, shape=("a", "b", "c"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -156,29 +155,30 @@ class ReduceReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(3, 2)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape"],
-                value=onh.from_array(np.array([3], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['shape'], value=onh.from_array(np.array([3], dtype=np.int64), name='value')),
+                    oh.make_node('ReduceSum', ['X'], ['xr'], axes=[1], keepdims=1),
+                    oh.make_node('Reshape', ['xr', 'shape'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (3, 2)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (3,)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 10)],
         )
-        nodes.append(oh.make_node("ReduceSum", ["X"], ["xr"], axes=[1], keepdims=1))
-        nodes.append(oh.make_node("Reshape", ["xr", "shape"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(3,)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=10)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -188,20 +188,26 @@ class ReduceReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(3, 2)))
-        nodes.append(oh.make_node("ReduceSum", ["X"], ["Y"], axes=[1], keepdims=0))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(3,)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=10)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('ReduceSum', ['X'], ['Y'], axes=[1], keepdims=0),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (3, 2)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (3,)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 10)],
+        )
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -299,42 +305,32 @@ class ReshapeReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("sh2", onnx.TensorProto.INT64, shape=(3,)))
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", 128))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['sh1'], value=onh.from_array(np.array([4096, 7, 7, 128], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['sh2'], value=onh.from_array(np.array([4096, 49, 128], dtype=np.int64), name='value')),
+                    oh.make_node('Reshape', ['X', 'sh1'], ['s1']),
+                    oh.make_node('Reshape', ['s1', 'sh2'], ['s2']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('sh2', onnx.TensorProto.INT64, (3,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 128)),
+                ],
+                [
+                    oh.make_tensor_value_info('s2', onnx.TensorProto.FLOAT, (4096, 49, 128)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["sh1"],
-                value=onh.from_array(np.array([4096, 7, 7, 128], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["sh2"],
-                value=onh.from_array(np.array([4096, 49, 128], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Reshape", ["X", "sh1"], ["s1"]))
-        nodes.append(oh.make_node("Reshape", ["s1", "sh2"], ["s2"]))
-        outputs.append(
-            oh.make_tensor_value_info("s2", onnx.TensorProto.FLOAT, shape=(4096, 49, 128))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -344,25 +340,27 @@ class ReshapeReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("sh2", onnx.TensorProto.INT64, shape=(3,)))
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", 128))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Reshape', ['X', 'sh2'], ['s2']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('sh2', onnx.TensorProto.INT64, (3,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 128)),
+                ],
+                [
+                    oh.make_tensor_value_info('s2', onnx.TensorProto.FLOAT, (4096, 49, 128)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Reshape", ["X", "sh2"], ["s2"]))
-        outputs.append(
-            oh.make_tensor_value_info("s2", onnx.TensorProto.FLOAT, shape=(4096, 49, 128))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -621,51 +619,38 @@ class Reshape2Of3Pattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(2, 3, 4)))
-        inputs.append(oh.make_tensor_value_info("shape2", onnx.TensorProto.INT64, shape=(2,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 3, 4)))
-        inputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(2, 3, 4)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape1"],
-                value=onh.from_array(np.array([-1, 8], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['shape1'], value=onh.from_array(np.array([-1, 8], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape2'], value=onh.from_array(np.array([3, -1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape3'], value=onh.from_array(np.array([2, 3, 4], dtype=np.int64), name='value')),
+                    oh.make_node('Reshape', ['X', 'shape1'], ['xr']),
+                    oh.make_node('Reshape', ['Y', 'shape2'], ['yr']),
+                    oh.make_node('Reshape', ['xrr', 'shape3'], ['Z']),
+                    oh.make_node('Mul', ['xr', 'yr'], ['xrr']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (2, 3, 4)),
+                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (2,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 4)),
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 3, 4)),
+                ],
+                [
+                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, (3, 8)),
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 3, 4)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape2"],
-                value=onh.from_array(np.array([3, -1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape3"],
-                value=onh.from_array(np.array([2, 3, 4], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Reshape", ["X", "shape1"], ["xr"]))
-        nodes.append(oh.make_node("Reshape", ["Y", "shape2"], ["yr"]))
-        nodes.append(oh.make_node("Reshape", ["xrr", "shape3"], ["Z"]))
-        nodes.append(oh.make_node("Mul", ["xr", "yr"], ["xrr"]))
-        outputs.append(oh.make_tensor_value_info("xrr", onnx.TensorProto.FLOAT, shape=(3, 8)))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(2, 3, 4)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -675,25 +660,31 @@ class Reshape2Of3Pattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(2, 3, 4)))
-        inputs.append(oh.make_tensor_value_info("shape2", onnx.TensorProto.INT64, shape=(2,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 3, 4)))
-        inputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(2, 3, 4)))
-        nodes.append(oh.make_node("Mul", ["X", "Y"], ["Z"]))
-        nodes.append(oh.make_node("Reshape", ["Z", "shape2"], ["xrr"]))
-        outputs.append(oh.make_tensor_value_info("xrr", onnx.TensorProto.FLOAT, shape=(3, 8)))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(2, 3, 4)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Mul', ['X', 'Y'], ['Z']),
+                    oh.make_node('Reshape', ['Z', 'shape2'], ['xrr']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (2, 3, 4)),
+                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (2,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 4)),
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 3, 4)),
+                ],
+                [
+                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, (3, 8)),
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 3, 4)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
+        )
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -890,44 +881,39 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 4)))
-        inputs.append(oh.make_tensor_value_info("sh1", onnx.TensorProto.INT64, shape=(2,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 4)))
-        initializers=[
-            onh.from_array(np.array([-1, 1], dtype=np.int64), name="sh1"),
-            onh.from_array(np.array([1, -1], dtype=np.int64), name="sh2"),
-            onh.from_array(np.array([4], dtype=np.int64), name="four"),
-        ]
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["sh1"],
-                value=onh.from_array(np.array([-1, 8], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['sh1'], value=onh.from_array(np.array([-1, 8], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['sh2'], value=onh.from_array(np.array([-1, 8], dtype=np.int64), name='value')),
+                    oh.make_node('Reshape', ['X', 'sh1'], ['xc']),
+                    oh.make_node('Reshape', ['Y', 'sh2'], ['yc']),
+                    oh.make_node('Add', ['xc', 'yc'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 4)),
+                    oh.make_tensor_value_info('sh1', onnx.TensorProto.INT64, (2,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 4)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('b', 8)),
+                ],
+                [
+                    onh.from_array(np.array([-1, 1], dtype=np.int64), name='sh1'),
+                    onh.from_array(np.array([1, -1], dtype=np.int64), name='sh2'),
+                    onh.from_array(np.array([4], dtype=np.int64), name='four'),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["sh2"],
-                value=onh.from_array(np.array([-1, 8], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Reshape", ["X", "sh1"], ["xc"]))
-        nodes.append(oh.make_node("Reshape", ["Y", "sh2"], ["yc"]))
-        nodes.append(oh.make_node("Add", ["xc", "yc"], ["Z"]))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("b", 8)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -937,23 +923,29 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 4)))
-        inputs.append(oh.make_tensor_value_info("sh1", onnx.TensorProto.INT64, shape=(2,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 4)))
-        nodes.append(oh.make_node("Add", ["X", "Y"], ["add-X"]))
-        nodes.append(oh.make_node("Reshape", ["add-X", "sh1"], ["Z"]))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("b", 8)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Add', ['X', 'Y'], ['add-X']),
+                    oh.make_node('Reshape', ['add-X', 'sh1'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 4)),
+                    oh.make_tensor_value_info('sh1', onnx.TensorProto.INT64, (2,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 4)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('b', 8)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
+        )
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1032,46 +1024,36 @@ class ConcatReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("I1", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("D1", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Shape', ['X'], ['D2'], end=3, start=2),
+                    oh.make_node('Shape', ['X'], ['D1'], end=4, start=3),
+                    oh.make_node('Constant', [], ['I1'], value=onh.from_array(np.array([2], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['I2'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
+                    oh.make_node('Concat', ['I1', 'I2', 'D1', 'D2'], ['d'], axis=0),
+                    oh.make_node('Reshape', ['X', 'd'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('I1', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('D1', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
+                    oh.make_tensor_value_info('I2', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'd', 'c')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(oh.make_tensor_value_info("I2", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(oh.make_node("Shape", ["X"], ["D2"], start=2, end=3))
-        nodes.append(oh.make_node("Shape", ["X"], ["D1"], start=3, end=4))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["I1"],
-                value=onh.from_array(np.array([2], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["I2"],
-                value=onh.from_array(np.array([1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Concat", ["I1", "I2", "D1", "D2"], ["d"], axis=0))
-        nodes.append(oh.make_node("Reshape", ["X", "d"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b", "d", "c"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1081,40 +1063,33 @@ class ConcatReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("I1", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("D1", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", "c", "d"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s1_-1'], value=onh.from_array(np.array([-1], dtype=np.int64), name='value')),
+                    oh.make_node('Concat', ['I1', 'I2', 'D1', 'init7_s1_-1'], ['d--concat'], axis=0),
+                    oh.make_node('Reshape', ['X', 'd--concat'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('I1', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('D1', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
+                    oh.make_tensor_value_info('I2', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'd', 'c')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(oh.make_tensor_value_info("I2", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s1_-1"],
-                value=onh.from_array(np.array([-1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Concat", ["I1", "I2", "D1", "init7_s1_-1"], ["d--concat"], axis=0
-            )
-        )
-        nodes.append(oh.make_node("Reshape", ["X", "d--concat"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b", "d", "c"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1236,31 +1211,32 @@ class StaticConcatReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("I1", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 3, "d")))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["I1"],
-                value=onh.from_array(np.array([6], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['I1'], value=onh.from_array(np.array([6], dtype=np.int64), name='value')),
+                    oh.make_node('Shape', ['X'], ['D2'], end=3, start=2),
+                    oh.make_node('Concat', ['I1', 'D2'], ['dc'], axis=0),
+                    oh.make_node('Reshape', ['X', 'dc'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('I1', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (6, 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Shape", ["X"], ["D2"], start=2, end=3))
-        nodes.append(oh.make_node("Concat", ["I1", "D2"], ["dc"], axis=0))
-        nodes.append(oh.make_node("Reshape", ["X", "dc"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(6, "d")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1270,30 +1246,31 @@ class StaticConcatReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("I1", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 3, "d")))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s1_-1"],
-                value=onh.from_array(np.array([-1], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s1_-1'], value=onh.from_array(np.array([-1], dtype=np.int64), name='value')),
+                    oh.make_node('Concat', ['I1', 'init7_s1_-1'], ['d--concat'], axis=0),
+                    oh.make_node('Reshape', ['X', 'd--concat'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('I1', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (6, 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Concat", ["I1", "init7_s1_-1"], ["d--concat"], axis=0))
-        nodes.append(oh.make_node("Reshape", ["X", "d--concat"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(6, "d")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1401,22 +1378,33 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = [onh.from_array(np.array([-1], dtype=np.int64), name="I1")]
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 3, "d")))
-        nodes.append(oh.make_node("Shape", ["X"], ["D2"], start=2, end=3))
-        nodes.append(oh.make_node("Concat", ["I1", "D2"], ["dshape"], axis=0))
-        nodes.append(oh.make_node("Reshape", ["X", "dshape"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(6, "d")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Shape', ['X'], ['D2'], end=3, start=2),
+                    oh.make_node('Concat', ['I1', 'D2'], ['dshape'], axis=0),
+                    oh.make_node('Reshape', ['X', 'dshape'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (6, 'd')),
+                ],
+                [
+                    onh.from_array(np.array([-1], dtype=np.int64), name='I1'),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
+        )
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1426,28 +1414,29 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 3, "d")))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s2_6_-1"],
-                value=onh.from_array(np.array([6, -1], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s2_6_-1'], value=onh.from_array(np.array([6, -1], dtype=np.int64), name='value')),
+                    oh.make_node('Reshape', ['X', 'init7_s2_6_-1'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (6, 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Reshape", ["X", "init7_s2_6_-1"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(6, "d")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1628,24 +1617,33 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = [onh.from_array(np.array([1], dtype=np.int64), name="one")]
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 3, "d")))
-        nodes.append(oh.make_node("Shape", ["X"], ["D2"]))
-        nodes.append(oh.make_node("Concat", ["one", "D2", "one"], ["dshape2"], axis=0))
-        nodes.append(oh.make_node("Reshape", ["X", "dshape2"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(1, 2, 3, "d", 1))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Shape', ['X'], ['D2']),
+                    oh.make_node('Concat', ['one', 'D2', 'one'], ['dshape2'], axis=0),
+                    oh.make_node('Reshape', ['X', 'dshape2'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1, 2, 3, 'd', 1)),
+                ],
+                [
+                    onh.from_array(np.array([1], dtype=np.int64), name='one'),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1655,30 +1653,29 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 3, "d")))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s2_0_4"],
-                value=onh.from_array(np.array([0, 4], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s2_0_4'], value=onh.from_array(np.array([0, 4], dtype=np.int64), name='value')),
+                    oh.make_node('Unsqueeze', ['X', 'init7_s2_0_4'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1, 2, 3, 'd', 1)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Unsqueeze", ["X", "init7_s2_0_4"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(1, 2, 3, "d", 1))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1784,41 +1781,31 @@ class UnsqueezeReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", "c"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([2], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape3'], value=onh.from_array(np.array([0, 1, -1, 0], dtype=np.int64), name='value')),
+                    oh.make_node('Unsqueeze', ['X', 'zero'], ['xu0']),
+                    oh.make_node('Reshape', ['xu0', 'shape3'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('e', 'f', 'g', 'h')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["zero"],
-                value=onh.from_array(np.array([2], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape3"],
-                value=onh.from_array(np.array([0, 1, -1, 0], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Unsqueeze", ["X", "zero"], ["xu0"]))
-        nodes.append(oh.make_node("Reshape", ["xu0", "shape3"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("e", "f", "g", "h"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1828,32 +1815,29 @@ class UnsqueezeReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", "c"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s1_1'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
+                    oh.make_node('Unsqueeze', ['X', 'init7_s1_1'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('e', 'f', 'g', 'h')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s1_1"],
-                value=onh.from_array(np.array([1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Unsqueeze", ["X", "init7_s1_1"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("e", "f", "g", "h"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1934,42 +1918,32 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 8, 16))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape3'], value=onh.from_array(np.array([-1, 128], dtype=np.int64), name='value')),
+                    oh.make_node('Unsqueeze', ['X', 'zero'], ['xu0']),
+                    oh.make_node('Reshape', ['xu0', 'shape3'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 8, 16)),
+                    oh.make_tensor_value_info('shape3', onnx.TensorProto.INT64, (2,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('2*a', 64)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        inputs.append(oh.make_tensor_value_info("shape3", onnx.TensorProto.INT64, shape=(2,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["zero"],
-                value=onh.from_array(np.array([0], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape3"],
-                value=onh.from_array(np.array([-1, 128], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Unsqueeze", ["X", "zero"], ["xu0"]))
-        nodes.append(oh.make_node("Reshape", ["xu0", "shape3"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("2*a", 64))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1979,25 +1953,27 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 8, 16))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Reshape', ['X', 'shape3'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 8, 16)),
+                    oh.make_tensor_value_info('shape3', onnx.TensorProto.INT64, (2,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('2*a', 64)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        inputs.append(oh.make_tensor_value_info("shape3", onnx.TensorProto.INT64, shape=(2,)))
-        nodes.append(oh.make_node("Reshape", ["X", "shape3"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("2*a", 64))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
     """

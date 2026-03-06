@@ -1545,38 +1545,3 @@ def enumerate_nodes(graph: onnx.GraphProto) -> Iterator[onnx.NodeProto]:
             for att in node.attribute:
                 if att.type == onnx.AttributeProto.GRAPH:
                     yield from enumerate_nodes(att.g)
-
-
-def make_pattern_model(
-    nodes: List[onnx.NodeProto],
-    inputs: Optional[List[onnx.ValueInfoProto]] = None,
-    outputs: Optional[List[onnx.ValueInfoProto]] = None,
-    initializers: Optional[List[onnx.TensorProto]] = None,
-    opset: int = 18,
-    functions: Optional[List[onnx.FunctionProto]] = None,
-    opsets: Optional[List[Tuple[str, int]]] = None,
-) -> onnx.ModelProto:
-    """
-    Creates a compact ONNX model for use in documentation pattern examples.
-
-    :param nodes: list of NodeProto
-    :param inputs: list of ValueInfoProto for graph inputs
-    :param outputs: list of ValueInfoProto for graph outputs
-    :param initializers: list of TensorProto for graph initializers
-    :param opset: default opset version (used only when *opsets* is None)
-    :param functions: list of FunctionProto (rarely needed)
-    :param opsets: list of ``(domain, version)`` tuples; overrides *opset*
-    :return: onnx.ModelProto
-    """
-    if opsets is not None:
-        opset_imports = [oh.make_opsetid(domain, version) for domain, version in opsets]
-    else:
-        opset_imports = [oh.make_opsetid("", opset)]
-    graph = oh.make_graph(
-        nodes or [],
-        "pattern",
-        inputs or [],
-        outputs or [],
-        initializers or [],
-    )
-    return oh.make_model(graph, functions=functions or [], opset_imports=opset_imports)

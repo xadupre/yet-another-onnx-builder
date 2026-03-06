@@ -15,41 +15,31 @@ class SqueezeUnsqueezePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 1, 1, "d"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['axes1'], value=onh.from_array(np.array([1, 2], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['axes2'], value=onh.from_array(np.array([1, 2], dtype=np.int64), name='value')),
+                    oh.make_node('Unsqueeze', ['X', 'axes1'], ['mm']),
+                    oh.make_node('Squeeze', ['mm', 'axes2'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 1, 1, 'd')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 1, 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["axes1"],
-                value=onh.from_array(np.array([1, 2], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["axes2"],
-                value=onh.from_array(np.array([1, 2], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Unsqueeze", ["X", "axes1"], ["mm"]))
-        nodes.append(oh.make_node("Squeeze", ["mm", "axes2"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 1, 1, "d"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -59,24 +49,26 @@ class SqueezeUnsqueezePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 1, 1, "d"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Identity', ['X'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 1, 1, 'd')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 1, 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Identity", ["X"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 1, 1, "d"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -201,41 +193,31 @@ class UnsqueezeUnsqueezePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['ii'], value=onh.from_array(np.array([2], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['jj'], value=onh.from_array(np.array([3], dtype=np.int64), name='value')),
+                    oh.make_node('Unsqueeze', ['X', 'ii'], ['x1']),
+                    oh.make_node('Unsqueeze', ['x1', 'jj'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1, 1, 'a', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["ii"],
-                value=onh.from_array(np.array([2], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["jj"],
-                value=onh.from_array(np.array([3], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Unsqueeze", ["X", "ii"], ["x1"]))
-        nodes.append(oh.make_node("Unsqueeze", ["x1", "jj"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(1, 1, "a", "b"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -245,30 +227,29 @@ class UnsqueezeUnsqueezePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s2_2_3"],
-                value=onh.from_array(np.array([2, 3], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s2_2_3'], value=onh.from_array(np.array([2, 3], dtype=np.int64), name='value')),
+                    oh.make_node('Unsqueeze', ['X', 'init7_s2_2_3'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1, 1, 'a', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Unsqueeze", ["X", "init7_s2_2_3"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(1, 1, "a", "b"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -382,23 +363,29 @@ class SqueezeAddPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("S2", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("S1", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(oh.make_node("Squeeze", ["S1"], ["s1"]))
-        nodes.append(oh.make_node("Squeeze", ["S2"], ["s2"]))
-        nodes.append(oh.make_node("Add", ["s1", "s2"], ["s"]))
-        outputs.append(oh.make_tensor_value_info("s", onnx.TensorProto.INT64, shape=[]))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Squeeze', ['S1'], ['s1']),
+                    oh.make_node('Squeeze', ['S2'], ['s2']),
+                    oh.make_node('Add', ['s1', 's2'], ['s']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('S2', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('S1', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('s', onnx.TensorProto.INT64, ()),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
+        )
 
         print("DOT-SECTION", to_dot(model))
 
@@ -408,22 +395,28 @@ class SqueezeAddPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("S2", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("S1", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(oh.make_node("Add", ["S1", "S2"], ["SqueezeAddPattern_s"]))
-        nodes.append(oh.make_node("Squeeze", ["SqueezeAddPattern_s"], ["s"]))
-        outputs.append(oh.make_tensor_value_info("s", onnx.TensorProto.INT64, shape=[]))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Add', ['S1', 'S2'], ['SqueezeAddPattern_s']),
+                    oh.make_node('Squeeze', ['SqueezeAddPattern_s'], ['s']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('S2', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('S1', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('s', onnx.TensorProto.INT64, ()),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
+        )
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -510,40 +503,34 @@ class SqueezeBinaryUnsqueezePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("zero", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("d", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("two", onnx.TensorProto.INT64, shape=[]))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["two"],
-                value=onh.from_array(np.array(2, dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['two'], value=onh.from_array(np.array(2, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0], dtype=np.int64), name='value')),
+                    oh.make_node('Squeeze', ['d'], ['d0']),
+                    oh.make_node('Div', ['d0', 'two'], ['d1']),
+                    oh.make_node('Unsqueeze', ['d1', 'zero'], ['e']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('zero', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('d', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('two', onnx.TensorProto.INT64, ()),
+                ],
+                [
+                    oh.make_tensor_value_info('e', onnx.TensorProto.INT64, (1,)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["zero"],
-                value=onh.from_array(np.array([0], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Squeeze", ["d"], ["d0"]))
-        nodes.append(oh.make_node("Div", ["d0", "two"], ["d1"]))
-        nodes.append(oh.make_node("Unsqueeze", ["d1", "zero"], ["e"]))
-        outputs.append(oh.make_tensor_value_info("e", onnx.TensorProto.INT64, shape=(1,)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -553,29 +540,29 @@ class SqueezeBinaryUnsqueezePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("zero", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("d", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("two", onnx.TensorProto.INT64, shape=[]))
-        nodes.append(
-            oh.make_node(
-                "Unsqueeze", ["two", "zero"], ["SqueezeBinaryUnsqueezePattern_two"]
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Unsqueeze', ['two', 'zero'], ['SqueezeBinaryUnsqueezePattern_two']),
+                    oh.make_node('Div', ['d', 'SqueezeBinaryUnsqueezePattern_two'], ['e']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('zero', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('d', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('two', onnx.TensorProto.INT64, ()),
+                ],
+                [
+                    oh.make_tensor_value_info('e', onnx.TensorProto.INT64, (1,)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node("Div", ["d", "SqueezeBinaryUnsqueezePattern_two"], ["e"])
-        )
-        outputs.append(oh.make_tensor_value_info("e", onnx.TensorProto.INT64, shape=(1,)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """

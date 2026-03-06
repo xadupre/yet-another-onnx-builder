@@ -17,66 +17,37 @@ class LayerNormalizationPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("add_1", onnx.TensorProto.FLOAT16, shape=(4, 512, 128))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s1_-1'], value=onh.from_array(np.array([-1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init10_s1_'], value=onh.from_array(np.array([2.0], dtype=np.float16), name='value')),
+                    oh.make_node('Constant', [], ['init10_s1_2'], value=onh.from_array(np.array([0.0], dtype=np.float16), name='value')),
+                    oh.make_node('ReduceMean', ['add_1', 'init7_s1_-1'], ['_onx_reducemean0'], keepdims=1),
+                    oh.make_node('Sub', ['add_1', '_onx_reducemean0'], ['_onx_sub0']),
+                    oh.make_node('Pow', ['_onx_sub0', 'init10_s1_'], ['_onx_pow0']),
+                    oh.make_node('ReduceMean', ['_onx_pow0', 'init7_s1_-1'], ['_onx_reducemean02'], keepdims=1),
+                    oh.make_node('Add', ['_onx_reducemean02', 'init10_s1_2'], ['_onx_add0']),
+                    oh.make_node('Sqrt', ['_onx_add0'], ['_onx_sqrt0']),
+                    oh.make_node('Div', ['_onx_sub0', '_onx_sqrt0'], ['_onx_div0']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('add_1', onnx.TensorProto.FLOAT16, (4, 512, 128)),
+                ],
+                [
+                    oh.make_tensor_value_info('_onx_div0', onnx.TensorProto.FLOAT16, (4, 512, 128)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s1_-1"],
-                value=onh.from_array(np.array([-1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init10_s1_"],
-                value=onh.from_array(np.array([2.0], dtype=np.float16), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init10_s1_2"],
-                value=onh.from_array(np.array([0.0], dtype=np.float16), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "ReduceMean", ["add_1", "init7_s1_-1"], ["_onx_reducemean0"], keepdims=1
-            )
-        )
-        nodes.append(oh.make_node("Sub", ["add_1", "_onx_reducemean0"], ["_onx_sub0"]))
-        nodes.append(oh.make_node("Pow", ["_onx_sub0", "init10_s1_"], ["_onx_pow0"]))
-        nodes.append(
-            oh.make_node(
-                "ReduceMean", ["_onx_pow0", "init7_s1_-1"], ["_onx_reducemean02"], keepdims=1
-            )
-        )
-        nodes.append(
-            oh.make_node("Add", ["_onx_reducemean02", "init10_s1_2"], ["_onx_add0"])
-        )
-        nodes.append(oh.make_node("Sqrt", ["_onx_add0"], ["_onx_sqrt0"]))
-        nodes.append(oh.make_node("Div", ["_onx_sub0", "_onx_sqrt0"], ["_onx_div0"]))
-        outputs.append(
-            oh.make_tensor_value_info(
-                "_onx_div0", onnx.TensorProto.FLOAT16, shape=(4, 512, 128)
-            )
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -86,325 +57,30 @@ class LayerNormalizationPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("add_1", onnx.TensorProto.FLOAT16, shape=(4, 512, 128))
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["p_model_albert_embeddings_layernorm_weight"],
-                value=onh.from_array(
-                    np.array(
-                        [
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                        ],
-                        dtype=np.float16,
-                    ),
-                    name="value",
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["p_model_albert_embeddings_layernorm_bias"],
-                value=onh.from_array(
-                    np.array(
-                        [
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                        ],
-                        dtype=np.float16,
-                    ),
-                    name="value",
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "LayerNormalization",
+        model = oh.make_model(
+            oh.make_graph(
                 [
-                    "add_1",
-                    "p_model_albert_embeddings_layernorm_weight",
-                    "p_model_albert_embeddings_layernorm_bias",
+                    oh.make_node('Constant', [], ['p_model_albert_embeddings_layernorm_weight'], value=onh.from_array(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float16), name='value')),
+                    oh.make_node('Constant', [], ['p_model_albert_embeddings_layernorm_bias'], value=onh.from_array(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float16), name='value')),
+                    oh.make_node('LayerNormalization', ['add_1', 'p_model_albert_embeddings_layernorm_weight', 'p_model_albert_embeddings_layernorm_bias'], ['_onx_div0'], axis=-1, epsilon=0.0, stash_type=1),
                 ],
-                ["_onx_div0"],
-                axis=-1,
-                epsilon=0.0,
-                stash_type=1,
-            )
+                'pattern',
+                [
+                    oh.make_tensor_value_info('add_1', onnx.TensorProto.FLOAT16, (4, 512, 128)),
+                ],
+                [
+                    oh.make_tensor_value_info('_onx_div0', onnx.TensorProto.FLOAT16, (4, 512, 128)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "_onx_div0", onnx.TensorProto.FLOAT16, shape=(4, 512, 128)
-            )
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -596,49 +272,33 @@ class LayerNormalizationScalePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("scale", onnx.TensorProto.FLOAT, shape=(3,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("s0", onnx.TensorProto.FLOAT, shape=(3,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["s0"],
-                value=onh.from_array(
-                    np.array(
-                        [-0.10000000149011612, -0.009999999776482582, -0.05000000074505806],
-                        dtype=np.float32,
-                    ),
-                    name="value",
-                ),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['s0'], value=onh.from_array(np.array([-0.10000000149011612, -0.009999999776482582, -0.05000000074505806], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['scale'], value=onh.from_array(np.array([2.0, 3.0, 4.0], dtype=np.float32), name='value')),
+                    oh.make_node('LayerNormalization', ['X', 's0'], ['norm'], epsilon=0.10000000149011612),
+                    oh.make_node('Mul', ['norm', 'scale'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('scale', onnx.TensorProto.FLOAT, (3,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('s0', onnx.TensorProto.FLOAT, (3,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 20)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["scale"],
-                value=onh.from_array(np.array([2.0, 3.0, 4.0], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "LayerNormalization", ["X", "s0"], ["norm"], epsilon=0.10000000149011612
-            )
-        )
-        nodes.append(oh.make_node("Mul", ["norm", "scale"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=20)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -648,32 +308,29 @@ class LayerNormalizationScalePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("scale", onnx.TensorProto.FLOAT, shape=(3,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("s0", onnx.TensorProto.FLOAT, shape=(3,)))
-        nodes.append(
-            oh.make_node("Mul", ["s0", "scale"], ["LayerNormalizationScalePattern_s0"])
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Mul', ['s0', 'scale'], ['LayerNormalizationScalePattern_s0']),
+                    oh.make_node('LayerNormalization', ['X', 'LayerNormalizationScalePattern_s0'], ['Y'], epsilon=0.10000000149011612),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('scale', onnx.TensorProto.FLOAT, (3,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('s0', onnx.TensorProto.FLOAT, (3,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 20)],
         )
-        nodes.append(
-            oh.make_node(
-                "LayerNormalization",
-                ["X", "LayerNormalizationScalePattern_s0"],
-                ["Y"],
-                epsilon=0.10000000149011612,
-            )
-        )
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=20)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -827,50 +484,34 @@ class CastLayerNormalizationCastPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("scale", onnx.TensorProto.FLOAT, shape=(3,)))
-        inputs.append(oh.make_tensor_value_info("bias", onnx.TensorProto.FLOAT, shape=(3,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT16, shape=(3, 3)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["scale"],
-                value=onh.from_array(
-                    np.array([0.5, 0.6000000238418579, 0.699999988079071], dtype=np.float32),
-                    name="value",
-                ),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['scale'], value=onh.from_array(np.array([0.5, 0.6000000238418579, 0.699999988079071], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['bias'], value=onh.from_array(np.array([-0.5, -0.6000000238418579, -0.699999988079071], dtype=np.float32), name='value')),
+                    oh.make_node('Cast', ['X'], ['xc'], to=1),
+                    oh.make_node('LayerNormalization', ['xc', 'scale', 'bias'], ['norm'], stash_type=1),
+                    oh.make_node('Cast', ['norm'], ['Y'], to=10),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('scale', onnx.TensorProto.FLOAT, (3,)),
+                    oh.make_tensor_value_info('bias', onnx.TensorProto.FLOAT, (3,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, (3, 3)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, (3, 3)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["bias"],
-                value=onh.from_array(
-                    np.array([-0.5, -0.6000000238418579, -0.699999988079071], dtype=np.float32),
-                    name="value",
-                ),
-            )
-        )
-        nodes.append(oh.make_node("Cast", ["X"], ["xc"], to=1))
-        nodes.append(
-            oh.make_node(
-                "LayerNormalization", ["xc", "scale", "bias"], ["norm"], stash_type=1
-            )
-        )
-        nodes.append(oh.make_node("Cast", ["norm"], ["Y"], to=10))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT16, shape=(3, 3)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -880,43 +521,30 @@ class CastLayerNormalizationCastPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("scale", onnx.TensorProto.FLOAT, shape=(3,)))
-        inputs.append(oh.make_tensor_value_info("bias", onnx.TensorProto.FLOAT, shape=(3,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT16, shape=(3, 3)))
-        nodes.append(
-            oh.make_node(
-                "Cast", ["scale"], ["CastLayerNormalizationCastPattern_scale::C10"], to=10
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Cast", ["bias"], ["CastLayerNormalizationCastPattern_bias::C10"], to=10
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "LayerNormalization",
+        model = oh.make_model(
+            oh.make_graph(
                 [
-                    "X",
-                    "CastLayerNormalizationCastPattern_scale::C10",
-                    "CastLayerNormalizationCastPattern_bias::C10",
+                    oh.make_node('Cast', ['scale'], ['CastLayerNormalizationCastPattern_scale::C10'], to=10),
+                    oh.make_node('Cast', ['bias'], ['CastLayerNormalizationCastPattern_bias::C10'], to=10),
+                    oh.make_node('LayerNormalization', ['X', 'CastLayerNormalizationCastPattern_scale::C10', 'CastLayerNormalizationCastPattern_bias::C10'], ['Y'], stash_type=1),
                 ],
-                ["Y"],
-                stash_type=1,
-            )
+                'pattern',
+                [
+                    oh.make_tensor_value_info('scale', onnx.TensorProto.FLOAT, (3,)),
+                    oh.make_tensor_value_info('bias', onnx.TensorProto.FLOAT, (3,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, (3, 3)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, (3, 3)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT16, shape=(3, 3)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1011,151 +639,32 @@ class BatchNormalizationPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(1024, 16)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["scale"],
-                value=onh.from_array(
-                    np.array(
-                        [
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                        ],
-                        dtype=np.float32,
-                    ),
-                    name="value",
-                ),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['scale'], value=onh.from_array(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['B'], value=onh.from_array(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['input_mean'], value=onh.from_array(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['input_var'], value=onh.from_array(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32), name='value')),
+                    oh.make_node('BatchNormalization', ['X', 'scale', 'B', 'input_mean', 'input_var'], ['Y'], epsilon=0.0),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (1024, 16)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1024, 16)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["B"],
-                value=onh.from_array(
-                    np.array(
-                        [
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                        ],
-                        dtype=np.float32,
-                    ),
-                    name="value",
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["input_mean"],
-                value=onh.from_array(
-                    np.array(
-                        [
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                        ],
-                        dtype=np.float32,
-                    ),
-                    name="value",
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["input_var"],
-                value=onh.from_array(
-                    np.array(
-                        [
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                        ],
-                        dtype=np.float32,
-                    ),
-                    name="value",
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "BatchNormalization",
-                ["X", "scale", "B", "input_mean", "input_var"],
-                ["Y"],
-                epsilon=0.0,
-            )
-        )
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(1024, 16)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1165,20 +674,26 @@ class BatchNormalizationPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(1024, 16)))
-        nodes.append(oh.make_node("Identity", ["X"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(1024, 16)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Identity', ['X'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (1024, 16)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1024, 16)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
+        )
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1382,66 +897,40 @@ class RMSNormalizationPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT16, shape=("a", "D"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['exp'], value=onh.from_array(np.array([2.0], dtype=np.float16), name='value')),
+                    oh.make_node('Constant', [], ['axis'], value=onh.from_array(np.array([-1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['eps'], value=onh.from_array(np.array([9.999999974752427e-07], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([1.0], dtype=np.float32), name='value')),
+                    oh.make_node('Cast', ['X'], ['Xc'], to=1),
+                    oh.make_node('Pow', ['Xc', 'exp'], ['x2']),
+                    oh.make_node('ReduceMean', ['x2', 'axis'], ['xr']),
+                    oh.make_node('Add', ['xr', 'eps'], ['xa']),
+                    oh.make_node('Sqrt', ['xa'], ['xq']),
+                    oh.make_node('Div', ['one', 'xq'], ['Z']),
+                    oh.make_node('Mul', ['Z', 'Xc'], ['Yc']),
+                    oh.make_node('Cast', ['Yc'], ['Y'], to=10),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, ('a', 'D')),
+                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, ('a', 'D')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 23)],
         )
-        inputs.append(oh.make_tensor_value_info("axis", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["exp"],
-                value=onh.from_array(np.array([2.0], dtype=np.float16), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["axis"],
-                value=onh.from_array(np.array([-1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["eps"],
-                value=onh.from_array(
-                    np.array([9.999999974752427e-07], dtype=np.float32), name="value"
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["one"],
-                value=onh.from_array(np.array([1.0], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Cast", ["X"], ["Xc"], to=1))
-        nodes.append(oh.make_node("Pow", ["Xc", "exp"], ["x2"]))
-        nodes.append(oh.make_node("ReduceMean", ["x2", "axis"], ["xr"]))
-        nodes.append(oh.make_node("Add", ["xr", "eps"], ["xa"]))
-        nodes.append(oh.make_node("Sqrt", ["xa"], ["xq"]))
-        nodes.append(oh.make_node("Div", ["one", "xq"], ["Z"]))
-        nodes.append(oh.make_node("Mul", ["Z", "Xc"], ["Yc"]))
-        nodes.append(oh.make_node("Cast", ["Yc"], ["Y"], to=10))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT16, shape=("a", "D"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=23)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1451,44 +940,32 @@ class RMSNormalizationPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT16, shape=("a", "D"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Shape', ['X'], ['shape-X']),
+                    oh.make_node('Gather', ['shape-X', 'axis'], ['gather-shape-X']),
+                    oh.make_node('ConstantOfShape', ['gather-shape-X'], ['constantofshape-gather-shape-X'], value=onh.from_array(np.array([1.0], dtype=np.float16), name='value')),
+                    oh.make_node('RMSNormalization', ['X', 'constantofshape-gather-shape-X'], ['Y'], axis=-1, epsilon=9.999999974752427e-07, stash_type=1),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, ('a', 'D')),
+                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, ('a', 'D')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 23)],
         )
-        inputs.append(oh.make_tensor_value_info("axis", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(oh.make_node("Shape", ["X"], ["shape-X"]))
-        nodes.append(oh.make_node("Gather", ["shape-X", "axis"], ["gather-shape-X"]))
-        nodes.append(
-            oh.make_node(
-                "ConstantOfShape",
-                ["gather-shape-X"],
-                ["constantofshape-gather-shape-X"],
-                value=onh.from_array(np.array([1.0], dtype=np.float16), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "RMSNormalization",
-                ["X", "constantofshape-gather-shape-X"],
-                ["Y"],
-                axis=-1,
-                epsilon=9.999999974752427e-07,
-                stash_type=1,
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT16, shape=("a", "D"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=23)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1671,37 +1148,31 @@ class RMSNormalizationMulPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 2)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["scale"],
-                value=onh.from_array(np.array([3.0, 4.0], dtype=np.float32), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['scale'], value=onh.from_array(np.array([3.0, 4.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['scale2'], value=onh.from_array(np.array([3.0, 4.0], dtype=np.float32), name='value')),
+                    oh.make_node('RMSNormalization', ['X', 'scale'], ['xs']),
+                    oh.make_node('Mul', ['xs', 'scale2'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 2)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 2)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 23)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["scale2"],
-                value=onh.from_array(np.array([3.0, 4.0], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("RMSNormalization", ["X", "scale"], ["xs"]))
-        nodes.append(oh.make_node("Mul", ["xs", "scale2"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 2)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=23)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1711,28 +1182,29 @@ class RMSNormalizationMulPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 2)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init1_s2_"],
-                value=onh.from_array(np.array([9.0, 16.0], dtype=np.float32), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init1_s2_'], value=onh.from_array(np.array([9.0, 16.0], dtype=np.float32), name='value')),
+                    oh.make_node('RMSNormalization', ['X', 'init1_s2_'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 2)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 2)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 23)],
         )
-        nodes.append(oh.make_node("RMSNormalization", ["X", "init1_s2_"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 2)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=23)
 
         print("DOT-SECTION", to_dot(model))
     """

@@ -13,23 +13,29 @@ class NotWherePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("A", onnx.TensorProto.INT64, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.BOOL, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("B", onnx.TensorProto.INT64, shape=("a", "b")))
-        nodes.append(oh.make_node("Not", ["X"], ["nx"]))
-        nodes.append(oh.make_node("Where", ["nx", "A", "B"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.INT64, shape=("a", "b")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Not', ['X'], ['nx']),
+                    oh.make_node('Where', ['nx', 'A', 'B'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('A', onnx.TensorProto.INT64, ('a', 'b')),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.BOOL, ('a', 'b')),
+                    oh.make_tensor_value_info('B', onnx.TensorProto.INT64, ('a', 'b')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.INT64, ('a', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
+        )
 
         print("DOT-SECTION", to_dot(model))
 
@@ -39,22 +45,28 @@ class NotWherePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("A", onnx.TensorProto.INT64, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.BOOL, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("B", onnx.TensorProto.INT64, shape=("a", "b")))
-        nodes.append(oh.make_node("Where", ["X", "B", "A"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.INT64, shape=("a", "b")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Where', ['X', 'B', 'A'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('A', onnx.TensorProto.INT64, ('a', 'b')),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.BOOL, ('a', 'b')),
+                    oh.make_tensor_value_info('B', onnx.TensorProto.INT64, ('a', 'b')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.INT64, ('a', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
+        )
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -102,41 +114,33 @@ class WhereAddPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("inf", onnx.TensorProto.FLOAT, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(
-            oh.make_tensor_value_info("mask", onnx.TensorProto.BOOL, shape=("a", "b"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['inf'], value=onh.from_array(np.array([-float('inf')], dtype=np.float32), name='value')),
+                    oh.make_node('Where', ['mask', 'zero', 'inf'], ['fmask']),
+                    oh.make_node('Add', ['fmask', 'X'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('inf', onnx.TensorProto.FLOAT, (1,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('mask', onnx.TensorProto.BOOL, ('a', 'b')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["zero"],
-                value=onh.from_array(np.array([0.0], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["inf"],
-                value=onh.from_array(np.array([-np.inf], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Where", ["mask", "zero", "inf"], ["fmask"]))
-        nodes.append(oh.make_node("Add", ["fmask", "X"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -146,24 +150,28 @@ class WhereAddPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("inf", onnx.TensorProto.FLOAT, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(
-            oh.make_tensor_value_info("mask", onnx.TensorProto.BOOL, shape=("a", "b"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Where', ['mask', 'X', 'inf'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('inf', onnx.TensorProto.FLOAT, (1,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('mask', onnx.TensorProto.BOOL, ('a', 'b')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        nodes.append(oh.make_node("Where", ["mask", "X", "inf"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
     """

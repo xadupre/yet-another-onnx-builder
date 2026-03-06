@@ -20,85 +20,44 @@ class FunctionAttentionPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "values", onnx.TensorProto.FLOAT, shape=("av", "bv", "cv", "dv")
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['scale_sqrt'], value=onh.from_array(np.array([0.3162277638912201], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['minfty'], value=onh.from_array(np.array([-float('inf')], dtype=np.float32), name='value')),
+                    oh.make_node('Mul', ['query', 'scale_sqrt'], ['query_scaled']),
+                    oh.make_node('Mul', ['keys', 'scale_sqrt'], ['keys_scaled']),
+                    oh.make_node('Transpose', ['keys_scaled'], ['keys_scaled_t'], perm=[0, 1, 3, 2]),
+                    oh.make_node('MatMul', ['query_scaled', 'keys_scaled_t'], ['qk']),
+                    oh.make_node('Where', ['mask', 'zero', 'minfty'], ['bias']),
+                    oh.make_node('Add', ['qk', 'bias'], ['qkb']),
+                    oh.make_node('Softmax', ['qkb'], ['qkbs'], axis=-1),
+                    oh.make_node('IsNaN', ['qkbs'], ['nans']),
+                    oh.make_node('Where', ['nans', 'zero', 'qkbs'], ['filt']),
+                    oh.make_node('MatMul', ['filt', 'values'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('values', onnx.TensorProto.FLOAT, ('av', 'bv', 'cv', 'dv')),
+                    oh.make_tensor_value_info('keys', onnx.TensorProto.FLOAT, ('ak', 'bk', 'ck', 'dk')),
+                    oh.make_tensor_value_info('scale_sqrt', onnx.TensorProto.FLOAT, (1,)),
+                    oh.make_tensor_value_info('mask', onnx.TensorProto.BOOL, ('am', 'bm', 'cm', 'dm')),
+                    oh.make_tensor_value_info('query', onnx.TensorProto.FLOAT, ('aq', 'bq', 'cq', 'dq')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('ay', 'by', 'cy', 'dy')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "keys", onnx.TensorProto.FLOAT, shape=("ak", "bk", "ck", "dk")
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("scale_sqrt", onnx.TensorProto.FLOAT, shape=(1,))
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "mask", onnx.TensorProto.BOOL, shape=("am", "bm", "cm", "dm")
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "query", onnx.TensorProto.FLOAT, shape=("aq", "bq", "cq", "dq")
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["scale_sqrt"],
-                value=onh.from_array(
-                    np.array([0.3162277638912201], dtype=np.float32), name="value"
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["zero"],
-                value=onh.from_array(np.array([0.0], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["minfty"],
-                value=onh.from_array(np.array([-np.inf], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Mul", ["query", "scale_sqrt"], ["query_scaled"]))
-        nodes.append(oh.make_node("Mul", ["keys", "scale_sqrt"], ["keys_scaled"]))
-        nodes.append(
-            oh.make_node(
-                "Transpose", ["keys_scaled"], ["keys_scaled_t"], perm=[0, 1, 3, 2]
-            )
-        )
-        nodes.append(oh.make_node("MatMul", ["query_scaled", "keys_scaled_t"], ["qk"]))
-        nodes.append(oh.make_node("Where", ["mask", "zero", "minfty"], ["bias"]))
-        nodes.append(oh.make_node("Add", ["qk", "bias"], ["qkb"]))
-        nodes.append(oh.make_node("Softmax", ["qkb"], ["qkbs"], axis=-1))
-        nodes.append(oh.make_node("IsNaN", ["qkbs"], ["nans"]))
-        nodes.append(oh.make_node("Where", ["nans", "zero", "qkbs"], ["filt"]))
-        nodes.append(oh.make_node("MatMul", ["filt", "values"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("ay", "by", "cy", "dy")
-            )
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
 
@@ -108,53 +67,30 @@ class FunctionAttentionPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "values", onnx.TensorProto.FLOAT, shape=("av", "bv", "cv", "dv")
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('LocalAttention_to1', ['query', 'keys', 'values', 'mask', 'scale_sqrt'], ['Y'], domain='intermediate'),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('values', onnx.TensorProto.FLOAT, ('av', 'bv', 'cv', 'dv')),
+                    oh.make_tensor_value_info('keys', onnx.TensorProto.FLOAT, ('ak', 'bk', 'ck', 'dk')),
+                    oh.make_tensor_value_info('scale_sqrt', onnx.TensorProto.FLOAT, (1,)),
+                    oh.make_tensor_value_info('mask', onnx.TensorProto.BOOL, ('am', 'bm', 'cm', 'dm')),
+                    oh.make_tensor_value_info('query', onnx.TensorProto.FLOAT, ('aq', 'bq', 'cq', 'dq')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('ay', 'by', 'cy', 'dy')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "keys", onnx.TensorProto.FLOAT, shape=("ak", "bk", "ck", "dk")
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("scale_sqrt", onnx.TensorProto.FLOAT, shape=(1,))
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "mask", onnx.TensorProto.BOOL, shape=("am", "bm", "cm", "dm")
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "query", onnx.TensorProto.FLOAT, shape=("aq", "bq", "cq", "dq")
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "LocalAttention_to1",
-                ["query", "keys", "values", "mask", "scale_sqrt"],
-                ["Y"],
-                domain="intermediate",
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("ay", "by", "cy", "dy")
-            )
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
 
@@ -165,172 +101,55 @@ class FunctionAttentionPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("init1_s_::RSh1", onnx.TensorProto.FLOAT, shape=(1,))
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "query", onnx.TensorProto.FLOAT, shape=("batch", 8, "seq_length", 32)
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "cat_1",
-                onnx.TensorProto.FLOAT,
-                shape=("batch", 4, "past_length+seq_length", 32),
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "cat", onnx.TensorProto.FLOAT, shape=("batch", 4, "past_length+seq_length", 32)
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "to", onnx.TensorProto.BOOL, shape=("seq_length", "total_length")
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("init7_s4_0_8_-1_32", onnx.TensorProto.INT64, shape=(4,))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("init7_s5_1_1_2_1_1", onnx.TensorProto.INT64, shape=(5,))
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init1_s_::RSh1"],
-                value=onh.from_array(
-                    np.array([0.4204482138156891], dtype=np.float32), name="value"
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s1_2"],
-                value=onh.from_array(np.array([2], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init1_s_::RSh12"],
-                value=onh.from_array(
-                    np.array([0.4204482138156891], dtype=np.float32), name="value"
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s5_1_1_2_1_1"],
-                value=onh.from_array(np.array([1, 1, 2, 1, 1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s4_0_8_-1_32"],
-                value=onh.from_array(np.array([0, 8, -1, 32], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init1_s1_"],
-                value=onh.from_array(np.array([-np.inf], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["c_lifted_tensor_0"],
-                value=onh.from_array(np.array(0.0, dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Mul", ["query", "init1_s_::RSh1"], ["_onx_mul_query"]))
-        nodes.append(oh.make_node("Unsqueeze", ["cat", "init7_s1_2"], ["cat::UnSq2"]))
-        nodes.append(
-            oh.make_node(
-                "Mul",
-                ["cat::UnSq2", "init1_s_::RSh12"],
-                ["ShapeBasedExpandSwapPattern_SwapUnaryPattern--repeat_interleave_1"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Expand",
+        model = oh.make_model(
+            oh.make_graph(
                 [
-                    "ShapeBasedExpandSwapPattern_SwapUnaryPattern--repeat_interleave_1",
-                    "init7_s5_1_1_2_1_1",
+                    oh.make_node('Constant', [], ['init1_s_::RSh1'], value=onh.from_array(np.array([0.4204482138156891], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['init7_s1_2'], value=onh.from_array(np.array([2], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init1_s_::RSh12'], value=onh.from_array(np.array([0.4204482138156891], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['init7_s5_1_1_2_1_1'], value=onh.from_array(np.array([1, 1, 2, 1, 1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s4_0_8_-1_32'], value=onh.from_array(np.array([0, 8, -1, 32], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init1_s1_'], value=onh.from_array(np.array([-float('inf')], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['c_lifted_tensor_0'], value=onh.from_array(np.array(0.0, dtype=np.float32), name='value')),
+                    oh.make_node('Mul', ['query', 'init1_s_::RSh1'], ['_onx_mul_query']),
+                    oh.make_node('Unsqueeze', ['cat', 'init7_s1_2'], ['cat::UnSq2']),
+                    oh.make_node('Mul', ['cat::UnSq2', 'init1_s_::RSh12'], ['ShapeBasedExpandSwapPattern_SwapUnaryPattern--repeat_interleave_1']),
+                    oh.make_node('Expand', ['ShapeBasedExpandSwapPattern_SwapUnaryPattern--repeat_interleave_1', 'init7_s5_1_1_2_1_1'], ['SwapUnaryPattern--repeat_interleave_1']),
+                    oh.make_node('Reshape', ['SwapUnaryPattern--repeat_interleave_1', 'init7_s4_0_8_-1_32'], ['SwapUnaryPattern--transpose']),
+                    oh.make_node('Transpose', ['SwapUnaryPattern--transpose'], ['_onx_mul_transpose'], perm=[0, 1, 3, 2]),
+                    oh.make_node('MatMul', ['_onx_mul_query', '_onx_mul_transpose'], ['matmul']),
+                    oh.make_node('Where', ['to', 'init1_s1_', 'matmul'], ['masked_fill']),
+                    oh.make_node('Softmax', ['masked_fill'], ['softmax'], axis=-1),
+                    oh.make_node('IsNaN', ['softmax'], ['isnan']),
+                    oh.make_node('Where', ['isnan', 'c_lifted_tensor_0', 'softmax'], ['where']),
+                    oh.make_node('Unsqueeze', ['cat_1', 'init7_s1_2'], ['cat_1::UnSq2']),
+                    oh.make_node('Expand', ['cat_1::UnSq2', 'init7_s5_1_1_2_1_1'], ['_onx_expand_cat_1::UnSq2']),
+                    oh.make_node('Reshape', ['_onx_expand_cat_1::UnSq2', 'init7_s4_0_8_-1_32'], ['repeat_interleave']),
+                    oh.make_node('MatMul', ['where', 'repeat_interleave'], ['output_0']),
                 ],
-                ["SwapUnaryPattern--repeat_interleave_1"],
-            )
+                'pattern',
+                [
+                    oh.make_tensor_value_info('init1_s_::RSh1', onnx.TensorProto.FLOAT, (1,)),
+                    oh.make_tensor_value_info('query', onnx.TensorProto.FLOAT, ('batch', 8, 'seq_length', 32)),
+                    oh.make_tensor_value_info('cat_1', onnx.TensorProto.FLOAT, ('batch', 4, 'past_length+seq_length', 32)),
+                    oh.make_tensor_value_info('cat', onnx.TensorProto.FLOAT, ('batch', 4, 'past_length+seq_length', 32)),
+                    oh.make_tensor_value_info('to', onnx.TensorProto.BOOL, ('seq_length', 'total_length')),
+                    oh.make_tensor_value_info('init7_s4_0_8_-1_32', onnx.TensorProto.INT64, (4,)),
+                    oh.make_tensor_value_info('init7_s5_1_1_2_1_1', onnx.TensorProto.INT64, (5,)),
+                ],
+                [
+                    oh.make_tensor_value_info('output_0', onnx.TensorProto.FLOAT, ('batch', 8, 'seq_length', 32)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
         )
-        nodes.append(
-            oh.make_node(
-                "Reshape",
-                ["SwapUnaryPattern--repeat_interleave_1", "init7_s4_0_8_-1_32"],
-                ["SwapUnaryPattern--transpose"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Transpose",
-                ["SwapUnaryPattern--transpose"],
-                ["_onx_mul_transpose"],
-                perm=[0, 1, 3, 2],
-            )
-        )
-        nodes.append(
-            oh.make_node("MatMul", ["_onx_mul_query", "_onx_mul_transpose"], ["matmul"])
-        )
-        nodes.append(
-            oh.make_node("Where", ["to", "init1_s1_", "matmul"], ["masked_fill"])
-        )
-        nodes.append(oh.make_node("Softmax", ["masked_fill"], ["softmax"], axis=-1))
-        nodes.append(oh.make_node("IsNaN", ["softmax"], ["isnan"]))
-        nodes.append(
-            oh.make_node("Where", ["isnan", "c_lifted_tensor_0", "softmax"], ["where"])
-        )
-        nodes.append(oh.make_node("Unsqueeze", ["cat_1", "init7_s1_2"], ["cat_1::UnSq2"]))
-        nodes.append(
-            oh.make_node(
-                "Expand", ["cat_1::UnSq2", "init7_s5_1_1_2_1_1"], ["_onx_expand_cat_1::UnSq2"]
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Reshape",
-                ["_onx_expand_cat_1::UnSq2", "init7_s4_0_8_-1_32"],
-                ["repeat_interleave"],
-            )
-        )
-        nodes.append(oh.make_node("MatMul", ["where", "repeat_interleave"], ["output_0"]))
-        outputs.append(
-            oh.make_tensor_value_info(
-                "output_0", onnx.TensorProto.FLOAT, shape=("batch", 8, "seq_length", 32)
-            )
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
 
@@ -340,69 +159,32 @@ class FunctionAttentionPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("init1_s_::RSh1", onnx.TensorProto.FLOAT, shape=(1,))
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "query", onnx.TensorProto.FLOAT, shape=("batch", 8, "seq_length", 32)
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "cat_1",
-                onnx.TensorProto.FLOAT,
-                shape=("batch", 4, "past_length+seq_length", 32),
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "cat", onnx.TensorProto.FLOAT, shape=("batch", 4, "past_length+seq_length", 32)
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "to", onnx.TensorProto.BOOL, shape=("seq_length", "total_length")
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("init7_s4_0_8_-1_32", onnx.TensorProto.INT64, shape=(4,))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("init7_s5_1_1_2_1_1", onnx.TensorProto.INT64, shape=(5,))
-        )
-        nodes.append(
-            oh.make_node(
-                "LocalAttentionGQASW_to1",
+        model = oh.make_model(
+            oh.make_graph(
                 [
-                    "query",
-                    "cat",
-                    "cat_1",
-                    "to",
-                    "init1_s_::RSh1",
-                    "init7_s5_1_1_2_1_1",
-                    "init7_s4_0_8_-1_32",
+                    oh.make_node('LocalAttentionGQASW_to1', ['query', 'cat', 'cat_1', 'to', 'init1_s_::RSh1', 'init7_s5_1_1_2_1_1', 'init7_s4_0_8_-1_32'], ['output_0'], domain='intermediate'),
                 ],
-                ["output_0"],
-                domain="intermediate",
-            )
+                'pattern',
+                [
+                    oh.make_tensor_value_info('init1_s_::RSh1', onnx.TensorProto.FLOAT, (1,)),
+                    oh.make_tensor_value_info('query', onnx.TensorProto.FLOAT, ('batch', 8, 'seq_length', 32)),
+                    oh.make_tensor_value_info('cat_1', onnx.TensorProto.FLOAT, ('batch', 4, 'past_length+seq_length', 32)),
+                    oh.make_tensor_value_info('cat', onnx.TensorProto.FLOAT, ('batch', 4, 'past_length+seq_length', 32)),
+                    oh.make_tensor_value_info('to', onnx.TensorProto.BOOL, ('seq_length', 'total_length')),
+                    oh.make_tensor_value_info('init7_s4_0_8_-1_32', onnx.TensorProto.INT64, (4,)),
+                    oh.make_tensor_value_info('init7_s5_1_1_2_1_1', onnx.TensorProto.INT64, (5,)),
+                ],
+                [
+                    oh.make_tensor_value_info('output_0', onnx.TensorProto.FLOAT, ('batch', 8, 'seq_length', 32)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
         )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "output_0", onnx.TensorProto.FLOAT, shape=("batch", 8, "seq_length", 32)
-            )
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
 
@@ -413,121 +195,49 @@ class FunctionAttentionPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "values_t", onnx.TensorProto.FLOAT, shape=("av", 8, "cv", 64)
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['scale_sqrt'], value=onh.from_array(np.array([0.3162277638912201], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['shape0'], value=onh.from_array(np.array([0, 0, 8, 64], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['minfty'], value=onh.from_array(np.array([-float('inf')], dtype=np.float32), name='value')),
+                    oh.make_node('Mul', ['query', 'scale_sqrt'], ['SwapUnaryPattern--query_reshaped']),
+                    oh.make_node('Transpose', ['SwapUnaryPattern--query_t'], ['query_scaled'], perm=[0, 2, 1, 3]),
+                    oh.make_node('Reshape', ['SwapUnaryPattern--query_reshaped', 'shape0'], ['SwapUnaryPattern--query_t']),
+                    oh.make_node('Mul', ['keys', 'scale_sqrt'], ['SwapUnaryPattern--keys_reshaped']),
+                    oh.make_node('Reshape', ['SwapUnaryPattern--keys_reshaped', 'shape0'], ['SwapUnaryPattern--keys_t']),
+                    oh.make_node('Transpose', ['SwapUnaryPattern--keys_t'], ['keys_scaled'], perm=[0, 2, 3, 1]),
+                    oh.make_node('MatMul', ['query_scaled', 'keys_scaled'], ['qk']),
+                    oh.make_node('Where', ['mask', 'zero', 'minfty'], ['bias']),
+                    oh.make_node('Add', ['qk', 'bias'], ['qkb']),
+                    oh.make_node('Softmax', ['qkb'], ['qkbs'], axis=-1),
+                    oh.make_node('IsNaN', ['qkbs'], ['nans']),
+                    oh.make_node('Where', ['nans', 'zero', 'qkbs'], ['filt']),
+                    oh.make_node('MatMul', ['filt', 'values_t'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('values_t', onnx.TensorProto.FLOAT, ('av', 8, 'cv', 64)),
+                    oh.make_tensor_value_info('keys', onnx.TensorProto.FLOAT, ('ak', 'ck', 'bk*dk')),
+                    oh.make_tensor_value_info('scale_sqrt', onnx.TensorProto.FLOAT, (1,)),
+                    oh.make_tensor_value_info('shape0', onnx.TensorProto.INT64, (4,)),
+                    oh.make_tensor_value_info('mask', onnx.TensorProto.BOOL, ('am', 'bm', 'cm', 'dm')),
+                    oh.make_tensor_value_info('query', onnx.TensorProto.FLOAT, ('aq', 'cq', 'bq*dq')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('ay', 'by', 'cy', 'dy')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "keys", onnx.TensorProto.FLOAT, shape=("ak", "ck", "bk*dk")
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("scale_sqrt", onnx.TensorProto.FLOAT, shape=(1,))
-        )
-        inputs.append(oh.make_tensor_value_info("shape0", onnx.TensorProto.INT64, shape=(4,)))
-        inputs.append(
-            oh.make_tensor_value_info(
-                "mask", onnx.TensorProto.BOOL, shape=("am", "bm", "cm", "dm")
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "query", onnx.TensorProto.FLOAT, shape=("aq", "cq", "bq*dq")
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["scale_sqrt"],
-                value=onh.from_array(
-                    np.array([0.3162277638912201], dtype=np.float32), name="value"
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape0"],
-                value=onh.from_array(np.array([0, 0, 8, 64], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["zero"],
-                value=onh.from_array(np.array([0.0], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["minfty"],
-                value=onh.from_array(np.array([-np.inf], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Mul", ["query", "scale_sqrt"], ["SwapUnaryPattern--query_reshaped"]
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Transpose", ["SwapUnaryPattern--query_t"], ["query_scaled"], perm=[0, 2, 1, 3]
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Reshape",
-                ["SwapUnaryPattern--query_reshaped", "shape0"],
-                ["SwapUnaryPattern--query_t"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Mul", ["keys", "scale_sqrt"], ["SwapUnaryPattern--keys_reshaped"]
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Reshape",
-                ["SwapUnaryPattern--keys_reshaped", "shape0"],
-                ["SwapUnaryPattern--keys_t"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Transpose", ["SwapUnaryPattern--keys_t"], ["keys_scaled"], perm=[0, 2, 3, 1]
-            )
-        )
-        nodes.append(oh.make_node("MatMul", ["query_scaled", "keys_scaled"], ["qk"]))
-        nodes.append(oh.make_node("Where", ["mask", "zero", "minfty"], ["bias"]))
-        nodes.append(oh.make_node("Add", ["qk", "bias"], ["qkb"]))
-        nodes.append(oh.make_node("Softmax", ["qkb"], ["qkbs"], axis=-1))
-        nodes.append(oh.make_node("IsNaN", ["qkbs"], ["nans"]))
-        nodes.append(oh.make_node("Where", ["nans", "zero", "qkbs"], ["filt"]))
-        nodes.append(oh.make_node("MatMul", ["filt", "values_t"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("ay", "by", "cy", "dy")
-            )
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
 
@@ -537,90 +247,35 @@ class FunctionAttentionPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "values_t", onnx.TensorProto.FLOAT, shape=("av", 8, "cv", 64)
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "keys", onnx.TensorProto.FLOAT, shape=("ak", "ck", "bk*dk")
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("scale_sqrt", onnx.TensorProto.FLOAT, shape=(1,))
-        )
-        inputs.append(oh.make_tensor_value_info("shape0", onnx.TensorProto.INT64, shape=(4,)))
-        inputs.append(
-            oh.make_tensor_value_info(
-                "mask", onnx.TensorProto.BOOL, shape=("am", "bm", "cm", "dm")
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "query", onnx.TensorProto.FLOAT, shape=("aq", "cq", "bq*dq")
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Reshape",
-                ["query", "shape0"],
-                ["FunctionAttentionPattern--SwapUnaryPattern--query_t"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Reshape",
-                ["keys", "shape0"],
-                ["FunctionAttentionPattern--SwapUnaryPattern--keys_t"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Transpose",
-                ["FunctionAttentionPattern--SwapUnaryPattern--query_t"],
-                ["FunctionAttentionPattern--query"],
-                perm=[0, 2, 1, 3],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Transpose",
-                ["FunctionAttentionPattern--SwapUnaryPattern--keys_t"],
-                ["FunctionAttentionPattern--keys"],
-                perm=[0, 2, 1, 3],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "LocalAttention_to1",
+        model = oh.make_model(
+            oh.make_graph(
                 [
-                    "FunctionAttentionPattern--query",
-                    "FunctionAttentionPattern--keys",
-                    "values_t",
-                    "mask",
-                    "scale_sqrt",
+                    oh.make_node('Reshape', ['query', 'shape0'], ['FunctionAttentionPattern--SwapUnaryPattern--query_t']),
+                    oh.make_node('Reshape', ['keys', 'shape0'], ['FunctionAttentionPattern--SwapUnaryPattern--keys_t']),
+                    oh.make_node('Transpose', ['FunctionAttentionPattern--SwapUnaryPattern--query_t'], ['FunctionAttentionPattern--query'], perm=[0, 2, 1, 3]),
+                    oh.make_node('Transpose', ['FunctionAttentionPattern--SwapUnaryPattern--keys_t'], ['FunctionAttentionPattern--keys'], perm=[0, 2, 1, 3]),
+                    oh.make_node('LocalAttention_to1', ['FunctionAttentionPattern--query', 'FunctionAttentionPattern--keys', 'values_t', 'mask', 'scale_sqrt'], ['Y'], domain='intermediate'),
                 ],
-                ["Y"],
-                domain="intermediate",
-            )
+                'pattern',
+                [
+                    oh.make_tensor_value_info('values_t', onnx.TensorProto.FLOAT, ('av', 8, 'cv', 64)),
+                    oh.make_tensor_value_info('keys', onnx.TensorProto.FLOAT, ('ak', 'ck', 'bk*dk')),
+                    oh.make_tensor_value_info('scale_sqrt', onnx.TensorProto.FLOAT, (1,)),
+                    oh.make_tensor_value_info('shape0', onnx.TensorProto.INT64, (4,)),
+                    oh.make_tensor_value_info('mask', onnx.TensorProto.BOOL, ('am', 'bm', 'cm', 'dm')),
+                    oh.make_tensor_value_info('query', onnx.TensorProto.FLOAT, ('aq', 'cq', 'bq*dq')),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('ay', 'by', 'cy', 'dy')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
         )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("ay", "by", "cy", "dy")
-            )
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1174,121 +829,44 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "cat", onnx.TensorProto.FLOAT, shape=("batch", 4, "past_length+seq_length", 32)
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s1_2'], value=onh.from_array(np.array([2], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s5_1_1_2_1_1'], value=onh.from_array(np.array([1, 1, 2, 1, 1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s4_0_8_-1_32'], value=onh.from_array(np.array([0, 8, -1, 32], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init1_s_::RSh1'], value=onh.from_array(np.array([0.4204482138156891], dtype=np.float32), name='value')),
+                    oh.make_node('Unsqueeze', ['cat', 'init7_s1_2'], ['cat::UnSq2']),
+                    oh.make_node('Expand', ['cat::UnSq2', 'init7_s5_1_1_2_1_1'], ['_onx_expand_cat::UnSq2']),
+                    oh.make_node('Reshape', ['_onx_expand_cat::UnSq2', 'init7_s4_0_8_-1_32'], ['repeat_interleave_1']),
+                    oh.make_node('Unsqueeze', ['cat_1', 'init7_s1_2'], ['cat_1::UnSq2']),
+                    oh.make_node('Expand', ['cat_1::UnSq2', 'init7_s5_1_1_2_1_1'], ['_onx_expand_cat_1::UnSq2']),
+                    oh.make_node('Reshape', ['_onx_expand_cat_1::UnSq2', 'init7_s4_0_8_-1_32'], ['repeat_interleave']),
+                    oh.make_node('LocalAttentionSW_to1', ['query', 'repeat_interleave_1', 'repeat_interleave', 'to', 'init1_s_::RSh1'], ['output_0'], domain='intermediate'),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('cat', onnx.TensorProto.FLOAT, ('batch', 4, 'past_length+seq_length', 32)),
+                    oh.make_tensor_value_info('init1_s_::RSh1', onnx.TensorProto.FLOAT, (1,)),
+                    oh.make_tensor_value_info('to', onnx.TensorProto.BOOL, ('seq_length', 'total_length')),
+                    oh.make_tensor_value_info('init7_s4_0_8_-1_32', onnx.TensorProto.INT64, (4,)),
+                    oh.make_tensor_value_info('init7_s5_1_1_2_1_1', onnx.TensorProto.INT64, (5,)),
+                    oh.make_tensor_value_info('cat_1', onnx.TensorProto.FLOAT, ('batch', 4, 'past_length+seq_length', 32)),
+                    oh.make_tensor_value_info('query', onnx.TensorProto.FLOAT, ('batch', 8, 'seq_length', 32)),
+                ],
+                [
+                    oh.make_tensor_value_info('output_0', onnx.TensorProto.FLOAT, ('batch', 8, 'seq_length', 32)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("init1_s_::RSh1", onnx.TensorProto.FLOAT, shape=(1,))
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "to", onnx.TensorProto.BOOL, shape=("seq_length", "total_length")
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("init7_s4_0_8_-1_32", onnx.TensorProto.INT64, shape=(4,))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("init7_s5_1_1_2_1_1", onnx.TensorProto.INT64, shape=(5,))
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "cat_1",
-                onnx.TensorProto.FLOAT,
-                shape=("batch", 4, "past_length+seq_length", 32),
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "query", onnx.TensorProto.FLOAT, shape=("batch", 8, "seq_length", 32)
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s1_2"],
-                value=onh.from_array(np.array([2], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s5_1_1_2_1_1"],
-                value=onh.from_array(np.array([1, 1, 2, 1, 1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s4_0_8_-1_32"],
-                value=onh.from_array(np.array([0, 8, -1, 32], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init1_s_::RSh1"],
-                value=onh.from_array(
-                    np.array([0.4204482138156891], dtype=np.float32), name="value"
-                ),
-            )
-        )
-        nodes.append(oh.make_node("Unsqueeze", ["cat", "init7_s1_2"], ["cat::UnSq2"]))
-        nodes.append(
-            oh.make_node(
-                "Expand", ["cat::UnSq2", "init7_s5_1_1_2_1_1"], ["_onx_expand_cat::UnSq2"]
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Reshape",
-                ["_onx_expand_cat::UnSq2", "init7_s4_0_8_-1_32"],
-                ["repeat_interleave_1"],
-            )
-        )
-        nodes.append(oh.make_node("Unsqueeze", ["cat_1", "init7_s1_2"], ["cat_1::UnSq2"]))
-        nodes.append(
-            oh.make_node(
-                "Expand", ["cat_1::UnSq2", "init7_s5_1_1_2_1_1"], ["_onx_expand_cat_1::UnSq2"]
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Reshape",
-                ["_onx_expand_cat_1::UnSq2", "init7_s4_0_8_-1_32"],
-                ["repeat_interleave"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "LocalAttentionSW_to1",
-                ["query", "repeat_interleave_1", "repeat_interleave", "to", "init1_s_::RSh1"],
-                ["output_0"],
-                domain="intermediate",
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "output_0", onnx.TensorProto.FLOAT, shape=("batch", 8, "seq_length", 32)
-            )
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1298,69 +876,32 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "cat", onnx.TensorProto.FLOAT, shape=("batch", 4, "past_length+seq_length", 32)
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("init1_s_::RSh1", onnx.TensorProto.FLOAT, shape=(1,))
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "to", onnx.TensorProto.BOOL, shape=("seq_length", "total_length")
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("init7_s4_0_8_-1_32", onnx.TensorProto.INT64, shape=(4,))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("init7_s5_1_1_2_1_1", onnx.TensorProto.INT64, shape=(5,))
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "cat_1",
-                onnx.TensorProto.FLOAT,
-                shape=("batch", 4, "past_length+seq_length", 32),
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "query", onnx.TensorProto.FLOAT, shape=("batch", 8, "seq_length", 32)
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "LocalAttentionGQASW_to1",
+        model = oh.make_model(
+            oh.make_graph(
                 [
-                    "query",
-                    "cat",
-                    "cat_1",
-                    "to",
-                    "init1_s_::RSh1",
-                    "init7_s5_1_1_2_1_1",
-                    "init7_s4_0_8_-1_32",
+                    oh.make_node('LocalAttentionGQASW_to1', ['query', 'cat', 'cat_1', 'to', 'init1_s_::RSh1', 'init7_s5_1_1_2_1_1', 'init7_s4_0_8_-1_32'], ['output_0'], domain='intermediate'),
                 ],
-                ["output_0"],
-                domain="intermediate",
-            )
+                'pattern',
+                [
+                    oh.make_tensor_value_info('cat', onnx.TensorProto.FLOAT, ('batch', 4, 'past_length+seq_length', 32)),
+                    oh.make_tensor_value_info('init1_s_::RSh1', onnx.TensorProto.FLOAT, (1,)),
+                    oh.make_tensor_value_info('to', onnx.TensorProto.BOOL, ('seq_length', 'total_length')),
+                    oh.make_tensor_value_info('init7_s4_0_8_-1_32', onnx.TensorProto.INT64, (4,)),
+                    oh.make_tensor_value_info('init7_s5_1_1_2_1_1', onnx.TensorProto.INT64, (5,)),
+                    oh.make_tensor_value_info('cat_1', onnx.TensorProto.FLOAT, ('batch', 4, 'past_length+seq_length', 32)),
+                    oh.make_tensor_value_info('query', onnx.TensorProto.FLOAT, ('batch', 8, 'seq_length', 32)),
+                ],
+                [
+                    oh.make_tensor_value_info('output_0', onnx.TensorProto.FLOAT, ('batch', 8, 'seq_length', 32)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
         )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "output_0", onnx.TensorProto.FLOAT, shape=("batch", 8, "seq_length", 32)
-            )
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opsets=[("", 18), ("intermediate", 1)])
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1472,94 +1013,46 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("key", onnx.TensorProto.FLOAT, shape=("a", 2, "c", 8))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['two'], value=onh.from_array(np.array([2], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['t11211'], value=onh.from_array(np.array([1, 1, 2, 1, 1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['resh'], value=onh.from_array(np.array([0, 4, -1, 8], dtype=np.int64), name='value')),
+                    oh.make_node('Concat', ['past_key', 'key'], ['present_key'], axis=2),
+                    oh.make_node('Concat', ['past_value', 'value'], ['present_value'], axis=2),
+                    oh.make_node('Unsqueeze', ['present_key', 'two'], ['key_u']),
+                    oh.make_node('Expand', ['key_u', 't11211'], ['key_ue']),
+                    oh.make_node('Reshape', ['key_ue', 'resh'], ['key_ues']),
+                    oh.make_node('Unsqueeze', ['present_value', 'two'], ['value_u']),
+                    oh.make_node('Expand', ['value_u', 't11211'], ['value_ue']),
+                    oh.make_node('Reshape', ['value_ue', 'resh'], ['value_ues']),
+                    oh.make_node('Attention', ['query', 'key_ues', 'value_ues', 'mask'], ['Y'], scale=0.10999999940395355),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('key', onnx.TensorProto.FLOAT, ('a', 2, 'c', 8)),
+                    oh.make_tensor_value_info('mask', onnx.TensorProto.BOOL, ('a', 1, 'c', 'c+h')),
+                    oh.make_tensor_value_info('value', onnx.TensorProto.FLOAT, ('a', 2, 'c', 8)),
+                    oh.make_tensor_value_info('past_key', onnx.TensorProto.FLOAT, ('a', 2, 'h', 8)),
+                    oh.make_tensor_value_info('query', onnx.TensorProto.FLOAT, ('a', 4, 'c', 8)),
+                    oh.make_tensor_value_info('past_value', onnx.TensorProto.FLOAT, ('a', 2, 'h', 8)),
+                ],
+                [
+                    oh.make_tensor_value_info('present_value', onnx.TensorProto.FLOAT, ('a', 2, 'c+h', 8)),
+                    oh.make_tensor_value_info('present_key', onnx.TensorProto.FLOAT, ('a', 2, 'c+h', 8)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 4, 'c_', 8)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 24)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("mask", onnx.TensorProto.BOOL, shape=("a", 1, "c", "c+h"))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("value", onnx.TensorProto.FLOAT, shape=("a", 2, "c", 8))
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "past_key", onnx.TensorProto.FLOAT, shape=("a", 2, "h", 8)
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("query", onnx.TensorProto.FLOAT, shape=("a", 4, "c", 8))
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "past_value", onnx.TensorProto.FLOAT, shape=("a", 2, "h", 8)
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["two"],
-                value=onh.from_array(np.array([2], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["t11211"],
-                value=onh.from_array(np.array([1, 1, 2, 1, 1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["resh"],
-                value=onh.from_array(np.array([0, 4, -1, 8], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Concat", ["past_key", "key"], ["present_key"], axis=2))
-        nodes.append(
-            oh.make_node("Concat", ["past_value", "value"], ["present_value"], axis=2)
-        )
-        nodes.append(oh.make_node("Unsqueeze", ["present_key", "two"], ["key_u"]))
-        nodes.append(oh.make_node("Expand", ["key_u", "t11211"], ["key_ue"]))
-        nodes.append(oh.make_node("Reshape", ["key_ue", "resh"], ["key_ues"]))
-        nodes.append(oh.make_node("Unsqueeze", ["present_value", "two"], ["value_u"]))
-        nodes.append(oh.make_node("Expand", ["value_u", "t11211"], ["value_ue"]))
-        nodes.append(oh.make_node("Reshape", ["value_ue", "resh"], ["value_ues"]))
-        nodes.append(
-            oh.make_node(
-                "Attention",
-                ["query", "key_ues", "value_ues", "mask"],
-                ["Y"],
-                scale=0.10999999940395355,
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "present_value", onnx.TensorProto.FLOAT, shape=("a", 2, "c+h", 8)
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "present_key", onnx.TensorProto.FLOAT, shape=("a", 2, "c+h", 8)
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 4, "c_", 8))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=24)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1569,61 +1062,33 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("key", onnx.TensorProto.FLOAT, shape=("a", 2, "c", 8))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Attention', ['query', 'key', 'value', 'mask', 'past_key', 'past_value'], ['Y', 'present_key', 'present_value'], is_causal=0, scale=0.10999999940395355),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('key', onnx.TensorProto.FLOAT, ('a', 2, 'c', 8)),
+                    oh.make_tensor_value_info('mask', onnx.TensorProto.BOOL, ('a', 1, 'c', 'c+h')),
+                    oh.make_tensor_value_info('value', onnx.TensorProto.FLOAT, ('a', 2, 'c', 8)),
+                    oh.make_tensor_value_info('past_key', onnx.TensorProto.FLOAT, ('a', 2, 'h', 8)),
+                    oh.make_tensor_value_info('query', onnx.TensorProto.FLOAT, ('a', 4, 'c', 8)),
+                    oh.make_tensor_value_info('past_value', onnx.TensorProto.FLOAT, ('a', 2, 'h', 8)),
+                ],
+                [
+                    oh.make_tensor_value_info('present_value', onnx.TensorProto.FLOAT, ('a', 2, 'c+h', 8)),
+                    oh.make_tensor_value_info('present_key', onnx.TensorProto.FLOAT, ('a', 2, 'c+h', 8)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 4, 'c_', 8)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 24)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("mask", onnx.TensorProto.BOOL, shape=("a", 1, "c", "c+h"))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("value", onnx.TensorProto.FLOAT, shape=("a", 2, "c", 8))
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "past_key", onnx.TensorProto.FLOAT, shape=("a", 2, "h", 8)
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("query", onnx.TensorProto.FLOAT, shape=("a", 4, "c", 8))
-        )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "past_value", onnx.TensorProto.FLOAT, shape=("a", 2, "h", 8)
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Attention",
-                ["query", "key", "value", "mask", "past_key", "past_value"],
-                ["Y", "present_key", "present_value"],
-                is_causal=0,
-                scale=0.10999999940395355,
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "present_value", onnx.TensorProto.FLOAT, shape=("a", 2, "c+h", 8)
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "present_key", onnx.TensorProto.FLOAT, shape=("a", 2, "c+h", 8)
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 4, "c_", 8))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=24)
 
         print("DOT-SECTION", to_dot(model))
     """

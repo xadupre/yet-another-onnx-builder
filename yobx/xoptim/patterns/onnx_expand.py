@@ -21,35 +21,30 @@ class ExpandPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("init7_s4_32_2_10_8", onnx.TensorProto.INT64, shape=(4,))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s4_32_2_10_8'], value=onh.from_array(np.array([32, 2, 10, 8], dtype=np.int64), name='value')),
+                    oh.make_node('Expand', ['mul', 'init7_s4_32_2_10_8'], ['expand']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('init7_s4_32_2_10_8', onnx.TensorProto.INT64, (4,)),
+                    oh.make_tensor_value_info('mul', onnx.TensorProto.FLOAT, (32, 2, 10, 8)),
+                ],
+                [
+                    oh.make_tensor_value_info('expand', onnx.TensorProto.FLOAT, (32, 2, 10, 8)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("mul", onnx.TensorProto.FLOAT, shape=(32, 2, 10, 8))
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s4_32_2_10_8"],
-                value=onh.from_array(np.array([32, 2, 10, 8], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Expand", ["mul", "init7_s4_32_2_10_8"], ["expand"]))
-        outputs.append(
-            oh.make_tensor_value_info("expand", onnx.TensorProto.FLOAT, shape=(32, 2, 10, 8))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -59,27 +54,27 @@ class ExpandPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("init7_s4_32_2_10_8", onnx.TensorProto.INT64, shape=(4,))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Identity', ['mul', 'init7_s4_32_2_10_8'], ['expand']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('init7_s4_32_2_10_8', onnx.TensorProto.INT64, (4,)),
+                    oh.make_tensor_value_info('mul', onnx.TensorProto.FLOAT, (32, 2, 10, 8)),
+                ],
+                [
+                    oh.make_tensor_value_info('expand', onnx.TensorProto.FLOAT, (32, 2, 10, 8)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("mul", onnx.TensorProto.FLOAT, shape=(32, 2, 10, 8))
-        )
-        nodes.append(oh.make_node("Identity", ["mul", "init7_s4_32_2_10_8"], ["expand"]))
-        outputs.append(
-            oh.make_tensor_value_info("expand", onnx.TensorProto.FLOAT, shape=(32, 2, 10, 8))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -139,42 +134,31 @@ class ExpandBroadcastPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("mul_25", onnx.TensorProto.FLOAT, shape=(2, 1024, 1))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s3_2_1024_1024'], value=onh.from_array(np.array([2, 1024, 1024], dtype=np.int64), name='value')),
+                    oh.make_node('Expand', ['mul_25', 'init7_s3_2_1024_1024'], ['expand_11']),
+                    oh.make_node('Mul', ['expand_11', 'input66'], ['MulMulMulPattern--mul_27']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('mul_25', onnx.TensorProto.FLOAT, (2, 1024, 1)),
+                    oh.make_tensor_value_info('input66', onnx.TensorProto.FLOAT, (2, 1024, 1024)),
+                ],
+                [
+                    oh.make_tensor_value_info('MulMulMulPattern--mul_27', onnx.TensorProto.FLOAT, (2, 1024, 1024)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("input66", onnx.TensorProto.FLOAT, shape=(2, 1024, 1024))
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s3_2_1024_1024"],
-                value=onh.from_array(np.array([2, 1024, 1024], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node("Expand", ["mul_25", "init7_s3_2_1024_1024"], ["expand_11"])
-        )
-        nodes.append(
-            oh.make_node("Mul", ["expand_11", "input66"], ["MulMulMulPattern--mul_27"])
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "MulMulMulPattern--mul_27", onnx.TensorProto.FLOAT, shape=(2, 1024, 1024)
-            )
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -184,31 +168,27 @@ class ExpandBroadcastPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("mul_25", onnx.TensorProto.FLOAT, shape=(2, 1024, 1))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Mul', ['mul_25', 'input66'], ['MulMulMulPattern--mul_27']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('mul_25', onnx.TensorProto.FLOAT, (2, 1024, 1)),
+                    oh.make_tensor_value_info('input66', onnx.TensorProto.FLOAT, (2, 1024, 1024)),
+                ],
+                [
+                    oh.make_tensor_value_info('MulMulMulPattern--mul_27', onnx.TensorProto.FLOAT, (2, 1024, 1024)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("input66", onnx.TensorProto.FLOAT, shape=(2, 1024, 1024))
-        )
-        nodes.append(
-            oh.make_node("Mul", ["mul_25", "input66"], ["MulMulMulPattern--mul_27"])
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "MulMulMulPattern--mul_27", onnx.TensorProto.FLOAT, shape=(2, 1024, 1024)
-            )
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -446,39 +426,33 @@ class ExpandSwapPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("p", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(1, 5, 7)))
-        inputs.append(oh.make_tensor_value_info("shape", onnx.TensorProto.INT64, shape=(3,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape"],
-                value=onh.from_array(np.array([3, 1, 1], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['shape'], value=onh.from_array(np.array([3, 1, 1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['p'], value=onh.from_array(np.array([2], dtype=np.int64), name='value')),
+                    oh.make_node('Expand', ['X', 'shape'], ['xs']),
+                    oh.make_node('Pow', ['xs', 'p'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('p', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (1, 5, 7)),
+                    oh.make_tensor_value_info('shape', onnx.TensorProto.INT64, (3,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (3, 5, 7)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["p"],
-                value=onh.from_array(np.array([2], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Expand", ["X", "shape"], ["xs"]))
-        nodes.append(oh.make_node("Pow", ["xs", "p"], ["Z"]))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(3, 5, 7)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -488,23 +462,29 @@ class ExpandSwapPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("p", onnx.TensorProto.INT64, shape=(1,)))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(1, 5, 7)))
-        inputs.append(oh.make_tensor_value_info("shape", onnx.TensorProto.INT64, shape=(3,)))
-        nodes.append(oh.make_node("Pow", ["X", "p"], ["ExpandSwapPattern_X"]))
-        nodes.append(oh.make_node("Expand", ["ExpandSwapPattern_X", "shape"], ["Z"]))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=(3, 5, 7)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Pow', ['X', 'p'], ['ExpandSwapPattern_X']),
+                    oh.make_node('Expand', ['ExpandSwapPattern_X', 'shape'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('p', onnx.TensorProto.INT64, (1,)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (1, 5, 7)),
+                    oh.make_tensor_value_info('shape', onnx.TensorProto.INT64, (3,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (3, 5, 7)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
+        )
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -583,26 +563,33 @@ class ShapeBasedStaticExpandPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = [onh.from_array(np.array([2], dtype=np.int64), name="two")]
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 3, "d", 1))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Shape', ['X'], ['D2'], end=-1, start=0),
+                    oh.make_node('Concat', ['D2', 'two'], ['d'], axis=0),
+                    oh.make_node('Expand', ['X', 'd'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd', 1)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (2, 3, 'd', 2)),
+                ],
+                [
+                    onh.from_array(np.array([2], dtype=np.int64), name='two'),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Shape", ["X"], ["D2"], start=0, end=-1))
-        nodes.append(oh.make_node("Concat", ["D2", "two"], ["d"], axis=0))
-        nodes.append(oh.make_node("Expand", ["X", "d"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(2, 3, "d", 2))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -612,32 +599,29 @@ class ShapeBasedStaticExpandPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(2, 3, "d", 1))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_s4_1_1_1_2'], value=onh.from_array(np.array([1, 1, 1, 2], dtype=np.int64), name='value')),
+                    oh.make_node('Expand', ['X', 'init7_s4_1_1_1_2'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd', 1)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (2, 3, 'd', 2)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_s4_1_1_1_2"],
-                value=onh.from_array(np.array([1, 1, 1, 2], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Expand", ["X", "init7_s4_1_1_1_2"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(2, 3, "d", 2))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -721,33 +705,32 @@ class ShapeBasedExpandSwapPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("full_shape", onnx.TensorProto.INT64, shape=(2,))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([4.0], dtype=np.float32), name='value')),
+                    oh.make_node('Expand', ['Xc', 'full_shape'], ['Xce']),
+                    oh.make_node('Add', ['Xce', 'one'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('full_shape', onnx.TensorProto.INT64, (2,)),
+                    oh.make_tensor_value_info('Xc', onnx.TensorProto.FLOAT, ('d', 1)),
+                    oh.make_tensor_value_info('one', onnx.TensorProto.FLOAT, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('d', 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(oh.make_tensor_value_info("Xc", onnx.TensorProto.FLOAT, shape=("d", 1)))
-        inputs.append(oh.make_tensor_value_info("one", onnx.TensorProto.FLOAT, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["one"],
-                value=onh.from_array(np.array([4.0], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Expand", ["Xc", "full_shape"], ["Xce"]))
-        nodes.append(oh.make_node("Add", ["Xce", "one"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("d", "d")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -757,29 +740,29 @@ class ShapeBasedExpandSwapPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("full_shape", onnx.TensorProto.INT64, shape=(2,))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Add', ['Xc', 'one'], ['ShapeBasedExpandSwapPattern_Y']),
+                    oh.make_node('Expand', ['ShapeBasedExpandSwapPattern_Y', 'full_shape'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('full_shape', onnx.TensorProto.INT64, (2,)),
+                    oh.make_tensor_value_info('Xc', onnx.TensorProto.FLOAT, ('d', 1)),
+                    oh.make_tensor_value_info('one', onnx.TensorProto.FLOAT, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('d', 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(oh.make_tensor_value_info("Xc", onnx.TensorProto.FLOAT, shape=("d", 1)))
-        inputs.append(oh.make_tensor_value_info("one", onnx.TensorProto.FLOAT, shape=(1,)))
-        nodes.append(
-            oh.make_node("Add", ["Xc", "one"], ["ShapeBasedExpandSwapPattern_Y"])
-        )
-        nodes.append(
-            oh.make_node("Expand", ["ShapeBasedExpandSwapPattern_Y", "full_shape"], ["Y"])
-        )
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("d", "d")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1021,30 +1004,35 @@ class ShapeBasedExpandBroadcastMatMulPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = [onh.from_array(np.array([1, 1], dtype=np.int64), name="o11")]
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(1, "c", "d"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Shape', ['Y'], ['batch'], end=1, start=0),
+                    oh.make_node('Concat', ['batch', 'o11'], ['exp'], axis=0),
+                    oh.make_node('Expand', ['Y', 'exp'], ['Ye']),
+                    oh.make_node('MatMul', ['X', 'Ye'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1, 'c', 'd')),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b', 'd')),
+                ],
+                [
+                    onh.from_array(np.array([1, 1], dtype=np.int64), name='o11'),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", "c"))
-        )
-        nodes.append(oh.make_node("Shape", ["Y"], ["batch"], start=0, end=1))
-        nodes.append(oh.make_node("Concat", ["batch", "o11"], ["exp"], axis=0))
-        nodes.append(oh.make_node("Expand", ["Y", "exp"], ["Ye"]))
-        nodes.append(oh.make_node("MatMul", ["X", "Ye"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "b", "d"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1054,27 +1042,27 @@ class ShapeBasedExpandBroadcastMatMulPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(1, "c", "d"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('MatMul', ['X', 'Y'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1, 'c', 'd')),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b', 'd')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b", "c"))
-        )
-        nodes.append(oh.make_node("MatMul", ["X", "Y"], ["Z"]))
-        outputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "b", "d"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1185,34 +1173,33 @@ class ShapeBasedExpandCastWhereSwapPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("b", "c")))
-        inputs.append(oh.make_tensor_value_info("exp", onnx.TensorProto.INT64, shape=(3,)))
-        inputs.append(oh.make_tensor_value_info("cst", onnx.TensorProto.FLOAT, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["cst"],
-                value=onh.from_array(np.array([-np.inf], dtype=np.float32), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['cst'], value=onh.from_array(np.array([-float('inf')], dtype=np.float32), name='value')),
+                    oh.make_node('Expand', ['X', 'exp'], ['Xe']),
+                    oh.make_node('Cast', ['Xe'], ['Xeb'], to=9),
+                    oh.make_node('Where', ['Xeb', 'Xe', 'cst'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('b', 'c')),
+                    oh.make_tensor_value_info('exp', onnx.TensorProto.INT64, (3,)),
+                    oh.make_tensor_value_info('cst', onnx.TensorProto.FLOAT, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('b', 'b', 'c')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Expand", ["X", "exp"], ["Xe"]))
-        nodes.append(oh.make_node("Cast", ["Xe"], ["Xeb"], to=9))
-        nodes.append(oh.make_node("Where", ["Xeb", "Xe", "cst"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("b", "b", "c"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1222,40 +1209,30 @@ class ShapeBasedExpandCastWhereSwapPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("b", "c")))
-        inputs.append(oh.make_tensor_value_info("exp", onnx.TensorProto.INT64, shape=(3,)))
-        inputs.append(oh.make_tensor_value_info("cst", onnx.TensorProto.FLOAT, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Cast", ["X"], ["ShapeBasedExpandCastWhereSwapPattern_Xeb"], to=9
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Cast', ['X'], ['ShapeBasedExpandCastWhereSwapPattern_Xeb'], to=9),
+                    oh.make_node('Where', ['ShapeBasedExpandCastWhereSwapPattern_Xeb', 'X', 'cst'], ['ShapeBasedExpandCastWhereSwapPattern_Y']),
+                    oh.make_node('Expand', ['ShapeBasedExpandCastWhereSwapPattern_Y', 'exp'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('b', 'c')),
+                    oh.make_tensor_value_info('exp', onnx.TensorProto.INT64, (3,)),
+                    oh.make_tensor_value_info('cst', onnx.TensorProto.FLOAT, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('b', 'b', 'c')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Where",
-                ["ShapeBasedExpandCastWhereSwapPattern_Xeb", "X", "cst"],
-                ["ShapeBasedExpandCastWhereSwapPattern_Y"],
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Expand", ["ShapeBasedExpandCastWhereSwapPattern_Y", "exp"], ["Y"]
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("b", "b", "c"))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1373,31 +1350,32 @@ class ShapeBasedConcatExpandPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 1)))
-        inputs.append(oh.make_tensor_value_info("two", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["two"],
-                value=onh.from_array(np.array([2], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['two'], value=onh.from_array(np.array([2], dtype=np.int64), name='value')),
+                    oh.make_node('Shape', ['X'], ['shx'], end=1, start=0),
+                    oh.make_node('Concat', ['shx', 'two'], ['sh2'], axis=0),
+                    oh.make_node('Expand', ['X', 'sh2'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 1)),
+                    oh.make_tensor_value_info('two', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 2)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Shape", ["X"], ["shx"], start=0, end=1))
-        nodes.append(oh.make_node("Concat", ["shx", "two"], ["sh2"], axis=0))
-        nodes.append(oh.make_node("Expand", ["X", "sh2"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 2)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1407,30 +1385,31 @@ class ShapeBasedConcatExpandPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 1)))
-        inputs.append(oh.make_tensor_value_info("two", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init7_12"],
-                value=onh.from_array(np.array([1], dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init7_12'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
+                    oh.make_node('Concat', ['init7_12', 'two'], ['sh22'], axis=0),
+                    oh.make_node('Expand', ['X', 'sh22'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 1)),
+                    oh.make_tensor_value_info('two', onnx.TensorProto.INT64, (1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 2)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Concat", ["init7_12", "two"], ["sh22"], axis=0))
-        nodes.append(oh.make_node("Expand", ["X", "sh22"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 2)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1533,45 +1512,33 @@ class SwapExpandReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("weight", onnx.TensorProto.FLOAT, shape=(1, 4, 1))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['weight'], value=onh.from_array(np.array([[[2.0], [3.0], [4.0], [5.0]]], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['stat'], value=onh.from_array(np.array([0, 1, -1], dtype=np.int64), name='value')),
+                    oh.make_node('Expand', ['weight', 'shape'], ['resh']),
+                    oh.make_node('Reshape', ['resh', 'stat'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('weight', onnx.TensorProto.FLOAT, (1, 4, 1)),
+                    oh.make_tensor_value_info('stat', onnx.TensorProto.INT64, (3,)),
+                    oh.make_tensor_value_info('shape', onnx.TensorProto.INT64, (3,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 4)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(oh.make_tensor_value_info("stat", onnx.TensorProto.INT64, shape=(3,)))
-        inputs.append(oh.make_tensor_value_info("shape", onnx.TensorProto.INT64, shape=(3,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["weight"],
-                value=onh.from_array(
-                    np.array([[[2.0], [3.0], [4.0], [5.0]]], dtype=np.float32), name="value"
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["stat"],
-                value=onh.from_array(np.array([0, 1, -1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Expand", ["weight", "shape"], ["resh"]))
-        nodes.append(oh.make_node("Reshape", ["resh", "stat"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 1, 4))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1581,27 +1548,29 @@ class SwapExpandReshapePattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("weight", onnx.TensorProto.FLOAT, shape=(1, 4, 1))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Reshape', ['weight', 'stat'], ['Y2']),
+                    oh.make_node('Expand', ['Y2', 'shape'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('weight', onnx.TensorProto.FLOAT, (1, 4, 1)),
+                    oh.make_tensor_value_info('stat', onnx.TensorProto.INT64, (3,)),
+                    oh.make_tensor_value_info('shape', onnx.TensorProto.INT64, (3,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 4)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        inputs.append(oh.make_tensor_value_info("stat", onnx.TensorProto.INT64, shape=(3,)))
-        inputs.append(oh.make_tensor_value_info("shape", onnx.TensorProto.INT64, shape=(3,)))
-        nodes.append(oh.make_node("Reshape", ["weight", "stat"], ["Y2"]))
-        nodes.append(oh.make_node("Expand", ["Y2", "shape"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 1, 4))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """

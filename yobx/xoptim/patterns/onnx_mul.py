@@ -17,39 +17,33 @@ class MulMulMulScalarPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["cst1"],
-                value=onh.from_array(np.array([2.0], dtype=np.float32), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['cst1'], value=onh.from_array(np.array([2.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['cst2'], value=onh.from_array(np.array([3.0], dtype=np.float32), name='value')),
+                    oh.make_node('Mul', ['xc', 'yc'], ['Z']),
+                    oh.make_node('Div', ['X', 'cst1'], ['xc']),
+                    oh.make_node('Div', ['Y', 'cst2'], ['yc']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["cst2"],
-                value=onh.from_array(np.array([3.0], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Mul", ["xc", "yc"], ["Z"]))
-        nodes.append(oh.make_node("Div", ["X", "cst1"], ["xc"]))
-        nodes.append(oh.make_node("Div", ["Y", "cst2"], ["yc"]))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -59,32 +53,31 @@ class MulMulMulScalarPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["init1_s1_"],
-                value=onh.from_array(np.array([6.0], dtype=np.float32), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['init1_s1_'], value=onh.from_array(np.array([6.0], dtype=np.float32), name='value')),
+                    oh.make_node('Mul', ['X', 'Y'], ['MulMulMulScalarPattern--Z']),
+                    oh.make_node('Div', ['MulMulMulScalarPattern--Z', 'init1_s1_'], ['Z']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Mul", ["X", "Y"], ["MulMulMulScalarPattern--Z"]))
-        nodes.append(
-            oh.make_node("Div", ["MulMulMulScalarPattern--Z", "init1_s1_"], ["Z"])
-        )
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", "b")))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -185,31 +178,29 @@ class SwitchOrderBinaryPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 1, 3, 4))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Add', ['Z', 'xy'], ['F']),
+                    oh.make_node('Add', ['X', 'Y'], ['xy']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 3, 4)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 1, 3, 4)),
+                ],
+                [
+                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 2, 3, 4))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", 1, 3, 4))
-        )
-        nodes.append(oh.make_node("Add", ["Z", "xy"], ["F"]))
-        nodes.append(oh.make_node("Add", ["X", "Y"], ["xy"]))
-        outputs.append(
-            oh.make_tensor_value_info("F", onnx.TensorProto.FLOAT, shape=("a", 2, 3, 4))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -219,31 +210,29 @@ class SwitchOrderBinaryPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
-        import numpy as np
+        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        inputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", 1, 3, 4))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Add', ['Y', 'Z'], ['add-Y']),
+                    oh.make_node('Add', ['add-Y', 'X'], ['F']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 3, 4)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 1, 3, 4)),
+                ],
+                [
+                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 26)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", 2, 3, 4))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", 1, 3, 4))
-        )
-        nodes.append(oh.make_node("Add", ["Y", "Z"], ["add-Y"]))
-        nodes.append(oh.make_node("Add", ["add-Y", "X"], ["F"]))
-        outputs.append(
-            oh.make_tensor_value_info("F", onnx.TensorProto.FLOAT, shape=("a", 2, 3, 4))
-        )
-        model = make_pattern_model(nodes, inputs, outputs, initializers, opset=26)
 
         print("DOT-SECTION", to_dot(model))
     """

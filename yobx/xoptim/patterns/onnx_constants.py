@@ -14,26 +14,27 @@ class ConstantToInitializerPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["cst"],
-                value=onh.from_array(np.array([1.0, 2.0], dtype=np.float32), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['cst'], value=onh.from_array(np.array([1.0, 2.0], dtype=np.float32), name='value')),
+                ],
+                'pattern',
+                [
+                ],
+                [
+                    oh.make_tensor_value_info('cst', onnx.TensorProto.FLOAT, (2,)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        outputs.append(oh.make_tensor_value_info("cst", onnx.TensorProto.FLOAT, shape=(2,)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -43,27 +44,28 @@ class ConstantToInitializerPattern(PatternOptimization):
         :script: DOT-SECTION
         :process:
 
-        from yobx.doc import to_dot, make_pattern_model
+        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
 
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["cst_cst2init"],
-                value=onh.from_array(np.array([1.0, 2.0], dtype=np.float32), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['cst_cst2init'], value=onh.from_array(np.array([1.0, 2.0], dtype=np.float32), name='value')),
+                    oh.make_node('Identity', ['cst_cst2init'], ['cst']),
+                ],
+                'pattern',
+                [
+                ],
+                [
+                    oh.make_tensor_value_info('cst', onnx.TensorProto.FLOAT, (2,)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(oh.make_node("Identity", ["cst_cst2init"], ["cst"]))
-        outputs.append(oh.make_tensor_value_info("cst", onnx.TensorProto.FLOAT, shape=(2,)))
-        model = make_pattern_model(nodes, inputs, outputs, initializers)
 
         print("DOT-SECTION", to_dot(model))
     """
