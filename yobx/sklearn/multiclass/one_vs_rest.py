@@ -100,6 +100,13 @@ def sklearn_one_vs_rest_classifier(
         fct = get_sklearn_converter(type(sub_est))
         fct(g, sts, [sub_label, sub_proba], sub_est, X, name=sub_name)
 
+        # Some converters (e.g. TreeEnsembleClassifier in ai.onnx.ml) do not
+        # register the output type in the graph builder because the domain's
+        # type inference is not implemented.  Fall back to FLOAT, which is the
+        # universal probability dtype for sklearn classifiers.
+        if not g.has_type(sub_proba):
+            g.set_type(sub_proba, onnx.TensorProto.FLOAT)
+
         # Extract column 1 (positive-class probability): [n, 2] → [n, 1].
         pos_prob = g.op.Slice(
             sub_proba,

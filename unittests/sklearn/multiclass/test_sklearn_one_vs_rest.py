@@ -119,6 +119,30 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         self.assertTrue(clf.multilabel_)
         self.assertRaises(NotImplementedError, to_onnx, clf, (X,))
 
+    def test_multiclass_decision_tree(self):
+        """OVR wrapping DecisionTreeClassifier (3 classes)."""
+        from sklearn.multiclass import OneVsRestClassifier
+        from sklearn.tree import DecisionTreeClassifier
+        from yobx.sklearn import to_onnx
+
+        clf = OneVsRestClassifier(DecisionTreeClassifier(max_depth=3, random_state=0))
+        clf.fit(self._X_multi, self._y_multi)
+
+        onx = to_onnx(clf, (self._X_multi,))
+
+        # Each sub-estimator should produce a TreeEnsembleClassifier node.
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertEqual(op_types.count("TreeEnsembleClassifier"), 3)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": self._X_multi})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(clf.predict(self._X_multi), label)
+        self.assertEqualArray(
+            clf.predict_proba(self._X_multi).astype(np.float32), proba, atol=1e-5
+        )
+
     def test_graph_structure_multiclass(self):
         """Check ONNX graph contains expected op types for multiclass OVR."""
         from sklearn.multiclass import OneVsRestClassifier
