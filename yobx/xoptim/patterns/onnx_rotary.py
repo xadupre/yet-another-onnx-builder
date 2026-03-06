@@ -74,8 +74,12 @@ class RotaryConcatPartPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['shape'], value=onh.from_array(np.array([3, 8], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['split'], value=onh.from_array(np.array([8, 8], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape'],
+                                 value=onh.from_array(np.array([3, 8], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['split'],
+                                 value=onh.from_array(np.array([8, 8], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('ConstantOfShape', ['shape'], ['zero']),
                     oh.make_node('Split', ['X', 'split'], ['x1', 'x2'], axis=1),
                     oh.make_node('Neg', ['x1'], ['nx1']),
@@ -788,7 +792,8 @@ class FunctionHalfRotaryEmbeddingPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('HalfRotaryEmbedding', ['X', 'm2', 'm1'], ['Y'], domain='intermediate'),
+                    oh.make_node('HalfRotaryEmbedding', ['X', 'm2', 'm1'], ['Y'],
+                                 domain='intermediate'),
                 ],
                 'pattern',
                 [
@@ -966,11 +971,14 @@ class RotaryEmbeddingPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['split'], value=onh.from_array(np.array([4, 6], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['split'],
+                                 value=onh.from_array(np.array([4, 6], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Concat', ['m2', 'm2'], ['m2x2'], axis=-1),
                     oh.make_node('Concat', ['m1', 'm1'], ['m1x2'], axis=-1),
                     oh.make_node('Split', ['X', 'split'], ['Xh1', 'Xh2'], axis=-1),
-                    oh.make_node('HalfRotaryEmbedding', ['Xh1', 'm2x2', 'm1x2'], ['Yh'], domain='intermediate'),
+                    oh.make_node('HalfRotaryEmbedding', ['Xh1', 'm2x2', 'm1x2'], ['Yh'],
+                                 domain='intermediate'),
                     oh.make_node('Concat', ['Yh', 'Xh2'], ['Y'], axis=-1),
                 ],
                 'pattern',
@@ -1004,15 +1012,29 @@ class RotaryEmbeddingPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s2_1_1'], value=onh.from_array(np.array([1, 1], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['init7_s1_1'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
-                    oh.make_node('Shape', ['X'], ['RotaryEmbeddingPattern--Xh1--dim'], end=1, start=0),
-                    oh.make_node('Concat', ['RotaryEmbeddingPattern--Xh1--dim', 'init7_s2_1_1'], ['RotaryEmbeddingPattern--Xh1::Shape'], axis=0),
-                    oh.make_node('Squeeze', ['m2', 'init7_s1_1'], ['RotaryEmbeddingPattern--m2x2']),
-                    oh.make_node('Squeeze', ['m1', 'init7_s1_1'], ['RotaryEmbeddingPattern--m1x2']),
-                    oh.make_node('Expand', ['RotaryEmbeddingPattern--m2x2', 'RotaryEmbeddingPattern--Xh1::Shape'], ['RotaryEmbeddingPattern--m2x22']),
-                    oh.make_node('Expand', ['RotaryEmbeddingPattern--m1x2', 'RotaryEmbeddingPattern--Xh1::Shape'], ['RotaryEmbeddingPattern--m1x22']),
-                    oh.make_node('RotaryEmbedding', ['X', 'RotaryEmbeddingPattern--m2x22', 'RotaryEmbeddingPattern--m1x22'], ['Y'], num_heads=2, rotary_embedding_dim=4),
+                    oh.make_node('Constant', [], ['init7_s2_1_1'],
+                                 value=onh.from_array(np.array([1, 1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init7_s1_1'],
+                                 value=onh.from_array(np.array([1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Shape', ['X'], ['RotaryEmbeddingPattern--Xh1--dim'],
+                                 end=1, start=0),
+                    oh.make_node('Concat', ['RotaryEmbeddingPattern--Xh1--dim', 'init7_s2_1_1'],
+                                 ['RotaryEmbeddingPattern--Xh1::Shape'], axis=0),
+                    oh.make_node('Squeeze', ['m2', 'init7_s1_1'],
+                                 ['RotaryEmbeddingPattern--m2x2']),
+                    oh.make_node('Squeeze', ['m1', 'init7_s1_1'],
+                                 ['RotaryEmbeddingPattern--m1x2']),
+                    oh.make_node('Expand',
+                        ['RotaryEmbeddingPattern--m2x2', 'RotaryEmbeddingPattern--Xh1::Shape'],
+                         ['RotaryEmbeddingPattern--m2x22']),
+                    oh.make_node('Expand',
+                        ['RotaryEmbeddingPattern--m1x2', 'RotaryEmbeddingPattern--Xh1::Shape'],
+                         ['RotaryEmbeddingPattern--m1x22']),
+                    oh.make_node('RotaryEmbedding',
+                        ['X', 'RotaryEmbeddingPattern--m2x22', 'RotaryEmbeddingPattern--m1x22'],
+                         ['Y'], num_heads=2, rotary_embedding_dim=4),
                 ],
                 'pattern',
                 [
@@ -1203,11 +1225,19 @@ class FunctionCausalMaskPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array(0, dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['a012'], value=onh.from_array(np.array([0, 1, 2], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['a013'], value=onh.from_array(np.array([0, 1, 3], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['initi'], value=onh.from_array(np.array([3], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zero'],
+                                 value=onh.from_array(np.array(0, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['one'],
+                                 value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['a012'],
+                                 value=onh.from_array(np.array([0, 1, 2], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['a013'],
+                                 value=onh.from_array(np.array([0, 1, 3], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['initi'],
+                                 value=onh.from_array(np.array([3], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Squeeze', ['d1'], ['nd1']),
                     oh.make_node('Squeeze', ['d2'], ['nd2']),
                     oh.make_node('Range', ['zero', 'nd2', 'one'], ['rg1']),
@@ -1248,7 +1278,8 @@ class FunctionCausalMaskPattern(PatternOptimization):
             oh.make_graph(
                 [
                     oh.make_node('Squeeze', ['d2'], ['nd2']),
-                    oh.make_node('ShiftedCausalMask', ['d1', 'd2', 'initi'], ['yc'], domain='intermediate'),
+                    oh.make_node('ShiftedCausalMask', ['d1', 'd2', 'initi'], ['yc'],
+                                 domain='intermediate'),
                 ],
                 'pattern',
                 [
@@ -1461,10 +1492,16 @@ class FunctionCausalMaskMulAddPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array(0, dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['a012'], value=onh.from_array(np.array([0, 1, 2], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['a123'], value=onh.from_array(np.array([1, 2, 3], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zero'],
+                                 value=onh.from_array(np.array(0, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['one'],
+                                 value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['a012'],
+                                 value=onh.from_array(np.array([0, 1, 2], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['a123'],
+                                 value=onh.from_array(np.array([1, 2, 3], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Squeeze', ['d1'], ['nd1']),
                     oh.make_node('Squeeze', ['d2'], ['nd2']),
                     oh.make_node('Range', ['zero', 'nd1', 'one'], ['rg1']),
@@ -1503,7 +1540,8 @@ class FunctionCausalMaskMulAddPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('CausalMaskMulAdd', ['d1', 'd2', 'N'], ['yyc'], domain='intermediate'),
+                    oh.make_node('CausalMaskMulAdd', ['d1', 'd2', 'N'], ['yyc'],
+                                 domain='intermediate'),
                 ],
                 'pattern',
                 [
@@ -1694,11 +1732,18 @@ class FunctionCosSinCachePattern(PatternOptimization):
                 [
                     oh.make_node('Squeeze', ['dim1'], ['dim1::Sq2']),
                     oh.make_node('Squeeze', ['dim2'], ['dim2::Sq2']),
-                    oh.make_node('Range', ['dim1::Sq2', 'dim2::Sq2', 'init7_s_12'], ['_onx_range_dim1::Sq2']),
-                    oh.make_node('Unsqueeze', ['_onx_range_dim1::Sq2', 'init7_s2_0_12'], ['_onx_range_dim1::Sq::UnSq0x12']),
-                    oh.make_node('Cast', ['_onx_range_dim1::Sq::UnSq0x12'], ['_onx_range_dim1::Sq::UnSq0x1::C12'], to=1),
-                    oh.make_node('Reshape', ['_onx_range_dim1::Sq::UnSq0x1::C12', 'init7_s3_0_-1_12'], ['_onx_range_dim1::Sq::UnSq0x1::C1::RSh0x-1x12']),
-                    oh.make_node('Mul', ['weights', '_onx_range_dim1::Sq::UnSq0x1::C1::RSh0x-1x12'], ['_onx_mul_weights2']),
+                    oh.make_node('Range', ['dim1::Sq2', 'dim2::Sq2', 'init7_s_12'],
+                                 ['_onx_range_dim1::Sq2']),
+                    oh.make_node('Unsqueeze', ['_onx_range_dim1::Sq2', 'init7_s2_0_12'],
+                                 ['_onx_range_dim1::Sq::UnSq0x12']),
+                    oh.make_node('Cast', ['_onx_range_dim1::Sq::UnSq0x12'],
+                                 ['_onx_range_dim1::Sq::UnSq0x1::C12'], to=1),
+                    oh.make_node('Reshape',
+                                 ['_onx_range_dim1::Sq::UnSq0x1::C12', 'init7_s3_0_-1_12'],
+                                 ['_onx_range_dim1::Sq::UnSq0x1::C1::RSh0x-1x12']),
+                    oh.make_node('Mul',
+                                 ['weights', '_onx_range_dim1::Sq::UnSq0x1::C1::RSh0x-1x12'],
+                                 ['_onx_mul_weights2']),
                     oh.make_node('Cos', ['_onx_mul_weights2'], ['_onx_cos_mul_weights']),
                     oh.make_node('Sin', ['_onx_mul_weights2'], ['_onx_sin_mul_weights']),
                 ],
@@ -1709,8 +1754,10 @@ class FunctionCosSinCachePattern(PatternOptimization):
                     oh.make_tensor_value_info('dim2', onnx.TensorProto.INT64, (1,)),
                 ],
                 [
-                    oh.make_tensor_value_info('_onx_sin_mul_weights', onnx.TensorProto.FLOAT, (1, 'dim2-dim1', 'a')),
-                    oh.make_tensor_value_info('_onx_cos_mul_weights', onnx.TensorProto.FLOAT, (1, 'dim2-dim1', 'a')),
+                    oh.make_tensor_value_info('_onx_sin_mul_weights', onnx.TensorProto.FLOAT,
+                                              (1, 'dim2-dim1', 'a')),
+                    oh.make_tensor_value_info('_onx_cos_mul_weights', onnx.TensorProto.FLOAT,
+                                              (1, 'dim2-dim1', 'a')),
                 ],
                 [
                     onh.from_array(np.array(1, dtype=np.int64), name='init7_s_12'),
@@ -1737,7 +1784,9 @@ class FunctionCosSinCachePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('CosSinCacheWithRange', ['dim1', 'dim2', 'weights'], ['_onx_cos_mul_weights', '_onx_sin_mul_weights'], domain='intermediate'),
+                    oh.make_node('CosSinCacheWithRange', ['dim1', 'dim2', 'weights'],
+                                 ['_onx_cos_mul_weights', '_onx_sin_mul_weights'],
+                                 domain='intermediate'),
                 ],
                 'pattern',
                 [
@@ -1746,8 +1795,10 @@ class FunctionCosSinCachePattern(PatternOptimization):
                     oh.make_tensor_value_info('dim2', onnx.TensorProto.INT64, (1,)),
                 ],
                 [
-                    oh.make_tensor_value_info('_onx_sin_mul_weights', onnx.TensorProto.FLOAT, (1, 'dim2-dim1', 'a')),
-                    oh.make_tensor_value_info('_onx_cos_mul_weights', onnx.TensorProto.FLOAT, (1, 'dim2-dim1', 'a')),
+                    oh.make_tensor_value_info('_onx_sin_mul_weights', onnx.TensorProto.FLOAT,
+                                              (1, 'dim2-dim1', 'a')),
+                    oh.make_tensor_value_info('_onx_cos_mul_weights', onnx.TensorProto.FLOAT,
+                                              (1, 'dim2-dim1', 'a')),
                 ],
             ),
             functions=[],

@@ -63,16 +63,25 @@ class MatMulAddPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s2_-1_3'], value=onh.from_array(np.array([-1, 3], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['init7_s1_-1'], value=onh.from_array(np.array([-1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s2_-1_3'],
+                                 value=onh.from_array(np.array([-1, 3], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init7_s1_-1'],
+                                 value=onh.from_array(np.array([-1], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Reshape', ['X1', 'init7_s2_-1_3'], ['MatMulAddPattern--X1']),
                     oh.make_node('Shape', ['B'], ['MatMulAddPattern--X12'], start=-1),
-                    oh.make_node('Concat', ['init7_s1_-1', 'MatMulAddPattern--X12'], ['MatMulAddPattern--X13'], axis=0),
-                    oh.make_node('Reshape', ['B', 'MatMulAddPattern--X13'], ['MatMulAddPattern--X14']),
+                    oh.make_node('Concat', ['init7_s1_-1', 'MatMulAddPattern--X12'],
+                                 ['MatMulAddPattern--X13'], axis=0),
+                    oh.make_node('Reshape', ['B', 'MatMulAddPattern--X13'],
+                                 ['MatMulAddPattern--X14']),
                     oh.make_node('Shape', ['X1'], ['MatMulAddPattern--X16'], end=-1, start=0),
-                    oh.make_node('Concat', ['MatMulAddPattern--X16', 'init7_s1_-1'], ['MatMulAddPattern--X17'], axis=0),
-                    oh.make_node('Gemm', ['MatMulAddPattern--X1', 'X2', 'MatMulAddPattern--X14'], ['MatMulAddPattern--X15']),
-                    oh.make_node('Reshape', ['MatMulAddPattern--X15', 'MatMulAddPattern--X17'], ['Z']),
+                    oh.make_node('Concat', ['MatMulAddPattern--X16', 'init7_s1_-1'],
+                                 ['MatMulAddPattern--X17'], axis=0),
+                    oh.make_node('Gemm', ['MatMulAddPattern--X1', 'X2', 'MatMulAddPattern--X14'],
+                                 ['MatMulAddPattern--X15']),
+                    oh.make_node('Reshape', ['MatMulAddPattern--X15', 'MatMulAddPattern--X17'],
+                                 ['Z']),
                 ],
                 'pattern',
                 [
@@ -361,7 +370,15 @@ class GemmTransposePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['B'], value=onh.from_array(np.array([[0.0, 0.1666666716337204], [0.3333333432674408, 0.5], [0.6666666865348816, 0.8333333134651184]], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['B'],
+                                 value=onh.from_array(
+                                     np.array([[0.0,
+                                               0.1666666716337204],
+                                               [0.3333333432674408,
+                                               0.5],
+                                               [0.6666666865348816,
+                                               0.8333333134651184]], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Gemm', ['X', 'B'], ['Z']),
                 ],
                 'pattern',
@@ -477,8 +494,12 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s3_52_7_7'], value=onh.from_array(np.array([52, 7, 7], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['init7_s4_13_4_7_8'], value=onh.from_array(np.array([13, 4, 7, 8], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s3_52_7_7'],
+                                 value=onh.from_array(np.array([52, 7, 7], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init7_s4_13_4_7_8'],
+                                 value=onh.from_array(np.array([13, 4, 7, 8], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Reshape', ['div_5', 'init7_s3_52_7_7'], ['view_83']),
                     oh.make_node('MatMul', ['view_83', 'transpose_23'], ['bmm_11']),
                     oh.make_node('Reshape', ['bmm_11', 'init7_s4_13_4_7_8'], ['view_85']),
@@ -512,8 +533,10 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Reshape', ['transpose_23', 'init7_s4_13_4_7_8'], ['MatMulReshape2Of3PatternL_view_83']),
-                    oh.make_node('MatMul', ['div_5', 'MatMulReshape2Of3PatternL_view_83'], ['view_85']),
+                    oh.make_node('Reshape', ['transpose_23', 'init7_s4_13_4_7_8'],
+                                 ['MatMulReshape2Of3PatternL_view_83']),
+                    oh.make_node('MatMul', ['div_5', 'MatMulReshape2Of3PatternL_view_83'],
+                                 ['view_85']),
                 ],
                 'pattern',
                 [
@@ -901,8 +924,14 @@ class MulMulMatMulPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['c'], value=onh.from_array(np.array([0.4000000059604645], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['d'], value=onh.from_array(np.array([0.6000000238418579], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['c'],
+                                 value=onh.from_array(
+                                     np.array([0.4000000059604645], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['d'],
+                                 value=onh.from_array(
+                                     np.array([0.6000000238418579], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Mul', ['X', 'c'], ['a']),
                     oh.make_node('Mul', ['d', 'Y'], ['b']),
                     oh.make_node('MatMul', ['a', 'b'], ['z']),
@@ -937,7 +966,10 @@ class MulMulMatMulPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init1_s1_'], value=onh.from_array(np.array([0.24000000953674316], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['init1_s1_'],
+                                 value=onh.from_array(
+                                     np.array([0.24000000953674316], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('MatMul', ['X', 'Y'], ['MulMulMatMulPattern_z']),
                     oh.make_node('Mul', ['MulMulMatMulPattern_z', 'init1_s1_'], ['z']),
                 ],
@@ -1030,9 +1062,15 @@ class ReshapeMatMulReshapePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['shape1'], value=onh.from_array(np.array([1, 32, 128], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['shape2'], value=onh.from_array(np.array([15, 128, 64], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['shape3'], value=onh.from_array(np.array([3, 5, 32, 64], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape1'],
+                                 value=onh.from_array(np.array([1, 32, 128], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['shape2'],
+                                 value=onh.from_array(np.array([15, 128, 64], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['shape3'],
+                                 value=onh.from_array(np.array([3, 5, 32, 64], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Reshape', ['xu2', 'shape1'], ['xm1']),
                     oh.make_node('Reshape', ['Y', 'shape2'], ['xm2c']),
                     oh.make_node('MatMul', ['xm1', 'xm2c'], ['xm']),
@@ -1389,7 +1427,9 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['shape'], value=onh.from_array(np.array([2, 2, 7, 3], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape'],
+                                 value=onh.from_array(np.array([2, 2, 7, 3], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('MatMul', ['X', 'yts'], ['Z']),
                     oh.make_node('Reshape', ['yt', 'shape'], ['yts']),
                     oh.make_node('Transpose', ['Y'], ['yt'], perm=[0, 2, 1]),
@@ -1426,9 +1466,13 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s4_2_2_3_7'], value=onh.from_array(np.array([2, 2, 3, 7], dtype=np.int64), name='value')),
-                    oh.make_node('Reshape', ['Y', 'init7_s4_2_2_3_7'], ['TransposeReshapeMatMulPatternL_Y']),
-                    oh.make_node('Transpose', ['TransposeReshapeMatMulPatternL_Y'], ['yts'], perm=[0, 1, 3, 2]),
+                    oh.make_node('Constant', [], ['init7_s4_2_2_3_7'],
+                                 value=onh.from_array(np.array([2, 2, 3, 7], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Reshape', ['Y', 'init7_s4_2_2_3_7'],
+                                 ['TransposeReshapeMatMulPatternL_Y']),
+                    oh.make_node('Transpose', ['TransposeReshapeMatMulPatternL_Y'], ['yts'],
+                                 perm=[0, 1, 3, 2]),
                     oh.make_node('MatMul', ['X', 'yts'], ['Z']),
                 ],
                 'pattern',
@@ -1638,8 +1682,10 @@ class SwitchReshapeActivationPattern(PatternOptimization):
             oh.make_graph(
                 [
                     oh.make_node('MatMul', ['X', 'Y'], ['SwitchReshapeActivationPatternL_mm']),
-                    oh.make_node('Relu', ['SwitchReshapeActivationPatternL_mm'], ['SwitchReshapeActivationPatternL_tmm']),
-                    oh.make_node('Transpose', ['SwitchReshapeActivationPatternL_tmm'], ['Z'], perm=[0, 2, 1, 3]),
+                    oh.make_node('Relu', ['SwitchReshapeActivationPatternL_mm'],
+                                 ['SwitchReshapeActivationPatternL_tmm']),
+                    oh.make_node('Transpose', ['SwitchReshapeActivationPatternL_tmm'], ['Z'],
+                                 perm=[0, 2, 1, 3]),
                 ],
                 'pattern',
                 [
@@ -1797,8 +1843,12 @@ class ShapeBasedMatMulToMulPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['X-ZEROS2'], value=onh.from_array(np.array([0, 1, -1], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['Y-ZEROS2'], value=onh.from_array(np.array([0, -1, 1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['X-ZEROS2'],
+                                 value=onh.from_array(np.array([0, 1, -1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['Y-ZEROS2'],
+                                 value=onh.from_array(np.array([0, -1, 1], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Reshape', ['X', 'X-ZEROS2'], ['X2']),
                     oh.make_node('Reshape', ['Y', 'Y-ZEROS2'], ['Y2']),
                     oh.make_node('Mul', ['X2', 'Y2'], ['Z']),

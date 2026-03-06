@@ -26,8 +26,12 @@ class MulMulMulScalarPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['cst1'], value=onh.from_array(np.array([2.0], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['cst2'], value=onh.from_array(np.array([3.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['cst1'],
+                                 value=onh.from_array(np.array([2.0], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['cst2'],
+                                 value=onh.from_array(np.array([3.0], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Mul', ['xc', 'yc'], ['Z']),
                     oh.make_node('Div', ['X', 'cst1'], ['xc']),
                     oh.make_node('Div', ['Y', 'cst2'], ['yc']),
@@ -62,7 +66,9 @@ class MulMulMulScalarPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init1_s1_'], value=onh.from_array(np.array([6.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['init1_s1_'],
+                                 value=onh.from_array(np.array([6.0], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Mul', ['X', 'Y'], ['MulMulMulScalarPattern--Z']),
                     oh.make_node('Div', ['MulMulMulScalarPattern--Z', 'init1_s1_'], ['Z']),
                 ],

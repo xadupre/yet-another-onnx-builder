@@ -27,10 +27,12 @@ class CastPattern(PatternOptimization):
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('_onx_mul045', onnx.TensorProto.FLOAT16, (4, 512, 16384)),
+                    oh.make_tensor_value_info('_onx_mul045', onnx.TensorProto.FLOAT16,
+                                              (4, 512, 16384)),
                 ],
                 [
-                    oh.make_tensor_value_info('mul_34', onnx.TensorProto.FLOAT16, (4, 512, 16384)),
+                    oh.make_tensor_value_info('mul_34', onnx.TensorProto.FLOAT16,
+                                              (4, 512, 16384)),
                 ],
             ),
             functions=[],
@@ -56,10 +58,12 @@ class CastPattern(PatternOptimization):
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('_onx_mul045', onnx.TensorProto.FLOAT16, (4, 512, 16384)),
+                    oh.make_tensor_value_info('_onx_mul045', onnx.TensorProto.FLOAT16,
+                                              (4, 512, 16384)),
                 ],
                 [
-                    oh.make_tensor_value_info('mul_34', onnx.TensorProto.FLOAT16, (4, 512, 16384)),
+                    oh.make_tensor_value_info('mul_34', onnx.TensorProto.FLOAT16,
+                                              (4, 512, 16384)),
                 ],
             ),
             functions=[],
@@ -673,7 +677,8 @@ class ComputationCastOpCastPattern(PatternOptimization):
             oh.make_graph(
                 [
                     oh.make_node('Cast', ['X'], ['ComputationCastOpCastPattern--X'], to=10),
-                    oh.make_node('Add', ['ComputationCastOpCastPattern--X', 'Y'], ['ComputationCastOpCastPattern--Z']),
+                    oh.make_node('Add', ['ComputationCastOpCastPattern--X', 'Y'],
+                                 ['ComputationCastOpCastPattern--Z']),
                     oh.make_node('Cast', ['ComputationCastOpCastPattern--Z'], ['Z'], to=1),
                 ],
                 'pattern',

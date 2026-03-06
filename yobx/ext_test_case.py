@@ -537,7 +537,7 @@ def requires_torch(version: str = "", msg: str = "") -> Callable:
 
 
 def requires_onnx_diagnostic(version: str = "", msg: str = "") -> Callable:
-    """Skips a unit test if :epkg:`onnx_diagnostic` is not recent enough."""
+    """Skips a unit test if :epkg:`onnx-diagnostic` is not recent enough."""
     try:
         import onnx_diagnostic
     except ImportError:

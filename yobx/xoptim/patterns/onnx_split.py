@@ -25,20 +25,37 @@ class SlicesSplitPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s1_0'], value=onh.from_array(np.array([0], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['init7_s1_256'], value=onh.from_array(np.array([256], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['init7_s1_3'], value=onh.from_array(np.array([3], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['init7_s1_9223372036854775807'], value=onh.from_array(np.array([9223372036854775807], dtype=np.int64), name='value')),
-                    oh.make_node('Slice', ['transpose_1', 'init7_s1_0', 'init7_s1_256', 'init7_s1_3'], ['slice_11']),
-                    oh.make_node('Slice', ['transpose_1', 'init7_s1_256', 'init7_s1_9223372036854775807', 'init7_s1_3'], ['slice_12']),
+                    oh.make_node('Constant', [], ['init7_s1_0'],
+                                 value=onh.from_array(np.array([0], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init7_s1_256'],
+                                 value=onh.from_array(np.array([256], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init7_s1_3'],
+                                 value=onh.from_array(np.array([3], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init7_s1_9223372036854775807'],
+                                 value=onh.from_array(
+                                     np.array([9223372036854775807], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Slice',
+                                 ['transpose_1', 'init7_s1_0', 'init7_s1_256', 'init7_s1_3'],
+                                 ['slice_11']),
+                    oh.make_node('Slice',
+                        ['transpose_1', 'init7_s1_256',
+                         'init7_s1_9223372036854775807', 'init7_s1_3'],
+                        ['slice_12']),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('transpose_1', onnx.TensorProto.FLOAT16, (2, 2, 1024, 512)),
+                    oh.make_tensor_value_info('transpose_1', onnx.TensorProto.FLOAT16,
+                                              (2, 2, 1024, 512)),
                 ],
                 [
-                    oh.make_tensor_value_info('slice_11', onnx.TensorProto.FLOAT16, (2, 2, 1024, 256)),
-                    oh.make_tensor_value_info('slice_12', onnx.TensorProto.FLOAT16, (2, 2, 1024, 256)),
+                    oh.make_tensor_value_info('slice_11', onnx.TensorProto.FLOAT16,
+                                              (2, 2, 1024, 256)),
+                    oh.make_tensor_value_info('slice_12', onnx.TensorProto.FLOAT16,
+                                              (2, 2, 1024, 256)),
                 ],
             ),
             functions=[],
@@ -62,16 +79,22 @@ class SlicesSplitPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s2_256_256'], value=onh.from_array(np.array([256, 256], dtype=np.int64), name='value')),
-                    oh.make_node('Split', ['transpose_1', 'init7_s2_256_256'], ['slice_11', 'slice_12'], axis=3),
+                    oh.make_node('Constant', [], ['init7_s2_256_256'],
+                                 value=onh.from_array(np.array([256, 256], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Split', ['transpose_1', 'init7_s2_256_256'],
+                                 ['slice_11', 'slice_12'], axis=3),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('transpose_1', onnx.TensorProto.FLOAT16, (2, 2, 1024, 512)),
+                    oh.make_tensor_value_info('transpose_1', onnx.TensorProto.FLOAT16,
+                                              (2, 2, 1024, 512)),
                 ],
                 [
-                    oh.make_tensor_value_info('slice_11', onnx.TensorProto.FLOAT16, (2, 2, 1024, 256)),
-                    oh.make_tensor_value_info('slice_12', onnx.TensorProto.FLOAT16, (2, 2, 1024, 256)),
+                    oh.make_tensor_value_info('slice_11', onnx.TensorProto.FLOAT16,
+                                              (2, 2, 1024, 256)),
+                    oh.make_tensor_value_info('slice_12', onnx.TensorProto.FLOAT16,
+                                              (2, 2, 1024, 256)),
                 ],
             ),
             functions=[],
@@ -234,8 +257,10 @@ class GathersSplitPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array(0, dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zero'],
+                                 value=onh.from_array(np.array(0, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['one'],
+                                 value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
                     oh.make_node('Gather', ['X', 'zero'], ['x1'], axis=1),
                     oh.make_node('Gather', ['X', 'one'], ['x2'], axis=1),
                 ],
@@ -269,8 +294,12 @@ class GathersSplitPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s1_1'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
-                    oh.make_node('Split', ['X'], ['GathersSplitPattern--x1', 'GathersSplitPattern--x2'], axis=1, num_outputs=2),
+                    oh.make_node('Constant', [], ['init7_s1_1'],
+                                 value=onh.from_array(np.array([1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Split', ['X'],
+                                 ['GathersSplitPattern--x1', 'GathersSplitPattern--x2'], axis=1,
+                                 num_outputs=2),
                     oh.make_node('Squeeze', ['GathersSplitPattern--x1', 'init7_s1_1'], ['x1']),
                     oh.make_node('Squeeze', ['GathersSplitPattern--x2', 'init7_s1_1'], ['x2']),
                 ],

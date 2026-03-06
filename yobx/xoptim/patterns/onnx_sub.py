@@ -24,7 +24,9 @@ class Sub1MulPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init1_s1_'], value=onh.from_array(np.array([1.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['init1_s1_'],
+                                 value=onh.from_array(np.array([1.0], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Mul', ['input3', '_onx_sub0'], ['_onx_mul0']),
                     oh.make_node('Sub', ['init1_s1_', 'input3'], ['_onx_sub0']),
                 ],
