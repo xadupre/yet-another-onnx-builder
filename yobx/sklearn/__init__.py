@@ -9,12 +9,14 @@ def register_sklearn_converters():
         # already done
         return
     from .linear_model import register as register_linear_model
+    from .multiclass import register as register_multiclass
     from .neural_network import register as register_neural_network
     from .pipeline import register as register_pipeline
     from .preprocessing import register as register_preprocessing
     from .tree import register as register_tree
 
     register_linear_model()
+    register_multiclass()
     register_neural_network()
     register_pipeline()
     register_preprocessing()
