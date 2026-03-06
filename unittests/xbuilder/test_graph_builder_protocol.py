@@ -13,6 +13,7 @@ import unittest
 
 from onnx import TensorProto
 
+from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
 from yobx.typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol
 from yobx.xbuilder import GraphBuilder
@@ -24,24 +25,20 @@ class TestGraphBuilderProtocolExists(ExtTestCase):
     """Protocol class is importable from both yobx.typing and yobx.xbuilder."""
 
     def test_import_from_typing(self):
-        from yobx.typing import GraphBuilderProtocol as P  # noqa: F401
-
-        self.assertIsNotNone(P)
+        self.assertIsNotNone(GraphBuilderProtocol)
 
     def test_import_from_xbuilder(self):
-        from yobx.xbuilder import GraphBuilderProtocol as P  # noqa: F401
+        from yobx.xbuilder import GraphBuilderProtocol as P
 
-        self.assertIsNotNone(P)
+        self.assertIs(P, GraphBuilderProtocol)
 
     def test_extended_import_from_typing(self):
-        from yobx.typing import GraphBuilderExtendedProtocol as P  # noqa: F401
-
-        self.assertIsNotNone(P)
+        self.assertIsNotNone(GraphBuilderExtendedProtocol)
 
     def test_extended_import_from_xbuilder(self):
-        from yobx.xbuilder import GraphBuilderExtendedProtocol as P  # noqa: F401
+        from yobx.xbuilder import GraphBuilderExtendedProtocol as P
 
-        self.assertIsNotNone(P)
+        self.assertIs(P, GraphBuilderExtendedProtocol)
 
     def test_protocol_has_required_methods(self):
         required = [
@@ -150,8 +147,6 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
     """OnnxScriptGraphBuilder has all methods required by GraphBuilderProtocol."""
 
     def _make_simple_model(self):
-        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
-
         g = OnnxScriptGraphBuilder(18)
         g.make_tensor_input("x", TFLOAT, (None, None))
         g.make_tensor_input("y", TFLOAT, (None, None))
@@ -160,8 +155,6 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
         return g
 
     def test_has_all_protocol_attributes(self):
-        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
-
         g = OnnxScriptGraphBuilder(18)
         for attr in [
             "input_names",
@@ -194,37 +187,27 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
         self.assertIn("y", g.input_names)
 
     def test_has_name(self):
-        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
-
         g = OnnxScriptGraphBuilder(18)
         g.make_tensor_input("x", TFLOAT, (None,))
         self.assertTrue(g.has_name("x"))
         self.assertFalse(g.has_name("does_not_exist"))
 
     def test_unique_name(self):
-        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
-
         g = OnnxScriptGraphBuilder(18)
         n1 = g.unique_name("tmp")
         n2 = g.unique_name("tmp")
         self.assertNotEqual(n1, n2)
 
     def test_get_opset(self):
-        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
-
         g = OnnxScriptGraphBuilder(18)
         self.assertEqual(g.get_opset(""), 18)
 
     def test_add_domain(self):
-        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
-
         g = OnnxScriptGraphBuilder(18)
         g.add_domain("custom", 1)
         self.assertEqual(g.get_opset("custom"), 1)
 
     def test_has_opset(self):
-        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
-
         g = OnnxScriptGraphBuilder(18)
         self.assertEqual(g.has_opset(""), 18)
         self.assertEqual(g.has_opset("custom.domain"), 0)
@@ -283,8 +266,6 @@ class TestOnnxScriptGraphBuilderExtendedProtocol(ExtTestCase):
     """OnnxScriptGraphBuilder satisfies GraphBuilderExtendedProtocol."""
 
     def test_onnxscript_has_extended_attrs(self):
-        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
-
         g = OnnxScriptGraphBuilder(18)
         for attr in ["op", "set_type_shape_unary_op"]:
             self.assertTrue(
@@ -293,8 +274,6 @@ class TestOnnxScriptGraphBuilderExtendedProtocol(ExtTestCase):
             )
 
     def test_onnxscript_is_instance_extended(self):
-        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
-
         g = OnnxScriptGraphBuilder(18)
         self.assertIsInstance(g, GraphBuilderExtendedProtocol)
 
