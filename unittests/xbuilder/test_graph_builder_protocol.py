@@ -10,13 +10,12 @@ required method/property exists with a functional smoke test).
 """
 
 import unittest
-from typing import Tuple
 
 from onnx import TensorProto
 
 from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
-from yobx.typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol, OpsetProtocol, TensorProtocol
+from yobx.typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol, OpsetProtocol
 from yobx.xbuilder import GraphBuilder
 
 TFLOAT = TensorProto.FLOAT
@@ -280,13 +279,13 @@ class TestOnnxScriptGraphBuilderExtendedProtocol(ExtTestCase):
 
 
 class TestOpsetProtocol(ExtTestCase):
-    """OpsetProtocol is importable and has the required make_node method."""
+    """OpsetProtocol is importable and has the required __getattr__ method."""
 
-    def test_opset_protocol_has_make_node(self):
+    def test_opset_protocol_has_getattr(self):
         self.assertIn(
-            "make_node",
+            "__getattr__",
             dir(OpsetProtocol),
-            msg="OpsetProtocol is missing 'make_node'",
+            msg="OpsetProtocol is missing '__getattr__'",
         )
 
     def test_graphbuilder_op_satisfies_protocol(self):
@@ -311,70 +310,6 @@ class TestOnnxScriptOpsetProtocol(ExtTestCase):
     def test_onnxscript_op_satisfies_protocol(self):
         g = OnnxScriptGraphBuilder(18)
         self.assertIsInstance(g.op, OpsetProtocol)
-
-
-class TestTensorProtocol(ExtTestCase):
-    """TensorProtocol is importable, has the required ``dtype``, ``shape``,
-    and ``device`` properties, and can be satisfied by any object exposing
-    those three attributes."""
-
-    def test_tensor_protocol_has_required_attrs(self):
-        for attr in ("dtype", "shape", "device"):
-            self.assertIn(
-                attr,
-                dir(TensorProtocol),
-                msg=f"TensorProtocol is missing '{attr}'",
-            )
-
-    def test_tensor_protocol_has_no_name(self):
-        """TensorProtocol describes a tensor value, not a named graph node."""
-        self.assertNotIn("name", TensorProtocol.__protocol_attrs__)
-
-    def test_import_from_xbuilder(self):
-        from yobx.xbuilder import TensorProtocol as P
-
-        self.assertIs(P, TensorProtocol)
-
-    def test_import_from_root(self):
-        from yobx import TensorProtocol as P
-
-        self.assertIs(P, TensorProtocol)
-
-    def test_tensor_value_satisfies_protocol(self):
-        """Any object with .dtype, .shape, .device attributes satisfies TensorProtocol."""
-
-        class _FakeTensor:
-            @property
-            def dtype(self):
-                return float
-
-            @property
-            def shape(self) -> Tuple[int, ...]:
-                return (2, 3)
-
-            @property
-            def device(self):
-                return "cpu"
-
-        self.assertIsInstance(_FakeTensor(), TensorProtocol)
-
-    def test_plain_string_does_not_satisfy_protocol(self):
-        """A plain str does NOT satisfy TensorProtocol (it has no .dtype/.shape/.device)."""
-        self.assertNotIsInstance("x", TensorProtocol)
-
-    def test_object_without_device_does_not_satisfy_protocol(self):
-        """An object missing .device does NOT satisfy TensorProtocol."""
-
-        class _NoDev:
-            @property
-            def dtype(self):
-                return float
-
-            @property
-            def shape(self) -> Tuple[int, ...]:
-                return (2, 3)
-
-        self.assertNotIsInstance(_NoDev(), TensorProtocol)
 
 
 if __name__ == "__main__":

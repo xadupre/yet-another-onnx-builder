@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Protocol, Sequence, Tuple, Union, runtime_checkable
+from typing import Any, Callable, Dict, List, Optional, Protocol, Sequence, Tuple, Union, runtime_checkable
 
 
 @runtime_checkable
@@ -203,45 +203,6 @@ class GraphBuilderProtocol(Protocol):
         ...
 
 
-@runtime_checkable
-class TensorProtocol(Protocol):
-    """Protocol for tensor-like values that can be passed as inputs to opset helpers.
-
-    Objects satisfying this protocol represent actual tensor values (e.g. constants
-    or traced tensors) that carry dtype, shape, and device information.  Typical
-    concrete types that satisfy this protocol include:
-
-    * :class:`torch.Tensor` — a PyTorch eager or :class:`torch.fx.proxy.Proxy` tensor.
-    * ``torch.FakeTensor`` — a symbolic tensor used during :mod:`torch.fx` tracing.
-    * Any framework tensor that exposes ``.dtype``, ``.shape``, and ``.device``.
-
-    Plain ``str`` tensor names are handled separately in :class:`OpsetProtocol`.
-    """
-
-    @property
-    def dtype(self) -> Any:
-        """Element type of the tensor (e.g. ``torch.float32``).
-
-        :return: framework-specific dtype object
-        """
-        ...
-
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        """Shape of the tensor as a tuple of integer dimensions.
-
-        :return: shape tuple
-        """
-        ...
-
-    @property
-    def device(self) -> Any:
-        """Device on which the tensor resides (e.g. ``torch.device("cpu")``).
-
-        :return: framework-specific device object
-        """
-        ...
-
 
 @runtime_checkable
 class OpsetProtocol(Protocol):
@@ -254,36 +215,18 @@ class OpsetProtocol(Protocol):
 
     The primary usage pattern is attribute-access dispatch::
 
-        out = g.op.Relu(x)   # equivalent to g.op.make_node("Relu", x)
+        out = g.op.Relu(x)   # resolves via __getattr__("Relu"), then calls result
 
-    :meth:`make_node` is the core method that all opset helper implementations
-    must provide.
+    ``__getattr__`` must return a callable that, when invoked, creates the
+    corresponding ONNX node and returns its output name(s).
     """
 
-    def make_node(
-        self,
-        op_type: str,
-        *inputs: Union[str, "TensorProtocol"],
-        outputs: Optional[Union[int, List[str], str]] = None,
-        domain: str = "",
-        name: Optional[str] = None,
-        **kwargs: Any,
-    ) -> Union[str, Tuple[str, ...]]:
-        """Creates an ONNX node and returns its output name(s).
+    def __getattr__(self, op_type: str) -> Callable[..., Union[str, Tuple[str, ...]]]:
+        """Returns a callable that creates an ONNX node of type *op_type*.
 
-        :param op_type: ONNX operator type (e.g. ``"Relu"``, ``"MatMul"``)
-        :param inputs: input tensor names (``str``) or tensor values
-            (:class:`TensorProtocol`, e.g. ``torch.Tensor``) — concrete
-            implementations also accept ``numpy.ndarray`` constants and ``None``
-            for optional inputs
-        :param outputs: number of outputs (``int``), a single output name
-            (``str``), or a list of output names; ``None`` uses a default
-            inferred from *op_type* when supported
-        :param domain: operator domain (default ``""`` = standard ONNX)
-        :param name: optional node name for debugging
-        :param kwargs: operator attributes as Python primitives
-        :return: output name when a single output is created, otherwise a
-            tuple of names
+        :param op_type: ONNX operator type name (e.g. ``"Relu"``, ``"MatMul"``)
+        :return: a callable that accepts tensor inputs and keyword attributes
+            and returns the output name (``str``) or a tuple of output names
         """
         ...
 
@@ -299,8 +242,7 @@ class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
     advanced graph construction:
 
     * ``op`` — an opset helper that allows constructing nodes with
-      ``g.op.Add(x, y)``-style syntax instead of calling :meth:`make_node`
-      directly.
+      ``g.op.Add(x, y)``-style syntax via :meth:`~OpsetProtocol.__getattr__`.
     * :meth:`set_type_shape_unary_op` — propagates type and shape from an
       input to an output for unary operators such as ``Abs``, ``Relu``, etc.
     """

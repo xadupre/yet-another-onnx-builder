@@ -43,13 +43,6 @@ OpsetProtocol
     :members:
     :no-undoc-members:
 
-TensorProtocol
-++++++++++++++
-
-.. autoclass:: yobx.typing.TensorProtocol
-    :members:
-    :no-undoc-members:
-
 FunctionOptions
 +++++++++++++++
 
