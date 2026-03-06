@@ -18,74 +18,38 @@ class SimplifiedLayerNormalizationPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
+        import numpy as np
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "D")))
-        inputs.append(oh.make_tensor_value_info("axis", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["exp"],
-                value=onh.from_array(np.array([2.0], dtype=np.float32), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['exp'], value=onh.from_array(np.array([2.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['axis'], value=onh.from_array(np.array([-1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['eps'], value=onh.from_array(np.array([9.999999974752427e-07], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([1.0], dtype=np.float32), name='value')),
+                    oh.make_node('Pow', ['X', 'exp'], ['x2']),
+                    oh.make_node('ReduceMean', ['x2', 'axis'], ['xr']),
+                    oh.make_node('Add', ['xr', 'eps'], ['xa']),
+                    oh.make_node('Sqrt', ['xa'], ['xq']),
+                    oh.make_node('Div', ['one', 'xq'], ['Z']),
+                    oh.make_node('Mul', ['Z', 'X'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('a', 'D')),
+                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, shape=(1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('a', 1)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('a', 'D')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["axis"],
-                value=onh.from_array(np.array([-1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["eps"],
-                value=onh.from_array(
-                    np.array([9.999999974752427e-07], dtype=np.float32), name="value"
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["one"],
-                value=onh.from_array(np.array([1.0], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Pow", ["X", "exp"], ["x2"]))
-        nodes.append(oh.make_node("ReduceMean", ["x2", "axis"], ["xr"]))
-        nodes.append(oh.make_node("Add", ["xr", "eps"], ["xa"]))
-        nodes.append(oh.make_node("Sqrt", ["xa"], ["xq"]))
-        nodes.append(oh.make_node("Div", ["one", "xq"], ["Z"]))
-        nodes.append(oh.make_node("Mul", ["Z", "X"], ["Y"]))
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", 1)))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "D")))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -96,54 +60,32 @@ class SimplifiedLayerNormalizationPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
+        import numpy as np
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=("a", "D")))
-        inputs.append(oh.make_tensor_value_info("axis", onnx.TensorProto.INT64, shape=(1,)))
-        nodes.append(oh.make_node("Shape", ["X"], ["shape-X"]))
-        nodes.append(oh.make_node("Gather", ["shape-X", "axis"], ["gather-shape-X"]))
-        nodes.append(
-            oh.make_node(
-                "ConstantOfShape",
-                ["gather-shape-X"],
-                ["constantofshape-gather-shape-X"],
-                value=onh.from_array(np.array([1.0], dtype=np.float32), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Shape', ['X'], ['shape-X']),
+                    oh.make_node('Gather', ['shape-X', 'axis'], ['gather-shape-X']),
+                    oh.make_node('ConstantOfShape', ['gather-shape-X'], ['constantofshape-gather-shape-X'], value=onh.from_array(np.array([1.0], dtype=np.float32), name='value')),
+                    oh.make_node('SimplifiedLayerNormalization', ['X', 'constantofshape-gather-shape-X'], ['Y', 'Z'], axis=-1, epsilon=9.999999974752427e-07, stash_type=1),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('a', 'D')),
+                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, shape=(1,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('a', 1)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('a', 'D')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18)],
         )
-        nodes.append(
-            oh.make_node(
-                "SimplifiedLayerNormalization",
-                ["X", "constantofshape-gather-shape-X"],
-                ["Y", "Z"],
-                axis=-1,
-                epsilon=9.999999974752427e-07,
-                stash_type=1,
-            )
-        )
-        outputs.append(oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, shape=("a", 1)))
-        outputs.append(oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=("a", "D")))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -300,51 +242,30 @@ class SkipLayerNormalizationPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("X2", onnx.TensorProto.FLOAT16, shape=("a", "b", "c"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Add', ['X1', 'X2'], ['add']),
+                    oh.make_node('LayerNormalization', ['add', 'scale', 'bias'], ['Y'], axis=-1),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X2', onnx.TensorProto.FLOAT16, shape=('a', 'b', 'c')),
+                    oh.make_tensor_value_info('X1', onnx.TensorProto.FLOAT16, shape=('a', 'b', 'c')),
+                    oh.make_tensor_value_info('scale', onnx.TensorProto.FLOAT16, shape=('c',)),
+                    oh.make_tensor_value_info('bias', onnx.TensorProto.FLOAT16, shape=('c',)),
+                ],
+                [
+                    oh.make_tensor_value_info('add', onnx.TensorProto.FLOAT16, shape=('a', 'b', 'c')),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, shape=('a', 'b', 'c')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X1", onnx.TensorProto.FLOAT16, shape=("a", "b", "c"))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("scale", onnx.TensorProto.FLOAT16, shape=("c",))
-        )
-        inputs.append(oh.make_tensor_value_info("bias", onnx.TensorProto.FLOAT16, shape=("c",)))
-        nodes.append(oh.make_node("Add", ["X1", "X2"], ["add"]))
-        nodes.append(
-            oh.make_node("LayerNormalization", ["add", "scale", "bias"], ["Y"], axis=-1)
-        )
-        outputs.append(
-            oh.make_tensor_value_info("add", onnx.TensorProto.FLOAT16, shape=("a", "b", "c"))
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT16, shape=("a", "b", "c"))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -355,55 +276,29 @@ class SkipLayerNormalizationPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("X2", onnx.TensorProto.FLOAT16, shape=("a", "b", "c"))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('SkipLayerNormalization', ['X1', 'X2', 'scale', 'bias'], ['Y', 'unused', 'unused2', 'add'], domain='com.microsoft'),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X2', onnx.TensorProto.FLOAT16, shape=('a', 'b', 'c')),
+                    oh.make_tensor_value_info('X1', onnx.TensorProto.FLOAT16, shape=('a', 'b', 'c')),
+                    oh.make_tensor_value_info('scale', onnx.TensorProto.FLOAT16, shape=('c',)),
+                    oh.make_tensor_value_info('bias', onnx.TensorProto.FLOAT16, shape=('c',)),
+                ],
+                [
+                    oh.make_tensor_value_info('add', onnx.TensorProto.FLOAT16, shape=('a', 'b', 'c')),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, shape=('a', 'b', 'c')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X1", onnx.TensorProto.FLOAT16, shape=("a", "b", "c"))
-        )
-        inputs.append(
-            oh.make_tensor_value_info("scale", onnx.TensorProto.FLOAT16, shape=("c",))
-        )
-        inputs.append(oh.make_tensor_value_info("bias", onnx.TensorProto.FLOAT16, shape=("c",)))
-        nodes.append(
-            oh.make_node(
-                "SkipLayerNormalization",
-                ["X1", "X2", "scale", "bias"],
-                ["Y", "unused", "unused2", "add"],
-                domain="com.microsoft",
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("add", onnx.TensorProto.FLOAT16, shape=("a", "b", "c"))
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT16, shape=("a", "b", "c"))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -482,269 +377,32 @@ class SkipSimplifiedLayerNormalizationPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
+        import numpy as np
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("scale", onnx.TensorProto.FLOAT, shape=(192,)))
-        inputs.append(
-            oh.make_tensor_value_info(
-                "skip", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['scale'], value=onh.from_array(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32), name='value')),
+                    oh.make_node('Add', ['X', 'skip'], ['xs']),
+                    oh.make_node('SimplifiedLayerNormalization', ['xs', 'scale'], ['ym'], axis=-1, epsilon=0.10000000149011612),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('scale', onnx.TensorProto.FLOAT, shape=(192,)),
+                    oh.make_tensor_value_info('skip', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                ],
+                [
+                    oh.make_tensor_value_info('xs', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                    oh.make_tensor_value_info('ym', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "X", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["scale"],
-                value=onh.from_array(
-                    np.array(
-                        [
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                        ],
-                        dtype=np.float32,
-                    ),
-                    name="value",
-                ),
-            )
-        )
-        nodes.append(oh.make_node("Add", ["X", "skip"], ["xs"]))
-        nodes.append(
-            oh.make_node(
-                "SimplifiedLayerNormalization",
-                ["xs", "scale"],
-                ["ym"],
-                axis=-1,
-                epsilon=0.10000000149011612,
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "xs", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "ym", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -755,61 +413,28 @@ class SkipSimplifiedLayerNormalizationPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("scale", onnx.TensorProto.FLOAT, shape=(192,)))
-        inputs.append(
-            oh.make_tensor_value_info(
-                "skip", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('SkipSimplifiedLayerNormalization', ['X', 'skip', 'scale'], ['ym', '', '', 'xs'], domain='com.microsoft', epsilon=0.10000000149011612),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('scale', onnx.TensorProto.FLOAT, shape=(192,)),
+                    oh.make_tensor_value_info('skip', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                ],
+                [
+                    oh.make_tensor_value_info('xs', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                    oh.make_tensor_value_info('ym', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "X", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "SkipSimplifiedLayerNormalization",
-                ["X", "skip", "scale"],
-                ["ym", "", "", "xs"],
-                domain="com.microsoft",
-                epsilon=0.10000000149011612,
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "xs", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "ym", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -882,479 +507,34 @@ class SkipSimplifiedLayerNormalizationMulPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
+        import numpy as np
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "X", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['scale'], value=onh.from_array(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['weights'], value=onh.from_array(np.array([1000.0, 1000.0051879882812, 1000.0104370117188, 1000.015625, 1000.0208129882812, 1000.0260620117188, 1000.03125, 1000.0364379882812, 1000.0416870117188, 1000.046875, 1000.0520629882812, 1000.0573120117188, 1000.0625, 1000.0676879882812, 1000.0729370117188, 1000.078125, 1000.0833129882812, 1000.0885620117188, 1000.09375, 1000.0989379882812, 1000.1041870117188, 1000.109375, 1000.1145629882812, 1000.1198120117188, 1000.125, 1000.1301879882812, 1000.1354370117188, 1000.140625, 1000.1458129882812, 1000.1510620117188, 1000.15625, 1000.1614379882812, 1000.1666870117188, 1000.171875, 1000.1770629882812, 1000.1823120117188, 1000.1875, 1000.1926879882812, 1000.1979370117188, 1000.203125, 1000.2083129882812, 1000.2135620117188, 1000.21875, 1000.2239379882812, 1000.2291870117188, 1000.234375, 1000.2395629882812, 1000.2448120117188, 1000.25, 1000.2551879882812, 1000.2604370117188, 1000.265625, 1000.2708129882812, 1000.2760620117188, 1000.28125, 1000.2864379882812, 1000.2916870117188, 1000.296875, 1000.3020629882812, 1000.3073120117188, 1000.3125, 1000.3176879882812, 1000.3229370117188, 1000.328125, 1000.3333129882812, 1000.3385620117188, 1000.34375, 1000.3489379882812, 1000.3541870117188, 1000.359375, 1000.3645629882812, 1000.3698120117188, 1000.375, 1000.3801879882812, 1000.3854370117188, 1000.390625, 1000.3958129882812, 1000.4010620117188, 1000.40625, 1000.4114379882812, 1000.4166870117188, 1000.421875, 1000.4270629882812, 1000.4323120117188, 1000.4375, 1000.4426879882812, 1000.4479370117188, 1000.453125, 1000.4583129882812, 1000.4635620117188, 1000.46875, 1000.4739379882812, 1000.4791870117188, 1000.484375, 1000.4895629882812, 1000.4948120117188, 1000.5, 1000.5051879882812, 1000.5104370117188, 1000.515625, 1000.5208129882812, 1000.5260620117188, 1000.53125, 1000.5364379882812, 1000.5416870117188, 1000.546875, 1000.5520629882812, 1000.5573120117188, 1000.5625, 1000.5676879882812, 1000.5729370117188, 1000.578125, 1000.5833129882812, 1000.5885620117188, 1000.59375, 1000.5989379882812, 1000.6041870117188, 1000.609375, 1000.6145629882812, 1000.6198120117188, 1000.625, 1000.6301879882812, 1000.6354370117188, 1000.640625, 1000.6458129882812, 1000.6510620117188, 1000.65625, 1000.6614379882812, 1000.6666870117188, 1000.671875, 1000.6770629882812, 1000.6823120117188, 1000.6875, 1000.6926879882812, 1000.6979370117188, 1000.703125, 1000.7083129882812, 1000.7135620117188, 1000.71875, 1000.7239379882812, 1000.7291870117188, 1000.734375, 1000.7395629882812, 1000.7448120117188, 1000.75, 1000.7551879882812, 1000.7604370117188, 1000.765625, 1000.7708129882812, 1000.7760620117188, 1000.78125, 1000.7864379882812, 1000.7916870117188, 1000.796875, 1000.8020629882812, 1000.8073120117188, 1000.8125, 1000.8176879882812, 1000.8229370117188, 1000.828125, 1000.8333129882812, 1000.8385620117188, 1000.84375, 1000.8489379882812, 1000.8541870117188, 1000.859375, 1000.8645629882812, 1000.8698120117188, 1000.875, 1000.8801879882812, 1000.8854370117188, 1000.890625, 1000.8958129882812, 1000.9010620117188, 1000.90625, 1000.9114379882812, 1000.9166870117188, 1000.921875, 1000.9270629882812, 1000.9323120117188, 1000.9375, 1000.9426879882812, 1000.9479370117188, 1000.953125, 1000.9583129882812, 1000.9635620117188, 1000.96875, 1000.9739379882812, 1000.9791870117188, 1000.984375, 1000.9895629882812, 1000.9948120117188], dtype=np.float32), name='value')),
+                    oh.make_node('SkipSimplifiedLayerNormalization', ['X', 'skip', 'scale'], ['ym', '', '', 'xs'], domain='com.microsoft', epsilon=0.10000000149011612),
+                    oh.make_node('Mul', ['ym', 'weights'], ['a']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                    oh.make_tensor_value_info('skip', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                    oh.make_tensor_value_info('weights', onnx.TensorProto.FLOAT, shape=(192,)),
+                ],
+                [
+                    oh.make_tensor_value_info('', onnx.TensorProto.UNDEFINED, []),
+                    oh.make_tensor_value_info('a', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                    oh.make_tensor_value_info('xs', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "skip", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("weights", onnx.TensorProto.FLOAT, shape=(192,))
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["scale"],
-                value=onh.from_array(
-                    np.array(
-                        [
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                        ],
-                        dtype=np.float32,
-                    ),
-                    name="value",
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["weights"],
-                value=onh.from_array(
-                    np.array(
-                        [
-                            1000.0,
-                            1000.0051879882812,
-                            1000.0104370117188,
-                            1000.015625,
-                            1000.0208129882812,
-                            1000.0260620117188,
-                            1000.03125,
-                            1000.0364379882812,
-                            1000.0416870117188,
-                            1000.046875,
-                            1000.0520629882812,
-                            1000.0573120117188,
-                            1000.0625,
-                            1000.0676879882812,
-                            1000.0729370117188,
-                            1000.078125,
-                            1000.0833129882812,
-                            1000.0885620117188,
-                            1000.09375,
-                            1000.0989379882812,
-                            1000.1041870117188,
-                            1000.109375,
-                            1000.1145629882812,
-                            1000.1198120117188,
-                            1000.125,
-                            1000.1301879882812,
-                            1000.1354370117188,
-                            1000.140625,
-                            1000.1458129882812,
-                            1000.1510620117188,
-                            1000.15625,
-                            1000.1614379882812,
-                            1000.1666870117188,
-                            1000.171875,
-                            1000.1770629882812,
-                            1000.1823120117188,
-                            1000.1875,
-                            1000.1926879882812,
-                            1000.1979370117188,
-                            1000.203125,
-                            1000.2083129882812,
-                            1000.2135620117188,
-                            1000.21875,
-                            1000.2239379882812,
-                            1000.2291870117188,
-                            1000.234375,
-                            1000.2395629882812,
-                            1000.2448120117188,
-                            1000.25,
-                            1000.2551879882812,
-                            1000.2604370117188,
-                            1000.265625,
-                            1000.2708129882812,
-                            1000.2760620117188,
-                            1000.28125,
-                            1000.2864379882812,
-                            1000.2916870117188,
-                            1000.296875,
-                            1000.3020629882812,
-                            1000.3073120117188,
-                            1000.3125,
-                            1000.3176879882812,
-                            1000.3229370117188,
-                            1000.328125,
-                            1000.3333129882812,
-                            1000.3385620117188,
-                            1000.34375,
-                            1000.3489379882812,
-                            1000.3541870117188,
-                            1000.359375,
-                            1000.3645629882812,
-                            1000.3698120117188,
-                            1000.375,
-                            1000.3801879882812,
-                            1000.3854370117188,
-                            1000.390625,
-                            1000.3958129882812,
-                            1000.4010620117188,
-                            1000.40625,
-                            1000.4114379882812,
-                            1000.4166870117188,
-                            1000.421875,
-                            1000.4270629882812,
-                            1000.4323120117188,
-                            1000.4375,
-                            1000.4426879882812,
-                            1000.4479370117188,
-                            1000.453125,
-                            1000.4583129882812,
-                            1000.4635620117188,
-                            1000.46875,
-                            1000.4739379882812,
-                            1000.4791870117188,
-                            1000.484375,
-                            1000.4895629882812,
-                            1000.4948120117188,
-                            1000.5,
-                            1000.5051879882812,
-                            1000.5104370117188,
-                            1000.515625,
-                            1000.5208129882812,
-                            1000.5260620117188,
-                            1000.53125,
-                            1000.5364379882812,
-                            1000.5416870117188,
-                            1000.546875,
-                            1000.5520629882812,
-                            1000.5573120117188,
-                            1000.5625,
-                            1000.5676879882812,
-                            1000.5729370117188,
-                            1000.578125,
-                            1000.5833129882812,
-                            1000.5885620117188,
-                            1000.59375,
-                            1000.5989379882812,
-                            1000.6041870117188,
-                            1000.609375,
-                            1000.6145629882812,
-                            1000.6198120117188,
-                            1000.625,
-                            1000.6301879882812,
-                            1000.6354370117188,
-                            1000.640625,
-                            1000.6458129882812,
-                            1000.6510620117188,
-                            1000.65625,
-                            1000.6614379882812,
-                            1000.6666870117188,
-                            1000.671875,
-                            1000.6770629882812,
-                            1000.6823120117188,
-                            1000.6875,
-                            1000.6926879882812,
-                            1000.6979370117188,
-                            1000.703125,
-                            1000.7083129882812,
-                            1000.7135620117188,
-                            1000.71875,
-                            1000.7239379882812,
-                            1000.7291870117188,
-                            1000.734375,
-                            1000.7395629882812,
-                            1000.7448120117188,
-                            1000.75,
-                            1000.7551879882812,
-                            1000.7604370117188,
-                            1000.765625,
-                            1000.7708129882812,
-                            1000.7760620117188,
-                            1000.78125,
-                            1000.7864379882812,
-                            1000.7916870117188,
-                            1000.796875,
-                            1000.8020629882812,
-                            1000.8073120117188,
-                            1000.8125,
-                            1000.8176879882812,
-                            1000.8229370117188,
-                            1000.828125,
-                            1000.8333129882812,
-                            1000.8385620117188,
-                            1000.84375,
-                            1000.8489379882812,
-                            1000.8541870117188,
-                            1000.859375,
-                            1000.8645629882812,
-                            1000.8698120117188,
-                            1000.875,
-                            1000.8801879882812,
-                            1000.8854370117188,
-                            1000.890625,
-                            1000.8958129882812,
-                            1000.9010620117188,
-                            1000.90625,
-                            1000.9114379882812,
-                            1000.9166870117188,
-                            1000.921875,
-                            1000.9270629882812,
-                            1000.9323120117188,
-                            1000.9375,
-                            1000.9426879882812,
-                            1000.9479370117188,
-                            1000.953125,
-                            1000.9583129882812,
-                            1000.9635620117188,
-                            1000.96875,
-                            1000.9739379882812,
-                            1000.9791870117188,
-                            1000.984375,
-                            1000.9895629882812,
-                            1000.9948120117188,
-                        ],
-                        dtype=np.float32,
-                    ),
-                    name="value",
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "SkipSimplifiedLayerNormalization",
-                ["X", "skip", "scale"],
-                ["ym", "", "", "xs"],
-                domain="com.microsoft",
-                epsilon=0.10000000149011612,
-            )
-        )
-        nodes.append(oh.make_node("Mul", ["ym", "weights"], ["a"]))
-        outputs.append(oh.make_tensor_value_info("", onnx.TensorProto.UNDEFINED, []))
-        outputs.append(
-            oh.make_tensor_value_info(
-                "a", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "xs", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1365,64 +545,29 @@ class SkipSimplifiedLayerNormalizationMulPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "X", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('SkipSimplifiedLayerNormalization', ['X', 'skip', 'weights'], ['a', '', '', 'xs'], domain='com.microsoft', epsilon=0.10000000149011612),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                    oh.make_tensor_value_info('skip', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                    oh.make_tensor_value_info('weights', onnx.TensorProto.FLOAT, shape=(192,)),
+                ],
+                [
+                    oh.make_tensor_value_info('', onnx.TensorProto.UNDEFINED, []),
+                    oh.make_tensor_value_info('a', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                    oh.make_tensor_value_info('xs', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info(
-                "skip", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
-        )
-        inputs.append(
-            oh.make_tensor_value_info("weights", onnx.TensorProto.FLOAT, shape=(192,))
-        )
-        nodes.append(
-            oh.make_node(
-                "SkipSimplifiedLayerNormalization",
-                ["X", "skip", "weights"],
-                ["a", "", "", "xs"],
-                domain="com.microsoft",
-                epsilon=0.10000000149011612,
-            )
-        )
-        outputs.append(oh.make_tensor_value_info("", onnx.TensorProto.UNDEFINED, []))
-        outputs.append(
-            oh.make_tensor_value_info(
-                "a", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "xs", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
@@ -1508,464 +653,31 @@ class SimplifiedLayerNormalizationMulPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
+        import numpy as np
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "xs", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['scale'], value=onh.from_array(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['weights'], value=onh.from_array(np.array([1000.0, 1000.0051879882812, 1000.0104370117188, 1000.015625, 1000.0208129882812, 1000.0260620117188, 1000.03125, 1000.0364379882812, 1000.0416870117188, 1000.046875, 1000.0520629882812, 1000.0573120117188, 1000.0625, 1000.0676879882812, 1000.0729370117188, 1000.078125, 1000.0833129882812, 1000.0885620117188, 1000.09375, 1000.0989379882812, 1000.1041870117188, 1000.109375, 1000.1145629882812, 1000.1198120117188, 1000.125, 1000.1301879882812, 1000.1354370117188, 1000.140625, 1000.1458129882812, 1000.1510620117188, 1000.15625, 1000.1614379882812, 1000.1666870117188, 1000.171875, 1000.1770629882812, 1000.1823120117188, 1000.1875, 1000.1926879882812, 1000.1979370117188, 1000.203125, 1000.2083129882812, 1000.2135620117188, 1000.21875, 1000.2239379882812, 1000.2291870117188, 1000.234375, 1000.2395629882812, 1000.2448120117188, 1000.25, 1000.2551879882812, 1000.2604370117188, 1000.265625, 1000.2708129882812, 1000.2760620117188, 1000.28125, 1000.2864379882812, 1000.2916870117188, 1000.296875, 1000.3020629882812, 1000.3073120117188, 1000.3125, 1000.3176879882812, 1000.3229370117188, 1000.328125, 1000.3333129882812, 1000.3385620117188, 1000.34375, 1000.3489379882812, 1000.3541870117188, 1000.359375, 1000.3645629882812, 1000.3698120117188, 1000.375, 1000.3801879882812, 1000.3854370117188, 1000.390625, 1000.3958129882812, 1000.4010620117188, 1000.40625, 1000.4114379882812, 1000.4166870117188, 1000.421875, 1000.4270629882812, 1000.4323120117188, 1000.4375, 1000.4426879882812, 1000.4479370117188, 1000.453125, 1000.4583129882812, 1000.4635620117188, 1000.46875, 1000.4739379882812, 1000.4791870117188, 1000.484375, 1000.4895629882812, 1000.4948120117188, 1000.5, 1000.5051879882812, 1000.5104370117188, 1000.515625, 1000.5208129882812, 1000.5260620117188, 1000.53125, 1000.5364379882812, 1000.5416870117188, 1000.546875, 1000.5520629882812, 1000.5573120117188, 1000.5625, 1000.5676879882812, 1000.5729370117188, 1000.578125, 1000.5833129882812, 1000.5885620117188, 1000.59375, 1000.5989379882812, 1000.6041870117188, 1000.609375, 1000.6145629882812, 1000.6198120117188, 1000.625, 1000.6301879882812, 1000.6354370117188, 1000.640625, 1000.6458129882812, 1000.6510620117188, 1000.65625, 1000.6614379882812, 1000.6666870117188, 1000.671875, 1000.6770629882812, 1000.6823120117188, 1000.6875, 1000.6926879882812, 1000.6979370117188, 1000.703125, 1000.7083129882812, 1000.7135620117188, 1000.71875, 1000.7239379882812, 1000.7291870117188, 1000.734375, 1000.7395629882812, 1000.7448120117188, 1000.75, 1000.7551879882812, 1000.7604370117188, 1000.765625, 1000.7708129882812, 1000.7760620117188, 1000.78125, 1000.7864379882812, 1000.7916870117188, 1000.796875, 1000.8020629882812, 1000.8073120117188, 1000.8125, 1000.8176879882812, 1000.8229370117188, 1000.828125, 1000.8333129882812, 1000.8385620117188, 1000.84375, 1000.8489379882812, 1000.8541870117188, 1000.859375, 1000.8645629882812, 1000.8698120117188, 1000.875, 1000.8801879882812, 1000.8854370117188, 1000.890625, 1000.8958129882812, 1000.9010620117188, 1000.90625, 1000.9114379882812, 1000.9166870117188, 1000.921875, 1000.9270629882812, 1000.9323120117188, 1000.9375, 1000.9426879882812, 1000.9479370117188, 1000.953125, 1000.9583129882812, 1000.9635620117188, 1000.96875, 1000.9739379882812, 1000.9791870117188, 1000.984375, 1000.9895629882812, 1000.9948120117188], dtype=np.float32), name='value')),
+                    oh.make_node('SimplifiedLayerNormalization', ['xs', 'scale'], ['ym'], axis=-1, epsilon=0.10000000149011612),
+                    oh.make_node('Mul', ['ym', 'weights'], ['a']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('xs', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                    oh.make_tensor_value_info('weights', onnx.TensorProto.FLOAT, shape=(192,)),
+                ],
+                [
+                    oh.make_tensor_value_info('a', onnx.TensorProto.FLOAT, shape=[]),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("weights", onnx.TensorProto.FLOAT, shape=(192,))
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["scale"],
-                value=onh.from_array(
-                    np.array(
-                        [
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                            1.0,
-                        ],
-                        dtype=np.float32,
-                    ),
-                    name="value",
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["weights"],
-                value=onh.from_array(
-                    np.array(
-                        [
-                            1000.0,
-                            1000.0051879882812,
-                            1000.0104370117188,
-                            1000.015625,
-                            1000.0208129882812,
-                            1000.0260620117188,
-                            1000.03125,
-                            1000.0364379882812,
-                            1000.0416870117188,
-                            1000.046875,
-                            1000.0520629882812,
-                            1000.0573120117188,
-                            1000.0625,
-                            1000.0676879882812,
-                            1000.0729370117188,
-                            1000.078125,
-                            1000.0833129882812,
-                            1000.0885620117188,
-                            1000.09375,
-                            1000.0989379882812,
-                            1000.1041870117188,
-                            1000.109375,
-                            1000.1145629882812,
-                            1000.1198120117188,
-                            1000.125,
-                            1000.1301879882812,
-                            1000.1354370117188,
-                            1000.140625,
-                            1000.1458129882812,
-                            1000.1510620117188,
-                            1000.15625,
-                            1000.1614379882812,
-                            1000.1666870117188,
-                            1000.171875,
-                            1000.1770629882812,
-                            1000.1823120117188,
-                            1000.1875,
-                            1000.1926879882812,
-                            1000.1979370117188,
-                            1000.203125,
-                            1000.2083129882812,
-                            1000.2135620117188,
-                            1000.21875,
-                            1000.2239379882812,
-                            1000.2291870117188,
-                            1000.234375,
-                            1000.2395629882812,
-                            1000.2448120117188,
-                            1000.25,
-                            1000.2551879882812,
-                            1000.2604370117188,
-                            1000.265625,
-                            1000.2708129882812,
-                            1000.2760620117188,
-                            1000.28125,
-                            1000.2864379882812,
-                            1000.2916870117188,
-                            1000.296875,
-                            1000.3020629882812,
-                            1000.3073120117188,
-                            1000.3125,
-                            1000.3176879882812,
-                            1000.3229370117188,
-                            1000.328125,
-                            1000.3333129882812,
-                            1000.3385620117188,
-                            1000.34375,
-                            1000.3489379882812,
-                            1000.3541870117188,
-                            1000.359375,
-                            1000.3645629882812,
-                            1000.3698120117188,
-                            1000.375,
-                            1000.3801879882812,
-                            1000.3854370117188,
-                            1000.390625,
-                            1000.3958129882812,
-                            1000.4010620117188,
-                            1000.40625,
-                            1000.4114379882812,
-                            1000.4166870117188,
-                            1000.421875,
-                            1000.4270629882812,
-                            1000.4323120117188,
-                            1000.4375,
-                            1000.4426879882812,
-                            1000.4479370117188,
-                            1000.453125,
-                            1000.4583129882812,
-                            1000.4635620117188,
-                            1000.46875,
-                            1000.4739379882812,
-                            1000.4791870117188,
-                            1000.484375,
-                            1000.4895629882812,
-                            1000.4948120117188,
-                            1000.5,
-                            1000.5051879882812,
-                            1000.5104370117188,
-                            1000.515625,
-                            1000.5208129882812,
-                            1000.5260620117188,
-                            1000.53125,
-                            1000.5364379882812,
-                            1000.5416870117188,
-                            1000.546875,
-                            1000.5520629882812,
-                            1000.5573120117188,
-                            1000.5625,
-                            1000.5676879882812,
-                            1000.5729370117188,
-                            1000.578125,
-                            1000.5833129882812,
-                            1000.5885620117188,
-                            1000.59375,
-                            1000.5989379882812,
-                            1000.6041870117188,
-                            1000.609375,
-                            1000.6145629882812,
-                            1000.6198120117188,
-                            1000.625,
-                            1000.6301879882812,
-                            1000.6354370117188,
-                            1000.640625,
-                            1000.6458129882812,
-                            1000.6510620117188,
-                            1000.65625,
-                            1000.6614379882812,
-                            1000.6666870117188,
-                            1000.671875,
-                            1000.6770629882812,
-                            1000.6823120117188,
-                            1000.6875,
-                            1000.6926879882812,
-                            1000.6979370117188,
-                            1000.703125,
-                            1000.7083129882812,
-                            1000.7135620117188,
-                            1000.71875,
-                            1000.7239379882812,
-                            1000.7291870117188,
-                            1000.734375,
-                            1000.7395629882812,
-                            1000.7448120117188,
-                            1000.75,
-                            1000.7551879882812,
-                            1000.7604370117188,
-                            1000.765625,
-                            1000.7708129882812,
-                            1000.7760620117188,
-                            1000.78125,
-                            1000.7864379882812,
-                            1000.7916870117188,
-                            1000.796875,
-                            1000.8020629882812,
-                            1000.8073120117188,
-                            1000.8125,
-                            1000.8176879882812,
-                            1000.8229370117188,
-                            1000.828125,
-                            1000.8333129882812,
-                            1000.8385620117188,
-                            1000.84375,
-                            1000.8489379882812,
-                            1000.8541870117188,
-                            1000.859375,
-                            1000.8645629882812,
-                            1000.8698120117188,
-                            1000.875,
-                            1000.8801879882812,
-                            1000.8854370117188,
-                            1000.890625,
-                            1000.8958129882812,
-                            1000.9010620117188,
-                            1000.90625,
-                            1000.9114379882812,
-                            1000.9166870117188,
-                            1000.921875,
-                            1000.9270629882812,
-                            1000.9323120117188,
-                            1000.9375,
-                            1000.9426879882812,
-                            1000.9479370117188,
-                            1000.953125,
-                            1000.9583129882812,
-                            1000.9635620117188,
-                            1000.96875,
-                            1000.9739379882812,
-                            1000.9791870117188,
-                            1000.984375,
-                            1000.9895629882812,
-                            1000.9948120117188,
-                        ],
-                        dtype=np.float32,
-                    ),
-                    name="value",
-                ),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "SimplifiedLayerNormalization",
-                ["xs", "scale"],
-                ["ym"],
-                axis=-1,
-                epsilon=0.10000000149011612,
-            )
-        )
-        nodes.append(oh.make_node("Mul", ["ym", "weights"], ["a"]))
-        outputs.append(oh.make_tensor_value_info("a", onnx.TensorProto.FLOAT, shape=[]))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -1976,49 +688,26 @@ class SimplifiedLayerNormalizationMulPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "xs", onnx.TensorProto.FLOAT, shape=("batch", "cache", 192)
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('SimplifiedLayerNormalization', ['xs', 'weights'], ['a'], axis=-1, epsilon=0.10000000149011612),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('xs', onnx.TensorProto.FLOAT, shape=('batch', 'cache', 192)),
+                    oh.make_tensor_value_info('weights', onnx.TensorProto.FLOAT, shape=(192,)),
+                ],
+                [
+                    oh.make_tensor_value_info('a', onnx.TensorProto.FLOAT, shape=[]),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("weights", onnx.TensorProto.FLOAT, shape=(192,))
-        )
-        nodes.append(
-            oh.make_node(
-                "SimplifiedLayerNormalization",
-                ["xs", "weights"],
-                ["a"],
-                axis=-1,
-                epsilon=0.10000000149011612,
-            )
-        )
-        outputs.append(oh.make_tensor_value_info("a", onnx.TensorProto.FLOAT, shape=[]))
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """

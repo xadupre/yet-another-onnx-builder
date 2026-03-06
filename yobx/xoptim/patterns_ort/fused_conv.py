@@ -15,53 +15,28 @@ class FusedConvPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("W", onnx.TensorProto.FLOAT, shape=(8, 8, 3, 3))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Conv', ['X', 'W', 'B'], ['c'], dilations=[1, 1], group=1, pads=[1, 1, 1, 1], strides=[1, 1]),
+                    oh.make_node('Relu', ['c'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('W', onnx.TensorProto.FLOAT, shape=(8, 8, 3, 3)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=(1, 8, 6, 6)),
+                    oh.make_tensor_value_info('B', onnx.TensorProto.FLOAT, shape=(8,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=(1, 8, 6, 6)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(1, 8, 6, 6))
-        )
-        inputs.append(oh.make_tensor_value_info("B", onnx.TensorProto.FLOAT, shape=(8,)))
-        nodes.append(
-            oh.make_node(
-                "Conv",
-                ["X", "W", "B"],
-                ["c"],
-                dilations=[1, 1],
-                group=1,
-                pads=[1, 1, 1, 1],
-                strides=[1, 1],
-            )
-        )
-        nodes.append(oh.make_node("Relu", ["c"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(1, 8, 6, 6))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -72,54 +47,27 @@ class FusedConvPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("com.microsoft", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info("W", onnx.TensorProto.FLOAT, shape=(8, 8, 3, 3))
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('FusedConv', ['X', 'W', 'B'], ['Y'], domain='com.microsoft', activation='Relu', dilations=[1, 1], group=1, pads=[1, 1, 1, 1], strides=[1, 1]),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('W', onnx.TensorProto.FLOAT, shape=(8, 8, 3, 3)),
+                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=(1, 8, 6, 6)),
+                    oh.make_tensor_value_info('B', onnx.TensorProto.FLOAT, shape=(8,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=(1, 8, 6, 6)),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1)],
         )
-        inputs.append(
-            oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, shape=(1, 8, 6, 6))
-        )
-        inputs.append(oh.make_tensor_value_info("B", onnx.TensorProto.FLOAT, shape=(8,)))
-        nodes.append(
-            oh.make_node(
-                "FusedConv",
-                ["X", "W", "B"],
-                ["Y"],
-                domain="com.microsoft",
-                activation="Relu",
-                dilations=[1, 1],
-                group=1,
-                pads=[1, 1, 1, 1],
-                strides=[1, 1],
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, shape=(1, 8, 6, 6))
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """

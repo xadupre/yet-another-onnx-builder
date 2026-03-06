@@ -18,108 +18,39 @@ class TriMatrixPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
+        import numpy as np
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("shape", onnx.TensorProto.INT64, shape=(2,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["zero"],
-                value=onh.from_array(np.array(0, dtype=np.int64), name="value"),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array(0, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['dim'], value=onh.from_array(np.array(1024, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['onei'], value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape1'], value=onh.from_array(np.array([1024, 1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zerof'], value=onh.from_array(np.array([0.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['shape'], value=onh.from_array(np.array([1024, 1024], dtype=np.int64), name='value')),
+                    oh.make_node('Range', ['zero', 'dim', 'onei'], ['ar']),
+                    oh.make_node('Add', ['ar', 'one'], ['ad']),
+                    oh.make_node('Reshape', ['ad', 'shape1'], ['re']),
+                    oh.make_node('Less', ['ar', 're'], ['le']),
+                    oh.make_node('Where', ['le', 'zerof', 'cst'], ['Y']),
+                    oh.make_node('ConstantOfShape', ['shape'], ['cst'], value=onh.from_array(np.array([-3.4028234663852886e+38], dtype=np.float32), name='value')),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('shape', onnx.TensorProto.INT64, shape=(2,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM', 'UNKNOWNDIM1')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["dim"],
-                value=onh.from_array(np.array(1024, dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["onei"],
-                value=onh.from_array(np.array(1, dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["one"],
-                value=onh.from_array(np.array([1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape1"],
-                value=onh.from_array(np.array([1024, 1], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["zerof"],
-                value=onh.from_array(np.array([0.0], dtype=np.float32), name="value"),
-            )
-        )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["shape"],
-                value=onh.from_array(np.array([1024, 1024], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Range", ["zero", "dim", "onei"], ["ar"]))
-        nodes.append(oh.make_node("Add", ["ar", "one"], ["ad"]))
-        nodes.append(oh.make_node("Reshape", ["ad", "shape1"], ["re"]))
-        nodes.append(oh.make_node("Less", ["ar", "re"], ["le"]))
-        nodes.append(oh.make_node("Where", ["le", "zerof", "cst"], ["Y"]))
-        nodes.append(
-            oh.make_node(
-                "ConstantOfShape",
-                ["shape"],
-                ["cst"],
-                value=onh.from_array(
-                    np.array([-3.4028234663852886e38], dtype=np.float32), name="value"
-                ),
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM", "UNKNOWNDIM1")
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -130,55 +61,28 @@ class TriMatrixPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
+        import numpy as np
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("shape", onnx.TensorProto.INT64, shape=(2,)))
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["TriMatrixPattern--"],
-                value=onh.from_array(
-                    np.array([0.0, 0.0, -3.4028234663852886e38], dtype=np.float32), name="value"
-                ),
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node('Constant', [], ['TriMatrixPattern--'], value=onh.from_array(np.array([0.0, 0.0, -3.4028234663852886e+38], dtype=np.float32), name='value')),
+                    oh.make_node('TriMatrix', ['shape', 'TriMatrixPattern--'], ['Y'], domain='onnx_extended.ortops.optim.cuda'),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('shape', onnx.TensorProto.INT64, shape=(2,)),
+                ],
+                [
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('UNKNOWNDIM', 'UNKNOWNDIM1')),
+                ],
+            ),
+            functions=[],
+            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1)],
         )
-        nodes.append(
-            oh.make_node(
-                "TriMatrix",
-                ["shape", "TriMatrixPattern--"],
-                ["Y"],
-                domain="onnx_extended.ortops.optim.cuda",
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM", "UNKNOWNDIM1")
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
