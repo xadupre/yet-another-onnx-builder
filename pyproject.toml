@@ -164,7 +164,6 @@ ignore-implicit-imports = ["*"]
 ignore-missing-imports = ["*"]
 project-includes = ["yobx/**/*.py"]
 project-excludes = [
-    "yobx/sklearn/**",
     "yobx/doc.py",
     "yobx/ext_test_case.py",
     "yobx/builder/light/*",

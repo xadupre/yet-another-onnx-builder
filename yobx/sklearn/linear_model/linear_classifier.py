@@ -154,7 +154,7 @@ def sklearn_linear_classifier(
         gt = g.op.Greater(decision_1d, zero, name=f"{name}_gt")
         label_idx = g.op.Cast(gt, to=onnx.TensorProto.INT64, name=f"{name}_cast")
 
-        label = _build_label(g, classes, label_idx, name, outputs, sts)
+        label = _build_label(g, classes, label_idx, name, outputs, sts)  # pyrefly: ignore[bad-argument-type]
 
         if emit_proba:
             # decision has shape (N, 1); Sigmoid gives (N, 1); 1-sigmoid is (N, 1).
@@ -170,7 +170,7 @@ def sklearn_linear_classifier(
         label_idx_raw = g.op.ArgMax(decision, axis=1, keepdims=0, name=f"{name}_argmax")
         label_idx = g.op.Cast(label_idx_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast")
 
-        label = _build_label(g, classes, label_idx, name, outputs, sts)
+        label = _build_label(g, classes, label_idx, name, outputs, sts)  # pyrefly: ignore[bad-argument-type]
 
         if emit_proba:
             # SGDClassifier with probabilistic losses uses one-vs-rest (OvR):
