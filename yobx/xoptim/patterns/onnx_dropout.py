@@ -23,13 +23,19 @@ class DropoutPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init10_s_3'], value=onh.from_array(np.array(0.0, dtype=np.float16), name='value')),
-                    oh.make_node('Constant', [], ['init9_s_'], value=onh.from_array(np.array(False, dtype=np.bool_), name='value')),
-                    oh.make_node('Dropout', ['_onx_add02', 'init10_s_3', 'init9_s_'], ['dropout', '']),
+                    oh.make_node('Constant', [], ['init10_s_3'],
+                                 value=onh.from_array(np.array(0.0, dtype=np.float16),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init9_s_'],
+                                 value=onh.from_array(np.array(False, dtype=np.bool_),
+                                 name='value')),
+                    oh.make_node('Dropout', ['_onx_add02', 'init10_s_3', 'init9_s_'],
+                                 ['dropout', '']),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('_onx_add02', onnx.TensorProto.FLOAT16, (4, 512, 128)),
+                    oh.make_tensor_value_info('_onx_add02', onnx.TensorProto.FLOAT16,
+                                              (4, 512, 128)),
                 ],
                 [
                     oh.make_tensor_value_info('dropout', onnx.TensorProto.FLOAT16, (4, 512, 128)),
@@ -58,7 +64,8 @@ class DropoutPattern(PatternOptimization):
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('_onx_add02', onnx.TensorProto.FLOAT16, (4, 512, 128)),
+                    oh.make_tensor_value_info('_onx_add02', onnx.TensorProto.FLOAT16,
+                                              (4, 512, 128)),
                 ],
                 [
                     oh.make_tensor_value_info('dropout', onnx.TensorProto.FLOAT16, (4, 512, 128)),

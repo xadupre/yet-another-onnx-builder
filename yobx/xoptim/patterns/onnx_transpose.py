@@ -192,19 +192,25 @@ class TransposeReshapeTransposePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['shape'], value=onh.from_array(np.array([32, 2, 14, 2, 13, 256], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['shape'],
+                                 value=onh.from_array(
+                                     np.array([32, 2, 14, 2, 13, 256], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Transpose', ['X'], ['xt'], perm=[0, 2, 3, 1]),
                     oh.make_node('Reshape', ['xt', 'shape'], ['xts']),
                     oh.make_node('Transpose', ['xts'], ['Y'], perm=[0, 1, 3, 2, 4, 5]),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('xts', onnx.TensorProto.FLOAT, (32, 2, 14, 2, 13, 256)),
+                    oh.make_tensor_value_info('xts', onnx.TensorProto.FLOAT,
+                                              (32, 2, 14, 2, 13, 256)),
                     oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (32, 256, 28, 26)),
                 ],
                 [
-                    oh.make_tensor_value_info('xts', onnx.TensorProto.FLOAT, (32, 2, 14, 2, 13, 256)),
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (32, 2, 2, 14, 13, 256)),
+                    oh.make_tensor_value_info('xts', onnx.TensorProto.FLOAT,
+                                              (32, 2, 14, 2, 13, 256)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT,
+                                              (32, 2, 2, 14, 13, 256)),
                 ],
             ),
             functions=[],
@@ -228,19 +234,27 @@ class TransposeReshapeTransposePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s6_'], value=onh.from_array(np.array([32, 256, 2, 14, 2, 13], dtype=np.int64), name='value')),
-                    oh.make_node('Reshape', ['X', 'init7_s6_'], ['TransposeReshapeTransposePattern_xt']),
-                    oh.make_node('Transpose', ['TransposeReshapeTransposePattern_xt'], ['xts'], perm=[0, 2, 3, 4, 5, 1]),
+                    oh.make_node('Constant', [], ['init7_s6_'],
+                                 value=onh.from_array(
+                                     np.array([32, 256, 2, 14, 2, 13], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Reshape', ['X', 'init7_s6_'],
+                                 ['TransposeReshapeTransposePattern_xt']),
+                    oh.make_node('Transpose', ['TransposeReshapeTransposePattern_xt'], ['xts'],
+                                 perm=[0, 2, 3, 4, 5, 1]),
                     oh.make_node('Transpose', ['xts'], ['Y'], perm=[0, 1, 3, 2, 4, 5]),
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('xts', onnx.TensorProto.FLOAT, (32, 2, 14, 2, 13, 256)),
+                    oh.make_tensor_value_info('xts', onnx.TensorProto.FLOAT,
+                                              (32, 2, 14, 2, 13, 256)),
                     oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (32, 256, 28, 26)),
                 ],
                 [
-                    oh.make_tensor_value_info('xts', onnx.TensorProto.FLOAT, (32, 2, 14, 2, 13, 256)),
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (32, 2, 2, 14, 13, 256)),
+                    oh.make_tensor_value_info('xts', onnx.TensorProto.FLOAT,
+                                              (32, 2, 14, 2, 13, 256)),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT,
+                                              (32, 2, 2, 14, 13, 256)),
                 ],
             ),
             functions=[],
@@ -484,7 +498,9 @@ class TransposeEqualReshapePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init7_s4_0_1_-1_0'], value=onh.from_array(np.array([0, 1, -1, 0], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['init7_s4_0_1_-1_0'],
+                                 value=onh.from_array(np.array([0, 1, -1, 0], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Reshape', ['X', 'init7_s4_0_1_-1_0'], ['Y']),
                 ],
                 'pattern',
@@ -592,7 +608,8 @@ class TransposeGatherPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['ind'], value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['ind'],
+                                 value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
                     oh.make_node('Transpose', ['X'], ['xt'], perm=[1, 0, 2, 3]),
                     oh.make_node('Gather', ['xt', 'ind'], ['Y'], axis=0),
                 ],
@@ -711,7 +728,9 @@ class SwapUnsqueezeTransposePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['axes'], value=onh.from_array(np.array([1, 2], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['axes'],
+                                 value=onh.from_array(np.array([1, 2], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Unsqueeze', ['X', 'axes'], ['xu']),
                     oh.make_node('Transpose', ['xu'], ['Y'], perm=[0, 2, 1, 4, 3]),
                 ],
@@ -721,7 +740,8 @@ class SwapUnsqueezeTransposePattern(PatternOptimization):
                     oh.make_tensor_value_info('axes', onnx.TensorProto.INT64, (2,)),
                 ],
                 [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('e', 'f', 'g', 'h', 'i')),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT,
+                                              ('e', 'f', 'g', 'h', 'i')),
                 ],
             ),
             functions=[],
@@ -743,7 +763,8 @@ class SwapUnsqueezeTransposePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Transpose', ['X'], ['SwapUnsqueezeTransposePattern_Y'], perm=[0, 2, 1]),
+                    oh.make_node('Transpose', ['X'], ['SwapUnsqueezeTransposePattern_Y'],
+                                 perm=[0, 2, 1]),
                     oh.make_node('Unsqueeze', ['SwapUnsqueezeTransposePattern_Y', 'axes'], ['Y']),
                 ],
                 'pattern',
@@ -752,7 +773,8 @@ class SwapUnsqueezeTransposePattern(PatternOptimization):
                     oh.make_tensor_value_info('axes', onnx.TensorProto.INT64, (2,)),
                 ],
                 [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('e', 'f', 'g', 'h', 'i')),
+                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT,
+                                              ('e', 'f', 'g', 'h', 'i')),
                 ],
             ),
             functions=[],

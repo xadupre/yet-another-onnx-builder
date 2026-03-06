@@ -850,7 +850,9 @@ class ShapeBasedIdentityPattern(PatternOptimization):
             oh.make_graph(
                 [
                     oh.make_node('Shape', ['X'], ['N'], end=1, start=0),
-                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zero'],
+                                 value=onh.from_array(np.array([0], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Slice', ['X', 'zero', 'N', 'zero'], ['Y']),
                 ],
                 'pattern',
@@ -967,7 +969,9 @@ class SwapUnaryPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['cst'], value=onh.from_array(np.array([2.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['cst'],
+                                 value=onh.from_array(np.array([2.0], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Transpose', ['X'], ['xt'], perm=[0, 2, 1, 3]),
                     oh.make_node('Mul', ['xt', 'cst'], ['Y']),
                 ],

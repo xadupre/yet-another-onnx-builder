@@ -25,7 +25,9 @@ class ConcatGatherPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['un'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['un'],
+                                 value=onh.from_array(np.array([1], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Concat', ['D1', 'D2'], ['d'], axis=0),
                     oh.make_node('Gather', ['d', 'un'], ['Y']),
                 ],
@@ -157,7 +159,9 @@ class ConcatEmptyPattern(_CommonConcatPattern):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['I'], value=onh.from_array(np.array([], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['I'],
+                                 value=onh.from_array(np.array([], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Concat', ['X', 'Y', 'I'], ['Z'], axis=0),
                 ],
                 'pattern',

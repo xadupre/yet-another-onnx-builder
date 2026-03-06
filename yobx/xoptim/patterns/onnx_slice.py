@@ -24,8 +24,12 @@ class SliceSlicePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
+                    oh.make_node('Constant', [], ['zero'],
+                                 value=onh.from_array(np.array([0], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['one'],
+                                 value=onh.from_array(np.array([1], dtype=np.int64),
+                                 name='value')),
                     oh.make_node('Slice', ['X', 'zero', 'one', 'zero'], ['x1']),
                     oh.make_node('Slice', ['x1', 'zero', 'one', 'one'], ['Y']),
                 ],
@@ -58,10 +62,15 @@ class SliceSlicePattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Concat', ['zero', 'zero'], ['SliceSlicePattern_zero_start'], axis=0),
+                    oh.make_node('Concat', ['zero', 'zero'], ['SliceSlicePattern_zero_start'],
+                                 axis=0),
                     oh.make_node('Concat', ['one', 'one'], ['SliceSlicePattern_one_end'], axis=0),
-                    oh.make_node('Concat', ['zero', 'one'], ['SliceSlicePattern_one_axis'], axis=0),
-                    oh.make_node('Slice', ['X', 'SliceSlicePattern_zero_start', 'SliceSlicePattern_one_end', 'SliceSlicePattern_one_axis'], ['Y']),
+                    oh.make_node('Concat', ['zero', 'one'], ['SliceSlicePattern_one_axis'],
+                                 axis=0),
+                    oh.make_node('Slice',
+                        ['X', 'SliceSlicePattern_zero_start', 'SliceSlicePattern_one_end',
+                         'SliceSlicePattern_one_axis'],
+                        ['Y']),
                 ],
                 'pattern',
                 [

@@ -28,11 +28,22 @@ class GeluPattern(EasyPatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['init10_s1_5'], value=onh.from_array(np.array([3.0], dtype=np.float16), name='value')),
-                    oh.make_node('Constant', [], ['init10_s_8'], value=onh.from_array(np.array(0.044708251953125, dtype=np.float16), name='value')),
-                    oh.make_node('Constant', [], ['init10_s_9'], value=onh.from_array(np.array(0.7978515625, dtype=np.float16), name='value')),
-                    oh.make_node('Constant', [], ['init10_s_10'], value=onh.from_array(np.array(1.0, dtype=np.float16), name='value')),
-                    oh.make_node('Constant', [], ['init10_s_7'], value=onh.from_array(np.array(0.5, dtype=np.float16), name='value')),
+                    oh.make_node('Constant', [], ['init10_s1_5'],
+                                 value=onh.from_array(np.array([3.0], dtype=np.float16),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init10_s_8'],
+                                 value=onh.from_array(
+                                     np.array(0.044708251953125, dtype=np.float16),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init10_s_9'],
+                                 value=onh.from_array(np.array(0.7978515625, dtype=np.float16),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init10_s_10'],
+                                 value=onh.from_array(np.array(1.0, dtype=np.float16),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['init10_s_7'],
+                                 value=onh.from_array(np.array(0.5, dtype=np.float16),
+                                 name='value')),
                     oh.make_node('Pow', ['linear_5', 'init10_s1_5'], ['pow_1']),
                     oh.make_node('Mul', ['pow_1', 'init10_s_8'], ['_onx_mul05']),
                     oh.make_node('Add', ['linear_5', '_onx_mul05'], ['add_4']),
@@ -44,7 +55,8 @@ class GeluPattern(EasyPatternOptimization):
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('linear_5', onnx.TensorProto.FLOAT16, (4, 512, 16384)),
+                    oh.make_tensor_value_info('linear_5', onnx.TensorProto.FLOAT16,
+                                              (4, 512, 16384)),
                 ],
                 [
                     oh.make_tensor_value_info('mul_4', onnx.TensorProto.FLOAT16, (4, 512, 16384)),
@@ -73,7 +85,8 @@ class GeluPattern(EasyPatternOptimization):
                 ],
                 'pattern',
                 [
-                    oh.make_tensor_value_info('linear_5', onnx.TensorProto.FLOAT16, (4, 512, 16384)),
+                    oh.make_tensor_value_info('linear_5', onnx.TensorProto.FLOAT16,
+                                              (4, 512, 16384)),
                 ],
                 [
                     oh.make_tensor_value_info('mul_4', onnx.TensorProto.FLOAT16, (4, 512, 16384)),
@@ -169,8 +182,13 @@ class LeakyReluPattern(EasyPatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['zero'], value=onh.from_array(np.array([0.0], dtype=np.float32), name='value')),
-                    oh.make_node('Constant', [], ['slope2'], value=onh.from_array(np.array([-0.33000001311302185], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['zero'],
+                                 value=onh.from_array(np.array([0.0], dtype=np.float32),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['slope2'],
+                                 value=onh.from_array(
+                                     np.array([-0.33000001311302185], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Greater', ['X1', 'zero'], ['xpos2']),
                     oh.make_node('Mul', ['X1', 'slope2'], ['xmul2']),
                     oh.make_node('Where', ['xpos2', 'X1', 'xmul2'], ['Y']),
@@ -278,10 +296,18 @@ class SoftmaxCrossEntropyLossCastPattern(EasyPatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['B'], value=onh.from_array(np.array([-100], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['zeroi'], value=onh.from_array(np.array([0], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['one'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['zerof'], value=onh.from_array(np.array([0.0], dtype=np.float16), name='value')),
+                    oh.make_node('Constant', [], ['B'],
+                                 value=onh.from_array(np.array([-100], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['zeroi'],
+                                 value=onh.from_array(np.array([0], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['one'],
+                                 value=onh.from_array(np.array([1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['zerof'],
+                                 value=onh.from_array(np.array([0.0], dtype=np.float16),
+                                 name='value')),
                     oh.make_node('Equal', ['I', 'B'], ['eq1']),
                     oh.make_node('Not', ['eq1'], ['neq1']),
                     oh.make_node('Where', ['neq1', 'I', 'zeroi'], ['ind']),
@@ -292,10 +318,12 @@ class SoftmaxCrossEntropyLossCastPattern(EasyPatternOptimization):
                     oh.make_node('Neg', ['flat_gx'], ['neg_gx']),
                     oh.make_node('Where', ['neq1', 'neg_gx', 'zerof'], ['w2']),
                     oh.make_node('Cast', ['neq1'], ['neq1f'], to=1),
-                    oh.make_node('ReduceSum', ['neq1f'], ['red2'], keepdims=0, noop_with_empty_axes=0),
+                    oh.make_node('ReduceSum', ['neq1f'], ['red2'],
+                                 keepdims=0, noop_with_empty_axes=0),
                     oh.make_node('Cast', ['red2'], ['red2_16'], to=10),
                     oh.make_node('Cast', ['w2'], ['w2f'], to=1),
-                    oh.make_node('ReduceSum', ['w2f'], ['red1'], keepdims=0, noop_with_empty_axes=0),
+                    oh.make_node('ReduceSum', ['w2f'], ['red1'],
+                                 keepdims=0, noop_with_empty_axes=0),
                     oh.make_node('Cast', ['red1'], ['red1_16'], to=10),
                     oh.make_node('Div', ['red1_16', 'red2_16'], ['Y']),
                 ],
@@ -327,7 +355,8 @@ class SoftmaxCrossEntropyLossCastPattern(EasyPatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('SoftmaxCrossEntropyLoss', ['X', 'I'], ['Y'], ignore_index=-100, reduction='mean'),
+                    oh.make_node('SoftmaxCrossEntropyLoss', ['X', 'I'], ['Y'],
+                                 ignore_index=-100, reduction='mean'),
                 ],
                 'pattern',
                 [

@@ -24,8 +24,12 @@ class UnsqueezeEqualPattern(PatternOptimization):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node('Constant', [], ['axis'], value=onh.from_array(np.array([1], dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['m_one'], value=onh.from_array(np.array([-1.0], dtype=np.float32), name='value')),
+                    oh.make_node('Constant', [], ['axis'],
+                                 value=onh.from_array(np.array([1], dtype=np.int64),
+                                 name='value')),
+                    oh.make_node('Constant', [], ['m_one'],
+                                 value=onh.from_array(np.array([-1.0], dtype=np.float32),
+                                 name='value')),
                     oh.make_node('Unsqueeze', ['X', 'axis'], ['Y']),
                     oh.make_node('Equal', ['X', 'm_one'], ['xe']),
                     oh.make_node('Unsqueeze', ['xe', 'axis'], ['Z']),
