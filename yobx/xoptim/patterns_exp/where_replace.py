@@ -15,53 +15,46 @@ class ReplaceZeroPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
+        import numpy as np
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "X", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM", "UNKNOWNDIM1")
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'Constant', [], ['cst'],
+                        value=onh.from_array(
+                            np.array([5.670000076293945], dtype=np.float32),
+                            name='value',
+                        ),
+                    ),
+                    oh.make_node('Cast', ['X'], ['xb'], to=9),
+                    oh.make_node('Where', ['xb', 'cst', 'X'], ['Y']),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
+                ],
+                [
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["cst"],
-                value=onh.from_array(
-                    np.array([5.670000076293945], dtype=np.float32), name="value"
-                ),
-            )
-        )
-        nodes.append(oh.make_node("Cast", ["X"], ["xb"], to=9))
-        nodes.append(oh.make_node("Where", ["xb", "cst", "X"], ["Y"]))
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM2", "UNKNOWNDIM3")
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -72,51 +65,43 @@ class ReplaceZeroPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(
-            oh.make_tensor_value_info(
-                "X", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM", "UNKNOWNDIM1")
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'ReplaceZero',
+                        ['X'],
+                        ['Y'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                        by=5.670000076293945,
+                        equal=0,
+                    ),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
+                ],
+                [
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        nodes.append(
-            oh.make_node(
-                "ReplaceZero",
-                ["X"],
-                ["Y"],
-                domain="onnx_extended.ortops.optim.cuda",
-                by=5.670000076293945,
-                equal=0,
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM2", "UNKNOWNDIM3")
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
