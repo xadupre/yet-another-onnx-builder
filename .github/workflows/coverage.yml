@@ -32,6 +32,12 @@ jobs:
         run: pytest --cov=yobx --cov-report=xml --durations=10
 
       - name: Upload coverage to Codecov
+        # Codecov automatically merges all uploads that share the same commit SHA.
+        # The sklearn_tests.yml job (scikit-learn 1.8 only) also uploads a coverage
+        # report flagged as 'sklearn'. Codecov unions the line-hit data from both
+        # uploads into a single combined report. The 'flags' value here ('coverage')
+        # lets you filter/view each source separately in the Codecov UI without
+        # preventing them from being merged.
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
