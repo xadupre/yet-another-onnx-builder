@@ -16,53 +16,45 @@ class SimpleRotaryPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
+        import numpy as np
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("splits", onnx.TensorProto.INT64, shape=(2,)))
-        inputs.append(
-            oh.make_tensor_value_info(
-                "X", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM", "UNKNOWNDIM1")
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'Constant', [], ['splits'],
+                        value=onh.from_array(np.array([4, 4], dtype=np.int64), name='value'),
+                    ),
+                    oh.make_node('Split', ['X', 'splits'], ['s1', 's2'], axis=-1),
+                    oh.make_node('Neg', ['s2'], ['ns2']),
+                    oh.make_node('Concat', ['ns2', 's1'], ['Y'], axis=-1),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('splits', onnx.TensorProto.INT64, shape=(2,)),
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
+                ],
+                [
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        nodes.append(
-            oh.make_node(
-                "Constant",
-                [],
-                ["splits"],
-                value=onh.from_array(np.array([4, 4], dtype=np.int64), name="value"),
-            )
-        )
-        nodes.append(oh.make_node("Split", ["X", "splits"], ["s1", "s2"], axis=-1))
-        nodes.append(oh.make_node("Neg", ["s2"], ["ns2"]))
-        nodes.append(oh.make_node("Concat", ["ns2", "s1"], ["Y"], axis=-1))
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM2", "UNKNOWNDIM3")
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
 
@@ -73,51 +65,43 @@ class SimpleRotaryPattern(PatternOptimization):
         :process:
 
         from yobx.doc import to_dot
-        import numpy as np
-        import ml_dtypes
         import onnx
         import onnx.helper as oh
-        import onnx.numpy_helper as onh
 
-        opset_imports = [
-            oh.make_opsetid("", 18),
-            oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
-        ]
-        inputs = []
-        outputs = []
-        nodes = []
-        initializers = []
-        sparse_initializers = []
-        functions = []
-        inputs.append(oh.make_tensor_value_info("splits", onnx.TensorProto.INT64, shape=(2,)))
-        inputs.append(
-            oh.make_tensor_value_info(
-                "X", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM", "UNKNOWNDIM1")
-            )
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        'Rotary',
+                        ['X', 'splits'],
+                        ['Y'],
+                        domain='onnx_extended.ortops.optim.cuda',
+                        side='right',
+                    ),
+                ],
+                'pattern',
+                [
+                    oh.make_tensor_value_info('splits', onnx.TensorProto.INT64, shape=(2,)),
+                    oh.make_tensor_value_info(
+                        'X',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
+                    ),
+                ],
+                [
+                    oh.make_tensor_value_info(
+                        'Y',
+                        onnx.TensorProto.FLOAT,
+                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
+                    ),
+                ],
+            ),
+            functions=[],
+            opset_imports=[
+                oh.make_opsetid('', 18),
+                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
+            ],
         )
-        nodes.append(
-            oh.make_node(
-                "Rotary",
-                ["X", "splits"],
-                ["Y"],
-                domain="onnx_extended.ortops.optim.cuda",
-                side="right",
-            )
-        )
-        outputs.append(
-            oh.make_tensor_value_info(
-                "Y", onnx.TensorProto.FLOAT, shape=("UNKNOWNDIM2", "UNKNOWNDIM3")
-            )
-        )
-        graph = oh.make_graph(
-            nodes,
-            "pattern",
-            inputs,
-            outputs,
-            initializers,
-            sparse_initializer=sparse_initializers,
-        )
-        model = oh.make_model(graph, functions=functions, opset_imports=opset_imports)
 
         print("DOT-SECTION", to_dot(model))
     """
