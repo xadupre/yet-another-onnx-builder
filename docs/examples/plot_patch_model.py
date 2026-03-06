@@ -26,6 +26,7 @@ on exit, so the original functions are restored once the ``with`` block ends.
 """
 
 import torch
+from yobx import doc
 from yobx.helpers.patch_helper import PatchDetails
 from yobx.torch import apply_patches_for_model, register_flattening_functions, use_dyn_not_str
 from yobx.torch.tiny_models import get_tiny_model
@@ -72,45 +73,23 @@ for patch in details:
 # Each unified diff is rendered as a matplotlib figure with colour-coded lines:
 # ``-`` lines in red, ``+`` lines in green, and ``@@`` hunk headers in blue.
 # This makes the figure capturable by sphinx-gallery.
+# :func:`yobx.doc.plot_text` automates this rendering.
 
 import matplotlib.pyplot as plt  # noqa: E402
 
-_LINE_COLORS = {"+": "#2a9d2a", "-": "#cc2222", "@": "#1a6fbf"}
-_DEFAULT_LINE_COLOR = "#333333"
-_MAX_FIG_HEIGHT = 30  # cap total figure height in inches
-
-
-def _plot_diff(patch_info, ax):
-    """Render one unified-diff as coloured text on *ax*."""
-    title = patch_info.name
-    diff_text = patch_info.make_diff()
-    lines = diff_text.splitlines()
-
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, max(len(lines), 1))
-    ax.axis("off")
-    ax.set_title(title, fontsize=8, loc="left", pad=3)
-
-    for i, line in enumerate(lines):
-        color = _LINE_COLORS.get(line[:1], _DEFAULT_LINE_COLOR)
-        ax.text(
-            0.01,
-            len(lines) - i - 0.5,
-            line,
-            fontsize=6,
-            color=color,
-            fontfamily="monospace",
-            va="center",
-            transform=ax.transData,
-        )
-
+_DIFF_COLORS = {"+": "#2a9d2a", "-": "#cc2222", "@": "#1a6fbf"}
 
 n = details.n_patches
-fig, axes = plt.subplots(n, 1, figsize=(10, min(n * 4, _MAX_FIG_HEIGHT)))
+fig, axes = plt.subplots(n, 1, figsize=(10, min(n * 4, 30)))
 if n == 1:
     axes = [axes]
 for ax, patch in zip(axes, details):
-    _plot_diff(patch, ax)
+    doc.plot_text(
+        patch.make_diff(),
+        ax=ax,
+        title=patch.name,
+        line_color_map=_DIFF_COLORS,
+    )
 plt.tight_layout()
 plt.show()
 
