@@ -144,38 +144,8 @@ values via ``op.get_attr("attr_name")``.
 Supported ops
 =============
 
-The built-in converters live under :mod:`yobx.tensorflow.ops` and are
-loaded on first call to :func:`to_onnx <yobx.tensorflow.to_onnx>` via
-:func:`register_tensorflow_converters
-<yobx.tensorflow.register_tensorflow_converters>`.
-
-+----------------------------+---------------------------------------------+
-| TF op type(s)              | ONNX equivalent                             |
-+============================+=============================================+
-| ``MatMul``                 | ``MatMul``                                  |
-| ``BatchMatMulV2``          | (with optional ``Transpose`` when           |
-| ``BatchMatMul``            | ``transpose_a`` / ``transpose_b`` is set)   |
-+----------------------------+---------------------------------------------+
-| ``BiasAdd``                | ``Add``                                     |
-+----------------------------+---------------------------------------------+
-| ``Relu``                   | ``Relu``                                    |
-+----------------------------+---------------------------------------------+
-| ``Relu6``                  | ``Clip(min=0, max=6)``                      |
-+----------------------------+---------------------------------------------+
-| ``Sigmoid``                | ``Sigmoid``                                 |
-+----------------------------+---------------------------------------------+
-| ``Tanh``                   | ``Tanh``                                    |
-+----------------------------+---------------------------------------------+
-| ``Softmax``                | ``Softmax(axis=-1)``                        |
-+----------------------------+---------------------------------------------+
-| ``ReadVariableOp``         | ``Identity`` (resolves captured variable)   |
-+----------------------------+---------------------------------------------+
-| ``Const``                  | constant value embedded as initializer      |
-+----------------------------+---------------------------------------------+
-| ``Identity``               | ``Identity``                                |
-+----------------------------+---------------------------------------------+
-| ``NoOp``                   | *(nothing emitted)*                         |
-+----------------------------+---------------------------------------------+
+See :ref:`l-design-tensorflow-supported-ops` for the full list of
+built-in TF op converters, generated automatically from the live registry.
 
 Dynamic shapes
 ==============
@@ -253,3 +223,9 @@ To extend the built-in op coverage:
         return g.op.ReduceSum(
             op.inputs[0].name, axes, keepdims=keepdims, outputs=outputs, name=op.name
         )
+
+.. toctree::
+   :maxdepth: 1
+
+   supported_ops
+
