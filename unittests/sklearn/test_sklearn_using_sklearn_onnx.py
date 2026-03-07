@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.typing import GraphBuilderProtocolExtended
+from yobx.typing import GraphBuilderExtendedProtocol
 from yobx.sklearn import to_onnx
 
 
@@ -27,7 +27,7 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
             )
 
         def convert_sklearn_mlp_classifier(
-            g: GraphBuilderProtocolExtended,
+            g: GraphBuilderExtendedProtocol,
             sts: Dict,
             outputs: List[str],
             estimator: MLPClassifier,

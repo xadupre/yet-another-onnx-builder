@@ -5,13 +5,13 @@ import onnx
 from sklearn.multiclass import OneVsRestClassifier
 
 from ..register import register_sklearn_converter, get_sklearn_converter
-from ...typing import GraphBuilderProtocolExtended
+from ...typing import GraphBuilderExtendedProtocol
 from ..sklearn_helper import get_n_expected_outputs
 
 
 @register_sklearn_converter(OneVsRestClassifier)
 def sklearn_one_vs_rest_classifier(
-    g: GraphBuilderProtocolExtended,
+    g: GraphBuilderExtendedProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: OneVsRestClassifier,

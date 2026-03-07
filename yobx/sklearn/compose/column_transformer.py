@@ -2,7 +2,7 @@ import numpy as np
 from typing import Dict, List, Union
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import FunctionTransformer
-from ...typing import GraphBuilderProtocolExtended
+from ...typing import GraphBuilderExtendedProtocol
 from ..register import register_sklearn_converter, get_sklearn_converter
 
 
@@ -50,7 +50,7 @@ def _is_passthrough(transformer) -> bool:
 
 @register_sklearn_converter(ColumnTransformer)
 def sklearn_column_transformer(
-    g: GraphBuilderProtocolExtended,
+    g: GraphBuilderExtendedProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: ColumnTransformer,

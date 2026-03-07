@@ -4,7 +4,7 @@ import onnx
 import onnx.helper as oh
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from ..register import register_sklearn_converter
-from ...typing import GraphBuilderProtocolExtended
+from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import choose_consistent_domain_opset
 
 _LEAF = -1  # sklearn's TREE_LEAF constant
@@ -13,13 +13,13 @@ _LEAF = -1  # sklearn's TREE_LEAF constant
 _NODE_MODE_LEQ = np.uint8(0)
 
 
-def _ensure_ml_domain(g: GraphBuilderProtocolExtended) -> None:
+def _ensure_ml_domain(g: GraphBuilderExtendedProtocol) -> None:
     """Ensures the 'ai.onnx.ml' domain is registered in the graph builder."""
     if "ai.onnx.ml" not in g.opsets:
         g.opsets["ai.onnx.ml"] = choose_consistent_domain_opset("ai.onnx.ml", g.opsets)
 
 
-def _get_ml_opset(g: GraphBuilderProtocolExtended) -> int:
+def _get_ml_opset(g: GraphBuilderExtendedProtocol) -> int:
     """Returns the resolved ``ai.onnx.ml`` opset version from the builder."""
     _ensure_ml_domain(g)
     return g.opsets.get("ai.onnx.ml", 1)
@@ -317,7 +317,7 @@ def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool):
 
 @register_sklearn_converter((DecisionTreeClassifier,))
 def sklearn_decision_tree_classifier(
-    g: GraphBuilderProtocolExtended,
+    g: GraphBuilderExtendedProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: DecisionTreeClassifier,
@@ -380,7 +380,7 @@ def sklearn_decision_tree_classifier(
 
 
 def _sklearn_decision_tree_classifier_v5(
-    g: GraphBuilderProtocolExtended,
+    g: GraphBuilderExtendedProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: DecisionTreeClassifier,
@@ -453,7 +453,7 @@ def _sklearn_decision_tree_classifier_v5(
 
 @register_sklearn_converter((DecisionTreeRegressor,))
 def sklearn_decision_tree_regressor(
-    g: GraphBuilderProtocolExtended,
+    g: GraphBuilderExtendedProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: DecisionTreeRegressor,
@@ -503,7 +503,7 @@ def sklearn_decision_tree_regressor(
 
 
 def _sklearn_decision_tree_regressor_v5(
-    g: GraphBuilderProtocolExtended,
+    g: GraphBuilderExtendedProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: DecisionTreeRegressor,

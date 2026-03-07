@@ -126,13 +126,13 @@ class TestDraftConverterWithCopilot(ExtTestCase):
     _FAKE_CODE = textwrap.dedent("""\
         from typing import Dict, List
         from sklearn.linear_model import Ridge
-        from ...typing import GraphBuilderProtocolExtended
+        from ...typing import GraphBuilderExtendedProtocol
         from ..register import register_sklearn_converter
 
 
         @register_sklearn_converter(Ridge)
         def sklearn_ridge(
-            g: GraphBuilderProtocolExtended,
+            g: GraphBuilderExtendedProtocol,
             sts: Dict,
             outputs: List[str],
             estimator: Ridge,

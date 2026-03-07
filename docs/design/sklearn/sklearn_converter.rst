@@ -74,12 +74,12 @@ Pass a single class or a tuple of classes as the first argument:
 .. code-block:: python
 
     from yobx.sklearn.register import register_sklearn_converter
-    from yobx.typing import GraphBuilderProtocolExtended
+    from yobx.typing import GraphBuilderExtendedProtocol
     from yobx.xbuilder import GraphBuilder
 
     @register_sklearn_converter(MyEstimator)
     def convert_my_estimator(
-        g: GraphBuilderProtocolExtended,
+        g: GraphBuilderExtendedProtocol,
         sts: dict,
         outputs: list[str],
         estimator: MyEstimator,
@@ -257,13 +257,13 @@ To support a new :epkg:`scikit-learn` estimator:
 
     # yobx/sklearn/ensemble/random_forest.py
     from sklearn.ensemble import RandomForestClassifier
-    from ...typing import GraphBuilderProtocolExtended
+    from ...typing import GraphBuilderExtendedProtocol
     from ..register import register_sklearn_converter
 
 
     @register_sklearn_converter(RandomForestClassifier)
     def convert_random_forest_classifier(
-        g: GraphBuilderProtocolExtended,
+        g: GraphBuilderExtendedProtocol,
         sts: dict,
         outputs: list[str],
         estimator: RandomForestClassifier,
