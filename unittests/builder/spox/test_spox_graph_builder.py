@@ -19,7 +19,6 @@ from onnx import TensorProto
 from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_spox
 from yobx.typing import GraphBuilderExtendedProtocol
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
