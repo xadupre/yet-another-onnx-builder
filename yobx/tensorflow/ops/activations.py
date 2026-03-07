@@ -11,13 +11,21 @@ from ...typing import GraphBuilderExtendedProtocol
 
 
 @register_tf_op_converter("Relu")
-def convert_relu(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
+def convert_relu(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
     """TF ``Relu`` → ONNX ``Relu``."""
     return g.op.Relu(op.inputs[0].name, outputs=outputs, name=op.name)
 
 
 @register_tf_op_converter("Relu6")
-def convert_relu6(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation, verbose: int = 0) -> str:
+def convert_relu6(
+    g: GraphBuilderExtendedProtocol,
+    sts: Dict[str, Any],
+    outputs: List[str],
+    op: tf.Operation,
+    verbose: int = 0,
+) -> str:
     """TF ``Relu6`` → ONNX ``Clip(min=0, max=6)``."""
     return g.op.Clip(
         op.inputs[0].name,
@@ -29,18 +37,28 @@ def convert_relu6(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs:
 
 
 @register_tf_op_converter("Sigmoid")
-def convert_sigmoid(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
+def convert_sigmoid(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
     """TF ``Sigmoid`` → ONNX ``Sigmoid``."""
     return g.op.Sigmoid(op.inputs[0].name, outputs=outputs, name=op.name)
 
 
 @register_tf_op_converter("Tanh")
-def convert_tanh(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
+def convert_tanh(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
     """TF ``Tanh`` → ONNX ``Tanh``."""
     return g.op.Tanh(op.inputs[0].name, outputs=outputs, name=op.name)
 
 
 @register_tf_op_converter("Softmax")
-def convert_softmax(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation, verbose: int = 0) -> str:
+def convert_softmax(
+    g: GraphBuilderExtendedProtocol,
+    sts: Dict[str, Any],
+    outputs: List[str],
+    op: tf.Operation,
+    verbose: int = 0,
+) -> str:
     """TF ``Softmax`` → ONNX ``Softmax(axis=-1)``."""
     return g.op.Softmax(op.inputs[0].name, axis=-1, outputs=outputs, name=op.name)

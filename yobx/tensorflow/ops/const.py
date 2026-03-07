@@ -10,7 +10,9 @@ from ...typing import GraphBuilderExtendedProtocol
 
 
 @register_tf_op_converter("ReadVariableOp")
-def convert_read_variable_op(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
+def convert_read_variable_op(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
     """Propagates a captured-variable value to the op's output tensor.
 
     In TF's graph, variables are captured as resource handles.  A
@@ -23,7 +25,9 @@ def convert_read_variable_op(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any
 
 
 @register_tf_op_converter("Const")
-def convert_const(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
+def convert_const(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
     """Materialises a TF ``Const`` op as a numpy array in the context.
 
     The constant value is extracted from the op's ``"value"`` attribute and
@@ -35,7 +39,9 @@ def convert_const(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs:
 
 
 @register_tf_op_converter("Identity")
-def convert_identity(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
+def convert_identity(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
     """Propagates the input tensor name / value without emitting any ONNX node.
 
     ``Identity`` is used heavily as a graph-internal pass-through (e.g. to
@@ -46,7 +52,9 @@ def convert_identity(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outpu
 
 
 @register_tf_op_converter("NoOp")
-def convert_noop(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
+def convert_noop(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
     """``NoOp`` — nothing to emit."""
     assert (
         not op.inputs and not op.outputs
