@@ -4,7 +4,7 @@ Elements of Design
 .. toctree::
    :maxdepth: 1
 
-   ci/index
+   ci
    misc/index
    builder/index
    sklearn/index

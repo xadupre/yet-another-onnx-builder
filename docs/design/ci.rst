@@ -1,8 +1,8 @@
 .. _l-design-ci:
 
-=================================
-Code and CI Design (per Library)
-=================================
+=======================================
+Repository Structure and CI Workflows
+=======================================
 
 This page explains how the source code is organized and how the
 continuous-integration workflows are structured for each component of
