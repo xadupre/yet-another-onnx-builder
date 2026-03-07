@@ -17,6 +17,16 @@ The variables below are handled by
 :class:`GraphBuilder <yobx.xbuilder.GraphBuilder>` and
 :class:`BasicShapeBuilder <yobx.xshape.BasicShapeBuilder>`.
 
+.. note::
+
+    When any ``ONNXSTOP*`` variable triggers an exception, the resulting
+    **stack trace points to the exact line of converter code** that first
+    assigned a type or shape to that result.  This is why it is important
+    to keep **explicit, stable names** for intermediate results in converter
+    code — an auto-generated name like ``tmp_0`` changes across runs,
+    whereas a name like ``scaled_output`` stays constant and can be passed
+    directly to ``ONNXSTOPSHAPE=scaled_output``.
+
 .. list-table::
    :header-rows: 1
    :widths: 30 70
@@ -25,9 +35,11 @@ The variables below are handled by
      - Effect
    * - ``ONNXSTOP=<name>``
      - Raises an exception the first time variable *name* receives a type.
-       Useful to locate the node that first assigns a type to a result.
+       The stack trace leads back to the converter line that created the
+       result, making it easy to find the responsible node.
    * - ``ONNXSTOPSHAPE=<name>``
      - Raises an exception the first time variable *name* receives a shape.
+       The stack trace identifies the converter line that produced the result.
    * - ``ONNXSTOPTYPE=<name>``
      - Raises an exception the first time variable *name* receives a type
        (same as ``ONNXSTOP``; kept for symmetry with ``ONNXSTOPSHAPE``).
