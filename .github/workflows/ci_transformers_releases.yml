@@ -1,4 +1,4 @@
-name: transformers-releases
+name: ci-7
 
 on:
   push:

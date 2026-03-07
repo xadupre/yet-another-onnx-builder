@@ -1,4 +1,4 @@
-name: torch-py
+name: ci-4
 
 on:
   push:
