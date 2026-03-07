@@ -21,13 +21,13 @@ def convert_matmul(
     # Honour optional transpose flags (present on MatMul and BatchMatMulV2).
     attr_names = {attr.name for attr in op.op_def.attr} if op.op_def else set()
     a = (
-        g.op.Transpose(op.inputs[0].name, perm=[-1, -2], name=f"{op.name}_tA")
+        g.op.Transpose(sts[op.inputs[0].name], perm=[-1, -2], name=f"{op.name}_tA")
         if "transpose_a" in attr_names and op.get_attr("transpose_a")
-        else op.inputs[0].name
+        else sts[op.inputs[0].name]
     )
     b = (
-        g.op.Transpose(op.inputs[1].name, perm=[-1, -2], name=f"{op.name}_tB")
+        g.op.Transpose(sts[op.inputs[1].name], perm=[-1, -2], name=f"{op.name}_tB")
         if "transpose_b" in attr_names and op.get_attr("transpose_b")
-        else op.inputs[1].name
+        else sts[op.inputs[1].name]
     )
     return g.op.MatMul(a, b, outputs=outputs, name=op.name)

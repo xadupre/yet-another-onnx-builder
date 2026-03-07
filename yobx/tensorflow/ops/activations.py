@@ -15,7 +15,7 @@ def convert_relu(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """TF ``Relu`` → ONNX ``Relu``."""
-    return g.op.Relu(op.inputs[0].name, outputs=outputs, name=op.name)
+    return g.op.Relu(sts[op.inputs[0].name], outputs=outputs, name=op.name)
 
 
 @register_tf_op_converter("Relu6")
@@ -28,7 +28,7 @@ def convert_relu6(
 ) -> str:
     """TF ``Relu6`` → ONNX ``Clip(min=0, max=6)``."""
     return g.op.Clip(
-        op.inputs[0].name,
+        sts[op.inputs[0].name],
         np.array(0.0, dtype=np.float32),
         np.array(6.0, dtype=np.float32),
         outputs=outputs[:1],
@@ -41,7 +41,7 @@ def convert_sigmoid(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """TF ``Sigmoid`` → ONNX ``Sigmoid``."""
-    return g.op.Sigmoid(op.inputs[0].name, outputs=outputs, name=op.name)
+    return g.op.Sigmoid(sts[op.inputs[0].name], outputs=outputs, name=op.name)
 
 
 @register_tf_op_converter("Tanh")
@@ -49,7 +49,7 @@ def convert_tanh(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """TF ``Tanh`` → ONNX ``Tanh``."""
-    return g.op.Tanh(op.inputs[0].name, outputs=outputs, name=op.name)
+    return g.op.Tanh(sts[op.inputs[0].name], outputs=outputs, name=op.name)
 
 
 @register_tf_op_converter("Softmax")
@@ -61,4 +61,4 @@ def convert_softmax(
     verbose: int = 0,
 ) -> str:
     """TF ``Softmax`` → ONNX ``Softmax(axis=-1)``."""
-    return g.op.Softmax(op.inputs[0].name, axis=-1, outputs=outputs, name=op.name)
+    return g.op.Softmax(sts[op.inputs[0].name], axis=-1, outputs=outputs, name=op.name)
