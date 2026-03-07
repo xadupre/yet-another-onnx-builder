@@ -1,4 +1,4 @@
-name: torch-sklearn
+name: torch
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   coverage:
-    name: torch-sklearn (ubuntu-latest, py3.13)
+    name: torch (ubuntu-latest, py3.13)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,7 +29,10 @@ jobs:
         run: pip freeze
 
       - name: Run tests with coverage
-        run: pytest --cov=yobx --cov-report=xml --durations=10 --ignore=unittests/tensorflow
+        run: |
+          pytest --cov=yobx --cov-report=xml --durations=10 \
+            --ignore=unittests/tensorflow \
+            --ignore=unittests/sklearn
 
       - name: Upload coverage to Codecov
         # Codecov automatically merges all uploads that share the same commit SHA.

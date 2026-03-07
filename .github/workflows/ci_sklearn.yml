@@ -31,13 +31,19 @@ jobs:
       - name: Install scikit-learn==${{ matrix.sklearn-version }}
         run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*" && pip freeze
 
-      - name: Run sklearn tests
+      - name: Run sklearn tests with coverage
         if: matrix.sklearn-version != '1.8'
-        run: pytest unittests/sklearn --durations=10
+        run: |
+            pytest --durations=10 \
+              --ignore=unittests/tensorflow \
+              --ignore=unittests/torch
 
       - name: Run sklearn tests with coverage
         if: matrix.sklearn-version == '1.8'
-        run: pytest --cov=yobx --cov-report=xml unittests/sklearn --durations=10
+        run: |
+            pytest --cov=yobx --cov-report=xml --durations=10 \
+              --ignore=unittests/tensorflow \
+              --ignore=unittests/torch
 
       - name: Upload coverage to Codecov
         if: matrix.sklearn-version == '1.8'

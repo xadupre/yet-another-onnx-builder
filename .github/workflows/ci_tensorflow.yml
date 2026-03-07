@@ -32,8 +32,12 @@ jobs:
       - name: Install TensorFlow ${{ matrix.tensorflow-version }}
         run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" && pip freeze
 
-      - name: Run TensorFlow tests with coverage
-        run: pytest --cov=yobx --cov-report=xml unittests/tensorflow --durations=10
+      - name: Run sklearn tests with coverage
+        if: matrix.sklearn-version == '1.8'
+        run: |
+            pytest --cov=yobx --cov-report=xml --durations=10 \
+              --ignore=unittests/sklearn \
+              --ignore=unittests/torch
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
