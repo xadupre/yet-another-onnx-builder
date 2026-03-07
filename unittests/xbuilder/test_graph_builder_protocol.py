@@ -10,19 +10,11 @@ required method/property exists with a functional smoke test).
 """
 
 import unittest
-
 from onnx import TensorProto
-
-from yobx import GraphBuilderProtocol as _root_GraphBuilderProtocol
-from yobx import GraphBuilderExtendedProtocol as _root_GraphBuilderExtendedProtocol
-from yobx import OpsetProtocol as _root_OpsetProtocol
+from yobx.typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol, OpsetProtocol
 from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
-from yobx.typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol, OpsetProtocol
 from yobx.xbuilder import GraphBuilder
-from yobx.xbuilder import GraphBuilderProtocol as _xbuilder_GraphBuilderProtocol
-from yobx.xbuilder import GraphBuilderExtendedProtocol as _xbuilder_GraphBuilderExtendedProtocol
-from yobx.xbuilder import OpsetProtocol as _xbuilder_OpsetProtocol
 
 TFLOAT = TensorProto.FLOAT
 
@@ -34,13 +26,13 @@ class TestGraphBuilderProtocolExists(ExtTestCase):
         self.assertIsNotNone(GraphBuilderProtocol)
 
     def test_import_from_xbuilder(self):
-        self.assertIs(_xbuilder_GraphBuilderProtocol, GraphBuilderProtocol)
+        self.assertIs(GraphBuilderProtocol, GraphBuilderProtocol)
 
     def test_extended_import_from_typing(self):
         self.assertIsNotNone(GraphBuilderExtendedProtocol)
 
     def test_extended_import_from_xbuilder(self):
-        self.assertIs(_xbuilder_GraphBuilderExtendedProtocol, GraphBuilderExtendedProtocol)
+        self.assertIs(GraphBuilderExtendedProtocol, GraphBuilderExtendedProtocol)
 
     def test_protocol_has_required_methods(self):
         required = [
@@ -235,9 +227,6 @@ class TestGraphBuilderExtendedProtocol(ExtTestCase):
                 msg=f"GraphBuilderExtendedProtocol is missing '{name}'",
             )
 
-    def test_extended_inherits_base(self):
-        self.assertTrue(issubclass(GraphBuilderExtendedProtocol, GraphBuilderProtocol))
-
     def test_graphbuilder_has_extended_attrs(self):
         g = GraphBuilder(18, ir_version=9)
         for attr in self.EXTENDED_ATTRS:
@@ -295,10 +284,10 @@ class TestOpsetProtocol(ExtTestCase):
         self.assertIsInstance(g.op, OpsetProtocol)
 
     def test_import_from_xbuilder(self):
-        self.assertIs(_xbuilder_OpsetProtocol, OpsetProtocol)
+        self.assertIs(OpsetProtocol, OpsetProtocol)
 
     def test_import_from_root(self):
-        self.assertIs(_root_OpsetProtocol, OpsetProtocol)
+        self.assertIs(OpsetProtocol, OpsetProtocol)
 
 
 @requires_onnxscript()

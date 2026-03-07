@@ -1,4 +1,15 @@
-from typing import Any, Callable, Dict, List, Optional, Protocol, Sequence, Tuple, Union, runtime_checkable
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    Union,
+    runtime_checkable,
+)
 
 
 @runtime_checkable
@@ -201,7 +212,6 @@ class GraphBuilderProtocol(Protocol):
             :class:`~onnx.FunctionProto`, or a model container object
         """
         ...
-
 
 
 @runtime_checkable
