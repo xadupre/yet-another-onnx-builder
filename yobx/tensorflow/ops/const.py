@@ -3,13 +3,14 @@ Converters for TF ops that act as pass-throughs or supply constant values:
 ``ReadVariableOp``, ``Const``, ``Identity``, and ``NoOp``.
 """
 
+from typing import Any, Dict, List
 import tensorflow as tf
 from ..register import register_tf_op_converter
-from ...xbuilder import GraphBuilder
+from ...typing import GraphBuilderExtendedProtocol
 
 
 @register_tf_op_converter("ReadVariableOp")
-def convert_read_variable_op(g: GraphBuilder, sts: dict, outputs: list, op) -> str:
+def convert_read_variable_op(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
     """Propagates a captured-variable value to the op's output tensor.
 
     In TF's graph, variables are captured as resource handles.  A
@@ -22,7 +23,7 @@ def convert_read_variable_op(g: GraphBuilder, sts: dict, outputs: list, op) -> s
 
 
 @register_tf_op_converter("Const")
-def convert_const(g: GraphBuilder, sts: dict, outputs: list, op) -> str:
+def convert_const(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
     """Materialises a TF ``Const`` op as a numpy array in the context.
 
     The constant value is extracted from the op's ``"value"`` attribute and
@@ -34,7 +35,7 @@ def convert_const(g: GraphBuilder, sts: dict, outputs: list, op) -> str:
 
 
 @register_tf_op_converter("Identity")
-def convert_identity(g: GraphBuilder, sts: dict, outputs: list, op) -> str:
+def convert_identity(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
     """Propagates the input tensor name / value without emitting any ONNX node.
 
     ``Identity`` is used heavily as a graph-internal pass-through (e.g. to
@@ -45,8 +46,9 @@ def convert_identity(g: GraphBuilder, sts: dict, outputs: list, op) -> str:
 
 
 @register_tf_op_converter("NoOp")
-def convert_noop(g: GraphBuilder, sts: dict, outputs: list, op) -> None:
+def convert_noop(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
     """``NoOp`` — nothing to emit."""
     assert (
         not op.inputs and not op.outputs
     ), f"This operator does something {op=}{g.get_debug_msg()}"
+    return ""
