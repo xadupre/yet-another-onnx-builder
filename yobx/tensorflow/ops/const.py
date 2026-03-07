@@ -46,8 +46,9 @@ def convert_identity(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outpu
 
 
 @register_tf_op_converter("NoOp")
-def convert_noop(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op) -> None:
+def convert_noop(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op) -> str:
     """``NoOp`` — nothing to emit."""
     assert (
         not op.inputs and not op.outputs
     ), f"This operator does something {op=}{g.get_debug_msg()}"
+    return ""
