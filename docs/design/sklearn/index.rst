@@ -65,6 +65,7 @@ That saves quite some time.
    supported_converters
    custom_converter
    copilot_draft
+   debug
 
 Finally, the example given at the top of the page would be converted
 into the mode which follows.
