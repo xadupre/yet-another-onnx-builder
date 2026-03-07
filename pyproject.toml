@@ -201,6 +201,12 @@ bad-return = false
 missing-attribute = false
 
 [[tool.pyrefly.sub-config]]
+matches = "yobx/tensorflow/ops/*.py"
+[tool.pyrefly.sub-config.errors]
+bad-argument-type = false
+bad-return = false
+
+[[tool.pyrefly.sub-config]]
 matches = "yobx/xbuilder/graph_builder_opset.py"
 [tool.pyrefly.sub-config.errors]
 bad-argument-type = false
