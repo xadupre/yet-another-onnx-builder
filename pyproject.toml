@@ -52,6 +52,9 @@ docs = [
 sklearn = [
     "scikit-learn>=1.4",
 ]
+spox = [
+    "spox>=0.12",
+]
 torch = [
     "accelerate",
     "huggingface_hub",
@@ -195,6 +198,13 @@ implicit-import = false
 
 [[tool.pyrefly.sub-config]]
 matches = "yobx/builder/onnxscript/bridge_graph_builder.py"
+[tool.pyrefly.sub-config.errors]
+bad-argument-type = false
+bad-override = false
+bad-return = false
+
+[[tool.pyrefly.sub-config]]
+matches = "yobx/builder/spox/bridge_graph_builder.py"
 [tool.pyrefly.sub-config.errors]
 bad-argument-type = false
 bad-override = false
