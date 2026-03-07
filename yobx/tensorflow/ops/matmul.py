@@ -3,12 +3,13 @@ Converter for the TF ``MatMul`` / ``BatchMatMulV2`` op → ONNX ``MatMul``.
 """
 
 from typing import Any, Dict, List
+import tensorflow as tf
 from ..register import register_tf_op_converter
 from ...typing import GraphBuilderExtendedProtocol
 
 
 @register_tf_op_converter(("MatMul", "BatchMatMulV2", "BatchMatMul"))
-def convert_matmul(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op) -> str:
+def convert_matmul(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
     """
     Converts TF ``MatMul`` / ``BatchMatMulV2`` to ONNX ``MatMul``.
 
