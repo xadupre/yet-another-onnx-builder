@@ -126,10 +126,15 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertIn("MatMul", op_types)
         self.assertIn("Relu", op_types)
 
+        expected = model(X).numpy()
+
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X:0": X})[0]
-        expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        ort_session = self.check_ort(onx)
+        ort_result = ort_session.run(None, {"X:0": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_tf_module_no_keras(self):
         """A model defined as a tf.Module subclass with no Keras dependency.
@@ -157,10 +162,15 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertIn("MatMul", op_types)
         self.assertIn("Relu", op_types)
 
+        expected = model(X).numpy()
+
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X:0": X})[0]
-        expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        ort_session = self.check_ort(onx)
+        ort_result = ort_session.run(None, {"X:0": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_custom_op_converter_with_extra_converters(self):
         """extra_converters can override how a specific TF op type is converted."""
