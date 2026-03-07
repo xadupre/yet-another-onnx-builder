@@ -49,7 +49,8 @@ from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import DoubleTensorType, FloatTensorType
 
 from yobx import doc
-from yobx.xbuilder import FunctionOptions, GraphBuilder
+from yobx.typing import GraphBuilderExtendedProtocol
+from yobx.xbuilder import FunctionOptions
 from yobx.sklearn import to_onnx
 
 # %%
@@ -112,7 +113,7 @@ def to_skl2onnx_input_type(elem_type: int, n_features: int):
 
 
 def convert_sklearn_mlp_classifier(
-    g: GraphBuilder,
+    g: GraphBuilderExtendedProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: MLPClassifier,

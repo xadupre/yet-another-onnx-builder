@@ -1,15 +1,15 @@
 from typing import Dict, List, Union
 import numpy as np
 from sklearn.linear_model import GammaRegressor, PoissonRegressor, TweedieRegressor
+from ...typing import GraphBuilderExtendedProtocol
 from ..register import register_sklearn_converter
-from ...xbuilder import GraphBuilder
 
 _GLM_TYPES = (TweedieRegressor, PoissonRegressor, GammaRegressor)
 
 
 @register_sklearn_converter(_GLM_TYPES)
 def sklearn_glm_regressor(
-    g: GraphBuilder,
+    g: GraphBuilderExtendedProtocol,
     sts: Dict,
     outputs: List[str],
     estimator: Union[TweedieRegressor, PoissonRegressor, GammaRegressor],

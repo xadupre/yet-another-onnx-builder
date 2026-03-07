@@ -1,9 +1,10 @@
 from __future__ import annotations
 from functools import partial
-from typing import Any, Dict, List, Optional, Sequence, Set, Union, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Union, Tuple
 import numpy as np
 import onnx
 import onnx_ir as ir
+from ...typing import GraphBuilderExtendedProtocol, OpsetProtocol
 from ...container import ExtendedModelContainer
 from ...helpers.onnx_helper import _default_OPSET_TO_IR_VERSION
 from ...xshape.shape_type_compute import set_type_shape_unary_op
@@ -73,15 +74,17 @@ def value_to_ir_tensor(value: Any, name: str) -> ir.TensorProtocol:
     )
 
 
-class _OnnxScriptGraphBuilderOpset:
+class OnnxScriptGraphBuilderOpset(OpsetProtocol):
+    """Implements :class:`yobx.typing.OpsetProtocol`."""
+
     def __init__(self, builder):
         self.builder = builder
 
-    def __getattr__(self, name):
-        return partial(self.builder._make_node, name)
+    def __getattr__(self, op_type: str) -> Callable[..., Union[str, Tuple[str, ...]]]:
+        return partial(self.builder._make_node, op_type)
 
 
-class OnnxScriptGraphBuilder:
+class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
     """
     Bridge builder that exposes a yobx-compatible API over onnxscript's IR.
     It takes onnxscript `GraphBuilder
@@ -146,10 +149,15 @@ class OnnxScriptGraphBuilder:
         # Counter for auto-generating output names
         self._output_counter: int = 0
         self._unique_names: Set[str] = set()
-        self.op = _OnnxScriptGraphBuilderOpset(self)
+        self._op = OnnxScriptGraphBuilderOpset(self)
 
     @property
-    def main_opset(self):
+    def op(self) -> OpsetProtocol:
+        """Returns the shortcut to OpsetProtocal."""
+        return self._op
+
+    @property
+    def main_opset(self) -> int:
         "Returns the opset for the main domain (assuming it is used)."
         return self.opsets[""]
 
@@ -184,6 +192,15 @@ class OnnxScriptGraphBuilder:
         self.opsets[domain] = version
         # Keep the underlying graph's opset_imports in sync.
         self._graph.opset_imports[domain] = version
+
+    def has_opset(self, domain: str) -> int:
+        """
+        Returns the opset version for a domain, or 0 if the domain is not registered.
+
+        :param domain: domain name
+        :return: opset version, or ``0`` if the domain is unknown
+        """
+        return self.opsets.get(domain, 0)
 
     @property
     def inner_builder(self):
@@ -564,6 +581,16 @@ class OnnxScriptGraphBuilder:
         if len(final_names) == 1:
             return final_names[0]
         return tuple(final_names)
+
+    @property
+    def input_names(self) -> List[str]:
+        """Returns input names."""
+        return [i.name or "" for i in self._graph.inputs]
+
+    @property
+    def output_names(self) -> List[str]:
+        """Returns output names."""
+        return [i.name or "" for i in self._graph.outputs]
 
     # ------------------------------------------------------------------
     # Export

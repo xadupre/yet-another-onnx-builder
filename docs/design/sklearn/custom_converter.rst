@@ -199,6 +199,7 @@ means you no longer have to pass ``extra_converters`` at every call site:
     import numpy as np
     from sklearn.base import BaseEstimator, TransformerMixin
     from yobx.sklearn.register import register_sklearn_converter
+    from yobx.typing import GraphBuilderExtendedProtocol
     from yobx.xbuilder import GraphBuilder
 
 
@@ -215,7 +216,7 @@ means you no longer have to pass ``extra_converters`` at every call site:
 
     @register_sklearn_converter(ScaleByConstant)
     def convert_scale_by_constant(
-        g: GraphBuilder,
+        g: GraphBuilderExtendedProtocol,
         sts: dict,
         outputs: list,
         estimator: ScaleByConstant,
