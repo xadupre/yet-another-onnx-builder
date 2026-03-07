@@ -1096,7 +1096,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         ), f"Domain {domain!r} is not registered{self.get_debug_msg()}."
         return self.opsets.get(domain, None)
 
-    def add_domain(self, domain: str, version: int = 1):
+    def set_opset(self, domain: str, version: int = 1):
         """
         Adds a domain to the list of supported ones.
         Checks the version is the same if it exists.
@@ -1108,6 +1108,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             )
             return
         self.opsets[domain] = version
+
+    def add_domain(self, domain: str, version: int = 1):
+        """Deprecated. Use :meth:`set_opset` instead."""
+        self.set_opset(domain, version)
 
     def _hash(self) -> str:
         return make_hash(self)

@@ -1,5 +1,5 @@
 """
-Tests for the opset query API (``main_opset``, ``get_opset``, ``add_domain``)
+Tests for the opset query API (``main_opset``, ``get_opset``, ``set_opset``)
 on :class:`~yobx.builder.onnxscript.OnnxScriptGraphBuilder`.
 
 This validates the API described in ``docs/design/sklearn/expected_api.rst``
@@ -60,7 +60,55 @@ class TestOnnxScriptGraphBuilderOpsetApi(ExtTestCase):
         self.assertIsNone(result)
 
     # ------------------------------------------------------------------
-    # add_domain
+    # set_opset
+    # ------------------------------------------------------------------
+
+    def test_set_opset_new(self):
+        g = self._make_builder()
+        g.set_opset("ai.onnx.ml", 3)
+        self.assertEqual(g.get_opset("ai.onnx.ml"), 3)
+
+    def test_set_opset_new_reflected_in_graph(self):
+        """set_opset must also update the underlying ir.Graph opset_imports."""
+        g = self._make_builder()
+        g.set_opset("ai.onnx.ml", 3)
+        self.assertIn("ai.onnx.ml", g._graph.opset_imports)
+        self.assertEqual(g._graph.opset_imports["ai.onnx.ml"], 3)
+
+    def test_set_opset_existing_same_version_noop(self):
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+
+        g = OnnxScriptGraphBuilder({"": 18, "ai.onnx.ml": 3})
+        g.set_opset("ai.onnx.ml", 3)
+        self.assertEqual(g.get_opset("ai.onnx.ml"), 3)
+
+    def test_set_opset_version_mismatch_raises(self):
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+
+        g = OnnxScriptGraphBuilder({"": 18, "ai.onnx.ml": 3})
+        with self.assertRaises(AssertionError):
+            g.set_opset("ai.onnx.ml", 5)
+
+    def test_set_opset_default_version(self):
+        g = self._make_builder()
+        g.set_opset("com.example")
+        self.assertEqual(g.get_opset("com.example"), 1)
+
+    def test_set_opset_exported_model_contains_domain(self):
+        """set_opset is reflected in the exported ONNX ModelProto."""
+        import onnx
+
+        g = self._make_builder()
+        g.set_opset("ai.onnx.ml", 3)
+        g.make_tensor_input("X", onnx.TensorProto.FLOAT, (None, 4))
+        g.make_node("Relu", ["X"], ["Y"])
+        g.make_tensor_output("Y", onnx.TensorProto.FLOAT)
+        proto = g.to_onnx()
+        domains = {oi.domain for oi in proto.opset_import}
+        self.assertIn("ai.onnx.ml", domains)
+
+    # ------------------------------------------------------------------
+    # add_domain (deprecated alias for set_opset)
     # ------------------------------------------------------------------
 
     def test_add_domain_new(self):

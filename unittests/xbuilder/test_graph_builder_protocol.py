@@ -38,6 +38,7 @@ class TestGraphBuilderProtocolExists(ExtTestCase):
             "input_names",
             "output_names",
             "get_opset",
+            "set_opset",
             "add_domain",
             "has_opset",
             "has_name",
@@ -79,6 +80,7 @@ class TestGraphBuilderSatisfiesProtocol(ExtTestCase):
             "input_names",
             "output_names",
             "get_opset",
+            "set_opset",
             "add_domain",
             "has_opset",
             "unique_name",
@@ -156,6 +158,7 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
             "input_names",
             "output_names",
             "get_opset",
+            "set_opset",
             "add_domain",
             "has_opset",
             "unique_name",
@@ -203,6 +206,13 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
 
         g = OnnxScriptGraphBuilder(18)
         self.assertEqual(g.get_opset(""), 18)
+
+    def test_set_opset(self):
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+
+        g = OnnxScriptGraphBuilder(18)
+        g.set_opset("custom", 1)
+        self.assertEqual(g.get_opset("custom"), 1)
 
     def test_add_domain(self):
         from yobx.builder.onnxscript import OnnxScriptGraphBuilder

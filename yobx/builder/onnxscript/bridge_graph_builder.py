@@ -175,7 +175,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
             ), f"Domain {domain!r} is not registered in opsets={self.opsets!r}."
         return self.opsets.get(domain, None)
 
-    def add_domain(self, domain: str, version: int = 1) -> None:
+    def set_opset(self, domain: str, version: int = 1) -> None:
         """
         Adds a domain to the list of supported ones.
         Checks the version is the same if it exists.
@@ -192,6 +192,10 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         self.opsets[domain] = version
         # Keep the underlying graph's opset_imports in sync.
         self._graph.opset_imports[domain] = version
+
+    def add_domain(self, domain: str, version: int = 1) -> None:
+        """Deprecated. Use :meth:`set_opset` instead."""
+        self.set_opset(domain, version)
 
     def has_opset(self, domain: str) -> int:
         """

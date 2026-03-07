@@ -54,12 +54,16 @@ class GraphBuilderProtocol(Protocol):
         """
         ...
 
-    def add_domain(self, domain: str, version: int = 1) -> None:
+    def set_opset(self, domain: str, version: int = 1) -> None:
         """Registers a domain with its opset version.
 
         :param domain: domain name
         :param version: opset version
         """
+        ...
+
+    def add_domain(self, domain: str, version: int = 1) -> None:
+        """Deprecated. Use :meth:`set_opset` instead."""
         ...
 
     def has_opset(self, domain: str) -> int:
