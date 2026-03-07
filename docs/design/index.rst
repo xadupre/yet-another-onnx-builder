@@ -9,3 +9,4 @@ Elements of Design
    builder/index
    sklearn/index
    torch/index
+   tensorflow/index

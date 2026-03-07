@@ -1,5 +1,5 @@
 """
-Tests for the opset query API (``main_opset``, ``get_opset``, ``add_domain``)
+Tests for the opset query API (``main_opset``, ``get_opset``, ``set_opset``)
 on :class:`~yobx.xbuilder.GraphBuilder`.
 
 This validates the API described in ``docs/design/sklearn/expected_api.rst``
@@ -49,7 +49,32 @@ class TestGraphBuilderOpsetApi(ExtTestCase):
         self.assertIsNone(result)
 
     # ------------------------------------------------------------------
-    # add_domain
+    # set_opset
+    # ------------------------------------------------------------------
+
+    def test_set_opset_new(self):
+        g = GraphBuilder(18, ir_version=10)
+        g.set_opset("ai.onnx.ml", 3)
+        self.assertEqual(g.get_opset("ai.onnx.ml"), 3)
+
+    def test_set_opset_existing_same_version_noop(self):
+        g = GraphBuilder({"": 18, "ai.onnx.ml": 3}, ir_version=10)
+        # Should not raise; version matches
+        g.set_opset("ai.onnx.ml", 3)
+        self.assertEqual(g.get_opset("ai.onnx.ml"), 3)
+
+    def test_set_opset_version_mismatch_raises(self):
+        g = GraphBuilder({"": 18, "ai.onnx.ml": 3}, ir_version=10)
+        with self.assertRaises(AssertionError):
+            g.set_opset("ai.onnx.ml", 5)
+
+    def test_set_opset_default_version(self):
+        g = GraphBuilder(18, ir_version=10)
+        g.set_opset("com.example")
+        self.assertEqual(g.get_opset("com.example"), 1)
+
+    # ------------------------------------------------------------------
+    # add_domain (deprecated alias for set_opset)
     # ------------------------------------------------------------------
 
     def test_add_domain_new(self):
