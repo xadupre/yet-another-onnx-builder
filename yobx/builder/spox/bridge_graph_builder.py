@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Un
 import numpy as np
 import numpy.typing as npt
 import onnx
+import spox
 
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ...typing import GraphBuilderExtendedProtocol, OpsetProtocol
@@ -183,8 +184,6 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
         target_opset_or_opsets: Union[int, Dict[str, int]],
         ir_version: Optional[int] = None,
     ) -> None:
-        import spox  # noqa: F401 — ensures spox is installed
-
         if isinstance(target_opset_or_opsets, int):
             self.opsets: Dict[str, int] = {"": target_opset_or_opsets}
         elif isinstance(target_opset_or_opsets, dict):
@@ -395,8 +394,6 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
         * :class:`numpy.ndarray` / scalar — creates an inline ``Constant`` node.
         * ``None`` — optional absent input → ``None``.
         """
-        import spox  # noqa: F401
-
         if arg is None:
             return None
         if isinstance(arg, str):
@@ -476,8 +473,6 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
             result = ctor(*input_vars, **adapted_kwargs)
 
         # Normalise the result to a list of Vars
-        import spox
-
         if isinstance(result, spox.Var):
             result_list: List[Any] = [result]
         else:
@@ -515,8 +510,6 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
         :param device: unused.
         :return: The registered name (same as *name*).
         """
-        import spox
-
         if elem_type:
             np_dtype = _onnx_elem_type_to_np_dtype(elem_type)
             spox_shape = tuple(shape) if shape is not None else None
@@ -738,8 +731,6 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
 
     def to_onnx(self) -> onnx.ModelProto:
         """Exports the accumulated graph as an :class:`onnx.ModelProto`."""
-        import spox
-
         inputs_dict = {n: self._name_to_var[n] for n in self._input_names}
         outputs_dict = {n: self._name_to_var[n] for n in self._output_names}
 
