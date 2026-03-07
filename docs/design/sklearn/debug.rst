@@ -1,8 +1,8 @@
 .. _l-design-sklearn-debug-env-vars:
 
-============================
+====================================
 Debugging with Environment Variables
-============================
+====================================
 
 When a conversion produces unexpected results or raises an error, a set of
 environment variables can be used to get more diagnostic output **without
@@ -17,15 +17,14 @@ The variables below are handled by
 :class:`GraphBuilder <yobx.xbuilder.GraphBuilder>` and
 :class:`BasicShapeBuilder <yobx.xshape.BasicShapeBuilder>`.
 
-.. note::
+When any ``ONNXSTOP*`` variable triggers an exception, the resulting
+**stack trace points to the exact line of converter code** that first
+assigned a type or shape to that result.
 
-    When any ``ONNXSTOP*`` variable triggers an exception, the resulting
-    **stack trace points to the exact line of converter code** that first
-    assigned a type or shape to that result.  This is why it is important
-    to keep **explicit, stable names** for intermediate results in converter
-    code — an auto-generated name like ``tmp_0`` changes across runs,
-    whereas a name like ``scaled_output`` stays constant and can be passed
-    directly to ``ONNXSTOPSHAPE=scaled_output``.
+A user usually only sees the final model and can only investigate an
+issue based on the names he reads.
+Keeping **explicit, stable names** for intermediate results in converters
+code helps to track the code where this name appears.
 
 .. list-table::
    :header-rows: 1
