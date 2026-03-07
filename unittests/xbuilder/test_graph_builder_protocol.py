@@ -13,10 +13,16 @@ import unittest
 
 from onnx import TensorProto
 
+from yobx import GraphBuilderProtocol as _root_GraphBuilderProtocol
+from yobx import GraphBuilderExtendedProtocol as _root_GraphBuilderExtendedProtocol
+from yobx import OpsetProtocol as _root_OpsetProtocol
 from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
 from yobx.typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol, OpsetProtocol
 from yobx.xbuilder import GraphBuilder
+from yobx.xbuilder import GraphBuilderProtocol as _xbuilder_GraphBuilderProtocol
+from yobx.xbuilder import GraphBuilderExtendedProtocol as _xbuilder_GraphBuilderExtendedProtocol
+from yobx.xbuilder import OpsetProtocol as _xbuilder_OpsetProtocol
 
 TFLOAT = TensorProto.FLOAT
 
@@ -28,17 +34,13 @@ class TestGraphBuilderProtocolExists(ExtTestCase):
         self.assertIsNotNone(GraphBuilderProtocol)
 
     def test_import_from_xbuilder(self):
-        from yobx.xbuilder import GraphBuilderProtocol as P
-
-        self.assertIs(P, GraphBuilderProtocol)
+        self.assertIs(_xbuilder_GraphBuilderProtocol, GraphBuilderProtocol)
 
     def test_extended_import_from_typing(self):
         self.assertIsNotNone(GraphBuilderExtendedProtocol)
 
     def test_extended_import_from_xbuilder(self):
-        from yobx.xbuilder import GraphBuilderExtendedProtocol as P
-
-        self.assertIs(P, GraphBuilderExtendedProtocol)
+        self.assertIs(_xbuilder_GraphBuilderExtendedProtocol, GraphBuilderExtendedProtocol)
 
     def test_protocol_has_required_methods(self):
         required = [
@@ -293,14 +295,10 @@ class TestOpsetProtocol(ExtTestCase):
         self.assertIsInstance(g.op, OpsetProtocol)
 
     def test_import_from_xbuilder(self):
-        from yobx.xbuilder import OpsetProtocol as P
-
-        self.assertIs(P, OpsetProtocol)
+        self.assertIs(_xbuilder_OpsetProtocol, OpsetProtocol)
 
     def test_import_from_root(self):
-        from yobx import OpsetProtocol as P
-
-        self.assertIs(P, OpsetProtocol)
+        self.assertIs(_root_OpsetProtocol, OpsetProtocol)
 
 
 @requires_onnxscript()
