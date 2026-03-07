@@ -204,7 +204,6 @@ class TestSklearnDecisionTree(ExtTestCase):
         self.assertEqualArray(pipe.predict(X), label)
         self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
-
     def test_decision_tree_classifier_float32(self):
         """DecisionTreeClassifier works with float32 input."""
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
@@ -268,9 +267,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         predictions = results[0]
 
-        self.assertEqualArray(
-            dt.predict(X).reshape(-1, 1), predictions, atol=1e-5
-        )
+        self.assertEqualArray(dt.predict(X).reshape(-1, 1), predictions, atol=1e-5)
 
 
 if __name__ == "__main__":

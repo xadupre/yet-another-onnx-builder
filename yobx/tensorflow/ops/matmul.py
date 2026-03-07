@@ -9,7 +9,9 @@ from ...typing import GraphBuilderExtendedProtocol
 
 
 @register_tf_op_converter(("MatMul", "BatchMatMulV2", "BatchMatMul"))
-def convert_matmul(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
+def convert_matmul(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
     """
     Converts TF ``MatMul`` / ``BatchMatMulV2`` to ONNX ``MatMul``.
 

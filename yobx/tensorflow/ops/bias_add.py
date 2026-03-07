@@ -9,7 +9,9 @@ from ...typing import GraphBuilderExtendedProtocol
 
 
 @register_tf_op_converter("BiasAdd")
-def convert_bias_add(g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation) -> str:
+def convert_bias_add(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
     """Converts TF ``BiasAdd`` to ONNX ``Add``.
 
     TF's ``BiasAdd`` is semantically equivalent to adding a 1-D bias along the
