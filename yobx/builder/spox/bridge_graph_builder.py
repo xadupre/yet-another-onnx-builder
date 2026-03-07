@@ -18,7 +18,6 @@ from ...typing import GraphBuilderExtendedProtocol, OpsetProtocol
 from ...xshape._shape_helper import DYNAMIC_SHAPE
 from ...xshape.shape_type_compute import set_type_shape_unary_op
 
-
 # ---------------------------------------------------------------------------
 # Opset module resolution
 # ---------------------------------------------------------------------------
@@ -98,11 +97,7 @@ def _positional_params(ctor: Callable) -> List[inspect.Parameter]:
 def _keyword_only_params(ctor: Callable) -> Dict[str, inspect.Parameter]:
     """Returns a dict of keyword-only parameters of *ctor*."""
     sig = inspect.signature(ctor)
-    return {
-        p.name: p
-        for p in sig.parameters.values()
-        if p.kind == p.KEYWORD_ONLY
-    }
+    return {p.name: p for p in sig.parameters.values() if p.kind == p.KEYWORD_ONLY}
 
 
 def _is_sequence_var_param(param: inspect.Parameter, ctor: Callable) -> bool:
@@ -248,9 +243,9 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
     def get_opset(self, domain: str, exc: bool = True) -> Optional[int]:
         """Returns the opset version for *domain*."""
         if exc:
-            assert domain in self.opsets, (
-                f"Domain {domain!r} is not registered. opsets={self.opsets!r}."
-            )
+            assert (
+                domain in self.opsets
+            ), f"Domain {domain!r} is not registered. opsets={self.opsets!r}."
         return self.opsets.get(domain, None)
 
     def set_opset(self, domain: str, version: int = 1) -> None:
@@ -556,9 +551,9 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
                 for n in name
             ]
 
-        assert name in self._name_to_var, (
-            f"Cannot mark {name!r} as output — it is not registered."
-        )
+        assert (
+            name in self._name_to_var
+        ), f"Cannot mark {name!r} as output — it is not registered."
         self._output_names.append(name)
         if elem_type is not None and name not in self._type_map:
             self._type_map[name] = elem_type
@@ -591,8 +586,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
             arr = np.array(value)
         else:
             raise TypeError(
-                f"Cannot convert initializer {name!r} of type {type(value)} "
-                "to a numpy array."
+                f"Cannot convert initializer {name!r} of type {type(value)} to a numpy array."
             )
 
         # Create a constant Var using the appropriate opset module

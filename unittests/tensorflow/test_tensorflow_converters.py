@@ -10,6 +10,17 @@ from yobx.reference import ExtendedReferenceEvaluator
 from yobx.tensorflow import to_onnx
 
 
+def _ort_run(onx, feeds):
+    """Run an ONNX model with onnxruntime; returns the first output or *None* if
+    onnxruntime is not installed."""
+    try:
+        from onnxruntime import InferenceSession
+    except ImportError:
+        return None
+    sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+    return sess.run(None, feeds)[0]
+
+
 @requires_tensorflow("2.0")
 class TestTensorflowBaseConverters(ExtTestCase):
     def test_dense_linear(self):
@@ -21,10 +32,18 @@ class TestTensorflowBaseConverters(ExtTestCase):
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
 
+        # The ONNX input name is the sanitized form of the TF placeholder name.
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X:0": X})[0]
+        result = ref.run(None, feeds)[0]
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        ort_result = _ort_run(onx, feeds)
+        if ort_result is not None:
+            self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_dense_relu(self):
         """Dense layer with relu activation."""
@@ -39,10 +58,17 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertIn("MatMul", op_types)
         self.assertIn("Relu", op_types)
 
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X:0": X})[0]
+        result = ref.run(None, feeds)[0]
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        ort_result = _ort_run(onx, feeds)
+        if ort_result is not None:
+            self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_dense_sigmoid(self):
         """Dense layer with sigmoid activation."""
@@ -56,10 +82,17 @@ class TestTensorflowBaseConverters(ExtTestCase):
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Sigmoid", op_types)
 
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X:0": X})[0]
+        result = ref.run(None, feeds)[0]
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        ort_result = _ort_run(onx, feeds)
+        if ort_result is not None:
+            self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_sequential_multi_layer(self):
         """Sequential model with multiple Dense layers."""
@@ -78,10 +111,17 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertIn("MatMul", op_types)
         self.assertIn("Relu", op_types)
 
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X:0": X})[0]
+        result = ref.run(None, feeds)[0]
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        ort_result = _ort_run(onx, feeds)
+        if ort_result is not None:
+            self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_sequential_dynamic_shape(self):
         """Sequential model with an explicit dynamic batch dimension."""
@@ -99,10 +139,17 @@ class TestTensorflowBaseConverters(ExtTestCase):
         # The first dimension should be dynamic (a dim_param, not a fixed dim_value).
         self.assertNotEqual(input_shape.dim[0].dim_value, 7)
 
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X:0": X})[0]
+        result = ref.run(None, feeds)[0]
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        ort_result = _ort_run(onx, feeds)
+        if ort_result is not None:
+            self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_plain_tf_function_no_keras(self):
         """A model defined as a plain @tf.function with no Keras layers.
@@ -184,7 +231,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         def custom_relu_converter(g, sts, outputs, op):
             """Override: apply Relu but also track the call."""
             called.append(True)
-            return g.op.Relu(op.inputs[0].name, outputs=outputs, name="custom_relu")
+            return g.op.Relu(sts[op.inputs[0].name], outputs=outputs, name="custom_relu")
 
         onx = to_onnx(model, (X,), extra_converters={"Relu": custom_relu_converter})
 
@@ -192,10 +239,17 @@ class TestTensorflowBaseConverters(ExtTestCase):
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Relu", op_types)
 
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X:0": X})[0]
+        result = ref.run(None, feeds)[0]
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        ort_result = _ort_run(onx, feeds)
+        if ort_result is not None:
+            self.assertEqualArray(expected, ort_result, atol=1e-5)
 
 
 if __name__ == "__main__":
