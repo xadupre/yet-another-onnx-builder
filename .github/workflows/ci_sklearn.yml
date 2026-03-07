@@ -36,12 +36,12 @@ jobs:
         run: |
             pytest --durations=10 \
               --ignore=unittests/builder/oxs \
-              --ignore=unittests/helpers/test_patch_helper.py \
+              --ignore=unittests/helpers/test_patch_helper_torch.py \
               --ignore=unittests/reference/test__inference_session_torch.py \
               --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
-              --ignore=unittests/reference/test_onnxruntime_evaluator.py \
+              --ignore=unittests/reference/test_onnxruntime_evaluator_torch.py \
               --ignore=unittests/reference/test_torch_reference_evaluator.py \
-              --ignore=unittests/xoptim/test_untrained_models.py \
+              --ignore=unittests/xoptim/test_untrained_models_torch.py \
               --ignore=unittests/tensorflow \
               --ignore=unittests/torch
 
@@ -50,12 +50,12 @@ jobs:
         run: |
             pytest --cov=yobx --cov-report=xml --durations=10 \
               --ignore=unittests/builder/oxs \
-              --ignore=unittests/helpers/test_patch_helper.py \
+              --ignore=unittests/helpers/test_patch_helper_torch.py \
               --ignore=unittests/reference/test__inference_session_torch.py \
               --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
-              --ignore=unittests/reference/test_onnxruntime_evaluator.py \
+              --ignore=unittests/reference/test_onnxruntime_evaluator_torch.py \
               --ignore=unittests/reference/test_torch_reference_evaluator.py \
-              --ignore=unittests/xoptim/test_untrained_models.py \
+              --ignore=unittests/xoptim/test_untrained_models_torch.py \
               --ignore=unittests/tensorflow \
               --ignore=unittests/torch
 

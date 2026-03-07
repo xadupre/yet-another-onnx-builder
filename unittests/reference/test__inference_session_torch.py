@@ -1,6 +1,7 @@
 import unittest
 from typing import Any, Dict, Optional, Tuple
 import numpy as np
+import ml_dtypes
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
@@ -15,6 +16,7 @@ from yobx.ext_test_case import (
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
 from yobx.torch.torch_helper import onnx_dtype_to_torch_dtype
 from yobx.reference._inference_session import investigate_onnxruntime_issue
+from yobx.reference._inference_session_numpy import InferenceSessionForNumpy
 from yobx.reference._inference_session_torch import InferenceSessionForTorch
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -258,6 +260,16 @@ class TestInferenceSessionTorch(ExtTestCase):
         got = wrap.run(None, feeds)
         self.assertIsInstance(got[0], torch.Tensor)
         self.assertEqualArray(expected[0], got[0])
+
+    def test_init_numpy_bfloat16(self):
+        model, feeds, expected = self._get_model_init(onnx.TensorProto.BFLOAT16)
+        wrap = InferenceSessionForNumpy(model, providers="cpu", graph_optimization_level=False)
+        numpy_feeds = {
+            k: v.numpy().astype(np.float32).astype(ml_dtypes.bfloat16) for k, v in feeds.items()
+        }
+        got = wrap.run(None, numpy_feeds)
+        self.assertIsInstance(got[0], np.ndarray)
+        self.assertEqualArray(expected[0].numpy(), got[0])
 
     def test_profiling(self):
         model, feeds, expected = self._get_model_init(onnx.TensorProto.BFLOAT16)
