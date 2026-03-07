@@ -382,7 +382,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertIn("Identity", op_types)
         self.assertNotIn("Sub", op_types)
 
-
     def test_estimator_without_transform_or_predict_raises(self):
         from sklearn.exceptions import NotFittedError
 
