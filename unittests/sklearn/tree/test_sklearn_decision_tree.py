@@ -229,13 +229,14 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt.fit(X, y)
 
         onx = to_onnx(dt, (X,))
+        self.print_onnx(onx)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
         self.assertEqualArray(dt.predict(X), label)
-        self.assertEqualArray(dt.predict_proba(X), proba, atol=1e-5)
+        self.assertEqualArray(dt.predict_proba(X), proba.astype(np.float64), atol=1e-5)
 
     def test_decision_tree_regressor_float32(self):
         """DecisionTreeRegressor works with float32 input."""
