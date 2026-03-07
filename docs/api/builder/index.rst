@@ -7,3 +7,4 @@ yobx.builder
 
     light/index
     onnxscript/index
+    spox/index
