@@ -156,6 +156,8 @@ epkg_dictionary = {
     "spox": "https://spox.readthedocs.io/en/latest/",
     "Supported Operators and Data Types": "https://github.com/microsoft/onnxruntime/blob/main/docs/OperatorKernels.md",
     "sympy": "https://www.sympy.org/en/index.html",
+    "Keras": "https://keras.io/",
+    "TensorFlow": "https://www.tensorflow.org/",
     "tensorflow-onnx": "https://github.com/onnx/tensorflow-onnx",
     "timm": "https://github.com/huggingface/pytorch-image-models",
     "torch": "https://docs.pytorch.org/docs/stable/torch.html",
