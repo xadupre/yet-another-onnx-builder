@@ -1,6 +1,6 @@
 from __future__ import annotations
 from functools import partial
-from typing import Any, Dict, List, Optional, Sequence, Set, Union, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Union, Tuple
 import numpy as np
 import onnx
 import onnx_ir as ir
@@ -80,8 +80,8 @@ class OnnxScriptGraphBuilderOpset(OpsetProtocol):
     def __init__(self, builder):
         self.builder = builder
 
-    def __getattr__(self, name):
-        return partial(self.builder._make_node, name)
+    def __getattr__(self, op_type: str) -> Callable[..., Union[str, Tuple[str, ...]]]:
+        return partial(self.builder._make_node, op_type)
 
 
 class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
@@ -585,12 +585,12 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
     @property
     def input_names(self) -> List[str]:
         """Returns input names."""
-        return [i.name for i in self._graph.inputs]
+        return [i.name or "" for i in self._graph.inputs]
 
     @property
     def output_names(self) -> List[str]:
         """Returns output names."""
-        return [i.name for i in self._graph.outputs]
+        return [i.name or "" for i in self._graph.outputs]
 
     # ------------------------------------------------------------------
     # Export

@@ -190,7 +190,7 @@ class GraphBuilderProtocol(Protocol):
         attributes: Optional[List[Any]] = None,
         name: Optional[str] = None,
         **kwargs: Any,
-    ) -> Union[str, List[str]]:
+    ) -> Union[str, Tuple[str]]:
         """Creates an ONNX node and returns its output name(s).
 
         :param op_type: ONNX operator type (e.g. ``"Relu"``, ``"MatMul"``)
