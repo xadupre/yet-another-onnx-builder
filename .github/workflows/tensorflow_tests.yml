@@ -10,7 +10,7 @@ on:
 
 jobs:
   tensorflow_tests:
-    name: tf-tests (ubuntu-latest, py${{ matrix.python-version }}, tf-${{ matrix.tensorflow-version }})
+    name: tensorflow (ubuntu-latest, py${{ matrix.python-version }}, tf-${{ matrix.tensorflow-version }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
