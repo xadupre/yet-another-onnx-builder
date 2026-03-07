@@ -15,14 +15,17 @@ _NODE_MODE_LEQ = np.uint8(0)
 
 def _ensure_ml_domain(g: GraphBuilderExtendedProtocol) -> None:
     """Ensures the 'ai.onnx.ml' domain is registered in the graph builder."""
-    if "ai.onnx.ml" not in g.opsets:
-        g.opsets["ai.onnx.ml"] = choose_consistent_domain_opset("ai.onnx.ml", g.opsets)
+    if not g.has_opset("ai.onnx.ml"):
+        g.add_domain(
+            "ai.onnx.ml",
+            choose_consistent_domain_opset("ai.onnx.ml", {"": g.get_opset(""), "ai.onnx.ml": 3}),
+        )
 
 
 def _get_ml_opset(g: GraphBuilderExtendedProtocol) -> int:
     """Returns the resolved ``ai.onnx.ml`` opset version from the builder."""
     _ensure_ml_domain(g)
-    return g.opsets.get("ai.onnx.ml", 1)
+    return g.get_opset("ai.onnx.ml") if g.has_opset("ai.onnx.ml") else 3
 
 
 def _extract_tree_attributes(tree, n_classes: int, is_classifier: bool):
