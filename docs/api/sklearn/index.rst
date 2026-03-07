@@ -8,7 +8,9 @@ yobx.sklearn
     convert
     register
     sklearn_helper
+    compose/index
     linear_model/index
+    multiclass/index
     neural_network/index
     pipeline/index
     preprocessing/index
