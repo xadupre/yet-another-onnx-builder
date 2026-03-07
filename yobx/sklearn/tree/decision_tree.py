@@ -16,7 +16,7 @@ _NODE_MODE_LEQ = np.uint8(0)
 def _ensure_ml_domain(g: GraphBuilderExtendedProtocol) -> None:
     """Ensures the 'ai.onnx.ml' domain is registered in the graph builder."""
     if not g.has_opset("ai.onnx.ml"):
-        g.add_domain(
+        g.set_opset(
             "ai.onnx.ml",
             choose_consistent_domain_opset("ai.onnx.ml", {"": g.get_opset(""), "ai.onnx.ml": 3}),  # type: ignore[dict-item]
         )
