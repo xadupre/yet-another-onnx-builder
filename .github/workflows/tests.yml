@@ -1,4 +1,4 @@
-name: torch-python
+name: torch-sklearn
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   tests:
-    name: tt-tests (${{ matrix.os }}, py${{ matrix.python-version }}, torch-${{ matrix.torch-version || 'stable' }}, transformers-${{ matrix.transformers-version || 'latest' }})
+    name: torch-sklearn (${{ matrix.os }}, py${{ matrix.python-version }}, torch-${{ matrix.torch-version || 'stable' }}, transformers-${{ matrix.transformers-version || 'latest' }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
