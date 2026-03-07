@@ -1,4 +1,4 @@
-name: yobx-no-lib
+name: ci-1
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   no_torch_tests:
-    name: yobx-no-lib (${{ matrix.os }}, py${{ matrix.python-version }})
+    name: core (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -35,14 +35,20 @@ jobs:
 
       - name: Run tests (no torch)
         run: |
-          pytest --durations=10 \
+          pytest --cov=yobx --cov-report=xml --durations=10 \
             --ignore=unittests/builder/oxs \
             --ignore=unittests/helpers/test_patch_helper.py \
             --ignore=unittests/reference/test__inference_session_torch.py \
             --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
             --ignore=unittests/reference/test_onnxruntime_evaluator.py \
             --ignore=unittests/reference/test_torch_reference_evaluator.py \
+            --ignore=unittests/xoptim/test_untrained_models.py \
             --ignore=unittests/sklearn \
             --ignore=unittests/tensorflow \
             --ignore=unittests/torch \
-            --ignore=unittests/xoptim/test_untrained_models.py
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: tensorflow
