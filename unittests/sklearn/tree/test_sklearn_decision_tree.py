@@ -205,5 +205,72 @@ class TestSklearnDecisionTree(ExtTestCase):
         self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
 
+    def test_decision_tree_classifier_float32(self):
+        """DecisionTreeClassifier works with float32 input."""
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1, 2, 2])
+        dt = DecisionTreeClassifier(random_state=0)
+        dt.fit(X, y)
+
+        onx = to_onnx(dt, (X,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(dt.predict(X), label)
+        self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+    def test_decision_tree_classifier_float64(self):
+        """DecisionTreeClassifier works with float64 input."""
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float64)
+        y = np.array([0, 0, 1, 1, 2, 2])
+        dt = DecisionTreeClassifier(random_state=0)
+        dt.fit(X, y)
+
+        onx = to_onnx(dt, (X,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(dt.predict(X), label)
+        self.assertEqualArray(dt.predict_proba(X), proba, atol=1e-5)
+
+    def test_decision_tree_regressor_float32(self):
+        """DecisionTreeRegressor works with float32 input."""
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
+        dt = DecisionTreeRegressor(random_state=0)
+        dt.fit(X, y)
+
+        onx = to_onnx(dt, (X,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        self.assertEqualArray(
+            dt.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
+        )
+
+    def test_decision_tree_regressor_float64(self):
+        """DecisionTreeRegressor works with float64 input."""
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float64)
+        y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float64)
+        dt = DecisionTreeRegressor(random_state=0)
+        dt.fit(X, y)
+
+        onx = to_onnx(dt, (X,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        self.assertEqualArray(
+            dt.predict(X).reshape(-1, 1), predictions, atol=1e-5
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
