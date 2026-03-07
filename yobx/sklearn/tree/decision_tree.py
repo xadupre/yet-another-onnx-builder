@@ -470,6 +470,11 @@ def sklearn_decision_tree_regressor(
     the unified ``TreeEnsemble`` operator is used; otherwise the legacy
     ``TreeEnsembleRegressor`` operator is emitted.
 
+    When the input tensor is double (``float64``), a ``Cast`` node is appended
+    after the tree operator to ensure the output dtype matches the input dtype,
+    since both ``TreeEnsembleRegressor`` and ``TreeEnsemble`` always produce
+    ``float32`` predictions per the ONNX ML spec.
+
     :param g: the graph builder to add nodes to
     :param sts: shapes defined by :epkg:`scikit-learn`
     :param estimator: a fitted ``DecisionTreeRegressor``
@@ -485,24 +490,52 @@ def sklearn_decision_tree_regressor(
     ml_opset = _get_ml_opset(g)
     tree = estimator.tree_
 
+    # Detect float64 input so we can cast the output back to double after the
+    # tree node (TreeEnsembleRegressor / TreeEnsemble always output float32).
+    itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
+    need_cast = itype == onnx.TensorProto.DOUBLE
+
+    # When a cast is needed, direct the tree node into a temporary name.
+    tree_outputs = [f"{outputs[0]}_f32"] if need_cast else outputs
+
     if ml_opset >= 5:
-        return _sklearn_decision_tree_regressor_v5(g, sts, outputs, estimator, X, name, tree)
+        tree_result = _sklearn_decision_tree_regressor_v5(
+            g, sts, tree_outputs, estimator, X, name, tree
+        )
+    else:
+        # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4)
+        attrs = _extract_tree_attributes(tree, n_classes=1, is_classifier=False)
 
-    # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4)
-    attrs = _extract_tree_attributes(tree, n_classes=1, is_classifier=False)
+        node_result = g.make_node(
+            "TreeEnsembleRegressor",
+            [X],
+            outputs=tree_outputs,
+            domain="ai.onnx.ml",
+            name=name,
+            n_targets=1,
+            post_transform="NONE",
+            **attrs,  # type: ignore
+        )
+        tree_result = node_result if isinstance(node_result, str) else node_result[0]
 
-    result = g.make_node(
-        "TreeEnsembleRegressor",
-        [X],
+    if not need_cast:
+        return tree_result
+
+    # TreeEnsembleRegressor always outputs float32 per the ONNX ML spec, but the
+    # graph builder may infer the intermediate type as double (inheriting from the
+    # double input). Override to float32 so the Cast optimiser does not mistake
+    # the cast for a no-op and remove it.
+    g._known_types[tree_result] = onnx.TensorProto.FLOAT  # type: ignore[attr-defined]
+
+    # Cast float32 output back to float64 to match the input dtype.
+    cast_result = g.make_node(
+        "Cast",
+        [tree_result],
         outputs=outputs,
-        domain="ai.onnx.ml",
-        name=name,
-        n_targets=1,
-        post_transform="NONE",
-        **attrs,  # type: ignore
+        name=f"{name}_cast_f64",
+        to=onnx.TensorProto.DOUBLE,
     )
-
-    return result if isinstance(result, str) else result[0]
+    return cast_result if isinstance(cast_result, str) else cast_result[0]
 
 
 def _sklearn_decision_tree_regressor_v5(

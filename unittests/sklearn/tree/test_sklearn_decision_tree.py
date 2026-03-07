@@ -31,8 +31,15 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(dt.predict(X), label)
-        self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = dt.predict(X)
+        expected_proba = dt.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_decision_tree_classifier_multiclass(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
@@ -51,8 +58,15 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(dt.predict(X), label)
-        self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = dt.predict(X)
+        expected_proba = dt.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_decision_tree_regressor(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -71,9 +85,12 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         predictions = results[0]
 
-        self.assertEqualArray(
-            dt.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
-        )
+        expected_predictions = dt.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected_predictions, predictions, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_predictions, ort_results[0], atol=1e-5)
 
     def test_pipeline_decision_tree_classifier(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -96,8 +113,15 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(pipe.predict(X), label)
-        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = pipe.predict(X)
+        expected_proba = pipe.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_decision_tree_classifier_binary_v5(self):
         """TreeEnsemble (ai.onnx.ml opset 5) - binary classification."""
@@ -118,8 +142,15 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(dt.predict(X), label)
-        self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = dt.predict(X)
+        expected_proba = dt.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_decision_tree_classifier_multiclass_v5(self):
         """TreeEnsemble (ai.onnx.ml opset 5) - multi-class classification."""
@@ -138,8 +169,15 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(dt.predict(X), label)
-        self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = dt.predict(X)
+        expected_proba = dt.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_decision_tree_regressor_v5(self):
         """TreeEnsemble (ai.onnx.ml opset 5) - regression."""
@@ -158,9 +196,12 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         predictions = results[0]
 
-        self.assertEqualArray(
-            dt.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
-        )
+        expected_predictions = dt.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected_predictions, predictions, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_predictions, ort_results[0], atol=1e-5)
 
     def test_decision_tree_legacy_opset_unchanged(self):
         """Passing an integer target_opset still emits legacy operators."""
@@ -201,8 +242,15 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(pipe.predict(X), label)
-        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = pipe.predict(X)
+        expected_proba = pipe.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_decision_tree_classifier_float32(self):
         """DecisionTreeClassifier works with float32 input."""
@@ -217,8 +265,15 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(dt.predict(X), label)
-        self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = dt.predict(X)
+        expected_proba = dt.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_decision_tree_classifier_float64(self):
         """DecisionTreeClassifier works with float64 input."""
@@ -234,8 +289,15 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(dt.predict(X), label)
-        self.assertEqualArray(dt.predict_proba(X), proba.astype(np.float64), atol=1e-5)
+        expected_label = dt.predict(X)
+        expected_proba = dt.predict_proba(X)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba.astype(np.float64), atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1].astype(np.float64), atol=1e-5)
 
     def test_decision_tree_regressor_float32(self):
         """DecisionTreeRegressor works with float32 input."""
@@ -250,9 +312,12 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         predictions = results[0]
 
-        self.assertEqualArray(
-            dt.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
-        )
+        expected_predictions = dt.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected_predictions, predictions, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_predictions, ort_results[0], atol=1e-5)
 
     def test_decision_tree_regressor_float64(self):
         """DecisionTreeRegressor works with float64 input."""
@@ -267,7 +332,12 @@ class TestSklearnDecisionTree(ExtTestCase):
         results = ref.run(None, {"X": X})
         predictions = results[0]
 
-        self.assertEqualArray(dt.predict(X).reshape(-1, 1), predictions, atol=1e-5)
+        expected_predictions = dt.predict(X).reshape(-1, 1)
+        self.assertEqualArray(expected_predictions, predictions, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_predictions, ort_results[0], atol=1e-5)
 
 
 if __name__ == "__main__":

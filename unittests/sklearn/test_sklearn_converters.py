@@ -33,6 +33,10 @@ class TestSklearnBaseConverters(ExtTestCase):
         expected = ss.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
 
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
     def test_logistic_regression_binary(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
@@ -52,8 +56,15 @@ class TestSklearnBaseConverters(ExtTestCase):
         results = ref.run(None, {"X": X_scaled})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(lr.predict(X_scaled), label)
-        self.assertEqualArray(lr.predict_proba(X_scaled).astype(np.float32), proba, atol=1e-5)
+        expected_label = lr.predict(X_scaled)
+        expected_proba = lr.predict_proba(X_scaled).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X_scaled})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_logistic_regression_multiclass(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
@@ -73,8 +84,15 @@ class TestSklearnBaseConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(lr.predict(X), label)
-        self.assertEqualArray(lr.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = lr.predict(X)
+        expected_proba = lr.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_pipeline_standard_scaler_logistic_regression(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -95,8 +113,15 @@ class TestSklearnBaseConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(pipe.predict(X), label)
-        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = pipe.predict(X)
+        expected_proba = pipe.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     @requires_sklearn("1.4")
     def test_pipeline_standard_scaler_only(self):
@@ -111,6 +136,10 @@ class TestSklearnBaseConverters(ExtTestCase):
         expected = pipe.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
 
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
     @requires_sklearn("1.4")
     def test_pipeline_multiclass(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
@@ -124,8 +153,15 @@ class TestSklearnBaseConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(pipe.predict(X), label)
-        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = pipe.predict(X)
+        expected_proba = pipe.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_custom_estimator_with_extra_converters(self):
         class ScaleByConstant(TransformerMixin, BaseEstimator):
@@ -165,6 +201,10 @@ class TestSklearnBaseConverters(ExtTestCase):
         result = ref.run(None, {"X": X})[0]
         expected = est.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_extra_converters_overrides_builtin(self):
         """extra_converters entries take priority over built-in converters."""
