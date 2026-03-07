@@ -152,13 +152,13 @@ def _build_converter_prompt(estimator_class: type) -> str:
     example_code = textwrap.dedent("""\
         from typing import Dict, List
         from sklearn.preprocessing import StandardScaler
+        from ...typing import GraphBuilderProtocolExtended
         from ..register import register_sklearn_converter
-        from ...xbuilder import GraphBuilder
 
 
         @register_sklearn_converter(StandardScaler)
         def sklearn_standard_scaler(
-            g: GraphBuilder,
+            g: GraphBuilderProtocolExtended,
             sts: Dict,
             outputs: List[str],
             estimator: StandardScaler,

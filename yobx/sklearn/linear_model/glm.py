@@ -1,8 +1,8 @@
 from typing import Dict, List, Union
 import numpy as np
 from sklearn.linear_model import GammaRegressor, PoissonRegressor, TweedieRegressor
-from ..register import register_sklearn_converter
 from ...typing import GraphBuilderProtocolExtended
+from ..register import register_sklearn_converter
 
 _GLM_TYPES = (TweedieRegressor, PoissonRegressor, GammaRegressor)
 

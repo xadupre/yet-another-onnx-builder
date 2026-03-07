@@ -140,9 +140,10 @@ version with ``g.get_opset(domain)``.
 
 .. code-block:: python
 
+    from yobx.typing import GraphBuilderProtocolExtended
     from yobx.xbuilder import GraphBuilder
 
-    def convert_my_estimator(g: GraphBuilder, sts, outputs, estimator, X):
+    def convert_my_estimator(g: GraphBuilderProtocolExtended, sts, outputs, estimator, X):
         # Read the main opset to pick the right operator variant.
         opset = g.main_opset
 

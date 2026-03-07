@@ -10,6 +10,7 @@ import onnx.helper as oh
 import onnx.numpy_helper as onh
 from onnx.reference.op_run import OpRun
 from yobx.ext_test_case import ExtTestCase
+from yobx.typing import GraphBuilderProtocolExtended
 from yobx.xoptim import (
     EasyPatternOptimization,
     make_pattern_from_onnx,
@@ -36,14 +37,14 @@ class TestGraphPatternBuilder(ExtTestCase):
             Replaces ConstantOfShape + ScatterND with ScatterNDOfShape (com.domain).
             """
 
-            def match_pattern(self, g: GraphBuilder, x: T, y: T, z: T):
+            def match_pattern(self, g: GraphBuilderProtocolExtended, x: T, y: T, z: T):
                 """
                 Builds the pattern to match.
                 """
                 tmp = g.op.Add(x, y)
                 return g.op.Add(tmp, z)
 
-            def apply_pattern(self, g: GraphBuilder, x: T, y: T, z: T):
+            def apply_pattern(self, g: GraphBuilderProtocolExtended, x: T, y: T, z: T):
                 """
                 Builds the pattern to match.
                 """
@@ -111,7 +112,7 @@ class TestGraphPatternBuilder(ExtTestCase):
             Replaces ConstantOfShape + ScatterND with ScatterNDOfShape (com.domain).
             """
 
-            def match_pattern(self, g: GraphBuilder, x: T, y: T, w: T, z: T):
+            def match_pattern(self, g: GraphBuilderProtocolExtended, x: T, y: T, w: T, z: T):
                 """
                 Builds the pattern to match.
                 """
@@ -120,7 +121,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                 r1 = g.op.Add(tmp, z)
                 return tmp2, r1
 
-            def apply_pattern(self, g: GraphBuilder, x: T, y: T, w: T, z: T):
+            def apply_pattern(self, g: GraphBuilderProtocolExtended, x: T, y: T, w: T, z: T):
                 """
                 Builds the pattern to match.
                 """
@@ -386,10 +387,10 @@ class TestGraphPatternBuilder(ExtTestCase):
         )
 
         class MulMulSigmoidPattern(EasyPatternOptimization):
-            def match_pattern(self, g: GraphBuilder, X, Y):
+            def match_pattern(self, g: GraphBuilderProtocolExtended, X, Y):
                 return g.op.Mul(X, g.op.Mul(Y, g.op.Sigmoid(Y)))
 
-            def apply_pattern(self, g: GraphBuilder, X, Y):
+            def apply_pattern(self, g: GraphBuilderProtocolExtended, X, Y):
                 return g.anyop.MulMulSigmoid(X, Y, domain="onnx_extended.ortops.optim.cuda")
 
             def validate_mapping(
@@ -426,7 +427,7 @@ class TestGraphPatternBuilder(ExtTestCase):
         class SliceSplitPattern(EasyPatternOptimization):
             def match_pattern(
                 self,
-                g: GraphBuilder,
+                g: GraphBuilderProtocolExtended,
                 x: "FLOAT",  # noqa: F821
                 b0: "INT64",  # noqa: F821
                 e0: "INT64",  # noqa: F821
@@ -437,7 +438,9 @@ class TestGraphPatternBuilder(ExtTestCase):
             ):
                 return g.op.Slice(x, b0, e0, a0), g.op.Slice(x, b1, e1, a1)
 
-            def apply_pattern(self, g: GraphBuilder, x: T, b0, e0, a0, b1, e1, a1):
+            def apply_pattern(
+                self, g: GraphBuilderProtocolExtended, x: T, b0, e0, a0, b1, e1, a1
+            ):
                 return g.op.Split(x, axis=-1, num_outputs=2)
 
             def validate_mapping(
@@ -519,10 +522,10 @@ class TestGraphPatternBuilder(ExtTestCase):
         )
 
         class TransposeMatMulPattern(EasyPatternOptimization):
-            def match_pattern(self, g: GraphBuilder, X, Y):
+            def match_pattern(self, g: GraphBuilderProtocolExtended, X, Y):
                 return g.op.MatMul(g.op.Transpose(X), Y)
 
-            def apply_pattern(self, g: GraphBuilder, X, Y):
+            def apply_pattern(self, g: GraphBuilderProtocolExtended, X, Y):
                 return g.anyop.FusedMatMul(X, Y, domain="com.microsoft", transA=1)
 
             def validate_mapping(
@@ -605,11 +608,11 @@ class TestGraphPatternBuilder(ExtTestCase):
         ]
 
         class Rotary1(EasyPatternOptimization):
-            def match_pattern(self, g: GraphBuilder, x):
+            def match_pattern(self, g: GraphBuilderProtocolExtended, x):
                 x1, x2 = g.op.Split(x, axis=-1, outputs=2, num_outputs=2)
                 return g.op.Concat(g.op.Neg(x2), x1, axis=-1)
 
-            def apply_pattern(self, g: GraphBuilder, x):
+            def apply_pattern(self, g: GraphBuilderProtocolExtended, x):
                 return g.op.Rotary(x, side="right", domain="onnx_extended.ortops.optim.cuda")
 
             def validate_mapping(
@@ -628,15 +631,15 @@ class TestGraphPatternBuilder(ExtTestCase):
                 return True
 
         class Rotary2(Rotary1):
-            def match_pattern(self, g: GraphBuilder, x):
+            def match_pattern(self, g: GraphBuilderProtocolExtended, x):
                 x1, x2 = g.op.Split(x, num_outputs=2, axis=-1, outputs=2)
                 return g.op.Concat(x2, g.op.Neg(x1), axis=-1)
 
-            def apply_pattern(self, g: GraphBuilder, x):
+            def apply_pattern(self, g: GraphBuilderProtocolExtended, x):
                 return g.op.Rotary(x, side="left", domain="onnx_extended.ortops.optim.cuda")
 
         class Rotary3(EasyPatternOptimization):
-            def match_pattern(self, g: GraphBuilder, x, splits):
+            def match_pattern(self, g: GraphBuilderProtocolExtended, x, splits):
                 x1, x2 = g.op.Split(x, splits, axis=-1, outputs=2)
                 return g.op.Concat(g.op.Neg(x2), x1, axis=-1)
 
@@ -663,17 +666,17 @@ class TestGraphPatternBuilder(ExtTestCase):
                     return False
                 return True
 
-            def apply_pattern(self, g: GraphBuilder, x, splits):
+            def apply_pattern(self, g: GraphBuilderProtocolExtended, x, splits):
                 return g.op.Rotary(
                     x, splits, side="right", domain="onnx_extended.ortops.optim.cuda"
                 )
 
         class Rotary4(Rotary3):
-            def match_pattern(self, g: GraphBuilder, x, splits):
+            def match_pattern(self, g: GraphBuilderProtocolExtended, x, splits):
                 x1, x2 = g.op.Split(x, splits, axis=-1, outputs=2)
                 return g.op.Concat(x2, g.op.Neg(x1), axis=-1)
 
-            def apply_pattern(self, g: GraphBuilder, x, splits):
+            def apply_pattern(self, g: GraphBuilderProtocolExtended, x, splits):
                 return g.op.Rotary(
                     x, splits, side="left", domain="onnx_extended.ortops.optim.cuda"
                 )
@@ -801,37 +804,37 @@ class TestGraphPatternBuilder(ExtTestCase):
                 )
 
         class AddSharedInput1(_CombineBinary):
-            def match_pattern(self, g: GraphBuilder, x, y, z):
+            def match_pattern(self, g: GraphBuilderProtocolExtended, x, y, z):
                 return g.op.Add(x, y), g.op.Add(x, z)
 
-            def apply_pattern(self, g: GraphBuilder, x, y, z):
+            def apply_pattern(self, g: GraphBuilderProtocolExtended, x, y, z):
                 return g.op.AddSharedInput(
                     x, y, z, domain="onnx_extended.ortops.optim.cuda", outputs=2
                 )
 
         class AddSharedInput2(_CombineBinary):
-            def match_pattern(self, g: GraphBuilder, x, y, z):
+            def match_pattern(self, g: GraphBuilderProtocolExtended, x, y, z):
                 return g.op.Add(x, y), g.op.Add(y, z)
 
-            def apply_pattern(self, g: GraphBuilder, x, y, z):
+            def apply_pattern(self, g: GraphBuilderProtocolExtended, x, y, z):
                 return g.op.AddSharedInput(
                     x, y, z, domain="onnx_extended.ortops.optim.cuda", outputs=2
                 )
 
         class MulSharedInput1(_CombineBinary):
-            def match_pattern(self, g: GraphBuilder, x, y, z):
+            def match_pattern(self, g: GraphBuilderProtocolExtended, x, y, z):
                 return g.op.Mul(x, y), g.op.Mul(x, z)
 
-            def apply_pattern(self, g: GraphBuilder, x, y, z):
+            def apply_pattern(self, g: GraphBuilderProtocolExtended, x, y, z):
                 return g.op.MulSharedInput(
                     x, y, z, domain="onnx_extended.ortops.optim.cuda", outputs=2
                 )
 
         class MulSharedInput2(_CombineBinary):
-            def match_pattern(self, g: GraphBuilder, x, y, z):
+            def match_pattern(self, g: GraphBuilderProtocolExtended, x, y, z):
                 return g.op.Mul(y, x), g.op.Mul(x, z)
 
-            def apply_pattern(self, g: GraphBuilder, x, y, z):
+            def apply_pattern(self, g: GraphBuilderProtocolExtended, x, y, z):
                 return g.op.MulSharedInput(
                     x, y, z, domain="onnx_extended.ortops.optim.cuda", outputs=2
                 )
