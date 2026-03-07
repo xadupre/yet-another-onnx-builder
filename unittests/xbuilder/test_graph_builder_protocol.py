@@ -234,6 +234,7 @@ class TestGraphBuilderExtendedProtocol(ExtTestCase):
     """GraphBuilder satisfies GraphBuilderExtendedProtocol."""
 
     EXTENDED_ATTRS = [
+        "main_opset",
         "unique_name",
         "op",
         "set_type_shape_unary_op",
@@ -280,7 +281,7 @@ class TestOnnxScriptGraphBuilderExtendedProtocol(ExtTestCase):
         from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 
         g = OnnxScriptGraphBuilder(18)
-        for attr in ["op", "set_type_shape_unary_op"]:
+        for attr in ["main_opset", "op", "set_type_shape_unary_op"]:
             self.assertTrue(
                 hasattr(g, attr),
                 msg=f"OnnxScriptGraphBuilder missing extended attribute '{attr}'",

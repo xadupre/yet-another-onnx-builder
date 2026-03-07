@@ -251,11 +251,20 @@ class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
     :class:`yobx.builder.onnxscript.OnnxScriptGraphBuilder` that are useful for
     advanced graph construction:
 
+    * ``main_opset`` — the opset version for the main (``""``/ONNX) domain.
     * ``op`` — an opset helper that allows constructing nodes with
       ``g.op.Add(x, y)``-style syntax via :meth:`~OpsetProtocol.__getattr__`.
     * :meth:`set_type_shape_unary_op` — propagates type and shape from an
       input to an output for unary operators such as ``Abs``, ``Relu``, etc.
     """
+
+    @property
+    def main_opset(self) -> int:
+        """Returns the opset version for the main (``""``/ONNX) domain.
+
+        :return: integer opset version for domain ``""``
+        """
+        ...
 
     def unique_name(self, prefix: str) -> str:
         """Returns a unique name derived from *prefix*.
