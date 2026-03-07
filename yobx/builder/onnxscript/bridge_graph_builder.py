@@ -177,8 +177,8 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
 
     def set_opset(self, domain: str, version: int = 1) -> None:
         """
-        Adds a domain to the list of supported ones.
-        Checks the version is the same if it exists.
+        Sets the opset version for a domain.
+        Checks the version is the same if it already exists.
 
         :param domain: domain name to register
         :param version: opset version for the domain

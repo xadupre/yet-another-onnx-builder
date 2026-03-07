@@ -1098,8 +1098,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def set_opset(self, domain: str, version: int = 1):
         """
-        Adds a domain to the list of supported ones.
-        Checks the version is the same if it exists.
+        Sets the opset version for a domain.
+        Checks the version is the same if it already exists.
         """
         if domain in self.opsets:
             assert version == self.opsets[domain], (
