@@ -1,5 +1,6 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 from sklearn.base import BaseEstimator
+from sklearn.utils.validation import check_is_fitted
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
 from .register import get_sklearn_converter
@@ -40,6 +41,16 @@ def to_onnx(
         allow converting custom estimators that are not natively supported
     :return: onnx model
     """
+    check_is_fitted(
+        estimator,
+        attributes=["transform", "predict"],
+        all_or_any=any,
+        msg=(
+            "This %(name)s instance has neither a 'transform' nor a 'predict' method "
+            "and cannot be converted to ONNX."
+        ),
+    )
+
     from . import register_sklearn_converters
 
     register_sklearn_converters()
