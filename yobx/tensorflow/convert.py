@@ -116,7 +116,13 @@ def _convert_concrete_function(
     # ------------------------------------------------------------------
     initializer_values: Dict[str, np.ndarray] = {}
     for _captured_tensor, var in zip(cf.captured_inputs, cf.variables):
-        initializer_values[var.name] = var.numpy()
+        value = var.numpy()
+        initializer_values[var.name] = value
+        g.make_initializer(var.name, value, source="_convert_concrete_function.0")
+
+    handle_names = {}
+    for capture, var in cf.graph.captures:
+        handle_names[var.name] = capture._name
 
     # ------------------------------------------------------------------
     # 2. Register ONNX inputs for each non-captured Placeholder op.
@@ -136,13 +142,25 @@ def _convert_concrete_function(
             if name in initializer_values:
                 # Captured variable resource handle — register its numpy value
                 # as an ONNX initializer so downstream ReadVariableOp can use it.
+                assert not g.has_name(
+                    name
+                ), f"The name {name!r} is already taken.{g.get_debug_msg()}"
                 g.make_initializer(
-                    name, initializer_values[name], source="_convert_concrete_function"
+                    name, initializer_values[name], source="_convert_concrete_function.0"
+                )
+                continue
+            if name in handle_names:
+                g.op.Identity(
+                    handle_names[name],
+                    outputs=[name],
+                    name="initializer",
+                    source="_convert_concrete_function.1",
                 )
                 continue
             raise AssertionError(
                 f"name={name!r} could not be handled as a placeholder, {type(tensor)=}, "
                 f"initializer_values={sorted(initializer_values)}, "
+                f"handle_names={sorted(handle_names)}, "
                 f"input_names={sorted(set_input_names)}{g.get_debug_msg()}"
             )
 

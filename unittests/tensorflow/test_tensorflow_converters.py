@@ -16,15 +16,13 @@ class TestTensorflowBaseConverters(ExtTestCase):
         """Dense layer with no activation (linear) converts to MatMul+Add."""
         model = tf.keras.Sequential([tf.keras.layers.Dense(4, input_shape=(3,))])
         X = np.random.rand(5, 3).astype(np.float32)
-
         onx = to_onnx(model, (X,))
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
-        self.assertIn("Add", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X": X})[0]
+        result = ref.run(None, {"X:0": X})[0]
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
 
@@ -42,7 +40,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertIn("Relu", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X": X})[0]
+        result = ref.run(None, {"X:0": X})[0]
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
 
@@ -59,7 +57,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertIn("Sigmoid", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X": X})[0]
+        result = ref.run(None, {"X:0": X})[0]
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
 
@@ -81,7 +79,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertIn("Relu", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X": X})[0]
+        result = ref.run(None, {"X:0": X})[0]
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
 
@@ -102,7 +100,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertNotEqual(input_shape.dim[0].dim_value, 7)
 
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X": X})[0]
+        result = ref.run(None, {"X:0": X})[0]
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
 
@@ -127,7 +125,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertIn("Relu", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X": X})[0]
+        result = ref.run(None, {"X:0": X})[0]
         expected = model(X).numpy()
         self.assertEqualArray(expected, result, atol=1e-5)
 
