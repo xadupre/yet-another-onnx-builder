@@ -1,0 +1,42 @@
+name: tensorflow
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 4 * * *"
+
+jobs:
+  tensorflow_tests:
+    name: tensorflow (ubuntu-latest, py${{ matrix.python-version }}, tf-${{ matrix.tensorflow-version }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13"]
+        tensorflow-version: ["2.20"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Install TensorFlow ${{ matrix.tensorflow-version }}
+        run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" && pip freeze
+
+      - name: Run TensorFlow tests with coverage
+        run: pytest --cov=yobx --cov-report=xml unittests/tensorflow --durations=10
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: tensorflow

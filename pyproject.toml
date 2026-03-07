@@ -194,6 +194,13 @@ project-excludes = [
 implicit-import = false
 
 [[tool.pyrefly.sub-config]]
+matches = "yobx/builder/onnxscript/bridge_graph_builder.py"
+[tool.pyrefly.sub-config.errors]
+bad-argument-type = false
+bad-override = false
+bad-return = false
+
+[[tool.pyrefly.sub-config]]
 matches = "yobx/sklearn/**/*.py"
 [tool.pyrefly.sub-config.errors]
 bad-argument-type = false
@@ -202,10 +209,9 @@ bad-return = false
 missing-attribute = false
 
 [[tool.pyrefly.sub-config]]
-matches = "yobx/builder/onnxscript/bridge_graph_builder.py"
+matches = "yobx/tensorflow/ops/*.py"
 [tool.pyrefly.sub-config.errors]
 bad-argument-type = false
-bad-override = false
 bad-return = false
 
 [[tool.pyrefly.sub-config]]
