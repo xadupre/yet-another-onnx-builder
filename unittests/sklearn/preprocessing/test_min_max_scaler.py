@@ -31,6 +31,10 @@ class TestMinMaxScaler(ExtTestCase):
         expected = mms.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
 
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
     def test_min_max_scaler_feature_range(self):
         from sklearn.preprocessing import MinMaxScaler
         from yobx.sklearn import to_onnx
@@ -52,6 +56,10 @@ class TestMinMaxScaler(ExtTestCase):
         result = ref.run(None, {"X": X})[0]
         expected = mms.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_pipeline_min_max_scaler_logistic_regression(self):
         from sklearn.preprocessing import MinMaxScaler
@@ -75,8 +83,15 @@ class TestMinMaxScaler(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(pipe.predict(X), label)
-        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = pipe.predict(X)
+        expected_proba = pipe.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
 
 if __name__ == "__main__":

@@ -71,6 +71,10 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
             expected = est.predict(Xd).astype(dtype).reshape(-1, 1)
             self.assertEqualArray(expected, result, atol=atol)
 
+            sess = self.check_ort(onx)
+            ort_result = sess.run(None, {"X": Xd})[0]
+            self.assertEqualArray(expected, ort_result, atol=atol)
+
     def test_linear_regression(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0])
@@ -216,6 +220,10 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
             expected = m.predict(Xd).astype(dtype)
             self.assertEqualArray(expected, result, atol=1e-4)
 
+            sess = self.check_ort(onx)
+            ort_result = sess.run(None, {"X": Xd})[0]
+            self.assertEqualArray(expected, ort_result, atol=1e-4)
+
     def test_multi_task_elastic_net(self):
         X = np.array(
             [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]],
@@ -232,6 +240,10 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
             result = ref.run(None, {"X": Xd})[0]
             expected = m.predict(Xd).astype(dtype)
             self.assertEqualArray(expected, result, atol=1e-4)
+
+            sess = self.check_ort(onx)
+            ort_result = sess.run(None, {"X": Xd})[0]
+            self.assertEqualArray(expected, ort_result, atol=1e-4)
 
 
 @requires_sklearn("1.4")
@@ -260,6 +272,10 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
             result = ref.run(None, {"X": X})[0]
             expected = est.predict(X).astype(dtype).reshape(-1, 1)
             self.assertEqualArray(expected, result, atol=atol)
+
+            sess = self.check_ort(onx)
+            ort_result = sess.run(None, {"X": X})[0]
+            self.assertEqualArray(expected, ort_result, atol=atol)
 
     def test_poisson_regressor(self):
         self._check_glm(PoissonRegressor())
@@ -326,7 +342,12 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
-            self.assertEqualArray(est.predict(Xd), results[0])
+            expected_label = est.predict(Xd)
+            self.assertEqualArray(expected_label, results[0])
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": Xd})
+            self.assertEqualArray(expected_label, ort_results[0])
 
     def test_ridge_classifier_binary(self):
         self._check_label_only_classifier(RidgeClassifier(), self._X_bin, self._y_bin)
@@ -381,8 +402,15 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
             results = ref.run(None, {"X": Xd})
             label, proba = results[0], results[1]
 
-            self.assertEqualArray(m.predict(Xd), label)
-            self.assertEqualArray(m.predict_proba(Xd).astype(dtype), proba, atol=1e-5)
+            expected_label = m.predict(Xd)
+            expected_proba = m.predict_proba(Xd).astype(dtype)
+            self.assertEqualArray(expected_label, label)
+            self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": Xd})
+            self.assertEqualArray(expected_label, ort_results[0])
+            self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_sgd_classifier_log_loss_multiclass(self):
         """SGDClassifier with log_loss multiclass → label + proba."""
@@ -400,8 +428,15 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
             results = ref.run(None, {"X": Xd})
             label, proba = results[0], results[1]
 
-            self.assertEqualArray(m.predict(Xd), label)
-            self.assertEqualArray(m.predict_proba(Xd).astype(dtype), proba, atol=1e-5)
+            expected_label = m.predict(Xd)
+            expected_proba = m.predict_proba(Xd).astype(dtype)
+            self.assertEqualArray(expected_label, label)
+            self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": Xd})
+            self.assertEqualArray(expected_label, ort_results[0])
+            self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_ridge_classifier_in_pipeline(self):
         """RidgeClassifier at the end of a Pipeline."""
@@ -415,7 +450,12 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
-            self.assertEqualArray(pipe.predict(Xd), results[0])
+            expected_label = pipe.predict(Xd)
+            self.assertEqualArray(expected_label, results[0])
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": Xd})
+            self.assertEqualArray(expected_label, ort_results[0])
 
 
 if __name__ == "__main__":
