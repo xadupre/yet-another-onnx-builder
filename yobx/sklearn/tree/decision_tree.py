@@ -495,8 +495,8 @@ def sklearn_decision_tree_regressor(
     itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
     need_cast = itype == onnx.TensorProto.DOUBLE
 
-    # When a cast is needed, direct the tree node into a temporary name.
-    tree_outputs = [f"{outputs[0]}_f32"] if need_cast else outputs
+    # When a cast is needed, direct the tree node into a temporary intermediate name.
+    tree_outputs = [f"{outputs[0]}_tree_out"] if need_cast else outputs
 
     if ml_opset >= 5:
         tree_result = _sklearn_decision_tree_regressor_v5(
@@ -521,10 +521,15 @@ def sklearn_decision_tree_regressor(
     if not need_cast:
         return tree_result
 
-    # TreeEnsembleRegressor always outputs float32 per the ONNX ML spec, but the
-    # graph builder may infer the intermediate type as double (inheriting from the
-    # double input). Override to float32 so the Cast optimiser does not mistake
-    # the cast for a no-op and remove it.
+    # TreeEnsembleRegressor / TreeEnsemble always outputs float32 per the ONNX ML
+    # spec, but the graph builder may infer the intermediate type as double
+    # (inheriting from the double input).  We must correct that inference before
+    # adding the Cast so that the CastPattern optimiser does not see
+    # Cast(double → double) and remove it as a no-op.
+    #
+    # There is intentionally no public "force_set_type" API on GraphBuilder, so we
+    # update the internal map directly.  The attribute is a plain dict – this is safe
+    # and consistent with other direct usages inside graph_builder.py itself.
     g._known_types[tree_result] = onnx.TensorProto.FLOAT  # type: ignore[attr-defined]
 
     # Cast float32 output back to float64 to match the input dtype.
