@@ -37,6 +37,10 @@ class TestSklearnColumnTransformer(ExtTestCase):
         expected = ct.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
 
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
     def test_column_transformer_two_scalers(self):
         X = np.array(
             [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
@@ -53,6 +57,10 @@ class TestSklearnColumnTransformer(ExtTestCase):
         result = ref.run(None, {"X": X})[0]
         expected = ct.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_column_transformer_drop(self):
         X = np.array(
@@ -72,6 +80,10 @@ class TestSklearnColumnTransformer(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-5)
         self.assertEqual(result.shape[1], 2)
 
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
     def test_column_transformer_remainder_passthrough(self):
         X = np.array(
             [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
@@ -89,6 +101,10 @@ class TestSklearnColumnTransformer(ExtTestCase):
         # scaler outputs 2 cols, remainder passes through 2 more
         self.assertEqual(result.shape[1], 4)
 
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
     def test_column_transformer_slice_columns(self):
         X = np.array(
             [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
@@ -105,6 +121,10 @@ class TestSklearnColumnTransformer(ExtTestCase):
         result = ref.run(None, {"X": X})[0]
         expected = ct.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_pipeline_with_column_transformer(self):
         X = np.array(
@@ -129,8 +149,15 @@ class TestSklearnColumnTransformer(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(pipe.predict(X), label)
-        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = pipe.predict(X)
+        expected_proba = pipe.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
 
 if __name__ == "__main__":

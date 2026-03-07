@@ -1,4 +1,4 @@
-name: transformers
+name: ci-7
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   torch_tests:
-    name: transformers (ubuntu-latest, py3.13, transformers 5.2/4.57/4/.5/4.49 torch-${{ matrix.torch-version }})
+    name: transformers-releases (ubuntu-latest, py3.13, transformers 5.2/4.57/4/.5/4.49 torch-${{ matrix.torch-version }})
     runs-on: ubuntu-latest
     permissions:
       contents: read

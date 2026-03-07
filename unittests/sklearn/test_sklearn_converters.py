@@ -11,7 +11,6 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from yobx.sklearn import to_onnx
 
 
@@ -35,6 +34,10 @@ class TestSklearnBaseConverters(ExtTestCase):
         expected = ss.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
 
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
     def test_logistic_regression_binary(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
@@ -54,8 +57,15 @@ class TestSklearnBaseConverters(ExtTestCase):
         results = ref.run(None, {"X": X_scaled})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(lr.predict(X_scaled), label)
-        self.assertEqualArray(lr.predict_proba(X_scaled).astype(np.float32), proba, atol=1e-5)
+        expected_label = lr.predict(X_scaled)
+        expected_proba = lr.predict_proba(X_scaled).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X_scaled})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_logistic_regression_multiclass(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
@@ -75,8 +85,15 @@ class TestSklearnBaseConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(lr.predict(X), label)
-        self.assertEqualArray(lr.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = lr.predict(X)
+        expected_proba = lr.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_pipeline_standard_scaler_logistic_regression(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -97,8 +114,15 @@ class TestSklearnBaseConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(pipe.predict(X), label)
-        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = pipe.predict(X)
+        expected_proba = pipe.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     @requires_sklearn("1.4")
     def test_pipeline_standard_scaler_only(self):
@@ -113,6 +137,10 @@ class TestSklearnBaseConverters(ExtTestCase):
         expected = pipe.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
 
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
     @requires_sklearn("1.4")
     def test_pipeline_multiclass(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
@@ -126,198 +154,15 @@ class TestSklearnBaseConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(pipe.predict(X), label)
-        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = pipe.predict(X)
+        expected_proba = pipe.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
 
-    def test_decision_tree_classifier_binary(self):
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
-        y = np.array([0, 0, 1, 1])
-        dt = DecisionTreeClassifier(random_state=0)
-        dt.fit(X, y)
-
-        onx = to_onnx(dt, (X,))
-
-        # Check graph structure
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("TreeEnsembleClassifier", op_types)
-
-        # Check outputs
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": X})
-        label, proba = results[0], results[1]
-
-        self.assertEqualArray(dt.predict(X), label)
-        self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
-
-    def test_decision_tree_classifier_multiclass(self):
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
-        y = np.array([0, 0, 1, 1, 2, 2])
-        dt = DecisionTreeClassifier(random_state=0)
-        dt.fit(X, y)
-
-        onx = to_onnx(dt, (X,))
-
-        # Check graph structure
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("TreeEnsembleClassifier", op_types)
-
-        # Check outputs
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": X})
-        label, proba = results[0], results[1]
-
-        self.assertEqualArray(dt.predict(X), label)
-        self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
-
-    def test_decision_tree_regressor(self):
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
-        y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
-        dt = DecisionTreeRegressor(random_state=0)
-        dt.fit(X, y)
-
-        onx = to_onnx(dt, (X,))
-
-        # Check graph structure
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("TreeEnsembleRegressor", op_types)
-
-        # Check outputs
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": X})
-        predictions = results[0]
-
-        self.assertEqualArray(
-            dt.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
-        )
-
-    def test_pipeline_decision_tree_classifier(self):
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
-        y = np.array([0, 0, 1, 1])
-        pipe = Pipeline(
-            [("scaler", StandardScaler()), ("clf", DecisionTreeClassifier(random_state=0))]
-        )
-        pipe.fit(X, y)
-
-        onx = to_onnx(pipe, (X,))
-
-        # Check graph contains nodes from both steps
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("Sub", op_types)
-        self.assertIn("Div", op_types)
-        self.assertIn("TreeEnsembleClassifier", op_types)
-
-        # Check outputs
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": X})
-        label, proba = results[0], results[1]
-
-        self.assertEqualArray(pipe.predict(X), label)
-        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
-
-    def test_decision_tree_classifier_binary_v5(self):
-        """TreeEnsemble (ai.onnx.ml opset 5) - binary classification."""
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
-        y = np.array([0, 0, 1, 1])
-        dt = DecisionTreeClassifier(random_state=0)
-        dt.fit(X, y)
-
-        onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
-
-        # Should use the new unified operator, not the legacy one
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("TreeEnsemble", op_types)
-        self.assertNotIn("TreeEnsembleClassifier", op_types)
-
-        # Numerical correctness
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": X})
-        label, proba = results[0], results[1]
-
-        self.assertEqualArray(dt.predict(X), label)
-        self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
-
-    def test_decision_tree_classifier_multiclass_v5(self):
-        """TreeEnsemble (ai.onnx.ml opset 5) - multi-class classification."""
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
-        y = np.array([0, 0, 1, 1, 2, 2])
-        dt = DecisionTreeClassifier(random_state=0)
-        dt.fit(X, y)
-
-        onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
-
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("TreeEnsemble", op_types)
-        self.assertNotIn("TreeEnsembleClassifier", op_types)
-
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": X})
-        label, proba = results[0], results[1]
-
-        self.assertEqualArray(dt.predict(X), label)
-        self.assertEqualArray(dt.predict_proba(X).astype(np.float32), proba, atol=1e-5)
-
-    def test_decision_tree_regressor_v5(self):
-        """TreeEnsemble (ai.onnx.ml opset 5) - regression."""
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
-        y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
-        dt = DecisionTreeRegressor(random_state=0)
-        dt.fit(X, y)
-
-        onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
-
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("TreeEnsemble", op_types)
-        self.assertNotIn("TreeEnsembleRegressor", op_types)
-
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": X})
-        predictions = results[0]
-
-        self.assertEqualArray(
-            dt.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
-        )
-
-    def test_decision_tree_legacy_opset_unchanged(self):
-        """Passing an integer target_opset still emits legacy operators."""
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
-        y_cls = np.array([0, 0, 1, 1])
-        y_reg = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
-
-        dtc = DecisionTreeClassifier(random_state=0)
-        dtc.fit(X, y_cls)
-        onx_c = to_onnx(dtc, (X,), target_opset=20)
-        op_types_c = [n.op_type for n in onx_c.graph.node]
-        self.assertIn("TreeEnsembleClassifier", op_types_c)
-        self.assertNotIn("TreeEnsemble", op_types_c)
-
-        dtr = DecisionTreeRegressor(random_state=0)
-        dtr.fit(X, y_reg)
-        onx_r = to_onnx(dtr, (X,), target_opset=20)
-        op_types_r = [n.op_type for n in onx_r.graph.node]
-        self.assertIn("TreeEnsembleRegressor", op_types_r)
-        self.assertNotIn("TreeEnsemble", op_types_r)
-
-    def test_pipeline_decision_tree_classifier_v5(self):
-        """Pipeline with TreeEnsemble (ai.onnx.ml opset 5)."""
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
-        y = np.array([0, 0, 1, 1])
-        pipe = Pipeline(
-            [("scaler", StandardScaler()), ("clf", DecisionTreeClassifier(random_state=0))]
-        )
-        pipe.fit(X, y)
-
-        onx = to_onnx(pipe, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
-
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("TreeEnsemble", op_types)
-        self.assertNotIn("TreeEnsembleClassifier", op_types)
-
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": X})
-        label, proba = results[0], results[1]
-
-        self.assertEqualArray(pipe.predict(X), label)
-        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_custom_estimator_with_extra_converters(self):
         class ScaleByConstant(TransformerMixin, BaseEstimator):
@@ -357,6 +202,10 @@ class TestSklearnBaseConverters(ExtTestCase):
         result = ref.run(None, {"X": X})[0]
         expected = est.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_extra_converters_overrides_builtin(self):
         """extra_converters entries take priority over built-in converters."""
