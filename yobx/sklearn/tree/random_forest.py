@@ -5,7 +5,7 @@ import onnx.helper as oh
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
-from .decision_tree import _get_ml_opset, _LEAF, _NODE_MODE_LEQ
+from .decision_tree import _get_ml_opset, _LEAF, _NODE_MODE_LEQ, _get_input_dtype
 
 
 def _extract_forest_attributes_legacy(
@@ -159,6 +159,7 @@ def _extract_forest_attributes_v5(
     n_classes: int,
     is_classifier: bool,
     n_estimators: int,
+    dtype=None,
 ):
     """
     Extracts combined attributes for all trees in a forest for use with the
@@ -181,8 +182,13 @@ def _extract_forest_attributes_v5(
     :param n_classes: number of classes (classifiers) or 1 (regressors)
     :param is_classifier: True for classification, False for regression
     :param n_estimators: total number of trees in the forest
+    :param dtype: numpy dtype to use for thresholds and leaf weights
+        (``np.float32`` or ``np.float64``); defaults to ``np.float32``
     :return: dict of ONNX attributes ready to be passed to ``make_node``
     """
+    if dtype is None:
+        dtype = np.float32
+    onnx_float_type = onnx.TensorProto.DOUBLE if dtype == np.float64 else onnx.TensorProto.FLOAT
     all_nodes_featureids: List[int] = []
     all_nodes_splits: List[float] = []
     all_nodes_modes: List[int] = []
@@ -205,7 +211,7 @@ def _extract_forest_attributes_v5(
         children_left = tree.children_left
         children_right = tree.children_right
         feature = tree.feature
-        threshold = tree.threshold.astype(np.float32)
+        threshold = tree.threshold.astype(dtype)
         value = tree.value  # shape: (n_nodes, n_outputs, max_n_classes)
         n_nodes = tree.node_count
 
@@ -304,11 +310,12 @@ def _extract_forest_attributes_v5(
         cumulative_leaf_offset += n_trees_per_est * max(n_leaves, 1)
 
     # Pack tensor attributes required by the opset-5 operator.
+    # nodes_splits and leaf_weights use the same float type as the input.
     nodes_splits_tensor = oh.make_tensor(
         "nodes_splits",
-        onnx.TensorProto.FLOAT,
+        onnx_float_type,
         (len(all_nodes_splits),),
-        np.array(all_nodes_splits, dtype=np.float32),
+        np.array(all_nodes_splits, dtype=dtype),
     )
     nodes_modes_tensor = oh.make_tensor(
         "nodes_modes",
@@ -318,9 +325,9 @@ def _extract_forest_attributes_v5(
     )
     leaf_weights_tensor = oh.make_tensor(
         "leaf_weights",
-        onnx.TensorProto.FLOAT,
+        onnx_float_type,
         (len(all_leaf_weights),),
-        np.array(all_leaf_weights, dtype=np.float32),
+        np.array(all_leaf_weights, dtype=dtype),
     )
 
     return dict(
@@ -379,7 +386,8 @@ def sklearn_random_forest_classifier(
 
     if ml_opset >= 5:
         return _sklearn_random_forest_classifier_v5(
-            g, sts, outputs, estimator, X, name, classes, n_classes, n_estimators, estimators
+            g, sts, outputs, estimator, X, name, classes, n_classes, n_estimators, estimators,
+            dtype=_get_input_dtype(g, X),
         )
 
     # Legacy path: TreeEnsembleClassifier (ai.onnx.ml opset <= 4)
@@ -421,6 +429,7 @@ def _sklearn_random_forest_classifier_v5(
     n_classes: int,
     n_estimators: int,
     estimators: list,
+    dtype=None,
 ) -> Tuple[str, str]:
     """
     Emits a ``TreeEnsemble`` node (``ai.onnx.ml`` opset 5) for a
@@ -429,10 +438,14 @@ def _sklearn_random_forest_classifier_v5(
     Mirrors :func:`~yobx.sklearn.tree.decision_tree._sklearn_decision_tree_classifier_v5`
     but encodes all ``n_estimators`` trees into a single node.
 
+    :param dtype: numpy float dtype for ``nodes_splits`` / ``leaf_weights``
+        tensors; uses ``np.float32`` when ``None``
     :return: tuple ``(label_result_name, proba_result_name)``
     """
+    if dtype is None:
+        dtype = np.float32
     attrs = _extract_forest_attributes_v5(
-        estimators, n_classes, is_classifier=True, n_estimators=n_estimators
+        estimators, n_classes, is_classifier=True, n_estimators=n_estimators, dtype=dtype
     )
 
     # scores: [N, n_classes] float32 - averaged class probabilities
@@ -518,29 +531,56 @@ def sklearn_random_forest_regressor(
     n_estimators = estimator.n_estimators
     estimators = estimator.estimators_
 
+    # Detect float64 input so we can cast the output back to double after the
+    # tree node (TreeEnsembleRegressor / TreeEnsemble always output float32).
+    itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
+    need_cast = itype == onnx.TensorProto.DOUBLE
+
+    # When a cast is needed, direct the tree node into a temporary intermediate name.
+    tree_outputs = [f"{outputs[0]}_tree_out"] if need_cast else outputs
+
     if ml_opset >= 5:
-        return _sklearn_random_forest_regressor_v5(
-            g, sts, outputs, estimator, X, name, n_estimators, estimators
+        tree_result = _sklearn_random_forest_regressor_v5(
+            g, sts, tree_outputs, estimator, X, name, n_estimators, estimators,
+            dtype=_get_input_dtype(g, X),
+        )
+    else:
+        # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4)
+        attrs = _extract_forest_attributes_legacy(
+            estimators, n_classes=1, is_classifier=False, n_estimators=n_estimators
         )
 
-    # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4)
-    attrs = _extract_forest_attributes_legacy(
-        estimators, n_classes=1, is_classifier=False, n_estimators=n_estimators
-    )
+        node_result = g.make_node(
+            "TreeEnsembleRegressor",
+            [X],
+            outputs=tree_outputs,
+            domain="ai.onnx.ml",
+            name=name,
+            n_targets=1,
+            aggregate_function="AVERAGE",
+            post_transform="NONE",
+            **attrs,  # type: ignore
+        )
+        tree_result = node_result if isinstance(node_result, str) else node_result[0]
 
-    result = g.make_node(
-        "TreeEnsembleRegressor",
-        [X],
+    if not need_cast:
+        return tree_result
+
+    # TreeEnsembleRegressor / TreeEnsemble always outputs float32 per the ONNX ML
+    # spec, but the graph builder may infer the intermediate type as double
+    # (inheriting from the double input).  We must correct that inference before
+    # adding the Cast so that the CastPattern optimiser does not remove it.
+    g._known_types[tree_result] = onnx.TensorProto.FLOAT  # type: ignore[attr-defined]
+
+    # Cast float32 output back to float64 to match the input dtype.
+    cast_result = g.make_node(
+        "Cast",
+        [tree_result],
         outputs=outputs,
-        domain="ai.onnx.ml",
-        name=name,
-        n_targets=1,
-        aggregate_function="AVERAGE",
-        post_transform="NONE",
-        **attrs,  # type: ignore
+        name=f"{name}_cast_f64",
+        to=onnx.TensorProto.DOUBLE,
     )
-
-    return result if isinstance(result, str) else result[0]
+    return cast_result if isinstance(cast_result, str) else cast_result[0]
 
 
 def _sklearn_random_forest_regressor_v5(
@@ -552,6 +592,7 @@ def _sklearn_random_forest_regressor_v5(
     name: str,
     n_estimators: int,
     estimators: list,
+    dtype=None,
 ) -> str:
     """
     Emits a ``TreeEnsemble`` node (``ai.onnx.ml`` opset 5) for a
@@ -560,10 +601,14 @@ def _sklearn_random_forest_regressor_v5(
     Leaf weights are pre-divided by ``n_estimators`` so that the ``SUM``
     aggregate gives the averaged prediction.
 
+    :param dtype: numpy float dtype for ``nodes_splits`` / ``leaf_weights``
+        tensors; uses ``np.float32`` when ``None``
     :return: output tensor name
     """
+    if dtype is None:
+        dtype = np.float32
     attrs = _extract_forest_attributes_v5(
-        estimators, n_classes=1, is_classifier=False, n_estimators=n_estimators
+        estimators, n_classes=1, is_classifier=False, n_estimators=n_estimators, dtype=dtype
     )
 
     result = g.make_node(
