@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 from ..xbuilder import GraphBuilder
 from .register import get_tf_op_converter
-from .tensorflow_helper import tf_dtype_to_np_dtype
+from .tensorflow_helper import sanitize_name, tf_dtype_to_np_dtype
 
 
 def to_onnx(
@@ -94,35 +94,44 @@ def _convert_concrete_function(
 ) -> None:
     """Walks the concrete-function graph and emits equivalent ONNX operations.
 
-    The conversion context ``ctx`` maps every TF tensor name to either an ONNX
-    tensor name (``str``) for dynamic values, or a :class:`numpy.ndarray` for
-    constant / weight values.
+    The conversion context ``sts`` maps every TF tensor name to the sanitized
+    ONNX tensor name used inside the :class:`~yobx.xbuilder.GraphBuilder`.
+    TF tensor names contain characters that are invalid or problematic in ONNX
+    (e.g. ``":"`` and ``"/"`` in names like ``"dense/MatMul:0"``); sanitization
+    is applied via :func:`~yobx.tensorflow.tensorflow_helper.sanitize_name`
+    before registering any tensor with the builder.
 
     :param cf: a :class:`tensorflow.ConcreteFunction`
     :param g: the :class:`~yobx.xbuilder.GraphBuilder` to populate
     :param args: original dummy inputs (used for dtype / shape information)
-    :param input_names: ONNX names for the model inputs
+    :param input_specs: TensorSpec objects used for tracing
     :param verbose: verbosity level
     :param extra_converters: op-type → converter overrides
     """
+    # sts: maps every TF tensor name → its sanitized ONNX tensor name.
+    # Op converters receive this dict so they can translate input references.
+    sts: Dict[str, str] = {}
+
     # ------------------------------------------------------------------
     # 1. Seed the context with captured variable values.
     #    cf.captured_inputs — list of TF tensors (resource handles) captured
     #    from outside the function (one per trainable variable).
     #    cf.variables        — corresponding tf.Variable objects.
-    #
-    #    Key by the captured tensor's name, which matches the Placeholder
-    #    output tensor name seen in cf.graph.get_operations().
     # ------------------------------------------------------------------
     initializer_values: Dict[str, np.ndarray] = {}
     for _captured_tensor, var in zip(cf.captured_inputs, cf.variables):
         value = var.numpy()
         initializer_values[var.name] = value
-        g.make_initializer(var.name, value, source="_convert_concrete_function.0")
+        onnx_name = sanitize_name(var.name)
+        g.make_initializer(onnx_name, value, source="_convert_concrete_function.0")
+        sts[var.name] = onnx_name
 
-    handle_names = {}
+    handle_names: Dict[str, str] = {}
     for capture, var in cf.graph.captures:
         handle_names[var.name] = capture._name
+        # Propagate the ONNX name to the internal capture handle tensor as well.
+        if var.name in sts:
+            sts[capture._name] = sts[var.name]
 
     # ------------------------------------------------------------------
     # 2. Register ONNX inputs for each non-captured Placeholder op.
@@ -135,27 +144,42 @@ def _convert_concrete_function(
             name = tensor.name
             if name in set_input_names:
                 spec = set_input_names[name][1]
+                onnx_name = sanitize_name(name)
                 g.make_tensor_input(
-                    name, tf_dtype_to_np_dtype(spec.dtype), _shape_to_tuple(g, spec.shape)
+                    onnx_name, tf_dtype_to_np_dtype(spec.dtype), _shape_to_tuple(g, spec.shape)
                 )
+                sts[name] = onnx_name
                 continue
             if name in initializer_values:
                 # Captured variable resource handle — register its numpy value
                 # as an ONNX initializer so downstream ReadVariableOp can use it.
-                assert not g.has_name(
-                    name
-                ), f"The name {name!r} is already taken.{g.get_debug_msg()}"
-                g.make_initializer(
-                    name, initializer_values[name], source="_convert_concrete_function.0"
-                )
+                if name not in sts:
+                    onnx_name = sanitize_name(name)
+                    assert not g.has_name(
+                        onnx_name
+                    ), f"The name {onnx_name!r} is already taken.{g.get_debug_msg()}"
+                    g.make_initializer(
+                        onnx_name, initializer_values[name], source="_convert_concrete_function.0"
+                    )
+                    sts[name] = onnx_name
                 continue
             if name in handle_names:
+                source_tf_name = handle_names[name]
+                # source_tf_name should already be in sts from step 1,
+                # where sts[capture._name] = sts[var.name] was set.
+                assert source_tf_name in sts, (
+                    f"Capture handle {source_tf_name!r} not found in name map; "
+                    f"known names: {sorted(sts)}{g.get_debug_msg()}"
+                )
+                source_onnx_name = sts[source_tf_name]
+                onnx_name = sanitize_name(name)
                 g.op.Identity(
-                    handle_names[name],
-                    outputs=[name],
+                    source_onnx_name,
+                    outputs=[onnx_name],
                     name="initializer",
                     source="_convert_concrete_function.1",
                 )
+                sts[name] = onnx_name
                 continue
             raise AssertionError(
                 f"name={name!r} could not be handled as a placeholder, {type(tensor)=}, "
@@ -171,8 +195,11 @@ def _convert_concrete_function(
             raise RuntimeError(f"Type {op_type!r} has no converting function mapped to it.")
 
         op_outputs = [t.name for t in op.outputs]
-        fct(g, {}, op_outputs, op)
-        assert all(g.has_name(o) for o in op_outputs), (
+        onnx_outputs = [sanitize_name(n) for n in op_outputs]
+        for tf_n, onnx_n in zip(op_outputs, onnx_outputs):
+            sts[tf_n] = onnx_n
+        fct(g, sts, onnx_outputs, op)
+        assert all(g.has_name(onnx_n) for onnx_n in onnx_outputs), (
             f"Issue with node {op.type}({[i.name for i in op.inputs]}) -> "
             f"{[o.name for o in op.outputs]} ({fct=}){g.get_debug_msg()}"
         )
@@ -181,4 +208,8 @@ def _convert_concrete_function(
     # 4. Register ONNX outputs.
     # ------------------------------------------------------------------
     for tensor in cf.outputs:
-        g.make_tensor_output(tensor.name, indexed=False, allow_untyped_output=True)
+        assert tensor.name in sts, (
+            f"Output tensor {tensor.name!r} not found in name map after converting all ops; "
+            f"known names: {sorted(sts)}{g.get_debug_msg()}"
+        )
+        g.make_tensor_output(sts[tensor.name], indexed=False, allow_untyped_output=True)

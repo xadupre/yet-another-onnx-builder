@@ -586,8 +586,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
             arr = np.array(value)
         else:
             raise TypeError(
-                f"Cannot convert initializer {name!r} of "
-                f"type {type(value)} to a numpy array."
+                f"Cannot convert initializer {name!r} of type {type(value)} to a numpy array."
             )
 
         # Create a constant Var using the appropriate opset module
