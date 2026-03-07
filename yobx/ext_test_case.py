@@ -700,6 +700,47 @@ def has_onnxscript(version: str) -> Callable:
     return True
 
 
+def requires_spox(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`spox` is not recent enough."""
+    try:
+        import spox
+    except ImportError:
+        return unittest.skip(msg or "spox not installed")
+
+    if not version:
+        return lambda x: x
+
+    import packaging.version as pv
+
+    if not hasattr(spox, "__version__"):
+        # development version
+        return lambda x: x
+
+    if pv.Version(spox.__version__) < pv.Version(version):
+        msg = f"spox version {spox.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
+def has_spox(version: str = "") -> bool:
+    """Returns ``True`` if :epkg:`spox` is installed and recent enough."""
+    try:
+        import spox
+    except (ImportError, AttributeError):
+        return False
+
+    if not version:
+        return True
+
+    if not hasattr(spox, "__version__"):
+        # development version
+        return True
+
+    import packaging.version as pv
+
+    return pv.Version(spox.__version__) >= pv.Version(version)
+
+
 def requires_onnxruntime(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not recent enough."""
     import packaging.version as pv

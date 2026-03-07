@@ -33,8 +33,15 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(mlp.predict(X), label)
-        self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = mlp.predict(X)
+        expected_proba = mlp.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_mlp_classifier_multiclass(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
@@ -55,8 +62,15 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(mlp.predict(X), label)
-        self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = mlp.predict(X)
+        expected_proba = mlp.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_mlp_classifier_multiple_hidden_layers(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
@@ -70,8 +84,15 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(mlp.predict(X), label)
-        self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = mlp.predict(X)
+        expected_proba = mlp.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_mlp_classifier_tanh_activation(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -90,8 +111,15 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(mlp.predict(X), label)
-        self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = mlp.predict(X)
+        expected_proba = mlp.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_mlp_regressor(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -111,9 +139,12 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         predictions = results[0]
 
-        self.assertEqualArray(
-            mlp.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
-        )
+        expected_predictions = mlp.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected_predictions, predictions, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_predictions, ort_results[0], atol=1e-5)
 
     def test_mlp_classifier_float32(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
@@ -129,8 +160,15 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(mlp.predict(X), label)
-        self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = mlp.predict(X)
+        expected_proba = mlp.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_mlp_classifier_float64(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float64)
@@ -146,8 +184,15 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(mlp.predict(X), label)
-        self.assertEqualArray(mlp.predict_proba(X).astype(np.float64), proba, atol=1e-5)
+        expected_label = mlp.predict(X)
+        expected_proba = mlp.predict_proba(X).astype(np.float64)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_mlp_regressor_float32(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -163,9 +208,12 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         predictions = results[0]
 
-        self.assertEqualArray(
-            mlp.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
-        )
+        expected_predictions = mlp.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected_predictions, predictions, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_predictions, ort_results[0], atol=1e-5)
 
     def test_mlp_regressor_float64(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float64)
@@ -181,9 +229,12 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         predictions = results[0]
 
-        self.assertEqualArray(
-            mlp.predict(X).astype(np.float64).reshape(-1, 1), predictions, atol=1e-10
-        )
+        expected_predictions = mlp.predict(X).astype(np.float64).reshape(-1, 1)
+        self.assertEqualArray(expected_predictions, predictions, atol=1e-10)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_predictions, ort_results[0], atol=1e-10)
 
     def test_pipeline_mlp_classifier(self):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -209,8 +260,15 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(pipe.predict(X), label)
-        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = pipe.predict(X)
+        expected_proba = pipe.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
 
 if __name__ == "__main__":
