@@ -35,8 +35,15 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         results = ref.run(None, {"X": self._X_bin})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(clf.predict(self._X_bin), label)
-        self.assertEqualArray(clf.predict_proba(self._X_bin).astype(np.float32), proba, atol=1e-5)
+        expected_label = clf.predict(self._X_bin)
+        expected_proba = clf.predict_proba(self._X_bin).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": self._X_bin})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_multiclass_logistic_regression(self):
         """OVR wrapping multi-class LogisticRegression (3 classes)."""
@@ -49,10 +56,15 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         results = ref.run(None, {"X": self._X_multi})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(clf.predict(self._X_multi), label)
-        self.assertEqualArray(
-            clf.predict_proba(self._X_multi).astype(np.float32), proba, atol=1e-5
-        )
+        expected_label = clf.predict(self._X_multi)
+        expected_proba = clf.predict_proba(self._X_multi).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": self._X_multi})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_float64_input(self):
         """OVR converter works with float64 input."""
@@ -66,8 +78,15 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         results = ref.run(None, {"X": X64})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(clf.predict(X64), label)
-        self.assertEqualArray(clf.predict_proba(X64).astype(np.float64), proba, atol=1e-5)
+        expected_label = clf.predict(X64)
+        expected_proba = clf.predict_proba(X64).astype(np.float64)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X64})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_pipeline_with_one_vs_rest(self):
         """OVR at the end of a Pipeline."""
@@ -85,10 +104,15 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         results = ref.run(None, {"X": self._X_multi})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(pipe.predict(self._X_multi), label)
-        self.assertEqualArray(
-            pipe.predict_proba(self._X_multi).astype(np.float32), proba, atol=1e-5
-        )
+        expected_label = pipe.predict(self._X_multi)
+        expected_proba = pipe.predict_proba(self._X_multi).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": self._X_multi})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_multilabel_raises(self):
         """OVR with multilabel_ = True should raise NotImplementedError."""
@@ -116,10 +140,15 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         results = ref.run(None, {"X": self._X_multi})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(clf.predict(self._X_multi), label)
-        self.assertEqualArray(
-            clf.predict_proba(self._X_multi).astype(np.float32), proba, atol=1e-5
-        )
+        expected_label = clf.predict(self._X_multi)
+        expected_proba = clf.predict_proba(self._X_multi).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": self._X_multi})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_graph_structure_multiclass(self):
         """Check ONNX graph contains expected op types for multiclass OVR."""

@@ -18,4 +18,6 @@ def convert_bias_add(
     last dimension of the input, which maps directly to ONNX ``Add`` with
     numpy-style broadcasting.
     """
-    return g.op.Add(sts[op.inputs[0].name], sts[op.inputs[1].name], outputs=outputs[:1], name=op.name)
+    return g.op.Add(
+        sts[op.inputs[0].name], sts[op.inputs[1].name], outputs=outputs[:1], name=op.name
+    )

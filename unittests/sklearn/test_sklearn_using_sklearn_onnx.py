@@ -82,8 +82,15 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        self.assertEqualArray(mlp.predict(X), label)
-        self.assertEqualArray(mlp.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+        expected_label = mlp.predict(X)
+        expected_proba = mlp.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
 
 if __name__ == "__main__":
