@@ -40,6 +40,12 @@ def to_onnx(
         allow converting custom estimators that are not natively supported
     :return: onnx model
     """
+    if not hasattr(estimator, "transform") and not hasattr(estimator, "predict"):
+        raise TypeError(
+            f"Estimator {type(estimator).__name__!r} has neither a 'transform' "
+            "nor a 'predict' method and cannot be converted to ONNX."
+        )
+
     from . import register_sklearn_converters
 
     register_sklearn_converters()
