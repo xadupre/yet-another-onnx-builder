@@ -115,7 +115,7 @@ def sklearn_one_vs_rest_classifier(
             np.array([1], dtype=np.int64),  # axes
             name=f"{sub_name}_slice",
         )
-        pos_probs.append(pos_prob)
+        pos_probs.append(pos_prob)  # type: ignore[arg-type]
 
     # Build the score matrix.
     if len(pos_probs) == 1:

@@ -219,3 +219,8 @@ matches = "yobx/xbuilder/graph_builder_opset.py"
 [tool.pyrefly.sub-config.errors]
 bad-return = false
 bad-override = false  # pyrefly is not happy with str | tuple[str, ...] becomes str
+
+[[tool.pyrefly.sub-config]]
+matches = "yobx/helpers/rt_helper.py"
+[tool.pyrefly.sub-config.errors]
+missing-attribute = false  # torch types unavailable when torch is not installed

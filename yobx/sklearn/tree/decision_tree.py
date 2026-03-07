@@ -18,14 +18,14 @@ def _ensure_ml_domain(g: GraphBuilderExtendedProtocol) -> None:
     if not g.has_opset("ai.onnx.ml"):
         g.add_domain(
             "ai.onnx.ml",
-            choose_consistent_domain_opset("ai.onnx.ml", {"": g.get_opset(""), "ai.onnx.ml": 3}),
+            choose_consistent_domain_opset("ai.onnx.ml", {"": g.get_opset(""), "ai.onnx.ml": 3}),  # type: ignore[dict-item]
         )
 
 
 def _get_ml_opset(g: GraphBuilderExtendedProtocol) -> int:
     """Returns the resolved ``ai.onnx.ml`` opset version from the builder."""
     _ensure_ml_domain(g)
-    return g.get_opset("ai.onnx.ml") if g.has_opset("ai.onnx.ml") else 3
+    return g.get_opset("ai.onnx.ml") if g.has_opset("ai.onnx.ml") else 3  # type: ignore[return-value]
 
 
 def _extract_tree_attributes(tree, n_classes: int, is_classifier: bool):

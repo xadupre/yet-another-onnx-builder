@@ -190,7 +190,7 @@ class GraphBuilderProtocol(Protocol):
         attributes: Optional[List[Any]] = None,
         name: Optional[str] = None,
         **kwargs: Any,
-    ) -> Union[str, Tuple[str]]:
+    ) -> Union[str, Tuple[str, ...]]:
         """Creates an ONNX node and returns its output name(s).
 
         :param op_type: ONNX operator type (e.g. ``"Relu"``, ``"MatMul"``)
@@ -296,5 +296,21 @@ class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
             type is used
         :return: ``True`` when shape information was available and set,
             ``None``/falsy when it could not be determined
+        """
+        ...
+
+    def get_debug_msg(self, limit: int = 1000) -> str:
+        """Returns a diagnostic string describing the current builder state.
+
+        :param limit: maximum string length
+        :return: debug information about the on-going conversion
+        """
+        ...
+
+    def onnx_dtype_to_np_dtype(self, itype: int) -> Any:
+        """Converts an ONNX element-type integer to the corresponding numpy dtype.
+
+        :param itype: ONNX element type integer (e.g. ``TensorProto.FLOAT``)
+        :return: corresponding :class:`numpy.dtype`
         """
         ...

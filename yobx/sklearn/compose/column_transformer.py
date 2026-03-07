@@ -108,7 +108,7 @@ def sklearn_column_transformer(
         X_sub = g.op.Gather(X, col_indices, axis=1, name=f"{name}__{trans_name}")
 
         if _is_passthrough(transformer):
-            parts.append(X_sub)
+            parts.append(X_sub)  # type: ignore[arg-type]
         else:
             try:
                 fct = get_sklearn_converter(type(transformer))

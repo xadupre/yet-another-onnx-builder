@@ -22,11 +22,11 @@ def _apply_activation(g: GraphBuilderExtendedProtocol, x: str, activation: str, 
     if activation == "identity":
         return x
     if activation == "logistic":
-        return g.op.Sigmoid(x, name=name)
+        return g.op.Sigmoid(x, name=name)  # type: ignore[return-value]
     if activation == "tanh":
-        return g.op.Tanh(x, name=name)
+        return g.op.Tanh(x, name=name)  # type: ignore[return-value]
     if activation == "relu":
-        return g.op.Relu(x, name=name)
+        return g.op.Relu(x, name=name)  # type: ignore[return-value]
     raise NotImplementedError(f"Activation {activation!r} is not supported.")
 
 
@@ -102,7 +102,7 @@ def sklearn_mlp_classifier(
         bias = intercepts[i].astype(dtype)
         z = g.op.MatMul(h, coef, name=f"{name}_mm{i}")
         z = g.op.Add(z, bias, name=f"{name}_add{i}")
-        h = _apply_activation(g, z, hidden_activation, name=f"{name}_act{i}")
+        h = _apply_activation(g, z, hidden_activation, name=f"{name}_act{i}")  # type: ignore[arg-type]
 
     # Output layer: linear part.
     coef_out = coefs[-1].astype(dtype)

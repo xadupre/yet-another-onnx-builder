@@ -326,7 +326,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
             return False
         return True
 
-    def get_shape(self, name: str) -> DYNAMIC_SHAPE:
+    def get_shape(self, name: str) -> DYNAMIC_SHAPE:  # type: ignore[override]
         """Returns the shape."""
         assert name in self._name_to_value, f"Name {name!r} is not registered."
         value = self._name_to_value[name]
@@ -334,7 +334,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         # A dynamic dimension is a ir.SymbolicDim.
         return tuple(s if isinstance(s, (int, str)) else s.value for s in value.shape)  # type: ignore
 
-    def set_shape(self, name: str, shape: DYNAMIC_SHAPE, allow_zero: bool = False):
+    def set_shape(self, name: str, shape: DYNAMIC_SHAPE, allow_zero: bool = False):  # type: ignore[override]
         """Sets the shape."""
         assert shape is not None, f"shape cannot be empty for name={name!r}"
         if name not in self._name_to_value:
