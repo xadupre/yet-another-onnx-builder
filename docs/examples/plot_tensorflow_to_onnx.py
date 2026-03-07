@@ -55,9 +55,7 @@ from yobx.tensorflow import to_onnx
 rng = np.random.default_rng(0)
 X = rng.standard_normal((5, 4)).astype(np.float32)
 
-model_linear = tf.keras.Sequential(
-    [tf.keras.layers.Dense(3, input_shape=(4,))]
-)
+model_linear = tf.keras.Sequential([tf.keras.layers.Dense(3, input_shape=(4,))])
 # Forward pass — required to initialise the weights before tracing.
 _ = model_linear(X)
 
@@ -162,6 +160,7 @@ print("Dynamic-batch model verified for batch sizes 1, 7, 20 ✓")
 # custom one that clips the output at 6 (i.e. ``Relu6``) instead of the
 # standard unbounded rectifier.
 
+
 def custom_relu_converter(g, sts, outputs, op):
     """Custom converter: replace Relu with Clip(0, 6)."""
     return g.op.Clip(
@@ -173,9 +172,7 @@ def custom_relu_converter(g, sts, outputs, op):
     )
 
 
-onx_custom = to_onnx(
-    mlp, (X_train[:1],), extra_converters={"Relu": custom_relu_converter}
-)
+onx_custom = to_onnx(mlp, (X_train[:1],), extra_converters={"Relu": custom_relu_converter})
 
 custom_op_types = [n.op_type for n in onx_custom.graph.node]
 print("\nOp-types with custom converter:", custom_op_types)
