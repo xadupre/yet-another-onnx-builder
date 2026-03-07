@@ -292,15 +292,23 @@ def _extract_forest_attributes_v5(
             # Degenerate tree: single leaf derived from the root node.
             for tree_idx in range(n_trees_per_est):
                 _append_leaf_entry_v5(
-                    all_leaf_targetids, all_leaf_weights,
-                    value[0, 0], tree_idx, is_classifier, n_estimators,
+                    all_leaf_targetids,
+                    all_leaf_weights,
+                    value[0, 0],
+                    tree_idx,
+                    is_classifier,
+                    n_estimators,
                 )
         else:
             for tree_idx in range(n_trees_per_est):
                 for nid in leaf_nodes:
                     _append_leaf_entry_v5(
-                        all_leaf_targetids, all_leaf_weights,
-                        value[nid, 0], tree_idx, is_classifier, n_estimators,
+                        all_leaf_targetids,
+                        all_leaf_weights,
+                        value[nid, 0],
+                        tree_idx,
+                        is_classifier,
+                        n_estimators,
                     )
 
         # ------------------------------------------------------------------ #
@@ -386,7 +394,16 @@ def sklearn_random_forest_classifier(
 
     if ml_opset >= 5:
         return _sklearn_random_forest_classifier_v5(
-            g, sts, outputs, estimator, X, name, classes, n_classes, n_estimators, estimators,
+            g,
+            sts,
+            outputs,
+            estimator,
+            X,
+            name,
+            classes,
+            n_classes,
+            n_estimators,
+            estimators,
             dtype=_get_input_dtype(g, X),
         )
 
@@ -541,7 +558,14 @@ def sklearn_random_forest_regressor(
 
     if ml_opset >= 5:
         tree_result = _sklearn_random_forest_regressor_v5(
-            g, sts, tree_outputs, estimator, X, name, n_estimators, estimators,
+            g,
+            sts,
+            tree_outputs,
+            estimator,
+            X,
+            name,
+            n_estimators,
+            estimators,
             dtype=_get_input_dtype(g, X),
         )
     else:

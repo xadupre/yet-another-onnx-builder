@@ -366,7 +366,10 @@ class TestSklearnBaseConverters(ExtTestCase):
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
         pipe = Pipeline(
-            [("scaler", StandardScaler()), ("clf", RandomForestClassifier(n_estimators=5, random_state=0))]
+            [
+                ("scaler", StandardScaler()),
+                ("clf", RandomForestClassifier(n_estimators=5, random_state=0)),
+            ]
         )
         pipe.fit(X, y)
 

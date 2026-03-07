@@ -307,3 +307,12 @@ class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
             ``None``/falsy when it could not be determined
         """
         ...
+
+    def get_debug_msg(self) -> str:
+        """Returns any information useful to understand where an error
+        could come from. This message is expected to be part of any
+        exception raised while converting a model.
+
+        :return: information in a string
+        """
+        ...
