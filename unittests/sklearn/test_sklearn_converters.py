@@ -7,6 +7,7 @@ import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -395,6 +396,142 @@ class TestSklearnBaseConverters(ExtTestCase):
             to_onnx(estimator, (X,))
         self.assertIn("transform", str(cm.exception))
         self.assertIn("predict", str(cm.exception))
+
+    def test_random_forest_classifier_binary(self):
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        rf = RandomForestClassifier(n_estimators=5, random_state=0)
+        rf.fit(X, y)
+
+        onx = to_onnx(rf, (X,))
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsembleClassifier", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(rf.predict(X), label)
+        self.assertEqualArray(rf.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+    def test_random_forest_classifier_multiclass(self):
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1, 2, 2])
+        rf = RandomForestClassifier(n_estimators=5, random_state=0)
+        rf.fit(X, y)
+
+        onx = to_onnx(rf, (X,))
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsembleClassifier", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(rf.predict(X), label)
+        self.assertEqualArray(rf.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+    def test_random_forest_regressor(self):
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
+        rf = RandomForestRegressor(n_estimators=5, random_state=0)
+        rf.fit(X, y)
+
+        onx = to_onnx(rf, (X,))
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsembleRegressor", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        self.assertEqualArray(
+            rf.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
+        )
+
+    def test_random_forest_classifier_binary_v5(self):
+        """TreeEnsemble (ai.onnx.ml opset 5) - binary classification."""
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        rf = RandomForestClassifier(n_estimators=5, random_state=0)
+        rf.fit(X, y)
+
+        onx = to_onnx(rf, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsemble", op_types)
+        self.assertNotIn("TreeEnsembleClassifier", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(rf.predict(X), label)
+        self.assertEqualArray(rf.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+    def test_random_forest_classifier_multiclass_v5(self):
+        """TreeEnsemble (ai.onnx.ml opset 5) - multi-class classification."""
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1, 2, 2])
+        rf = RandomForestClassifier(n_estimators=5, random_state=0)
+        rf.fit(X, y)
+
+        onx = to_onnx(rf, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsemble", op_types)
+        self.assertNotIn("TreeEnsembleClassifier", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(rf.predict(X), label)
+        self.assertEqualArray(rf.predict_proba(X).astype(np.float32), proba, atol=1e-5)
+
+    def test_random_forest_regressor_v5(self):
+        """TreeEnsemble (ai.onnx.ml opset 5) - regression."""
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
+        rf = RandomForestRegressor(n_estimators=5, random_state=0)
+        rf.fit(X, y)
+
+        onx = to_onnx(rf, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsemble", op_types)
+        self.assertNotIn("TreeEnsembleRegressor", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        self.assertEqualArray(
+            rf.predict(X).astype(np.float32).reshape(-1, 1), predictions, atol=1e-5
+        )
+
+    def test_pipeline_random_forest_classifier(self):
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        pipe = Pipeline(
+            [("scaler", StandardScaler()), ("clf", RandomForestClassifier(n_estimators=5, random_state=0))]
+        )
+        pipe.fit(X, y)
+
+        onx = to_onnx(pipe, (X,))
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsembleClassifier", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        self.assertEqualArray(pipe.predict(X), label)
+        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
 
 if __name__ == "__main__":
