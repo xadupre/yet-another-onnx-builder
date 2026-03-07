@@ -116,10 +116,7 @@ def _is_sequence_var_param(param: inspect.Parameter, ctor: Callable) -> bool:
     origin = typing.get_origin(hint)
     if origin is None:
         return False
-    try:
-        return issubclass(origin, collections.abc.Sequence)
-    except TypeError:
-        return False
+    return issubclass(origin, collections.abc.Sequence)
 
 
 def _is_dtype_like_param(param: inspect.Parameter, ctor: Callable) -> bool:
