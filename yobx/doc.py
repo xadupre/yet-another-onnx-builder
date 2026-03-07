@@ -16,7 +16,7 @@ def get_latest_pypi_version(package_name="yet-another-onnx-builder") -> str:  # 
     import requests
 
     url = f"https://pypi.org/pypi/{package_name}/json"
-    response = requests.get(url)
+    response = requests.get(url, timeout=10)
 
     assert response.status_code == 200, f"Unable to retrieve the version response={response}"
     data = response.json()
@@ -142,28 +142,22 @@ def _run_subprocess(args: List[str], cwd: Optional[str] = None):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    raise_exception = False
-    output_lines: List[str] = []
-    while True:
-        line = p.stdout.readline()  # type: ignore[union-attr]
-        if not line and p.poll() is not None:
-            break
-        if line:
-            decoded = line.decode(errors="ignore")
-            output_lines.append(decoded)
-            if (
-                "fatal error" in decoded
-                or "CMake Error" in decoded
-                or "gmake: ***" in decoded
-                or "): error C" in decoded
-                or ": error: " in decoded
-            ):
-                raise_exception = True
-    p.poll()
-    stdout_output = "".join(output_lines)
-    error = p.stderr.read().decode(errors="ignore")  # type: ignore[union-attr]
-    p.stdout.close()  # type: ignore[union-attr]
-    p.stderr.close()  # type: ignore[union-attr]
+    # Use communicate() to read stdout and stderr concurrently, avoiding the
+    # deadlock that occurs when the subprocess fills its stderr pipe buffer
+    # while the main process is blocked waiting for stdout data.
+    stdout_data, stderr_data = p.communicate()
+    stdout_output = stdout_data.decode(errors="ignore")
+    error = stderr_data.decode(errors="ignore")
+    raise_exception = any(
+        phrase in stdout_output
+        for phrase in (
+            "fatal error",
+            "CMake Error",
+            "gmake: ***",
+            "): error C",
+            ": error: ",
+        )
+    )
     if error and raise_exception:
         raise RuntimeError(
             f"An error was found in the output. The build is stopped."

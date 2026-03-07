@@ -1,4 +1,4 @@
-name: scikit-learn
+name: sklearn
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   sklearn_tests:
-    name: skl-tests (ubuntu-latest, py3.12, sklearn-${{ matrix.sklearn-version }})
+    name: sklearn (ubuntu-latest, py3.12, sklearn-${{ matrix.sklearn-version }})
     runs-on: ubuntu-latest
     permissions:
       contents: read

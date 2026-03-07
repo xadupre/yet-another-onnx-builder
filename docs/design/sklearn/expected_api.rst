@@ -20,6 +20,21 @@ An alternative bridge implementation,
 :class:`OnnxScriptGraphBuilder <yobx.builder.onnxscript.OnnxScriptGraphBuilder>`,
 shows how the same API can be satisfied on top of ``onnxscript``'s IR.
 
+When any ``ONNXSTOP*`` variable triggers an exception, the resulting
+**stack trace points to the exact line of converter code** that first
+assigned a type or shape to that result.
+
+**Why using strings to refer to intermediate results?**
+
+A user usually only sees the final model and can only investigate an
+issue based on the names he reads.
+Keeping **explicit, stable names** for intermediate results in converters
+code helps to track the code where this name appears.
+Keeping that in mind, a protocol for a value seems unnecessary.
+The creation of the final name should not be delayed.
+That makes it easier to investigate issues such as exposes in
+:ref:`l-design-sklearn-debug-env-vars`.
+
 Construction API
 ================
 
@@ -125,9 +140,10 @@ version with ``g.get_opset(domain)``.
 
 .. code-block:: python
 
+    from yobx.typing import GraphBuilderExtendedProtocol
     from yobx.xbuilder import GraphBuilder
 
-    def convert_my_estimator(g: GraphBuilder, sts, outputs, estimator, X):
+    def convert_my_estimator(g: GraphBuilderExtendedProtocol, sts, outputs, estimator, X):
         # Read the main opset to pick the right operator variant.
         opset = g.main_opset
 

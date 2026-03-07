@@ -199,15 +199,28 @@ project-excludes = [
 implicit-import = false
 
 [[tool.pyrefly.sub-config]]
+matches = "yobx/builder/onnxscript/bridge_graph_builder.py"
+[tool.pyrefly.sub-config.errors]
+bad-argument-type = false
+bad-override = false
+bad-return = false
+
+[[tool.pyrefly.sub-config]]
 matches = "yobx/sklearn/**/*.py"
 [tool.pyrefly.sub-config.errors]
 bad-argument-type = false
+bad-index = false  # tuple[str, str] != tuple[str, ...]
 bad-return = false
 missing-attribute = false
 
 [[tool.pyrefly.sub-config]]
-matches = "yobx/xbuilder/graph_builder_opset.py"
+matches = "yobx/tensorflow/ops/*.py"
 [tool.pyrefly.sub-config.errors]
 bad-argument-type = false
 bad-return = false
-missing-attribute = false
+
+[[tool.pyrefly.sub-config]]
+matches = "yobx/xbuilder/graph_builder_opset.py"
+[tool.pyrefly.sub-config.errors]
+bad-return = false
+bad-override = false  # pyrefly is not happy with str | tuple[str, ...] becomes str

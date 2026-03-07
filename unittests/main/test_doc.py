@@ -136,5 +136,50 @@ class TestDocVersionHelpers(ExtTestCase):
         self.assertEqual(result, "0.2.dev")
 
 
+@skipif_ci_windows("too long")
+@skipif_ci_apple("too long")
+class TestRunSubprocess(ExtTestCase):
+    def test_run_subprocess_captures_stdout(self):
+        from yobx.doc import _run_subprocess
+
+        result = _run_subprocess([sys.executable, "-c", "print('hello')"])
+        self.assertIn("hello", result)
+
+    def test_run_subprocess_captures_stderr(self):
+        from yobx.doc import _run_subprocess
+
+        result = _run_subprocess(
+            [sys.executable, "-c", "import sys; sys.stderr.write('err_msg\\n')"]
+        )
+        self.assertIn("err_msg", result)
+
+    def test_run_subprocess_no_deadlock_with_large_stderr(self):
+        # Verify that _run_subprocess does not deadlock when the subprocess
+        # writes a large amount of data to stderr (more than the pipe buffer
+        # ~64 KB), while writing nothing to stdout.
+        from yobx.doc import _run_subprocess
+
+        # Write 200 KB to stderr, nothing to stdout — the old line-by-line
+        # stdout reader would deadlock here; communicate() handles it safely.
+        script = "import sys; sys.stderr.write('x' * 200_000)"
+        result = _run_subprocess([sys.executable, "-c", script])
+        # The function should return without hanging; stderr ends up in the
+        # return value (appended after stdout).
+        self.assertGreater(len(result), 100_000)
+
+    def test_run_subprocess_raises_on_build_error(self):
+        from yobx.doc import _run_subprocess
+
+        # A script that prints a "fatal error" to stdout AND writes to stderr
+        # should cause _run_subprocess to raise RuntimeError.
+        script = (
+            "import sys; "
+            "print('fatal error: something went wrong'); "
+            "sys.stderr.write('build failed\\n')"
+        )
+        with self.assertRaises(RuntimeError):
+            _run_subprocess([sys.executable, "-c", script])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

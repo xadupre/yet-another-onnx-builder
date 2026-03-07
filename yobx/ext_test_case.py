@@ -559,6 +559,24 @@ def requires_torch(
     return lambda x: x
 
 
+def requires_tensorflow(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`tensorflow` is not recent enough."""
+    try:
+        import tensorflow
+    except (ImportError, AttributeError):
+        return unittest.skip(msg or "tensorflow not installed")
+
+    if not version:
+        return lambda x: x
+
+    import packaging.version as pv
+
+    if pv.Version(tensorflow.__version__) < pv.Version(version):
+        msg = f"tensorflow version {tensorflow.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def requires_onnx_diagnostic(
     version: str = "", msg: Optional[Union[Callable[[], str], str]] = None
 ) -> Callable:

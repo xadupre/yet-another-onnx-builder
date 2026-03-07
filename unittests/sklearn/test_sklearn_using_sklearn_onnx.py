@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
+from yobx.typing import GraphBuilderExtendedProtocol
 from yobx.sklearn import to_onnx
 
 
@@ -11,7 +12,7 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
         from typing import Dict, List, Tuple
         import onnx
         from sklearn.neural_network import MLPClassifier
-        from yobx.xbuilder import GraphBuilder, FunctionOptions
+        from yobx.xbuilder import FunctionOptions
         from skl2onnx import convert_sklearn
         from skl2onnx.common.data_types import DoubleTensorType, FloatTensorType
 
@@ -26,7 +27,7 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
             )
 
         def convert_sklearn_mlp_classifier(
-            g: GraphBuilder,
+            g: GraphBuilderExtendedProtocol,
             sts: Dict,
             outputs: List[str],
             estimator: MLPClassifier,
