@@ -384,13 +384,15 @@ class TestSklearnBaseConverters(ExtTestCase):
 
 
     def test_estimator_without_transform_or_predict_raises(self):
+        from sklearn.exceptions import NotFittedError
+
         class NoOpEstimator(BaseEstimator):
             def fit(self, X, y=None):
                 return self
 
         estimator = NoOpEstimator().fit(np.zeros((4, 2), dtype=np.float32))
         X = np.zeros((4, 2), dtype=np.float32)
-        with self.assertRaises(TypeError) as cm:
+        with self.assertRaises(NotFittedError) as cm:
             to_onnx(estimator, (X,))
         self.assertIn("transform", str(cm.exception))
         self.assertIn("predict", str(cm.exception))
