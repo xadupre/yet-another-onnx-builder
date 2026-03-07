@@ -10,6 +10,7 @@ from yobx._command_lines_parser import (
     get_parser_find,
     get_parser_partition,
     get_parser_print,
+    get_parser_run_doc_examples,
     process_outputname,
 )
 
@@ -103,6 +104,22 @@ class TestCommandLines(ExtTestCase):
         self.assertEqual(args.token, "ghp_test")
         self.assertEqual(args.verbose, 1)
         self.assertEqual(args.output_dir, "")
+
+    def test_parser_run_doc_examples(self):
+        st = StringIO()
+        with redirect_stdout(st):
+            get_parser_run_doc_examples().print_help()
+        text = st.getvalue()
+        self.assertIn("--timeout", text)
+        self.assertIn("--ext", text)
+        self.assertIn("inputs", text)
+
+    def test_main_parser_has_run_doc_examples(self):
+        st = StringIO()
+        with redirect_stdout(st):
+            get_main_parser().print_help()
+        text = st.getvalue()
+        self.assertIn("run-doc-examples", text)
 
 
 if __name__ == "__main__":
