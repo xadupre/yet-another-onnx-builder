@@ -614,7 +614,7 @@ This information can be built by running shape inference
 on the onnx models. That's what is done in the previous examples.
 However, the best case is when this information comes from torch.
 
-Function :func:`to_onnx <yobx.torch_interpreter.to_onnx>`
+Function :func:`to_onnx <yobx.torch.interpreter.to_onnx>`
 converts a torch model into ONNX. While doing so, it stores the shape
 information coming from torch. There is no need to run shape inference
 on the onnx model it generates before optimizing it.

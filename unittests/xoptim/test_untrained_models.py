@@ -10,7 +10,7 @@ from yobx.torch.torch_helper import torch_deepcopy
 from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.xbuilder import OptimizationOptions
 
-# from yobx.torch_interpreter import to_onnx
+# from yobx.torch.interpreter import to_onnx
 to_onnx = None
 
 

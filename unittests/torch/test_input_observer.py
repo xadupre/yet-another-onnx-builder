@@ -12,7 +12,7 @@ from yobx.ext_test_case import (
 from yobx.torch.input_observer import InputCandidate, InputObserver, _infer_dynamic_dimensions
 from yobx.torch import apply_patches_for_model
 
-# from onnx_diagnostic.export.api import to_onnx
+# from yobx.export.api import to_onnx
 
 to_onnx = lambda *args, **kwargs: None
 
