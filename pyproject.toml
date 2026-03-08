@@ -54,7 +54,7 @@ sklearn = [
 ]
 xgboost = [
     "scikit-learn>=1.4",
-    "xgboost>=1.7",
+    "xgboost>=3.0",
 ]
 spox = [
     "spox>=0.12",

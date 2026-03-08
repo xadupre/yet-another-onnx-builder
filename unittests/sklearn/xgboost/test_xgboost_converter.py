@@ -10,7 +10,7 @@ from yobx.sklearn import to_onnx
 
 
 @requires_sklearn("1.4")
-@requires_xgboost("1.7")
+@requires_xgboost("3.0")
 class TestXGBoostClassifier(ExtTestCase):
     def _make_binary_data(self):
         rng = np.random.default_rng(0)
@@ -114,7 +114,7 @@ class TestXGBoostClassifier(ExtTestCase):
 
 
 @requires_sklearn("1.4")
-@requires_xgboost("1.7")
+@requires_xgboost("3.0")
 class TestXGBoostRegressor(ExtTestCase):
     def _make_regression_data(self):
         rng = np.random.default_rng(2)
