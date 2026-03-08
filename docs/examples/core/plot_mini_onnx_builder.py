@@ -70,7 +70,9 @@ builder2.append_output_initializer("x_np", x_np)
 builder2.append_output_initializer("x_torch", x_torch.numpy())
 
 model2 = builder2.to_onnx()
-ref2 = onnxruntime.InferenceSession(model2.SerializeToString(), providers=["CPUExecutionProvider"])
+ref2 = onnxruntime.InferenceSession(
+    model2.SerializeToString(), providers=["CPUExecutionProvider"]
+)
 got_np, got_torch = ref2.run(None, {})
 
 print("x_np   :", got_np)
@@ -91,7 +93,9 @@ seq = [np.array([10, 20], dtype=np.int64), np.array([30, 40], dtype=np.int64)]
 builder3.append_output_sequence("my_seq", seq)
 
 model3 = builder3.to_onnx()
-ref3 = onnxruntime.InferenceSession(model3.SerializeToString(), providers=["CPUExecutionProvider"])
+ref3 = onnxruntime.InferenceSession(
+    model3.SerializeToString(), providers=["CPUExecutionProvider"]
+)
 (got_seq,) = ref3.run(None, {})
 
 print("sequence:", got_seq)
