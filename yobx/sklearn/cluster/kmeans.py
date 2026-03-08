@@ -58,9 +58,7 @@ def sklearn_kmeans(
     :return: tuple ``(labels, distances)`` when two outputs are requested,
         otherwise just ``labels``
     """
-    assert isinstance(
-        estimator, KMeans
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, KMeans), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
@@ -69,7 +67,7 @@ def sklearn_kmeans(
     centers = estimator.cluster_centers_.astype(dtype)  # (K, F)
     centers_T = centers.T  # (F, K)
 
-    # ||x||² – sum of squares over the feature axis for every sample → (N, 1)
+    # ||x||² - sum of squares over the feature axis for every sample → (N, 1)
     x_sq = g.op.Mul(X, X, name=f"{name}_x_sq")
     x_sq_sum = g.op.ReduceSum(
         x_sq,
@@ -78,8 +76,8 @@ def sklearn_kmeans(
         name=f"{name}_x_sq_sum",
     )  # (N, 1)
 
-    # ||c||² – precomputed constant for each centre → (1, K)
-    c_sq = (np.sum(centers ** 2, axis=1, keepdims=True).T).astype(dtype)  # (1, K)
+    # ||c||² - precomputed constant for each centre → (1, K)
+    c_sq = (np.sum(centers**2, axis=1, keepdims=True).T).astype(dtype)  # (1, K)
 
     # Cross term: X @ centersᵀ → (N, K)
     cross = g.op.MatMul(X, centers_T, name=f"{name}_cross")  # (N, K)
