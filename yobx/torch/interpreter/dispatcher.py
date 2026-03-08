@@ -94,7 +94,7 @@ class Dispatcher:
         fct: Optional[Callable],
         args: List[Any],
         kwargs: Dict[str, Any],
-        builder: "GraphBuilder",  # noqa: F821
+        builder: "GraphBuilder",  # type: ignore # noqa: F821
     ) -> Optional[Callable]:
         """
         The function is called after the function converting an aten function

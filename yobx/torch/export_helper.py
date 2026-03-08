@@ -6,7 +6,7 @@ from ..helpers import flatten_object
 _torch_guard_or = _tds._guard_or
 
 
-def _guard_or(a: "BoolLikeType", default: bool) -> bool:  # noqa: F821
+def _guard_or(a: "BoolLikeType", default: bool) -> bool:  # type: ignore # noqa: F821
     if not isinstance(a, _tds.SymBool):
         assert isinstance(a, bool)
         return a
@@ -48,17 +48,17 @@ def torch_export(
     if backed_size_oblivious == "half":
         if verbose:
             print(f"[torch_export] backed_size_oblivious={backed_size_oblivious!r}")
-        value = _tds.ShapeEnv._init.__kwdefaults__["specialize_zero_one"]
-        _tds.ShapeEnv._init.__kwdefaults__["specialize_zero_one"] = False
+        value = _tds.ShapeEnv._init.__kwdefaults__["specialize_zero_one"]  # type: ignore
+        _tds.ShapeEnv._init.__kwdefaults__["specialize_zero_one"] = False  # type: ignore
         _tds._guard_or = _guard_or
 
-        with torch.fx.experimental._config.patch(backed_size_oblivious=True):
+        with torch.fx.experimental._config.patch(backed_size_oblivious=True):  # type: ignore
             ep = torch.export.export(
                 mod, args, kwargs, dynamic_shapes=dynamic_shapes, strict=strict, **export_kwargs
             )
 
         _tds._guard_or = _torch_guard_or
-        _tds.ShapeEnv._init.__kwdefaults__["specialize_zero_one"] = value
+        _tds.ShapeEnv._init.__kwdefaults__["specialize_zero_one"] = value  # type: ignore
         return ep
 
     if backed_size_oblivious == "auto":
@@ -128,7 +128,7 @@ def torch_export(
             ):
                 try:
                     cpl = CoupleInputsDynamicShapes(aags, kws, ds)  # type: ignore
-                    backed_size_oblivious = cpl.invalid_dimensions_for_export()
+                    backed_size_oblivious = cpl.invalid_dimensions_for_export()  # type: ignore
                 except AssertionError as e:
                     from onnx_diagnostic.helpers import string_type
 
@@ -151,7 +151,7 @@ def torch_export(
             ep = torch.export.export(
                 mod, args, kwargs, dynamic_shapes=dynamic_shapes, strict=strict, **export_kwargs  # type: ignore
             )
-        ep._computed_backed_size_oblivious = backed_size_oblivious
+        ep._computed_backed_size_oblivious = backed_size_oblivious  # type: ignore
         return ep
 
     if verbose:

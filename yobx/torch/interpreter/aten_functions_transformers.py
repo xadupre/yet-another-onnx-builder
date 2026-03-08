@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from . import _aten_functions_transformers
 
 
@@ -20,9 +20,9 @@ def _register() -> Dict[str, Callable]:
 registered_functions = _register()
 
 
-def find_function(name: Any) -> Optional[Callable]:
+def find_function(name: Any) -> Tuple[Optional[Callable], List[str], List[str]]:
     if name in registered_functions:
-        return registered_functions[name], [name], []  # type: ignore
+        return registered_functions[name], [name], []
     if isinstance(name, str):
         return None, [name], []
 
@@ -32,7 +32,7 @@ def find_function(name: Any) -> Optional[Callable]:
         new_name = f"transformers_{name.__name__.replace('.', '_')}"
         lookup.append(new_name)
         if new_name in registered_functions:
-            return registered_functions[new_name], lookup, []  # type: ignore
+            return registered_functions[new_name], lookup, []
 
     lookup_names = ["__qualname__", "__name__"]
     for att in lookup_names:
@@ -40,6 +40,6 @@ def find_function(name: Any) -> Optional[Callable]:
             v = getattr(name, att).replace(".", "_").replace("::", "_")
             lookup.append(v)
             if v in registered_functions:
-                return registered_functions[v], lookup, lookup_names  # type: ignore
+                return registered_functions[v], lookup, lookup_names
 
     return None, lookup, lookup_names

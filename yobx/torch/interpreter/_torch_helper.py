@@ -56,7 +56,7 @@ def _tune_thresholds_histc(
     for i in range(tensor.numel() - 1):
         th = tensor[i]
         buffer[0] = th
-        n = int(max(10, 1.0 / max(torch.abs(th), 1e-4)))
+        n = int(max(10, 1.0 / max(float(torch.abs(th)), 1e-4)))  # type: ignore
         for _ in range(n):
             buffer = torch.nextafter(buffer, minf)
 

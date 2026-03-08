@@ -54,7 +54,7 @@ def _register() -> Dict[str, Callable]:
         for c in options:
             if c in res:
                 raise RuntimeError(f"Alias {c!r} for function {v} is already taken by {res[k]}.")
-        res.update(options)
+        res.update(options)  # type: ignore
     return res
 
 

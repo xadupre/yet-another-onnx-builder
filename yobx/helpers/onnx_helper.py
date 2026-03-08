@@ -1575,7 +1575,23 @@ def type_info(itype: int, att: str):
 
 def get_onnx_signature(
     model: onnx.ModelProto,
-) -> Tuple[Tuple[str, int, Tuple[Union[int, str], ...]], ...]:
+) -> Tuple[
+    Tuple[
+        str,
+        int,
+        Union[
+            Tuple[Union[int, str], ...],
+            List[
+                Tuple[
+                    str,
+                    int,
+                    Tuple[Union[int, str], ...],
+                ],
+            ],
+        ],
+    ],
+    ...,
+]:
     """
     Produces a tuple of tuples corresponding to the signatures.
 
@@ -1590,11 +1606,11 @@ def get_onnx_signature(
             tdt = dst.tensor_type
             el = tdt.elem_type
             shape = tuple(d.dim_param or d.dim_value for d in tdt.shape.dim)
-            sig.append((i.name, [(i.name, el, shape)]))
+            sig.append((i.name, el, [(i.name, el, shape)]))
         elif dt.HasField("tensor_type"):
             el = dt.tensor_type.elem_type
             shape = tuple(d.dim_param or d.dim_value for d in dt.tensor_type.shape.dim)
-            sig.append((i.name, el, shape))
+            sig.append((i.name, el, shape))  # type: ignore
         else:
             raise AssertionError(f"Unable to interpret dt={dt!r} in {i!r}")
     return tuple(sig)
