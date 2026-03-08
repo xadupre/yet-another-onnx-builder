@@ -13,7 +13,7 @@ Comparison
 
 Logical
 -------
-``LogicalAnd``, ``LogicalOr``, ``LogicalXor``
+``LogicalAnd``, ``LogicalNot``, ``LogicalOr``, ``LogicalXor``
 """
 
 from typing import Any, Dict, List
@@ -188,6 +188,14 @@ def convert_logical_and(
 ) -> str:
     """TF ``LogicalAnd`` → ONNX ``And``."""
     return g.op.And(op.inputs[0].name, op.inputs[1].name, outputs=outputs[:1], name=op.name)
+
+
+@register_tf_op_converter("LogicalNot")
+def convert_logical_not(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
+    """TF ``LogicalNot`` → ONNX ``Not``."""
+    return g.op.Not(op.inputs[0].name, outputs=outputs[:1], name=op.name)
 
 
 @register_tf_op_converter("LogicalOr")

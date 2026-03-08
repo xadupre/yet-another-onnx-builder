@@ -419,6 +419,27 @@ class TestTensorflowBinaryOpConverters(ExtTestCase):
         onx = self._run_binary_op(tf.logical_and, a, b)
         self.assertIn("And", [n.op_type for n in onx.graph.node])
 
+    def test_logical_not(self):
+        """TF LogicalNot → ONNX Not."""
+        a = np.array([[True, False, True], [False, True, False]])
+
+        @tf.function
+        def model(x):
+            return tf.logical_not(x)
+
+        from yobx.tensorflow import to_onnx as _to_onnx
+
+        onx = _to_onnx(model, (a,), input_names=["X"])
+        expected = model(a).numpy()
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X:0": a})[0]
+        self.assertEqualArray(expected, result)
+
+        ort_result = _ort_run(onx, {"X:0": a})
+        self.assertEqualArray(expected, ort_result)
+        self.assertIn("Not", [n.op_type for n in onx.graph.node])
+
     def test_logical_or(self):
         """TF LogicalOr → ONNX Or."""
         a = np.array([[True, False, True], [False, True, False]])
