@@ -13,7 +13,7 @@ import numpy.typing as npt
 import onnx
 import spox
 
-from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
+from ...helpers.onnx_helper import attr_proto_to_python, tensor_dtype_to_np_dtype
 from ...typing import GraphBuilderExtendedProtocol, OpsetProtocol
 from ...xshape._shape_helper import DYNAMIC_SHAPE
 from ...xshape.shape_type_compute import set_type_shape_unary_op
@@ -700,8 +700,6 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
     @staticmethod
     def _attr_proto_to_python(attr: onnx.AttributeProto) -> Any:
         """Converts an :class:`onnx.AttributeProto` to a plain Python value."""
-        from yobx.helpers.onnx_helper import attr_proto_to_python
-
         return attr_proto_to_python(attr)
 
     # ------------------------------------------------------------------
