@@ -269,5 +269,194 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
 
+@requires_tensorflow("2.18")
+class TestTensorflowBinaryOpConverters(ExtTestCase):
+    """Tests for the binary-op converters added in binary_ops.py."""
+
+    def _run_binary_op(self, tf_fn, a, b, disable_ort=False):
+        """Trace tf_fn(a, b) to ONNX and compare TF vs ONNX vs ORT results."""
+
+        @tf.function
+        def model(x, y):
+            return tf_fn(x, y)
+
+        onx = to_onnx(model, (a, b), input_names=["X", "Y"])
+        expected = model(a, b).numpy()
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X:0": a, "Y:0": b})[0]
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+        if disable_ort:
+            # Some operator is not implemented in onnxruntime.
+            return onx
+        ort_result = _ort_run(onx, {"X:0": a, "Y:0": b})
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+        return onx
+
+    # ------------------------------------------------------------------
+    # Arithmetic
+    # ------------------------------------------------------------------
+
+    def test_sub(self):
+        """TF Sub → ONNX Sub."""
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_binary_op(tf.subtract, a, b)
+        self.assertIn("Sub", [n.op_type for n in onx.graph.node])
+
+    def test_mul(self):
+        """TF Mul → ONNX Mul."""
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_binary_op(tf.multiply, a, b)
+        self.assertIn("Mul", [n.op_type for n in onx.graph.node])
+
+    def test_real_div(self):
+        """TF RealDiv → ONNX Div."""
+        a = np.random.rand(3, 4).astype(np.float32) + 0.5
+        b = np.random.rand(3, 4).astype(np.float32) + 0.5
+        onx = self._run_binary_op(tf.divide, a, b)
+        self.assertIn("Div", [n.op_type for n in onx.graph.node])
+
+    def test_minimum(self):
+        """TF Minimum → ONNX Min."""
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_binary_op(tf.minimum, a, b)
+        self.assertIn("Min", [n.op_type for n in onx.graph.node])
+
+    def test_maximum(self):
+        """TF Maximum → ONNX Max."""
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_binary_op(tf.maximum, a, b)
+        self.assertIn("Max", [n.op_type for n in onx.graph.node])
+
+    def test_pow(self):
+        """TF Pow → ONNX Pow."""
+        a = np.random.rand(3, 4).astype(np.float32) + 0.1
+        b = np.random.rand(3, 4).astype(np.float32) + 0.1
+        onx = self._run_binary_op(tf.pow, a, b)
+        self.assertIn("Pow", [n.op_type for n in onx.graph.node])
+
+    def test_squared_difference(self):
+        """TF SquaredDifference → ONNX Sub + Mul."""
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_binary_op(tf.math.squared_difference, a, b)
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Sub", op_types)
+        self.assertIn("Mul", op_types)
+
+    def test_floor_mod(self):
+        """TF FloorMod → ONNX Mod(fmod=0)."""
+        a = (np.random.rand(3, 4).astype(np.float32) * 10 + 1).astype(np.float32)
+        b = (np.random.rand(3, 4).astype(np.float32) * 3 + 1).astype(np.float32)
+        onx = self._run_binary_op(tf.math.floormod, a, b, disable_ort=True)
+        self.assertIn("Mod", [n.op_type for n in onx.graph.node])
+
+    def test_truncate_mod(self):
+        """TF TruncateMod → ONNX Mod(fmod=1)."""
+        a = (np.random.rand(3, 4).astype(np.float32) * 10 + 1).astype(np.float32)
+        b = (np.random.rand(3, 4).astype(np.float32) * 3 + 1).astype(np.float32)
+        onx = self._run_binary_op(tf.truncatemod, a, b)
+        self.assertIn("Mod", [n.op_type for n in onx.graph.node])
+
+    # ------------------------------------------------------------------
+    # Comparison
+    # ------------------------------------------------------------------
+
+    def test_equal(self):
+        """TF Equal → ONNX Equal."""
+        a = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+        b = np.array([[1.0, 0.0, 3.0], [4.0, 9.0, 6.0]], dtype=np.float32)
+        onx = self._run_binary_op(tf.equal, a, b)
+        self.assertIn("Equal", [n.op_type for n in onx.graph.node])
+
+    def test_not_equal(self):
+        """TF NotEqual → ONNX Not(Equal)."""
+        a = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+        b = np.array([[1.0, 0.0, 3.0], [4.0, 9.0, 6.0]], dtype=np.float32)
+        onx = self._run_binary_op(tf.not_equal, a, b)
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Equal", op_types)
+        self.assertIn("Not", op_types)
+
+    def test_greater(self):
+        """TF Greater → ONNX Greater."""
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_binary_op(tf.greater, a, b)
+        self.assertIn("Greater", [n.op_type for n in onx.graph.node])
+
+    def test_greater_equal(self):
+        """TF GreaterEqual → ONNX GreaterOrEqual."""
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_binary_op(tf.greater_equal, a, b)
+        self.assertIn("GreaterOrEqual", [n.op_type for n in onx.graph.node])
+
+    def test_less(self):
+        """TF Less → ONNX Less."""
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_binary_op(tf.less, a, b)
+        self.assertIn("Less", [n.op_type for n in onx.graph.node])
+
+    def test_less_equal(self):
+        """TF LessEqual → ONNX LessOrEqual."""
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_binary_op(tf.less_equal, a, b)
+        self.assertIn("LessOrEqual", [n.op_type for n in onx.graph.node])
+
+    # ------------------------------------------------------------------
+    # Logical
+    # ------------------------------------------------------------------
+
+    def test_logical_and(self):
+        """TF LogicalAnd → ONNX And."""
+        a = np.array([[True, False, True], [False, True, False]])
+        b = np.array([[True, True, False], [False, False, True]])
+        onx = self._run_binary_op(tf.logical_and, a, b)
+        self.assertIn("And", [n.op_type for n in onx.graph.node])
+
+    def test_logical_not(self):
+        """TF LogicalNot → ONNX Not."""
+        a = np.array([[True, False, True], [False, True, False]])
+
+        @tf.function
+        def model(x):
+            return tf.logical_not(x)
+
+        from yobx.tensorflow import to_onnx as _to_onnx
+
+        onx = _to_onnx(model, (a,), input_names=["X"])
+        expected = model(a).numpy()
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X:0": a})[0]
+        self.assertEqualArray(expected, result)
+
+        ort_result = _ort_run(onx, {"X:0": a})
+        self.assertEqualArray(expected, ort_result)
+        self.assertIn("Not", [n.op_type for n in onx.graph.node])
+
+    def test_logical_or(self):
+        """TF LogicalOr → ONNX Or."""
+        a = np.array([[True, False, True], [False, True, False]])
+        b = np.array([[True, True, False], [False, False, True]])
+        onx = self._run_binary_op(tf.logical_or, a, b)
+        self.assertIn("Or", [n.op_type for n in onx.graph.node])
+
+    def test_logical_xor(self):
+        """TF LogicalXor → ONNX Xor."""
+        a = np.array([[True, False, True], [False, True, False]])
+        b = np.array([[True, True, False], [False, False, True]])
+        self._run_binary_op(tf.math.logical_xor, a, b)
+        # Xor may be not used...
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

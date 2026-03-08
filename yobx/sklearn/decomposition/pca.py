@@ -1,4 +1,3 @@
-import numpy as np
 from typing import Dict, List
 from sklearn.decomposition import PCA
 from ..register import register_sklearn_converter
@@ -36,9 +35,7 @@ def sklearn_pca(
     :param name: prefix name for the added nodes
     :return: output tensor name
     """
-    assert isinstance(
-        estimator, PCA
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, PCA), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)

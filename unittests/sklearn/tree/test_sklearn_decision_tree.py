@@ -631,9 +631,7 @@ class TestSklearnDecisionTree(ExtTestCase):
             label, proba = results[0], results[1]
 
             self.assertEqualArray(dt.predict(X_test), label)
-            self.assertEqualArray(
-                dt.predict_proba(X_test).astype(np.float32), proba, atol=1e-5
-            )
+            self.assertEqualArray(dt.predict_proba(X_test).astype(np.float32), proba, atol=1e-5)
 
             sess = self.check_ort(onx)
             ort_results = sess.run(None, {"X": X_test})

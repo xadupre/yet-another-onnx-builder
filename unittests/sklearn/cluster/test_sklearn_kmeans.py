@@ -27,7 +27,7 @@ class TestKMeans(ExtTestCase):
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
-        labels, distances = results[0], results[1]
+        labels, _distances = results[0], results[1]
 
         expected_labels = km.predict(X).astype(np.int64)
         self.assertEqualArray(expected_labels, labels)
@@ -49,7 +49,7 @@ class TestKMeans(ExtTestCase):
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
-        labels, distances = results[0], results[1]
+        _labels, distances = results[0], results[1]
 
         # Distances should match sklearn's transform output.
         expected_distances = km.transform(X).astype(np.float32)
@@ -63,9 +63,7 @@ class TestKMeans(ExtTestCase):
         from sklearn.cluster import KMeans
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1.0, 0.0], [2.0, 0.0], [-1.0, 0.0], [-2.0, 0.0]], dtype=np.float32
-        )
+        X = np.array([[1.0, 0.0], [2.0, 0.0], [-1.0, 0.0], [-2.0, 0.0]], dtype=np.float32)
         km = KMeans(n_clusters=2, random_state=0, n_init=10)
         km.fit(X)
 
@@ -86,10 +84,12 @@ class TestKMeans(ExtTestCase):
 
         rng = np.random.default_rng(2)
         X = rng.standard_normal((30, 4)).astype(np.float32)
-        pipe = Pipeline([
-            ("scaler", StandardScaler()),
-            ("km", KMeans(n_clusters=3, random_state=0, n_init=10)),
-        ])
+        pipe = Pipeline(
+            [
+                ("scaler", StandardScaler()),
+                ("km", KMeans(n_clusters=3, random_state=0, n_init=10)),
+            ]
+        )
         pipe.fit(X)
 
         onx = to_onnx(pipe, (X,))

@@ -6,6 +6,7 @@ yobx.tensorflow.ops
     :caption: modules
 
     activations
+    binary_ops
     element_wise
     const
     matmul

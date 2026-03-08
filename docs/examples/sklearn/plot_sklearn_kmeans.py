@@ -11,9 +11,9 @@ runtime.
 
 The converted model produces two outputs:
 
-* **label** – cluster index for each sample (equivalent to
+* **label** - cluster index for each sample (equivalent to
   :meth:`~sklearn.cluster.KMeans.predict`).
-* **distances** – Euclidean distance from each sample to every centroid
+* **distances** - Euclidean distance from each sample to every centroid
   (equivalent to :meth:`~sklearn.cluster.KMeans.transform`).
 
 The workflow is:
@@ -55,9 +55,7 @@ print(f"ONNX model outputs: {[o.name for o in onx.graph.output]}")
 # 3. Run the ONNX model and compare outputs
 # ------------------------------------------
 
-ref = onnxruntime.InferenceSession(
-    onx.SerializeToString(), providers=["CPUExecutionProvider"]
-)
+ref = onnxruntime.InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
 label_onnx, distances_onnx = ref.run(None, {"X": X})
 
 label_sk = km.predict(X).astype(np.int64)
