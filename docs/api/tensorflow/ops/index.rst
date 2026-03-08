@@ -6,6 +6,6 @@ yobx.tensorflow.ops
     :caption: modules
 
     activations
-    bias_add
+    element_wise
     const
     matmul

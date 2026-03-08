@@ -1,5 +1,5 @@
 """
-Converter for the TF ``BiasAdd`` op → ONNX ``Add``.
+Converter for element-wise TF ops → ONNX ``Add``.
 """
 
 from typing import Any, Dict, List
@@ -9,11 +9,11 @@ from ...typing import GraphBuilderExtendedProtocol
 
 
 @register_tf_op_converter(("AddV2", "BiasAdd"))
-def convert_bias_add(
+def convert_element_wise(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
-    Converts TF ``BiasAdd`` to ONNX ``Add``.
+    Converts TF element-wise addition ops (``AddV2``, ``BiasAdd``) to ONNX ``Add``.
 
     TF's ``BiasAdd`` is semantically equivalent to adding a 1-D bias along the
     last dimension of the input, which maps directly to ONNX ``Add`` with
