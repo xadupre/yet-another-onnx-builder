@@ -170,7 +170,7 @@ class InputCandidate:
         flat_shapes = self._flatten_nested_object(dynamic_shapes)
         if len(flat_shapes) > len(self.flat_list):
             raise RuntimeError(
-                f"The flatten dyanmic shapes has not the same size ({len(flat_shapes)})"
+                f"The flatten dynamic shapes has not the same size ({len(flat_shapes)})"
                 f"than the flat list of tensors ({len(self.flat_list)})."
             )
         for shape, tensor in zip(flat_shapes, self.flat_list):
