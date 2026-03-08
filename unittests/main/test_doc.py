@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import numpy as np
+import onnx
 from yobx.ext_test_case import (
     ExtTestCase,
     requires_matplotlib,
@@ -26,22 +27,20 @@ class TestDocMatplotlib(ExtTestCase):
         cls.plt = plt
 
     def test_plot_legend_returns_axes(self):
+        import matplotlib.axes
         from yobx.doc import plot_legend
 
         self.assertEqual(sys.platform, "linux")
 
         ax = plot_legend("TEST")
-        import matplotlib.axes
-
         self.assertIsInstance(ax, matplotlib.axes.Axes)
         self.plt.close("all")
 
     def test_plot_legend_with_text_bottom(self):
+        import matplotlib.axes
         from yobx.doc import plot_legend
 
         ax = plot_legend("LABEL", text_bottom="bottom text", color="blue", fontsize=12)
-        import matplotlib.axes
-
         self.assertIsInstance(ax, matplotlib.axes.Axes)
         self.plt.close("all")
 
@@ -92,12 +91,11 @@ class TestDocMatplotlib(ExtTestCase):
         self.plt.close("all")
 
     def test_plot_histogram_returns_axes(self):
+        import matplotlib.axes
         from yobx.doc import plot_histogram
 
         data = np.random.default_rng(0).standard_normal(100)
         ax = plot_histogram(data)
-        import matplotlib.axes
-
         self.assertIsInstance(ax, matplotlib.axes.Axes)
         self.plt.close("all")
 
@@ -179,6 +177,169 @@ class TestRunSubprocess(ExtTestCase):
         )
         with self.assertRaises(RuntimeError):
             _run_subprocess([sys.executable, "-c", script])
+
+
+class TestDocDemoMlpModel(ExtTestCase):
+    def test_demo_mlp_model_returns_model_proto(self):
+        from yobx.doc import demo_mlp_model
+
+        model = demo_mlp_model("")
+        self.assertIsInstance(model, onnx.ModelProto)
+
+    def test_demo_mlp_model_graph_has_five_nodes(self):
+        from yobx.doc import demo_mlp_model
+
+        model = demo_mlp_model("")
+        self.assertEqual(len(model.graph.node), 5)
+
+    def test_demo_mlp_model_op_types(self):
+        from yobx.doc import demo_mlp_model
+
+        model = demo_mlp_model("")
+        ops = [n.op_type for n in model.graph.node]
+        self.assertIn("MatMul", ops)
+        self.assertIn("Add", ops)
+        self.assertIn("Relu", ops)
+
+    def test_demo_mlp_model_input_output(self):
+        from yobx.doc import demo_mlp_model
+
+        model = demo_mlp_model("")
+        self.assertEqual(len(model.graph.input), 1)
+        self.assertEqual(model.graph.input[0].name, "x")
+        self.assertEqual(len(model.graph.output), 1)
+        self.assertEqual(model.graph.output[0].name, "output_0")
+
+    def test_demo_mlp_model_initializers(self):
+        from yobx.doc import demo_mlp_model
+
+        model = demo_mlp_model("")
+        self.assertEqual(len(model.graph.initializer), 4)
+
+
+@skipif_ci_windows("too long")
+@skipif_ci_apple("too long")
+@requires_matplotlib()
+class TestDocPlotText(ExtTestCase):
+    @classmethod
+    def setUp(cls):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        cls.plt = plt
+
+    def test_plot_text_returns_axes(self):
+        import matplotlib.axes
+        from yobx.doc import plot_text
+
+        ax = plot_text("line one\nline two")
+        self.assertIsInstance(ax, matplotlib.axes.Axes)
+        self.plt.close("all")
+
+    def test_plot_text_uses_provided_axes(self):
+        from yobx.doc import plot_text
+
+        _fig, ax = self.plt.subplots()
+        result = plot_text("hello", ax=ax)
+        self.assertIs(result, ax)
+        self.plt.close("all")
+
+    def test_plot_text_sets_title(self):
+        from yobx.doc import plot_text
+
+        ax = plot_text("content", title="My Title")
+        # plot_text calls ax.set_title(..., loc="left"), so the title text
+        # lives in ax._left_title rather than the default centre title.
+        self.assertEqual("My Title", ax._left_title.get_text())
+        self.plt.close("all")
+
+    def test_plot_text_with_line_color_map(self):
+        import matplotlib.axes
+        from yobx.doc import plot_text
+
+        ax = plot_text(
+            "+added\n-removed\n neutral",
+            line_color_map={"+": "green", "-": "red"},
+        )
+        self.assertIsInstance(ax, matplotlib.axes.Axes)
+        self.plt.close("all")
+
+    def test_plot_text_custom_figsize(self):
+        import matplotlib.axes
+        from yobx.doc import plot_text
+
+        ax = plot_text("text", figsize=(8, 4))
+        self.assertIsInstance(ax, matplotlib.axes.Axes)
+        self.plt.close("all")
+
+    def test_plot_text_empty_string(self):
+        import matplotlib.axes
+        from yobx.doc import plot_text
+
+        ax = plot_text("")
+        self.assertIsInstance(ax, matplotlib.axes.Axes)
+        self.plt.close("all")
+
+
+@skipif_ci_windows("too long")
+@skipif_ci_apple("too long")
+@requires_matplotlib()
+class TestDocPlotDot(ExtTestCase):
+    @classmethod
+    def setUp(cls):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        cls.plt = plt
+
+    def _write_fake_png(self, path):
+        """Write a minimal valid PNG to *path* so PIL can open it."""
+        from PIL import Image
+
+        Image.fromarray(np.zeros((4, 4, 3), dtype=np.uint8)).save(path)
+
+    def test_plot_dot_returns_axes_from_model_proto(self):
+        import matplotlib.axes
+        from yobx.doc import demo_mlp_model, plot_dot
+
+        model = demo_mlp_model("")
+        with patch(
+            "yobx.doc.draw_graph_graphviz",
+            side_effect=lambda dot, path, engine="dot": self._write_fake_png(path),
+        ):
+            ax = plot_dot(model)
+        self.assertIsInstance(ax, matplotlib.axes.Axes)
+        self.plt.close("all")
+
+    def test_plot_dot_uses_provided_axes(self):
+        from yobx.doc import demo_mlp_model, plot_dot
+
+        model = demo_mlp_model("")
+        _fig, ax = self.plt.subplots()
+        with patch(
+            "yobx.doc.draw_graph_graphviz",
+            side_effect=lambda dot, path, engine="dot": self._write_fake_png(path),
+        ):
+            result = plot_dot(model, ax=ax)
+        self.assertIs(result, ax)
+        self.plt.close("all")
+
+    def test_plot_dot_accepts_dot_string(self):
+        import matplotlib.axes
+        from yobx.doc import plot_dot
+
+        dot_str = "digraph { a -> b }"
+        with patch(
+            "yobx.doc.draw_graph_graphviz",
+            side_effect=lambda dot, path, engine="dot": self._write_fake_png(path),
+        ):
+            ax = plot_dot(dot_str)
+        self.assertIsInstance(ax, matplotlib.axes.Axes)
+        self.plt.close("all")
 
 
 if __name__ == "__main__":
