@@ -609,6 +609,115 @@ class TestSklearnDecisionTree(ExtTestCase):
             dt.predict(X).astype(np.float64).reshape(-1, 1), predictions, atol=1e-5
         )
 
+    # ------------------------------------------------------------------ #
+    # Random tensor discrepancy tests                                      #
+    # ------------------------------------------------------------------ #
+
+    def test_decision_tree_classifier_random_float32(self):
+        """DecisionTreeClassifier: no discrepancy on real random float32 tensors."""
+        rng = np.random.default_rng(0)
+        X_train = rng.standard_normal((100, 5)).astype(np.float32)
+        y_train = (X_train[:, 0] + X_train[:, 1] > 0).astype(int)
+        X_test = rng.standard_normal((50, 5)).astype(np.float32)
+
+        dt = DecisionTreeClassifier(max_depth=5, random_state=0)
+        dt.fit(X_train, y_train)
+
+        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+            onx = to_onnx(dt, (X_train,), **opset_kw)
+
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": X_test})
+            label, proba = results[0], results[1]
+
+            self.assertEqualArray(dt.predict(X_test), label)
+            self.assertEqualArray(
+                dt.predict_proba(X_test).astype(np.float32), proba, atol=1e-5
+            )
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": X_test})
+            self.assertEqualArray(dt.predict(X_test), ort_results[0])
+            self.assertEqualArray(
+                dt.predict_proba(X_test).astype(np.float32), ort_results[1], atol=1e-5
+            )
+
+    def test_decision_tree_classifier_random_float64(self):
+        """DecisionTreeClassifier: no discrepancy on real random float64 tensors."""
+        rng = np.random.default_rng(1)
+        X_train = rng.standard_normal((100, 5))
+        y_train = (X_train[:, 0] + X_train[:, 1] > 0).astype(int)
+        X_test = rng.standard_normal((50, 5))
+
+        dt = DecisionTreeClassifier(max_depth=5, random_state=0)
+        dt.fit(X_train, y_train)
+
+        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+            onx = to_onnx(dt, (X_train,), **opset_kw)
+
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": X_test})
+            label, proba = results[0], results[1]
+
+            expected_proba_raw = dt.predict_proba(X_test)
+            self.assertEqualArray(dt.predict(X_test), label)
+            self.assertEqualArray(expected_proba_raw.astype(proba.dtype), proba, atol=1e-5)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": X_test})
+            self.assertEqualArray(dt.predict(X_test), ort_results[0])
+            self.assertEqualArray(
+                expected_proba_raw.astype(ort_results[1].dtype), ort_results[1], atol=1e-5
+            )
+
+    def test_decision_tree_regressor_random_float32(self):
+        """DecisionTreeRegressor: no discrepancy on real random float32 tensors."""
+        rng = np.random.default_rng(2)
+        X_train = rng.standard_normal((100, 5)).astype(np.float32)
+        y_train = (X_train[:, 0] * 2 + X_train[:, 1]).astype(np.float32)
+        X_test = rng.standard_normal((50, 5)).astype(np.float32)
+
+        dt = DecisionTreeRegressor(max_depth=5, random_state=0)
+        dt.fit(X_train, y_train)
+
+        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+            onx = to_onnx(dt, (X_train,), **opset_kw)
+
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": X_test})
+            predictions = results[0]
+
+            expected = dt.predict(X_test).astype(np.float32).reshape(-1, 1)
+            self.assertEqualArray(expected, predictions, atol=1e-5)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": X_test})
+            self.assertEqualArray(expected, ort_results[0], atol=1e-5)
+
+    def test_decision_tree_regressor_random_float64(self):
+        """DecisionTreeRegressor: no discrepancy on real random float64 tensors."""
+        rng = np.random.default_rng(3)
+        X_train = rng.standard_normal((100, 5))
+        y_train = X_train[:, 0] * 2 + X_train[:, 1]
+        X_test = rng.standard_normal((50, 5))
+
+        dt = DecisionTreeRegressor(max_depth=5, random_state=0)
+        dt.fit(X_train, y_train)
+
+        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+            onx = to_onnx(dt, (X_train,), **opset_kw)
+
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": X_test})
+            predictions = results[0]
+
+            expected = dt.predict(X_test).reshape(-1, 1)
+            self.assertEqualArray(expected, predictions, atol=1e-5)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": X_test})
+            self.assertEqualArray(expected, ort_results[0], atol=1e-5)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
