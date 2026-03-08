@@ -5,6 +5,11 @@ import unittest
 from unittest.mock import patch
 import numpy as np
 import onnx
+try:
+    import matplotlib.axes
+    from PIL import Image
+except ImportError:
+    pass
 from yobx.ext_test_case import (
     ExtTestCase,
     requires_matplotlib,
@@ -32,8 +37,6 @@ class TestDocMatplotlib(ExtTestCase):
         self.assertEqual(sys.platform, "linux")
 
         ax = plot_legend("TEST")
-        import matplotlib.axes
-
         self.assertIsInstance(ax, matplotlib.axes.Axes)
         self.plt.close("all")
 
@@ -41,8 +44,6 @@ class TestDocMatplotlib(ExtTestCase):
         from yobx.doc import plot_legend
 
         ax = plot_legend("LABEL", text_bottom="bottom text", color="blue", fontsize=12)
-        import matplotlib.axes
-
         self.assertIsInstance(ax, matplotlib.axes.Axes)
         self.plt.close("all")
 
@@ -97,8 +98,6 @@ class TestDocMatplotlib(ExtTestCase):
 
         data = np.random.default_rng(0).standard_normal(100)
         ax = plot_histogram(data)
-        import matplotlib.axes
-
         self.assertIsInstance(ax, matplotlib.axes.Axes)
         self.plt.close("all")
 
@@ -236,8 +235,6 @@ class TestDocPlotText(ExtTestCase):
     def test_plot_text_returns_axes(self):
         from yobx.doc import plot_text
 
-        import matplotlib.axes
-
         ax = plot_text("line one\nline two")
         self.assertIsInstance(ax, matplotlib.axes.Axes)
         self.plt.close("all")
@@ -262,8 +259,6 @@ class TestDocPlotText(ExtTestCase):
     def test_plot_text_with_line_color_map(self):
         from yobx.doc import plot_text
 
-        import matplotlib.axes
-
         ax = plot_text(
             "+added\n-removed\n neutral",
             line_color_map={"+": "green", "-": "red"},
@@ -274,16 +269,12 @@ class TestDocPlotText(ExtTestCase):
     def test_plot_text_custom_figsize(self):
         from yobx.doc import plot_text
 
-        import matplotlib.axes
-
         ax = plot_text("text", figsize=(8, 4))
         self.assertIsInstance(ax, matplotlib.axes.Axes)
         self.plt.close("all")
 
     def test_plot_text_empty_string(self):
         from yobx.doc import plot_text
-
-        import matplotlib.axes
 
         ax = plot_text("")
         self.assertIsInstance(ax, matplotlib.axes.Axes)
@@ -305,14 +296,10 @@ class TestDocPlotDot(ExtTestCase):
 
     def _write_fake_png(self, path):
         """Write a minimal valid PNG to *path* so PIL can open it."""
-        from PIL import Image
-
         Image.fromarray(np.zeros((4, 4, 3), dtype=np.uint8)).save(path)
 
     def test_plot_dot_returns_axes_from_model_proto(self):
         from yobx.doc import demo_mlp_model, plot_dot
-
-        import matplotlib.axes
 
         model = demo_mlp_model("")
         with patch(
@@ -338,8 +325,6 @@ class TestDocPlotDot(ExtTestCase):
 
     def test_plot_dot_accepts_dot_string(self):
         from yobx.doc import plot_dot
-
-        import matplotlib.axes
 
         dot_str = "digraph { a -> b }"
         with patch(
