@@ -434,6 +434,12 @@ def sklearn_hgb_regressor(
     if not need_cast:
         return raw
 
+    # TreeEnsembleRegressor / TreeEnsemble always outputs float32 per the ONNX ML
+    # spec, but the graph builder may infer the intermediate type as double
+    # (inheriting from the double input).  We must correct that inference before
+    # adding the Cast so that the CastPattern optimiser does not remove it.
+    # There is intentionally no public "force_set_type" API on GraphBuilder, so we
+    # update the internal map directly.
     g._known_types[raw] = onnx.TensorProto.FLOAT  # type: ignore[attr-defined]
     cast_result = g.make_node(
         "Cast",
@@ -512,9 +518,10 @@ def sklearn_hgb_classifier(
     # reference evaluator propagates the input dtype.  Cast explicitly to
     # float32 before applying sigmoid/softmax so that the constant "1"
     # and the probability output are always float32.
+    # There is intentionally no public "force_set_type" API on GraphBuilder, so we
+    # update the internal map directly when correcting the inferred type.
     itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
     if itype == onnx.TensorProto.DOUBLE:
-        raw_f32_name = g.unique_name(f"{name}_raw_f32")
         g._known_types[raw] = onnx.TensorProto.DOUBLE  # type: ignore[attr-defined]
         raw_f32 = g.op.Cast(
             raw, to=onnx.TensorProto.FLOAT, name=f"{name}_cast_f32"
