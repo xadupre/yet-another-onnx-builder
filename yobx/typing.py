@@ -140,8 +140,9 @@ class GraphBuilderProtocol(Protocol):
 
         :param name: tensor name
         :param elem_type: ONNX element type (e.g. ``TensorProto.FLOAT``)
-        :param shape: tensor shape; use ``None`` for unknown dimensions and
-            a ``str`` for symbolic / dynamic dimensions
+        :param shape: tensor shape; use a ``str`` for symbolic or unknown
+            dimensions (e.g. ``"batch"`` or ``"?"``), and an ``int`` for
+            fixed-size dimensions
         :param device: device identifier (optional, may be ignored by some backends)
         :return: the registered name (same as *name*)
         """
