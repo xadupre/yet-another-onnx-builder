@@ -26,7 +26,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -e ".[dev,sklearn]"
+        run: pip install -e ".[dev,sklearn,xgboost]"
 
       - name: Install scikit-learn==${{ matrix.sklearn-version }}
         run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*" && pip freeze
@@ -68,36 +68,3 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: sklearn
-
-  xgboost_tests:
-    name: xgboost (ubuntu-latest, py3.12, xgboost-${{ matrix.xgboost-version }})
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        xgboost-version: ["2.1", "3.0"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: pip install -e ".[dev,xgboost]"
-
-      - name: Install xgboost==${{ matrix.xgboost-version }}
-        run: pip install "xgboost==${{ matrix.xgboost-version }}.*" && pip freeze
-
-      - name: Run xgboost tests
-        run: |
-            pytest --cov=yobx --cov-report=xml --durations=10 \
-              unittests/sklearn/xgboost
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: xgboost

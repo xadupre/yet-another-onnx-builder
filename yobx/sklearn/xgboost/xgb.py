@@ -61,9 +61,7 @@ def _collect_nodes(node: dict, nodes_dict: dict) -> None:
         _collect_nodes(child, nodes_dict)
 
 
-def _parse_feature_idx(
-    split_name: str, feature_name_to_idx: Optional[dict] = None
-) -> int:
+def _parse_feature_idx(split_name: str, feature_name_to_idx: Optional[dict] = None) -> int:
     """Return the 0-based integer index for an XGBoost feature name.
 
     When no feature names were supplied to XGBoost during training, the JSON
@@ -226,9 +224,7 @@ def _build_xgb_tree_attrs_v5(
     """
     if dtype is None:
         dtype = np.float32
-    onnx_float_type = (
-        onnx.TensorProto.DOUBLE if dtype == np.float64 else onnx.TensorProto.FLOAT
-    )
+    onnx_float_type = onnx.TensorProto.DOUBLE if dtype == np.float64 else onnx.TensorProto.FLOAT
 
     all_nodes_featureids: List[int] = []
     all_nodes_splits: List[float] = []
@@ -287,9 +283,7 @@ def _build_xgb_tree_attrs_v5(
                 # True branch → yes child (x < threshold)
                 yes_is_leaf = "leaf" in nodes[yes_id]
                 if yes_is_leaf:
-                    all_nodes_truenodeids.append(
-                        cumulative_leaf_offset + leaf_idx[yes_id]
-                    )
+                    all_nodes_truenodeids.append(cumulative_leaf_offset + leaf_idx[yes_id])
                     all_nodes_trueleafs.append(1)
                 else:
                     all_nodes_truenodeids.append(
@@ -300,9 +294,7 @@ def _build_xgb_tree_attrs_v5(
                 # False branch → no child (x >= threshold)
                 no_is_leaf = "leaf" in nodes[no_id]
                 if no_is_leaf:
-                    all_nodes_falsenodeids.append(
-                        cumulative_leaf_offset + leaf_idx[no_id]
-                    )
+                    all_nodes_falsenodeids.append(cumulative_leaf_offset + leaf_idx[no_id])
                     all_nodes_falseleafs.append(1)
                 else:
                     all_nodes_falsenodeids.append(
@@ -532,9 +524,7 @@ def sklearn_xgb_classifier(
 
     trees_json = [json.loads(t) for t in booster.get_dump(dump_format="json")]
     feature_names = booster.feature_names
-    feature_name_to_idx = (
-        {fn: i for i, fn in enumerate(feature_names)} if feature_names else None
-    )
+    feature_name_to_idx = {fn: i for i, fn in enumerate(feature_names)} if feature_names else None
 
     n_targets = 1 if is_binary else n_classes
 
@@ -571,21 +561,15 @@ def sklearn_xgb_classifier(
 
         # Label via ArgMax → [N]
         label_idx = g.op.ArgMax(proba, axis=1, keepdims=0, name=f"{name}_argmax")
-        label_idx_i64 = g.op.Cast(
-            label_idx, to=onnx.TensorProto.INT64, name=f"{name}_cast"
-        )
+        label_idx_i64 = g.op.Cast(label_idx, to=onnx.TensorProto.INT64, name=f"{name}_cast")
     else:
         # Multi-class: softmax → [N, n_classes]
-        proba = g.op.Softmax(
-            raw_scores, axis=1, name=f"{name}_softmax", outputs=outputs[1:]
-        )
+        proba = g.op.Softmax(raw_scores, axis=1, name=f"{name}_softmax", outputs=outputs[1:])
         assert isinstance(proba, str)
 
         # Label via ArgMax → [N]
         label_idx = g.op.ArgMax(proba, axis=1, keepdims=0, name=f"{name}_argmax")
-        label_idx_i64 = g.op.Cast(
-            label_idx, to=onnx.TensorProto.INT64, name=f"{name}_cast"
-        )
+        label_idx_i64 = g.op.Cast(label_idx, to=onnx.TensorProto.INT64, name=f"{name}_cast")
 
     label = _gather_labels(g, label_idx_i64, classes, name, outputs[0])
     return label, proba
@@ -626,9 +610,7 @@ def sklearn_xgb_regressor(
 
     trees_json = [json.loads(t) for t in booster.get_dump(dump_format="json")]
     feature_names = booster.feature_names
-    feature_name_to_idx = (
-        {fn: i for i, fn in enumerate(feature_names)} if feature_names else None
-    )
+    feature_name_to_idx = {fn: i for i, fn in enumerate(feature_names)} if feature_names else None
 
     # Detect float64 input: TreeEnsembleRegressor/TreeEnsemble always outputs
     # float32 per the ONNX ML spec, so we may need to cast back to float64.
