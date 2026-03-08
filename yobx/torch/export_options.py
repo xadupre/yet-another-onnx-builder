@@ -5,6 +5,7 @@ import torch
 from ..helpers import max_diff, string_diff, string_type
 from ..helpers.helper import string_sig, get_sig_kwargs
 from .torch_helper import torch_deepcopy
+from .input_observer import InputCandidate
 
 # Type alias for torch operator overload
 # (forward reference avoids importing torch at module level)
@@ -285,15 +286,21 @@ class ExportOptions:
         }
         if prefer_deferred_runtime_asserts_over_guards:
             export_kwargs["prefer_deferred_runtime_asserts_over_guards"] = True
+        if backed_size_oblivious == "auto":
+            cand = InputCandidate(args, kwargs, clone=False, cst_kwargs={})
+            backed_size_oblivious = cand.needs_back_size_backed_size_oblivious(dynamic_shapes)
         if backed_size_oblivious is True:
             with torch.fx.experimental._config.patch(backed_size_oblivious=True):  # type: ignore[attr-defined]
-                return torch.export.export(
+                ep = torch.export.export(
                     mod,
                     args or (),
                     kwargs=kwargs or {},
                     dynamic_shapes=dyn_shapes,
                     **export_kwargs,
                 )
+                ep._computed_backed_size_oblivious = True
+                return ep
+        assert backed_size_oblivious is False, f"{backed_size_oblivious=}, unexpected"
         return torch.export.export(
             mod,
             args or (),

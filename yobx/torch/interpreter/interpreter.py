@@ -1925,7 +1925,7 @@ class DynamoInterpreter:
                                 f"\n         res={res!r}\n"
                                 f"node.name={node.name!r}"
                             )
-            elif isinstance(res, list) and len(res) != 1:
+            elif isinstance(res, tuple) and len(res) != 1:
                 # SplitToSequence rewritten into a Split
                 name = output_names[0]
                 assert all(s.startswith(name) for s in res), (
@@ -1936,7 +1936,7 @@ class DynamoInterpreter:
                 # nothing to do
                 res = tuple(res)
             elif (
-                isinstance(res, list)
+                isinstance(res, tuple)
                 and len(res) == 1
                 and str(getattr(node, "target", None))
                 in {"scan", "aten.split_with_sizes.default"}
@@ -1960,6 +1960,13 @@ class DynamoInterpreter:
                 )
                 self.builder.make_node("Identity", [res], [node.name], name="_check_output_name")
                 res = node.name
+            else:
+                assert isinstance(res, str), (
+                    f"Unexpected res={res}, output_names={output_names}, "
+                    f"node.name={node.name}, target={getattr(node, 'target', '?')!r}, "
+                    f"target(str)={str(getattr(node, 'target', None))!r}"
+                    f"{self.builder.get_debug_msg()}"
+                )
         else:
             raise NotImplementedError(
                 f"Unexpected type {type(node.name)} for node.name={node.name!r}."

@@ -143,6 +143,50 @@ class InputCandidate:
         self.aligned_spec: pytree.PyTreeSpec | None = None
         self.aligned_flat_list: list[torch.Tensor | None] | None = None
 
+    @classmethod
+    def _flatten_nested_object(cls, dynamic_shapes: Any) -> list[dict[int, int | str | None]]:
+        if dynamic_shapes is None or (
+            isinstance(dynamic_shapes, dict) and all(isinstance(k, int) for k in dynamic_shapes)
+        ):
+            return [dynamic_shapes]
+        if isinstance(dynamic_shapes, (tuple, list)):
+            res = []
+            for v in dynamic_shapes:
+                res.extend(cls._flatten_nested_object(v))
+            return dynamic_shapes.__class__(res)
+        if isinstance(dynamic_shapes, dict):
+            res = []
+            for v in dynamic_shapes.values():
+                res.extend(cls._flatten_nested_object(v))
+            return dynamic_shapes.__class__(res)
+        raise TypeError(f"Unexpected type {type(dynamic_shapes)} in {dynamic_shapes=}.")
+
+    def needs_back_size_backed_size_oblivious(self, dynamic_shapes: Any) -> bool:
+        """Tells if ``torch.fx.experimental._config.patch(backed_size_oblivious=True):``
+        should be use (a dynamic dimension is 1 in one of the tensor).
+        """
+        if not dynamic_shapes:
+            return False
+        flat_shapes = self._flatten_nested_object(dynamic_shapes)
+        if len(flat_shapes) > len(self.flat_list):
+            raise RuntimeError(
+                f"The flatten dyanmic shapes has not the same size ({len(flat_shapes)})"
+                f"than the flat list of tensors ({len(self.flat_list)})."
+            )
+        for shape, tensor in zip(flat_shapes, self.flat_list):
+            if not isinstance(tensor, torch.Tensor):
+                continue
+            for k, v in shape.items():
+                if k < 0 or k >= tensor.ndim:
+                    raise RuntimeError(
+                        f"Dimension {k} is outside the boundary "
+                        f"for a tensor of rank {tensor.ndim}."
+                    )
+                if isinstance(v, str) or v in (torch.export.Dim.AUTO, torch.export.Dim.DYNAMIC):
+                    if tensor.shape[k] == 1:
+                        return True
+        return False
+
     def remove_inputs(self, input_names: Sequence[str | int]):
         """Removes inputs."""
         # Work on a mutable copy of positional arguments.

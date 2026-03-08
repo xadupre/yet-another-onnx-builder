@@ -6367,7 +6367,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         update[n2].add(n1)
                     k2 = rename_expression(k, {n1: n2})
                     vv2 = rename_expression(vv, {n2: n1})
-                    assert k != k2 or vv != vv2, f"{k=}, {k2=}, {vv=}, {vv2=}"
+                    assert (
+                        k != k2 or vv != vv2
+                    ), f"{k=}, {k2=}, {vv=}, {vv2=}, {n1=}, {n2=}, {self.constraints_=}"
                     eq = {k, k2, vv, vv2}
                     for e in eq:
                         if e not in update:

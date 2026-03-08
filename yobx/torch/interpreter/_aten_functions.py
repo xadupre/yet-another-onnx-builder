@@ -7642,7 +7642,7 @@ def aten_meshgrid(
                 g.get_shape(o, shape)
     if len(expanded) == 1:
         return expanded[0]
-    return expanded
+    return tuple(expanded)
 
 
 def aten_meshgrid_indexing(
@@ -8753,7 +8753,7 @@ def aten_nonzero_numpy(
             g.set_type(spl, TensorProto.INT64)
             g.op.Reshape(spl, g.MINUS_ONE, name=name, outputs=[out])
             g.set_type(out, TensorProto.INT64)
-        return new_names
+        return tuple(new_names)
 
     new_names = [f"{outputs[0]}#0"]
     res = g.op.Reshape(nz, g.MINUS_ONE, name=name, outputs=new_names)
@@ -11496,7 +11496,7 @@ def aten_split_with_sizes(
                 dt = g.get_rank(x)
                 for o in outputs:
                     g.set_type(o, dt)
-        return outputs
+        return tuple(outputs)
 
     assert isinstance(split_sizes, list) and all_int(split_sizes), (
         f"Not implemented when split_sizes ({split_sizes}) is a constant, "
