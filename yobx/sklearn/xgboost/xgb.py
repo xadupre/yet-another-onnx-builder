@@ -4,8 +4,9 @@ ONNX converters for :class:`xgboost.XGBClassifier` and
 
 The trees are extracted from the fitted booster via
 ``booster.get_dump(dump_format='json')`` and encoded using the ONNX ML
-``TreeEnsembleRegressor`` operator (legacy ``ai.onnx.ml`` opset ≤ 4) or the
-unified ``TreeEnsemble`` operator (``ai.onnx.ml`` opset ≥ 5).
+``TreeEnsembleClassifier`` / ``TreeEnsembleRegressor`` operators (legacy
+``ai.onnx.ml`` opset ≤ 4) or the unified ``TreeEnsemble`` operator
+(``ai.onnx.ml`` opset ≥ 5).
 
 * **Binary classification** — the raw per-sample margin is passed through
   a sigmoid function and assembled into a ``[N, 2]`` probability matrix.
@@ -14,7 +15,7 @@ unified ``TreeEnsemble`` operator (``ai.onnx.ml`` opset ≥ 5).
 * **Regression** — raw margin output with the XGBoost ``base_score`` bias
   added as a constant.
 
-The conversion supports XGBoost 2.x and treats the stored ``base_score``
+The conversion supports XGBoost 2.x and 3.x and treats the stored ``base_score``
 configuration value as the untransformed prediction-space value:
 
 * Binary/logistic objectives: ``margin_bias = logit(base_score)``
@@ -25,10 +26,8 @@ configuration value as the untransformed prediction-space value:
 XGBoost's tree-branching condition *"go to yes-child when
 x < split_condition"* maps to:
 
-* ``BRANCH_LT`` (mode 1) for ``ai.onnx.ml`` opset ≥ 5 — exact match.
-* ``BRANCH_LEQ`` (mode 0 / string ``"BRANCH_LEQ"``) for older opsets —
-  differs only at the exact threshold value (rarely relevant for
-  floating-point features).
+* ``BRANCH_LT`` for both ``ai.onnx.ml`` opset ≤ 4 and opset ≥ 5 — exact
+  match.
 """
 
 import json
@@ -88,16 +87,21 @@ def _get_base_score(booster) -> float:
     """Return the raw (prediction-space) ``base_score`` from an XGBoost booster.
 
     The value is read from ``booster.save_config()`` which returns the stored
-    JSON configuration.  In XGBoost 2.x this is the untransformed
-    prediction-space value (e.g. ``0.5`` for the default binary classification
-    base score).  Falls back to ``0.5`` if the field cannot be read.
+    JSON configuration.  In XGBoost 2.x the value is a plain float string;
+    in XGBoost 3.x it may be a JSON array encoded as a string (e.g.
+    ``"[7.5205207E-1]"``).  Falls back to ``0.5`` if the field cannot be read.
 
     :param booster: fitted :class:`xgboost.Booster`
     :return: raw base score as a Python float
     """
     try:
         cfg = json.loads(booster.save_config())
-        return float(cfg["learner"]["learner_model_param"]["base_score"])
+        raw = cfg["learner"]["learner_model_param"]["base_score"]
+        # XGBoost 3.x serialises base_score as a JSON array string e.g. "[0.75]"
+        raw_stripped = raw.strip() if isinstance(raw, str) else str(raw)
+        if raw_stripped.startswith("[") and raw_stripped.endswith("]"):
+            raw_stripped = raw_stripped[1:-1].strip()
+        return float(raw_stripped)
     except Exception:
         return 0.5
 
@@ -106,16 +110,17 @@ def _build_xgb_tree_attrs_legacy(
     trees_json: List[dict],
     n_targets: int,
     feature_name_to_idx: Optional[dict] = None,
+    is_classifier: bool = False,
 ) -> dict:
-    """Build legacy ``TreeEnsembleRegressor`` attribute arrays from XGBoost trees.
+    """Build legacy ``TreeEnsembleRegressor`` / ``TreeEnsembleClassifier`` attribute arrays.
 
     All trees are encoded into a single flat set of arrays suitable for the
-    ``ai.onnx.ml ≤ 4`` ``TreeEnsembleRegressor`` operator.
+    ``ai.onnx.ml ≤ 4`` ``TreeEnsembleRegressor`` or ``TreeEnsembleClassifier``
+    operators.
 
     The branching direction maps XGBoost's *yes* child (``x < threshold``) to
-    the ONNX ``BRANCH_LEQ`` *true* branch (``x ≤ threshold``).  For
-    floating-point features this is equivalent except at the exact threshold
-    value.
+    the ONNX ``BRANCH_LT`` *true* branch (``x < threshold``), matching
+    XGBoost's exact semantics.
 
     Each tree is assigned ``target_id = tree_idx % n_targets`` so that for
     multi-class models (``n_targets = n_classes``) tree contributions are
@@ -127,7 +132,10 @@ def _build_xgb_tree_attrs_legacy(
     :param n_targets: number of output targets (1 for binary/regression,
         ``n_classes`` for multi-class)
     :param feature_name_to_idx: optional feature-name → index mapping
-    :return: flat attribute dict for ``TreeEnsembleRegressor``
+    :param is_classifier: when ``True`` the returned dict uses ``class_*``
+        attribute keys (for ``TreeEnsembleClassifier``) instead of the
+        ``target_*`` keys used by ``TreeEnsembleRegressor``
+    :return: flat attribute dict for the tree ensemble operator
     """
     all_featureids: List[int] = []
     all_values: List[float] = []
@@ -176,15 +184,36 @@ def _build_xgb_tree_attrs_legacy(
                 missing_id = int(node.get("missing", node["yes"]))
 
                 all_featureids.append(feat_idx)
-                all_values.append(float(node["split_condition"]))
+                # Round-trip through float32 so the stored threshold matches
+                # XGBoost's internal float32 precision.  This is critical for
+                # float64 inputs: both the feature value and threshold are
+                # float64 representations of float32 values, so rounding to
+                # float32 ensures identical branching to XGBoost (see also
+                # the equivalent fix in _build_xgb_tree_attrs_v5).
+                all_values.append(float(np.float32(node["split_condition"])))
                 # XGBoost: yes = x < threshold (BRANCH_LT semantics).
-                # Encoded as BRANCH_LEQ for legacy opset compatibility.
-                all_modes.append("BRANCH_LEQ")
+                all_modes.append("BRANCH_LT")
                 all_truenodeids.append(yes_id)
                 all_falsenodeids.append(no_id)
                 # 1 when NaN routes to the yes (true) branch, else 0.
                 all_mvt.append(1 if missing_id == yes_id else 0)
 
+    if is_classifier:
+        return dict(
+            nodes_featureids=all_featureids,
+            nodes_values=all_values,
+            nodes_modes=all_modes,
+            nodes_truenodeids=all_truenodeids,
+            nodes_falsenodeids=all_falsenodeids,
+            nodes_nodeids=all_nodeids,
+            nodes_treeids=all_treeids,
+            nodes_hitrates=all_hitrates,
+            nodes_missing_value_tracks_true=all_mvt,
+            class_nodeids=all_target_nodeids,
+            class_treeids=all_target_treeids,
+            class_ids=all_target_ids,
+            class_weights=all_target_weights,
+        )
     return dict(
         nodes_featureids=all_featureids,
         nodes_values=all_values,
@@ -277,7 +306,12 @@ def _build_xgb_tree_attrs_v5(
                 no_id = int(node["no"])
 
                 all_nodes_featureids.append(feat_idx)
-                all_nodes_splits.append(float(node["split_condition"]))
+                # XGBoost stores split conditions as float32 internally.
+                # The JSON may print fewer digits, so we round-trip through
+                # float32 to ensure the ONNX threshold matches XGBoost's
+                # internal value exactly (critical for float64 inputs where a
+                # feature value can equal the threshold after f32→f64 promotion).
+                all_nodes_splits.append(float(np.float32(node["split_condition"])))
                 all_nodes_modes.append(int(_NODE_MODE_LT))
 
                 # True branch → yes child (x < threshold)
@@ -384,8 +418,9 @@ def _emit_tree_node(
     ml_opset: int,
     dtype,
     intermediate_name: Optional[str] = None,
+    is_classifier: bool = False,
 ) -> str:
-    """Emit a ``TreeEnsembleRegressor`` / ``TreeEnsemble`` ONNX node.
+    """Emit a ``TreeEnsembleRegressor`` / ``TreeEnsembleClassifier`` / ``TreeEnsemble`` ONNX node.
 
     :param g: graph builder
     :param X: input tensor name
@@ -396,7 +431,10 @@ def _emit_tree_node(
     :param ml_opset: ``ai.onnx.ml`` opset version
     :param dtype: numpy float dtype for numeric attributes
     :param intermediate_name: if provided, use this as the output name;
-        otherwise let the builder choose
+        otherwise let the builder choose (only used for the regressor legacy path)
+    :param is_classifier: when ``True`` and ``ml_opset < 5``, emits a
+        ``TreeEnsembleClassifier`` node instead of ``TreeEnsembleRegressor``
+        and returns the scores (second output)
     :return: output tensor name (shape ``[N, n_targets]``)
     """
     out_arg = [intermediate_name] if intermediate_name else 1
@@ -418,6 +456,44 @@ def _emit_tree_node(
             aggregate_function=1,  # SUM
             **attrs,  # type: ignore
         )
+    elif is_classifier:
+        attrs = _build_xgb_tree_attrs_legacy(
+            trees_json,
+            n_targets=n_targets,
+            feature_name_to_idx=feature_name_to_idx,
+            is_classifier=True,
+        )
+        # The ONNX reference evaluator requires at least 2 class labels.
+        # For binary (n_targets=1) we declare [0, 1] so the output scores
+        # tensor has shape [N, 2]; column 0 carries all tree contributions
+        # (all class_ids are 0 for binary).  We then Gather column 0 to
+        # produce the expected [N, 1] raw-score output.
+        n_labels = max(n_targets, 2)
+        classlabels = list(range(n_labels))
+        # TreeEnsembleClassifier produces 2 outputs: [labels, scores].
+        # We want the raw scores (second output) for downstream sigmoid/softmax.
+        result = g.make_node(
+            "TreeEnsembleClassifier",
+            [X],
+            outputs=2,
+            domain="ai.onnx.ml",
+            name=f"{name}_tec",
+            post_transform="NONE",
+            classlabels_int64s=classlabels,
+            **attrs,  # type: ignore
+        )
+        # result is a tuple (label_out, scores_out); return scores
+        scores = result[1]
+        if n_targets == 1:
+            # Binary: when all class_ids share one value (0), both ORT and the
+            # ONNX reference evaluator treat this as a "binary" classification
+            # and return scores shaped [N, 2] where:
+            #   col 0 = 1 - raw_tree_sum   (ONNX binary complement)
+            #   col 1 = raw_tree_sum        (the margin we need)
+            # We extract col 1 to obtain the raw margin for downstream sigmoid.
+            col1 = np.array([1], dtype=np.int64)
+            return g.op.Gather(scores, col1, axis=1, name=f"{name}_tec_col1")
+        return scores
     else:
         attrs = _build_xgb_tree_attrs_legacy(
             trees_json,
@@ -537,22 +613,29 @@ def sklearn_xgb_classifier(
         feature_name_to_idx=feature_name_to_idx,
         ml_opset=ml_opset,
         dtype=dtype,
+        is_classifier=True,
     )
 
     classes = estimator.classes_
+
+    # TreeEnsembleClassifier (legacy opset ≤ 4) always outputs float32 regardless
+    # of the input dtype.  TreeEnsemble (opset ≥ 5) uses the leaf weight dtype, so
+    # its output is float64 when the input is float64.  Constants in the
+    # post-processing graph (bias, "ones") must match this actual output dtype.
+    post_dtype = dtype if ml_opset >= 5 else np.float32
 
     if is_binary:
         # Add margin-space bias from base_score (zero for default 0.5).
         bias = _compute_margin_bias(_get_base_score(booster), objective)
         if abs(bias) > 1e-8:
-            bias_arr = np.array([bias], dtype=np.float32)
+            bias_arr = np.array([bias], dtype=post_dtype)
             raw_scores = g.op.Add(raw_scores, bias_arr, name=f"{name}_bias")
 
         # sigmoid → [N, 1] probability of positive class
         p1 = g.op.Sigmoid(raw_scores, name=f"{name}_sigmoid")
 
         # p0 = 1 - p1 → [N, 1]
-        ones = np.array([1.0], dtype=np.float32)
+        ones = np.array([1.0], dtype=post_dtype)
         p0 = g.op.Sub(ones, p1, name=f"{name}_p0")
 
         # Concat [p0, p1] → [N, 2]
@@ -612,11 +695,17 @@ def sklearn_xgb_regressor(
     feature_names = booster.feature_names
     feature_name_to_idx = {fn: i for i, fn in enumerate(feature_names)} if feature_names else None
 
-    # Detect float64 input: TreeEnsembleRegressor/TreeEnsemble always outputs
-    # float32 per the ONNX ML spec, so we may need to cast back to float64.
     itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
     need_cast = itype == onnx.TensorProto.DOUBLE
-    tree_out_name = f"{outputs[0]}_tree_out" if need_cast else None
+
+    # For opset ≥ 5 with float64 leaf weights, TreeEnsemble natively outputs
+    # float64, so no extra Cast is required.  For legacy opset < 5, the ONNX
+    # spec declares float32 output, but runtimes may propagate float64 when the
+    # input is float64 (reference evaluator) or always output float32 (ORT).
+    # We normalise by inserting an explicit Cast(→float32) after the tree node
+    # so that both runtimes behave consistently before the bias is added.
+    v5_native_float64 = need_cast and ml_opset >= 5
+    tree_out_name = f"{outputs[0]}_tree_out" if need_cast and not v5_native_float64 else None
 
     raw_scores = _emit_tree_node(
         g,
@@ -630,19 +719,40 @@ def sklearn_xgb_regressor(
         intermediate_name=tree_out_name,
     )
 
+    if need_cast and not v5_native_float64:
+        # Normalise tree output to float32 for both ORT (float32 per spec) and
+        # reference evaluator (may return float64 for float64 input).
+        raw_scores = g.make_node(
+            "Cast",
+            [raw_scores],
+            outputs=1,
+            name=f"{name}_tree_to_f32",
+            to=onnx.TensorProto.FLOAT,
+        )
+
     # Add base_score bias (regression: base_score is in prediction space).
     base_score = _get_base_score(booster)
     bias = _compute_margin_bias(base_score, objective)
     if abs(bias) > 1e-8:
-        bias_arr = np.array([bias], dtype=np.float32)
+        # Bias dtype matches the current working dtype:
+        # - v5 float64: float64 tree → float64 bias
+        # - v3 float64: float32 (after normalization above) → float32 bias
+        # - float32: float32 bias
+        bias_arr = np.array([bias], dtype=dtype if v5_native_float64 else np.float32)
         raw_scores = g.op.Add(raw_scores, bias_arr, name=f"{name}_bias")
 
     if not need_cast:
         result = g.op.Identity(raw_scores, name=f"{name}_out", outputs=outputs)
         return result if isinstance(result, str) else result[0]
 
-    # Correct the inferred float64 type before the Cast so the CastPattern
-    # optimiser does not eliminate it.
+    if v5_native_float64:
+        # Tree ensemble already outputs float64; just write to the output.
+        result = g.op.Identity(raw_scores, name=f"{name}_out", outputs=outputs)
+        return result if isinstance(result, str) else result[0]
+
+    # Legacy (v3) float64 path: raw_scores is float32, cast to float64.
+    # Keep the type annotation as FLOAT so the CastPattern optimiser does not
+    # eliminate the Cast (it would see FLOAT→DOUBLE as a widening cast).
     g._known_types[raw_scores] = onnx.TensorProto.FLOAT  # type: ignore[attr-defined]
     cast_result = g.make_node(
         "Cast",

@@ -35,10 +35,9 @@ class TestXGBoostClassifier(ExtTestCase):
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertTrue(
-            any(t in op_types for t in ("TreeEnsembleRegressor", "TreeEnsemble")),
-            f"Expected a tree node, got {op_types}",
+            any(t in op_types for t in ("TreeEnsembleClassifier", "TreeEnsemble")),
+            f"Expected TreeEnsembleClassifier or TreeEnsemble, got {op_types}",
         )
-        self.assertIn("Sigmoid", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -70,8 +69,8 @@ class TestXGBoostClassifier(ExtTestCase):
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertTrue(
-            any(t in op_types for t in ("TreeEnsembleRegressor", "TreeEnsemble")),
-            f"Expected a tree node, got {op_types}",
+            any(t in op_types for t in ("TreeEnsembleClassifier", "TreeEnsemble")),
+            f"Expected TreeEnsembleClassifier or TreeEnsemble, got {op_types}",
         )
         self.assertIn("Softmax", op_types)
 
@@ -112,13 +111,16 @@ class TestXGBoostClassifier(ExtTestCase):
                         self.assertIn("TreeEnsemble", op_types)
                     else:
                         op_types = [n.op_type for n in onx.graph.node]
-                        self.assertIn("TreeEnsembleRegressor", op_types)
+                        self.assertIn("TreeEnsembleClassifier", op_types)
 
                     ref = ExtendedReferenceEvaluator(onx)
                     results = ref.run(None, {"X": X})
                     proba, label = results[1], results[0]
 
-                    expected_proba = clf.predict_proba(X32).astype(np.float32)
+                    # TreeEnsembleClassifier (opset ≤ 4) always outputs float32.
+                    # TreeEnsemble (opset ≥ 5) outputs dtype when leaf weights are float64.
+                    out_dtype = dtype if ml_opset >= 5 else np.float32
+                    expected_proba = clf.predict_proba(X32).astype(out_dtype)
                     expected_label = clf.predict(X32)
                     self.assertEqualArray(expected_proba, proba, atol=1e-5)
                     self.assertEqualArray(expected_label, label)
@@ -147,7 +149,8 @@ class TestXGBoostClassifier(ExtTestCase):
                     results = ref.run(None, {"X": X})
                     proba, label = results[1], results[0]
 
-                    expected_proba = clf.predict_proba(X32).astype(np.float32)
+                    out_dtype = dtype if ml_opset >= 5 else np.float32
+                    expected_proba = clf.predict_proba(X32).astype(out_dtype)
                     expected_label = clf.predict(X32)
                     self.assertEqualArray(expected_proba, proba, atol=1e-5)
                     self.assertEqualArray(expected_label, label)
@@ -242,7 +245,9 @@ class TestXGBoostRegressor(ExtTestCase):
                     results = ref.run(None, {"X": X})
                     predictions = results[0]
 
-                    expected = reg.predict(X32).astype(np.float32).reshape(-1, 1)
+                    # When input is float64 the tree node outputs float64, so the
+                    # ONNX model output is float64.  Cast the expected values to match.
+                    expected = reg.predict(X32).astype(np.float32).astype(dtype).reshape(-1, 1)
                     self.assertEqualArray(expected, predictions, atol=1e-4)
 
     def test_xgb_regressor_pipeline(self):
