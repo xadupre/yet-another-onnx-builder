@@ -1,5 +1,5 @@
-yobx.sklearn.enemble.random_forest
-==================================
+yobx.sklearn.ensemble.random_forest
+===================================
 
 .. automodule:: yobx.sklearn.ensemble.random_forest
     :members:
