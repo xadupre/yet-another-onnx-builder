@@ -55,7 +55,7 @@ jobs:
         run: pip install transformers==4.49
 
       - name: Install dependencies
-        run: pip install -e ".[dev,docs,sklearn,torch]"
+        run: pip install -e ".[dev,torch]"
 
       - name: pip freeze
         run: pip freeze

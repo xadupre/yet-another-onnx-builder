@@ -32,17 +32,14 @@ The workflow is:
 """
 
 # %%
-# Guard: skip this example if TensorFlow is not installed.
-try:
-    import tensorflow as tf
-except ImportError:
-    import sys
-
-    sys.exit(0)
-
+import tensorflow as tf
 import numpy as np
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.tensorflow import to_onnx
+
+# %%
+# Remove this line to run on GPU.
+tf.config.set_visible_devices([], "GPU")
 
 # %%
 # 1. Build a simple Dense layer

@@ -27,13 +27,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,tensorflow]"
 
-      - name: Install TensorFlow ${{ matrix.tensorflow-version }}
-        run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" && pip freeze
-
-      - name: Run sklearn tests with coverage
-        if: matrix.sklearn-version == '1.8'
+      - name: Run tensorflow tests with coverage
         run: |
             pytest --cov=yobx --cov-report=xml --durations=10 \
               --ignore=unittests/builder/oxs \

@@ -9,6 +9,7 @@ yobx.sklearn
     register
     sklearn_helper
     compose/index
+    ensemble/index
     linear_model/index
     multiclass/index
     neural_network/index

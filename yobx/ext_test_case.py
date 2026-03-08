@@ -741,6 +741,25 @@ def has_spox(version: str = "") -> bool:
     return pv.Version(spox.__version__) >= pv.Version(version)
 
 
+def has_tensorflow(version: str = "") -> bool:
+    """Returns ``True`` if :epkg:`tensorflow` is installed and recent enough."""
+    try:
+        import tensorflow
+    except (ImportError, AttributeError):
+        return False
+
+    if not version:
+        return True
+
+    if not hasattr(tensorflow, "__version__"):
+        # development version
+        return True
+
+    import packaging.version as pv
+
+    return pv.Version(tensorflow.__version__) >= pv.Version(version)
+
+
 def requires_onnxruntime(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not recent enough."""
     import packaging.version as pv

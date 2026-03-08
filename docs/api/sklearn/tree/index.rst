@@ -6,4 +6,3 @@ yobx.sklearn.tree
     :caption: modules
 
     decision_tree
-    random_forest

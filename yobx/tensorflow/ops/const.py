@@ -21,7 +21,7 @@ def convert_read_variable_op(
     variables, this converter simply maps the op's output tensor name to the
     same numpy array that was stored under the input (handle) tensor name.
     """
-    return g.op.Identity(sts[op.inputs[0].name], outputs=outputs, name=op.name)
+    return g.op.Identity(op.inputs[0].name, outputs=outputs, name=op.name)
 
 
 @register_tf_op_converter("Const")
@@ -48,7 +48,7 @@ def convert_identity(
     attach a name to an output).  We simply forward whatever value or ONNX name
     the input has to the output, so downstream converters can use it directly.
     """
-    return g.op.Identity(sts[op.inputs[0].name], outputs=outputs, name=op.name)
+    return g.op.Identity(op.inputs[0].name, outputs=outputs, name=op.name)
 
 
 @register_tf_op_converter("NoOp")

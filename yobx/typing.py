@@ -5,7 +5,6 @@ from typing import (
     List,
     Optional,
     Protocol,
-    Sequence,
     Tuple,
     Union,
     runtime_checkable,
@@ -107,19 +106,19 @@ class GraphBuilderProtocol(Protocol):
         """
         ...
 
-    def get_shape(self, name: str) -> Tuple[Union[int, str, None], ...]:
+    def get_shape(self, name: str) -> Tuple[Union[int, str], ...]:
         """Returns the shape of *name*.
 
         :param name: tensor name
         :return: shape as a tuple where each element is an ``int``,
-            a ``str`` (symbolic dimension), or ``None`` (unknown dimension)
+            a ``str`` (symbolic dimension)
         """
         ...
 
     def set_shape(
         self,
         name: str,
-        shape: Sequence[Optional[Union[int, str]]],
+        shape: Tuple[Union[int, str], ...],
         allow_zero: bool = False,
     ) -> None:
         """Sets the shape for *name*.
@@ -134,7 +133,7 @@ class GraphBuilderProtocol(Protocol):
         self,
         name: str,
         elem_type: Optional[int] = None,
-        shape: Optional[Sequence[Optional[Union[int, str]]]] = None,
+        shape: Optional[Tuple[Union[int, str], ...]] = None,
         device: Optional[int] = None,
     ) -> Union[str, List[str]]:
         """Declares a graph input and returns its name.
@@ -152,7 +151,7 @@ class GraphBuilderProtocol(Protocol):
         self,
         name: Union[str, List[str]],
         elem_type: Optional[int] = None,
-        shape: Optional[Sequence[Optional[Union[int, str]]]] = None,
+        shape: Optional[Tuple[Union[int, str], ...]] = None,
         indexed: bool = False,
         allow_untyped_output: bool = False,
     ) -> Union[str, List[str]]:
@@ -305,5 +304,14 @@ class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
             type is used
         :return: ``True`` when shape information was available and set,
             ``None``/falsy when it could not be determined
+        """
+        ...
+
+    def get_debug_msg(self) -> str:
+        """Returns any information useful to understand where an error
+        could come from. This message is expected to be part of any
+        exception raised while converting a model.
+
+        :return: information in a string
         """
         ...

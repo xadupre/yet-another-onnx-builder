@@ -3,14 +3,14 @@ import numpy as np
 import onnx
 from onnx import TensorProto
 from yobx.ext_test_case import ExtTestCase
-from yobx.builder.light import start, OnnxGraph, Var, Vars
+from yobx.builder.light import start, Var, Vars
 
 
 class TestVars(ExtTestCase):
     """Unit tests for the :class:`Vars` class."""
 
     # ------------------------------------------------------------------
-    # __init__ – construction paths
+    # __init__ - construction paths
     # ------------------------------------------------------------------
 
     def test_init_with_var_instances(self):
@@ -208,7 +208,7 @@ class TestVars(ExtTestCase):
     def test_vout_multiple(self):
         gr = start()
         x = gr.vin("X")
-        y = gr.vin("Y")
+        gr.vin("Y")
         # Build a TopK node that has two outputs
         vs_in = Vars(gr, x, gr.cst(np.array(2, dtype=np.int64), name="k"))
         topk_out = vs_in.TopK(axis=0)
@@ -401,16 +401,7 @@ class TestVars(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_full_model_add(self):
-        onx = (
-            start()
-            .vin("X")
-            .vin("Y")
-            .bring("X", "Y")
-            .Add()
-            .rename("Z")
-            .vout()
-            .to_onnx()
-        )
+        onx = start().vin("X").vin("Y").bring("X", "Y").Add().rename("Z").vout().to_onnx()
         self.assertIsInstance(onx, onnx.ModelProto)
         self.assertEqual(onx.graph.node[0].op_type, "Add")
         self.assertEqual(len(onx.graph.input), 2)
