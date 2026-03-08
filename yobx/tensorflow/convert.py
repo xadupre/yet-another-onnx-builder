@@ -114,7 +114,17 @@ def _convert_concrete_function(
     initializer_values: Dict[str, np.ndarray] = {}
     value_alias = {}
     forbidden = set()
-    for _captured_tensor, var in zip(cf.captured_inputs, cf.variables):
+    # Build a mapping from resource handle unique_id to variable for correct pairing.
+    # Using zip(cf.captured_inputs, cf.variables) is unreliable: cf.captured_inputs can
+    # include non-variable captures (e.g. training-phase flags) and the ordering of the
+    # two sequences is not guaranteed to match for multi-layer Keras models.  Instead we
+    # match each captured tensor to its variable by comparing handle unique IDs.
+    uid_to_var = {var.handle._unique_id: var for var in cf.variables}
+    for _captured_tensor in cf.captured_inputs:
+        var = uid_to_var.get(_captured_tensor._unique_id)
+        if var is None:
+            # Non-variable capture (e.g. a training-phase boolean); skip.
+            continue
         value = var.numpy()
         name = f"{var.name}[{_captured_tensor._unique_id}]"
         initializer_values[name] = value
