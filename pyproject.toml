@@ -153,6 +153,7 @@ module = [
     "yobx.helpers._excel_helper",
     "yobx.helpers.helper",
     "yobx.reference.ops.*",
+    "yobx.sklearn.ensemble.*",
     "yobx.sklearn.linear_model.*",
     "yobx.sklearn.multiclass.*",
     "yobx.sklearn.neural_network.*",

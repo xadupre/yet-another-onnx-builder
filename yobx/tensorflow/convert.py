@@ -134,7 +134,7 @@ def _convert_concrete_function(
         ), f"A unique id {_captured_tensor._unique_id!r} is not unique for var={var.name!r}"
         value_alias[_captured_tensor._unique_id] = name
 
-    handle_names: Dict[str, str] = {}
+    handle_names: Dict[str, Dict[str, str]] = {}
     for capture, var in cf.graph.captures:
         name = var.name
         assert name not in handle_names, f"Duplicated name={name!r} in {handle_names=}."
