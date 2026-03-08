@@ -5,6 +5,7 @@ yobx.torch
     :maxdepth: 1
     :caption: modules
 
+    export_helper
     export_options
     fake_tensor_helper
     flatten
@@ -16,6 +17,7 @@ yobx.torch
     tracing
     in_torch/index
     in_transformers/index
+    interpreter/index
 
 register_flattening_functions
 +++++++++++++++++++++++++++++
