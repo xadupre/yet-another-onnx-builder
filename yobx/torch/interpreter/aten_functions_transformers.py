@@ -22,7 +22,7 @@ registered_functions = _register()
 
 def find_function(name: Any) -> Optional[Callable]:
     if name in registered_functions:
-        return registered_functions[name], [name], []
+        return registered_functions[name], [name], []  # type: ignore
     if isinstance(name, str):
         return None, [name], []
 
@@ -32,7 +32,7 @@ def find_function(name: Any) -> Optional[Callable]:
         new_name = f"transformers_{name.__name__.replace('.', '_')}"
         lookup.append(new_name)
         if new_name in registered_functions:
-            return registered_functions[new_name], lookup, []
+            return registered_functions[new_name], lookup, []  # type: ignore
 
     lookup_names = ["__qualname__", "__name__"]
     for att in lookup_names:
@@ -40,6 +40,6 @@ def find_function(name: Any) -> Optional[Callable]:
             v = getattr(name, att).replace(".", "_").replace("::", "_")
             lookup.append(v)
             if v in registered_functions:
-                return registered_functions[v], lookup, lookup_names
+                return registered_functions[v], lookup, lookup_names  # type: ignore
 
     return None, lookup, lookup_names

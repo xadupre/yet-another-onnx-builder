@@ -26,7 +26,7 @@ class Dispatcher:
         "Returns the list supported dispateched names."
         return set(self.registered_functions)
 
-    def _get_function_name(self, name: Any) -> str:
+    def _get_function_name(self, name: Any) -> Union[str, type]:
         if isinstance(name, str):
             return name
 
@@ -39,12 +39,13 @@ class Dispatcher:
                 return new_name
 
         lookup_names = ["__qualname__", "__name__"]
+        v = None
         for att in lookup_names:
             if hasattr(name, att):
                 v = getattr(name, att).replace(".", "_")
                 if v in self.registered_functions:
                     return v
-
+        assert v, f"Unable to find a function for {name!r}"
         return str(v)
 
     def find_function(self, name: Any) -> Optional[Callable]:
@@ -224,7 +225,7 @@ class ForceDispatcher(Dispatcher):
         fct: Optional[Callable],
         args: List[Any],
         kwargs: Dict[str, Any],
-        builder: "GraphBuilder",  # noqa: F821
+        builder: "GraphBuilder",  # type: ignore # noqa: F821
     ) -> Optional[Callable]:
         """
         The function is called after the function converting an aten function

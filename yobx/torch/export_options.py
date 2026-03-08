@@ -117,7 +117,7 @@ class ExportOptions:
                 get_default_aten_as_function,
             )
 
-            aten_as_function = get_default_aten_as_function()
+            aten_as_function = get_default_aten_as_function()  # type: ignore
         self.aten_as_function = aten_as_function
 
         if strategy is not None:
@@ -463,7 +463,7 @@ class ExportOptions:
                 if verbose:
                     print(f"[ExportOptions.export] done, modified={modified}")
             if self.save_ep:
-                save_ep = self.save_ep[0] if isinstance(self.save, tuple) else self.save_ep
+                save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
                 with open(f"{save_ep}.tracing", "w") as f:
                     f.write(str(graph))
             gm = _make_graph_module(tracer.root, graph, mod.__class__.__name__)

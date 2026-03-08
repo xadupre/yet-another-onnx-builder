@@ -313,9 +313,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self.dynamic_dimensions_source_flat: Optional[List[Any]] = None
         self.output_dynamic_dimensions_source_flat: Optional[List[Any]] = None
         unique_names = set()
-        self.dynamic_shapes = self._pre_process_dynamic_shape(dynamic_shapes, unique_names)
+        self.dynamic_shapes = self._pre_process_dynamic_shape(dynamic_shapes, unique_names)  # type: ignore
         self.output_dynamic_shapes = self._pre_process_dynamic_shape(
-            output_dynamic_shapes, unique_names
+            output_dynamic_shapes, unique_names  # type: ignore
         )
         self.dynamic_objects: Dict[str, Any] = {}
         self.dynamic_objects_rev: Dict[str, Any] = {}

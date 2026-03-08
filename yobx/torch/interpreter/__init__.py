@@ -20,7 +20,7 @@ class TorchOpOverload:
     pass  # noqa: PIE790
 
 
-def make_undefined_dimension(i: int) -> "torch.SymInt":  # noqa: F821
+def make_undefined_dimension(i: int) -> "torch.SymInt":  # type: ignore # noqa: F821
     """
     Uses for a custom op when a new dimension must be introduced to bypass
     some verification. The following function creates a dummy output

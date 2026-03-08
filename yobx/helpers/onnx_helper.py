@@ -1573,7 +1573,9 @@ def type_info(itype: int, att: str):
     raise ValueError(f"Unexpected value {att!r}")
 
 
-def get_onnx_signature(model: onnx.ModelProto) -> Tuple[Tuple[str, Any], ...]:
+def get_onnx_signature(
+    model: onnx.ModelProto,
+) -> Tuple[Tuple[str, int, Tuple[Union[int, str], ...]], ...]:
     """
     Produces a tuple of tuples corresponding to the signatures.
 

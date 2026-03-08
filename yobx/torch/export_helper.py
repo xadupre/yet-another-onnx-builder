@@ -36,7 +36,7 @@ def torch_export(
     or not. It can be ``'auto'`` to let select automatically the best
     mode. It can be ``'half'`` to disable some non oblivious exceptions.
     """
-    export_kwargs = {}
+    export_kwargs: Dict[str, Any] = {}
     if prefer_deferred_runtime_asserts_over_guards:
         export_kwargs["prefer_deferred_runtime_asserts_over_guards"] = (
             prefer_deferred_runtime_asserts_over_guards
@@ -127,7 +127,7 @@ def torch_export(
                 isinstance(f, FakeTensor) for f in flatten_object([aags, kws], drop_keys=True)
             ):
                 try:
-                    cpl = CoupleInputsDynamicShapes(aags, kws, ds)
+                    cpl = CoupleInputsDynamicShapes(aags, kws, ds)  # type: ignore
                     backed_size_oblivious = cpl.invalid_dimensions_for_export()
                 except AssertionError as e:
                     from onnx_diagnostic.helpers import string_type
@@ -147,9 +147,9 @@ def torch_export(
             print(
                 f"[torch_export] export starts with backed_size_oblivious={backed_size_oblivious}"
             )
-        with torch.fx.experimental._config.patch(backed_size_oblivious=True):
+        with torch.fx.experimental._config.patch(backed_size_oblivious=True):  # type: ignore
             ep = torch.export.export(
-                mod, args, kwargs, dynamic_shapes=dynamic_shapes, strict=strict, **export_kwargs
+                mod, args, kwargs, dynamic_shapes=dynamic_shapes, strict=strict, **export_kwargs  # type: ignore
             )
         ep._computed_backed_size_oblivious = backed_size_oblivious
         return ep
@@ -158,16 +158,16 @@ def torch_export(
         print(f"[torch_export] export starts with backed_size_oblivious={backed_size_oblivious}")
     if strict:
         return torch.export.export(
-            mod, args, kwargs, dynamic_shapes=dynamic_shapes, strict=strict, **export_kwargs
+            mod, args, kwargs, dynamic_shapes=dynamic_shapes, strict=strict, **export_kwargs  # type: ignore
         )
     try:
         return torch.export.export(
-            mod, args, kwargs, dynamic_shapes=dynamic_shapes, strict=strict, **export_kwargs
+            mod, args, kwargs, dynamic_shapes=dynamic_shapes, strict=strict, **export_kwargs  # type: ignore
         )
     except RuntimeError as e:
         # This happens when tensor.data_ptr() is accessed.
         if "Cannot access data pointer of Tensor (e.g. FakeTensor, FunctionalTensor)" in str(e):
             return torch.export.export(
-                mod, args, kwargs, dynamic_shapes=dynamic_shapes, strict=True, **export_kwargs
+                mod, args, kwargs, dynamic_shapes=dynamic_shapes, strict=True, **export_kwargs  # type: ignore
             )
         raise

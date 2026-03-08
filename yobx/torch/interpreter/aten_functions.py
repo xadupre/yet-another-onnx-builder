@@ -45,9 +45,9 @@ def _register() -> Dict[str, Callable]:
                     raise RuntimeError(
                         f"Alias {c!r} for function {v} is already taken by {res[k]}."
                     )
-            res.update(options)
+            res.update(options)  # type: ignore
         else:
-            res[k] = v
+            res[k] = v  # type: ignore
     for k, v in _enumerate_prims_functions():
         other_key = "::".join(k.split("_", maxsplit=1))
         options = {k: v, other_key: v}
