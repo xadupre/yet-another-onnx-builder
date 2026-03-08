@@ -489,7 +489,6 @@ def sklearn_hgb_classifier(
     assert isinstance(estimator, HistGradientBoostingClassifier)
 
     classes = estimator.classes_
-    n_classes = len(classes)
     is_binary = estimator.n_trees_per_iteration_ == 1
 
     all_trees, target_ids, n_targets = _flatten_hgb_trees(estimator)
