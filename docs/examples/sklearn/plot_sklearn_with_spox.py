@@ -32,12 +32,12 @@ Covered in this example:
 
 import spox  # noqa: F401
 import numpy as np
+import onnxruntime
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from yobx.builder.spox import SpoxGraphBuilder
-from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
 
 # %%
@@ -87,13 +87,12 @@ print("Graph outputs:", [out.name for out in onx.graph.output])
 # 3. Run and verify — binary classification
 # ------------------------------------------
 #
-# We run the exported model with
-# :class:`~yobx.reference.ExtendedReferenceEvaluator` and check that
+# We run the exported model with :epkg:`onnxruntime` and check that
 # class labels and probabilities match scikit-learn's predictions.
 
 X_test = rng.standard_normal((20, 4)).astype(np.float32)
 
-ref = ExtendedReferenceEvaluator(onx)
+ref = onnxruntime.InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
 label_onnx, proba_onnx = ref.run(None, {"X": X_test})
 
 label_sk = pipe.predict(X_test)
@@ -128,7 +127,7 @@ pipe_mc.fit(X_mc, y_mc)
 X_test_mc = rng.standard_normal((30, 4)).astype(np.float32)
 onx_mc = to_onnx(pipe_mc, (X_test_mc[:1],), builder_cls=SpoxGraphBuilder)
 
-ref_mc = ExtendedReferenceEvaluator(onx_mc)
+ref_mc = onnxruntime.InferenceSession(onx_mc.SerializeToString(), providers=["CPUExecutionProvider"])
 label_mc_onnx, proba_mc_onnx = ref_mc.run(None, {"X": X_test_mc})
 
 label_mc_sk = pipe_mc.predict(X_test_mc)
@@ -162,7 +161,7 @@ print("\nDecisionTree node types:", [n.op_type for n in onx_dt.graph.node])
 print("Domains used:", list({n.domain for n in onx_dt.graph.node}))
 
 X_test_dt = rng.standard_normal((20, 4)).astype(np.float32)
-ref_dt = ExtendedReferenceEvaluator(onx_dt)
+ref_dt = onnxruntime.InferenceSession(onx_dt.SerializeToString(), providers=["CPUExecutionProvider"])
 label_dt_onnx, _ = ref_dt.run(None, {"X": X_test_dt})
 
 assert np.array_equal(dt.predict(X_test_dt), label_dt_onnx), "Decision tree mismatch!"

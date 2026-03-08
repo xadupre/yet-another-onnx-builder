@@ -74,12 +74,17 @@ class TestDocumentationExamples(ExtTestCase):
     @classmethod
     def add_test_methods(cls):
         this = os.path.abspath(os.path.dirname(__file__))
-        fold = os.path.normpath(os.path.join(this, "..", "..", "docs", "examples"))
-        found = os.listdir(fold)
+        root_fold = os.path.normpath(os.path.join(this, "..", "..", "docs", "examples"))
+        # Collect (fold, name) pairs from all subdirectories
+        found = []
+        for subdir in ("core", "sklearn", "torch", "tensorflow"):
+            fold = os.path.join(root_fold, subdir)
+            if os.path.isdir(fold):
+                for name in os.listdir(fold):
+                    if name.endswith(".py") and name.startswith("plot_"):
+                        found.append((fold, name))
         has_dot = int(os.environ.get("UNITTEST_DOT", "0"))
-        for name in found:
-            if not name.endswith(".py") or not name.startswith("plot_"):
-                continue
+        for fold, name in found:
             reason = None
 
             if (
@@ -127,14 +132,14 @@ class TestDocumentationExamples(ExtTestCase):
             if reason:
 
                 @unittest.skip(reason)
-                def _test_(self, name=name):
+                def _test_(self, fold=fold, name=name):
                     res = self.run_test(fold, name, verbose=VERBOSE)
                     self.assertTrue(res)
 
             else:
 
                 @ignore_errors(OSError)  # connectivity issues
-                def _test_(self, name=name):
+                def _test_(self, fold=fold, name=name):
                     res = self.run_test(fold, name, verbose=VERBOSE)
                     self.assertTrue(res)
 

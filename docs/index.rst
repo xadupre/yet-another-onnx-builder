@@ -39,7 +39,10 @@ It provides:
 
    design/index
    cmds/index
-   auto_examples/index
+   auto_examples_core/index
+   auto_examples_sklearn/index
+   auto_examples_torch/index
+   auto_examples_tensorflow/index
 
 .. toctree::
    :maxdepth: 2

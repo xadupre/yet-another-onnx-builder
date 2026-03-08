@@ -28,13 +28,13 @@ The module also provides two higher-level helpers built on top of
 """
 
 import numpy as np
+import onnxruntime
 import torch
 from yobx.helpers.mini_onnx_builder import (
     MiniOnnxBuilder,
     create_onnx_model_from_input_tensors,
     create_input_tensors_from_onnx_model,
 )
-from yobx.reference import ExtendedReferenceEvaluator
 
 # %%
 # 1. Store a single numpy array
@@ -47,7 +47,7 @@ weights = np.array([1.0, 2.0, 3.0], dtype=np.float32)
 builder.append_output_initializer("weights", weights)
 
 model = builder.to_onnx()
-ref = ExtendedReferenceEvaluator(model)
+ref = onnxruntime.InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
 (recovered,) = ref.run(None, {})
 
 print("original :", weights)
@@ -70,7 +70,7 @@ builder2.append_output_initializer("x_np", x_np)
 builder2.append_output_initializer("x_torch", x_torch.numpy())
 
 model2 = builder2.to_onnx()
-ref2 = ExtendedReferenceEvaluator(model2)
+ref2 = onnxruntime.InferenceSession(model2.SerializeToString(), providers=["CPUExecutionProvider"])
 got_np, got_torch = ref2.run(None, {})
 
 print("x_np   :", got_np)
@@ -91,7 +91,7 @@ seq = [np.array([10, 20], dtype=np.int64), np.array([30, 40], dtype=np.int64)]
 builder3.append_output_sequence("my_seq", seq)
 
 model3 = builder3.to_onnx()
-ref3 = ExtendedReferenceEvaluator(model3)
+ref3 = onnxruntime.InferenceSession(model3.SerializeToString(), providers=["CPUExecutionProvider"])
 (got_seq,) = ref3.run(None, {})
 
 print("sequence:", got_seq)
