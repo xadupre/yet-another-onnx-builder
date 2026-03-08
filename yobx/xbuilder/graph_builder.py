@@ -6356,7 +6356,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     if items[0][1] != -items[1][1]:
                         continue
                     # adds an equivalence
-                    n1, n2 = items[0][0], items[1][0]
+                    n1, n2 = items[0][0].replace(" ", ""), items[1][0].replace(" ", "")
                     if n1 not in update:
                         update[n1] = {n2}
                     else:
@@ -6369,7 +6369,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     vv2 = rename_expression(vv, {n2: n1})
                     assert (
                         k != k2 or vv != vv2
-                    ), f"{k=}, {k2=}, {vv=}, {vv2=}, {n1=}, {n2=}, {self.constraints_=}"
+                    ), f"{k=}, {k2=}, {vv=}, {vv2=}, {n1=}, {n2=}, {v=}, {self.constraints_=}"
                     eq = {k, k2, vv, vv2}
                     for e in eq:
                         if e not in update:

@@ -153,12 +153,12 @@ class InputCandidate:
             res = []
             for v in dynamic_shapes:
                 res.extend(cls._flatten_nested_object(v))
-            return dynamic_shapes.__class__(res)
+            return res
         if isinstance(dynamic_shapes, dict):
             res = []
             for v in dynamic_shapes.values():
                 res.extend(cls._flatten_nested_object(v))
-            return dynamic_shapes.__class__(res)
+            return res
         raise TypeError(f"Unexpected type {type(dynamic_shapes)} in {dynamic_shapes=}.")
 
     def needs_back_size_backed_size_oblivious(self, dynamic_shapes: Any) -> bool:

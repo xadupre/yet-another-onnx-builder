@@ -12,6 +12,23 @@ class TestRenameExpressions(ExtTestCase):
     def test_rename_expression2(self):
         self.assertEqual("B+seq_length", rename_expression("s52+seq_length", {"s52": "B"}))
 
+    def test_renae_expression_max(self):
+        cst = {
+            "A": "s77",
+            "s77": "A",
+            "B": "s27",
+            "s27": "B",
+            "D": "s3",
+            "s3": "D",
+            "E": "s10",
+            "s10": "E",
+            "E^D": "Max(s10,s3)",
+            "Max(s10,s3)": "E^D",
+        }
+        self.assertEqual("E^D", rename_expression("s10^s3", cst))
+        self.assertEqual("E^D", rename_expression("Max(s10,s3)", cst))
+        self.assertEqual("E^D", rename_dynamic_expression("Max(s10,s3)", cst))
+
     def test_rename_dynamic_dimension(self):
         constraints = {
             "batch": {"s0", "s12", "s14", "s10", "s8", "s2"},

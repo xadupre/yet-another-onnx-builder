@@ -1,6 +1,10 @@
 import ast
 from typing import Dict, Optional, Set
-from .simplify_expressions import SimpleSimpliflyTransformer, CommonTransformer
+from .simplify_expressions import (
+    SimpleSimpliflyTransformer,
+    MaxToXorTransformer,
+    CommonTransformer,
+)
 
 
 def parse_expression_tokens(expr: str) -> Set[str]:
@@ -33,7 +37,8 @@ class RenameTransformer(CommonTransformer):
 
     def visit_Name(self, node):
         if node.id in self.mapping:
-            return ast.copy_location(ast.Name(id=self.mapping[node.id], ctx=node.ctx), node)
+            t = ast.copy_location(ast.Name(id=self.mapping[node.id], ctx=node.ctx), node)
+            return t
         return node
 
 
@@ -50,7 +55,7 @@ def rename_expression(expr: str, mapping: Dict[str, str]) -> str:
     except TypeError as e:
         raise TypeError(f"Unable to parse expression {expr!r}.") from e
     transformer = RenameTransformer(mapping)
-    new_tree = transformer.visit(tree)
+    new_tree = transformer.visit(MaxToXorTransformer().visit(tree))
     ast.fix_missing_locations(new_tree)
     return ast.unparse(new_tree).replace(" ", "")
 
@@ -70,7 +75,7 @@ def rename_dynamic_expression(expression: str, replacements: Dict[str, str]):
         return expression
     transformer = RenameTransformer(replacements)
     simplify = SimpleSimpliflyTransformer()
-    new_tree = simplify.visit(transformer.visit(tree))
+    new_tree = simplify.visit(transformer.visit(MaxToXorTransformer().visit(tree)))
     res = ast.unparse(new_tree).replace(" ", "")
     return res
 
