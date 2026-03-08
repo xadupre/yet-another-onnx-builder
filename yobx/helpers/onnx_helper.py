@@ -1545,3 +1545,31 @@ def enumerate_nodes(graph: onnx.GraphProto) -> Iterator[onnx.NodeProto]:
             for att in node.attribute:
                 if att.type == onnx.AttributeProto.GRAPH:
                     yield from enumerate_nodes(att.g)
+
+
+def attr_proto_to_python(attr: onnx.AttributeProto) -> Any:
+    """
+    Converts an :class:`onnx.AttributeProto` to a plain Python value.
+
+    :param attr: attribute proto to convert
+    :return: Python value
+
+    Supported attribute types: FLOAT, INT, STRING, TENSOR, FLOATS, INTS, STRINGS.
+    Raises :exc:`NotImplementedError` for unsupported types.
+    """
+    t = attr.type
+    if t == onnx.AttributeProto.FLOAT:
+        return attr.f
+    if t == onnx.AttributeProto.INT:
+        return attr.i
+    if t == onnx.AttributeProto.STRING:
+        return attr.s.decode("utf-8") if isinstance(attr.s, bytes) else attr.s
+    if t == onnx.AttributeProto.TENSOR:
+        return onh.to_array(attr.t)
+    if t == onnx.AttributeProto.FLOATS:
+        return list(attr.floats)
+    if t == onnx.AttributeProto.INTS:
+        return list(attr.ints)
+    if t == onnx.AttributeProto.STRINGS:
+        return [s.decode("utf-8") if isinstance(s, bytes) else s for s in attr.strings]
+    raise NotImplementedError(f"Unsupported AttributeProto type: {t}")
