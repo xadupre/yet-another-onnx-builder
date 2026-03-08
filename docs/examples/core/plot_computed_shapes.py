@@ -24,9 +24,9 @@ works and a comparison table with :func:`onnx.shape_inference.infer_shapes`.
 
 import numpy as np
 import onnx
+import onnxruntime
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xshape import BasicShapeBuilder
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -134,7 +134,7 @@ feeds = {
     "Y": np.random.rand(2, 5, 8).astype(np.float32),
 }
 
-session = ExtendedReferenceEvaluator(model)
+session = onnxruntime.InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
 outputs = session.run(None, feeds)
 result = builder.compare_with_true_inputs(feeds, outputs)
 print("\n=== shape comparison (expr, expected, computed) ===")

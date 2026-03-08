@@ -26,15 +26,15 @@ The workflow is:
 2. Call :func:`yobx.sklearn.to_onnx` with a representative dummy
    input to convert the fitted model into an ONNX graph.
 3. **Run** the ONNX model with any ONNX runtime — this example uses
-   :class:`~yobx.reference.ExtendedReferenceEvaluator`.
+   :epkg:`onnxruntime`.
 4. **Verify** that the ONNX outputs match scikit-learn's predictions.
 """
 
 import numpy as np
+import onnxruntime
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
 
 # %%
@@ -93,7 +93,7 @@ print(
 X_test = rng.standard_normal((20, 4)).astype(np.float32)
 y_test = (X_test[:, 0] + X_test[:, 1] > 0).astype(int)
 
-ref = ExtendedReferenceEvaluator(onx)
+ref = onnxruntime.InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
 label_onnx, proba_onnx = ref.run(None, {"X": X_test})
 
 label_sk = pipe.predict(X_test)
@@ -130,7 +130,7 @@ pipe_mc.fit(X_mc, y_mc)
 X_test_mc = rng.standard_normal((30, 4)).astype(np.float32)
 onx_mc = to_onnx(pipe_mc, (X_test_mc[:1],))
 
-ref_mc = ExtendedReferenceEvaluator(onx_mc)
+ref_mc = onnxruntime.InferenceSession(onx_mc.SerializeToString(), providers=["CPUExecutionProvider"])
 label_mc_onnx, proba_mc_onnx = ref_mc.run(None, {"X": X_test_mc})
 
 label_mc_sk = pipe_mc.predict(X_test_mc)
