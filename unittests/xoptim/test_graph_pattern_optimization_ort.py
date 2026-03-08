@@ -25,9 +25,7 @@ from yobx.xoptim import get_pattern_list
 from yobx.xoptim.patterns_ort.activation import GeluErfPattern
 from yobx.helpers.onnx_helper import choose_consistent_domain_opset, compatible_opsets
 from yobx.reference import ExtendedReferenceEvaluator
-
-# from yobx.torch.interpreter import to_onnx
-to_onnx = None
+from yobx.torch import to_onnx
 
 TFLOAT = TensorProto.FLOAT
 TINT64 = TensorProto.INT64

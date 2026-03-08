@@ -5,13 +5,10 @@ from yobx.helpers import max_diff
 from yobx.helpers.rt_helper import make_feeds
 from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
 from yobx.torch.tiny_models import get_tiny_model
-from yobx.torch import register_flattening_functions, apply_patches_for_model
+from yobx.torch import register_flattening_functions, apply_patches_for_model, to_onnx
 from yobx.torch.torch_helper import torch_deepcopy
 from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.xbuilder import OptimizationOptions
-
-# from yobx.torch.interpreter import to_onnx
-to_onnx = None
 
 
 class TestOptimizationUntrainedTorchModel(ExtTestCase):
