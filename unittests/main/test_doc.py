@@ -5,11 +5,6 @@ import unittest
 from unittest.mock import patch
 import numpy as np
 import onnx
-try:
-    import matplotlib.axes
-    from PIL import Image
-except ImportError:
-    pass
 from yobx.ext_test_case import (
     ExtTestCase,
     requires_matplotlib,
@@ -32,6 +27,7 @@ class TestDocMatplotlib(ExtTestCase):
         cls.plt = plt
 
     def test_plot_legend_returns_axes(self):
+        import matplotlib.axes
         from yobx.doc import plot_legend
 
         self.assertEqual(sys.platform, "linux")
@@ -41,6 +37,7 @@ class TestDocMatplotlib(ExtTestCase):
         self.plt.close("all")
 
     def test_plot_legend_with_text_bottom(self):
+        import matplotlib.axes
         from yobx.doc import plot_legend
 
         ax = plot_legend("LABEL", text_bottom="bottom text", color="blue", fontsize=12)
@@ -94,6 +91,7 @@ class TestDocMatplotlib(ExtTestCase):
         self.plt.close("all")
 
     def test_plot_histogram_returns_axes(self):
+        import matplotlib.axes
         from yobx.doc import plot_histogram
 
         data = np.random.default_rng(0).standard_normal(100)
@@ -233,6 +231,7 @@ class TestDocPlotText(ExtTestCase):
         cls.plt = plt
 
     def test_plot_text_returns_axes(self):
+        import matplotlib.axes
         from yobx.doc import plot_text
 
         ax = plot_text("line one\nline two")
@@ -257,6 +256,7 @@ class TestDocPlotText(ExtTestCase):
         self.plt.close("all")
 
     def test_plot_text_with_line_color_map(self):
+        import matplotlib.axes
         from yobx.doc import plot_text
 
         ax = plot_text(
@@ -267,6 +267,7 @@ class TestDocPlotText(ExtTestCase):
         self.plt.close("all")
 
     def test_plot_text_custom_figsize(self):
+        import matplotlib.axes
         from yobx.doc import plot_text
 
         ax = plot_text("text", figsize=(8, 4))
@@ -274,6 +275,7 @@ class TestDocPlotText(ExtTestCase):
         self.plt.close("all")
 
     def test_plot_text_empty_string(self):
+        import matplotlib.axes
         from yobx.doc import plot_text
 
         ax = plot_text("")
@@ -296,9 +298,12 @@ class TestDocPlotDot(ExtTestCase):
 
     def _write_fake_png(self, path):
         """Write a minimal valid PNG to *path* so PIL can open it."""
+        from PIL import Image
+
         Image.fromarray(np.zeros((4, 4, 3), dtype=np.uint8)).save(path)
 
     def test_plot_dot_returns_axes_from_model_proto(self):
+        import matplotlib.axes
         from yobx.doc import demo_mlp_model, plot_dot
 
         model = demo_mlp_model("")
@@ -324,6 +329,7 @@ class TestDocPlotDot(ExtTestCase):
         self.plt.close("all")
 
     def test_plot_dot_accepts_dot_string(self):
+        import matplotlib.axes
         from yobx.doc import plot_dot
 
         dot_str = "digraph { a -> b }"
