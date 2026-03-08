@@ -121,7 +121,7 @@ class TestDocumentationExamples(ExtTestCase):
             if not reason and not has_spox() and "spox" in name:
                 reason = "spox not installed"
 
-            if not reason and not has_tensorflow() and "tensorflo" in name:
+            if not reason and not has_tensorflow() and "tensorflow" in name:
                 reason = "tensorflow not installed"
 
             if reason:
