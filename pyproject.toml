@@ -55,6 +55,9 @@ sklearn = [
 spox = [
     "spox>=0.12",
 ]
+tensorflow = [
+    "tensorflow>=2.20",
+]
 torch = [
     "accelerate",
     "huggingface_hub",
