@@ -120,19 +120,23 @@ def _convert_concrete_function(
         initializer_values[name] = value
         assert not g.has_name(name), f"name {name!r} is already taken."
         g.make_initializer(name, value, source="_convert_concrete_function.0")
+        assert value.shape == var.shape or value.shape != _captured_tensor.shape, (
+            f"Shape Mismatch for {var.name!r}, {var.shape=}, {value.shape=}, "
+            f"{_captured_tensor.shape=}"
+        )
 
-        if var.name in forbidden:
-            continue
-        if var.name in value_alias:
-            # In that case, it means there are local variables receiving the same base name.
-            del value_alias[var.name]
-            forbidden.add(var.name)
-        else:
-            value_alias[var.name] = name
         assert (
             _captured_tensor._unique_id not in value_alias
         ), f"A unique id {_captured_tensor._unique_id!r} is not unique for var={var.name!r}"
         value_alias[_captured_tensor._unique_id] = name
+        if var.name in forbidden:
+            continue
+        if var.name in value_alias:
+            # In that case, it means there are local variable receiving the same name.
+            del value_alias[var.name]
+            forbidden.add(var.name)
+        else:
+            value_alias[var.name] = name
 
     handle_names: Dict[str, Dict[str, str]] = {}
     for capture, var in cf.graph.captures:
@@ -195,12 +199,7 @@ def _convert_concrete_function(
                         initializer_values[original_name],
                         source="_convert_concrete_function.1",
                     )
-                g.op.Identity(
-                    original_name,
-                    outputs=[name],
-                    name="initializer",
-                    source="_convert_concrete_function.2",
-                )
+                g.op.Identity(original_name, outputs=[name], name="handle")
                 continue
 
             raise AssertionError(
@@ -220,12 +219,21 @@ def _convert_concrete_function(
                 f"outputs={[t.name for t in op.outputs]}"
             )
 
+        assert all(g.has_shape(i.name) for i in op.inputs), (
+            f"A shape is missing, input names={[i.name for i in op.inputs]}, "
+            f"has_shape={[g.has_shape(i.name) for i in op.inputs]}"
+        )
         onnx_outputs = op_outputs = [t.name for t in op.outputs]
         sts: Dict[str, Any] = {}
         fct(g, sts, onnx_outputs, op)
         assert all(g.has_name(o) for o in op_outputs), (
             f"Issue with node {op.type}({[i.name for i in op.inputs]}) -> "
             f"{[o.name for o in op.outputs]} ({fct=}){g.get_debug_msg()}"
+            f"{g.get_debug_msg()}"
+        )
+        assert all(g.has_shape(i.name) for i in op.outputs), (
+            f"A shape is missing, output names={[i.name for i in op.outputs]}, "
+            f"has_shape={[g.has_shape(i.name) for i in op.outputs]}{g.get_debug_msg()}"
         )
 
     # ------------------------------------------------------------------
