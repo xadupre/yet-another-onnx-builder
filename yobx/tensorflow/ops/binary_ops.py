@@ -21,7 +21,6 @@ import tensorflow as tf
 from ..register import register_tf_op_converter
 from ...typing import GraphBuilderExtendedProtocol
 
-
 # ---------------------------------------------------------------------------
 # Arithmetic
 # ---------------------------------------------------------------------------
@@ -65,9 +64,7 @@ def convert_minimum(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """TF ``Minimum`` → ONNX ``Min``."""
-    return g.op.Min(
-        op.inputs[0].name, op.inputs[1].name, outputs=outputs[:1], name=op.name
-    )
+    return g.op.Min(op.inputs[0].name, op.inputs[1].name, outputs=outputs[:1], name=op.name)
 
 
 @register_tf_op_converter("Maximum")
@@ -75,9 +72,7 @@ def convert_maximum(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """TF ``Maximum`` → ONNX ``Max``."""
-    return g.op.Max(
-        op.inputs[0].name, op.inputs[1].name, outputs=outputs[:1], name=op.name
-    )
+    return g.op.Max(op.inputs[0].name, op.inputs[1].name, outputs=outputs[:1], name=op.name)
 
 
 @register_tf_op_converter("Pow")
@@ -144,9 +139,7 @@ def convert_greater(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """TF ``Greater`` → ONNX ``Greater``."""
-    return g.op.Greater(
-        op.inputs[0].name, op.inputs[1].name, outputs=outputs[:1], name=op.name
-    )
+    return g.op.Greater(op.inputs[0].name, op.inputs[1].name, outputs=outputs[:1], name=op.name)
 
 
 @register_tf_op_converter("GreaterEqual")
