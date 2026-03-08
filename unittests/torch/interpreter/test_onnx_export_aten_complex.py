@@ -134,14 +134,12 @@ class TestOnnxExportComplex(ExtTestCase):
 
                 # No decomposition.
                 onx = to_onnx(
-                    model,
-                    (x,),
-                    dynamic_shapes=({0: "batch", 1: "length"},),
-                    target_opset=opset,
+                    model, (x,), dynamic_shapes=({0: "batch", 1: "length"},), target_opset=opset
                 )
                 self.assertEqual(onx.opset_import[0].domain, "")
                 self.assertEqual(onx.opset_import[0].version, opset)
                 # self.print_model(onx)
+                # self.dump_onnx("test_fft2_simple_complex.onnx", onx)
                 ref = ExtendedReferenceEvaluator(onx, verbose=0)
                 got = ref.run(None, {"x": x.numpy()})
                 self.assertEqualArray(expected, got[0], atol=1e-5)

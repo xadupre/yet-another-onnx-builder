@@ -161,9 +161,9 @@ class InputCandidate:
             return res
         raise TypeError(f"Unexpected type {type(dynamic_shapes)} in {dynamic_shapes=}.")
 
-    def needs_back_size_backed_size_oblivious(self, dynamic_shapes: Any) -> bool:
+    def needs_backed_size_oblivious(self, dynamic_shapes: Any) -> bool:
         """Tells if ``torch.fx.experimental._config.patch(backed_size_oblivious=True):``
-        should be use (a dynamic dimension is 1 in one of the tensor).
+        should be use (a dynamic dimension is 0 or 1 in one of the tensor).
         """
         if not dynamic_shapes:
             return False
@@ -183,7 +183,7 @@ class InputCandidate:
                         f"for a tensor of rank {tensor.ndim}."
                     )
                 if isinstance(v, str) or v in (torch.export.Dim.AUTO, torch.export.Dim.DYNAMIC):
-                    if tensor.shape[k] == 1:
+                    if tensor.shape[k] in (0, 1):
                         return True
         return False
 

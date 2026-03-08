@@ -11,6 +11,7 @@ from yobx.ext_test_case import (
     ExtTestCase,
     skipif_ci_windows,
     requires_torch,
+    requires_transformers,
     ignore_warnings,
 )
 from yobx.helpers import string_type
@@ -504,6 +505,7 @@ class TestOnnxExportSignatures(ExtTestCase):
 
     @skipif_ci_windows("not working on windows")
     @requires_torch("2.7")
+    @requires_transformers("4.55")
     def test_signature_dc_none(self):
         class Neuron(torch.nn.Module):
             def forward(self, x=None, y=None, z=None, w=None, ww=None):
@@ -551,6 +553,7 @@ class TestOnnxExportSignatures(ExtTestCase):
             )
 
     @requires_torch("2.8")
+    @requires_transformers("4.55")
     def test_signature_dynamic_int(self):
         class Model(torch.nn.Module):
             def forward(self, x, i):

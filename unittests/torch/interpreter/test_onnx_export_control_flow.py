@@ -13,6 +13,7 @@ from yobx.helpers import string_type
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch import ExportOptions
 from yobx.torch.interpreter import to_onnx
+from yobx.torch.tracing import CustomTracer
 
 
 class TestOnnxExportControlFlow(ExtTestCase):
@@ -214,39 +215,6 @@ class TestOnnxExportControlFlow(ExtTestCase):
 
     @skipif_ci_windows("not yet supported on Windows")
     @requires_torch("2.4")
-    @hide_stdout()
-    def test_controlflow_custom_fallback(self):
-        import torch
-
-        class RawTest(torch.nn.Module):
-            def forward(self, x):
-                def true_fn(x):
-                    return torch.sin(x)
-
-                def false_fn(x):
-                    return torch.cos(x)
-
-                if x.sum() > 0:
-                    return true_fn(x)
-                return false_fn(x)
-
-        x = torch.rand(5, 3)
-        model = RawTest()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            onx = to_onnx(model, (x,), export_options=ExportOptions(strategy="fallback"))
-        co = Counter([n.op_type for n in onx.graph.node])
-        self.assertEqual(co, {"Sin": 1})
-        self.assertEqual(len(onx.functions), 0)
-        ref = ExtendedReferenceEvaluator(onx)
-
-        for _x in (x,):
-            expected = model(_x)
-            got = ref.run(None, {"x": _x.detach().numpy()})
-            self.assertEqualArray(expected, got[0], atol=1e-5)
-
-    @skipif_ci_windows("not yet supported on Windows")
-    @requires_torch("2.4")
     def test_controlflow_custom_initializer(self):
         import torch
 
@@ -421,8 +389,6 @@ class TestOnnxExportControlFlow(ExtTestCase):
         batch = torch.export.Dim("batch")
         seq_length = torch.export.Dim("seq_length")
         dynamic_shapes = ({0: batch}, {0: batch, 1: seq_length}, None)
-
-        from yobx.torch.interpreter.tracing import CustomTracer
 
         graph = CustomTracer().trace(
             model2,

@@ -3498,7 +3498,7 @@ def aten__fftn_onnx(
             else:
                 ones.append(lth)
 
-        conc = [(np.array(i, dtype=np.int64) if isinstance(i, int) else i) for i in ones]
+        conc = [(np.array([i], dtype=np.int64) if isinstance(i, int) else i) for i in ones]
         if len(conc) == 1:
             sample = g.op.Cast(conc[0], to=ritype, name=name)
         else:

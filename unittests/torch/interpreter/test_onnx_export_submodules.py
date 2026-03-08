@@ -673,7 +673,7 @@ class TestOnnxExportSubModules(ExtTestCase):
 
         model_id = "arnir0/Tiny-LLM"
         data = get_tiny_model(model_id)
-        model, inputs, ds = data.model, data.inputs, data.dynamic_shapes
+        model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
 
         with (
             apply_patches_for_model(patch_torch=True, patch_transformers=True, model=model),
