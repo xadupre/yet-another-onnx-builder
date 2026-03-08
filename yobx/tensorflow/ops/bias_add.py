@@ -2,13 +2,18 @@
 Converter for the TF ``BiasAdd`` op → ONNX ``Add``.
 """
 
+from typing import Any, Dict, List
+import tensorflow as tf
 from ..register import register_tf_op_converter
-from ...xbuilder import GraphBuilder
+from ...typing import GraphBuilderExtendedProtocol
 
 
-@register_tf_op_converter("BiasAdd")
-def convert_bias_add(g: GraphBuilder, sts: dict, outputs: list, op) -> str:
-    """Converts TF ``BiasAdd`` to ONNX ``Add``.
+@register_tf_op_converter(("AddV2", "BiasAdd"))
+def convert_bias_add(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
+    """
+    Converts TF ``BiasAdd`` to ONNX ``Add``.
 
     TF's ``BiasAdd`` is semantically equivalent to adding a 1-D bias along the
     last dimension of the input, which maps directly to ONNX ``Add`` with

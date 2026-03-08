@@ -7,6 +7,7 @@ import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.helpers._onnx_simple_text_plot import onnx_simple_text_plot
 from yobx.helpers.onnx_helper import (
+    attr_proto_to_python,
     get_hidden_inputs,
     make_model_with_local_functions,
     make_subfunction,
@@ -802,6 +803,51 @@ class TestOnnxHelper(ExtTestCase):
             same_function_proto(f1, f3, verbose=1),
             "different input names at node 1, ['xa', 'b'], ['xb_', 'a_'] != ['xa_', 'b_']",
         )
+
+
+class TestAttrProtoToPython(ExtTestCase):
+    def test_float(self):
+        attr = oh.make_attribute("alpha", 0.5)
+        self.assertAlmostEqual(attr_proto_to_python(attr), 0.5)
+
+    def test_int(self):
+        attr = oh.make_attribute("axis", 1)
+        self.assertEqual(attr_proto_to_python(attr), 1)
+
+    def test_string(self):
+        attr = oh.make_attribute("mode", "linear")
+        self.assertEqual(attr_proto_to_python(attr), "linear")
+
+    def test_string_bytes(self):
+        attr = onnx.AttributeProto()
+        attr.name = "mode"
+        attr.type = onnx.AttributeProto.STRING
+        attr.s = b"linear"
+        self.assertEqual(attr_proto_to_python(attr), "linear")
+
+    def test_tensor(self):
+        arr = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        attr = oh.make_attribute("value", onh.from_array(arr))
+        result = attr_proto_to_python(attr)
+        np.testing.assert_array_equal(result, arr)
+
+    def test_floats(self):
+        attr = oh.make_attribute("scales", [1.0, 2.0, 3.0])
+        self.assertEqual(attr_proto_to_python(attr), [1.0, 2.0, 3.0])
+
+    def test_ints(self):
+        attr = oh.make_attribute("pads", [0, 1, 0, 1])
+        self.assertEqual(attr_proto_to_python(attr), [0, 1, 0, 1])
+
+    def test_strings(self):
+        attr = oh.make_attribute("keys", ["a", "b", "c"])
+        self.assertEqual(attr_proto_to_python(attr), ["a", "b", "c"])
+
+    def test_unsupported_raises(self):
+        attr = onnx.AttributeProto()
+        attr.name = "body"
+        attr.type = onnx.AttributeProto.GRAPH
+        self.assertRaises(NotImplementedError, attr_proto_to_python, attr)
 
 
 if __name__ == "__main__":

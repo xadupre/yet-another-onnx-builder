@@ -1,4 +1,4 @@
-name: torch-sklearn
+name: ci-5
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   coverage:
-    name: torch-sklearn (ubuntu-latest, py3.13)
+    name: torch (ubuntu-latest, py3.13)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -23,13 +23,16 @@ jobs:
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
 
       - name: Install dependencies
-        run: pip install -e ".[dev,docs,sklearn,torch]"
+        run: pip install -e ".[dev,torch]"
 
       - name: pip freeze
         run: pip freeze
 
       - name: Run tests with coverage
-        run: pytest --cov=yobx --cov-report=xml --durations=10 --ignore=unittests/tensorflow
+        run: |
+          pytest --cov=yobx --cov-report=xml --durations=10 \
+            --ignore=unittests/tensorflow \
+            --ignore=unittests/sklearn
 
       - name: Upload coverage to Codecov
         # Codecov automatically merges all uploads that share the same commit SHA.

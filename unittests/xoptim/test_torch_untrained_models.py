@@ -14,7 +14,7 @@ from yobx.xbuilder import OptimizationOptions
 to_onnx = None
 
 
-class TestOptimizationUntrainedModel(ExtTestCase):
+class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @hide_stdout()
     @unittest.skipIf(to_onnx is None, "not implement yet")
     def test_tiny_llm_to_onnx_24(self):

@@ -38,7 +38,7 @@ class TestGraphBuilderProtocolExists(ExtTestCase):
             "input_names",
             "output_names",
             "get_opset",
-            "add_domain",
+            "set_opset",
             "has_opset",
             "has_name",
             "has_type",
@@ -79,7 +79,7 @@ class TestGraphBuilderSatisfiesProtocol(ExtTestCase):
             "input_names",
             "output_names",
             "get_opset",
-            "add_domain",
+            "set_opset",
             "has_opset",
             "unique_name",
             "has_name",
@@ -156,7 +156,7 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
             "input_names",
             "output_names",
             "get_opset",
-            "add_domain",
+            "set_opset",
             "has_opset",
             "unique_name",
             "has_name",
@@ -204,6 +204,13 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
         g = OnnxScriptGraphBuilder(18)
         self.assertEqual(g.get_opset(""), 18)
 
+    def test_set_opset(self):
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+
+        g = OnnxScriptGraphBuilder(18)
+        g.set_opset("custom", 1)
+        self.assertEqual(g.get_opset("custom"), 1)
+
     def test_add_domain(self):
         from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 
@@ -227,6 +234,7 @@ class TestGraphBuilderExtendedProtocol(ExtTestCase):
     """GraphBuilder satisfies GraphBuilderExtendedProtocol."""
 
     EXTENDED_ATTRS = [
+        "main_opset",
         "unique_name",
         "op",
         "set_type_shape_unary_op",
@@ -273,7 +281,7 @@ class TestOnnxScriptGraphBuilderExtendedProtocol(ExtTestCase):
         from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 
         g = OnnxScriptGraphBuilder(18)
-        for attr in ["op", "set_type_shape_unary_op"]:
+        for attr in ["main_opset", "op", "set_type_shape_unary_op"]:
             self.assertTrue(
                 hasattr(g, attr),
                 msg=f"OnnxScriptGraphBuilder missing extended attribute '{attr}'",

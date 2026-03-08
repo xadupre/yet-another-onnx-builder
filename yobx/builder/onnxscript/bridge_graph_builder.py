@@ -175,10 +175,10 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
             ), f"Domain {domain!r} is not registered in opsets={self.opsets!r}."
         return self.opsets.get(domain, None)
 
-    def add_domain(self, domain: str, version: int = 1) -> None:
+    def set_opset(self, domain: str, version: int = 1) -> None:
         """
-        Adds a domain to the list of supported ones.
-        Checks the version is the same if it exists.
+        Sets the opset version for a domain.
+        Checks the version is the same if it already exists.
 
         :param domain: domain name to register
         :param version: opset version for the domain
@@ -192,6 +192,10 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         self.opsets[domain] = version
         # Keep the underlying graph's opset_imports in sync.
         self._graph.opset_imports[domain] = version
+
+    def add_domain(self, domain: str, version: int = 1) -> None:
+        """Deprecated. Use :meth:`set_opset` instead."""
+        self.set_opset(domain, version)
 
     def has_opset(self, domain: str) -> int:
         """
@@ -591,6 +595,19 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
     def output_names(self) -> List[str]:
         """Returns output names."""
         return [i.name or "" for i in self._graph.outputs]
+
+    def get_debug_msg(self) -> str:
+        """Returns information useful for understanding where an error could come from.
+
+        :return: a summary of the current graph state as a string
+        """
+        lines = [
+            f"OnnxScriptGraphBuilder opsets={self.opsets!r}",
+            f"  inputs:  {self.input_names}",
+            f"  outputs: {self.output_names}",
+            f"  initializers: {list(self._name_to_value.keys())}",
+        ]
+        return "\n".join(lines)
 
     # ------------------------------------------------------------------
     # Export

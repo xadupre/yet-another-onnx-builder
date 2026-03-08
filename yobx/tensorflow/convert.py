@@ -92,16 +92,13 @@ def _convert_concrete_function(
     verbose: int,
     extra_converters: Dict[str, Callable],
 ) -> None:
-    """Walks the concrete-function graph and emits equivalent ONNX operations.
-
-    The conversion context ``ctx`` maps every TF tensor name to either an ONNX
-    tensor name (``str``) for dynamic values, or a :class:`numpy.ndarray` for
-    constant / weight values.
+    """
+    Walks the concrete-function graph and emits equivalent ONNX operations.
 
     :param cf: a :class:`tensorflow.ConcreteFunction`
     :param g: the :class:`~yobx.xbuilder.GraphBuilder` to populate
     :param args: original dummy inputs (used for dtype / shape information)
-    :param input_names: ONNX names for the model inputs
+    :param input_specs: TensorSpec objects used for tracing
     :param verbose: verbosity level
     :param extra_converters: op-type → converter overrides
     """
@@ -110,57 +107,105 @@ def _convert_concrete_function(
     #    cf.captured_inputs — list of TF tensors (resource handles) captured
     #    from outside the function (one per trainable variable).
     #    cf.variables        — corresponding tf.Variable objects.
-    #
-    #    Key by the captured tensor's name, which matches the Placeholder
-    #    output tensor name seen in cf.graph.get_operations().
     # ------------------------------------------------------------------
+    # using keras or not keras, tf does not seem consistent into
+    # what it does in both case.
+    ops = cf.graph.get_operations()
     initializer_values: Dict[str, np.ndarray] = {}
+    value_alias = {}
+    forbidden = set()
     for _captured_tensor, var in zip(cf.captured_inputs, cf.variables):
         value = var.numpy()
-        initializer_values[var.name] = value
-        g.make_initializer(var.name, value, source="_convert_concrete_function.0")
+        name = f"{var.name}[{_captured_tensor._unique_id}]"
+        initializer_values[name] = value
+        assert not g.has_name(name), f"name {name!r} is already taken."
+        g.make_initializer(name, value, source="_convert_concrete_function.0")
+        assert value.shape == var.shape or value.shape != _captured_tensor.shape, (
+            f"Shape Mismatch for {var.name!r}, {var.shape=}, {value.shape=}, "
+            f"{_captured_tensor.shape=}"
+        )
 
-    handle_names = {}
+        assert (
+            _captured_tensor._unique_id not in value_alias
+        ), f"A unique id {_captured_tensor._unique_id!r} is not unique for var={var.name!r}"
+        value_alias[_captured_tensor._unique_id] = name
+        if var.name in forbidden:
+            continue
+        if var.name in value_alias:
+            # In that case, it means there are local variable receiving the same name.
+            del value_alias[var.name]
+            forbidden.add(var.name)
+        else:
+            value_alias[var.name] = name
+
+    handle_names: Dict[str, Dict[str, str]] = {}
     for capture, var in cf.graph.captures:
-        handle_names[var.name] = capture._name
+        name = var.name
+        assert name not in handle_names, f"Duplicated name={name!r} in {handle_names=}."
+        handle_names[name] = dict(
+            full_name=f"{capture._name}[{capture._unique_id}]",
+            name=capture._name,
+            unique_id=capture._unique_id,
+        )
 
     # ------------------------------------------------------------------
     # 2. Register ONNX inputs for each non-captured Placeholder op.
     # 3. Convert each operation in topological (graph-definition) order.
     # ------------------------------------------------------------------
     set_input_names = {f"{i.name}:0": (ind, i) for ind, i in enumerate(input_specs)}
-    for op in cf.graph.get_operations():
+    for op in ops:
         if op.type == "Placeholder":
             tensor = op.outputs[0]
             name = tensor.name
             if name in set_input_names:
+                assert not g.has_name(name), f"Input {name!r} is already used{g.get_debug_msg()}"
                 spec = set_input_names[name][1]
                 g.make_tensor_input(
                     name, tf_dtype_to_np_dtype(spec.dtype), _shape_to_tuple(g, spec.shape)
                 )
                 continue
+
             if name in initializer_values:
                 # Captured variable resource handle — register its numpy value
                 # as an ONNX initializer so downstream ReadVariableOp can use it.
                 assert not g.has_name(
                     name
-                ), f"The name {name!r} is already taken.{g.get_debug_msg()}"
+                ), f"Initializer {name!r} is already used{g.get_debug_msg()}"
                 g.make_initializer(
                     name, initializer_values[name], source="_convert_concrete_function.0"
                 )
                 continue
             if name in handle_names:
-                g.op.Identity(
-                    handle_names[name],
-                    outputs=[name],
-                    name="initializer",
-                    source="_convert_concrete_function.1",
-                )
+                assert not g.has_name(
+                    name
+                ), f"Initializer {name!r} is already used{g.get_debug_msg()}"
+                original_name = handle_names[name]["full_name"]
+                if not g.has_name(original_name):
+                    # We need to add the initializer to the model.
+                    if original_name not in initializer_values:
+                        unique_id = handle_names[name]["unique_id"]
+                        if unique_id in value_alias:
+                            original_name = value_alias[unique_id]
+
+                if not g.has_name(original_name):
+                    assert original_name in initializer_values, (
+                        f"{original_name!r} not found in "
+                        f"initializer_values={sorted(initializer_values)}, "
+                        f"tensor.name={tensor.name!r}, handle_names={handle_names[name]}, "
+                        f"value_alias={value_alias}"
+                    )
+                    g.make_initializer(
+                        original_name,
+                        initializer_values[original_name],
+                        source="_convert_concrete_function.1",
+                    )
+                g.op.Identity(original_name, outputs=[name], name="handle")
                 continue
+
             raise AssertionError(
-                f"name={name!r} could not be handled as a placeholder, {type(tensor)=}, "
-                f"initializer_values={sorted(initializer_values)}, "
-                f"handle_names={sorted(handle_names)}, "
+                f"tensor.name={tensor.name!r} could not be handled as a placeholder, "
+                f"{type(tensor)=}, initializer_values={sorted(initializer_values)}, "
+                f"handle_names={handle_names}, value_alias={value_alias}, "
                 f"input_names={sorted(set_input_names)}{g.get_debug_msg()}"
             )
 
@@ -168,13 +213,27 @@ def _convert_concrete_function(
         # extra_converters take priority over built-in ones.
         fct = extra_converters.get(op_type) or get_tf_op_converter(op_type)
         if fct is None:
-            raise RuntimeError(f"Type {op_type!r} has no converting function mapped to it.")
+            raise RuntimeError(
+                f"Type {op_type!r} has no converting function mapped to it, "
+                f"inputs={[t.name for t in op.inputs]}, "
+                f"outputs={[t.name for t in op.outputs]}"
+            )
 
-        op_outputs = [t.name for t in op.outputs]
-        fct(g, {}, op_outputs, op)
+        assert all(g.has_shape(i.name) for i in op.inputs), (
+            f"A shape is missing, input names={[i.name for i in op.inputs]}, "
+            f"has_shape={[g.has_shape(i.name) for i in op.inputs]}"
+        )
+        onnx_outputs = op_outputs = [t.name for t in op.outputs]
+        sts: Dict[str, Any] = {}
+        fct(g, sts, onnx_outputs, op)
         assert all(g.has_name(o) for o in op_outputs), (
             f"Issue with node {op.type}({[i.name for i in op.inputs]}) -> "
             f"{[o.name for o in op.outputs]} ({fct=}){g.get_debug_msg()}"
+            f"{g.get_debug_msg()}"
+        )
+        assert all(g.has_shape(i.name) for i in op.outputs), (
+            f"A shape is missing, output names={[i.name for i in op.outputs]}, "
+            f"has_shape={[g.has_shape(i.name) for i in op.outputs]}{g.get_debug_msg()}"
         )
 
     # ------------------------------------------------------------------

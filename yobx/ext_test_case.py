@@ -183,7 +183,7 @@ def hide_stdout(f: Optional[Callable] = None) -> Callable:
 def long_test(msg: Optional[Union[Callable[[], str], str]] = None) -> Callable:
     """Skips a unit test if it runs on :epkg:`azure pipeline` on :epkg:`Windows`."""
     if os.environ.get("LONGTEST", "0") in ("0", 0, False, "False", "false"):
-        msg = f"Skipped (set LONGTEST=1 to run it. {msg}"
+        msg = f"Skipped (set LONGTEST=1 to run it. {_msg(msg)}"
         return unittest.skip(msg)
     return lambda x: x
 
@@ -407,9 +407,7 @@ def has_cuda() -> bool:
     return torch.cuda.device_count() > 0
 
 
-def requires_python(
-    version: Tuple[int, ...], msg: Optional[Union[Callable[[], str], str]] = None
-):
+def requires_python(version: Tuple[int, ...], msg: str = ""):
     """
     Skips a test if python is too old.
 
@@ -421,14 +419,12 @@ def requires_python(
     return lambda x: x
 
 
-def requires_cuda(
-    msg: Optional[Union[Callable[[], str], str]] = None, version: str = "", memory: int = 0
-):
+def requires_cuda(version: str = "", msg: str = "", memory: int = 0):
     """
     Skips a test if cuda is not available.
 
-    :param msg: to overwrite the message
     :param version: minimum version
+    :param msg: to overwrite the message
     :param memory: minimum number of Gb to run the test
     """
     if not has_torch():
@@ -456,9 +452,7 @@ def requires_cuda(
     return lambda x: x
 
 
-def requires_onnxir(
-    version: str, msg: Optional[Union[Callable[[], str], str]] = None
-) -> Callable:
+def requires_onnxir(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx-ir` is not recent enough."""
     import packaging.version as pv
 
@@ -492,9 +486,7 @@ def has_sklearn(version: str = "") -> bool:
     return pv.Version(sklearn.__version__) >= pv.Version(version)
 
 
-def requires_sklearn(
-    version: str = "", msg: Optional[Union[Callable[[], str], str]] = None
-) -> Callable:
+def requires_sklearn(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`scikit-learn` is not recent enough."""
     import packaging.version as pv
 
@@ -537,9 +529,7 @@ def has_transformers(version: str) -> bool:
     return pv.Version(transformers.__version__) >= pv.Version(version)
 
 
-def requires_torch(
-    version: str = "", msg: Optional[Union[Callable[[], str], str]] = None
-) -> Callable:
+def requires_torch(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`pytorch` is not recent enough."""
     try:
         import torch
@@ -577,9 +567,7 @@ def requires_tensorflow(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
-def requires_onnx_diagnostic(
-    version: str = "", msg: Optional[Union[Callable[[], str], str]] = None
-) -> Callable:
+def requires_onnx_diagnostic(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx-diagnostic` is not recent enough."""
     try:
         import onnx_diagnostic
@@ -597,9 +585,7 @@ def requires_onnx_diagnostic(
     return lambda x: x
 
 
-def requires_matplotlib(
-    version: str = "", msg: Optional[Union[Callable[[], str], str]] = None
-) -> Callable:
+def requires_matplotlib(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`pytorch` is not recent enough."""
     try:
         import matplotlib
@@ -617,7 +603,7 @@ def requires_matplotlib(
     return lambda x: x
 
 
-def requires_numpy(version: str, msg: Optional[Union[Callable[[], str], str]] = None) -> Callable:
+def requires_numpy(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`numpy` is not recent enough."""
     import packaging.version as pv
 
@@ -634,7 +620,7 @@ def requires_numpy(version: str, msg: Optional[Union[Callable[[], str], str]] = 
 
 def requires_transformers(
     version: str,
-    msg: Optional[Union[Callable[[], str], str]] = None,
+    msg: str = "",
     or_older_than: Optional[str] = None,
 ) -> Callable:
     """Skips a unit test if :epkg:`transformers` is not recent enough."""
@@ -665,7 +651,7 @@ def requires_transformers(
 
 def requires_diffusers(
     version: str,
-    msg: Optional[Union[Callable[[], str], str]] = None,
+    msg: str = "",
     or_older_than: Optional[str] = None,
 ) -> Callable:
     """Skips a unit test if :epkg:`transformers` is not recent enough."""
@@ -691,9 +677,7 @@ def requires_diffusers(
     return lambda x: x
 
 
-def requires_onnxscript(
-    version: str = "", msg: Optional[Union[Callable[[], str], str]] = None
-) -> Callable:
+def requires_onnxscript(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxscript` is not recent enough."""
     try:
         import onnxscript
@@ -733,9 +717,67 @@ def has_onnxscript(version: str) -> Callable:
     return True
 
 
-def requires_onnxruntime(
-    version: str, msg: Optional[Union[Callable[[], str], str]] = None
-) -> Callable:
+def requires_spox(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`spox` is not recent enough."""
+    try:
+        import spox
+    except ImportError:
+        return unittest.skip(msg or "spox not installed")
+
+    if not version:
+        return lambda x: x
+
+    import packaging.version as pv
+
+    if not hasattr(spox, "__version__"):
+        # development version
+        return lambda x: x
+
+    if pv.Version(spox.__version__) < pv.Version(version):
+        msg = f"spox version {spox.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
+def has_spox(version: str = "") -> bool:
+    """Returns ``True`` if :epkg:`spox` is installed and recent enough."""
+    try:
+        import spox
+    except (ImportError, AttributeError):
+        return False
+
+    if not version:
+        return True
+
+    if not hasattr(spox, "__version__"):
+        # development version
+        return True
+
+    import packaging.version as pv
+
+    return pv.Version(spox.__version__) >= pv.Version(version)
+
+
+def has_tensorflow(version: str = "") -> bool:
+    """Returns ``True`` if :epkg:`tensorflow` is installed and recent enough."""
+    try:
+        import tensorflow
+    except (ImportError, AttributeError):
+        return False
+
+    if not version:
+        return True
+
+    if not hasattr(tensorflow, "__version__"):
+        # development version
+        return True
+
+    import packaging.version as pv
+
+    return pv.Version(tensorflow.__version__) >= pv.Version(version)
+
+
+def requires_onnxruntime(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not recent enough."""
     import packaging.version as pv
 
@@ -750,9 +792,7 @@ def requires_onnxruntime(
     return lambda x: x
 
 
-def has_onnxruntime(
-    version: str, msg: Optional[Union[Callable[[], str], str]] = None
-) -> Callable:
+def has_onnxruntime(version: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not recent enough."""
     import packaging.version as pv
     import onnxruntime
@@ -761,8 +801,7 @@ def has_onnxruntime(
         # development version
         return True
 
-    if pv.Version(onnxruntime.__version__) < pv.Version(version):
-        msg = f"onnxruntime version {onnxruntime.__version__} < {version}: {msg}"
+    if version and pv.Version(onnxruntime.__version__) < pv.Version(version):
         return False
     return True
 
@@ -802,7 +841,7 @@ def has_onnxruntime_genai():
 def requires_onnxruntime_training(
     push_back_batch: bool = False,
     ortmodule: bool = False,
-    msg: Optional[Union[Callable[[], str], str]] = None,
+    msg: str = "",
 ) -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not onnxruntime_training."""
     try:
@@ -833,7 +872,7 @@ def requires_onnxruntime_training(
     return lambda x: x
 
 
-def requires_onnx(version: str, msg: Optional[Union[Callable[[], str], str]] = None) -> Callable:
+def requires_onnx(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx` is not recent enough."""
     import packaging.version as pv
 

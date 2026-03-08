@@ -12,6 +12,7 @@ API Reference
    helpers/index
    reference/index
    sklearn/index
+   tensorflow/index
    torch/index
    translate/index
    xbuilder/index

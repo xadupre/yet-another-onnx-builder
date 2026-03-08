@@ -17,7 +17,7 @@ TFLOAT = onnx.TensorProto.FLOAT
 TINT64 = onnx.TensorProto.INT64
 
 
-class TestOnnxruntimeEvaluator(ExtTestCase):
+class TestTorchOnnxruntimeEvaluator(ExtTestCase):
     def _range(self, *shape, bias: Optional[float] = None):
         n = np.prod(shape)
         x = np.arange(n).astype(np.float32) / n
