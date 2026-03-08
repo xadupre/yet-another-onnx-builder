@@ -27,14 +27,14 @@ The workflow is:
 2. Call :func:`yobx.tensorflow.to_onnx` with a representative *dummy input*
    (a NumPy array) so it can infer input dtype and shape.
 3. **Run** the ONNX model with any ONNX runtime — this example uses
-   :class:`~yobx.reference.ExtendedReferenceEvaluator`.
+   :epkg:`onnxruntime`.
 4. **Verify** that the ONNX outputs match Keras' predictions.
 """
 
 # %%
 import tensorflow as tf
 import numpy as np
-from yobx.reference import ExtendedReferenceEvaluator
+import onnxruntime
 from yobx.tensorflow import to_onnx
 
 # %%
@@ -72,7 +72,7 @@ print("Graph outputs    :", [out.name for out in onx_linear.graph.output])
 # ``"{name}:0"`` where *name* is the name passed to :func:`to_onnx`
 # (defaults to ``"X"``).
 
-ref = ExtendedReferenceEvaluator(onx_linear)
+ref = onnxruntime.InferenceSession(onx_linear.SerializeToString(), providers=["CPUExecutionProvider"])
 (result_linear,) = ref.run(None, {"X:0": X})
 
 expected_linear = model_linear(X).numpy()
@@ -111,7 +111,7 @@ assert "Relu" in op_types
 
 X_test = rng.standard_normal((20, 8)).astype(np.float32)
 
-ref_mlp = ExtendedReferenceEvaluator(onx_mlp)
+ref_mlp = onnxruntime.InferenceSession(onx_mlp.SerializeToString(), providers=["CPUExecutionProvider"])
 (result_mlp,) = ref_mlp.run(None, {"X:0": X_test})
 
 expected_mlp = mlp(X_test).numpy()
@@ -136,7 +136,7 @@ print("Batch dimension value  :", batch_dim.dim_value)
 assert batch_dim.dim_param, "Expected a named dynamic dimension"
 
 # The converted model still produces correct results for any batch size.
-ref_dyn = ExtendedReferenceEvaluator(onx_dyn)
+ref_dyn = onnxruntime.InferenceSession(onx_dyn.SerializeToString(), providers=["CPUExecutionProvider"])
 for n in (1, 7, 20):
     X_batch = rng.standard_normal((n, 8)).astype(np.float32)
     (out,) = ref_dyn.run(None, {"X:0": X_batch})
