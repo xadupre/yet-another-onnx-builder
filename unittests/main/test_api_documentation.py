@@ -80,6 +80,8 @@ _KNOWN_EXCLUSIONS = frozenset(
         "yobx.reference.ops.op__extended_scatternd_of_shape",
         "yobx.reference.ops.op__extended_transpose_cast",
         "yobx.reference.ops.op__extended_tri_matrix",
+        "yobx.reference.ops.op__overwrite_gather_elements",
+        "yobx.reference.ops.op__overwrite_scatter_elements",
         "yobx.reference.ops.op_attention",
         "yobx.reference.ops.op_bias_softmax",
         "yobx.reference.ops.op_complex",
