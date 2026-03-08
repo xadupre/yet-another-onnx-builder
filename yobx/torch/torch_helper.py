@@ -183,7 +183,7 @@ def torch_deepcopy(value: Any) -> Any:
     )
 
 
-def to_tensor(tensor: onnx.TensorProto, base_dir: str = "") -> torch.Tensor:
+def to_tensor(tensor: onnx.TensorProto, base_dir: str = "") -> "torch.Tensor":
     """
     Converts a TensorProto to a torch.Tensor.
 
