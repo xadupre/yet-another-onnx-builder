@@ -86,14 +86,6 @@ class TestTensorflowBaseConverters(ExtTestCase):
         ort_result = _ort_run(onx, feeds)
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
-    @unittest.skip(
-        "Multi-layer Sequential conversion raises AssertionError in "
-        "_convert_concrete_function (yobx/tensorflow/convert.py): the "
-        "initializer name built from capture._name does not match the key "
-        "stored under var.name in initializer_values. "
-        "See test_sequential_initializer_confusion_regression for the "
-        "isolated failure mode."
-    )
     def test_sequential_multi_layer(self):
         """Sequential model with multiple Dense layers."""
         model = tf.keras.Sequential(
@@ -122,14 +114,6 @@ class TestTensorflowBaseConverters(ExtTestCase):
         ort_result = _ort_run(onx, feeds)
         self.assertEqualArray(expected, ort_result, atol=1e-3)
 
-    @unittest.skip(
-        "Multi-layer Sequential conversion raises AssertionError in "
-        "_convert_concrete_function (yobx/tensorflow/convert.py): the "
-        "initializer name built from capture._name does not match the key "
-        "stored under var.name in initializer_values. "
-        "See test_sequential_initializer_confusion_regression for the "
-        "isolated failure mode."
-    )
     def test_sequential_dynamic_shape(self):
         """Sequential model with an explicit dynamic batch dimension."""
         model = tf.keras.Sequential(
@@ -158,21 +142,11 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_sequential_initializer_confusion_regression(self):
-        """Regression test for the initializer-naming bug in multi-layer Sequential models.
+        """Regression: multi-layer Sequential models must produce numerically correct outputs.
 
-        Converting a :class:`tf.keras.Sequential` model with two or more
-        ``Dense`` layers currently raises an :exc:`AssertionError` inside
-        :func:`~yobx.tensorflow.convert._convert_concrete_function`.  The
-        root cause is a naming discrepancy: initializer keys are built from
-        ``var.name`` (e.g. ``"dense_1/kernel:0[uid]"``), but the lookup
-        key is derived from ``capture._name`` (e.g. ``"dense_1_kernel[uid]"``),
-        so the assertion ``original_name in initializer_values`` fails.
-
-        This test documents the failure so that it becomes an explicit,
-        trackable signal.  When the bug in
-        ``yobx/tensorflow/convert.py:_convert_concrete_function`` is fixed,
-        the ``assertRaises`` block should be replaced with a full-roundtrip
-        assertion (matching the pattern in :meth:`test_sequential_multi_layer`).
+        Verifies that conversion does not raise and that the ONNX model matches
+        TF predictions, covering the previously broken code path where variable
+        handles were paired with the wrong tf.Variable values.
         """
         model = tf.keras.Sequential(
             [
@@ -181,11 +155,19 @@ class TestTensorflowBaseConverters(ExtTestCase):
             ]
         )
         X = np.random.rand(5, 3).astype(np.float32)
-        # The conversion raises AssertionError because the initializer lookup
-        # in _convert_concrete_function fails for the second (and subsequent)
-        # Dense layers.  Remove assertRaises once the naming bug is fixed.
-        with self.assertRaises(AssertionError):
-            to_onnx(model, (X,))
+        expected = model(X).numpy()
+
+        onx = to_onnx(model, (X,))
+
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+        ort_result = _ort_run(onx, feeds)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_plain_tf_function_no_keras(self):
         """A model defined as a plain @tf.function with no Keras layers.
