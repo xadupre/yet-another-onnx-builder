@@ -322,6 +322,114 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         with self.assertRaises(NotImplementedError):
             to_onnx(est, (X,))
 
+    # ------------------------------------------------------------------ #
+    # Random tensor discrepancy tests                                      #
+    # ------------------------------------------------------------------ #
+
+    def test_hgb_regressor_random_float32(self):
+        """HGBRegressor: no discrepancy on real random float32 tensors."""
+        rng = np.random.default_rng(0)
+        X_train = rng.standard_normal((100, 5)).astype(np.float32)
+        y_train = (X_train[:, 0] * 2 + X_train[:, 1] - X_train[:, 2]).astype(np.float32)
+        X_test = rng.standard_normal((50, 5)).astype(np.float32)
+
+        est = HistGradientBoostingRegressor(max_iter=10, max_depth=3, random_state=0)
+        est.fit(X_train, y_train)
+
+        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+            onx = to_onnx(est, (X_train,), **opset_kw)
+
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": X_test})
+            pred = results[0]
+
+            expected = est.predict(X_test).astype(np.float32).reshape(-1, 1)
+            self.assertEqualArray(expected, pred, atol=1e-5)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": X_test})
+            self.assertEqualArray(expected, ort_results[0], atol=1e-5)
+
+    def test_hgb_regressor_random_float64(self):
+        """HGBRegressor: no discrepancy on real random float64 tensors."""
+        rng = np.random.default_rng(1)
+        X_train = rng.standard_normal((100, 5))
+        y_train = X_train[:, 0] * 2 + X_train[:, 1] - X_train[:, 2]
+        X_test = rng.standard_normal((50, 5))
+
+        est = HistGradientBoostingRegressor(max_iter=10, max_depth=3, random_state=0)
+        est.fit(X_train, y_train)
+
+        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+            onx = to_onnx(est, (X_train,), **opset_kw)
+
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": X_test})
+            pred = results[0]
+
+            expected = est.predict(X_test).reshape(-1, 1)
+            self.assertEqualArray(expected, pred, atol=1e-5)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": X_test})
+            self.assertEqualArray(expected, ort_results[0], atol=1e-5)
+
+    def test_hgb_classifier_random_float32(self):
+        """HGBClassifier: no discrepancy on real random float32 tensors."""
+        rng = np.random.default_rng(2)
+        X_train = rng.standard_normal((100, 5)).astype(np.float32)
+        y_train = (X_train[:, 0] + X_train[:, 1] > 0).astype(int)
+        X_test = rng.standard_normal((50, 5)).astype(np.float32)
+
+        est = HistGradientBoostingClassifier(max_iter=10, max_depth=3, random_state=0)
+        est.fit(X_train, y_train)
+
+        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+            onx = to_onnx(est, (X_train,), **opset_kw)
+
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": X_test})
+            label, proba = results[0], results[1]
+
+            expected_label = est.predict(X_test)
+            expected_proba = est.predict_proba(X_test).astype(np.float32)
+            self.assertEqualArray(expected_label, label)
+            self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": X_test})
+            self.assertEqualArray(expected_label, ort_results[0])
+            self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
+
+    def test_hgb_classifier_random_float64(self):
+        """HGBClassifier: no discrepancy on real random float64 tensors."""
+        rng = np.random.default_rng(3)
+        X_train = rng.standard_normal((100, 5))
+        y_train = (X_train[:, 0] + X_train[:, 1] > 0).astype(int)
+        X_test = rng.standard_normal((50, 5))
+
+        est = HistGradientBoostingClassifier(max_iter=10, max_depth=3, random_state=0)
+        est.fit(X_train, y_train)
+
+        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+            onx = to_onnx(est, (X_train,), **opset_kw)
+
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": X_test})
+            label, proba = results[0], results[1]
+
+            expected_label = est.predict(X_test)
+            expected_proba_raw = est.predict_proba(X_test)
+            self.assertEqualArray(expected_label, label)
+            self.assertEqualArray(expected_proba_raw.astype(proba.dtype), proba, atol=1e-5)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": X_test})
+            self.assertEqualArray(expected_label, ort_results[0])
+            self.assertEqualArray(
+                expected_proba_raw.astype(ort_results[1].dtype), ort_results[1], atol=1e-5
+            )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
