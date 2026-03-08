@@ -12,8 +12,7 @@ from yobx.tensorflow import to_onnx
 
 
 def _ort_run(onx, feeds):
-    """Run an ONNX model with onnxruntime; returns the first output or *None* if
-    onnxruntime is not installed."""
+    """Run an ONNX model with onnxruntime; returns the first output."""
     sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
     return sess.run(None, feeds)[0]
 
@@ -38,8 +37,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-5)
 
         ort_result = _ort_run(onx, feeds)
-        if ort_result is not None:
-            self.assertEqualArray(expected, ort_result, atol=1e-5)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_dense_relu(self):
         """Dense layer with relu activation."""
@@ -63,8 +61,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-3)
 
         ort_result = _ort_run(onx, feeds)
-        if ort_result is not None:
-            self.assertEqualArray(expected, ort_result, atol=1e-3)
+        self.assertEqualArray(expected, ort_result, atol=1e-3)
 
     def test_dense_sigmoid(self):
         """Dense layer with sigmoid activation."""
@@ -87,8 +84,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-5)
 
         ort_result = _ort_run(onx, feeds)
-        if ort_result is not None:
-            self.assertEqualArray(expected, ort_result, atol=1e-5)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     @unittest.skip("initializer confusion")
     def test_sequential_multi_layer(self):
@@ -117,8 +113,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-3)
 
         ort_result = _ort_run(onx, feeds)
-        if ort_result is not None:
-            self.assertEqualArray(expected, ort_result, atol=1e-3)
+        self.assertEqualArray(expected, ort_result, atol=1e-3)
 
     @unittest.skip("initializer confusion")
     def test_sequential_dynamic_shape(self):
@@ -146,8 +141,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-5)
 
         ort_result = _ort_run(onx, feeds)
-        if ort_result is not None:
-            self.assertEqualArray(expected, ort_result, atol=1e-5)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_plain_tf_function_no_keras(self):
         """A model defined as a plain @tf.function with no Keras layers.
@@ -246,8 +240,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-5)
 
         ort_result = _ort_run(onx, feeds)
-        if ort_result is not None:
-            self.assertEqualArray(expected, ort_result, atol=1e-5)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
 
 
 if __name__ == "__main__":
