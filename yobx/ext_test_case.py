@@ -554,6 +554,42 @@ def requires_tensorflow(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
+def has_xgboost(version: str = "") -> bool:
+    "Returns True if XGBoost is installed and its version is high enough."
+    import packaging.version as pv
+
+    try:
+        import xgboost
+    except (ImportError, AttributeError):
+        return False
+    if not hasattr(xgboost, "__version__"):
+        return False
+    if not version:
+        return True
+    return pv.Version(xgboost.__version__) >= pv.Version(version)
+
+
+def requires_xgboost(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`xgboost` is not recent enough."""
+    try:
+        import xgboost
+    except (AttributeError, ImportError):
+        return unittest.skip(msg or "xgboost not installed")
+
+    if not hasattr(xgboost, "__version__"):
+        return unittest.skip(msg or "xgboost not installed")
+
+    if not version:
+        return lambda x: x
+
+    import packaging.version as pv
+
+    if pv.Version(xgboost.__version__) < pv.Version(version):
+        msg = f"xgboost version {xgboost.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def requires_onnx_diagnostic(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx-diagnostic` is not recent enough."""
     try:
