@@ -8,7 +8,9 @@ def register_sklearn_converters():
     if SKLEARN_CONVERTERS:
         # already done
         return
+    from .cluster import register as register_cluster
     from .compose import register as register_compose
+    from .decomposition import register as register_decomposition
     from .ensemble import register as register_ensemble
     from .linear_model import register as register_linear_model
     from .multiclass import register as register_multiclass
@@ -17,7 +19,9 @@ def register_sklearn_converters():
     from .preprocessing import register as register_preprocessing
     from .tree import register as register_tree
 
+    register_cluster()
     register_compose()
+    register_decomposition()
     register_ensemble()
     register_linear_model()
     register_multiclass()

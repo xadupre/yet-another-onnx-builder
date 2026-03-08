@@ -1,5 +1,5 @@
 from typing import Sequence
-from sklearn.base import BaseEstimator, is_classifier, is_regressor
+from sklearn.base import BaseEstimator, ClusterMixin, is_classifier, is_regressor
 from sklearn.pipeline import Pipeline
 
 
@@ -25,6 +25,8 @@ def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
     if is_classifier(estimator):
         return 2 if _classifier_has_predict_proba(estimator) else 1
+    if isinstance(estimator, ClusterMixin):
+        return 2
     return 1
 
 
@@ -32,13 +34,15 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
     """Returns output names for every estimator."""
     if hasattr(estimator, "get_feature_names_out"):
         if isinstance(estimator, Pipeline):
-            try:
-                return post_process_output_names(
-                    estimator.steps[-1][1], list(estimator.steps[-1][1].get_feature_names_out())
-                )
-            except AttributeError:
-                pass
-        else:
+            last_step = estimator.steps[-1][1]
+            if not isinstance(last_step, ClusterMixin):
+                try:
+                    return post_process_output_names(
+                        last_step, list(last_step.get_feature_names_out())
+                    )
+                except AttributeError:
+                    pass
+        elif not isinstance(estimator, ClusterMixin):
             try:
                 return post_process_output_names(
                     estimator, list(estimator.get_feature_names_out())
@@ -51,6 +55,9 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
         return ["label"]
     if is_regressor(estimator):
         return ["predictions"]
+    last = estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
+    if isinstance(last, ClusterMixin):
+        return ["label", "distances"]
     return ["Y"]
 
 
