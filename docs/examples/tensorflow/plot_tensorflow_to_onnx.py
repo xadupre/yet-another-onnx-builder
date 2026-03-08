@@ -72,7 +72,9 @@ print("Graph outputs    :", [out.name for out in onx_linear.graph.output])
 # ``"{name}:0"`` where *name* is the name passed to :func:`to_onnx`
 # (defaults to ``"X"``).
 
-ref = onnxruntime.InferenceSession(onx_linear.SerializeToString(), providers=["CPUExecutionProvider"])
+ref = onnxruntime.InferenceSession(
+    onx_linear.SerializeToString(), providers=["CPUExecutionProvider"]
+)
 (result_linear,) = ref.run(None, {"X:0": X})
 
 expected_linear = model_linear(X).numpy()
@@ -111,7 +113,9 @@ assert "Relu" in op_types
 
 X_test = rng.standard_normal((20, 8)).astype(np.float32)
 
-ref_mlp = onnxruntime.InferenceSession(onx_mlp.SerializeToString(), providers=["CPUExecutionProvider"])
+ref_mlp = onnxruntime.InferenceSession(
+    onx_mlp.SerializeToString(), providers=["CPUExecutionProvider"]
+)
 (result_mlp,) = ref_mlp.run(None, {"X:0": X_test})
 
 expected_mlp = mlp(X_test).numpy()
@@ -136,7 +140,9 @@ print("Batch dimension value  :", batch_dim.dim_value)
 assert batch_dim.dim_param, "Expected a named dynamic dimension"
 
 # The converted model still produces correct results for any batch size.
-ref_dyn = onnxruntime.InferenceSession(onx_dyn.SerializeToString(), providers=["CPUExecutionProvider"])
+ref_dyn = onnxruntime.InferenceSession(
+    onx_dyn.SerializeToString(), providers=["CPUExecutionProvider"]
+)
 for n in (1, 7, 20):
     X_batch = rng.standard_normal((n, 8)).astype(np.float32)
     (out,) = ref_dyn.run(None, {"X:0": X_batch})

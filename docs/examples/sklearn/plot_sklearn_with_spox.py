@@ -127,7 +127,9 @@ pipe_mc.fit(X_mc, y_mc)
 X_test_mc = rng.standard_normal((30, 4)).astype(np.float32)
 onx_mc = to_onnx(pipe_mc, (X_test_mc[:1],), builder_cls=SpoxGraphBuilder)
 
-ref_mc = onnxruntime.InferenceSession(onx_mc.SerializeToString(), providers=["CPUExecutionProvider"])
+ref_mc = onnxruntime.InferenceSession(
+    onx_mc.SerializeToString(), providers=["CPUExecutionProvider"]
+)
 label_mc_onnx, proba_mc_onnx = ref_mc.run(None, {"X": X_test_mc})
 
 label_mc_sk = pipe_mc.predict(X_test_mc)
@@ -161,7 +163,9 @@ print("\nDecisionTree node types:", [n.op_type for n in onx_dt.graph.node])
 print("Domains used:", list({n.domain for n in onx_dt.graph.node}))
 
 X_test_dt = rng.standard_normal((20, 4)).astype(np.float32)
-ref_dt = onnxruntime.InferenceSession(onx_dt.SerializeToString(), providers=["CPUExecutionProvider"])
+ref_dt = onnxruntime.InferenceSession(
+    onx_dt.SerializeToString(), providers=["CPUExecutionProvider"]
+)
 label_dt_onnx, _ = ref_dt.run(None, {"X": X_test_dt})
 
 assert np.array_equal(dt.predict(X_test_dt), label_dt_onnx), "Decision tree mismatch!"
