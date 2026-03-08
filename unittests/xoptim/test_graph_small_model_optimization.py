@@ -6,7 +6,6 @@ from onnx import TensorProto
 from onnx.checker import check_model
 from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
-from yobx.torch import to_onnx
 
 TFLOAT = TensorProto.FLOAT
 
@@ -45,10 +44,10 @@ class TestGraphSmallModelOptimization(ExtTestCase):
         self.assertEqual(len(after), 0)
         self._check_with_ort(onx)
 
-    @unittest.skipIf(to_onnx is None, "not implement yet")
     @requires_torch("2.9")
     def test_remove_unused_nodes_par(self):
         import torch
+        from yobx.torch import to_onnx
 
         class Dummy(torch.nn.Module):
             def __init__(self):
@@ -69,10 +68,10 @@ class TestGraphSmallModelOptimization(ExtTestCase):
         self.assertEqual(len(after), 0)
         self._check_with_ort(onx)
 
-    @unittest.skipIf(to_onnx is None, "not implement yet")
     @requires_torch("2.9")
     def test_remove_unused_nodes_cst(self):
         import torch
+        from yobx.torch import to_onnx
 
         class Dummy(torch.nn.Module):
             def __init__(self):
