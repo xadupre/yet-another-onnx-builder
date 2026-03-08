@@ -108,8 +108,12 @@ def _convert_concrete_function(
     #    from outside the function (one per trainable variable).
     #    cf.variables        — corresponding tf.Variable objects.
     # ------------------------------------------------------------------
+    # using keras or not keras, tf does not seem consistent into
+    # what it does in both case.
     ops = cf.graph.get_operations()
     initializer_values: Dict[str, np.ndarray] = {}
+    value_alias = {}
+    forbidden = set()
     for _captured_tensor, var in zip(cf.captured_inputs, cf.variables):
         value = var.numpy()
         name = f"{var.name}[{_captured_tensor._unique_id}]"
@@ -117,11 +121,28 @@ def _convert_concrete_function(
         assert not g.has_name(name), f"name {name!r} is already taken."
         g.make_initializer(name, value, source="_convert_concrete_function.0")
 
+        if var.name in forbidden:
+            continue
+        if var.name in initializer_values:
+            # In that case, it means there are local variable receiving the same name.
+            del initializer_values[var.name]
+            forbidden.add(var.name)
+        else:
+            value_alias[var.name] = name
+        assert (
+            _captured_tensor._unique_id not in value_alias
+        ), f"A unique id {_captured_tensor._unique_id!r} is not unique for var={var.name!r}"
+        value_alias[_captured_tensor._unique_id] = name
+
     handle_names: Dict[str, str] = {}
     for capture, var in cf.graph.captures:
         name = var.name
         assert name not in handle_names, f"Duplicated name={name!r} in {handle_names=}."
-        handle_names[name] = f"{capture._name}[{capture._unique_id}]"
+        handle_names[name] = dict(
+            full_name=f"{capture._name}[{capture._unique_id}]",
+            name=capture._name,
+            unique_id=capture._unique_id,
+        )
 
     # ------------------------------------------------------------------
     # 2. Register ONNX inputs for each non-captured Placeholder op.
@@ -154,18 +175,38 @@ def _convert_concrete_function(
                 assert not g.has_name(
                     name
                 ), f"Initializer {name!r} is already used{g.get_debug_msg()}"
+                original_name = handle_names[name]["full_name"]
+                if not g.has_name(original_name):
+                    # We need to add the initializer to the model.
+                    if original_name not in initializer_values:
+                        unique_id = handle_names[name]["unique_id"]
+                        if unique_id in value_alias:
+                            original_name = value_alias[unique_id]
+
+                if not g.has_name(original_name):
+                    assert original_name in initializer_values, (
+                        f"{original_name!r} not found in "
+                        f"initializer_values={sorted(initializer_values)}, "
+                        f"tensor.name={tensor.name!r}, handle_names={handle_names[name]}, "
+                        f"value_alias={value_alias}"
+                    )
+                    g.make_initializer(
+                        original_name,
+                        initializer_values[original_name],
+                        source="_convert_concrete_function.1",
+                    )
                 g.op.Identity(
-                    handle_names[name],
+                    original_name,
                     outputs=[name],
                     name="initializer",
-                    source="_convert_concrete_function.1",
+                    source="_convert_concrete_function.2",
                 )
                 continue
 
             raise AssertionError(
                 f"tensor.name={tensor.name!r} could not be handled as a placeholder, "
                 f"{type(tensor)=}, initializer_values={sorted(initializer_values)}, "
-                f"handle_names={sorted(handle_names)}, "
+                f"handle_names={handle_names}, value_alias={value_alias}, "
                 f"input_names={sorted(set_input_names)}{g.get_debug_msg()}"
             )
 
@@ -180,7 +221,7 @@ def _convert_concrete_function(
             )
 
         onnx_outputs = op_outputs = [t.name for t in op.outputs]
-        sts = {}
+        sts: Dict[str, Any] = {}
         fct(g, sts, onnx_outputs, op)
         assert all(g.has_name(o) for o in op_outputs), (
             f"Issue with node {op.type}({[i.name for i in op.inputs]}) -> "

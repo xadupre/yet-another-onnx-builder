@@ -147,6 +147,8 @@ module = [
     "yobx.doc",
     "yobx.ext_test_case",
     "yobx.builder.light.*",
+    "yobx.builder.onnxscript.*",
+    "yobx.builder.spox.*",
     "yobx.container.*",
     "yobx.helpers._excel_helper",
     "yobx.helpers.helper",

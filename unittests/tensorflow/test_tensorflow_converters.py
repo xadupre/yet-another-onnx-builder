@@ -18,7 +18,7 @@ def _ort_run(onx, feeds):
     return sess.run(None, feeds)[0]
 
 
-@requires_tensorflow("2.0")
+@requires_tensorflow("2.18")
 class TestTensorflowBaseConverters(ExtTestCase):
     def test_dense_linear(self):
         """Dense layer with no activation (linear) converts to MatMul+Add."""

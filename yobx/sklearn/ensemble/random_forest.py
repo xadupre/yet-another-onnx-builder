@@ -419,7 +419,7 @@ def sklearn_random_forest_classifier(
         classlabels = classes.astype(str).tolist()  # type: ignore
         label_kwargs = {"classlabels_strings": classlabels}
 
-    result = g.make_node(
+    g.make_node(
         "TreeEnsembleClassifier",
         [X],
         outputs=outputs,
@@ -429,10 +429,7 @@ def sklearn_random_forest_classifier(
         **attrs,  # type: ignore
         **label_kwargs,
     )
-
-    if isinstance(result, str):
-        return result, result
-    return result[0], result[1]
+    return tuple(outputs)
 
 
 def _sklearn_random_forest_classifier_v5(
