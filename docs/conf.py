@@ -78,9 +78,19 @@ intersphinx_mapping = {
 
 sphinx_gallery_conf = {
     # path to your examples scripts
-    "examples_dirs": [os.path.join(os.path.dirname(__file__), "examples")],
+    "examples_dirs": [
+        os.path.join(os.path.dirname(__file__), "examples_core"),
+        os.path.join(os.path.dirname(__file__), "examples_sklearn"),
+        os.path.join(os.path.dirname(__file__), "examples_torch"),
+        os.path.join(os.path.dirname(__file__), "examples_tensorflow"),
+    ],
     # path where to save gallery generated examples
-    "gallery_dirs": ["auto_examples"],
+    "gallery_dirs": [
+        "auto_examples_core",
+        "auto_examples_sklearn",
+        "auto_examples_torch",
+        "auto_examples_tensorflow",
+    ],
     # no parallelization to avoid conflict with environment variables
     "parallel": 1,
     # sorting
