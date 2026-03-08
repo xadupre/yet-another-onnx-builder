@@ -21,6 +21,7 @@ example :ref:`l-plot-sklearn-with-sklearn-onnx` shows how to plug
     from yobx.sklearn.register import get_sklearn_converters
 
     CATEGORY_TITLES = {
+        "cluster": "Cluster Models",
         "preprocessing": "Preprocessing",
         "linear_model": "Linear Models",
         "tree": "Tree Models",
