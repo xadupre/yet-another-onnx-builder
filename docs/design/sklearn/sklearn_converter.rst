@@ -208,6 +208,36 @@ The graph structure depends on the number of classes:
                                        │
                                    ArgMax ──Cast──Gather(classes)  ──►  label
 
+PCA
+---
+
+:func:`sklearn_pca
+<yobx.sklearn.decomposition.pca.sklearn_pca>`
+converts :class:`sklearn.decomposition.PCA`.
+
+The implementation centres the input (when ``mean_`` is not ``None``) and
+then projects it onto the principal components:
+
+.. code-block:: text
+
+    X  ──Sub(mean_)──►  centered  ──MatMul(components_.T)──►  output
+         (if mean_ is not None)
+
+When ``mean_`` is ``None`` the ``Sub`` node is skipped.
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from sklearn.decomposition import PCA
+    from yobx.sklearn import to_onnx
+    from yobx.helpers.onnx_helper import pretty_onnx
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((10, 4)).astype(np.float32)
+    model = to_onnx(PCA(n_components=2).fit(X), (X,))
+    print(pretty_onnx(model))
+
 Pipeline
 --------
 
