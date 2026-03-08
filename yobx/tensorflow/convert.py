@@ -123,9 +123,9 @@ def _convert_concrete_function(
 
         if var.name in forbidden:
             continue
-        if var.name in initializer_values:
-            # In that case, it means there are local variable receiving the same name.
-            del initializer_values[var.name]
+        if var.name in value_alias:
+            # In that case, it means there are local variables receiving the same base name.
+            del value_alias[var.name]
             forbidden.add(var.name)
         else:
             value_alias[var.name] = name
