@@ -423,12 +423,26 @@ def sklearn_hgb_regressor(
     ml_opset = _get_ml_opset(g)
     if ml_opset >= 5:
         raw = _build_hgb_raw_output_v5(
-            g, X, name, all_trees, target_ids, n_targets, baseline, tree_outputs,
+            g,
+            X,
+            name,
+            all_trees,
+            target_ids,
+            n_targets,
+            baseline,
+            tree_outputs,
             dtype=_get_input_dtype(g, X),
         )
     else:
         raw = _build_hgb_raw_output_legacy(
-            g, X, name, all_trees, target_ids, n_targets, baseline, tree_outputs,
+            g,
+            X,
+            name,
+            all_trees,
+            target_ids,
+            n_targets,
+            baseline,
+            tree_outputs,
         )
 
     if not need_cast:
@@ -502,12 +516,26 @@ def sklearn_hgb_classifier(
 
     if ml_opset >= 5:
         raw = _build_hgb_raw_output_v5(
-            g, X, name, all_trees, target_ids, n_targets, baseline, [raw_name],
+            g,
+            X,
+            name,
+            all_trees,
+            target_ids,
+            n_targets,
+            baseline,
+            [raw_name],
             dtype=dtype,
         )
     else:
         raw = _build_hgb_raw_output_legacy(
-            g, X, name, all_trees, target_ids, n_targets, baseline, [raw_name],
+            g,
+            X,
+            name,
+            all_trees,
+            target_ids,
+            n_targets,
+            baseline,
+            [raw_name],
         )
 
     # ------------------------------------------------------------------ #
@@ -522,9 +550,7 @@ def sklearn_hgb_classifier(
     itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
     if itype == onnx.TensorProto.DOUBLE:
         g._known_types[raw] = onnx.TensorProto.DOUBLE  # type: ignore[attr-defined]
-        raw_f32 = g.op.Cast(
-            raw, to=onnx.TensorProto.FLOAT, name=f"{name}_cast_f32"
-        )
+        raw_f32 = g.op.Cast(raw, to=onnx.TensorProto.FLOAT, name=f"{name}_cast_f32")
         assert isinstance(raw_f32, str)
     else:
         raw_f32 = raw

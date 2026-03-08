@@ -130,7 +130,9 @@ pipe_mc.fit(X_mc, y_mc)
 X_test_mc = rng.standard_normal((30, 4)).astype(np.float32)
 onx_mc = to_onnx(pipe_mc, (X_test_mc[:1],))
 
-ref_mc = onnxruntime.InferenceSession(onx_mc.SerializeToString(), providers=["CPUExecutionProvider"])
+ref_mc = onnxruntime.InferenceSession(
+    onx_mc.SerializeToString(), providers=["CPUExecutionProvider"]
+)
 label_mc_onnx, proba_mc_onnx = ref_mc.run(None, {"X": X_test_mc})
 
 label_mc_sk = pipe_mc.predict(X_test_mc)

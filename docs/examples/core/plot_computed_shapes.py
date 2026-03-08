@@ -134,7 +134,9 @@ feeds = {
     "Y": np.random.rand(2, 5, 8).astype(np.float32),
 }
 
-session = onnxruntime.InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+session = onnxruntime.InferenceSession(
+    model.SerializeToString(), providers=["CPUExecutionProvider"]
+)
 outputs = session.run(None, feeds)
 result = builder.compare_with_true_inputs(feeds, outputs)
 print("\n=== shape comparison (expr, expected, computed) ===")
