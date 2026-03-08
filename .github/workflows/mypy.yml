@@ -20,6 +20,6 @@ jobs:
       - name: Install pytorch 2.10
         run: pip install torch==2.10.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
       - name: Install dependencies
-        run: pip install -e ".[dev,torch]" mypy
+        run: pip install -e ".[dev,docs,sklearn,spox,tensorflow,torch]" mypy
       - name: Run mypy
         run: mypy yobx

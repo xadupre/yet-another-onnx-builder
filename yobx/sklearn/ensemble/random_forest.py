@@ -3,9 +3,9 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
-from .decision_tree import _get_ml_opset, _LEAF, _NODE_MODE_LEQ, _get_input_dtype
+from ..register import register_sklearn_converter
+from ..tree.decision_tree import _get_ml_opset, _LEAF, _NODE_MODE_LEQ, _get_input_dtype
 
 
 def _extract_forest_attributes_legacy(
@@ -292,15 +292,23 @@ def _extract_forest_attributes_v5(
             # Degenerate tree: single leaf derived from the root node.
             for tree_idx in range(n_trees_per_est):
                 _append_leaf_entry_v5(
-                    all_leaf_targetids, all_leaf_weights,
-                    value[0, 0], tree_idx, is_classifier, n_estimators,
+                    all_leaf_targetids,
+                    all_leaf_weights,
+                    value[0, 0],
+                    tree_idx,
+                    is_classifier,
+                    n_estimators,
                 )
         else:
             for tree_idx in range(n_trees_per_est):
                 for nid in leaf_nodes:
                     _append_leaf_entry_v5(
-                        all_leaf_targetids, all_leaf_weights,
-                        value[nid, 0], tree_idx, is_classifier, n_estimators,
+                        all_leaf_targetids,
+                        all_leaf_weights,
+                        value[nid, 0],
+                        tree_idx,
+                        is_classifier,
+                        n_estimators,
                     )
 
         # ------------------------------------------------------------------ #
@@ -386,7 +394,16 @@ def sklearn_random_forest_classifier(
 
     if ml_opset >= 5:
         return _sklearn_random_forest_classifier_v5(
-            g, sts, outputs, estimator, X, name, classes, n_classes, n_estimators, estimators,
+            g,
+            sts,
+            outputs,
+            estimator,
+            X,
+            name,
+            classes,
+            n_classes,
+            n_estimators,
+            estimators,
             dtype=_get_input_dtype(g, X),
         )
 
@@ -402,7 +419,7 @@ def sklearn_random_forest_classifier(
         classlabels = classes.astype(str).tolist()  # type: ignore
         label_kwargs = {"classlabels_strings": classlabels}
 
-    result = g.make_node(
+    g.make_node(
         "TreeEnsembleClassifier",
         [X],
         outputs=outputs,
@@ -412,10 +429,7 @@ def sklearn_random_forest_classifier(
         **attrs,  # type: ignore
         **label_kwargs,
     )
-
-    if isinstance(result, str):
-        return result, result
-    return result[0], result[1]
+    return tuple(outputs)
 
 
 def _sklearn_random_forest_classifier_v5(
@@ -541,7 +555,14 @@ def sklearn_random_forest_regressor(
 
     if ml_opset >= 5:
         tree_result = _sklearn_random_forest_regressor_v5(
-            g, sts, tree_outputs, estimator, X, name, n_estimators, estimators,
+            g,
+            sts,
+            tree_outputs,
+            estimator,
+            X,
+            name,
+            n_estimators,
+            estimators,
             dtype=_get_input_dtype(g, X),
         )
     else:

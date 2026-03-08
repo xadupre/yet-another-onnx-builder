@@ -11,7 +11,9 @@ from yobx.ext_test_case import (
     ignore_errors,
     has_transformers,
     has_sklearn,
+    has_spox,
     has_torch,
+    has_tensorflow,
 )
 
 VERBOSE = 0
@@ -115,6 +117,12 @@ class TestDocumentationExamples(ExtTestCase):
 
             if not reason and not has_sklearn() and name in {"plot_sklearn_pipeline.py"}:
                 reason = "scikit-learn not installed"
+
+            if not reason and not has_spox() and "spox" in name:
+                reason = "spox not installed"
+
+            if not reason and not has_tensorflow() and "tensorflow" in name:
+                reason = "tensorflow not installed"
 
             if reason:
 

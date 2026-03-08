@@ -55,6 +55,9 @@ sklearn = [
 spox = [
     "spox>=0.12",
 ]
+tensorflow = [
+    "tensorflow>=2.20",
+]
 torch = [
     "accelerate",
     "huggingface_hub",
@@ -144,11 +147,20 @@ module = [
     "yobx.doc",
     "yobx.ext_test_case",
     "yobx.builder.light.*",
+    "yobx.builder.onnxscript.*",
+    "yobx.builder.spox.*",
     "yobx.container.*",
     "yobx.helpers._excel_helper",
     "yobx.helpers.helper",
     "yobx.reference.ops.*",
+    "yobx.sklearn.ensemble.*",
+    "yobx.sklearn.linear_model.*",
+    "yobx.sklearn.multiclass.*",
+    "yobx.sklearn.neural_network.*",
+    "yobx.sklearn.preprocessing.*",
+    "yobx.sklearn.tree.*",
     "yobx.reference.torch_ops.*",
+    "yobx.tensorflow.ops.*",
     "yobx.torch.tracing.*",
     "yobx.torch.in_transformers._patches_model_rope_utils",
     "yobx.translate.*",

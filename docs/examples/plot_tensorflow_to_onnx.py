@@ -32,17 +32,14 @@ The workflow is:
 """
 
 # %%
-# Guard: skip this example if TensorFlow is not installed.
-try:
-    import tensorflow as tf
-except ImportError:
-    import sys
-
-    sys.exit(0)
-
+import tensorflow as tf
 import numpy as np
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.tensorflow import to_onnx
+
+# %%
+# Remove this line to run on GPU.
+tf.config.set_visible_devices([], "GPU")
 
 # %%
 # 1. Build a simple Dense layer
@@ -56,9 +53,6 @@ rng = np.random.default_rng(0)
 X = rng.standard_normal((5, 4)).astype(np.float32)
 
 model_linear = tf.keras.Sequential([tf.keras.layers.Dense(3, input_shape=(4,))])
-# Forward pass — required to initialise the weights before tracing.
-_ = model_linear(X)
-
 onx_linear = to_onnx(model_linear, (X,))
 
 print("Opset            :", onx_linear.opset_import[0].version)

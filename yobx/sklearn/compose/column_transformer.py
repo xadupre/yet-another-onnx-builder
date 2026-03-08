@@ -108,6 +108,7 @@ def sklearn_column_transformer(
         X_sub = g.op.Gather(X, col_indices, axis=1, name=f"{name}__{trans_name}")
 
         if _is_passthrough(transformer):
+            assert isinstance(X_sub, str)  # type happiness
             parts.append(X_sub)
         else:
             try:

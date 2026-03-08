@@ -10,7 +10,6 @@ from onnx import TensorProto
 from yobx.builder.light import Var, Vars, start
 from yobx.ext_test_case import ExtTestCase
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

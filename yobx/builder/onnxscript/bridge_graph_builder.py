@@ -596,6 +596,19 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         """Returns output names."""
         return [i.name or "" for i in self._graph.outputs]
 
+    def get_debug_msg(self) -> str:
+        """Returns information useful for understanding where an error could come from.
+
+        :return: a summary of the current graph state as a string
+        """
+        lines = [
+            f"OnnxScriptGraphBuilder opsets={self.opsets!r}",
+            f"  inputs:  {self.input_names}",
+            f"  outputs: {self.output_names}",
+            f"  initializers: {list(self._name_to_value.keys())}",
+        ]
+        return "\n".join(lines)
+
     # ------------------------------------------------------------------
     # Export
     # ------------------------------------------------------------------
