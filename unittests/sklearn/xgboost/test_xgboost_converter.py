@@ -44,15 +44,15 @@ class TestXGBoostClassifier(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        expected_label = clf.predict(X)
         expected_proba = clf.predict_proba(X).astype(np.float32)
-        self.assertEqualArray(expected_label, label)
+        expected_label = clf.predict(X)
         self.assertEqualArray(expected_proba, proba, atol=1e-5)
+        self.assertEqualArray(expected_label, label)
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": X})
-        self.assertEqualArray(expected_label, ort_results[0])
         self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
+        self.assertEqualArray(expected_label, ort_results[0])
 
     def test_xgb_classifier_multiclass(self):
         from xgboost import XGBClassifier
@@ -79,15 +79,15 @@ class TestXGBoostClassifier(ExtTestCase):
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
 
-        expected_label = clf.predict(X)
         expected_proba = clf.predict_proba(X).astype(np.float32)
-        self.assertEqualArray(expected_label, label)
+        expected_label = clf.predict(X)
         self.assertEqualArray(expected_proba, proba, atol=1e-5)
+        self.assertEqualArray(expected_label, label)
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": X})
-        self.assertEqualArray(expected_label, ort_results[0])
         self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
+        self.assertEqualArray(expected_label, ort_results[0])
 
     def test_xgb_classifier_binary_pipeline(self):
         """XGBClassifier works inside a sklearn Pipeline."""
@@ -107,9 +107,11 @@ class TestXGBoostClassifier(ExtTestCase):
         onx = to_onnx(pipe, (X,))
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
-        label = results[0]
+        label, proba = results[0], results[1]
 
+        expected_proba = pipe.predict_proba(X).astype(np.float32)
         expected_label = pipe.predict(X)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
         self.assertEqualArray(expected_label, label)
 
 
