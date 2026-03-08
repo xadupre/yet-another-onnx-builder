@@ -3,9 +3,9 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
-from .decision_tree import _get_ml_opset, _LEAF, _NODE_MODE_LEQ, _get_input_dtype
+from ..register import register_sklearn_converter
+from ..tree.decision_tree import _get_ml_opset, _LEAF, _NODE_MODE_LEQ, _get_input_dtype
 
 
 def _extract_forest_attributes_legacy(

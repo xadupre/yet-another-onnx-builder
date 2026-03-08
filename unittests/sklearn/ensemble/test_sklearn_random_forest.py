@@ -1,5 +1,5 @@
 """
-Unit tests for yobx.sklearn.tree random forest converters.
+Unit tests for yobx.sklearn.ensemble random forest converters.
 """
 
 import unittest

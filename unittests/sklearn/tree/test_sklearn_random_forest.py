@@ -1,7 +1,3 @@
-"""
-Unit tests for yobx.sklearn.tree random forest converters.
-"""
-
 import unittest
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
