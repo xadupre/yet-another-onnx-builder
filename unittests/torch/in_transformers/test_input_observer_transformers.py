@@ -28,14 +28,16 @@ class TestInputObserverTransformers(ExtTestCase):
 
         filenamec = self.get_dump_file("test_input_observer_onnx_generate_tiny_llm.onnx")
 
-        with apply_patches_for_model(patch_transformers=True, model=model):
+        with (
+            register_flattening_functions(patch_transformers=True),
+            apply_patches_for_model(patch_transformers=True, model=model),
+        ):
             to_onnx(
                 model,
                 (),
                 kwargs=observer.infer_arguments(),
                 dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
                 filename=filenamec,
-                exporter="custom",
             )
 
         data = observer.check_discrepancies(filenamec, progress_bar=False)

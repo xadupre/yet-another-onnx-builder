@@ -159,6 +159,9 @@ class InputCandidate:
             for v in dynamic_shapes.values():
                 res.extend(cls._flatten_nested_object(v))
             return res
+        if isinstance(dynamic_shapes, (torch.export.Dim, torch.export.dynamic_shapes._DimHint)):
+            # weird case where one input is annoted with a single torch.export.Dim.
+            return [dynamic_shapes]
         raise TypeError(f"Unexpected type {type(dynamic_shapes)} in {dynamic_shapes=}.")
 
     def needs_backed_size_oblivious(self, dynamic_shapes: Any) -> bool:
@@ -565,10 +568,14 @@ class InputObserverInfo:
 
         if len(self._best_candidate.flat_list) != len(self._best_candidate.aligned_flat_list):
             raise NotImplementedError(
-                "infer_dynamic_shapes is not implemented "
-                "when the best candidate is not 'aligned'. "
-                "This happens when there is no stored set of inputs where "
-                "all optional inputs showing in other sets are defined."
+                f"infer_dynamic_shapes is not implemented "
+                f"when the best candidate is not 'aligned'. "
+                f"This happens when there is no stored set of inputs where "
+                f"all optional inputs showing in other sets are defined."
+                f"\nself._best_candidate.flat_list="
+                f"{string_type(self._best_candidate.flat_list, with_shape=True)}"
+                f"\nself._best_candidate.aligned_flat_list="
+                f"{string_type(self._best_candidate.aligned_flat_list, with_shape=True)}"
             )
 
         if len({inputs.n_aligned_tensors for inputs in self.inputs}) != 1:

@@ -554,6 +554,7 @@ class TestOnnxExportSignatures(ExtTestCase):
 
     @requires_torch("2.8")
     @requires_transformers("4.55")
+    @ignore_warnings(FutureWarning)
     def test_signature_dynamic_int(self):
         class Model(torch.nn.Module):
             def forward(self, x, i):

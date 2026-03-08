@@ -6349,6 +6349,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     assert isinstance(
                         vv, str
                     ), f"Unexpected type for {vv!r}{self.get_debug_msg()}"
+                    if vv in self.constraints_ and k in self.constraints_[vv]:
+                        # already an equivalence
+                        continue
                     simpl = simplify_two_expressions(k, vv)
                     if len(simpl) != 2:
                         continue
