@@ -18,7 +18,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         import onnxruntime
 
         data = get_tiny_model("arnir0/Tiny-LLM")
-        model, inputs, ds = data.model, data.inputs, data.dynamic_shapes
+        model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
 
         b1 = data["inputs_batch1"]
         del inputs["position_ids"]
@@ -114,7 +114,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         import onnxruntime
 
         data = get_tiny_model("arnir0/Tiny-LLM")
-        model, inputs, ds = data.model, data.inputs, data.dynamic_shapes
+        model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
         b1 = data["inputs_batch1"]
         filename = self.get_dump_file("test_tiny_llm_to_onnx_ort_22.onnx")
         del inputs["position_ids"]

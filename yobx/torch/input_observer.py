@@ -160,7 +160,7 @@ class InputCandidate:
                 res.extend(cls._flatten_nested_object(v))
             return res
         if isinstance(dynamic_shapes, (torch.export.Dim, torch.export.dynamic_shapes._DimHint)):
-            # weird case where one input is annoted with a single torch.export.Dim.
+            # weird case where one input is annotated with a single torch.export.Dim.
             return [dynamic_shapes]
         raise TypeError(f"Unexpected type {type(dynamic_shapes)} in {dynamic_shapes=}.")
 
