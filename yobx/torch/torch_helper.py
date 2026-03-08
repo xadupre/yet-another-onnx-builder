@@ -16,7 +16,8 @@ _TYPENAME = dict(
 )
 
 
-def onnx_dtype_to_torch_dtype(itype: int) -> torch.dtype:
+# keeps quotes, pytest is not happy otherwise
+def onnx_dtype_to_torch_dtype(itype: int) -> "torch.dtype":
     """
     Converts an onnx type into a torch dtype.
 

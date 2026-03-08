@@ -2185,7 +2185,7 @@ class TestOnnxExportAten(ExtTestCase):
                         [x.detach().cpu().numpy() for x in inputs],
                     )
                 )
-                ref = ExtendedReferenceEvaluator(onx, verbose=0)
+                ref = self.check_ort(onx)
                 got = ref.run(None, feeds)[0]
                 self.assertEqualArray(expected, got, atol=1e-2)
 
@@ -2224,7 +2224,7 @@ class TestOnnxExportAten(ExtTestCase):
                         [x.detach().cpu().numpy() for x in inputs],
                     )
                 )
-                ref = ExtendedReferenceEvaluator(onx, verbose=0)
+                ref = self.check_ort(onx)
                 got = ref.run(None, feeds)[0]
                 self.assertEqualArray(expected, got, atol=1e-2)
 
@@ -2266,7 +2266,7 @@ class TestOnnxExportAten(ExtTestCase):
                         [x.detach().cpu().numpy() for x in inputs],
                     )
                 )
-                ref = ExtendedReferenceEvaluator(onx, verbose=0)
+                ref = self.check_ort(onx)
                 got = ref.run(None, feeds)[0]
                 self.assertEqualArray(expected, got, atol=1e-2)
 

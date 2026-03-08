@@ -693,7 +693,6 @@ class TestInputObserver(ExtTestCase):
             model,
             observer.infer_arguments(),
             dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
-            exporter="custom",
             filename=proto_name,
         )
         if not os.path.exists(proto_name):
@@ -725,7 +724,6 @@ class TestInputObserver(ExtTestCase):
             model,
             observer.infer_arguments(),
             dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
-            exporter="custom",
             filename=proto_name,
         )
         if not os.path.exists(proto_name):
