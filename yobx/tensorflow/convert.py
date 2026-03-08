@@ -114,21 +114,31 @@ def _convert_concrete_function(
     initializer_values: Dict[str, np.ndarray] = {}
     value_alias = {}
     forbidden = set()
-    for _captured_tensor, var in zip(cf.captured_inputs, cf.variables):
+    # Build a mapping from resource handle unique_id to variable for correct pairing.
+    # Using zip(cf.captured_inputs, cf.variables) is unreliable: cf.captured_inputs can
+    # include non-variable captures (e.g. training-phase flags) and the ordering of the
+    # two sequences is not guaranteed to match for multi-layer Keras models.  Instead we
+    # match each captured tensor to its variable by comparing handle unique IDs.
+    uid_to_var = {var.handle._unique_id: var for var in cf.variables}
+    for captured_tensor in cf.captured_inputs:
+        var = uid_to_var.get(captured_tensor._unique_id)
+        if var is None:
+            # Non-variable capture (e.g. a training-phase boolean); skip.
+            continue
         value = var.numpy()
-        name = f"{var.name}[{_captured_tensor._unique_id}]"
+        name = f"{var.name}[{captured_tensor._unique_id}]"
         initializer_values[name] = value
         assert not g.has_name(name), f"name {name!r} is already taken."
         g.make_initializer(name, value, source="_convert_concrete_function.0")
-        assert value.shape == var.shape or value.shape != _captured_tensor.shape, (
+        assert value.shape == var.shape or value.shape != captured_tensor.shape, (
             f"Shape Mismatch for {var.name!r}, {var.shape=}, {value.shape=}, "
-            f"{_captured_tensor.shape=}"
+            f"{captured_tensor.shape=}"
         )
 
         assert (
-            _captured_tensor._unique_id not in value_alias
-        ), f"A unique id {_captured_tensor._unique_id!r} is not unique for var={var.name!r}"
-        value_alias[_captured_tensor._unique_id] = name
+            captured_tensor._unique_id not in value_alias
+        ), f"A unique id {captured_tensor._unique_id!r} is not unique for var={var.name!r}"
+        value_alias[captured_tensor._unique_id] = name
         if var.name in forbidden:
             continue
         if var.name in value_alias:
