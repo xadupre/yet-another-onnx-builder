@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 from ..xbuilder import GraphBuilder
 from .register import get_tf_op_converter
-from .tensorflow_helper import sanitize_name, tf_dtype_to_np_dtype
+from .tensorflow_helper import tf_dtype_to_np_dtype
 
 
 def to_onnx(
@@ -94,12 +94,10 @@ def _convert_concrete_function(
 ) -> None:
     """Walks the concrete-function graph and emits equivalent ONNX operations.
 
-    The conversion context ``sts`` maps every TF tensor name to the sanitized
+    The conversion context ``sts`` maps every TF tensor name to the
     ONNX tensor name used inside the :class:`~yobx.xbuilder.GraphBuilder`.
     TF tensor names contain characters that are invalid or problematic in ONNX
-    (e.g. ``":"`` and ``"/"`` in names like ``"dense/MatMul:0"``); sanitization
-    is applied via :func:`~yobx.tensorflow.tensorflow_helper.sanitize_name`
-    before registering any tensor with the builder.
+    (e.g. ``":"`` and ``"/"`` in names like ``"dense/MatMul:0"``).
 
     :param cf: a :class:`tensorflow.ConcreteFunction`
     :param g: the :class:`~yobx.xbuilder.GraphBuilder` to populate
@@ -108,7 +106,7 @@ def _convert_concrete_function(
     :param verbose: verbosity level
     :param extra_converters: op-type → converter overrides
     """
-    # sts: maps every TF tensor name → its sanitized ONNX tensor name.
+    # sts: maps every TF tensor name = ONNX tensor name.
     # Op converters receive this dict so they can translate input references.
     sts: Dict[str, str] = {}
 
@@ -122,7 +120,7 @@ def _convert_concrete_function(
     for _captured_tensor, var in zip(cf.captured_inputs, cf.variables):
         value = var.numpy()
         initializer_values[var.name] = value
-        onnx_name = sanitize_name(var.name)
+        onnx_name = var.name
         g.make_initializer(onnx_name, value, source="_convert_concrete_function.0")
         sts[var.name] = onnx_name
 
@@ -144,7 +142,7 @@ def _convert_concrete_function(
             name = tensor.name
             if name in set_input_names:
                 spec = set_input_names[name][1]
-                onnx_name = sanitize_name(name)
+                onnx_name = name
                 g.make_tensor_input(
                     onnx_name, tf_dtype_to_np_dtype(spec.dtype), _shape_to_tuple(g, spec.shape)
                 )
@@ -154,7 +152,7 @@ def _convert_concrete_function(
                 # Captured variable resource handle — register its numpy value
                 # as an ONNX initializer so downstream ReadVariableOp can use it.
                 if name not in sts:
-                    onnx_name = sanitize_name(name)
+                    onnx_name = name
                     assert not g.has_name(
                         onnx_name
                     ), f"The name {onnx_name!r} is already taken.{g.get_debug_msg()}"
@@ -172,7 +170,7 @@ def _convert_concrete_function(
                     f"known names: {sorted(sts)}{g.get_debug_msg()}"
                 )
                 source_onnx_name = sts[source_tf_name]
-                onnx_name = sanitize_name(name)
+                onnx_name = name
                 g.op.Identity(
                     source_onnx_name,
                     outputs=[onnx_name],
@@ -194,8 +192,7 @@ def _convert_concrete_function(
         if fct is None:
             raise RuntimeError(f"Type {op_type!r} has no converting function mapped to it.")
 
-        op_outputs = [t.name for t in op.outputs]
-        onnx_outputs = [sanitize_name(n) for n in op_outputs]
+        onnx_outputs = op_outputs = [t.name for t in op.outputs]
         for tf_n, onnx_n in zip(op_outputs, onnx_outputs):
             sts[tf_n] = onnx_n
         fct(g, sts, onnx_outputs, op)

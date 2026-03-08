@@ -29,14 +29,8 @@ Covered in this example:
 """
 
 # %%
-# Guard: skip this example if spox is not installed.
-try:
-    import spox  # noqa: F401
-except ImportError:
-    import sys
 
-    sys.exit(0)
-
+import spox  # noqa: F401
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline

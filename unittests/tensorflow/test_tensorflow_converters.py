@@ -32,7 +32,6 @@ class TestTensorflowBaseConverters(ExtTestCase):
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
 
-        # The ONNX input name is the sanitized form of the TF placeholder name.
         input_name = onx.graph.input[0].name
         feeds = {input_name: X}
 
