@@ -3446,6 +3446,36 @@ class TestPositionMsg(ExtTestCase):
         self.assertIsInstance(msg, str)
         self.assertIn("Abs", msg)
 
+    def test_value_info_static_shapes(self):
+        """Shape info for intermediate tensors must be added even when there are no
+        dynamic dimensions (regression test for early-return bug in
+        _add_shape_information)."""
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("X", TFLOAT, (2, 3))
+        g.make_node("Relu", ["X"], ["tmp"], name="relu1")
+        g.make_node("Relu", ["tmp"], ["output_0"], name="relu2")
+        g.make_tensor_output("output_0", TFLOAT, (2, 3), is_dimension=False, indexed=True)
+        onx = g.to_onnx(optimize=False)
+        vi_names = {vi.name for vi in onx.graph.value_info}
+        self.assertIn("tmp", vi_names, "intermediate tensor 'tmp' must have shape info")
+        tmp_vi = next(vi for vi in onx.graph.value_info if vi.name == "tmp")
+        shape = [d.dim_value for d in tmp_vi.type.tensor_type.shape.dim]
+        self.assertEqual(shape, [2, 3])
+
+    def test_value_info_dynamic_shapes(self):
+        """Shape info for intermediate tensors must also be present with dynamic dims."""
+        g = GraphBuilder(18, ir_version=9, dynamic_shapes={"X": {0: "batch"}})
+        g.make_tensor_input("X", TFLOAT, ("batch", 3))
+        g.make_node("Relu", ["X"], ["tmp"], name="relu1")
+        g.make_node("Relu", ["tmp"], ["output_0"], name="relu2")
+        g.make_tensor_output("output_0", TFLOAT, ("batch", 3), is_dimension=False, indexed=True)
+        onx = g.to_onnx(optimize=False)
+        vi_names = {vi.name for vi in onx.graph.value_info}
+        self.assertIn("tmp", vi_names, "intermediate tensor 'tmp' must have shape info")
+        tmp_vi = next(vi for vi in onx.graph.value_info if vi.name == "tmp")
+        shape = [d.dim_param or d.dim_value for d in tmp_vi.type.tensor_type.shape.dim]
+        self.assertEqual(shape, ["batch", 3])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

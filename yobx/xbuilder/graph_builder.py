@@ -6211,8 +6211,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             the names the user provides
         """
         replacements = self._improves_dynamic_dimension_naming()
-        if not replacements:
-            return
 
         if len(model.graph.node) == 0:
             raise RuntimeError(
