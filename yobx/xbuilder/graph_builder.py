@@ -1083,7 +1083,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         """
         return self.opsets.get(domain, 0)
 
-    def get_opset(self, domain: str, exc: bool = True) -> Optional[int]:
+    def get_opset(self, domain: str, exc: bool = True) -> int:
         """
         Returns the opset version for a specific domain.
 
@@ -1094,7 +1094,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         assert (
             not exc or domain in self.opsets
         ), f"Domain {domain!r} is not registered{self.get_debug_msg()}."
-        return self.opsets.get(domain, None)
+        return self.opsets.get(domain, 0)
 
     def set_opset(self, domain: str, version: int = 1):
         """

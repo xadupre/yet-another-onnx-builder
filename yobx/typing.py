@@ -44,12 +44,12 @@ class GraphBuilderProtocol(Protocol):
         """Returns the list of output names."""
         ...
 
-    def get_opset(self, domain: str, exc: bool = True) -> Optional[int]:
+    def get_opset(self, domain: str, exc: bool = True) -> int:
         """Returns the opset version for a specific domain.
 
         :param domain: domain name
         :param exc: raise an exception if missing
-        :return: version or ``None`` when *exc* is ``False`` and the domain is unknown
+        :return: version or 0 when *exc* is ``False`` and the domain is unknown
         """
         ...
 

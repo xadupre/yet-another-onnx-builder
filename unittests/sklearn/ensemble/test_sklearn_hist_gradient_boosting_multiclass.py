@@ -22,7 +22,7 @@ class TestSklearnHistGradientBoostingMultiClass(ExtTestCase):
         est = HistGradientBoostingClassifier(max_iter=5, max_depth=2, random_state=42)
         est.fit(X, y)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -55,7 +55,7 @@ class TestSklearnHistGradientBoostingMultiClass(ExtTestCase):
         est = HistGradientBoostingClassifier(max_iter=5, max_depth=2, random_state=42)
         est.fit(X, y)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -66,7 +66,7 @@ class TestSklearnHistGradientBoostingMultiClass(ExtTestCase):
         label, proba = results[0], results[1]
 
         expected_label = est.predict(X)
-        expected_proba = est.predict_proba(X).astype(np.float32)
+        expected_proba = est.predict_proba(X)
         self.assertEqualArray(expected_label, label)
         self.assertEqualArray(expected_proba, proba, atol=1e-5)
 
@@ -130,7 +130,7 @@ class TestSklearnHistGradientBoostingMultiClass(ExtTestCase):
         label, proba = results[0], results[1]
 
         expected_label = est.predict(X)
-        expected_proba = est.predict_proba(X).astype(np.float32)
+        expected_proba = est.predict_proba(X)
         self.assertEqualArray(expected_label, label)
         self.assertEqualArray(expected_proba, proba, atol=1e-5)
 

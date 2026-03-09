@@ -101,4 +101,4 @@ print("Pipeline labels match ✓")
 # 5. Visualize the pipeline
 # -------------------------
 
-plot_dot(label_pipe_onnx)
+plot_dot(onx_pipe)
