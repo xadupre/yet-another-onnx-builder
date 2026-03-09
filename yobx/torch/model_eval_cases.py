@@ -291,7 +291,7 @@ def _make_exporter_export(
         return exported.module()
 
     if exporter == "export-tracing":
-        from experimental_experiment.torch_interpreter.tracing import CustomTracer
+        from yobx.torch.tracing import CustomTracer
 
         try:
             if verbose >= 2:
@@ -324,7 +324,7 @@ def _make_exporter_onnx(
     quiet: bool = True,
 ) -> Union[Dict, Tuple[onnx.ModelProto, Any]]:
     if exporter.startswith("custom"):
-        from experimental_experiment.torch_interpreter import to_onnx, ExportOptions
+        from yobx.torch import to_onnx, ExportOptions
 
         opts = {}
         opts["strict"] = "-strict" in exporter
