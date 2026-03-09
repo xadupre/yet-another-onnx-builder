@@ -9,7 +9,7 @@ on:
     - cron: "0 4 * * *"
 
 jobs:
-  torch_tests:
+  torch_tests_4:
     name: transformers-releases (ubuntu-latest, py3.13, transformers 4.57/4/.5/4.49 torch-${{ matrix.torch-version }})
     runs-on: ubuntu-latest
     permissions:
@@ -51,7 +51,7 @@ jobs:
         run: pytest unittests/torch --durations=10
 
 jobs:
-  torch_tests:
+  torch_tests_5:
     name: transformers-releases (ubuntu-latest, py3.13, transformers 5.3/5.2 torch-${{ matrix.torch-version }})
     runs-on: ubuntu-latest
     permissions:
