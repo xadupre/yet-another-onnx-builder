@@ -11,7 +11,7 @@
 
 yet another onnx builder, patches, flattening functions...
 
-**Documentation**: [https://xadupre.github.io/yet-another-onnx-builder/](https://xadupre.github.io/yet-another-onnx-builder/)
+**Documentation**: [https://sdpython.github.io/doc/yet-another-onnx-builder/dev/index.html](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/index.html)
 
 **yet-another-onnx-builder** (`yobx`) is a toolkit for converting machine learning models
 to [ONNX](https://onnx.ai) format and manipulating ONNX graphs programmatically.
