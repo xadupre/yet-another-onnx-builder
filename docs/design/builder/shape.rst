@@ -142,7 +142,7 @@ to a whole shape at once.
 
 .. seealso::
 
-    :ref:`plot-shape-expressions` — sphinx-gallery
+    :ref:`l-plot-shape-expressions` — sphinx-gallery
     example demonstrating ``Concat``, ``Reshape``, and ``Split`` symbolic
     expressions, automatic simplification, and evaluation with concrete values.
 
