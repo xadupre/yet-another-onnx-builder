@@ -150,19 +150,9 @@ def _make_empty_cache(
     onnx_input_names: List[str],
     onnx_input_shapes: List[Tuple[Union[int, str], ...]],
     onnx_input_types: List[str],
+    _ORT_TYPE_TO_TORCH,
 ) -> Dict[str, "torch.Tensor"]:  # noqa: F821
-    """
-    Creates an empty cache. Example:
-
-    .. code-block:: python
-
-        _make_empty_cache(
-            1,
-            sess.input_names[2:],
-            [i.shape for i in sess.get_inputs()[2:]],
-            [i.type for i in sess.get_inputs()[2:]],
-        )
-    """
+    """Creates an empty cache."""
     import torch
 
     assert batch > 0, f"batch size = {batch} must be positive"
@@ -172,7 +162,7 @@ def _make_empty_cache(
         assert (
             new_shape and new_shape[0] > 0
         ), f"new_shape={new_shape} cannot have a null batch size, name={name!r}, shape={shape}"
-        feeds[name] = torch.empty(new_shape, dtype=_ORT_TYPE_TO_NUMPY[dtype])
+        feeds[name] = torch.empty(new_shape, dtype=_ORT_TYPE_TO_TORCH[dtype])
     return feeds
 
 
@@ -272,11 +262,28 @@ def onnx_generate(
     import torch
     from ..reference._inference_session_torch import InferenceSessionForTorch
 
+    _ORT_TYPE_TO_TORCH: Dict[str, type] = {
+        "tensor(float)": torch.float32,
+        "tensor(float32)": torch.float32,
+        "tensor(float16)": torch.float16,
+        "tensor(double)": torch.float64,
+        "tensor(float64)": torch.float64,
+        "tensor(int64)": torch.int64,
+        "tensor(int32)": torch.int32,
+        "tensor(int16)": torch.int16,
+        "tensor(int8)": torch.int8,
+        "tensor(uint64)": torch.uint64,
+        "tensor(uint32)": torch.uint32,
+        "tensor(uint16)": torch.uint16,
+        "tensor(uint8)": torch.uint8,
+        "tensor(bool)": torch.bool,
+    }
+
     return_np = False
     if isinstance(input_ids, np.ndarray):
         return_np = True
         input_ids = torch.from_numpy(input_ids)
-        attention_mask = torch.from_array(attention_mask) if attention_mask is not None else None
+        attention_mask = torch.from_numpy(attention_mask) if attention_mask is not None else None
 
     if not isinstance(model_or_path, InferenceSessionForTorch):
         providers = ["CUDAExecutionProvider"] if input_ids.is_cuda else []
@@ -311,7 +318,9 @@ def onnx_generate(
             cache_types.append(dt)
 
     # First call: prefill
-    empty_cache = _make_empty_cache(input_ids.shape[0], cache_names, cache_shapes, cache_types)
+    empty_cache = _make_empty_cache(
+        input_ids.shape[0], cache_names, cache_shapes, cache_types, _ORT_TYPE_TO_TORCH
+    )
     feeds = (
         dict(input_ids=input_ids)
         if len(input_names) == 1

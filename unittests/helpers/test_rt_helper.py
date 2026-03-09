@@ -145,6 +145,7 @@ class TestMakeFeeds(ExtTestCase):
         self.assertNotIn("position_ids", feeds)
 
 
+@requires_torch()
 class TestOnnxGenerate(ExtTestCase):
     """Tests for :func:`yobx.helpers.rt_helper.onnx_generate`."""
 
