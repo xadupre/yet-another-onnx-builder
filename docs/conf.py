@@ -23,7 +23,7 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_gallery.gen_gallery",
     "sphinx_issues",
-    "sphinxcontrib-mermaid",
+    "sphinxcontrib.mermaid",
     "matplotlib.sphinxext.plot_directive",
     "sphinx_runpython.epkg",
     "sphinx_runpython.gdot",
