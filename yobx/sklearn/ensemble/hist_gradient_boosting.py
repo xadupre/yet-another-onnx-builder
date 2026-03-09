@@ -417,8 +417,7 @@ def sklearn_hgb_regressor(
     baseline = estimator._baseline_prediction  # shape (1, 1)
 
     itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
-    need_cast = itype == onnx.TensorProto.DOUBLE
-    tree_outputs = [f"{outputs[0]}_tree_out"] if need_cast else outputs
+    tree_outputs = [f"{outputs[0]}_tree_out"]
 
     ml_opset = g.get_opset("ai.onnx.ml")
     if ml_opset >= 5:
@@ -445,15 +444,12 @@ def sklearn_hgb_regressor(
             tree_outputs,
         )
 
-    if not need_cast:
-        return raw
-
     cast_result = g.make_node(
         "Cast",
         [raw],
         outputs=outputs,
         name=f"{name}_cast_f64",
-        to=onnx.TensorProto.DOUBLE,
+        to=itype,
     )
     return cast_result if isinstance(cast_result, str) else cast_result[0]
 
