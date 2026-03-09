@@ -2355,6 +2355,19 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             self.set_rank(node.output[0], self.get_rank(node.input[0]))
         return None
 
+    # CDist: computes pairwise distances between two sets of vectors.
+    # Input A: (N, D), Input B: (M, D) → Output: (N, M)
+    if node.op_type == "CDist" and node.domain == "com.microsoft":
+        if self.has_type(node.input[0]):
+            self.set_type(node.output[0], self.get_type(node.input[0]))
+        if self.has_shape(node.input[0]) and self.has_shape(node.input[1]):
+            shape_a = self.get_shape(node.input[0])
+            shape_b = self.get_shape(node.input[1])
+            self.set_shape(node.output[0], (shape_a[0], shape_b[0]))
+        elif self.has_rank(node.input[0]):
+            self.set_rank(node.output[0], 2)
+        return None
+
     assert node.domain not in {
         "ai.onnx.ml",
         "intermediate",

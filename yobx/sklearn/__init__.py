@@ -14,6 +14,7 @@ def register_sklearn_converters():
     from .ensemble import register as register_ensemble
     from .linear_model import register as register_linear_model
     from .multiclass import register as register_multiclass
+    from .neighbors import register as register_neighbors
     from .neural_network import register as register_neural_network
     from .pipeline import register as register_pipeline
     from .preprocessing import register as register_preprocessing
@@ -26,6 +27,7 @@ def register_sklearn_converters():
     register_ensemble()
     register_linear_model()
     register_multiclass()
+    register_neighbors()
     register_neural_network()
     register_pipeline()
     register_preprocessing()
