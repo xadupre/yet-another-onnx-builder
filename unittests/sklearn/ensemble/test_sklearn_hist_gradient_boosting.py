@@ -181,6 +181,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est.fit(X, y)
 
         onx = to_onnx(est, (X,))
+        self.dump_onnx("test_hgb_classifier_binary_float64.onnx", onx)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -191,7 +192,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         label, proba = results[0], results[1]
 
         expected_label = est.predict(X)
-        expected_proba = est.predict_proba(X).astype(np.float32)
+        expected_proba = est.predict_proba(X)
         self.assertEqualArray(expected_label, label)
         self.assertEqualArray(expected_proba, proba, atol=1e-5)
 
@@ -256,7 +257,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         label, proba = results[0], results[1]
 
         expected_label = est.predict(X)
-        expected_proba = est.predict_proba(X).astype(np.float32)
+        expected_proba = est.predict_proba(X)
         self.assertEqualArray(expected_label, label)
         self.assertEqualArray(expected_proba, proba, atol=1e-5)
 

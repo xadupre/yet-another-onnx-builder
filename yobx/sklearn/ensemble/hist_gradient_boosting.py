@@ -26,6 +26,7 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
+from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
 from ..tree.decision_tree import _get_ml_opset, _get_input_dtype, _NODE_MODE_LEQ
@@ -448,13 +449,6 @@ def sklearn_hgb_regressor(
     if not need_cast:
         return raw
 
-    # TreeEnsembleRegressor / TreeEnsemble always outputs float32 per the ONNX ML
-    # spec, but the graph builder may infer the intermediate type as double
-    # (inheriting from the double input).  We must correct that inference before
-    # adding the Cast so that the CastPattern optimiser does not remove it.
-    # There is intentionally no public "force_set_type" API on GraphBuilder, so we
-    # update the internal map directly.
-    g._known_types[raw] = onnx.TensorProto.FLOAT  # type: ignore[attr-defined]
     cast_result = g.make_node(
         "Cast",
         [raw],
@@ -538,27 +532,13 @@ def sklearn_hgb_classifier(
             [raw_name],
         )
 
-    # ------------------------------------------------------------------ #
-    # Post-processing: sigmoid (binary) or softmax (multiclass).          #
-    # ------------------------------------------------------------------ #
-    # The ONNX ML tree operators always output float32 per spec, but the
-    # reference evaluator propagates the input dtype.  Cast explicitly to
-    # float32 before applying sigmoid/softmax so that the constant "1"
-    # and the probability output are always float32.
-    # There is intentionally no public "force_set_type" API on GraphBuilder, so we
-    # update the internal map directly when correcting the inferred type.
-    itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
-    if itype == onnx.TensorProto.DOUBLE:
-        g._known_types[raw] = onnx.TensorProto.DOUBLE  # type: ignore[attr-defined]
-        raw_f32 = g.op.Cast(raw, to=onnx.TensorProto.FLOAT, name=f"{name}_cast_f32")
-        assert isinstance(raw_f32, str)
-    else:
-        raw_f32 = raw
+    itype = g.get_type(X)
+    raw_f32 = g.op.Cast(raw, to=itype, name=name)
 
     if is_binary:
         # raw_f32: (N, 1) → sigmoid → p1, complement → p0, concat → proba (N, 2)
         p1 = g.op.Sigmoid(raw_f32, name=f"{name}_sigmoid")
-        one_cst = np.ones((1, 1), dtype=np.float32)
+        one_cst = np.ones((1, 1), dtype=tensor_dtype_to_np_dtype(itype))
         p0 = g.op.Sub(one_cst, p1, name=f"{name}_p0")
         proba_raw = g.op.Concat(p0, p1, axis=1, name=f"{name}_concat")
     else:

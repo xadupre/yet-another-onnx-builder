@@ -670,7 +670,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 if isinstance(_v, self.WrapDim):
                     self.make_dynamic_object(
                         _v.name,
-                        self.torch.SymInt(_v.name),  # type: ignore
+                        self.WrapDim(_v.name),  # type: ignore
                         axis=_k,
                         input_name=input_name,
                     )

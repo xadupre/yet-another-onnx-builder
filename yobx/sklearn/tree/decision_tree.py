@@ -523,92 +523,37 @@ def sklearn_decision_tree_regressor(
     ml_opset = _get_ml_opset(g)
     tree = estimator.tree_
 
-    # Detect float64 input so we can cast the output back to double after the
-    # tree node (TreeEnsembleRegressor / TreeEnsemble always output float32).
-    itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
-    need_cast = itype == onnx.TensorProto.DOUBLE
-
-    # When a cast is needed, direct the tree node into a temporary intermediate name.
-    tree_outputs = [f"{outputs[0]}_tree_out"] if need_cast else outputs
-
     if ml_opset >= 5:
-        tree_result = _sklearn_decision_tree_regressor_v5(
-            g, sts, tree_outputs, estimator, X, name, tree, dtype=_get_input_dtype(g, X)
-        )
-    else:
-        # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4)
-        attrs = _extract_tree_attributes(tree, n_classes=1, is_classifier=False)
-
-        node_result = g.make_node(
-            "TreeEnsembleRegressor",
+        attrs = _extract_tree_attributes_v5(tree, n_classes=1, is_classifier=False)
+        return g.make_node(
+            "TreeEnsemble",
             [X],
-            outputs=tree_outputs,
+            outputs=outputs,
             domain="ai.onnx.ml",
-            name=name,
-            n_targets=1,
-            post_transform="NONE",
+            name=f"{name}_te",
+            post_transform=0,  # NONE
+            aggregate_function=1,  # SUM
             **attrs,  # type: ignore
         )
-        tree_result = node_result if isinstance(node_result, str) else node_result[0]
 
-    if not need_cast:
-        return tree_result
-
-    # TreeEnsembleRegressor / TreeEnsemble always outputs float32 per the ONNX ML
-    # spec, but the graph builder may infer the intermediate type as double
-    # (inheriting from the double input).  We must correct that inference before
-    # adding the Cast so that the CastPattern optimiser does not see
-    # Cast(double → double) and remove it as a no-op.
-    #
-    # There is intentionally no public "force_set_type" API on GraphBuilder, so we
-    # update the internal map directly.  The attribute is a plain dict - this is safe
-    # and consistent with other direct usages inside graph_builder.py itself.
-    g._known_types[tree_result] = onnx.TensorProto.FLOAT  # type: ignore[attr-defined]
-
-    # Cast float32 output back to float64 to match the input dtype.
+    # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4)
+    attrs = _extract_tree_attributes(tree, n_classes=1, is_classifier=False)
+    tree_outputs = [g.unique_name(outputs[0])]
+    tree_result = g.make_node(
+        "TreeEnsembleRegressor",
+        [X],
+        outputs=tree_outputs,
+        domain="ai.onnx.ml",
+        name=name,
+        n_targets=1,
+        post_transform="NONE",
+        **attrs,  # type: ignore
+    )
     cast_result = g.make_node(
         "Cast",
         [tree_result],
         outputs=outputs,
         name=f"{name}_cast_f64",
-        to=onnx.TensorProto.DOUBLE,
+        to=g.get_type(X),
     )
-    return cast_result if isinstance(cast_result, str) else cast_result[0]
-
-
-def _sklearn_decision_tree_regressor_v5(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict,
-    outputs: List[str],
-    estimator: DecisionTreeRegressor,
-    X: str,
-    name: str,
-    tree,
-    dtype=None,
-) -> str:
-    """
-    Emits a ``TreeEnsemble`` node (``ai.onnx.ml`` opset 5) for a regressor.
-
-    The output is a float ``[N, 1]`` tensor of predictions, matching the
-    shape produced by the legacy ``TreeEnsembleRegressor``.
-
-    :param dtype: numpy float dtype for ``nodes_splits`` / ``leaf_weights``
-        tensors; uses ``np.float32`` when ``None``
-    :return: output tensor name
-    """
-    if dtype is None:
-        dtype = np.float32
-    attrs = _extract_tree_attributes_v5(tree, n_classes=1, is_classifier=False, dtype=dtype)
-
-    result = g.make_node(
-        "TreeEnsemble",
-        [X],
-        outputs=outputs,
-        domain="ai.onnx.ml",
-        name=f"{name}_te",
-        post_transform=0,  # NONE
-        aggregate_function=1,  # SUM
-        **attrs,  # type: ignore
-    )
-
-    return result if isinstance(result, str) else result[0]
+    return cast_result
