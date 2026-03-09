@@ -354,16 +354,7 @@ def sklearn_decision_tree_classifier(
 
     if ml_opset >= 5:
         return _sklearn_decision_tree_classifier_v5(
-            g,
-            sts,
-            outputs,
-            estimator,
-            X,
-            name,
-            classes,
-            n_classes,
-            tree,
-            dtype=g.get_type(X)
+            g, sts, outputs, estimator, X, name, classes, n_classes, tree, dtype=g.get_type(X)
         )
 
     # Legacy path: TreeEnsembleClassifier (ai.onnx.ml opset <= 4)

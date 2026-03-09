@@ -1499,6 +1499,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b = BasicShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (10, 5))
+        b.set_opset("ai.onnx.ml", 3)
         node = oh.make_node(
             "TreeEnsembleRegressor",
             ["X"],
@@ -1528,6 +1529,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b = BasicShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_rank("X", 2)
+        b.set_opset("ai.onnx.ml", 5)
         node = oh.make_node(
             "TreeEnsembleRegressor",
             ["X"],
@@ -1727,6 +1729,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b = BasicShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (5, 3))
+        b.set_opset("ai.onnx.ml", 3)
         node = oh.make_node(
             "TreeEnsembleRegressor",
             ["X"],
@@ -2361,6 +2364,7 @@ class TestDevicePropagation(ExtTestCase):
         b.set_type("X", TFLOAT)
         b.set_shape("X", (4, 3))
         b.set_device("X", -1)
+        b.set_opset("ai.onnx.ml", 3)
         node = oh.make_node(
             "TreeEnsembleRegressor",
             ["X"],
