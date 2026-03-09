@@ -7,6 +7,7 @@ from sklearn.multiclass import OneVsRestClassifier
 from ..register import register_sklearn_converter, get_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
 from ..sklearn_helper import get_n_expected_outputs
+from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 
 @register_sklearn_converter(OneVsRestClassifier)
@@ -78,7 +79,7 @@ def sklearn_one_vs_rest_classifier(
         )
 
     itype = g.get_type(X)
-    dtype = g.onnx_dtype_to_np_dtype(itype)
+    dtype = tensor_dtype_to_np_dtype(itype)
     classes = estimator.classes_
     emit_proba = len(outputs) > 1
 

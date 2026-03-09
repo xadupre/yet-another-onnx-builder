@@ -154,6 +154,7 @@ def _build_converter_prompt(estimator_class: type) -> str:
         from sklearn.preprocessing import StandardScaler
         from ...typing import GraphBuilderExtendedProtocol
         from ..register import register_sklearn_converter
+        from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 
         @register_sklearn_converter(StandardScaler)
@@ -189,7 +190,7 @@ def _build_converter_prompt(estimator_class: type) -> str:
             assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
             itype = g.get_type(X)
-            dtype = g.onnx_dtype_to_np_dtype(itype)
+            dtype = tensor_dtype_to_np_dtype(itype)
 
             if getattr(estimator, "with_mean", True):
                 mean = estimator.mean_.astype(dtype)
@@ -235,7 +236,7 @@ def _build_converter_prompt(estimator_class: type) -> str:
         - `g.has_type(name)`, `g.get_type(name)`, `g.set_type(name, dtype)`
         - `g.has_shape(name)`, `g.get_shape(name)`, `g.set_shape(name, shape)`
         - `g.has_device(name)`, `g.get_device(name)`, `g.set_device(name, device)`
-        - `g.onnx_dtype_to_np_dtype(itype)` - convert ONNX dtype to numpy dtype
+        - `tensor_dtype_to_np_dtype(itype)` from `yobx.helpers.onnx_helper` - convert ONNX dtype to numpy dtype
         - `g.unique_name(prefix)` - generate a unique tensor name
 
         Write the complete converter function for `{cls_name}`. Requirements:

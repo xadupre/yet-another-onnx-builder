@@ -4,6 +4,7 @@ import onnx
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
+from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 
 @register_sklearn_converter((LogisticRegression, LogisticRegressionCV))
@@ -59,7 +60,7 @@ def sklearn_logistic_regression(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
-    dtype = g.onnx_dtype_to_np_dtype(itype)
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     coef = estimator.coef_.astype(dtype)
     intercept = estimator.intercept_.astype(dtype)
