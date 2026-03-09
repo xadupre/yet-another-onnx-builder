@@ -46,7 +46,7 @@ class TestGraphBuilderOpsetApi(ExtTestCase):
     def test_get_opset_missing_exc_false(self):
         g = GraphBuilder(18, ir_version=10)
         result = g.get_opset("unknown.domain", exc=False)
-        self.assertIsNone(result)
+        self.assertEqual(0, result)
 
     # ------------------------------------------------------------------
     # set_opset

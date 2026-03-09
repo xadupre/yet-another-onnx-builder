@@ -85,7 +85,7 @@ class TestSpoxGraphBuilderOpsetApi(ExtTestCase):
 
     def test_get_opset_missing_no_exc(self):
         g = _make_builder()
-        self.assertIsNone(g.get_opset("unknown.domain", exc=False))
+        self.assertEqual(0, g.get_opset("unknown.domain", exc=False))
 
     def test_set_opset_new_domain(self):
         g = _make_builder()
