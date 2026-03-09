@@ -196,9 +196,7 @@ class TestOnnxGenerate(ExtTestCase):
         new_kv = np.zeros((cls.BATCH, HEADS, 1, HEAD_DIM), dtype=np.float32)
 
         inputs = [
-            onnx.helper.make_tensor_value_info(
-                "input_ids", TensorProto.INT64, [cls.BATCH, None]
-            ),
+            onnx.helper.make_tensor_value_info("input_ids", TensorProto.INT64, [cls.BATCH, None]),
             onnx.helper.make_tensor_value_info(
                 "attention_mask", TensorProto.INT64, [cls.BATCH, None]
             ),
@@ -268,9 +266,7 @@ class TestOnnxGenerate(ExtTestCase):
 
         inits = [onnx.numpy_helper.from_array(new_kv, name="new_kv")]
         return onnx.helper.make_model(
-            onnx.helper.make_graph(
-                nodes, "tiny_llm_with_kv", inputs, outputs, inits
-            ),
+            onnx.helper.make_graph(nodes, "tiny_llm_with_kv", inputs, outputs, inits),
             opset_imports=[onnx.helper.make_opsetid("", 18)],
             ir_version=9,
         )
@@ -304,7 +300,9 @@ class TestOnnxGenerate(ExtTestCase):
         model = self._make_kv_model(winner_token=5)
         prompt = np.array([[1, 2]], dtype=np.int64)
         attn = np.ones_like(prompt)
-        tokens = onnx_generate(model, prompt, attention_mask=attn, max_new_tokens=10, eos_token_id=5)
+        tokens = onnx_generate(
+            model, prompt, attention_mask=attn, max_new_tokens=10, eos_token_id=5
+        )
         self.assertEqual(tokens.shape, (1, 3))
         self.assertEqual(int(tokens[0, 2]), 5)
 
@@ -330,7 +328,9 @@ class TestOnnxGenerate(ExtTestCase):
         model = self._make_fixed_logits_model(winner_token=2)
         prompt = torch.tensor([[1, 2, 3]], dtype=torch.int64)
         attn = torch.ones_like(prompt)
-        tokens = onnx_generate(model, prompt, attention_mask=attn, max_new_tokens=2, eos_token_id=99)
+        tokens = onnx_generate(
+            model, prompt, attention_mask=attn, max_new_tokens=2, eos_token_id=99
+        )
         self.assertIsInstance(tokens, np.ndarray)
         self.assertEqual(tokens.shape, (1, 5))
 
