@@ -12,6 +12,7 @@ from yobx.ext_test_case import (
     skipif_ci_windows,
     requires_torch,
     requires_onnxruntime,
+    requires_transformers,
     ignore_warnings,
     hide_stdout,
 )

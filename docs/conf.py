@@ -11,6 +11,7 @@ release = yobx.__version__
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.coverage",
+    "sphinx.ext.duration",
     "sphinx.ext.githubpages",
     "sphinx.ext.graphviz",
     "sphinx.ext.ifconfig",
@@ -71,7 +72,10 @@ intersphinx_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "sklearn": ("https://scikit-learn.org/stable/", None),
     "skl2onnx": ("https://onnx.ai/sklearn-onnx/", None),
-    "tensorflow": ("https://www.tensorflow.org/api_docs/python", None),
+    "tensorflow": (
+        "https://www.tensorflow.org/api_docs/python",
+        "https://github.com/mr-ubik/tensorflow-intersphinx/raw/master/tf2_py_objects.inv",
+    ),
     "torch": ("https://docs.pytorch.org/docs/stable/", None),
 }
 
@@ -109,7 +113,8 @@ substring_to_disable = []
 if int(os.environ.get("UNITTEST_GOING", "0")):
     substring_to_disable = ["tiny_llm"]
 substring = "|".join(f"({s})" for s in substring_to_disable)
-sphinx_gallery_conf["ignore_pattern"] = f".*({substring}).*"
+if substring:
+    sphinx_gallery_conf["ignore_pattern"] = f".*({substring}).*"
 
 epkg_dictionary = {
     "aten functions": "https://pytorch.org/cppdocs/api/namespace_at.html#functions",
@@ -167,7 +172,7 @@ epkg_dictionary = {
     "Supported Operators and Data Types": "https://github.com/microsoft/onnxruntime/blob/main/docs/OperatorKernels.md",
     "sympy": "https://www.sympy.org/en/index.html",
     "Keras": "https://keras.io/",
-    "tensorFlow": "https://www.tensorflow.org/",
+    "tensorflow": "https://www.tensorflow.org/",
     "TensorFlow": "https://www.tensorflow.org/",
     "tensorflow-onnx": "https://github.com/onnx/tensorflow-onnx",
     "timm": "https://github.com/huggingface/pytorch-image-models",
