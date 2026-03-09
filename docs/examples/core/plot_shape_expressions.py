@@ -1,5 +1,5 @@
 """
-.. _plot-shape-expressions:
+.. _l-plot-shape-expressions:
 
 Expressions in Shape Computation
 =================================
