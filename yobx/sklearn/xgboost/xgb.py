@@ -13,15 +13,20 @@ The trees are extracted from the fitted booster via
 * **Multi-class classification** — per-class margins are passed through
   softmax to produce a ``[N, n_classes]`` probability matrix.
 * **Regression** — raw margin output with the XGBoost ``base_score`` bias
-  added as a constant.
+  added, followed by an objective-dependent output transform:
+
+  * Identity objectives (``reg:squarederror``, ``reg:absoluteerror``, …):
+    no transform; bias = ``base_score`` added directly.
+  * Sigmoid objective (``reg:logistic``): ``sigmoid(margin)``; bias =
+    ``logit(base_score)``.
+  * Exp objectives (``count:poisson``, ``reg:gamma``, ``reg:tweedie``,
+    ``survival:cox``): ``exp(margin)``; bias = ``log(base_score)``.
+  * Unknown objectives: raises :class:`NotImplementedError`.
+
+* Multi-class objectives: no bias (base score is zero for each class).
 
 The conversion supports XGBoost 2.x and 3.x and treats the stored ``base_score``
-configuration value as the untransformed prediction-space value:
-
-* Binary/logistic objectives: ``margin_bias = logit(base_score)``
-  (equals 0 for the default ``base_score = 0.5``).
-* Regression objectives: ``bias = base_score`` added directly.
-* Multi-class objectives: no bias (base score is zero for each class).
+configuration value as the untransformed prediction-space value.
 
 XGBoost's tree-branching condition *"go to yes-child when
 x < split_condition"* maps to:
@@ -41,6 +46,35 @@ from ..tree.decision_tree import _get_ml_opset, _get_input_dtype
 # Mode encoding for ai.onnx.ml opset-5 TreeEnsemble.
 # 0 = BRANCH_LEQ, 1 = BRANCH_LT (exact match for XGBoost's x < threshold).
 _NODE_MODE_LT = np.uint8(1)
+
+# ---------------------------------------------------------------------------
+# Supported regression objectives, grouped by their output transform.
+# ---------------------------------------------------------------------------
+
+#: Regression objectives that use the identity link (no output transform).
+_REG_IDENTITY_OBJECTIVES = frozenset(
+    {
+        "reg:squarederror",
+        "reg:squaredlogerror",
+        "reg:absoluteerror",
+        "reg:pseudohubererror",
+        "reg:quantileerror",
+    }
+)
+
+#: Regression objectives that apply ``sigmoid`` as the output transform.
+_REG_SIGMOID_OBJECTIVES = frozenset({"reg:logistic"})
+
+#: Regression objectives that apply ``exp`` as the output transform
+#: (log-link objectives).
+_REG_EXP_OBJECTIVES = frozenset(
+    {
+        "count:poisson",
+        "reg:gamma",
+        "reg:tweedie",
+        "survival:cox",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -386,15 +420,17 @@ def _build_xgb_tree_attrs_v5(
 def _compute_margin_bias(base_score: float, objective: str) -> float:
     """Compute the margin-space bias from the raw ``base_score``.
 
-    XGBoost 2.x stores ``base_score`` in the prediction space.  The value
-    must be transformed to margin (log-odds) space before adding to the raw
-    tree output:
+    XGBoost stores ``base_score`` in the prediction space.  The value
+    must be transformed to margin space before adding to the raw tree output:
 
-    * Binary logistic: ``logit(base_score)`` — zero for the default 0.5.
-    * Regression (``reg:*`` / ``count:*`` / etc.): use ``base_score`` directly.
+    * Binary / sigmoid logistic: ``logit(base_score)`` — zero for default 0.5.
+    * Sigmoid regression (``reg:logistic``): same logit transform.
+    * Log-link regression (``count:poisson``, ``reg:gamma``, ``reg:tweedie``,
+      ``survival:cox``): ``log(base_score)`` — zero for default ``base_score=1``.
+    * Identity regression (``reg:squarederror``, …): use ``base_score`` directly.
     * Multi-class: return 0 (no single bias applies across classes).
 
-    :param base_score: untransformed base score from the model config
+    :param base_score: prediction-space base score from the model config
     :param objective: XGBoost objective string (e.g. ``"binary:logistic"``)
     :return: margin-space bias to add to tree output
     """
@@ -404,8 +440,37 @@ def _compute_margin_bias(base_score: float, objective: str) -> float:
         return float(np.log(p / (1.0 - p)))
     if "softmax" in objective or "softprob" in objective or "multi" in objective:
         return 0.0
-    # Regression objectives: base_score is in prediction space, added directly.
+    if objective in _REG_EXP_OBJECTIVES:
+        # Log-link: stored base_score is in prediction space (positive real).
+        # Margin = log(base_score); clamp to avoid log(0).
+        return float(np.log(max(float(base_score), 1e-7)))
+    # Identity-link regression objectives: base_score is in prediction space
+    # which equals margin space (identity transform), so add it directly.
     return float(base_score)
+
+
+def _get_reg_output_transform(objective: str) -> Optional[str]:
+    """Return the ONNX output-transform type for an :class:`~xgboost.XGBRegressor` objective.
+
+    :param objective: XGBoost objective string (e.g. ``"reg:squarederror"``)
+    :return: ``"sigmoid"`` or ``"exp"`` when a transform is needed, ``None``
+        for identity objectives.
+    :raises NotImplementedError: when *objective* is not supported by this
+        converter.  Callers should catch this and report a meaningful error
+        rather than silently producing wrong outputs.
+    """
+    if objective in _REG_IDENTITY_OBJECTIVES:
+        return None
+    if objective in _REG_SIGMOID_OBJECTIVES:
+        return "sigmoid"
+    if objective in _REG_EXP_OBJECTIVES:
+        return "exp"
+    raise NotImplementedError(
+        f"XGBRegressor ONNX converter: objective {objective!r} is not yet supported. "
+        f"Supported objectives — identity: {sorted(_REG_IDENTITY_OBJECTIVES)}, "
+        f"sigmoid: {sorted(_REG_SIGMOID_OBJECTIVES)}, "
+        f"exp: {sorted(_REG_EXP_OBJECTIVES)}."
+    )
 
 
 def _emit_tree_node(
@@ -674,8 +739,16 @@ def sklearn_xgb_regressor(
     """Convert an :class:`xgboost.XGBRegressor` to ONNX.
 
     The raw margin (sum of all tree leaf values) is computed via a
-    ``TreeEnsembleRegressor`` / ``TreeEnsemble`` node and then the XGBoost
-    ``base_score`` is added as a constant bias.
+    ``TreeEnsembleRegressor`` / ``TreeEnsemble`` node, the XGBoost
+    ``base_score`` bias is added, and then an objective-dependent output
+    transform is applied to match :meth:`~xgboost.XGBRegressor.predict`:
+
+    * Identity (``reg:squarederror``, ``reg:absoluteerror``, …): no transform.
+    * ``reg:logistic``: ``sigmoid(margin)``.
+    * ``count:poisson``, ``reg:gamma``, ``reg:tweedie``, ``survival:cox``:
+      ``exp(margin)``.
+
+    Unsupported objectives raise :class:`NotImplementedError`.
 
     :param g: the graph builder to add nodes to
     :param sts: shapes dict (passed through, not used internally)
@@ -684,9 +757,13 @@ def sklearn_xgb_regressor(
     :param X: input tensor name
     :param name: prefix for node names added to the graph
     :return: output tensor name (shape ``[N, 1]``)
+    :raises NotImplementedError: if the model's objective is not supported
     """
     booster = estimator.get_booster()
     objective: str = estimator.objective or "reg:squarederror"
+
+    # Validate early so the error message is clear before we build any graph.
+    out_transform = _get_reg_output_transform(objective)
 
     ml_opset = _get_ml_opset(g)
     dtype = _get_input_dtype(g, X)
@@ -730,7 +807,7 @@ def sklearn_xgb_regressor(
             to=onnx.TensorProto.FLOAT,
         )
 
-    # Add base_score bias (regression: base_score is in prediction space).
+    # Add margin-space bias derived from base_score.
     base_score = _get_base_score(booster)
     bias = _compute_margin_bias(base_score, objective)
     if abs(bias) > 1e-8:
@@ -740,6 +817,13 @@ def sklearn_xgb_regressor(
         # - float32: float32 bias
         bias_arr = np.array([bias], dtype=dtype if v5_native_float64 else np.float32)
         raw_scores = g.op.Add(raw_scores, bias_arr, name=f"{name}_bias")
+
+    # Apply the objective-specific output transform (Sigmoid / Exp / identity).
+    if out_transform == "sigmoid":
+        raw_scores = g.op.Sigmoid(raw_scores, name=f"{name}_sigmoid")
+    elif out_transform == "exp":
+        raw_scores = g.op.Exp(raw_scores, name=f"{name}_exp")
+    # out_transform is None → identity, no node needed.
 
     if not need_cast:
         result = g.op.Identity(raw_scores, name=f"{name}_out", outputs=outputs)

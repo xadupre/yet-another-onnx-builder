@@ -44,6 +44,69 @@ class TestXGBoostRegressor(ExtTestCase):
         ort_results = sess.run(None, {"X": X})
         self.assertEqualArray(expected, ort_results[0], atol=1e-4)
 
+    def test_xgb_regressor_logistic_objective(self):
+        """reg:logistic objective applies sigmoid — predictions in (0, 1)."""
+        from xgboost import XGBRegressor
+
+        X, _ = self._make_regression_data()
+        y = (X[:, 0] > 0).astype(np.float32)
+        reg = XGBRegressor(
+            n_estimators=5, max_depth=3, random_state=0, objective="reg:logistic"
+        )
+        reg.fit(X, y)
+
+        onx = to_onnx(reg, (X,))
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Sigmoid", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        expected = reg.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected, predictions, atol=1e-4)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected, ort_results[0], atol=1e-4)
+
+    def test_xgb_regressor_poisson_objective(self):
+        """count:poisson objective applies exp — predictions are positive counts."""
+        from xgboost import XGBRegressor
+
+        rng = np.random.default_rng(3)
+        X = rng.standard_normal((20, 4)).astype(np.float32)
+        y = rng.poisson(lam=3, size=20).astype(np.float32)
+        reg = XGBRegressor(
+            n_estimators=5, max_depth=3, random_state=0, objective="count:poisson"
+        )
+        reg.fit(X, y)
+
+        onx = to_onnx(reg, (X,))
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Exp", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        expected = reg.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected, predictions, atol=1e-4)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected, ort_results[0], atol=1e-4)
+
+    def test_xgb_regressor_unsupported_objective_raises(self):
+        """Unknown regression objectives raise NotImplementedError."""
+        from xgboost import XGBRegressor
+        from yobx.sklearn.xgboost.xgb import _get_reg_output_transform
+
+        with self.assertRaises(NotImplementedError):
+            _get_reg_output_transform("unknown:objective")
+
     def test_xgb_regressor_dtypes_opsets(self):
         """Regressor: float32/float64 × ai.onnx.ml opset 3 and 5."""
         from xgboost import XGBRegressor
