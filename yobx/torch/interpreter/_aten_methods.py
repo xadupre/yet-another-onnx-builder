@@ -13,7 +13,7 @@ The list of supported methods:
     rows = []
     for name, func in sorted(_aten_methods.__dict__.items()):
         if name.startswith("aten_meth_") and callable(func) and func.__doc__:
-            rows.append(f"* ``{name}``  - {func.__doc__.strip()}")
+            rows.append(f"* ``{name}`` - {func.__doc__.strip()}")
     print()
     print("\\n".join(rows))
     print()
