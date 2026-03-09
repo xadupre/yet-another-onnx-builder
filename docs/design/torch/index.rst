@@ -9,4 +9,5 @@ Torch Export to ONNX
    patches
    patches_list
    input_observer
+   supported_aten_functions
 
