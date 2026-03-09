@@ -26,7 +26,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est = HistGradientBoostingRegressor(max_iter=5, max_depth=3, random_state=42)
         est.fit(X, y)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -56,7 +56,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est = HistGradientBoostingRegressor(max_iter=5, max_depth=3, random_state=42)
         est.fit(X, y)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -147,7 +147,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est = HistGradientBoostingClassifier(max_iter=5, max_depth=3, random_state=42)
         est.fit(X, y)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -180,7 +180,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est = HistGradientBoostingClassifier(max_iter=5, max_depth=3, random_state=42)
         est.fit(X, y)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=18)
         self.dump_onnx("test_hgb_classifier_binary_float64.onnx", onx)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}

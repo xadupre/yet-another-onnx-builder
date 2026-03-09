@@ -128,7 +128,7 @@ def _extract_hgb_attributes_v5(
     all_trees: List,
     n_targets: int,
     target_ids_per_tree: List[int],
-    dtype,
+    itype: int,
 ) -> Dict:
     """
     Extract ``TreeEnsemble`` (``ai.onnx.ml`` opset 5) attributes from a flat
@@ -145,8 +145,6 @@ def _extract_hgb_attributes_v5(
     :param dtype: numpy float dtype (``np.float32`` or ``np.float64``).
     :return: dict of ONNX attributes.
     """
-    onnx_float_type = onnx.TensorProto.DOUBLE if dtype == np.float64 else onnx.TensorProto.FLOAT
-
     all_nodes_featureids: List[int] = []
     all_nodes_splits: List[float] = []
     all_nodes_modes: List[int] = []
@@ -162,6 +160,7 @@ def _extract_hgb_attributes_v5(
 
     cumulative_internal_offset = 0
     cumulative_leaf_offset = 0
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     for tree, target_id in zip(all_trees, target_ids_per_tree):
         nodes = tree.nodes
@@ -241,7 +240,7 @@ def _extract_hgb_attributes_v5(
 
     nodes_splits_tensor = oh.make_tensor(
         "nodes_splits",
-        onnx_float_type,
+        itype,
         (len(all_nodes_splits),),
         np.array(all_nodes_splits, dtype=dtype),
     )
@@ -253,7 +252,7 @@ def _extract_hgb_attributes_v5(
     )
     leaf_weights_tensor = oh.make_tensor(
         "leaf_weights",
-        onnx_float_type,
+        itype,
         (len(all_leaf_weights),),
         np.array(all_leaf_weights, dtype=dtype),
     )
@@ -339,7 +338,7 @@ def _build_hgb_raw_output_v5(
     n_targets: int,
     baseline: np.ndarray,
     raw_outputs: List[str],
-    dtype,
+    itype: int,
 ) -> str:
     """
     Emit a ``TreeEnsemble`` node (opset-5 path) followed by an ``Add`` for the
@@ -349,7 +348,7 @@ def _build_hgb_raw_output_v5(
     ``base_values`` attribute, so the baseline prediction is applied via a
     constant ``Add`` node.
     """
-    attrs = _extract_hgb_attributes_v5(all_trees, n_targets, target_ids_per_tree, dtype)
+    attrs = _extract_hgb_attributes_v5(all_trees, n_targets, target_ids_per_tree, itype)
 
     te_out = g.unique_name(f"{name}_te_out")
     result = g.make_node(
@@ -366,7 +365,7 @@ def _build_hgb_raw_output_v5(
 
     # Add the baseline prediction as a constant.
     # Use the same dtype as the tree node output (which matches leaf_weights).
-    bv = baseline.flatten().astype(dtype)
+    bv = baseline.flatten().astype(tensor_dtype_to_np_dtype(itype))
     bv_expanded = bv.reshape(1, n_targets)  # broadcast over batch dimension
     add_result = g.op.Add(
         te_out_name,
@@ -432,7 +431,7 @@ def sklearn_hgb_regressor(
             n_targets,
             baseline,
             tree_outputs,
-            dtype=g.get_type(X),
+            itype=g.get_type(X),
         )
     else:
         raw = _build_hgb_raw_output_legacy(
@@ -506,7 +505,6 @@ def sklearn_hgb_classifier(
 
     ml_opset = g.get_opset("ai.onnx.ml")
     itype = g.get_type(X)
-    dtype = tensor_dtype_to_np_dtype(itype)
     raw_name = g.unique_name(f"{name}_raw")
 
     if ml_opset >= 5:
@@ -519,7 +517,7 @@ def sklearn_hgb_classifier(
             n_targets,
             baseline,
             [raw_name],
-            dtype=dtype,
+            itype=itype,
         )
     else:
         raw = _build_hgb_raw_output_legacy(

@@ -23,7 +23,7 @@ class TestSklearnRandomForest(ExtTestCase):
         rf = RandomForestClassifier(n_estimators=5, random_state=0)
         rf.fit(X, y)
 
-        onx = to_onnx(rf, (X,))
+        onx = to_onnx(rf, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -51,7 +51,7 @@ class TestSklearnRandomForest(ExtTestCase):
         rf = RandomForestClassifier(n_estimators=5, random_state=0)
         rf.fit(X, y)
 
-        onx = to_onnx(rf, (X,))
+        onx = to_onnx(rf, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -79,7 +79,7 @@ class TestSklearnRandomForest(ExtTestCase):
         rf = RandomForestRegressor(n_estimators=5, random_state=0)
         rf.fit(X, y)
 
-        onx = to_onnx(rf, (X,))
+        onx = to_onnx(rf, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -112,7 +112,7 @@ class TestSklearnRandomForest(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -304,7 +304,7 @@ class TestSklearnRandomForest(ExtTestCase):
         rf = RandomForestClassifier(n_estimators=5, random_state=0)
         rf.fit(X, y)
 
-        onx = to_onnx(rf, (X,))
+        onx = to_onnx(rf, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -331,7 +331,7 @@ class TestSklearnRandomForest(ExtTestCase):
         rf = RandomForestClassifier(n_estimators=5, random_state=0)
         rf.fit(X, y)
 
-        onx = to_onnx(rf, (X,))
+        onx = to_onnx(rf, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -358,7 +358,7 @@ class TestSklearnRandomForest(ExtTestCase):
         rf = RandomForestRegressor(n_estimators=5, random_state=0)
         rf.fit(X, y)
 
-        onx = to_onnx(rf, (X,))
+        onx = to_onnx(rf, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -382,7 +382,7 @@ class TestSklearnRandomForest(ExtTestCase):
         rf = RandomForestRegressor(n_estimators=5, random_state=0)
         rf.fit(X, y)
 
-        onx = to_onnx(rf, (X,))
+        onx = to_onnx(rf, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)

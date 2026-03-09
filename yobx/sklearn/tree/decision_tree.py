@@ -127,7 +127,7 @@ def _extract_tree_attributes(tree, n_classes: int, is_classifier: bool):
     )
 
 
-def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, dtype=None):
+def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, itype: int):
     """
     Extracts the attributes needed by the unified ``TreeEnsemble`` operator
     introduced in ``ai.onnx.ml`` opset 5.
@@ -153,10 +153,7 @@ def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, dtype
         tree.n_outputs == 1
     ), f"Only single-output decision trees are supported, got n_outputs={tree.n_outputs}."
 
-    if dtype is None:
-        dtype = np.float32
-    onnx_float_type = onnx.TensorProto.DOUBLE if dtype == np.float64 else onnx.TensorProto.FLOAT
-
+    dtype = tensor_dtype_to_np_dtype(itype)
     children_left = tree.children_left
     children_right = tree.children_right
     feature = tree.feature
@@ -278,7 +275,7 @@ def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, dtype
     # nodes_splits and leaf_weights use the same float type as the input.
     nodes_splits_tensor = oh.make_tensor(
         "nodes_splits",
-        onnx_float_type,
+        itype,
         (len(nodes_splits_),),
         np.array(nodes_splits_, dtype=dtype),
     )
@@ -290,7 +287,7 @@ def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, dtype
     )
     leaf_weights_tensor = oh.make_tensor(
         "leaf_weights",
-        onnx_float_type,
+        itype,
         (len(leaf_weights_),),
         np.array(leaf_weights_, dtype=dtype),
     )
@@ -400,9 +397,7 @@ def _sklearn_decision_tree_classifier_v5(
         tensors; uses input element type when ``None``
     :return: tuple ``(label_result_name, proba_result_name)``
     """
-    if dtype is None:
-        dtype = np.float32
-    attrs = _extract_tree_attributes_v5(tree, n_classes, is_classifier=True, dtype=dtype)
+    attrs = _extract_tree_attributes_v5(tree, n_classes, is_classifier=True, itype=g.get_type(X))
 
     # scores: [N, n_classes] float32 - class probabilities
     scores = g.make_node(
@@ -490,7 +485,9 @@ def sklearn_decision_tree_regressor(
     tree = estimator.tree_
 
     if ml_opset >= 5:
-        attrs = _extract_tree_attributes_v5(tree, n_classes=1, is_classifier=False)
+        attrs = _extract_tree_attributes_v5(
+            tree, n_classes=1, is_classifier=False, itype=g.get_type(X)
+        )
         return g.make_node(
             "TreeEnsemble",
             [X],
@@ -504,7 +501,7 @@ def sklearn_decision_tree_regressor(
 
     # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4)
     attrs = _extract_tree_attributes(tree, n_classes=1, is_classifier=False)
-    tree_outputs = [g.unique_name(outputs[0])]
+    tree_outputs = [f"{outputs[0]}_cast"]
     tree_result = g.make_node(
         "TreeEnsembleRegressor",
         [X],
