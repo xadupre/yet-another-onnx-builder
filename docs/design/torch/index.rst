@@ -1,9 +1,36 @@
 Torch Export to ONNX
 ====================
 
+This section describes the design of the PyTorch-to-ONNX conversion pipeline.
+The entry point is :func:`yobx.torch.interpreter.to_onnx`, which accepts a
+:class:`torch.nn.Module` and representative inputs and returns an
+:class:`onnx.ModelProto` (or an :class:`onnx.model_container.ModelContainer`
+for large models).
+
+The pipeline has three main stages:
+
+1. **Export** — the module is traced into a portable
+   :class:`~torch.export.ExportedProgram` (or :class:`~torch.fx.GraphModule`)
+   using one of the strategies provided by
+   :class:`~yobx.torch.export_options.ExportOptions` (``strict``,
+   ``nostrict``, ``tracing``, ``jit``, ``dynamo``, ``fake``, …).
+2. **Interpret** — :class:`~yobx.torch.interpreter.interpreter.DynamoInterpreter`
+   walks the FX graph node by node and emits the corresponding ONNX operators
+   into a :class:`~yobx.xbuilder.GraphBuilder`.
+3. **Optimise** — the accumulated ONNX graph is folded, simplified, and
+   serialised by :meth:`~yobx.xbuilder.GraphBuilder.to_onnx`.
+
+The remaining pages in this section document supporting concerns: how custom
+pytree nodes must be registered before export (:ref:`l-design-flatten`), which
+internal torch/transformers patches are needed for successful tracing
+(:ref:`l-design-patches`), and how real forward passes can be used to infer
+export arguments and dynamic shapes automatically
+(:ref:`l-design-input-observer`).
+
 .. toctree::
    :maxdepth: 1
 
+   converter
    flatten
    flatten_list
    patches
