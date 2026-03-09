@@ -62,6 +62,7 @@ intersphinx_mapping = {
     # Not a sphinx documentation
     # "diffusers": ("https://huggingface.co/docs/diffusers/index", None),
     "matplotlib": ("https://matplotlib.org/stable/", None),
+    "np": ("https://numpy.org/doc/stable", None),
     "numpy": ("https://numpy.org/doc/stable", None),
     "onnx": ("https://onnx.ai/onnx/", None),
     "onnxruntime": ("https://onnxruntime.ai/docs/api/python/", None),
@@ -71,7 +72,8 @@ intersphinx_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "sklearn": ("https://scikit-learn.org/stable/", None),
     "skl2onnx": ("https://onnx.ai/sklearn-onnx/", None),
-    "tensorflow": ("https://www.tensorflow.org/", None),
+    "tensorflow": ("https://www.tensorflow.org/api_docs/python", None),
+    "tf": ("https://www.tensorflow.org/api_docs/python", None),
     "torch": ("https://docs.pytorch.org/docs/stable/", None),
 }
 
