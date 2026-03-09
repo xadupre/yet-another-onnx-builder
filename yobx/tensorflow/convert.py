@@ -15,6 +15,7 @@ def to_onnx(
     input_names: Optional[Sequence[str]] = None,
     dynamic_shapes: Optional[Tuple[Dict[int, str]]] = None,
     target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
+    builder_cls: Union[type, Callable] = GraphBuilder,
     verbose: int = 0,
     extra_converters: Optional[Dict[str, Callable]] = None,
     large_model: bool = False,
@@ -36,6 +37,10 @@ def to_onnx(
         (``""``), or a dictionary mapping domain names to opset versions.
         If it includes ``{'com.microsoft': 1}``, the converted model
         may include optimized kernels specific to :epkg:`onnxruntime`.
+    :param builder_cls: by default the graph builder is a
+        :class:`yobx.xbuilder.GraphBuilder` but any builder can
+        be used as long it implements the apis :ref:`builder-api`
+        and :ref:`builder-api-make`
     :param verbose: verbosity level (0 = silent)
     :param extra_converters: optional mapping from TF op-type string to converter
         function with signature ``(g, sts, outputs, op, verbose=0)``;
@@ -50,6 +55,15 @@ def to_onnx(
         when *large_model* is True
     """
     from . import register_tensorflow_converters
+
+    if isinstance(target_opset, int):
+        dict_target_opset = {"": target_opset}
+    else:
+        if not isinstance(target_opset, dict):
+            raise TypeError(f"target_opset must be a dictionary or an integer not {target_opset}")
+        dict_target_opset = target_opset.copy()
+        if "" not in dict_target_opset:
+            dict_target_opset[""] = 21
 
     register_tensorflow_converters()
 
@@ -69,14 +83,15 @@ def to_onnx(
         cf = fn.get_concrete_function(*input_specs)
 
     # Populate an ONNX GraphBuilder by walking the concrete-function graph.
-    g = GraphBuilder(target_opset)
-    _convert_concrete_function(cf, g, args, input_specs, verbose, extra_converters or {})
-    opts = (
-        OptimizationOptions(patterns="default+onnxruntime")
-        if g.has_opset("com.microsoft")
-        else None
+    kwargs = (
+        dict(optimization_options=OptimizationOptions(patterns="default+onnxruntime"))
+        if "com.microsoft" in dict_target_opset
+        else {}
     )
-    return g.to_onnx(large_model=large_model, external_threshold=external_threshold, options=opts)  # type: ignore
+    g = GraphBuilder(dict_target_opset, **kwargs)
+
+    _convert_concrete_function(cf, g, args, input_specs, verbose, extra_converters or {})
+    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
 
 
 # ---------------------------------------------------------------------------

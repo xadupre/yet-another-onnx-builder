@@ -88,7 +88,13 @@ def to_onnx(
     from . import register_sklearn_converters
 
     register_sklearn_converters()
-    g = builder_cls(dict_target_opset)
+
+    kwargs = (
+        dict(optimization_options=OptimizationOptions(patterns="default+onnxruntime"))
+        if "com.microsoft" in dict_target_opset
+        else {}
+    )
+    g = builder_cls(dict_target_opset, **kwargs)
 
     cls = type(estimator)
     if extra_converters and cls in extra_converters:
@@ -116,9 +122,4 @@ def to_onnx(
 
     for name in output_names:
         g.make_tensor_output(name, indexed=False, allow_untyped_output=True)
-    opts = (
-        OptimizationOptions(patterns="default+onnxruntime")
-        if g.has_opset("com.microsoft")
-        else None
-    )
-    return g.to_onnx(large_model=large_model, external_threshold=external_threshold, options=opts)
+    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
