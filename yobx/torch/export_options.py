@@ -5,6 +5,7 @@ import torch
 from ..helpers import max_diff, string_diff, string_type
 from ..helpers.helper import string_sig, get_sig_kwargs
 from .torch_helper import torch_deepcopy
+from .input_observer import InputCandidate
 
 # Type alias for torch operator overload
 # (forward reference avoids importing torch at module level)
@@ -19,13 +20,24 @@ class ExportOptions:
     :param strict: strict export or not, it only applies
         if :func:`torch.export.export` is called
     :param decomposition_table: decomposition_table, a string such as ``'default'``
-        or ``'all'``, or a custom decomposition dict
+        or ``'all'``, or a custom decomposition dict, see
+        :func:`get_decomposition_table
+        <ybox.torch.export_options.get_decomposition_table>`,
+        it can ``'all'``, ``'default'`` or a decomposition list
     :param dynamo: to use ``torch._dynamo.export`` instead of :func:`torch.export.export`
+    :param tracing: use symbolic tracing
     :param jit: use jit to get a graph then converts it into a fx graph
     :param strategy: to overwrite all the previous parameters with just a value
     :param remove_inplace: remove inplace nodes
     :param aten_as_function: keeps aten function as local function to keep a faithful
-        translation of the fx graph; can be a set of function names or a bool
+        translation of the fx graph, it can also be a set of function name the export
+        should export as local function such as
+        ``torch.ops.aten.scaled_dot_product_attention``, the default value
+        :func:`get_default_aten_as_function
+        <ybox.torch.interpreter.onnx_export.get_default_aten_as_function>`
+        returns a default list of functions to keep as function depending on this opset,
+        if no value is specified, this defaults to the whatever the function mentioned above
+        returns
     :param allow_untyped_output: allows output with no shape and/or no type
     :param save_ep: to save the exported program; if True, will save the graph as text;
         can be a tuple ``(str, int)`` to avoid saving a model bigger than the desired size
@@ -37,6 +49,9 @@ class ExportOptions:
     :param prefer_deferred_runtime_asserts_over_guards:
         see :func:`torch.export.export`
     :param fake: use fake tensors as inputs
+    :param tracing_module_leaves: this option is used when the module is traced
+        (``tracing=True``), it specifies which modules should remain a *call_module*,
+        see :class:`yobx.torch.tracing.CustomTracer`.
     """
 
     _allowed = {
@@ -45,6 +60,7 @@ class ExportOptions:
         "strict": {"strict": True},
         "strict-dec": {"strict": True, "decomposition_table": "default"},
         "strict-decall": {"strict": True, "decomposition_table": "all"},
+        "tracing": {"tracing": True},
         "nostrict": {"strict": False},
         "nostrict-dec": {"strict": False, "decomposition_table": "default"},
         "nostrict-decall": {"strict": False, "decomposition_table": "all"},
@@ -59,6 +75,7 @@ class ExportOptions:
     def __init__(
         self,
         strict: bool = False,
+        tracing: bool = False,
         jit: bool = False,
         decomposition_table: Optional[
             Union[str, Dict[TorchOpOverload, Callable[..., Any]]]
@@ -73,8 +90,13 @@ class ExportOptions:
         backed_size_oblivious: Union[bool, str] = "auto",
         prefer_deferred_runtime_asserts_over_guards: bool = True,
         fake: bool = False,
+        tracing_module_leaves: Optional[
+            Dict[type, Callable[["torch.nn.Module", str], bool]]  # noqa: F821
+        ] = None,
     ):
         self.strict = strict
+        self.tracing = tracing
+        self.tracing_module_leaves = tracing_module_leaves
         self.save_ep = save_ep
         self.decomposition_table = (
             None if decomposition_table in ("none", None) else decomposition_table
@@ -91,6 +113,13 @@ class ExportOptions:
             prefer_deferred_runtime_asserts_over_guards
         )
         self.fake = fake
+        if aten_as_function is None:
+            from yobx.torch.interpreter.onnx_export import (
+                get_default_aten_as_function,
+            )
+
+            aten_as_function = get_default_aten_as_function()  # type: ignore
+        self.aten_as_function = aten_as_function
 
         if strategy is not None:
             assert strategy in self._allowed, (
@@ -103,6 +132,9 @@ class ExportOptions:
                 setattr(self, k, v)
 
         assert not self.dynamo or not self.jit, "jit and dynamo cannot be true at the same time"
+        assert (
+            not tracing or not dynamo
+        ), f"Both tracing and dynamo are incompatible options in {self!r}"
 
     def __repr__(self) -> str:
         return string_sig(self)  # type: ignore[arg-type]
@@ -116,7 +148,8 @@ class ExportOptions:
     def get_decomposition_table(
         self,
     ) -> Optional[Dict[TorchOpOverload, Callable[..., Any]]]:
-        """Returns the decomposition table.
+        """
+        Returns the decomposition table.
 
         For ``decomposition_table='all'``, returns ``None`` because ``'all'`` triggers
         :func:`torch.export.ExportedProgram.run_decompositions` with no arguments
@@ -170,21 +203,32 @@ class ExportOptions:
             if verbose:
                 begin = time.perf_counter()
                 print("[ExportOptions.export] remove inplace nodes")
-            modified = _remove_inplace_nodes(exported_program.graph)
+            modified = self.remove_inplace_nodes(
+                exported_program.graph, exported_program=exported_program, verbose=verbose
+            )
             if verbose:
                 print(
                     f"[ExportOptions.export] done remove inplace in "
                     f"{time.perf_counter() - begin}, modified={modified}"
                 )
-            need_dec = not self.decomposition_table and _has_inplace_nodes(exported_program.graph)
-            if need_dec or modified < 0:
+            need_dec, need_dec_all = (
+                self.need_run_decompositions(exported_program)
+                if not self.decomposition_table
+                else (False, False)
+            )
+            if need_dec or need_dec_all or modified <= -1:
+                # We need to run decomposition to fully remove all inplace operations.
                 if verbose:
                     begin = time.perf_counter()
                     print(
-                        "[ExportOptions.export] use decomposition to remove inplace nodes left "
+                        "[ExportOptions.export] use decomposition to remove inplace nodes left"
                         f"[modified={modified}, need_dec={need_dec}]"
                     )
-                exported_program = exported_program.run_decompositions({})
+                exported_program = (
+                    exported_program.run_decompositions()
+                    if need_dec_all
+                    else exported_program.run_decompositions({})
+                )
                 if verbose:
                     print(
                         f"[ExportOptions.export] done in {time.perf_counter() - begin}, "
@@ -196,27 +240,29 @@ class ExportOptions:
                 print("-- DONE -- ")
         return exported_program
 
-    def use_str_not_dyn(self, dynamic_shapes: Any, default_value: Any = None) -> Any:
-        """Replaces dynamic shape objects with string placeholders."""
-        if not hasattr(self, "_c_use_str_not_dyn"):
-            self._c_use_str_not_dyn = 0
-        if isinstance(dynamic_shapes, list):
-            return [self.use_str_not_dyn(a, default_value=default_value) for a in dynamic_shapes]
-        if isinstance(dynamic_shapes, tuple):
-            return tuple(
-                self.use_str_not_dyn(a, default_value=default_value) for a in dynamic_shapes
-            )
-        if isinstance(dynamic_shapes, dict):
-            return {
-                k: self.use_str_not_dyn(v, default_value=default_value)
-                for k, v in dynamic_shapes.items()
-            }
-        if isinstance(dynamic_shapes, set):
-            return {self.use_str_not_dyn(a, default_value=default_value) for a in dynamic_shapes}
-        if not isinstance(dynamic_shapes, (int, str)) and dynamic_shapes is not None:
-            self._c_use_str_not_dyn += 1
-            return f"udim{self._c_use_str_not_dyn}"
-        return dynamic_shapes
+    def need_run_decompositions(self, exported_program) -> Tuple[bool, bool]:
+        """Final check to see if we need to run decompositions."""
+        from .tracing import CustomTracer
+
+        ret = False
+        for node in exported_program.graph.nodes:
+            target_name = CustomTracer.get_node_target_name(node, exc=False)
+            if target_name in {"aten::index_copy_"}:
+                ret = True
+                continue
+            if target_name in {
+                "aten:relu_",
+                "aten::mul_.Tensor",
+            }:
+                ret = len(node.users) == 0
+                continue
+            if target_name in {
+                "aten::lstm.input",
+                "torch._functorch.predispatch._add_batch_dim",
+                "torch._functorch.predispatch._remove_batch_dim",
+            }:
+                return True, True
+        return ret, False
 
     def _export(
         self,
@@ -240,15 +286,21 @@ class ExportOptions:
         }
         if prefer_deferred_runtime_asserts_over_guards:
             export_kwargs["prefer_deferred_runtime_asserts_over_guards"] = True
+        if backed_size_oblivious == "auto":
+            cand = InputCandidate(args, kwargs, clone=False, cst_kwargs={})
+            backed_size_oblivious = cand.needs_backed_size_oblivious(dynamic_shapes)
         if backed_size_oblivious is True:
             with torch.fx.experimental._config.patch(backed_size_oblivious=True):  # type: ignore[attr-defined]
-                return torch.export.export(
+                ep = torch.export.export(
                     mod,
                     args or (),
                     kwargs=kwargs or {},
                     dynamic_shapes=dyn_shapes,
                     **export_kwargs,
                 )
+                ep._computed_backed_size_oblivious = True
+                return ep
+        assert backed_size_oblivious is False, f"{backed_size_oblivious=}, unexpected"
         return torch.export.export(
             mod,
             args or (),
@@ -270,6 +322,9 @@ class ExportOptions:
         verbose: int = 0,
     ) -> Union["torch.export.ExportedProgram", "torch.fx.GraphModule"]:  # noqa: F821
         """Exports the model into an exported program."""
+        import torch
+        from .tracing import CustomTracer
+
         print_exported_program = os.environ.get("PRINT_EXPORTED_PROGRAM", "0") in (1, "1")
         begin = time.perf_counter()  # to avoid many warnings from pyrefly
 
@@ -358,6 +413,73 @@ class ExportOptions:
                 print(f"[ExportOptions.export] done in {time.perf_counter() - begin}")
             return dec
 
+        if self.tracing:
+            from torch.fx._lazy_graph_module import _make_graph_module
+            from .tracing import CustomTracer
+
+            concrete_args = kwargs.copy() if kwargs else {}
+            trace_dynamic_shapes = (
+                None
+                if dynamic_shapes is None
+                else (dynamic_shapes.copy() if isinstance(dynamic_shapes, dict) else {})
+            )
+            if args:
+                import inspect
+
+                sig = inspect.signature(mod.forward)
+                for ip, (p, a) in enumerate(zip(sig.parameters, args)):
+                    if a is not None and p not in concrete_args:
+                        if isinstance(a, int):
+                            # not traceable otherwise
+                            concrete_args[p] = torch.tensor(a, dtype=torch.int64)
+                        elif isinstance(a, float):
+                            # not traceable otherwise
+                            concrete_args[p] = torch.tensor(a, dtype=torch.float32)
+                        else:
+                            concrete_args[p] = a
+                    if trace_dynamic_shapes is not None and not isinstance(dynamic_shapes, dict):
+                        trace_dynamic_shapes[p] = dynamic_shapes[ip]
+
+            if verbose:
+                print(f"[ExportOptions.export] CustomTracer().trace, verbose={verbose}")
+                print(f"[ExportOptions.export] {self.tracing_module_leaves=}")
+                print(f"[ExportOptions.export] dynamic_shapes={dynamic_shapes}")
+                print(
+                    f"[ExportOptions.export] args={string_type(args, with_shape=True, limit=20)}"
+                )
+                print(
+                    f"[ExportOptions.export] kwargs="
+                    f"{string_type(kwargs, with_shape=True, limit=20)}"
+                )
+                print(
+                    f"[ExportOptions.export] concrete_args="
+                    f"{string_type(concrete_args, limit=20)}"
+                )
+
+            tracer = CustomTracer(module_leaves=self.tracing_module_leaves)
+            graph = tracer.trace(
+                mod,
+                concrete_args=concrete_args,
+                verbose=verbose,
+                dynamic_shapes=trace_dynamic_shapes,
+            )
+            if self.remove_inplace:
+                if verbose:
+                    print("[ExportOptions.export] remove_inplace_nodes")
+                modified = self.remove_inplace_nodes(graph, verbose=verbose)
+                if verbose:
+                    print(f"[ExportOptions.export] done, modified={modified}")
+            if self.save_ep:
+                save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
+                with open(f"{save_ep}.tracing", "w") as f:
+                    f.write(str(graph))
+            gm = _make_graph_module(tracer.root, graph, mod.__class__.__name__)
+
+            # from torch.fx.passes.shape_prop import ShapeProp
+            # ShapeProp(gp).propagate(**concrete_args)
+            # gm = torch.fx.GraphModule(getattr(tracer, "traced_model", None) or mod, graph)
+            return gm
+
         if verbose:
             print(f"[ExportOptions.export] torch.export.export strict={self.strict}")
             print(f"[ExportOptions.export] dynamic_shapes={dynamic_shapes}")
@@ -365,10 +487,17 @@ class ExportOptions:
             print(f"[ExportOptions.export] kwargs={string_type(kwargs, limit=20)}")
 
         if self.strict:
+            # torch.export.export may turn Tensor into FakeTensor.
+            # We need to make a copy to avoid getting FakeTensor instead
             args0, kwargs0 = args, kwargs
             args = torch_deepcopy(args)
             kwargs = torch_deepcopy(kwargs)
-
+        if verbose:
+            t0 = time.perf_counter()
+            print(
+                f"[ExportOptions.export] export start with strict={self.strict} "
+                f"backed_size_oblivious={self.backed_size_oblivious}"
+            )
         begin = time.perf_counter()
         exported_program = self._export(
             mod,
@@ -385,7 +514,12 @@ class ExportOptions:
         )
         self._stat_time_torch_export_export_oblivious = time.perf_counter() - begin
 
+        if verbose:
+            print(f"[ExportOptions.export] export done in {time.perf_counter() - t0}")
+
         if self.strict:
+            # torch.export.export may turn Tensor into FakeTensor.
+            # We need to make a copy to avoid getting FakeTensor instead
             args, kwargs = args0, kwargs0  # pyrefly: ignore[unbound-name]
 
         if exported_program is None:
@@ -437,6 +571,11 @@ class ExportOptions:
             exported_program, verbose=verbose, print_exported_program=print_exported_program
         )
         self._stat_time_post_process_exported_program = time.perf_counter() - begin
+        if verbose:
+            print(
+                f"[ExportOptions.export] done with no decomposition "
+                f"in {time.perf_counter() - begin}"
+            )
         return exported_program
 
     def validate_exported_program(
@@ -457,6 +596,12 @@ class ExportOptions:
             )
         expected = model(*(ar or []), **(kws or {}))
         ar, kws = torch_deepcopy((args, kwargs))
+        if verbose:
+            print(
+                f"[ExportOptions.validate_exported_program] run exported_program with "
+                f"args={string_type(args, with_shape=True)} and "
+                f"kwargs={string_type(kwargs, with_shape=True)}"
+            )
         got = exported_program.module()(*(ar or []), **(kws or {}))
         diff = max_diff(expected, got)
         if verbose:
@@ -466,6 +611,65 @@ class ExportOptions:
             f"Discrepancies observed between the model and the exported program "
             f"(atol={atol}) diff={string_diff(diff)}"
         )
+
+    def export_as_aten_function(self, aten_name: Any) -> bool:
+        if not self.aten_as_function:
+            return False
+        if isinstance(self.aten_as_function, bool):
+            return self.aten_as_function
+        if isinstance(aten_name, str):
+            return aten_name in self.aten_as_function
+        return aten_name in self.aten_as_function or str(aten_name) in self.aten_as_function
+
+    def remove_inplace_nodes(
+        self,
+        graph: "torch.fx.Graph",  # noqa: F821
+        exported_program: Optional["torch.export.ExportedProgram"] = None,  # noqa: F821
+        verbose: int = 0,
+    ) -> int:
+        """
+        Post-processing to remove inplace nodes.
+
+        :param graph: graph to modify
+        :param exported_program: if available, it is used in the error message
+            to make it easier to trace the code source
+        :param verbose: verbosity
+        :return: number of inplace nodes removed or -1 if there are any remaining inplace nodes
+        """
+        from .tracing import CustomTracer
+
+        removed = CustomTracer.remove_unnecessary_slices(graph)
+        if removed:
+            if verbose:
+                print(f"[ExportOptions.export] slices: {removed} slices nodes were removed")
+            graph.lint()
+        modified = CustomTracer.remove_inplace(
+            graph, exported_program=exported_program, verbose=verbose, exc=False
+        )
+        if modified < 0:
+            return modified
+        if modified:
+            if verbose:
+                print(f"[ExportOptions.export] inplaces: {modified} inplaced nodes were removed")
+            graph.lint()
+        return modified
+
+    def use_str_not_dyn(self, dynamic_shapes: Any, default_value=None) -> Any:
+        if not hasattr(self, "_c_use_str_not_dyn"):
+            self._c_use_str_not_dyn = 0
+        if isinstance(dynamic_shapes, (tuple, list, set)):
+            return dynamic_shapes.__class__(
+                self.use_str_not_dyn(a, default_value=default_value) for a in dynamic_shapes
+            )
+        if isinstance(dynamic_shapes, dict):
+            return {
+                k: self.use_str_not_dyn(v, default_value=default_value)
+                for k, v in dynamic_shapes.items()
+            }
+        if not isinstance(dynamic_shapes, (int, str)) and dynamic_shapes is not None:
+            self._c_use_str_not_dyn += 1
+            return f"udim{self._c_use_str_not_dyn}"
+        return dynamic_shapes
 
 
 def _get_decomposition_table_by_name(
@@ -497,40 +701,6 @@ def _inplace_nodes(graph: "torch.fx.Graph") -> List[Any]:  # noqa: F821
 def _has_inplace_nodes(graph: "torch.fx.Graph") -> bool:  # noqa: F821
     """Returns True if the graph has probable inplace nodes."""
     return bool(_inplace_nodes(graph))
-
-
-def _remove_inplace_nodes(
-    graph: "torch.fx.Graph",  # noqa: F821
-    verbose: int = 0,
-) -> int:
-    """
-    Removes inplace nodes where possible (nodes with inplace-style names and no users).
-
-    :param graph: graph to modify
-    :param verbose: verbosity
-    :return: number of nodes removed, or -1 if there are inplace nodes that could not
-        be removed (e.g., they still have users)
-    """
-    to_erase = []
-    has_remaining = False
-    for node in graph.nodes:
-        if node.op in ("call_function", "call_method"):
-            name = getattr(node.target, "__name__", None) or str(node.target)
-            if name.endswith("_") or "_." in name:
-                if len(node.users) == 0:
-                    to_erase.append(node)
-                else:
-                    has_remaining = True
-
-    modified = 0
-    for node in to_erase:
-        if len(node.users) == 0:
-            if verbose:
-                print(f"[_remove_inplace_nodes] erasing node {node}")
-            graph.erase_node(node)
-            modified += 1
-
-    return -1 if has_remaining else modified
 
 
 def apply_decompositions(
@@ -582,7 +752,7 @@ def insert_contiguous_between_transpose_and_view(
     """
     Modifies the module inplace to insert a ``contiguous`` node between a
     ``transpose`` node followed by a ``view`` node.
-
+    The modification takes place inplace.
     See https://github.com/pytorch/pytorch/issues/136543.
     """
     modified = False
@@ -610,10 +780,12 @@ def insert_contiguous_between_transpose_and_view(
         with graph.inserting_after(node):
             new_node = graph.call_method("contiguous", args=(node,))
             node.replace_all_uses_with(new_node)
+            # new_node is replaced as well so we manually revert the replacement
             new_node.update_arg(0, node)
             node.users = {new_node: None}
 
     if not modified:
+        # no rewrite was done.
         return exported_program
 
     graph.lint()

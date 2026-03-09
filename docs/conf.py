@@ -62,17 +62,18 @@ intersphinx_mapping = {
     # Not a sphinx documentation
     # "diffusers": ("https://huggingface.co/docs/diffusers/index", None),
     "matplotlib": ("https://matplotlib.org/stable/", None),
+    "np": ("https://numpy.org/doc/stable", None),
     "numpy": ("https://numpy.org/doc/stable", None),
     "onnx": ("https://onnx.ai/onnx/", None),
     "onnxruntime": ("https://onnxruntime.ai/docs/api/python/", None),
     "onnxscript": ("https://microsoft.github.io/onnxscript/", None),
-    "onnx_diagnostic": ("https://sdpython.github.io/doc/onnx-diagnostic/dev/", None),
-    "onnx_extended": ("https://sdpython.github.io/doc/onnx-extended/dev/", None),
     "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", None),
     "python": (f"https://docs.python.org/{sys.version_info.major}", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "sklearn": ("https://scikit-learn.org/stable/", None),
     "skl2onnx": ("https://onnx.ai/sklearn-onnx/", None),
+    "tensorflow": ("https://www.tensorflow.org/api_docs/python", None),
+    "tf": ("https://www.tensorflow.org/api_docs/python", None),
     "torch": ("https://docs.pytorch.org/docs/stable/", None),
 }
 
@@ -167,6 +168,7 @@ epkg_dictionary = {
     "Supported Operators and Data Types": "https://github.com/microsoft/onnxruntime/blob/main/docs/OperatorKernels.md",
     "sympy": "https://www.sympy.org/en/index.html",
     "Keras": "https://keras.io/",
+    "tensorFlow": "https://www.tensorflow.org/",
     "TensorFlow": "https://www.tensorflow.org/",
     "tensorflow-onnx": "https://github.com/onnx/tensorflow-onnx",
     "timm": "https://github.com/huggingface/pytorch-image-models",

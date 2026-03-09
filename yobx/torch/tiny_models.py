@@ -12,6 +12,7 @@ class ModelData:
     model: torch.nn.Module
     export_inputs: Dict[str, Any]
     dynamic_shapes: Dict[str, Any]
+    inputs_batch1: Optional[Dict[str, Any]] = None
 
     @property
     def dynamic_shapes_for_torch_export_export(self) -> Dict[str, Any]:
@@ -205,6 +206,19 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
                 },
                 position_ids={0: "batch", 1: "seq_length"},
                 past_key_values=[{0: "batch", 2: "past_length"} for _ in range(2)],
+            ),
+            inputs_batch1=dict(
+                input_ids=torch.randint(15, size=(1, 3), dtype=torch.int64),
+                attention_mask=torch.randint(1, size=(1, 33), dtype=torch.int64),
+                position_ids=torch.arange(3, dtype=torch.int64).unsqueeze(0),
+                past_key_values=make_dynamic_cache(
+                    [
+                        (
+                            torch.randn(1, nheads, slen, dim),
+                            torch.randn(1, nheads, slen, dim),
+                        )
+                    ]
+                ),
             ),
         )
 

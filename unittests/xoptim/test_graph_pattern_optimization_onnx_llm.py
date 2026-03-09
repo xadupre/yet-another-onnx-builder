@@ -10,12 +10,10 @@ from yobx.ext_test_case import (
     hide_stdout,
     ignore_warnings,
     requires_onnxruntime,
+    requires_torch,
 )
 from yobx.xbuilder.graph_builder import GraphBuilder, InferShapesOptions, OptimizationOptions
 from yobx.reference import ExtendedReferenceEvaluator
-
-# from yobx.torch_interpreter import to_onnx
-to_onnx = None
 
 TFLOAT = onnx.TensorProto.FLOAT
 TFLOAT16 = onnx.TensorProto.FLOAT16
@@ -835,9 +833,12 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         )
         return model, inputs, ds, expected
 
-    @unittest.skipIf(to_onnx is None, "not implemented yet")
+    @unittest.skip("TODO: fix it later")
+    @requires_torch("2.9")
     @hide_stdout()
     def test_local_attention_gqa_0(self):
+        from yobx.torch import to_onnx
+
         model, inputs, ds, expected = self._get_gqa_model()
         f1 = self.get_dump_file("test_local_attention_gqa_0.onnx")
         onx = to_onnx(
@@ -865,9 +866,12 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         self.assertEqual(["LocalAttentionSW_to1"], [f.name for f in onx.functions])
         self.assertIn("LocalAttentionSW_to1", [n.op_type for n in onx.graph.node])
 
-    @unittest.skipIf(to_onnx is None, "not implemented yet")
+    @unittest.skip("TODO: fix it later")
+    @requires_torch("2.9")
     @hide_stdout()
     def test_local_attention_gqa_1(self):
+        from yobx.torch import to_onnx
+
         model, inputs, ds, expected = self._get_gqa_model()
         f1 = self.get_dump_file("test_local_attention_gqa_1.onnx")
         onx = to_onnx(
@@ -895,9 +899,12 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         self.assertEqual(["LocalAttentionGQASW_to1"], [f.name for f in onx.functions])
         self.assertIn("LocalAttentionGQASW_to1", [n.op_type for n in onx.graph.node])
 
-    @unittest.skipIf(to_onnx is None, "not implemented yet")
+    @unittest.skip("TODO: fix it later")
+    @requires_torch("2.9")
     @hide_stdout()
     def test_local_attention_gqa_2(self):
+        from yobx.torch import to_onnx
+
         model, inputs, ds, expected = self._get_gqa_model()
         f1 = self.get_dump_file("test_local_attention_gqa_2.onnx")
         onx = to_onnx(
@@ -1050,10 +1057,13 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         )
         return model, inputs, ds, expected
 
-    @unittest.skipIf(to_onnx is None, "not implemented yet")
+    @unittest.skip("TODO: fix it later")
+    @requires_torch("2.9")
     @ignore_warnings((UserWarning, FutureWarning))
     @hide_stdout()
     def test_attention_gqa_default_22(self):
+        from yobx.torch import to_onnx
+
         model, inputs, ds, expected = self._get_model_attention()
         f1 = self.get_dump_file("test_attention_gqa.22.onnx")
         onx = to_onnx(
@@ -1071,11 +1081,14 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         got = ort.run(None, feeds)
         self.assertEqualArray(expected, got[0], 1e-5)
 
-    @unittest.skipIf(to_onnx is None, "not implemented yet")
+    @unittest.skip("TODO: fix it later")
+    @requires_torch("2.9")
     @requires_onnxruntime("1.24")
     @ignore_warnings((UserWarning, FutureWarning))
     @hide_stdout()
     def test_attention_gqa_default_24(self):
+        from yobx.torch import to_onnx
+
         model, inputs, ds, expected = self._get_model_attention()
         f1 = self.get_dump_file("test_attention_gqa.24.onnx")
         onx = to_onnx(

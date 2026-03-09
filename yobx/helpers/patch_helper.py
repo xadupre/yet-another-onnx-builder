@@ -258,8 +258,7 @@ class PatchDetails:
     """
     This class is used to store patching information.
     This helps understanding which rewriting was applied to which
-    method of functions. Page :ref:`l-patch-diff` contains all the
-    diff for all the implemented patches.
+    method of functions. See page :ref:`l-plot-patch-model-diff`.
     """
 
     def __init__(self):

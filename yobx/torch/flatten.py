@@ -191,8 +191,6 @@ def register_cache_flattening(
 
     # DynamicCache flattening is different in transformers and does not
     # play way with torch.export.export.
-    # see test test_export_dynamic_cache_cat with NOBYPASS=1
-    # :: NOBYBASS=1 python _unittests/ut_torch_export_patches/test_dynamic_class.py -k e_c
     # This is caused by this line:
     # torch.fx._pytree.register_pytree_flatten_spec(
     #           DynamicCache, _flatten_dynamic_cache_for_fx)

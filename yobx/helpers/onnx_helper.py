@@ -1547,6 +1547,75 @@ def enumerate_nodes(graph: onnx.GraphProto) -> Iterator[onnx.NodeProto]:
                     yield from enumerate_nodes(att.g)
 
 
+def type_info(itype: int, att: str):
+    """
+    Returns the minimum or maximum value for a type.
+
+    :param itype: onnx type
+    :param att: 'min' or 'max'
+    :return: value
+    """
+    if itype in {onnx.TensorProto.FLOAT, onnx.TensorProto.FLOAT16, onnx.TensorProto.DOUBLE}:
+        dtype = tensor_dtype_to_np_dtype(itype)
+        fi = np.finfo(dtype)
+    elif itype == onnx.TensorProto.BFLOAT16:
+        import ml_dtypes
+
+        dtype = tensor_dtype_to_np_dtype(itype)
+        fi = ml_dtypes.finfo(dtype)
+    else:
+        dtype = tensor_dtype_to_np_dtype(itype)
+        fi = np.iinfo(dtype)
+    if att == "min":
+        return fi.min
+    if att == "max":
+        return fi.max
+    raise ValueError(f"Unexpected value {att!r}")
+
+
+def get_onnx_signature(
+    model: onnx.ModelProto,
+) -> Tuple[
+    Tuple[
+        str,
+        int,
+        Union[
+            Tuple[Union[int, str], ...],
+            List[
+                Tuple[
+                    str,
+                    int,
+                    Tuple[Union[int, str], ...],
+                ],
+            ],
+        ],
+    ],
+    ...,
+]:
+    """
+    Produces a tuple of tuples corresponding to the signatures.
+
+    :param model: model
+    :return: signature
+    """
+    sig = []
+    for i in model.graph.input:
+        dt = i.type
+        if dt.HasField("sequence_type"):
+            dst = dt.sequence_type.elem_type
+            tdt = dst.tensor_type
+            el = tdt.elem_type
+            shape = tuple(d.dim_param or d.dim_value for d in tdt.shape.dim)
+            sig.append((i.name, el, [(i.name, el, shape)]))
+        elif dt.HasField("tensor_type"):
+            el = dt.tensor_type.elem_type
+            shape = tuple(d.dim_param or d.dim_value for d in dt.tensor_type.shape.dim)
+            sig.append((i.name, el, shape))  # type: ignore
+        else:
+            raise AssertionError(f"Unable to interpret dt={dt!r} in {i!r}")
+    return tuple(sig)
+
+
 def attr_proto_to_python(attr: onnx.AttributeProto) -> Any:
     """
     Converts an :class:`onnx.AttributeProto` to a plain Python value.

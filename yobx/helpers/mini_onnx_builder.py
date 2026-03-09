@@ -21,7 +21,7 @@ def proto_from_array(
     :param verbose: display the type and shape
     :return: a onnx.TensorProto
     """
-    if arr.__class__.__name__ != "Tensor":
+    if arr.__class__.__name__ not in ("Tensor", "Parameter"):
         raise TypeError(f"Unexpected type {type(arr)}.")
 
     import torch
@@ -630,8 +630,6 @@ def create_input_tensors_from_onnx_model(
     :param engine: runtime to use, onnx, the default value, onnxruntime
     :param sep: separator
     :return: restored data
-
-    See example :ref:`l-plot-intermediate-results` for an example.
 
     .. code-block:: python
 
