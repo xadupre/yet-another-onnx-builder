@@ -58,68 +58,36 @@ class ShapedBasedReshapePattern(ReshapePattern):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 'a', 'b', 'c'])
+            C[Constant <br/> value: 0, 0, -1]
+            R[[Reshape]]
+            xrr([Output: xrr <br/> float, 'a', 'b', 'c'])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['shape2'],
-                                 value=onh.from_array(np.array([0, 0, -1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Reshape', ['X', 'shape2'], ['xrr']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            %% Flow
+            C -->|shape2| R
+            X --> R
+            R --> xrr
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C fill:#f9f,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style xrr fill:#dfd
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
+            X[Input: X] --> ID[Identity]
+            S[Input: shape2] -.->|Invalid?| ID
+            ID --> xrr[Output: xrr]
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Identity', ['X', 'shape2'], ['xrr']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
-
-        print("DOT-SECTION", to_dot(model))
+            style ID fill:#f9f,stroke:#333,stroke-width:2px
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -153,67 +121,49 @@ class ReduceReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 3, 2])
+            C[Constant <br/> value: 3]
+            RS[[ReduceSum <br/> axes=1, keepdims=1]]
+            R[[Reshape]]
+            Y([Output: Y <br/> float, 3])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['shape'],
-                                 value=onh.from_array(np.array([3], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('ReduceSum', ['X'], ['xr'], axes=[1], keepdims=1),
-                    oh.make_node('Reshape', ['xr', 'shape'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (3, 2)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (3,)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 10)],
-        )
+            %% Flow
+            X --> RS
+            RS --> xr[ ]
+            C -->|shape| R
+            xr --> R
+            R --> Y
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C fill:#f9f,stroke:#333,stroke-width:2px
+            style RS fill:#bbf,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style Y fill:#dfd
+            style xr fill:#eee,stroke:#999
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 3, 2])
+            RS[[ReduceSum <br/> axes=1, keepdims=0]]
+            Y([Output: Y <br/> float, 3])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('ReduceSum', ['X'], ['Y'], axes=[1], keepdims=0),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (3, 2)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (3,)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 10)],
-        )
+            %% Flow
+            X --> RS
+            RS --> Y
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style RS fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style Y fill:#dfd
     """
 
     def match(
@@ -305,72 +255,55 @@ class ReshapeReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 'a', 'b', 128])
+            C1[Constant <br/> value: 4096, 7, 7, 128]
+            C2[Constant <br/> value: 4096, 49, 128]
+            R1[[Reshape]]
+            R2[[Reshape]]
+            s2([Output: s2 <br/> float, 4096, 49, 128])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['sh1'],
-                                 value=onh.from_array(np.array([4096, 7, 7, 128], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['sh2'],
-                                 value=onh.from_array(np.array([4096, 49, 128], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Reshape', ['X', 'sh1'], ['s1']),
-                    oh.make_node('Reshape', ['s1', 'sh2'], ['s2']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('sh2', onnx.TensorProto.INT64, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 128)),
-                ],
-                [
-                    oh.make_tensor_value_info('s2', onnx.TensorProto.FLOAT, (4096, 49, 128)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            %% Flow
+            C1 -->|sh1| R1
+            X --> R1
+            R1 --> s1[ ]
+            C2 -->|sh2| R2
+            s1 --> R2
+            R2 --> s2
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C1 fill:#f9f,stroke:#333,stroke-width:2px
+            style C2 fill:#f9f,stroke:#333,stroke-width:2px
+            style R1 fill:#bbf,stroke:#333,stroke-width:2px
+            style R2 fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style s2 fill:#dfd
+            style s1 fill:#eee,stroke:#999
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 'a', 'b', 128])
+            C2[Constant <br/> value: 4096, 49, 128]
+            R[[Reshape]]
+            s2([Output: s2 <br/> float, 4096, 49, 128])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Reshape', ['X', 'sh2'], ['s2']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('sh2', onnx.TensorProto.INT64, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 128)),
-                ],
-                [
-                    oh.make_tensor_value_info('s2', onnx.TensorProto.FLOAT, (4096, 49, 128)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            %% Flow
+            C2 -->|sh2| R
+            X --> R
+            R --> s2
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C2 fill:#f9f,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style s2 fill:#dfd
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -623,84 +556,85 @@ class Reshape2Of3Pattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 2, 3, 4])
+            Y([Input: Y <br/> float, 2, 3, 4])
+            C1[Constant <br/> value: -1, 8]
+            C2[Constant <br/> value: 3, -1]
+            C3[Constant <br/> value: 2, 3, 4]
+            R1[[Reshape]]
+            R2[[Reshape]]
+            R3[[Reshape]]
+            M[[Mul]]
+            xrr([Output: xrr <br/> float, 3, 8])
+            Z([Output: Z <br/> float, 2, 3, 4])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['shape1'],
-                                 value=onh.from_array(np.array([-1, 8], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['shape2'],
-                                 value=onh.from_array(np.array([3, -1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['shape3'],
-                                 value=onh.from_array(np.array([2, 3, 4], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Reshape', ['X', 'shape1'], ['xr']),
-                    oh.make_node('Reshape', ['Y', 'shape2'], ['yr']),
-                    oh.make_node('Reshape', ['xrr', 'shape3'], ['Z']),
-                    oh.make_node('Mul', ['xr', 'yr'], ['xrr']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (2,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                ],
-                [
-                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, (3, 8)),
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            %% Flow
+            C1 -->|shape1| R1
+            X --> R1
+            R1 --> xr[ ]
+            C2 -->|shape2| R2
+            Y --> R2
+            R2 --> yr[ ]
+            xr --> M
+            yr --> M
+            M --> xrr_int[ ]
+            C3 -->|shape3| R3
+            xrr_int --> R3
+            R3 --> Z
+            xrr_int --> xrr
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C1 fill:#f9f,stroke:#333,stroke-width:2px
+            style C2 fill:#f9f,stroke:#333,stroke-width:2px
+            style C3 fill:#f9f,stroke:#333,stroke-width:2px
+            style R1 fill:#bbf,stroke:#333,stroke-width:2px
+            style R2 fill:#bbf,stroke:#333,stroke-width:2px
+            style R3 fill:#bbf,stroke:#333,stroke-width:2px
+            style M fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style Y fill:#dfd
+            style xrr fill:#dfd
+            style Z fill:#dfd
+            style xr fill:#eee,stroke:#999
+            style yr fill:#eee,stroke:#999
+            style xrr_int fill:#eee,stroke:#999
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 2, 3, 4])
+            Y([Input: Y <br/> float, 2, 3, 4])
+            C2[Constant <br/> value: 3, -1]
+            M[[Mul]]
+            R[[Reshape]]
+            xrr([Output: xrr <br/> float, 3, 8])
+            Z([Output: Z <br/> float, 2, 3, 4])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Mul', ['X', 'Y'], ['Z']),
-                    oh.make_node('Reshape', ['Z', 'shape2'], ['xrr']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (2,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                ],
-                [
-                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, (3, 8)),
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            %% Flow
+            X --> M
+            Y --> M
+            M --> z_int[ ]
+            z_int --> Z
+            C2 -->|shape2| R
+            z_int --> R
+            R --> xrr
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C2 fill:#f9f,stroke:#333,stroke-width:2px
+            style M fill:#bbf,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style Y fill:#dfd
+            style xrr fill:#dfd
+            style Z fill:#dfd
+            style z_int fill:#eee,stroke:#999
     """
 
     _op_types = element_wise_binary_op_types()
@@ -891,81 +825,71 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 'a', 4])
+            Y([Input: Y <br/> float, 'a', 4])
+            C1[Constant <br/> value: -1, 8]
+            C2[Constant <br/> value: -1, 8]
+            R1[[Reshape]]
+            R2[[Reshape]]
+            A[[Add]]
+            Z([Output: Z <br/> float, 'b', 8])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['sh1'],
-                                 value=onh.from_array(np.array([-1, 8], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['sh2'],
-                                 value=onh.from_array(np.array([-1, 8], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Reshape', ['X', 'sh1'], ['xc']),
-                    oh.make_node('Reshape', ['Y', 'sh2'], ['yc']),
-                    oh.make_node('Add', ['xc', 'yc'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 4)),
-                    oh.make_tensor_value_info('sh1', onnx.TensorProto.INT64, (2,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 4)),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('b', 8)),
-                ],
-                [
-                    onh.from_array(np.array([-1, 1], dtype=np.int64), name='sh1'),
-                    onh.from_array(np.array([1, -1], dtype=np.int64), name='sh2'),
-                    onh.from_array(np.array([4], dtype=np.int64), name='four'),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            %% Flow
+            C1 -->|sh1| R1
+            X --> R1
+            R1 --> xc[ ]
+            C2 -->|sh2| R2
+            Y --> R2
+            R2 --> yc[ ]
+            xc --> A
+            yc --> A
+            A --> Z
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C1 fill:#f9f,stroke:#333,stroke-width:2px
+            style C2 fill:#f9f,stroke:#333,stroke-width:2px
+            style R1 fill:#bbf,stroke:#333,stroke-width:2px
+            style R2 fill:#bbf,stroke:#333,stroke-width:2px
+            style A fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style Y fill:#dfd
+            style Z fill:#dfd
+            style xc fill:#eee,stroke:#999
+            style yc fill:#eee,stroke:#999
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 'a', 4])
+            Y([Input: Y <br/> float, 'a', 4])
+            C1[Constant <br/> value: -1, 8]
+            A[[Add]]
+            R[[Reshape]]
+            Z([Output: Z <br/> float, 'b', 8])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Add', ['X', 'Y'], ['add-X']),
-                    oh.make_node('Reshape', ['add-X', 'sh1'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 4)),
-                    oh.make_tensor_value_info('sh1', onnx.TensorProto.INT64, (2,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 4)),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('b', 8)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            %% Flow
+            X --> A
+            Y --> A
+            A --> add_out[ ]
+            C1 -->|sh1| R
+            add_out --> R
+            R --> Z
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C1 fill:#f9f,stroke:#333,stroke-width:2px
+            style A fill:#bbf,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style Y fill:#dfd
+            style Z fill:#dfd
+            style add_out fill:#eee,stroke:#999
     """
 
     _op_types = element_wise_binary_op_types()
@@ -1038,85 +962,81 @@ class ConcatReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 'a', 'b', 'c', 'd'])
+            I1([Input: I1 <br/> int64, 1])
+            I2([Input: I2 <br/> int64, 1])
+            SH1[[Shape <br/> start=2, end=3]]
+            SH2[[Shape <br/> start=3, end=4]]
+            CC[[Concat <br/> axis=0]]
+            R[[Reshape]]
+            Y([Output: Y <br/> float, 'a', 'b', 'd', 'c'])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Shape', ['X'], ['D2'], end=3, start=2),
-                    oh.make_node('Shape', ['X'], ['D1'], end=4, start=3),
-                    oh.make_node('Constant', [], ['I1'],
-                                 value=onh.from_array(np.array([2], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['I2'],
-                                 value=onh.from_array(np.array([1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Concat', ['I1', 'I2', 'D1', 'D2'], ['d'], axis=0),
-                    oh.make_node('Reshape', ['X', 'd'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('I1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('D1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
-                    oh.make_tensor_value_info('I2', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'd', 'c')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            %% Flow
+            X --> SH1
+            X --> SH2
+            SH1 --> D2[ ]
+            SH2 --> D1[ ]
+            I1 --> CC
+            I2 --> CC
+            D1 --> CC
+            D2 --> CC
+            CC --> d[ ]
+            X --> R
+            d --> R
+            R --> Y
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style SH1 fill:#bbf,stroke:#333,stroke-width:2px
+            style SH2 fill:#bbf,stroke:#333,stroke-width:2px
+            style CC fill:#bbf,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style I1 fill:#dfd
+            style I2 fill:#dfd
+            style Y fill:#dfd
+            style D1 fill:#eee,stroke:#999
+            style D2 fill:#eee,stroke:#999
+            style d fill:#eee,stroke:#999
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 'a', 'b', 'c', 'd'])
+            I1([Input: I1 <br/> int64, 1])
+            I2([Input: I2 <br/> int64, 1])
+            D1([Input: D1 <br/> int64, 1])
+            CM1[Constant <br/> value: -1]
+            CC[[Concat <br/> axis=0]]
+            R[[Reshape]]
+            Y([Output: Y <br/> float, 'a', 'b', 'd', 'c'])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s1_-1'],
-                                 value=onh.from_array(np.array([-1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Concat', ['I1', 'I2', 'D1', 'init7_s1_-1'], ['d--concat'],
-                                 axis=0),
-                    oh.make_node('Reshape', ['X', 'd--concat'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('I1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('D1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
-                    oh.make_tensor_value_info('I2', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'd', 'c')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            %% Flow
+            I1 --> CC
+            I2 --> CC
+            D1 --> CC
+            CM1 --> CC
+            CC --> d_concat[ ]
+            X --> R
+            d_concat --> R
+            R --> Y
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style CM1 fill:#f9f,stroke:#333,stroke-width:2px
+            style CC fill:#bbf,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style I1 fill:#dfd
+            style I2 fill:#dfd
+            style D1 fill:#dfd
+            style Y fill:#dfd
+            style d_concat fill:#eee,stroke:#999
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1232,76 +1152,66 @@ class StaticConcatReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 2, 3, 'd'])
+            I1([Input: I1 <br/> int64, 1])
+            SH[[Shape <br/> start=2, end=3]]
+            CC[[Concat <br/> axis=0]]
+            R[[Reshape]]
+            Y([Output: Y <br/> float, 6, 'd'])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['I1'],
-                                 value=onh.from_array(np.array([6], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Shape', ['X'], ['D2'], end=3, start=2),
-                    oh.make_node('Concat', ['I1', 'D2'], ['dc'], axis=0),
-                    oh.make_node('Reshape', ['X', 'dc'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('I1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (6, 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            %% Flow
+            X --> SH
+            SH --> D2[ ]
+            I1 --> CC
+            D2 --> CC
+            CC --> dc[ ]
+            X --> R
+            dc --> R
+            R --> Y
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style SH fill:#bbf,stroke:#333,stroke-width:2px
+            style CC fill:#bbf,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style I1 fill:#dfd
+            style Y fill:#dfd
+            style D2 fill:#eee,stroke:#999
+            style dc fill:#eee,stroke:#999
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 2, 3, 'd'])
+            I1([Input: I1 <br/> int64, 1])
+            CM1[Constant <br/> value: -1]
+            CC[[Concat <br/> axis=0]]
+            R[[Reshape]]
+            Y([Output: Y <br/> float, 6, 'd'])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s1_-1'],
-                                 value=onh.from_array(np.array([-1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Concat', ['I1', 'init7_s1_-1'], ['d--concat'], axis=0),
-                    oh.make_node('Reshape', ['X', 'd--concat'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('I1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (6, 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            %% Flow
+            I1 --> CC
+            CM1 --> CC
+            CC --> d_concat[ ]
+            X --> R
+            d_concat --> R
+            R --> Y
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style CM1 fill:#f9f,stroke:#333,stroke-width:2px
+            style CC fill:#bbf,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style I1 fill:#dfd
+            style Y fill:#dfd
+            style d_concat fill:#eee,stroke:#999
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1403,73 +1313,58 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 2, 3, 'd'])
+            I1[Initializer <br/> value: -1]
+            SH[[Shape <br/> start=2, end=3]]
+            CC[[Concat <br/> axis=0]]
+            R[[Reshape]]
+            Y([Output: Y <br/> float, 6, 'd'])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Shape', ['X'], ['D2'], end=3, start=2),
-                    oh.make_node('Concat', ['I1', 'D2'], ['dshape'], axis=0),
-                    oh.make_node('Reshape', ['X', 'dshape'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (6, 'd')),
-                ],
-                [
-                    onh.from_array(np.array([-1], dtype=np.int64), name='I1'),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            %% Flow
+            X --> SH
+            SH --> D2[ ]
+            I1 --> CC
+            D2 --> CC
+            CC --> dshape[ ]
+            X --> R
+            dshape --> R
+            R --> Y
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style I1 fill:#f9f,stroke:#333,stroke-width:2px
+            style SH fill:#bbf,stroke:#333,stroke-width:2px
+            style CC fill:#bbf,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style Y fill:#dfd
+            style D2 fill:#eee,stroke:#999
+            style dshape fill:#eee,stroke:#999
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 2, 3, 'd'])
+            C[Constant <br/> value: 6, -1]
+            R[[Reshape]]
+            Y([Output: Y <br/> float, 6, 'd'])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s2_6_-1'],
-                                 value=onh.from_array(np.array([6, -1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Reshape', ['X', 'init7_s2_6_-1'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (6, 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            %% Flow
+            C -->|shape| R
+            X --> R
+            R --> Y
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C fill:#f9f,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style Y fill:#dfd
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1644,73 +1539,59 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 2, 3, 'd'])
+            one[Initializer <br/> value: 1]
+            SH[[Shape]]
+            CC[[Concat <br/> axis=0]]
+            R[[Reshape]]
+            Y([Output: Y <br/> float, 1, 2, 3, 'd', 1])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Shape', ['X'], ['D2']),
-                    oh.make_node('Concat', ['one', 'D2', 'one'], ['dshape2'], axis=0),
-                    oh.make_node('Reshape', ['X', 'dshape2'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1, 2, 3, 'd', 1)),
-                ],
-                [
-                    onh.from_array(np.array([1], dtype=np.int64), name='one'),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            %% Flow
+            X --> SH
+            SH --> D2[ ]
+            one --> CC
+            D2 --> CC
+            one --> CC
+            CC --> dshape2[ ]
+            X --> R
+            dshape2 --> R
+            R --> Y
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style one fill:#f9f,stroke:#333,stroke-width:2px
+            style SH fill:#bbf,stroke:#333,stroke-width:2px
+            style CC fill:#bbf,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style Y fill:#dfd
+            style D2 fill:#eee,stroke:#999
+            style dshape2 fill:#eee,stroke:#999
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 2, 3, 'd'])
+            C[Constant <br/> value: 0, 4]
+            U[[Unsqueeze]]
+            Y([Output: Y <br/> float, 1, 2, 3, 'd', 1])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s2_0_4'],
-                                 value=onh.from_array(np.array([0, 4], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Unsqueeze', ['X', 'init7_s2_0_4'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1, 2, 3, 'd', 1)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            %% Flow
+            C -->|axes| U
+            X --> U
+            U --> Y
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C fill:#f9f,stroke:#333,stroke-width:2px
+            style U fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style Y fill:#dfd
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1810,75 +1691,55 @@ class UnsqueezeReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 'a', 'b', 'c'])
+            C1[Constant <br/> value: 2]
+            C2[Constant <br/> value: 0, 1, -1, 0]
+            U[[Unsqueeze]]
+            R[[Reshape]]
+            Z([Output: Z <br/> float, 'e', 'f', 'g', 'h'])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['zero'],
-                                 value=onh.from_array(np.array([2], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['shape3'],
-                                 value=onh.from_array(np.array([0, 1, -1, 0], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Unsqueeze', ['X', 'zero'], ['xu0']),
-                    oh.make_node('Reshape', ['xu0', 'shape3'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('e', 'f', 'g', 'h')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            %% Flow
+            C1 -->|axes| U
+            X --> U
+            U --> xu0[ ]
+            C2 -->|shape| R
+            xu0 --> R
+            R --> Z
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C1 fill:#f9f,stroke:#333,stroke-width:2px
+            style C2 fill:#f9f,stroke:#333,stroke-width:2px
+            style U fill:#bbf,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style Z fill:#dfd
+            style xu0 fill:#eee,stroke:#999
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 'a', 'b', 'c'])
+            C[Constant <br/> value: 1]
+            U[[Unsqueeze]]
+            Z([Output: Z <br/> float, 'e', 'f', 'g', 'h'])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s1_1'],
-                                 value=onh.from_array(np.array([1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Unsqueeze', ['X', 'init7_s1_1'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('e', 'f', 'g', 'h')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            %% Flow
+            C -->|axes| U
+            X --> U
+            U --> Z
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C fill:#f9f,stroke:#333,stroke-width:2px
+            style U fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style Z fill:#dfd
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1953,72 +1814,55 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 'a', 8, 16])
+            S3([Input: shape3 <br/> int64, 2])
+            C[Constant <br/> value: 0]
+            U[[Unsqueeze]]
+            R[[Reshape]]
+            Z([Output: Z <br/> float, '2*a', 64])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['zero'],
-                                 value=onh.from_array(np.array([0], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['shape3'],
-                                 value=onh.from_array(np.array([-1, 128], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Unsqueeze', ['X', 'zero'], ['xu0']),
-                    oh.make_node('Reshape', ['xu0', 'shape3'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 8, 16)),
-                    oh.make_tensor_value_info('shape3', onnx.TensorProto.INT64, (2,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('2*a', 64)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            %% Flow
+            C -->|axes| U
+            X --> U
+            U --> xu0[ ]
+            S3 -->|shape| R
+            xu0 --> R
+            R --> Z
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C fill:#f9f,stroke:#333,stroke-width:2px
+            style U fill:#bbf,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style S3 fill:#dfd
+            style Z fill:#dfd
+            style xu0 fill:#eee,stroke:#999
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 'a', 8, 16])
+            S3([Input: shape3 <br/> int64, 2])
+            R[[Reshape]]
+            Z([Output: Z <br/> float, '2*a', 64])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Reshape', ['X', 'shape3'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 8, 16)),
-                    oh.make_tensor_value_info('shape3', onnx.TensorProto.INT64, (2,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('2*a', 64)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            %% Flow
+            X --> R
+            S3 -->|shape| R
+            R --> Z
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style S3 fill:#dfd
+            style Z fill:#dfd
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
