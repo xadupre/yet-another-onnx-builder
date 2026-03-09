@@ -58,11 +58,9 @@ class ShapedBasedReshapePattern(ReshapePattern):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -89,15 +87,14 @@ class ShapedBasedReshapePattern(ReshapePattern):
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
 
@@ -119,7 +116,8 @@ class ShapedBasedReshapePattern(ReshapePattern):
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -153,11 +151,9 @@ class ReduceReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -184,15 +180,14 @@ class ReduceReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 10)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
 
@@ -213,7 +208,8 @@ class ReduceReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 10)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
     """
 
     def match(
@@ -305,11 +301,9 @@ class ReshapeReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -340,15 +334,14 @@ class ReshapeReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
 
@@ -370,7 +363,8 @@ class ReshapeReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -623,11 +617,9 @@ class Reshape2Of3Pattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -666,15 +658,14 @@ class Reshape2Of3Pattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
 
@@ -700,7 +691,8 @@ class Reshape2Of3Pattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
     """
 
     _op_types = element_wise_binary_op_types()
@@ -891,11 +883,9 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -933,15 +923,14 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
 
@@ -965,7 +954,8 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
     """
 
     _op_types = element_wise_binary_op_types()
@@ -1038,11 +1028,9 @@ class ConcatReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -1077,15 +1065,14 @@ class ConcatReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -1116,7 +1103,8 @@ class ConcatReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1232,11 +1220,9 @@ class StaticConcatReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -1265,15 +1251,14 @@ class StaticConcatReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -1301,7 +1286,8 @@ class StaticConcatReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1403,11 +1389,9 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -1435,15 +1419,14 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -1469,7 +1452,8 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1644,11 +1628,9 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -1676,15 +1658,14 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -1710,7 +1691,8 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 18)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1810,11 +1792,9 @@ class UnsqueezeReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -1844,15 +1824,14 @@ class UnsqueezeReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -1878,7 +1857,8 @@ class UnsqueezeReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1953,11 +1933,9 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import numpy as np
         import onnx
         import onnx.helper as oh
@@ -1988,15 +1966,14 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. runpython::
+        :showcode:
 
-        from yobx.doc import to_dot
         import onnx
         import onnx.helper as oh
 
@@ -2018,7 +1995,8 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
             opset_imports=[oh.make_opsetid('', 26)],
         )
 
-        print("DOT-SECTION", to_dot(model))
+        from yobx.helpers.onnx_helper import pretty_onnx
+        print(pretty_onnx(model))
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
