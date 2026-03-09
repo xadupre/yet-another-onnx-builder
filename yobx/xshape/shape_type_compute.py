@@ -2360,6 +2360,8 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
     if node.op_type == "CDist" and node.domain == "com.microsoft":
         if self.has_type(node.input[0]):
             self.set_type(node.output[0], self.get_type(node.input[0]))
+        if self.has_device(node.input[0]):
+            self.set_device(node.output[0], self.get_device(node.input[0]))
         if self.has_shape(node.input[0]) and self.has_shape(node.input[1]):
             shape_a = self.get_shape(node.input[0])
             shape_b = self.get_shape(node.input[1])
