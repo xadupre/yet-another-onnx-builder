@@ -10,7 +10,7 @@ on:
 
 jobs:
   torch_tests:
-    name: transformers-releases (ubuntu-latest, py3.13, transformers 5.3/5.2/4.57/4/.5/4.49 torch-${{ matrix.torch-version }})
+    name: transformers-releases (ubuntu-latest, py3.13, transformers 4.57/4/.5/4.49 torch-${{ matrix.torch-version }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -35,42 +35,54 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev,torch]"
 
-      - name: pip freeze
-        run: pip freeze
-
-      - name: install transformers==4.49
+      - name: install transformers==4.49 and pip freeze
         run: pip install transformers==4.49 && pip freeze
       - name: Run tests with transformers==4.49
         run: pytest unittests/torch --durations=10
 
-      - name: pip freeze
-        run: pip freeze
-
-      - name: install transformers==4.55
+      - name: install transformers==4.55 and pip freeze
         run: pip install transformers==4.55 && pip freeze
       - name: Run tests with transformers==4.55
         run: pytest unittests/torch --durations=10
 
-      - name: pip freeze
-        run: pip freeze
-
-      - name: install transformers==4.57
+      - name: install transformers==4.57 and pip freeze
         run: pip install transformers==4.57 && pip freeze
       - name: Run tests with transformers==4.57
         run: pytest unittests/torch --durations=10
 
-      - name: pip freeze
-        run: pip freeze
+jobs:
+  torch_tests:
+    name: transformers-releases (ubuntu-latest, py3.13, transformers 5.3/5.2 torch-${{ matrix.torch-version }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        torch-version: ["2.10"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
 
-      - name: install transformers==5.2
+      - name: Install pytorch 2.10
+        if: matrix.torch-version == '2.10'
+        run: pip install torch==2.10.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - name: Install nightly pytorch
+        if: matrix.torch-version == 'nightly'
+        run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,torch]"
+
+      - name: install transformers==5.2 and pip freeze
         run: pip install transformers==5.2 && pip freeze
       - name: Run tests with transformers==5.2
         run: pytest unittests/torch --durations=10
 
-      - name: pip freeze
-        run: pip freeze
-
-      - name: install transformers==5.3
+      - name: install transformers==5.3 and pip freeze
         run: pip install transformers==5.3 && pip freeze
       - name: Run tests with transformers==5.3
         run: pytest unittests/torch --durations=10

@@ -21,7 +21,7 @@ jobs:
         torch-version: ["2.10", "nightly"]
         exclude:
           - os: "macos-latest"
-            python-version: "3.13"
+            python-version: "3.12"
           - os: "windows-latest"
             python-version: "3.12"
           - os: "macos-latest"
