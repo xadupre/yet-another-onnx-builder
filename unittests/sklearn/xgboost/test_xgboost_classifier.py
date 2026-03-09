@@ -142,6 +142,12 @@ class TestXGBoostClassifier(ExtTestCase):
                     ml_opsets = {op.domain: op.version for op in onx.opset_import}
                     self.assertEqual(ml_opsets.get("ai.onnx.ml"), ml_opset)
 
+                    op_types = [n.op_type for n in onx.graph.node]
+                    if ml_opset >= 5:
+                        self.assertIn("TreeEnsemble", op_types)
+                    else:
+                        self.assertIn("TreeEnsembleClassifier", op_types)
+
                     ref = ExtendedReferenceEvaluator(onx)
                     results = ref.run(None, {"X": X})
                     proba, label = results[1], results[0]
