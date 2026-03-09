@@ -145,5 +145,195 @@ class TestMakeFeeds(ExtTestCase):
         self.assertNotIn("position_ids", feeds)
 
 
+class TestOnnxGenerate(ExtTestCase):
+    """Tests for :func:`yobx.helpers.rt_helper.onnx_generate`."""
+
+    VOCAB = 8
+    BATCH = 1
+
+    @classmethod
+    def _make_fixed_logits_model(cls, winner_token: int) -> onnx.ModelProto:
+        """
+        Returns an ONNX model (no KV cache) whose logits always give the
+        highest score to *winner_token*, regardless of the input sequence.
+        """
+        fixed_logits = np.zeros((cls.BATCH, 1, cls.VOCAB), dtype=np.float32)
+        fixed_logits[0, 0, winner_token] = 10.0
+        return onnx.helper.make_model(
+            onnx.helper.make_graph(
+                [
+                    onnx.helper.make_node(
+                        "Constant",
+                        [],
+                        ["logits"],
+                        value=onnx.numpy_helper.from_array(fixed_logits),
+                    )
+                ],
+                "tiny_lm_no_kv",
+                [onnx.helper.make_tensor_value_info("input_ids", TensorProto.INT64, [1, None])],
+                [
+                    onnx.helper.make_tensor_value_info(
+                        "logits", TensorProto.FLOAT, [1, 1, cls.VOCAB]
+                    )
+                ],
+            ),
+            opset_imports=[onnx.helper.make_opsetid("", 18)],
+            ir_version=9,
+        )
+
+    @classmethod
+    def _make_kv_model(cls, winner_token: int) -> onnx.ModelProto:
+        """
+        Returns an ONNX model with 2-layer KV cache.  Logits always favour
+        *winner_token*.  The present KV values are just the past KV values
+        concatenated with a zero slice (so shapes update correctly).
+        """
+        HEADS = 2
+        HEAD_DIM = 4
+        LAYERS = 2
+        fixed_logits = np.zeros((cls.BATCH, 1, cls.VOCAB), dtype=np.float32)
+        fixed_logits[0, 0, winner_token] = 10.0
+        new_kv = np.zeros((cls.BATCH, HEADS, 1, HEAD_DIM), dtype=np.float32)
+
+        inputs = [
+            onnx.helper.make_tensor_value_info(
+                "input_ids", TensorProto.INT64, [cls.BATCH, None]
+            ),
+            onnx.helper.make_tensor_value_info(
+                "attention_mask", TensorProto.INT64, [cls.BATCH, None]
+            ),
+        ]
+        for i in range(LAYERS):
+            inputs.append(
+                onnx.helper.make_tensor_value_info(
+                    f"past_key_values.{i}.key",
+                    TensorProto.FLOAT,
+                    [cls.BATCH, HEADS, None, HEAD_DIM],
+                )
+            )
+            inputs.append(
+                onnx.helper.make_tensor_value_info(
+                    f"past_key_values.{i}.value",
+                    TensorProto.FLOAT,
+                    [cls.BATCH, HEADS, None, HEAD_DIM],
+                )
+            )
+
+        outputs = [
+            onnx.helper.make_tensor_value_info(
+                "logits", TensorProto.FLOAT, [cls.BATCH, 1, cls.VOCAB]
+            )
+        ]
+        for i in range(LAYERS):
+            outputs.append(
+                onnx.helper.make_tensor_value_info(
+                    f"present_key_values.{i}.key",
+                    TensorProto.FLOAT,
+                    [cls.BATCH, HEADS, None, HEAD_DIM],
+                )
+            )
+            outputs.append(
+                onnx.helper.make_tensor_value_info(
+                    f"present_key_values.{i}.value",
+                    TensorProto.FLOAT,
+                    [cls.BATCH, HEADS, None, HEAD_DIM],
+                )
+            )
+
+        nodes = [
+            onnx.helper.make_node(
+                "Constant",
+                [],
+                ["logits"],
+                value=onnx.numpy_helper.from_array(fixed_logits),
+            )
+        ]
+        for i in range(LAYERS):
+            nodes.append(
+                onnx.helper.make_node(
+                    "Concat",
+                    [f"past_key_values.{i}.key", "new_kv"],
+                    [f"present_key_values.{i}.key"],
+                    axis=2,
+                )
+            )
+            nodes.append(
+                onnx.helper.make_node(
+                    "Concat",
+                    [f"past_key_values.{i}.value", "new_kv"],
+                    [f"present_key_values.{i}.value"],
+                    axis=2,
+                )
+            )
+
+        inits = [onnx.numpy_helper.from_array(new_kv, name="new_kv")]
+        return onnx.helper.make_model(
+            onnx.helper.make_graph(
+                nodes, "tiny_llm_with_kv", inputs, outputs, inits
+            ),
+            opset_imports=[onnx.helper.make_opsetid("", 18)],
+            ir_version=9,
+        )
+
+    def test_greedy_no_kv_stops_at_eos(self):
+        """Without KV cache: generation stops when EOS token is produced."""
+        from yobx.helpers.rt_helper import onnx_generate
+
+        model = self._make_fixed_logits_model(winner_token=3)
+        prompt = np.array([[1, 2]], dtype=np.int64)
+        tokens = onnx_generate(model, prompt, max_new_tokens=10, eos_token_id=3)
+        # Prompt + exactly one new token (which is EOS=3).
+        self.assertEqual(tokens.shape, (1, 3))
+        self.assertEqual(int(tokens[0, 2]), 3)
+
+    def test_greedy_no_kv_max_tokens(self):
+        """Without KV cache: exactly max_new_tokens tokens appended when no EOS."""
+        from yobx.helpers.rt_helper import onnx_generate
+
+        model = self._make_fixed_logits_model(winner_token=3)
+        prompt = np.array([[1, 2]], dtype=np.int64)
+        # Use a winner token that is NOT the EOS token.
+        tokens = onnx_generate(model, prompt, max_new_tokens=4, eos_token_id=99)
+        self.assertEqual(tokens.shape, (1, 6))
+        self.assertTrue(np.all(tokens[0, 2:] == 3))
+
+    def test_greedy_with_kv_stops_at_eos(self):
+        """With KV cache: generation stops when EOS token is produced."""
+        from yobx.helpers.rt_helper import onnx_generate
+
+        model = self._make_kv_model(winner_token=5)
+        prompt = np.array([[1, 2]], dtype=np.int64)
+        attn = np.ones_like(prompt)
+        tokens = onnx_generate(model, prompt, attention_mask=attn, max_new_tokens=10, eos_token_id=5)
+        self.assertEqual(tokens.shape, (1, 3))
+        self.assertEqual(int(tokens[0, 2]), 5)
+
+    def test_greedy_with_kv_max_tokens(self):
+        """With KV cache: max_new_tokens are generated when EOS is not reached."""
+        from yobx.helpers.rt_helper import onnx_generate
+
+        model = self._make_kv_model(winner_token=5)
+        prompt = np.array([[1, 2]], dtype=np.int64)
+        attn = np.ones_like(prompt)
+        tokens = onnx_generate(
+            model, prompt, attention_mask=attn, max_new_tokens=3, eos_token_id=99
+        )
+        self.assertEqual(tokens.shape, (1, 5))
+        self.assertTrue(np.all(tokens[0, 2:] == 5))
+
+    @requires_torch()
+    def test_torch_input_ids(self):
+        """Torch tensors are accepted as input_ids/attention_mask."""
+        import torch
+        from yobx.helpers.rt_helper import onnx_generate
+
+        model = self._make_fixed_logits_model(winner_token=2)
+        prompt = torch.tensor([[1, 2, 3]], dtype=torch.int64)
+        attn = torch.ones_like(prompt)
+        tokens = onnx_generate(model, prompt, attention_mask=attn, max_new_tokens=2, eos_token_id=99)
+        self.assertIsInstance(tokens, np.ndarray)
+        self.assertEqual(tokens.shape, (1, 5))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
