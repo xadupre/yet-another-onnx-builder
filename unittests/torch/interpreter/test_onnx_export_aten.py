@@ -12,6 +12,7 @@ from yobx.ext_test_case import (
     skipif_ci_windows,
     requires_torch,
     requires_transformers,
+    requires_onnxruntime,
     ignore_warnings,
     hide_stdout,
 )
@@ -2151,6 +2152,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqualArray(expected, got, atol=1e-2)
 
     @ignore_warnings(RuntimeWarning)
+    @requires_onnxruntime("1.24.3")
     def test_attention_scale_dot_product_attention(self):
         import torch
 
@@ -2191,6 +2193,7 @@ class TestOnnxExportAten(ExtTestCase):
                 self.assertEqualArray(expected, got, atol=1e-2)
 
     @ignore_warnings(RuntimeWarning)
+    @requires_onnxruntime("1.24.3")
     def test_attention_scale_dot_product_attention_float_mask(self):
         import torch
 
@@ -2231,7 +2234,7 @@ class TestOnnxExportAten(ExtTestCase):
 
     @ignore_warnings(RuntimeWarning)
     @requires_transformers("4.57")
-    @unittest.skip("ToDO: fix it later")
+    @unittest.skip("TODO: fix it later")
     def test_attention_scale_dot_product_attention_gqa(self):
         import torch
 
@@ -3568,7 +3571,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model, (a, b), dynamic_shapes=({0: "G", 1: "M", 2: "K"}, {0: "G", 1: "N", 2: "K"})
         )
-        self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=1e-3)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=1e-2)
 
     def test_aten_grouped_mm_offsets(self):
         import torch

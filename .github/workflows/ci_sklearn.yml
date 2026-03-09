@@ -34,7 +34,7 @@ jobs:
       - name: pip freeze
         run: pip freeze
 
-      - name: Run sklearn tests with coverage
+      - name: Run sklearn tests with no coverage
         if: matrix.sklearn-version != '1.8'
         run: |
             pytest --durations=10 \
