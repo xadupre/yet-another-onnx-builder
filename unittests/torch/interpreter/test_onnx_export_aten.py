@@ -2233,8 +2233,8 @@ class TestOnnxExportAten(ExtTestCase):
                 self.assertEqualArray(expected, got, atol=1e-2)
 
     @ignore_warnings(RuntimeWarning)
-    @requires_transformers("4.57")
-    @unittest.skip("TODO: fix it later")
+    @requires_onnxruntime("1.24.3")
+    @requires_torch("2.5")
     def test_attention_scale_dot_product_attention_gqa(self):
         import torch
 

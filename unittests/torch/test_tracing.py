@@ -748,7 +748,6 @@ class TestTracing(ExtTestCase):
             got = mod(*inp)
             self.assertEqualArray(expected, got)
 
-    @unittest.skip("TODO: fix it")
     def test_tracing_int_shape(self):
         class Model(torch.nn.Module):
             @staticmethod
@@ -771,7 +770,6 @@ class TestTracing(ExtTestCase):
             got = mod(*inp)
             self.assertEqualArray(expected, got)
 
-    @unittest.skip("TODO: fix it")
     def test_tracing_function_int_shape(self):
         class Model(torch.nn.Module):
             @staticmethod
