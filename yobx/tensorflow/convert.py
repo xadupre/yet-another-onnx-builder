@@ -15,6 +15,8 @@ def to_onnx(
     target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
     verbose: int = 0,
     extra_converters: Optional[Dict[str, Callable]] = None,
+    large_model: bool = False,
+    external_threshold: int = 1024,
 ):
     """
     Converts a :epkg:`TensorFlow`/:epkg:`Keras` model into ONNX.
@@ -34,7 +36,14 @@ def to_onnx(
     :param extra_converters: optional mapping from TF op-type string to converter
         function with signature ``(g, sts, outputs, op, verbose=0)``;
         entries here take priority over the built-in op converters
-    :return: onnx model
+    :param large_model: if True returns a
+        :class:`onnx.model_container.ModelContainer`, which lets the user
+        decide later whether weights should be embedded in the model or saved
+        as external data
+    :param external_threshold: if ``large_model`` is True, every tensor whose
+        element count exceeds this threshold is stored as external data
+    :return: onnx model or :class:`onnx.model_container.ModelContainer`
+        when *large_model* is True
     """
     from . import register_tensorflow_converters
 
@@ -58,7 +67,7 @@ def to_onnx(
     # Populate an ONNX GraphBuilder by walking the concrete-function graph.
     g = GraphBuilder(target_opset)
     _convert_concrete_function(cf, g, args, input_specs, verbose, extra_converters or {})
-    return g.to_onnx()
+    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
 
 
 # ---------------------------------------------------------------------------

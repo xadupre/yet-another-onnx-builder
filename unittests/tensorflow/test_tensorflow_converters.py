@@ -458,5 +458,15 @@ class TestTensorflowBinaryOpConverters(ExtTestCase):
         # Xor may be not used...
 
 
+    def test_dense_linear_large_model(self):
+        """to_onnx with large_model=True returns an ExtendedModelContainer."""
+        from yobx.container import ExtendedModelContainer
+
+        model = tf.keras.Sequential([tf.keras.layers.Dense(4, input_shape=(3,))])
+        X = np.random.rand(5, 3).astype(np.float32)
+        container = to_onnx(model, (X,), large_model=True)
+        self.assertIsInstance(container, ExtendedModelContainer)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
