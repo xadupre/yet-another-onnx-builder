@@ -1,7 +1,7 @@
 import unittest
-from yobx.torch.interpreter import to_onnx, requires_transformers
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.reference import ExtendedReferenceEvaluator
+from yobx.torch.interpreter import to_onnx
 
 
 class TestOnnxExportTransformers(ExtTestCase):
