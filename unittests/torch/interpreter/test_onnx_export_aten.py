@@ -11,7 +11,6 @@ from yobx.ext_test_case import (
     ExtTestCase,
     skipif_ci_windows,
     requires_torch,
-    requires_transformers,
     requires_onnxruntime,
     ignore_warnings,
     hide_stdout,

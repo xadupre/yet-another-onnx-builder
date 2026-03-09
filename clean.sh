@@ -1,5 +1,7 @@
 rm dump_test* -rf
 rm onnxruntime_profile*
+rm plot*.onnx
+rm plot*.png
 rm temp*.onnx
 rm test*.onnx
 rm *.ep
