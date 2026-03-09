@@ -37,6 +37,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+from yobx.doc import plot_dot
 from yobx.builder.spox import SpoxGraphBuilder
 from yobx.sklearn import to_onnx
 
@@ -140,74 +141,7 @@ assert np.allclose(proba_mc_sk, proba_mc_onnx, atol=1e-5), "Multiclass proba mis
 print("Multiclass predictions match ✓")
 
 # %%
-# 5. DecisionTreeClassifier — the ``ai.onnx.ml`` domain
-# -------------------------------------------------------
-#
-# Decision-tree models map to the ``TreeEnsembleClassifier`` operator in
-# the ``ai.onnx.ml`` domain.
-# :class:`~yobx.builder.spox.SpoxGraphBuilder` resolves this domain to
-# ``spox.opset.ai.onnx.ml.v3`` automatically, so no extra configuration
-# is needed.
+# 5. Visualise the ONNX graph
+# ---------------------------
 
-from sklearn.tree import DecisionTreeClassifier  # noqa: E402
-
-X_dt = rng.standard_normal((60, 4)).astype(np.float32)
-y_dt = rng.integers(0, 3, size=60)
-
-dt = DecisionTreeClassifier(max_depth=4, random_state=0)
-dt.fit(X_dt, y_dt)
-
-onx_dt = to_onnx(dt, (X_dt[:1],), builder_cls=SpoxGraphBuilder)
-
-print("\nDecisionTree node types:", [n.op_type for n in onx_dt.graph.node])
-print("Domains used:", list({n.domain for n in onx_dt.graph.node}))
-
-X_test_dt = rng.standard_normal((20, 4)).astype(np.float32)
-ref_dt = onnxruntime.InferenceSession(
-    onx_dt.SerializeToString(), providers=["CPUExecutionProvider"]
-)
-label_dt_onnx, _ = ref_dt.run(None, {"X": X_test_dt})
-
-assert np.array_equal(dt.predict(X_test_dt), label_dt_onnx), "Decision tree mismatch!"
-print("DecisionTree predictions match ✓")
-
-# %%
-# 6. Visualise the ONNX graph
-# ----------------------------
-#
-# :func:`yobx.helpers.dot_helper.to_dot` converts the
-# :class:`onnx.ModelProto` into a DOT string.  The graph below shows
-# the binary pipeline produced by :class:`~yobx.builder.spox.SpoxGraphBuilder`.
-
-from yobx.helpers.dot_helper import to_dot  # noqa: E402
-
-dot_src = to_dot(onx)
-print(dot_src)
-
-# %%
-# Display the graph
-# ------------------
-#
-# The DOT source produced above describes the following graph.
-#
-# .. gdot::
-#     :script: DOT-SECTION
-#
-#     import numpy as np
-#     from sklearn.linear_model import LogisticRegression
-#     from sklearn.pipeline import Pipeline
-#     from sklearn.preprocessing import StandardScaler
-#     from yobx.builder.spox import SpoxGraphBuilder
-#     from yobx.sklearn import to_onnx
-#     from yobx.helpers.dot_helper import to_dot
-#
-#     rng = np.random.default_rng(0)
-#     X_train = rng.standard_normal((80, 4)).astype(np.float32)
-#     y_train = (X_train[:, 0] + X_train[:, 1] > 0).astype(int)
-#     pipe = Pipeline(
-#         [("scaler", StandardScaler()), ("clf", LogisticRegression())]
-#     )
-#     pipe.fit(X_train, y_train)
-#     onx = to_onnx(pipe, (X_train[:1],), builder_cls=SpoxGraphBuilder)
-#     dot = to_dot(onx)
-#     print("DOT-SECTION", dot)
+plot_dot(onx)

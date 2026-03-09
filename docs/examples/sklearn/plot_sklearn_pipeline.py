@@ -35,6 +35,7 @@ import onnxruntime
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from yobx.doc import plot_dot
 from yobx.sklearn import to_onnx
 
 # %%
@@ -146,39 +147,4 @@ print("Multiclass predictions match ✓")
 # 5. Visualize the ONNX graph
 # ----------------------------
 #
-# :func:`to_dot <yobx.helpers.dot_helper.to_dot>` converts the
-# :class:`onnx.ModelProto` into a DOT string that can be rendered by
-# Graphviz.  The graph shows every ONNX node produced by the converter,
-# with dtype/shape annotations on each edge.
-
-from yobx.helpers.dot_helper import to_dot  # noqa: E402
-
-dot_src = to_dot(onx)
-print(dot_src)
-
-# %%
-# Display the graph
-# ------------------
-#
-# The DOT source produced above describes the following graph.
-#
-# .. gdot::
-#     :script: DOT-SECTION
-#
-#     import numpy as np
-#     from sklearn.linear_model import LogisticRegression
-#     from sklearn.pipeline import Pipeline
-#     from sklearn.preprocessing import StandardScaler
-#     from yobx.sklearn import to_onnx
-#     from yobx.helpers.dot_helper import to_dot
-#
-#     rng = np.random.default_rng(0)
-#     X_train = rng.standard_normal((80, 4)).astype(np.float32)
-#     y_train = (X_train[:, 0] + X_train[:, 1] > 0).astype(int)
-#     pipe = Pipeline(
-#         [("scaler", StandardScaler()), ("clf", LogisticRegression())]
-#     )
-#     pipe.fit(X_train, y_train)
-#     onx = to_onnx(pipe, (X_train[:1],))
-#     dot = to_dot(onx)
-#     print("DOT-SECTION", dot)
+plot_dot(onx)

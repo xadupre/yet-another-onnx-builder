@@ -35,6 +35,7 @@ The workflow is:
 import tensorflow as tf
 import numpy as np
 import onnxruntime
+from yobx.doc import plot_dot
 from yobx.tensorflow import to_onnx
 
 # %%
@@ -184,40 +185,4 @@ print("Custom converter verified ✓")
 # 5. Visualize the ONNX graph
 # ----------------------------
 #
-# :func:`to_dot <yobx.helpers.dot_helper.to_dot>` converts the
-# :class:`onnx.ModelProto` into a DOT string that can be rendered by
-# :epkg:`Graphviz`.  The graph shows every ONNX node produced by the
-# converter, with dtype and shape annotations on each edge.
-
-from yobx.helpers.dot_helper import to_dot  # noqa: E402
-
-dot_src = to_dot(onx_mlp)
-print(dot_src[:500], "...(truncated)")
-
-# %%
-# Display the graph
-# ------------------
-#
-# The DOT source produced above describes the following graph.
-#
-# .. gdot::
-#     :script: DOT-SECTION
-#
-#     import numpy as np
-#     import tensorflow as tf
-#     from yobx.tensorflow import to_onnx
-#     from yobx.helpers.dot_helper import to_dot
-#
-#     rng = np.random.default_rng(0)
-#     X_train = rng.standard_normal((80, 8)).astype(np.float32)
-#     mlp = tf.keras.Sequential(
-#         [
-#             tf.keras.layers.Dense(16, activation="relu", input_shape=(8,)),
-#             tf.keras.layers.Dense(8, activation="relu"),
-#             tf.keras.layers.Dense(4),
-#         ]
-#     )
-#     _ = mlp(X_train)
-#     onx = to_onnx(mlp, (X_train[:1],))
-#     dot = to_dot(onx)
-#     print("DOT-SECTION", dot)
+plot_dot(onx_mlp)
