@@ -309,6 +309,22 @@ def replace_problematic_function_before_tracing():
                 setattr(torch, k, v)
 
 
+_AUTOWRAP_FUNCTIONS: Tuple[Callable, ...] = (
+    torch.ones,
+    torch.zeros,
+    torch.full,
+    torch.empty,
+    torch.arange,
+)
+"""
+Default functions to autowrap in :class:`CustomTracer`.
+These tensor-creating functions take integer size arguments and would
+fail during symbolic tracing when size values are proxy objects.
+By autowrapping them, FX records their calls as traced nodes rather
+than attempting to execute them immediately.
+"""
+
+
 class CustomTracer(torch.fx.Tracer):
     """
     Defines a custom tracer to trace the execution of a model
@@ -323,9 +339,11 @@ class CustomTracer(torch.fx.Tracer):
     :param autowrap_modules: defaults to `(math, )`,
         Python modules whose functions should be wrapped automatically
         without needing to use fx.wrap().
-    :param autowrap_functions: defaults to `()`,
+    :param autowrap_functions: defaults to :data:`_AUTOWRAP_FUNCTIONS`,
         Python functions that should be wrapped automatically without
-        needing to use fx.wrap().
+        needing to use fx.wrap(). Includes tensor-creating functions
+        (e.g. ``torch.ones``) so that calls with proxy size arguments
+        are captured as traced nodes rather than executed immediately.
     :param param_shapes_constant: When this flag is set, calls to shape,
         size and a few other shape like attributes of a module's parameter
         will be evaluated directly, rather than returning a new Proxy value
@@ -340,7 +358,7 @@ class CustomTracer(torch.fx.Tracer):
     def __init__(
         self,
         autowrap_modules: Tuple[types.ModuleType, ...] = (math,),
-        autowrap_functions: Tuple[Callable, ...] = (),
+        autowrap_functions: Tuple[Callable, ...] = _AUTOWRAP_FUNCTIONS,
         param_shapes_constant: bool = False,
         module_leaves: Optional[Dict[type, Callable[[torch.nn.Module, str], bool]]] = None,
     ):
