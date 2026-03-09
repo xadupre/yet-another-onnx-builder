@@ -39,6 +39,11 @@ It provides:
 
    design/index
    cmds/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Galleries
+
    auto_examples_core/index
    auto_examples_sklearn/index
    auto_examples_torch/index

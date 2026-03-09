@@ -11,8 +11,8 @@ from yobx.ext_test_case import (
     ExtTestCase,
     skipif_ci_windows,
     requires_torch,
-    requires_transformers,
     requires_onnxruntime,
+    requires_transformers,
     ignore_warnings,
     hide_stdout,
 )
@@ -3545,6 +3545,7 @@ class TestOnnxExportAten(ExtTestCase):
                 got = sess.run(None, {"x": inputs[0].detach().numpy()})
                 self.assertEqualArray(expected, got[0])
 
+    @requires_transformers("5.0")
     def test_aten_grouped_mm_no_offset(self):
         import torch
 

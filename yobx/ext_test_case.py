@@ -516,7 +516,7 @@ def has_torch(version: str = "") -> bool:
     return pv.Version(torch.__version__) >= pv.Version(version)
 
 
-def has_transformers(version: str) -> bool:
+def has_transformers(version: str = "") -> bool:
     "Returns True if transformers version is higher."
     import packaging.version as pv
 
@@ -525,7 +525,10 @@ def has_transformers(version: str) -> bool:
         import transformers
     except (ImportError, AttributeError):
         return False
-
+    if not hasattr(transformers, "__version__"):
+        return False
+    if not version:
+        return True
     return pv.Version(transformers.__version__) >= pv.Version(version)
 
 

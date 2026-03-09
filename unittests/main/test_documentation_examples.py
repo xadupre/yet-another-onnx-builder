@@ -9,11 +9,11 @@ from yobx.ext_test_case import (
     ExtTestCase,
     is_windows,
     ignore_errors,
-    has_transformers,
     has_sklearn,
     has_spox,
-    has_torch,
     has_tensorflow,
+    has_torch,
+    has_transformers,
 )
 
 VERBOSE = 0
@@ -91,7 +91,11 @@ class TestDocumentationExamples(ExtTestCase):
                 not reason
                 and not has_dot
                 and name
-                in {"plot_dump_intermediate_results.py", "plot_sklearn_with_sklearn_onnx.py"}
+                in {
+                    "plot_dump_intermediate_results.py",
+                    "plot_sklearn_with_sklearn_onnx.py",
+                    "plot_input_observer_tiny_llm.py",
+                }
             ):
                 reason = "dot not installed"
 
@@ -114,13 +118,21 @@ class TestDocumentationExamples(ExtTestCase):
                     "plot_flattening.py",
                     "plot_input_observer.py",
                     "plot_mini_onnx_builder.py",
+                    "plot_input_observer_tiny_llm.py",
                     "plot_input_observer_transformers.py",
                     "plot_patch_model.py",
                 }
             ):
                 reason = "torch not installed"
 
-            if not reason and not has_sklearn() and name in {"plot_sklearn_pipeline.py"}:
+            if (
+                not reason
+                and not has_transformers()
+                and name in {"plot_input_observer_tiny_llm.py"}
+            ):
+                reason = "transformers not installed"
+
+            if not reason and not has_sklearn() and "sklearn" in name:
                 reason = "scikit-learn not installed"
 
             if not reason and not has_spox() and "spox" in name:
