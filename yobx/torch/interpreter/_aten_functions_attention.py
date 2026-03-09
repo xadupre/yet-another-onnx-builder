@@ -139,19 +139,34 @@ def aten_scaled_dot_product_attention(
                 f"but rank(query)={g.get_rank(query)}, rank(key)={g.get_rank(key)}, "
                 f"rank(value)={g.get_rank(value)}{g.get_debug_msg()}"
             )
-            Y = g.op.Attention(
-                query,
-                key,
-                value,
-                attn_mask,
-                scale=scale,
-                # q_num_heads=q1,
-                # kv_num_heads=k1,
-                is_causal=is_causal,
-                outputs=outputs,
-                name=f"{name}{'_gqa' if enable_gqa else ''}{'_causal' if is_causal else ''}",
-            )
-            return Y
+            # For GQA with mismatched heads, ORT (through at least version 1.24.3)
+            # requires attn_mask to be broadcastable to
+            # (batch, kv_num_heads, q_seq, kv_seq), so an attn_mask shaped
+            # (batch, q_num_heads, q_seq, kv_seq) is rejected when
+            # q_num_heads > kv_num_heads.  Fall through to the manual GQA
+            # expansion path in that case.
+            use_attention_op = True
+            if enable_gqa and g.has_shape(query) and g.has_shape(key):
+                shape_q = g.get_shape(query)
+                shape_k = g.get_shape(key)
+                if (
+                    isinstance(shape_q[1], int)
+                    and isinstance(shape_k[1], int)
+                    and shape_q[1] != shape_k[1]
+                ):
+                    use_attention_op = False
+            if use_attention_op:
+                Y = g.op.Attention(
+                    query,
+                    key,
+                    value,
+                    attn_mask,
+                    scale=scale,
+                    is_causal=is_causal,
+                    outputs=outputs,
+                    name=f"{name}{'_gqa' if enable_gqa else ''}{'_causal' if is_causal else ''}",
+                )
+                return Y
 
     if enable_gqa:
         assert g.has_shape(query), f"Missing shape for {query!r}{g.get_debug_msg()}"
