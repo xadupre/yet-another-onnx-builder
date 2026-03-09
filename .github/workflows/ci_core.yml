@@ -30,6 +30,9 @@ jobs:
       - name: Install pytest
         run: pip install pytest
 
+      - name: Uninstall scikit-learn if present
+        run: pip uninstall -y scikit-learn
+
       - name: pip freeze
         run: pip freeze
 

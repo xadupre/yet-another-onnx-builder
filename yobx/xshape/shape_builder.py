@@ -103,6 +103,28 @@ class ShapeBuilder:
         """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
+    def has_opset(self, name: str) -> bool:
+        """Tells if opset `name` is defined."""
+        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+
+    def get_opset(self, name: str) -> int:
+        """
+        Returns the opset version for domain `name`.
+
+        :param name: domain name
+        :return: domain version or 0 if not defined
+        """
+        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+
+    def set_opset(self, name: str, itype: int):
+        """
+        Sets the opset version for domain `name`.
+
+        :param name: domain name
+        :param version: domain version
+        """
+        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+
     def has_shape(self, name: str) -> bool:
         """Tells if `name` has a shape."""
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")

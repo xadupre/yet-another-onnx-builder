@@ -30,7 +30,7 @@ import onnxruntime
 from sklearn.cluster import KMeans
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-
+from yobx.doc import plot_dot
 from yobx.sklearn import to_onnx
 
 # %%
@@ -95,3 +95,10 @@ label_pipe_sk = pipe.predict(X).astype(np.int64)
 
 assert (label_pipe_sk == label_pipe_onnx).all(), "Pipeline labels differ!"
 print("Pipeline labels match ✓")
+
+
+# %%
+# 5. Visualize the pipeline
+# -------------------------
+
+plot_dot(onx_pipe)

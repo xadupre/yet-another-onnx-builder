@@ -103,7 +103,6 @@ class TestXGBoostRegressor(ExtTestCase):
             _get_reg_output_transform("unknown:objective")
 
     def test_xgb_regressor_dtypes_opsets(self):
-        """Regressor: float32/float64 x ai.onnx.ml opset 3 and 5."""
         from xgboost import XGBRegressor
 
         X32, y = self._make_regression_data()
@@ -114,7 +113,7 @@ class TestXGBoostRegressor(ExtTestCase):
             for dtype in (np.float32, np.float64):
                 with self.subTest(ml_opset=ml_opset, dtype=dtype):
                     X = X32.astype(dtype)
-                    target_opset = {"": 20, "ai.onnx.ml": ml_opset}
+                    target_opset = {"": 21, "ai.onnx.ml": ml_opset}
                     onx = to_onnx(reg, (X,), target_opset=target_opset)
 
                     ml_opsets = {op.domain: op.version for op in onx.opset_import}

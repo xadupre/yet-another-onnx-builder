@@ -1,6 +1,7 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
 import tensorflow as tf
+from .. import DEFAULT_TARGET_OPSET
 from ..xbuilder import GraphBuilder
 from .register import get_tf_op_converter
 from .tensorflow_helper import tf_dtype_to_np_dtype
@@ -11,7 +12,7 @@ def to_onnx(
     args: Tuple[Any],
     input_names: Optional[Sequence[str]] = None,
     dynamic_shapes: Optional[Tuple[Dict[int, str]]] = None,
-    target_opset: Union[int, Dict[str, int]] = 20,
+    target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
     verbose: int = 0,
     extra_converters: Optional[Dict[str, Callable]] = None,
 ):

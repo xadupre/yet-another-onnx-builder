@@ -1,10 +1,21 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_is_fitted
+from .. import DEFAULT_TARGET_OPSET
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
 from .register import get_sklearn_converter
 from .sklearn_helper import get_output_names
+
+
+def _default_ai_onnx_ml(main_opset: int) -> int:
+    if main_opset >= 21:
+        return 5
+    if main_opset >= 18:
+        return 3
+    if main_opset >= 6:
+        return 2
+    return 1
 
 
 def to_onnx(
@@ -12,7 +23,7 @@ def to_onnx(
     args: Tuple[Any],
     input_names: Optional[Sequence[str]] = None,
     dynamic_shapes: Optional[Tuple[Dict[int, str]]] = None,
-    target_opset: Union[int, Dict[str, int]] = 20,
+    target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
     verbose: int = 0,
     builder_cls: Union[type, Callable] = GraphBuilder,
     extra_converters: Optional[Dict[type, Callable]] = None,
@@ -50,11 +61,21 @@ def to_onnx(
             "and cannot be converted to ONNX."
         ),
     )
+    if isinstance(target_opset, int):
+        dict_target_opset = {"": target_opset, "ai.onnx.ml": _default_ai_onnx_ml(target_opset)}
+    else:
+        if not isinstance(target_opset, dict):
+            raise TypeError(f"target_opset must be a dictionary or an integer not {target_opset}")
+        dict_target_opset = target_opset.copy()
+        if "" not in dict_target_opset:
+            dict_target_opset[""] = 21
+        if "ai.onnx.ml" not in dict_target_opset:
+            dict_target_opset["ai.onnx.ml"] = _default_ai_onnx_ml(dict_target_opset[""])
 
     from . import register_sklearn_converters
 
     register_sklearn_converters()
-    g = builder_cls(target_opset)
+    g = builder_cls(dict_target_opset)
 
     cls = type(estimator)
     if extra_converters and cls in extra_converters:

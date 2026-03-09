@@ -240,13 +240,13 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
     # GraphBuilderProtocol: opset management
     # ------------------------------------------------------------------
 
-    def get_opset(self, domain: str, exc: bool = True) -> Optional[int]:
+    def get_opset(self, domain: str, exc: bool = True) -> int:
         """Returns the opset version for *domain*."""
         if exc:
             assert (
                 domain in self.opsets
             ), f"Domain {domain!r} is not registered. opsets={self.opsets!r}."
-        return self.opsets.get(domain, None)
+        return self.opsets.get(domain, 0)
 
     def set_opset(self, domain: str, version: int = 1) -> None:
         """Registers *version* for *domain*, or no-ops if already set to the same value."""

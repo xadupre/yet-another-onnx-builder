@@ -2041,15 +2041,42 @@ def set_type_shape_tree_ensemble(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for node types TreeEnsemble and TreeEnsembleRegressor."""
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
-    self.set_type(node.output[0], self.get_type(node.input[0]))
-    n_targets = self.get_attribute(node, "n_targets", exc=False)
+        if len(node.output) > 1:
+            self.set_device(node.output[1], self.get_device(node.input[0]))
+    assert self.has_opset("ai.onnx.ml"), f"Opset ai.onnx.ml is missing{self.get_debug_msg()}"
+    assert self.get_opset("ai.onnx.ml") >= 1, (
+        f"Only opset >= 1 is supported but opset for ai.onnx.ml is "
+        f"{self.get_opset('ai.onnx.ml')}{self.get_debug_msg()}"
+    )
+    if node.op_type == "TreeEnsembleClassifier":
+        self.set_type(node.output[0], TensorProto.INT64)
+        self.set_type(node.output[1], TensorProto.FLOAT)
+        att = self.get_attribute(node, "classlabels_int64s", exc=False)
+        if not att:
+            att = self.get_attribute(node, "classlabels_strings", exc=False)
+            assert att is not None, (
+                f"No attribute classlabels_int64s or classlabels_strings "
+                f"is set for node {self.pretty_node(node)}{self.get_debug_msg()}"
+            )
+            n_targets = len(att.strings)
+        else:
+            n_targets = len(att.ints)
+    elif node.op_type == "TreeEnsembleRegressor":
+        self.set_type(node.output[0], TensorProto.FLOAT)
+        n_targets = self.get_attribute(node, "n_targets").i
+    elif node.op_type == "TreeEnsemble":
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+        n_targets = self.get_attribute(node, "n_targets").i
+    else:
+        raise AssertionError(f"Unexpected type {node.op_type!r}{self.get_debug_msg()}")
+
     assert n_targets is not None, (
         f"Unable to extract the dimension of the output for node type "
         f"{node.op_type!r} and name={node.name!r}"
     )
     if self.has_shape(node.input[0]):
         shape = self.get_shape(node.input[0])
-        new_shape = (shape[0], n_targets.i)
+        new_shape = (shape[0], n_targets)
         self.set_shape(node.output[0], new_shape)
         return new_shape
     else:
@@ -2245,7 +2272,7 @@ _set_shape_type_op_any_custom = {
 def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False):
     """Sets the shape and type if it can."""
     if node.domain == "ai.onnx.ml":
-        if node.op_type in ("TreeEnsembleRegressor", "TreeEnsemble"):
+        if node.op_type in ("TreeEnsembleRegressor", "TreeEnsembleClassifier", "TreeEnsemble"):
             return set_type_shape_tree_ensemble(self, node)
         return None
     if node.op_type in {"ReplaceZero", "NegXplus1"}:

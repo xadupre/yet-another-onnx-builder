@@ -5,27 +5,12 @@ import onnx.helper as oh
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
-from ...helpers.onnx_helper import choose_consistent_domain_opset
+from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 _LEAF = -1  # sklearn's TREE_LEAF constant
 
 # Mode encoding for the TreeEnsemble operator (ai.onnx.ml opset 5)
 _NODE_MODE_LEQ = np.uint8(0)
-
-
-def _ensure_ml_domain(g: GraphBuilderExtendedProtocol) -> None:
-    """Ensures the 'ai.onnx.ml' domain is registered in the graph builder."""
-    if not g.has_opset("ai.onnx.ml"):
-        g.set_opset(
-            "ai.onnx.ml",
-            choose_consistent_domain_opset("ai.onnx.ml", {"": g.get_opset(""), "ai.onnx.ml": 3}),
-        )
-
-
-def _get_ml_opset(g: GraphBuilderExtendedProtocol) -> int:
-    """Returns the resolved ``ai.onnx.ml`` opset version from the builder."""
-    _ensure_ml_domain(g)
-    return g.get_opset("ai.onnx.ml") if g.has_opset("ai.onnx.ml") else 3
 
 
 def _extract_tree_attributes(tree, n_classes: int, is_classifier: bool):
@@ -142,7 +127,7 @@ def _extract_tree_attributes(tree, n_classes: int, is_classifier: bool):
     )
 
 
-def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, dtype=None):
+def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, itype: int):
     """
     Extracts the attributes needed by the unified ``TreeEnsemble`` operator
     introduced in ``ai.onnx.ml`` opset 5.
@@ -168,10 +153,7 @@ def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, dtype
         tree.n_outputs == 1
     ), f"Only single-output decision trees are supported, got n_outputs={tree.n_outputs}."
 
-    if dtype is None:
-        dtype = np.float32
-    onnx_float_type = onnx.TensorProto.DOUBLE if dtype == np.float64 else onnx.TensorProto.FLOAT
-
+    dtype = tensor_dtype_to_np_dtype(itype)
     children_left = tree.children_left
     children_right = tree.children_right
     feature = tree.feature
@@ -293,7 +275,7 @@ def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, dtype
     # nodes_splits and leaf_weights use the same float type as the input.
     nodes_splits_tensor = oh.make_tensor(
         "nodes_splits",
-        onnx_float_type,
+        itype,
         (len(nodes_splits_),),
         np.array(nodes_splits_, dtype=dtype),
     )
@@ -305,7 +287,7 @@ def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, dtype
     )
     leaf_weights_tensor = oh.make_tensor(
         "leaf_weights",
-        onnx_float_type,
+        itype,
         (len(leaf_weights_),),
         np.array(leaf_weights_, dtype=dtype),
     )
@@ -323,18 +305,6 @@ def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, dtype
         leaf_targetids=leaf_targetids_,
         leaf_weights=leaf_weights_tensor,
     )
-
-
-def _get_input_dtype(g: GraphBuilderExtendedProtocol, X: str):
-    """Returns the numpy dtype matching the ONNX element type of input tensor *X*.
-
-    Defaults to ``np.float32`` when the type is not yet known.
-    """
-    if g.has_type(X):
-        elem_type = g.get_type(X)
-        if elem_type == onnx.TensorProto.DOUBLE:
-            return np.float64
-    return np.float32
 
 
 @register_sklearn_converter((DecisionTreeClassifier,))
@@ -365,23 +335,16 @@ def sklearn_decision_tree_classifier(
         estimator, DecisionTreeClassifier
     ), f"Unexpected type {type(estimator)} for estimator."
 
-    ml_opset = _get_ml_opset(g)
+    ml_opset = g.get_opset("ai.onnx.ml")
     classes = estimator.classes_
     n_classes = len(classes)
     tree = estimator.tree_
+    itype = g.get_type(X)
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     if ml_opset >= 5:
         return _sklearn_decision_tree_classifier_v5(
-            g,
-            sts,
-            outputs,
-            estimator,
-            X,
-            name,
-            classes,
-            n_classes,
-            tree,
-            dtype=_get_input_dtype(g, X),
+            g, sts, outputs, estimator, X, name, classes, n_classes, tree, dtype=dtype
         )
 
     # Legacy path: TreeEnsembleClassifier (ai.onnx.ml opset <= 4)
@@ -434,9 +397,7 @@ def _sklearn_decision_tree_classifier_v5(
         tensors; uses input element type when ``None``
     :return: tuple ``(label_result_name, proba_result_name)``
     """
-    if dtype is None:
-        dtype = np.float32
-    attrs = _extract_tree_attributes_v5(tree, n_classes, is_classifier=True, dtype=dtype)
+    attrs = _extract_tree_attributes_v5(tree, n_classes, is_classifier=True, itype=g.get_type(X))
 
     # scores: [N, n_classes] float32 - class probabilities
     scores = g.make_node(
@@ -520,95 +481,42 @@ def sklearn_decision_tree_regressor(
         estimator, DecisionTreeRegressor
     ), f"Unexpected type {type(estimator)} for estimator."
 
-    ml_opset = _get_ml_opset(g)
+    ml_opset = g.get_opset("ai.onnx.ml")
     tree = estimator.tree_
 
-    # Detect float64 input so we can cast the output back to double after the
-    # tree node (TreeEnsembleRegressor / TreeEnsemble always output float32).
-    itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
-    need_cast = itype == onnx.TensorProto.DOUBLE
-
-    # When a cast is needed, direct the tree node into a temporary intermediate name.
-    tree_outputs = [f"{outputs[0]}_tree_out"] if need_cast else outputs
-
     if ml_opset >= 5:
-        tree_result = _sklearn_decision_tree_regressor_v5(
-            g, sts, tree_outputs, estimator, X, name, tree, dtype=_get_input_dtype(g, X)
+        attrs = _extract_tree_attributes_v5(
+            tree, n_classes=1, is_classifier=False, itype=g.get_type(X)
         )
-    else:
-        # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4)
-        attrs = _extract_tree_attributes(tree, n_classes=1, is_classifier=False)
-
-        node_result = g.make_node(
-            "TreeEnsembleRegressor",
+        return g.make_node(
+            "TreeEnsemble",
             [X],
-            outputs=tree_outputs,
+            outputs=outputs,
             domain="ai.onnx.ml",
-            name=name,
-            n_targets=1,
-            post_transform="NONE",
+            name=f"{name}_te",
+            post_transform=0,  # NONE
+            aggregate_function=1,  # SUM
             **attrs,  # type: ignore
         )
-        tree_result = node_result if isinstance(node_result, str) else node_result[0]
 
-    if not need_cast:
-        return tree_result
-
-    # TreeEnsembleRegressor / TreeEnsemble always outputs float32 per the ONNX ML
-    # spec, but the graph builder may infer the intermediate type as double
-    # (inheriting from the double input).  We must correct that inference before
-    # adding the Cast so that the CastPattern optimiser does not see
-    # Cast(double → double) and remove it as a no-op.
-    #
-    # There is intentionally no public "force_set_type" API on GraphBuilder, so we
-    # update the internal map directly.  The attribute is a plain dict - this is safe
-    # and consistent with other direct usages inside graph_builder.py itself.
-    g._known_types[tree_result] = onnx.TensorProto.FLOAT  # type: ignore[attr-defined]
-
-    # Cast float32 output back to float64 to match the input dtype.
+    # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4)
+    attrs = _extract_tree_attributes(tree, n_classes=1, is_classifier=False)
+    tree_outputs = [f"{outputs[0]}_cast"]
+    tree_result = g.make_node(
+        "TreeEnsembleRegressor",
+        [X],
+        outputs=tree_outputs,
+        domain="ai.onnx.ml",
+        name=name,
+        n_targets=1,
+        post_transform="NONE",
+        **attrs,  # type: ignore
+    )
     cast_result = g.make_node(
         "Cast",
         [tree_result],
         outputs=outputs,
         name=f"{name}_cast_f64",
-        to=onnx.TensorProto.DOUBLE,
+        to=g.get_type(X),
     )
-    return cast_result if isinstance(cast_result, str) else cast_result[0]
-
-
-def _sklearn_decision_tree_regressor_v5(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict,
-    outputs: List[str],
-    estimator: DecisionTreeRegressor,
-    X: str,
-    name: str,
-    tree,
-    dtype=None,
-) -> str:
-    """
-    Emits a ``TreeEnsemble`` node (``ai.onnx.ml`` opset 5) for a regressor.
-
-    The output is a float ``[N, 1]`` tensor of predictions, matching the
-    shape produced by the legacy ``TreeEnsembleRegressor``.
-
-    :param dtype: numpy float dtype for ``nodes_splits`` / ``leaf_weights``
-        tensors; uses ``np.float32`` when ``None``
-    :return: output tensor name
-    """
-    if dtype is None:
-        dtype = np.float32
-    attrs = _extract_tree_attributes_v5(tree, n_classes=1, is_classifier=False, dtype=dtype)
-
-    result = g.make_node(
-        "TreeEnsemble",
-        [X],
-        outputs=outputs,
-        domain="ai.onnx.ml",
-        name=f"{name}_te",
-        post_transform=0,  # NONE
-        aggregate_function=1,  # SUM
-        **attrs,  # type: ignore
-    )
-
-    return result if isinstance(result, str) else result[0]
+    return cast_result

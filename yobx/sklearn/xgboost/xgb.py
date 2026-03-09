@@ -40,8 +40,10 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import onnx
 import onnx.helper as oh
+from xgboost import XGBRegressor, XGBClassifier
 from ...typing import GraphBuilderExtendedProtocol
-from ..tree.decision_tree import _get_ml_opset, _get_input_dtype
+from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
+from ..register import register_sklearn_converter
 
 # Mode encoding for ai.onnx.ml opset-5 TreeEnsemble.
 # 0 = BRANCH_LEQ, 1 = BRANCH_LT (exact match for XGBoost's x < threshold).
@@ -268,8 +270,8 @@ def _build_xgb_tree_attrs_legacy(
 def _build_xgb_tree_attrs_v5(
     trees_json: List[dict],
     n_targets: int,
-    dtype=None,
-    feature_name_to_idx: Optional[dict] = None,
+    feature_name_to_idx: Optional[dict],
+    itype: int,
 ) -> dict:
     """Build ``TreeEnsemble`` (``ai.onnx.ml`` opset 5) attribute arrays.
 
@@ -285,10 +287,6 @@ def _build_xgb_tree_attrs_v5(
     :param feature_name_to_idx: optional feature-name → index mapping
     :return: attribute dict for ``TreeEnsemble``
     """
-    if dtype is None:
-        dtype = np.float32
-    onnx_float_type = onnx.TensorProto.DOUBLE if dtype == np.float64 else onnx.TensorProto.FLOAT
-
     all_nodes_featureids: List[int] = []
     all_nodes_splits: List[float] = []
     all_nodes_modes: List[int] = []
@@ -304,6 +302,7 @@ def _build_xgb_tree_attrs_v5(
 
     cumulative_internal_offset = 0
     cumulative_leaf_offset = 0
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     for tree_idx, tree_root in enumerate(trees_json):
         nodes: dict = {}
@@ -385,7 +384,7 @@ def _build_xgb_tree_attrs_v5(
 
     nodes_splits_tensor = oh.make_tensor(
         "nodes_splits",
-        onnx_float_type,
+        itype,
         (len(all_nodes_splits),),
         np.array(all_nodes_splits, dtype=dtype),
     )
@@ -397,7 +396,7 @@ def _build_xgb_tree_attrs_v5(
     )
     leaf_weights_tensor = oh.make_tensor(
         "leaf_weights",
-        onnx_float_type,
+        itype,
         (len(all_leaf_weights),),
         np.array(all_leaf_weights, dtype=dtype),
     )
@@ -481,9 +480,9 @@ def _emit_tree_node(
     trees_json: List[dict],
     feature_name_to_idx: Optional[dict],
     ml_opset: int,
-    dtype,
     intermediate_name: Optional[str] = None,
     is_classifier: bool = False,
+    itype: int = 0,
 ) -> str:
     """Emit a ``TreeEnsembleRegressor`` / ``TreeEnsembleClassifier`` / ``TreeEnsemble`` ONNX node.
 
@@ -494,12 +493,12 @@ def _emit_tree_node(
     :param trees_json: parsed XGBoost tree dicts
     :param feature_name_to_idx: optional feature-name → index mapping
     :param ml_opset: ``ai.onnx.ml`` opset version
-    :param dtype: numpy float dtype for numeric attributes
     :param intermediate_name: if provided, use this as the output name;
         otherwise let the builder choose (only used for the regressor legacy path)
     :param is_classifier: when ``True`` and ``ml_opset < 5``, emits a
         ``TreeEnsembleClassifier`` node instead of ``TreeEnsembleRegressor``
         and returns the scores (second output)
+    :param itype: onnx float dtype for numeric attributes
     :return: output tensor name (shape ``[N, n_targets]``)
     """
     out_arg = [intermediate_name] if intermediate_name else 1
@@ -508,8 +507,8 @@ def _emit_tree_node(
         attrs = _build_xgb_tree_attrs_v5(
             trees_json,
             n_targets=n_targets,
-            dtype=dtype,
             feature_name_to_idx=feature_name_to_idx,
+            itype=itype,
         )
         result = g.make_node(
             "TreeEnsemble",
@@ -547,6 +546,9 @@ def _emit_tree_node(
             classlabels_int64s=classlabels,
             **attrs,  # type: ignore
         )
+        assert len(result) == 2, f"Unexpected output: {result!r}{g.get_debug_msg()}"
+        assert g.has_type(result[0]), f"Type is missing for {result[0]}{g.get_debug_msg()}"
+        assert g.has_type(result[1]), f"Type is missing for {result[1]}{g.get_debug_msg()}"
         # result is a tuple (label_out, scores_out); return scores
         scores = result[1]
         if n_targets == 1:
@@ -626,6 +628,7 @@ def _gather_labels(
 # ---------------------------------------------------------------------------
 
 
+@register_sklearn_converter(XGBClassifier)
 def sklearn_xgb_classifier(
     g: GraphBuilderExtendedProtocol,
     sts: Dict,
@@ -660,8 +663,8 @@ def sklearn_xgb_classifier(
     is_binary: bool = n_classes == 2
     objective: str = estimator.objective or "binary:logistic"
 
-    ml_opset = _get_ml_opset(g)
-    dtype = _get_input_dtype(g, X)
+    ml_opset = g.get_opset("ai.onnx.ml")
+    itype = g.get_type(X)
 
     trees_json = [json.loads(t) for t in booster.get_dump(dump_format="json")]
     feature_names = booster.feature_names
@@ -677,18 +680,13 @@ def sklearn_xgb_classifier(
         trees_json=trees_json,
         feature_name_to_idx=feature_name_to_idx,
         ml_opset=ml_opset,
-        dtype=dtype,
         is_classifier=True,
+        itype=itype,
     )
 
     classes = estimator.classes_
 
-    # TreeEnsembleClassifier (legacy opset ≤ 4) always outputs float32 regardless
-    # of the input dtype.  TreeEnsemble (opset ≥ 5) uses the leaf weight dtype, so
-    # its output is float64 when the input is float64.  Constants in the
-    # post-processing graph (bias, "ones") must match this actual output dtype.
-    post_dtype = dtype if ml_opset >= 5 else np.float32
-
+    post_dtype = tensor_dtype_to_np_dtype(g.get_type(raw_scores))
     if is_binary:
         # Add margin-space bias from base_score (zero for default 0.5).
         bias = _compute_margin_bias(_get_base_score(booster), objective)
@@ -728,6 +726,7 @@ def sklearn_xgb_classifier(
 # ---------------------------------------------------------------------------
 
 
+@register_sklearn_converter(XGBRegressor)
 def sklearn_xgb_regressor(
     g: GraphBuilderExtendedProtocol,
     sts: Dict,
@@ -765,15 +764,15 @@ def sklearn_xgb_regressor(
     # Validate early so the error message is clear before we build any graph.
     out_transform = _get_reg_output_transform(objective)
 
-    ml_opset = _get_ml_opset(g)
-    dtype = _get_input_dtype(g, X)
+    ml_opset = g.get_opset("ai.onnx.ml")
+    itype = g.get_type(X)
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     trees_json = [json.loads(t) for t in booster.get_dump(dump_format="json")]
     feature_names = booster.feature_names
     feature_name_to_idx = {fn: i for i, fn in enumerate(feature_names)} if feature_names else None
 
-    itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
-    need_cast = itype == onnx.TensorProto.DOUBLE
+    itype = g.get_type(X)
 
     # For opset ≥ 5 with float64 leaf weights, TreeEnsemble natively outputs
     # float64, so no extra Cast is required.  For legacy opset < 5, the ONNX
@@ -781,8 +780,7 @@ def sklearn_xgb_regressor(
     # input is float64 (reference evaluator) or always output float32 (ORT).
     # We normalise by inserting an explicit Cast(→float32) after the tree node
     # so that both runtimes behave consistently before the bias is added.
-    v5_native_float64 = need_cast and ml_opset >= 5
-    tree_out_name = f"{outputs[0]}_tree_out" if need_cast and not v5_native_float64 else None
+    tree_out_name = f"{outputs[0]}_tree_out"
 
     raw_scores = _emit_tree_node(
         g,
@@ -792,20 +790,11 @@ def sklearn_xgb_regressor(
         trees_json=trees_json,
         feature_name_to_idx=feature_name_to_idx,
         ml_opset=ml_opset,
-        dtype=dtype,
         intermediate_name=tree_out_name,
+        itype=itype,
     )
 
-    if need_cast and not v5_native_float64:
-        # Normalise tree output to float32 for both ORT (float32 per spec) and
-        # reference evaluator (may return float64 for float64 input).
-        raw_scores = g.make_node(
-            "Cast",
-            [raw_scores],
-            outputs=1,
-            name=f"{name}_tree_to_f32",
-            to=onnx.TensorProto.FLOAT,
-        )
+    raw_scores = g.make_node("Cast", [raw_scores], outputs=1, name=f"{name}_tree_cast", to=itype)
 
     # Add margin-space bias derived from base_score.
     base_score = _get_base_score(booster)
@@ -815,7 +804,7 @@ def sklearn_xgb_regressor(
         # - v5 float64: float64 tree → float64 bias
         # - v3 float64: float32 (after normalization above) → float32 bias
         # - float32: float32 bias
-        bias_arr = np.array([bias], dtype=dtype if v5_native_float64 else np.float32)
+        bias_arr = np.array([bias], dtype=dtype)
         raw_scores = g.op.Add(raw_scores, bias_arr, name=f"{name}_bias")
 
     # Apply the objective-specific output transform (Sigmoid / Exp / identity).
@@ -825,24 +814,7 @@ def sklearn_xgb_regressor(
         raw_scores = g.op.Exp(raw_scores, name=f"{name}_exp")
     # out_transform is None → identity, no node needed.
 
-    if not need_cast:
-        result = g.op.Identity(raw_scores, name=f"{name}_out", outputs=outputs)
-        return result if isinstance(result, str) else result[0]
-
-    if v5_native_float64:
-        # Tree ensemble already outputs float64; just write to the output.
-        result = g.op.Identity(raw_scores, name=f"{name}_out", outputs=outputs)
-        return result if isinstance(result, str) else result[0]
-
-    # Legacy (v3) float64 path: raw_scores is float32, cast to float64.
-    # Keep the type annotation as FLOAT so the CastPattern optimiser does not
-    # eliminate the Cast (it would see FLOAT→DOUBLE as a widening cast).
-    g._known_types[raw_scores] = onnx.TensorProto.FLOAT  # type: ignore[attr-defined]
     cast_result = g.make_node(
-        "Cast",
-        [raw_scores],
-        outputs=outputs,
-        name=f"{name}_cast_f64",
-        to=onnx.TensorProto.DOUBLE,
+        "Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype
     )
-    return cast_result if isinstance(cast_result, str) else cast_result[0]
+    return cast_result

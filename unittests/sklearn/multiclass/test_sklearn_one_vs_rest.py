@@ -125,16 +125,41 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         self.assertTrue(clf.multilabel_)
         self.assertRaises(NotImplementedError, to_onnx, clf, (X,))
 
-    def test_multiclass_decision_tree(self):
+    def test_multiclass_decision_tree_18(self):
         """OVR wrapping DecisionTreeClassifier (3 classes)."""
         clf = OneVsRestClassifier(DecisionTreeClassifier(max_depth=3, random_state=0))
         clf.fit(self._X_multi, self._y_multi)
 
-        onx = to_onnx(clf, (self._X_multi,))
+        onx = to_onnx(clf, (self._X_multi,), target_opset=18)
 
         # Each sub-estimator should produce a TreeEnsembleClassifier node.
         op_types = [n.op_type for n in onx.graph.node]
         self.assertEqual(op_types.count("TreeEnsembleClassifier"), 3)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": self._X_multi})
+        label, proba = results[0], results[1]
+
+        expected_label = clf.predict(self._X_multi)
+        expected_proba = clf.predict_proba(self._X_multi).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": self._X_multi})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
+
+    def test_multiclass_decision_tree_21(self):
+        """OVR wrapping DecisionTreeClassifier (3 classes)."""
+        clf = OneVsRestClassifier(DecisionTreeClassifier(max_depth=3, random_state=0))
+        clf.fit(self._X_multi, self._y_multi)
+
+        onx = to_onnx(clf, (self._X_multi,), target_opset=21)
+
+        # Each sub-estimator should produce a TreeEnsembleClassifier node.
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertEqual(op_types.count("TreeEnsemble"), 3)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X_multi})

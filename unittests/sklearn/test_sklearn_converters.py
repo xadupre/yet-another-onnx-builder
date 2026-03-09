@@ -255,7 +255,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         onx = to_onnx(rf, (X,))
 
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("TreeEnsembleClassifier", op_types)
+        self.assertIn("TreeEnsemble", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -270,7 +270,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         rf = RandomForestClassifier(n_estimators=5, random_state=0)
         rf.fit(X, y)
 
-        onx = to_onnx(rf, (X,))
+        onx = to_onnx(rf, (X,), target_opset=18)
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("TreeEnsembleClassifier", op_types)
@@ -288,7 +288,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         rf = RandomForestRegressor(n_estimators=5, random_state=0)
         rf.fit(X, y)
 
-        onx = to_onnx(rf, (X,))
+        onx = to_onnx(rf, (X,), target_opset=18)
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("TreeEnsembleRegressor", op_types)
@@ -376,7 +376,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         onx = to_onnx(pipe, (X,))
 
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("TreeEnsembleClassifier", op_types)
+        self.assertIn("TreeEnsemble", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

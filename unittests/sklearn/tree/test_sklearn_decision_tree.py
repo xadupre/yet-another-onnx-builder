@@ -20,7 +20,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = DecisionTreeClassifier(random_state=0)
         dt.fit(X, y)
 
-        onx = to_onnx(dt, (X,))
+        onx = to_onnx(dt, (X,), target_opset=18)
 
         # Check graph structure
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
@@ -50,7 +50,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = DecisionTreeClassifier(random_state=0)
         dt.fit(X, y)
 
-        onx = to_onnx(dt, (X,))
+        onx = to_onnx(dt, (X,), target_opset=18)
 
         # Check graph structure
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
@@ -80,7 +80,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = DecisionTreeRegressor(random_state=0)
         dt.fit(X, y)
 
-        onx = to_onnx(dt, (X,))
+        onx = to_onnx(dt, (X,), target_opset=18)
 
         # Check graph structure
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
@@ -109,7 +109,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=18)
 
         # Check graph contains nodes from both steps
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
@@ -293,7 +293,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = DecisionTreeClassifier(random_state=0)
         dt.fit(X, y)
 
-        onx = to_onnx(dt, (X,))
+        onx = to_onnx(dt, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -320,7 +320,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = DecisionTreeClassifier(random_state=0)
         dt.fit(X, y)
 
-        onx = to_onnx(dt, (X,))
+        onx = to_onnx(dt, (X,), target_opset=18)
         self.print_onnx(onx)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
@@ -348,7 +348,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = DecisionTreeRegressor(random_state=0)
         dt.fit(X, y)
 
-        onx = to_onnx(dt, (X,))
+        onx = to_onnx(dt, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -372,7 +372,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = DecisionTreeRegressor(random_state=0)
         dt.fit(X, y)
 
-        onx = to_onnx(dt, (X,))
+        onx = to_onnx(dt, (X,), target_opset=18)
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
@@ -493,7 +493,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = DecisionTreeRegressor(random_state=0)
         dt.fit(X, y)
 
-        onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
+        onx = to_onnx(dt, (X,), target_opset={"": 21, "ai.onnx.ml": 5})
 
         ml_opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)

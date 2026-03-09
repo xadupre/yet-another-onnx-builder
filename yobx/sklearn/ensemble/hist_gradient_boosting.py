@@ -26,9 +26,10 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
+from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
-from ..tree.decision_tree import _get_ml_opset, _get_input_dtype, _NODE_MODE_LEQ
+from ..tree.decision_tree import _NODE_MODE_LEQ
 
 _HGB_TYPES = (HistGradientBoostingClassifier, HistGradientBoostingRegressor)
 
@@ -127,7 +128,7 @@ def _extract_hgb_attributes_v5(
     all_trees: List,
     n_targets: int,
     target_ids_per_tree: List[int],
-    dtype,
+    itype: int,
 ) -> Dict:
     """
     Extract ``TreeEnsemble`` (``ai.onnx.ml`` opset 5) attributes from a flat
@@ -144,8 +145,6 @@ def _extract_hgb_attributes_v5(
     :param dtype: numpy float dtype (``np.float32`` or ``np.float64``).
     :return: dict of ONNX attributes.
     """
-    onnx_float_type = onnx.TensorProto.DOUBLE if dtype == np.float64 else onnx.TensorProto.FLOAT
-
     all_nodes_featureids: List[int] = []
     all_nodes_splits: List[float] = []
     all_nodes_modes: List[int] = []
@@ -161,6 +160,7 @@ def _extract_hgb_attributes_v5(
 
     cumulative_internal_offset = 0
     cumulative_leaf_offset = 0
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     for tree, target_id in zip(all_trees, target_ids_per_tree):
         nodes = tree.nodes
@@ -240,7 +240,7 @@ def _extract_hgb_attributes_v5(
 
     nodes_splits_tensor = oh.make_tensor(
         "nodes_splits",
-        onnx_float_type,
+        itype,
         (len(all_nodes_splits),),
         np.array(all_nodes_splits, dtype=dtype),
     )
@@ -252,7 +252,7 @@ def _extract_hgb_attributes_v5(
     )
     leaf_weights_tensor = oh.make_tensor(
         "leaf_weights",
-        onnx_float_type,
+        itype,
         (len(all_leaf_weights),),
         np.array(all_leaf_weights, dtype=dtype),
     )
@@ -338,7 +338,7 @@ def _build_hgb_raw_output_v5(
     n_targets: int,
     baseline: np.ndarray,
     raw_outputs: List[str],
-    dtype,
+    itype: int,
 ) -> str:
     """
     Emit a ``TreeEnsemble`` node (opset-5 path) followed by an ``Add`` for the
@@ -348,7 +348,7 @@ def _build_hgb_raw_output_v5(
     ``base_values`` attribute, so the baseline prediction is applied via a
     constant ``Add`` node.
     """
-    attrs = _extract_hgb_attributes_v5(all_trees, n_targets, target_ids_per_tree, dtype)
+    attrs = _extract_hgb_attributes_v5(all_trees, n_targets, target_ids_per_tree, itype)
 
     te_out = g.unique_name(f"{name}_te_out")
     result = g.make_node(
@@ -365,7 +365,7 @@ def _build_hgb_raw_output_v5(
 
     # Add the baseline prediction as a constant.
     # Use the same dtype as the tree node output (which matches leaf_weights).
-    bv = baseline.flatten().astype(dtype)
+    bv = baseline.flatten().astype(tensor_dtype_to_np_dtype(itype))
     bv_expanded = bv.reshape(1, n_targets)  # broadcast over batch dimension
     add_result = g.op.Add(
         te_out_name,
@@ -417,10 +417,9 @@ def sklearn_hgb_regressor(
     baseline = estimator._baseline_prediction  # shape (1, 1)
 
     itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
-    need_cast = itype == onnx.TensorProto.DOUBLE
-    tree_outputs = [f"{outputs[0]}_tree_out"] if need_cast else outputs
+    tree_outputs = [f"{outputs[0]}_tree_out"]
 
-    ml_opset = _get_ml_opset(g)
+    ml_opset = g.get_opset("ai.onnx.ml")
     if ml_opset >= 5:
         raw = _build_hgb_raw_output_v5(
             g,
@@ -431,7 +430,7 @@ def sklearn_hgb_regressor(
             n_targets,
             baseline,
             tree_outputs,
-            dtype=_get_input_dtype(g, X),
+            itype=g.get_type(X),
         )
     else:
         raw = _build_hgb_raw_output_legacy(
@@ -445,22 +444,12 @@ def sklearn_hgb_regressor(
             tree_outputs,
         )
 
-    if not need_cast:
-        return raw
-
-    # TreeEnsembleRegressor / TreeEnsemble always outputs float32 per the ONNX ML
-    # spec, but the graph builder may infer the intermediate type as double
-    # (inheriting from the double input).  We must correct that inference before
-    # adding the Cast so that the CastPattern optimiser does not remove it.
-    # There is intentionally no public "force_set_type" API on GraphBuilder, so we
-    # update the internal map directly.
-    g._known_types[raw] = onnx.TensorProto.FLOAT  # type: ignore[attr-defined]
     cast_result = g.make_node(
         "Cast",
         [raw],
         outputs=outputs,
         name=f"{name}_cast_f64",
-        to=onnx.TensorProto.DOUBLE,
+        to=itype,
     )
     return cast_result if isinstance(cast_result, str) else cast_result[0]
 
@@ -510,8 +499,8 @@ def sklearn_hgb_classifier(
 
     baseline = estimator._baseline_prediction  # shape (1, n_trees_per_iteration_)
 
-    ml_opset = _get_ml_opset(g)
-    dtype = _get_input_dtype(g, X)
+    ml_opset = g.get_opset("ai.onnx.ml")
+    itype = g.get_type(X)
     raw_name = g.unique_name(f"{name}_raw")
 
     if ml_opset >= 5:
@@ -524,7 +513,7 @@ def sklearn_hgb_classifier(
             n_targets,
             baseline,
             [raw_name],
-            dtype=dtype,
+            itype=itype,
         )
     else:
         raw = _build_hgb_raw_output_legacy(
@@ -538,27 +527,13 @@ def sklearn_hgb_classifier(
             [raw_name],
         )
 
-    # ------------------------------------------------------------------ #
-    # Post-processing: sigmoid (binary) or softmax (multiclass).          #
-    # ------------------------------------------------------------------ #
-    # The ONNX ML tree operators always output float32 per spec, but the
-    # reference evaluator propagates the input dtype.  Cast explicitly to
-    # float32 before applying sigmoid/softmax so that the constant "1"
-    # and the probability output are always float32.
-    # There is intentionally no public "force_set_type" API on GraphBuilder, so we
-    # update the internal map directly when correcting the inferred type.
-    itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
-    if itype == onnx.TensorProto.DOUBLE:
-        g._known_types[raw] = onnx.TensorProto.DOUBLE  # type: ignore[attr-defined]
-        raw_f32 = g.op.Cast(raw, to=onnx.TensorProto.FLOAT, name=f"{name}_cast_f32")
-        assert isinstance(raw_f32, str)
-    else:
-        raw_f32 = raw
+    itype = g.get_type(X)
+    raw_f32 = g.op.Cast(raw, to=itype, name=name)
 
     if is_binary:
         # raw_f32: (N, 1) → sigmoid → p1, complement → p0, concat → proba (N, 2)
         p1 = g.op.Sigmoid(raw_f32, name=f"{name}_sigmoid")
-        one_cst = np.ones((1, 1), dtype=np.float32)
+        one_cst = np.ones((1, 1), dtype=tensor_dtype_to_np_dtype(itype))
         p0 = g.op.Sub(one_cst, p1, name=f"{name}_p0")
         proba_raw = g.op.Concat(p0, p1, axis=1, name=f"{name}_concat")
     else:

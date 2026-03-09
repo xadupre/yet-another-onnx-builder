@@ -67,7 +67,8 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         self._debug_value_shape = os.environ.get("ONNXSTOPVALUESHAPE", "")
         self._debug_constant_folding = 0
         self._debug_msg = {}
-        self.main_opset = opset or 18
+        self.opsets = {"": opset} if isinstance(opset, int) else (opset or {"": 18})
+        self.main_opset = self.opsets[""]
         self.time_evaluation_constants_ = 0
         self.optimization_options = _OptimizationOptions()
 
@@ -428,6 +429,33 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         self._known_types[name] = int_type
         return True
 
+    def has_opset(self, name: str) -> bool:
+        """Tells if opset `name` is defined."""
+        return name in self.opsets
+
+    def get_opset(self, name: str) -> int:
+        """
+        Returns the opset version for domain `name`.
+
+        :param name: domain name
+        :return: domain version or 0 if not specified
+        """
+        return self.opsets.get(name, 0)
+
+    def set_opset(self, name: str, version: int):
+        """
+        Sets the opset version for domain `name`.
+
+        :param name: domain name
+        :param version: domain version
+        """
+        if not self.has_opset(name):
+            self.opsets[name] = version
+            return
+        assert (
+            self.get_opset(name) == version
+        ), f"Inconsistencies for domain {name!r}, existing {self.get_opset(name)}, new {version}"
+
     def has_rank(self, name: str) -> bool:
         """Tells if a result has a rank."""
         assert isinstance(name, str), f"Unexpected type {type(name)} for name."
@@ -671,13 +699,17 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         exc: bool = False,
     ):
         """Runs inference over a model or a graph."""
-        self.main_opset = 18
+
         self.time_evaluation_constants_ = 0
         if isinstance(model, onnx.ModelProto):
+            self.opsets.clear()
             for opset in model.opset_import:
-                if opset.domain == "":
-                    self.main_opset = opset.version
-                    break
+                self.opsets[opset.domain] = opset.version
+            if "" not in self.opsets:
+                from .. import DEFAULT_TARGET_OPSET
+
+                self.opsets[""] = DEFAULT_TARGET_OPSET
+            self.main_opset = self.opsets[""]
             return self.run_model(
                 model.graph, functions={(f.domain, f.name): f for f in model.functions}
             )

@@ -161,7 +161,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         "Returns the opset for the main domain (assuming it is used)."
         return self.opsets[""]
 
-    def get_opset(self, domain: str, exc: bool = True) -> Optional[int]:
+    def get_opset(self, domain: str, exc: bool = True) -> int:
         """
         Returns the opset version for a specific domain.
 
@@ -173,7 +173,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
             assert (
                 domain in self.opsets
             ), f"Domain {domain!r} is not registered in opsets={self.opsets!r}."
-        return self.opsets.get(domain, None)
+        return self.opsets.get(domain, 0)
 
     def set_opset(self, domain: str, version: int = 1) -> None:
         """
