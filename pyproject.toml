@@ -52,6 +52,10 @@ docs = [
 sklearn = [
     "scikit-learn>=1.4",
 ]
+xgboost = [
+    "scikit-learn>=1.4",
+    "xgboost>=3.0",
+]
 spox = [
     "spox>=0.12",
 ]
@@ -159,6 +163,7 @@ module = [
     "yobx.sklearn.neural_network.*",
     "yobx.sklearn.preprocessing.*",
     "yobx.sklearn.tree.*",
+    "yobx.sklearn.xgboost.*",
     "yobx.reference.torch_ops.*",
     "yobx.tensorflow.ops.*",
     "yobx.torch.tracing.*",

@@ -27,6 +27,7 @@ example :ref:`l-plot-sklearn-with-sklearn-onnx` shows how to plug
         "tree": "Tree Models",
         "pipeline": "Pipeline",
         "neural_network": "Neural Networks",
+        "xgboost": "XGBoost",
     }
 
     def public_module(cls):
