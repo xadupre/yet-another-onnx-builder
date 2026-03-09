@@ -186,6 +186,7 @@ epkg_dictionary = {
     "transformers": "https://huggingface.co/docs/transformers/en/index",
     "vocos": "https://github.com/gemelo-ai/vocos",
     "Windows": "https://www.microsoft.com/windows",
+    "xgboost": "https://xgboost.readthedocs.io/en/stable/get_started.html",
 }
 
 # models

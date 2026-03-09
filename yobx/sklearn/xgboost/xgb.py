@@ -546,6 +546,9 @@ def _emit_tree_node(
             classlabels_int64s=classlabels,
             **attrs,  # type: ignore
         )
+        assert len(result) == 2, f"Unexpected output: {result!r}{g.get_debug_msg()}"
+        assert g.has_type(result[0]), f"Type is missing for {result[0]}{g.get_debug_msg()}"
+        assert g.has_type(result[1]), f"Type is missing for {result[1]}{g.get_debug_msg()}"
         # result is a tuple (label_out, scores_out); return scores
         scores = result[1]
         if n_targets == 1:
