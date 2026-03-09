@@ -6,7 +6,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import onnx
 import torch
-from ..helpers import string_type
+from ..helpers import string_type, max_diff
+from ..helpers.onnx_helper import pretty_onnx
 
 
 def discover():
@@ -441,8 +442,6 @@ def _make_exporter_onnx(
 def _compares_on_one_example(
     model: Callable, inputs: Tuple[Any, ...], mod: Callable, verbose: int, quiet: bool
 ) -> Tuple[Any, Any, Dict]:
-    from onnx_diagnostic.helpers import max_diff, string_type
-
     try:
         expected = model(*_clone(inputs))
     except Exception as e:
@@ -524,9 +523,6 @@ def run_exporter(
     :param verbose: verbosity
     :return: results
     """
-    from onnx_diagnostic.helpers import max_diff, string_type
-    from onnx_diagnostic.helpers.onnx_helper import pretty_onnx
-
     assert hasattr(cls_model, "_inputs"), f"Attribute '_inputs' is missing from class {cls_model}"
 
     model = cls_model()
