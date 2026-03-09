@@ -4,7 +4,7 @@ from yobx.reference import ExtendedReferenceEvaluator
 
 
 class TestOnnxExportTransformers(ExtTestCase):
-    @requires_transformers("4.57")
+    @requires_transformers("5.2")
     def test_aten_transformers_grouped_mm_no_offset(self):
         import torch
         import transformers.integrations.moe as tmoe

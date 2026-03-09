@@ -21,7 +21,7 @@ jobs:
         torch-version: ["2.10", "nightly"]
         exclude:
           - os: "macos-latest"
-            python-version: "3.12"
+            python-version: "3.13"
           - os: "windows-latest"
             python-version: "3.12"
           - os: "macos-latest"
@@ -50,7 +50,4 @@ jobs:
         run: pip freeze
 
       - name: Run tests
-        run: |
-          pytest --durations=10 \
-            --ignore=unittests/tensorflow \
-            --ignore=unittests/sklearn
+        run: pytest --durations=10 --ignore=unittests/tensorflow --ignore=unittests/sklearn

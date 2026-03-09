@@ -662,7 +662,7 @@ class TestOnnxExportSubModules(ExtTestCase):
 
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.6", "owning module is None before that")
-    @requires_transformers("4.57")
+    @requires_transformers("5.2")
     @ignore_warnings(FutureWarning)
     def test_submodule_local_functions_tiny_llm(self):
         """

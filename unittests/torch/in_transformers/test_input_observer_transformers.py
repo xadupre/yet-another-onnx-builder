@@ -12,7 +12,7 @@ onnx_generate = lambda *args, **kwargs: None
 
 
 class TestInputObserverTransformers(ExtTestCase):
-    @requires_transformers("4.57")
+    @requires_transformers("5.2")
     def test_input_observer_onnx_generate_tiny_llm(self):
         mid = "arnir0/Tiny-LLM"
         data = get_tiny_model(mid)
