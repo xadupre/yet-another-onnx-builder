@@ -2,6 +2,7 @@ from typing import Dict, List
 from sklearn.preprocessing import StandardScaler
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
+from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 
 @register_sklearn_converter(StandardScaler)
@@ -40,7 +41,7 @@ def sklearn_standard_scaler(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
-    dtype = g.onnx_dtype_to_np_dtype(itype)
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     # Apply centering only if requested.
     if getattr(estimator, "with_mean", True):

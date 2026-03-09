@@ -3,6 +3,7 @@ from typing import Dict, List
 from sklearn.preprocessing import MinMaxScaler
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
+from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 
 @register_sklearn_converter(MinMaxScaler)
@@ -48,7 +49,7 @@ def sklearn_min_max_scaler(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
-    dtype = g.onnx_dtype_to_np_dtype(itype)
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     data_min = estimator.data_min_.astype(dtype)
     data_range = estimator.data_range_.astype(dtype)
