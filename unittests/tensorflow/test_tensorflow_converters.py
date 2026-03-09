@@ -522,13 +522,13 @@ class TestTensorflowUnaryOpConverters(ExtTestCase):
 
     def test_acos(self):
         """TF Acos → ONNX Acos."""
-        x = (np.random.rand(3, 4).astype(np.float32) * 2 - 1)
+        x = np.random.rand(3, 4).astype(np.float32) * 2 - 1
         onx = self._run_unary_op(tf.math.acos, x)
         self.assertIn("Acos", [n.op_type for n in onx.graph.node])
 
     def test_asin(self):
         """TF Asin → ONNX Asin."""
-        x = (np.random.rand(3, 4).astype(np.float32) * 2 - 1)
+        x = np.random.rand(3, 4).astype(np.float32) * 2 - 1
         onx = self._run_unary_op(tf.math.asin, x)
         self.assertIn("Asin", [n.op_type for n in onx.graph.node])
 
@@ -560,7 +560,7 @@ class TestTensorflowUnaryOpConverters(ExtTestCase):
 
     def test_abs(self):
         """TF Abs → ONNX Abs."""
-        x = (np.random.rand(3, 4).astype(np.float32) - 0.5)
+        x = np.random.rand(3, 4).astype(np.float32) - 0.5
         onx = self._run_unary_op(tf.math.abs, x)
         self.assertIn("Abs", [n.op_type for n in onx.graph.node])
 
@@ -572,25 +572,25 @@ class TestTensorflowUnaryOpConverters(ExtTestCase):
 
     def test_sign(self):
         """TF Sign → ONNX Sign."""
-        x = (np.random.rand(3, 4).astype(np.float32) - 0.5)
+        x = np.random.rand(3, 4).astype(np.float32) - 0.5
         onx = self._run_unary_op(tf.math.sign, x)
         self.assertIn("Sign", [n.op_type for n in onx.graph.node])
 
     def test_floor(self):
         """TF Floor → ONNX Floor."""
-        x = (np.random.rand(3, 4).astype(np.float32) * 10 - 5)
+        x = np.random.rand(3, 4).astype(np.float32) * 10 - 5
         onx = self._run_unary_op(tf.math.floor, x)
         self.assertIn("Floor", [n.op_type for n in onx.graph.node])
 
     def test_ceil(self):
         """TF Ceil → ONNX Ceil."""
-        x = (np.random.rand(3, 4).astype(np.float32) * 10 - 5)
+        x = np.random.rand(3, 4).astype(np.float32) * 10 - 5
         onx = self._run_unary_op(tf.math.ceil, x)
         self.assertIn("Ceil", [n.op_type for n in onx.graph.node])
 
     def test_round(self):
         """TF Round → ONNX Round."""
-        x = (np.random.rand(3, 4).astype(np.float32) * 10 - 5)
+        x = np.random.rand(3, 4).astype(np.float32) * 10 - 5
         onx = self._run_unary_op(tf.math.round, x)
         self.assertIn("Round", [n.op_type for n in onx.graph.node])
 
