@@ -11,25 +11,72 @@ from the live converter registry.
 Aten Functions
 ==============
 
-Functions registered via :mod:`yobx.torch.interpreter._aten_functions`
-and :mod:`yobx.torch.interpreter._aten_functions_attention`.
+Functions registered via :mod:`yobx.torch.interpreter._aten_functions`.
 
 .. runpython::
     :showcode:
     :rst:
 
     import yobx.torch.interpreter._aten_functions as _af
+
+    rows = []
+    for k, v in sorted(_af.__dict__.items()):
+        if not k.startswith("aten_") or not callable(v):
+            continue
+        rows.append(
+            f"* ``{k}`` → "
+            f":func:`{v.__name__} <{v.__module__}.{v.__name__}>`"
+        )
+
+    print("\n".join(rows))
+
+Attention Functions
+===================
+
+Functions registered via
+:mod:`yobx.torch.interpreter._aten_functions_attention`.
+
+.. runpython::
+    :showcode:
+    :rst:
+
     import yobx.torch.interpreter._aten_functions_attention as _afa
 
     rows = []
-    for mod in (_af, _afa):
-        for k, v in sorted(mod.__dict__.items()):
-            if not k.startswith("aten_") or not callable(v):
-                continue
-            rows.append(
-                f"* ``{k}`` → "
-                f":func:`{v.__name__} <{v.__module__}.{v.__name__}>`"
-            )
+    for k, v in sorted(_afa.__dict__.items()):
+        if not k.startswith("aten_") or not callable(v):
+            continue
+        rows.append(
+            f"* ``{k}`` → "
+            f":func:`{v.__name__} <{v.__module__}.{v.__name__}>`"
+        )
+
+    print("\n".join(rows))
+
+Non-Aten Functions
+==================
+
+Functions registered via :mod:`yobx.torch.interpreter._non_aten_functions`.
+These converters handle ONNX-specific symbolic operations that are not
+part of the standard :epkg:`aten` namespace.
+
+.. runpython::
+    :showcode:
+    :rst:
+
+    import inspect
+    import yobx.torch.interpreter._non_aten_functions as _naf
+
+    rows = []
+    for k, v in sorted(_naf.__dict__.items()):
+        if not callable(v) or not inspect.isfunction(v):
+            continue
+        if v.__module__ != _naf.__name__:
+            continue
+        rows.append(
+            f"* ``{k}`` → "
+            f":func:`{v.__name__} <{v.__module__}.{v.__name__}>`"
+        )
 
     print("\n".join(rows))
 
