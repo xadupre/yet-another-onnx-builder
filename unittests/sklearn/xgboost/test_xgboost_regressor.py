@@ -50,9 +50,7 @@ class TestXGBoostRegressor(ExtTestCase):
 
         X, _ = self._make_regression_data()
         y = (X[:, 0] > 0).astype(np.float32)
-        reg = XGBRegressor(
-            n_estimators=5, max_depth=3, random_state=0, objective="reg:logistic"
-        )
+        reg = XGBRegressor(n_estimators=5, max_depth=3, random_state=0, objective="reg:logistic")
         reg.fit(X, y)
 
         onx = to_onnx(reg, (X,))
@@ -78,9 +76,7 @@ class TestXGBoostRegressor(ExtTestCase):
         rng = np.random.default_rng(3)
         X = rng.standard_normal((20, 4)).astype(np.float32)
         y = rng.poisson(lam=3, size=20).astype(np.float32)
-        reg = XGBRegressor(
-            n_estimators=5, max_depth=3, random_state=0, objective="count:poisson"
-        )
+        reg = XGBRegressor(n_estimators=5, max_depth=3, random_state=0, objective="count:poisson")
         reg.fit(X, y)
 
         onx = to_onnx(reg, (X,))
@@ -101,14 +97,13 @@ class TestXGBoostRegressor(ExtTestCase):
 
     def test_xgb_regressor_unsupported_objective_raises(self):
         """Unknown regression objectives raise NotImplementedError."""
-        from xgboost import XGBRegressor
         from yobx.sklearn.xgboost.xgb import _get_reg_output_transform
 
         with self.assertRaises(NotImplementedError):
             _get_reg_output_transform("unknown:objective")
 
     def test_xgb_regressor_dtypes_opsets(self):
-        """Regressor: float32/float64 × ai.onnx.ml opset 3 and 5."""
+        """Regressor: float32/float64 x ai.onnx.ml opset 3 and 5."""
         from xgboost import XGBRegressor
 
         X32, y = self._make_regression_data()

@@ -89,7 +89,6 @@ class TestXGBoostClassifier(ExtTestCase):
         self.assertEqualArray(expected_label, ort_results[0])
 
     def test_xgb_classifier_binary_dtypes_opsets(self):
-        """Binary classifier: float32/float64 × ai.onnx.ml opset 3 and 5."""
         from xgboost import XGBClassifier
 
         X32, y = self._make_binary_data()
@@ -126,13 +125,11 @@ class TestXGBoostClassifier(ExtTestCase):
                     self.assertEqualArray(expected_label, label)
 
     def test_xgb_classifier_multiclass_dtypes_opsets(self):
-        """Multi-class classifier: float32/float64 × ai.onnx.ml opset 3 and 5."""
+        """Multi-class classifier: float32/float64 x ai.onnx.ml opset 3 and 5."""
         from xgboost import XGBClassifier
 
         X32, y = self._make_multiclass_data()
-        clf = XGBClassifier(
-            n_estimators=5, max_depth=3, random_state=0, eval_metric="mlogloss"
-        )
+        clf = XGBClassifier(n_estimators=5, max_depth=3, random_state=0, eval_metric="mlogloss")
         clf.fit(X32, y)
 
         for ml_opset in (3, 5):
@@ -156,7 +153,6 @@ class TestXGBoostClassifier(ExtTestCase):
                     self.assertEqualArray(expected_label, label)
 
     def test_xgb_classifier_binary_pipeline(self):
-        """XGBClassifier works inside a sklearn Pipeline."""
         from xgboost import XGBClassifier
         from sklearn.pipeline import Pipeline
         from sklearn.preprocessing import StandardScaler
