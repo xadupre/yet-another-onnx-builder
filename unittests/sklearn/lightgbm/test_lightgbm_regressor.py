@@ -160,6 +160,64 @@ class TestLGBMRegressor(ExtTestCase):
         expected = pipe.predict(X).astype(np.float32).reshape(-1, 1)
         self.assertEqualArray(expected, predictions, atol=1e-4)
 
+    def _make_categorical_data(self):
+        rng = np.random.default_rng(7)
+        n = 300
+        X_num = rng.standard_normal((n, 3)).astype(np.float32)
+        cat = rng.integers(0, 5, size=n).astype(np.float32)
+        X = np.column_stack([X_num, cat])
+        y = X_num[:, 0] + cat * 0.5
+        return X.astype(np.float32), y
+
+    def test_lgbm_regressor_categorical(self):
+        """LGBMRegressor with categorical features converts correctly."""
+        from lightgbm import LGBMRegressor
+
+        X, y = self._make_categorical_data()
+        reg = LGBMRegressor(
+            n_estimators=10, max_depth=4, random_state=0, verbose=-1, min_child_samples=5
+        )
+        reg.fit(X, y, categorical_feature=[3])
+
+        onx = to_onnx(reg, (X,))
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        expected = reg.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected, predictions, atol=1e-4)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected, ort_results[0], atol=1e-4)
+
+    def test_lgbm_regressor_categorical_dtypes_opsets(self):
+        """Categorical regressor: float32/float64 x ai.onnx.ml opset 3 and 5."""
+        from lightgbm import LGBMRegressor
+
+        X32, y = self._make_categorical_data()
+        reg = LGBMRegressor(
+            n_estimators=10, max_depth=4, random_state=0, verbose=-1, min_child_samples=5
+        )
+        reg.fit(X32, y, categorical_feature=[3])
+
+        for ml_opset in (3, 5):
+            for dtype in (np.float32, np.float64):
+                with self.subTest(ml_opset=ml_opset, dtype=dtype):
+                    X = X32.astype(dtype)
+                    target_opset = {"": 21, "ai.onnx.ml": ml_opset}
+                    onx = to_onnx(reg, (X,), target_opset=target_opset)
+
+                    ml_opsets = {op.domain: op.version for op in onx.opset_import}
+                    self.assertEqual(ml_opsets.get("ai.onnx.ml"), ml_opset)
+
+                    sess = self.check_ort(onx)
+                    ort_results = sess.run(None, {"X": X})
+                    predictions = ort_results[0]
+
+                    expected = reg.predict(X32).astype(np.float32).astype(dtype).reshape(-1, 1)
+                    self.assertEqualArray(expected, predictions, atol=1e-4)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

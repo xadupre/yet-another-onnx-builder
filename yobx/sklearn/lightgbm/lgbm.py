@@ -20,11 +20,17 @@ The trees are extracted from the fitted booster via
   * Exp objectives (``poisson``, ``tweedie``): ``exp(margin)``; prediction
     is in positive-real space.
 
-LightGBM's tree-branching condition *"go to left child when
-x ≤ split_condition"* maps to:
+**Numerical splits**: LightGBM's condition *"go to left child when
+x ≤ split_condition"* maps to ``BRANCH_LEQ`` for both ``ai.onnx.ml``
+opset ≤ 4 and opset ≥ 5 — exact match.
 
-* ``BRANCH_LEQ`` for both ``ai.onnx.ml`` opset ≤ 4 and opset ≥ 5 — exact
-  match.
+**Categorical splits**: LightGBM encodes categorical splits as
+``decision_type == '=='`` with a threshold like ``'0||1||2'``.  ONNX only
+supports single-value ``BRANCH_EQ`` comparisons, so each multi-value
+categorical node is expanded into a chain of single-value checks by
+:func:`_expand_categorical_splits` before flattening.  The memoised DFS in
+:func:`_flatten_lgbm_tree` ensures shared subtree references (the ``left``
+branch of every chain node) are assigned exactly one flat node ID.
 """
 
 from typing import Dict, List, Optional, Tuple
@@ -37,8 +43,10 @@ from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
 
 # Mode encoding for ai.onnx.ml opset-5 TreeEnsemble.
-# 0 = BRANCH_LEQ (x <= threshold) — exact match for LightGBM semantics.
+# 0 = BRANCH_LEQ (x <= threshold) — exact match for LightGBM numerical split semantics.
 _NODE_MODE_LEQ = np.uint8(0)
+# 4 = BRANCH_EQ  (x == threshold) — used for LightGBM categorical splits.
+_NODE_MODE_EQ = np.uint8(4)
 
 # ---------------------------------------------------------------------------
 # Supported regression objectives, grouped by their output transform.
@@ -91,50 +99,144 @@ def _get_reg_output_transform(objective: str) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Tree flattening helpers
+# Tree flattening helpers (categorical-aware)
 # ---------------------------------------------------------------------------
 
 
-def _collect_lgbm_nodes(
-    node: dict,
-    n_internal: int,
-    internal_nodes: List[dict],
-    leaf_nodes: List[dict],
-) -> None:
-    """Recursively collect all nodes from a LightGBM dump_model tree.
+def _expand_categorical_splits(node: dict) -> dict:
+    """Recursively expand LightGBM categorical split nodes into EQ chains.
 
-    Internal nodes (split nodes) are appended to *internal_nodes* using
-    their ``split_index`` as the identifier.  Leaf nodes are appended to
-    *leaf_nodes* using their ``leaf_index``.
+    LightGBM represents a categorical split as ``decision_type == '=='`` with
+    a threshold string like ``'0||1||2'``, meaning *go left if feature value is
+    0, 1, or 2*.  ONNX only supports single-value ``BRANCH_EQ`` (``x == v``),
+    so multi-value sets must be expanded into a chain of single-value checks:
 
-    :param node: root node dict from ``booster_.dump_model()['tree_info'][i]['tree_structure']``
-    :param n_internal: total number of internal nodes in the tree (used to
-        offset leaf IDs)
-    :param internal_nodes: output list that collects internal node dicts
-    :param leaf_nodes: output list that collects leaf node dicts
+    .. code-block:: text
+
+        feature IN {0, 1}
+          → EQ(feature==0): true→left, false→
+              EQ(feature==1): true→left, false→right
+
+    The ``left`` subtree may be shared (same object reference) across multiple
+    EQ chain nodes — this is intentional and handled by the memoised DFS in
+    :func:`_flatten_lgbm_tree`.
+
+    :param node: node dict from ``booster_.dump_model()['tree_info'][i]['tree_structure']``
+    :return: new node dict (leaf nodes are returned unchanged)
     """
     if "leaf_index" in node:
-        leaf_nodes.append(node)
-    else:
-        internal_nodes.append(node)
-        _collect_lgbm_nodes(node["left_child"], n_internal, internal_nodes, leaf_nodes)
-        _collect_lgbm_nodes(node["right_child"], n_internal, internal_nodes, leaf_nodes)
+        return node
+
+    left = _expand_categorical_splits(node["left_child"])
+    right = _expand_categorical_splits(node["right_child"])
+
+    if node.get("decision_type", "<=") == "==":
+        # Categorical split: threshold is e.g. '0||1||2'
+        categories = [int(c) for c in str(node["threshold"]).split("||")]
+        feat = node["split_feature"]
+        default_left = node.get("default_left", False)
+
+        # Build chain from back: check each category value in turn.
+        # True branch of every node goes to the original left subtree.
+        # False branch of last node goes to the original right subtree.
+        result: dict = right
+        for cat in reversed(categories):
+            result = {
+                "split_feature": feat,
+                "threshold": float(cat),
+                "decision_type": "==",
+                "default_left": default_left,
+                "left_child": left,  # shared reference — memoised during flatten
+                "right_child": result,
+            }
+        return result
+
+    return {**node, "left_child": left, "right_child": right}
 
 
-def _child_node_id(child: dict, n_internal: int) -> int:
-    """Return the flat node ID for a child node.
+def _flatten_lgbm_tree(tree_structure: dict) -> Tuple[List[dict], List[dict], int]:
+    """Flatten a LightGBM tree structure into sorted flat lists of nodes.
 
-    Internal nodes are numbered ``0..n_internal-1`` (by ``split_index``).
-    Leaf nodes are numbered ``n_internal..n_internal+n_leaves-1``
-    (by ``n_internal + leaf_index``).
+    Handles both numerical (``<=``) and categorical (``==``) splits.
+    Shared subtree references introduced by :func:`_expand_categorical_splits`
+    are handled via memoisation on object identity so that each unique node
+    object is assigned exactly one flat ID.
 
-    :param child: child node dict from dump_model
-    :param n_internal: total number of internal nodes in the tree
-    :return: flat node ID
+    :param tree_structure: expanded root node (output of
+        :func:`_expand_categorical_splits`)
+    :return: ``(internal_nodes, leaf_nodes, n_internal)`` where
+
+        * ``internal_nodes`` — list of dicts (one per unique internal node),
+          each containing:
+          ``id``, ``split_feature``, ``threshold``, ``mode`` (``"BRANCH_LEQ"``
+          or ``"BRANCH_EQ"``), ``true_id``, ``true_is_leaf``,
+          ``false_id``, ``false_is_leaf``, ``default_left``.
+        * ``leaf_nodes`` — list of dicts (one per unique leaf node), each
+          containing: ``id``, ``leaf_value``.
+        * ``n_internal`` — number of unique internal nodes.
+
+    Internal nodes are assigned IDs ``0..n_internal-1`` in DFS pre-order;
+    leaf nodes are assigned IDs ``n_internal..n_internal+n_leaves-1``.
     """
-    if "leaf_index" in child:
-        return n_internal + child["leaf_index"]
-    return child["split_index"]
+    internal_nodes: List[dict] = []
+    leaf_nodes: List[dict] = []
+    # memo: id(node_object) → ('internal'|'leaf', assigned_id)
+    memo: dict = {}
+
+    internal_counter = [0]
+    leaf_counter = [0]
+
+    def _is_leaf(node: dict) -> bool:
+        return "leaf_index" in node or "leaf_value" in node
+
+    def _visit(node: dict) -> Tuple[str, int]:
+        oid = id(node)
+        if oid in memo:
+            return memo[oid]
+
+        if _is_leaf(node):
+            my_id = leaf_counter[0]
+            leaf_counter[0] += 1
+            memo[oid] = ("leaf", my_id)
+            leaf_nodes.append({"id": my_id, "leaf_value": float(node["leaf_value"])})
+            return memo[oid]
+
+        # Pre-assign internal ID before recursing so that back-references
+        # (cycles, if any) resolve correctly.
+        my_id = internal_counter[0]
+        internal_counter[0] += 1
+        memo[oid] = ("internal", my_id)
+
+        left_type, left_id = _visit(node["left_child"])
+        right_type, right_id = _visit(node["right_child"])
+
+        dt = node.get("decision_type", "<=")
+        mode = "BRANCH_EQ" if dt == "==" else "BRANCH_LEQ"
+
+        internal_nodes.append(
+            {
+                "id": my_id,
+                "split_feature": node["split_feature"],
+                "threshold": float(node["threshold"]),
+                "mode": mode,
+                "true_id": left_id,
+                "true_is_leaf": left_type == "leaf",
+                "false_id": right_id,
+                "false_is_leaf": right_type == "leaf",
+                "default_left": bool(node.get("default_left", False)),
+            }
+        )
+        return memo[oid]
+
+    if _is_leaf(tree_structure):
+        # Degenerate tree: single leaf root (no internal nodes).
+        # Use _visit so memoization state remains consistent.
+        _visit(tree_structure)
+    else:
+        _visit(tree_structure)
+
+    n_internal = internal_counter[0]
+    return internal_nodes, leaf_nodes, n_internal
 
 
 def _build_lgbm_tree_attrs_legacy(
@@ -148,9 +250,11 @@ def _build_lgbm_tree_attrs_legacy(
     ``ai.onnx.ml ≤ 4`` ``TreeEnsembleRegressor`` or ``TreeEnsembleClassifier``
     operators.
 
-    The branching direction maps LightGBM's *left child* (``x ≤ threshold``)
-    to the ONNX ``BRANCH_LEQ`` *true* branch, matching LightGBM's exact
-    semantics.
+    Numerical splits use ``BRANCH_LEQ`` (``x ≤ threshold``, left branch taken).
+    Categorical splits (LightGBM ``decision_type == '=='``) are expanded into
+    chains of ``BRANCH_EQ`` single-value checks by
+    :func:`_expand_categorical_splits`, then flattened by
+    :func:`_flatten_lgbm_tree`.
 
     :param trees: list of ``tree_info`` dicts from ``booster_.dump_model()``
     :param n_targets: number of output targets (1 for binary/regression,
@@ -176,41 +280,33 @@ def _build_lgbm_tree_attrs_legacy(
     all_target_weights: List[float] = []
 
     for tree_idx, tree_info in enumerate(trees):
-        ts = tree_info["tree_structure"]
-        num_leaves = tree_info["num_leaves"]
-        n_internal = num_leaves - 1  # binary tree: n_internal = n_leaves - 1
-
-        # Collect all internal/leaf nodes from the recursive structure.
-        internal_nodes: List[dict] = []
-        leaf_nodes: List[dict] = []
-        _collect_lgbm_nodes(ts, n_internal, internal_nodes, leaf_nodes)
+        ts_expanded = _expand_categorical_splits(tree_info["tree_structure"])
+        internal_nodes, leaf_nodes, n_internal = _flatten_lgbm_tree(ts_expanded)
 
         target_id = tree_idx % n_targets
 
-        # Internal nodes: node_id = split_index
-        for node in sorted(internal_nodes, key=lambda n: n["split_index"]):
-            node_id = node["split_index"]
+        # Internal nodes
+        for node in sorted(internal_nodes, key=lambda n: n["id"]):
+            node_id = node["id"]
+            true_id = n_internal + node["true_id"] if node["true_is_leaf"] else node["true_id"]
+            false_id = n_internal + node["false_id"] if node["false_is_leaf"] else node["false_id"]
+
             all_nodeids.append(node_id)
             all_treeids.append(tree_idx)
             all_hitrates.append(1.0)
-
             all_featureids.append(node["split_feature"])
-            all_values.append(float(node["threshold"]))
-            # LightGBM: left child taken when x <= threshold (BRANCH_LEQ true branch).
-            all_modes.append("BRANCH_LEQ")
-            # True branch = left child, False branch = right child.
-            all_truenodeids.append(_child_node_id(node["left_child"], n_internal))
-            all_falsenodeids.append(_child_node_id(node["right_child"], n_internal))
-            # missing_value_tracks_true = 1 if NaN goes to left (true) branch.
+            all_values.append(node["threshold"])
+            all_modes.append(node["mode"])
+            all_truenodeids.append(true_id)
+            all_falsenodeids.append(false_id)
             all_mvt.append(1 if node["default_left"] else 0)
 
-        # Leaf nodes: node_id = n_internal + leaf_index
-        for node in sorted(leaf_nodes, key=lambda n: n["leaf_index"]):
-            node_id = n_internal + node["leaf_index"]
+        # Leaf nodes
+        for node in sorted(leaf_nodes, key=lambda n: n["id"]):
+            node_id = n_internal + node["id"]
             all_nodeids.append(node_id)
             all_treeids.append(tree_idx)
             all_hitrates.append(1.0)
-
             all_featureids.append(0)
             all_values.append(0.0)
             all_modes.append("LEAF")
@@ -221,7 +317,7 @@ def _build_lgbm_tree_attrs_legacy(
             all_target_nodeids.append(node_id)
             all_target_treeids.append(tree_idx)
             all_target_ids.append(target_id)
-            all_target_weights.append(float(node["leaf_value"]))
+            all_target_weights.append(node["leaf_value"])
 
     if is_classifier:
         return dict(
@@ -264,14 +360,18 @@ def _build_lgbm_tree_attrs_v5(
     """Build ``TreeEnsemble`` (``ai.onnx.ml`` opset 5) attribute arrays.
 
     The opset-5 encoding stores *internal* nodes and *leaf* nodes in separate
-    flat arrays indexed by contiguous offsets.  ``BRANCH_LEQ`` (mode 0) is
-    used so that LightGBM's ``x ≤ threshold`` condition is matched exactly.
+    flat arrays indexed by contiguous offsets.  Numerical splits use
+    ``BRANCH_LEQ`` (mode 0) and categorical splits use ``BRANCH_EQ`` (mode 4),
+    after categorical nodes have been expanded into chains by
+    :func:`_expand_categorical_splits`.
 
     :param trees: list of ``tree_info`` dicts from ``booster_.dump_model()``
     :param n_targets: number of output targets
     :param itype: onnx float dtype for splits / weights
     :return: attribute dict for ``TreeEnsemble``
     """
+    _MODE_INT = {"BRANCH_LEQ": int(_NODE_MODE_LEQ), "BRANCH_EQ": int(_NODE_MODE_EQ)}
+
     all_nodes_featureids: List[int] = []
     all_nodes_splits: List[float] = []
     all_nodes_modes: List[int] = []
@@ -289,39 +389,17 @@ def _build_lgbm_tree_attrs_v5(
     cumulative_leaf_offset = 0
     dtype = tensor_dtype_to_np_dtype(itype)
 
-    for tree_idx, tree_info in enumerate(trees):
-        ts = tree_info["tree_structure"]
-        num_leaves = tree_info["num_leaves"]
-        n_internal = num_leaves - 1  # binary tree: n_internal = n_leaves - 1
-
-        # Collect all internal/leaf nodes from the recursive structure.
-        internal_nodes_list: List[dict] = []
-        leaf_nodes_list: List[dict] = []
-        _collect_lgbm_nodes(ts, n_internal, internal_nodes_list, leaf_nodes_list)
-
-        # Sort by split_index / leaf_index for deterministic ordering.
-        internal_nodes_sorted = sorted(internal_nodes_list, key=lambda n: n["split_index"])
-        leaf_nodes_sorted = sorted(leaf_nodes_list, key=lambda n: n["leaf_index"])
-
-        # Build index maps: split_index → position in internal_nodes_sorted,
-        # leaf_index → position in leaf_nodes_sorted.
-        internal_idx = {n["split_index"]: i for i, n in enumerate(internal_nodes_sorted)}
-        leaf_idx = {n["leaf_index"]: i for i, n in enumerate(leaf_nodes_sorted)}
-
-        n_internal_actual = len(internal_nodes_sorted)
-        n_leaves_actual = len(leaf_nodes_sorted)
-
-        target_id = tree_idx % n_targets
+    for tree_info in trees:
+        ts_expanded = _expand_categorical_splits(tree_info["tree_structure"])
+        internal_nodes, leaf_nodes, n_internal_actual = _flatten_lgbm_tree(ts_expanded)
+        n_leaves_actual = len(leaf_nodes)
 
         all_tree_roots.append(cumulative_internal_offset)
 
-        if not internal_nodes_sorted:
-            # Degenerate tree (single leaf root): the ONNX TreeEnsemble spec
-            # requires at least one internal node.  We emit a dummy split node
-            # whose both branches (true and false) point to the single leaf at
-            # cumulative_leaf_offset.  The split condition (feature 0, threshold
-            # 0.0, BRANCH_LEQ) will always route to one branch, but since both
-            # branches yield the same constant leaf value the result is correct.
+        if not internal_nodes:
+            # Degenerate tree (single leaf root): TreeEnsemble requires at least
+            # one internal node.  Emit a dummy BRANCH_LEQ node that routes to the
+            # single leaf regardless of the split result.
             all_nodes_featureids.append(0)
             all_nodes_splits.append(0.0)
             all_nodes_modes.append(int(_NODE_MODE_LEQ))
@@ -330,53 +408,44 @@ def _build_lgbm_tree_attrs_v5(
             all_nodes_falsenodeids.append(cumulative_leaf_offset)
             all_nodes_falseleafs.append(1)
         else:
-            for node in internal_nodes_sorted:
-                feat_idx = node["split_feature"]
-                left_child = node["left_child"]
-                right_child = node["right_child"]
+            for node in sorted(internal_nodes, key=lambda n: n["id"]):
+                true_id = (
+                    cumulative_leaf_offset + node["true_id"]
+                    if node["true_is_leaf"]
+                    else cumulative_internal_offset + node["true_id"]
+                )
+                false_id = (
+                    cumulative_leaf_offset + node["false_id"]
+                    if node["false_is_leaf"]
+                    else cumulative_internal_offset + node["false_id"]
+                )
 
-                all_nodes_featureids.append(feat_idx)
-                all_nodes_splits.append(float(node["threshold"]))
-                all_nodes_modes.append(int(_NODE_MODE_LEQ))
+                all_nodes_featureids.append(node["split_feature"])
+                all_nodes_splits.append(node["threshold"])
+                all_nodes_modes.append(_MODE_INT[node["mode"]])
+                all_nodes_truenodeids.append(true_id)
+                all_nodes_trueleafs.append(1 if node["true_is_leaf"] else 0)
+                all_nodes_falsenodeids.append(false_id)
+                all_nodes_falseleafs.append(1 if node["false_is_leaf"] else 0)
 
-                # True branch = left child (x <= threshold).
-                left_is_leaf = "leaf_index" in left_child
-                if left_is_leaf:
-                    all_nodes_truenodeids.append(
-                        cumulative_leaf_offset + leaf_idx[left_child["leaf_index"]]
-                    )
-                    all_nodes_trueleafs.append(1)
-                else:
-                    all_nodes_truenodeids.append(
-                        cumulative_internal_offset + internal_idx[left_child["split_index"]]
-                    )
-                    all_nodes_trueleafs.append(0)
-
-                # False branch = right child (x > threshold).
-                right_is_leaf = "leaf_index" in right_child
-                if right_is_leaf:
-                    all_nodes_falsenodeids.append(
-                        cumulative_leaf_offset + leaf_idx[right_child["leaf_index"]]
-                    )
-                    all_nodes_falseleafs.append(1)
-                else:
-                    all_nodes_falsenodeids.append(
-                        cumulative_internal_offset + internal_idx[right_child["split_index"]]
-                    )
-                    all_nodes_falseleafs.append(0)
-
-        # Build leaf arrays.
-        if not leaf_nodes_sorted:
-            # Degenerate tree: single dummy leaf.
-            all_leaf_targetids.append(target_id)
+        # Leaf arrays
+        if not leaf_nodes:
+            all_leaf_targetids.append(0)
             all_leaf_weights.append(0.0)
         else:
-            for node in leaf_nodes_sorted:
-                all_leaf_targetids.append(target_id)
-                all_leaf_weights.append(float(node["leaf_value"]))
+            for node in sorted(leaf_nodes, key=lambda n: n["id"]):
+                all_leaf_targetids.append(0)  # overwritten per-tree below
+                all_leaf_weights.append(node["leaf_value"])
+
+        # Fix up leaf_targetids for the leaves we just appended
+        n_leaves_appended = max(n_leaves_actual, 1)
+        tree_idx = len(all_tree_roots) - 1
+        real_target_id = tree_idx % n_targets
+        for i in range(1, n_leaves_appended + 1):
+            all_leaf_targetids[-i] = real_target_id
 
         cumulative_internal_offset += max(n_internal_actual, 1)
-        cumulative_leaf_offset += max(n_leaves_actual, 1)
+        cumulative_leaf_offset += n_leaves_appended
 
     nodes_splits_tensor = oh.make_tensor(
         "nodes_splits",
