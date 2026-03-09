@@ -58,66 +58,24 @@ class ShapedBasedReshapePattern(ReshapePattern):
 
     Model with nodes to be fused:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['shape2'],
-                                 value=onh.from_array(np.array([0, 0, -1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Reshape', ['X', 'shape2'], ['xrr']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=26
+        input: name='shape2' type=dtype('int64') shape=[3]
+        input: name='X' type=dtype('float32') shape=['a', 'b', 'c']
+        Constant(value=[0, 0, -1]) -> shape2
+        Reshape(X, shape2) -> xrr
+        output: name='xrr' type=dtype('float32') shape=['a', 'b', 'c']
 
     Outcome of the fusion:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import onnx
-        import onnx.helper as oh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Identity', ['X', 'shape2'], ['xrr']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=26
+        input: name='shape2' type=dtype('int64') shape=[3]
+        input: name='X' type=dtype('float32') shape=['a', 'b', 'c']
+        Identity(X, shape2) -> xrr
+        output: name='xrr' type=dtype('float32') shape=['a', 'b', 'c']
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -151,65 +109,23 @@ class ReduceReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['shape'],
-                                 value=onh.from_array(np.array([3], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('ReduceSum', ['X'], ['xr'], axes=[1], keepdims=1),
-                    oh.make_node('Reshape', ['xr', 'shape'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (3, 2)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (3,)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 10)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=10
+        input: name='X' type=dtype('float32') shape=[3, 2]
+        Constant(value=[3]) -> shape
+        ReduceSum(X, axes=[1], keepdims=1) -> xr
+          Reshape(xr, shape) -> Y
+        output: name='Y' type=dtype('float32') shape=[3]
 
     Outcome of the fusion:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import onnx
-        import onnx.helper as oh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('ReduceSum', ['X'], ['Y'], axes=[1], keepdims=0),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (3, 2)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (3,)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 10)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=10
+        input: name='X' type=dtype('float32') shape=[3, 2]
+        ReduceSum(X, axes=[1], keepdims=0) -> Y
+        output: name='Y' type=dtype('float32') shape=[3]
     """
 
     def match(
@@ -301,70 +217,26 @@ class ReshapeReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['sh1'],
-                                 value=onh.from_array(np.array([4096, 7, 7, 128], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['sh2'],
-                                 value=onh.from_array(np.array([4096, 49, 128], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Reshape', ['X', 'sh1'], ['s1']),
-                    oh.make_node('Reshape', ['s1', 'sh2'], ['s2']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('sh2', onnx.TensorProto.INT64, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 128)),
-                ],
-                [
-                    oh.make_tensor_value_info('s2', onnx.TensorProto.FLOAT, (4096, 49, 128)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=18
+        input: name='sh2' type=dtype('int64') shape=[3]
+        input: name='X' type=dtype('float32') shape=['a', 'b', 128]
+        Constant(value=[4096, 7, ...) -> sh1
+          Reshape(X, sh1) -> s1
+        Constant(value=[4096, 49,...) -> sh2
+            Reshape(s1, sh2) -> s2
+        output: name='s2' type=dtype('float32') shape=[4096, 49, 128]
 
     Outcome of the fusion:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import onnx
-        import onnx.helper as oh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Reshape', ['X', 'sh2'], ['s2']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('sh2', onnx.TensorProto.INT64, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 128)),
-                ],
-                [
-                    oh.make_tensor_value_info('s2', onnx.TensorProto.FLOAT, (4096, 49, 128)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=18
+        input: name='sh2' type=dtype('int64') shape=[3]
+        input: name='X' type=dtype('float32') shape=['a', 'b', 128]
+        Reshape(X, sh2) -> s2
+        output: name='s2' type=dtype('float32') shape=[4096, 49, 128]
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -617,82 +489,36 @@ class Reshape2Of3Pattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['shape1'],
-                                 value=onh.from_array(np.array([-1, 8], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['shape2'],
-                                 value=onh.from_array(np.array([3, -1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['shape3'],
-                                 value=onh.from_array(np.array([2, 3, 4], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Reshape', ['X', 'shape1'], ['xr']),
-                    oh.make_node('Reshape', ['Y', 'shape2'], ['yr']),
-                    oh.make_node('Reshape', ['xrr', 'shape3'], ['Z']),
-                    oh.make_node('Mul', ['xr', 'yr'], ['xrr']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (2,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                ],
-                [
-                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, (3, 8)),
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=26
+        input: name='Y' type=dtype('float32') shape=[2, 3, 4]
+        input: name='shape2' type=dtype('int64') shape=[2]
+        input: name='X' type=dtype('float32') shape=[2, 3, 4]
+        input: name='Z' type=dtype('float32') shape=[2, 3, 4]
+        Constant(value=[-1, 8]) -> shape1
+          Reshape(X, shape1) -> xr
+        Constant(value=[3, -1]) -> shape2
+        Reshape(Y, shape2) -> yr
+          Mul(xr, yr) -> xrr
+        Constant(value=[2, 3, 4]) -> shape3
+          Reshape(xrr, shape3) -> Z
+        output: name='xrr' type=dtype('float32') shape=[3, 8]
+        output: name='Z' type=dtype('float32') shape=[2, 3, 4]
 
     Outcome of the fusion:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import onnx
-        import onnx.helper as oh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Mul', ['X', 'Y'], ['Z']),
-                    oh.make_node('Reshape', ['Z', 'shape2'], ['xrr']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (2,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                ],
-                [
-                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, (3, 8)),
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, (2, 3, 4)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=26
+        input: name='Y' type=dtype('float32') shape=[2, 3, 4]
+        input: name='shape2' type=dtype('int64') shape=[2]
+        input: name='X' type=dtype('float32') shape=[2, 3, 4]
+        input: name='Z' type=dtype('float32') shape=[2, 3, 4]
+        Mul(X, Y) -> Z
+        Reshape(Z, shape2) -> xrr
+        output: name='xrr' type=dtype('float32') shape=[3, 8]
+        output: name='Z' type=dtype('float32') shape=[2, 3, 4]
     """
 
     _op_types = element_wise_binary_op_types()
@@ -883,79 +709,33 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['sh1'],
-                                 value=onh.from_array(np.array([-1, 8], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['sh2'],
-                                 value=onh.from_array(np.array([-1, 8], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Reshape', ['X', 'sh1'], ['xc']),
-                    oh.make_node('Reshape', ['Y', 'sh2'], ['yc']),
-                    oh.make_node('Add', ['xc', 'yc'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 4)),
-                    oh.make_tensor_value_info('sh1', onnx.TensorProto.INT64, (2,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 4)),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('b', 8)),
-                ],
-                [
-                    onh.from_array(np.array([-1, 1], dtype=np.int64), name='sh1'),
-                    onh.from_array(np.array([1, -1], dtype=np.int64), name='sh2'),
-                    onh.from_array(np.array([4], dtype=np.int64), name='four'),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=26
+        input: name='Y' type=dtype('float32') shape=['a', 4]
+        input: name='sh1' type=dtype('int64') shape=[2]
+        input: name='X' type=dtype('float32') shape=['a', 4]
+        init: name='sh1' type=int64 shape=(2,) -- array([-1,  1])
+        init: name='sh2' type=int64 shape=(2,) -- array([ 1, -1])
+        init: name='four' type=int64 shape=(1,) -- array([4])
+        Constant(value=[-1, 8]) -> sh1
+        Reshape(X, sh1) -> xc
+        Constant(value=[-1, 8]) -> sh2
+        Reshape(Y, sh2) -> yc
+          Add(xc, yc) -> Z
+        output: name='Z' type=dtype('float32') shape=['b', 8]
 
     Outcome of the fusion:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import onnx
-        import onnx.helper as oh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Add', ['X', 'Y'], ['add-X']),
-                    oh.make_node('Reshape', ['add-X', 'sh1'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 4)),
-                    oh.make_tensor_value_info('sh1', onnx.TensorProto.INT64, (2,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 4)),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('b', 8)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=26
+        input: name='Y' type=dtype('float32') shape=['a', 4]
+        input: name='sh1' type=dtype('int64') shape=[2]
+        input: name='X' type=dtype('float32') shape=['a', 4]
+        Add(X, Y) -> add-X
+          Reshape(add-X, sh1) -> Z
+        output: name='Z' type=dtype('float32') shape=['b', 8]
     """
 
     _op_types = element_wise_binary_op_types()
@@ -1028,83 +808,34 @@ class ConcatReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Shape', ['X'], ['D2'], end=3, start=2),
-                    oh.make_node('Shape', ['X'], ['D1'], end=4, start=3),
-                    oh.make_node('Constant', [], ['I1'],
-                                 value=onh.from_array(np.array([2], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['I2'],
-                                 value=onh.from_array(np.array([1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Concat', ['I1', 'I2', 'D1', 'D2'], ['d'], axis=0),
-                    oh.make_node('Reshape', ['X', 'd'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('I1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('D1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
-                    oh.make_tensor_value_info('I2', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'd', 'c')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=18
+        input: name='I1' type=dtype('int64') shape=[1]
+        input: name='D1' type=dtype('int64') shape=[1]
+        input: name='X' type=dtype('float32') shape=['a', 'b', 'c', 'd']
+        input: name='I2' type=dtype('int64') shape=[1]
+        Constant(value=[2]) -> I1
+        Shape(X, end=3, start=2) -> D2
+        Shape(X, end=4, start=3) -> D1
+        Constant(value=[1]) -> I2
+          Concat(I1, I2, D1, D2, axis=0) -> d
+            Reshape(X, d) -> Y
+        output: name='Y' type=dtype('float32') shape=['a', 'b', 'd', 'c']
 
     Outcome of the fusion:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s1_-1'],
-                                 value=onh.from_array(np.array([-1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Concat', ['I1', 'I2', 'D1', 'init7_s1_-1'], ['d--concat'],
-                                 axis=0),
-                    oh.make_node('Reshape', ['X', 'd--concat'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('I1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('D1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
-                    oh.make_tensor_value_info('I2', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'd', 'c')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=18
+        input: name='I1' type=dtype('int64') shape=[1]
+        input: name='D1' type=dtype('int64') shape=[1]
+        input: name='X' type=dtype('float32') shape=['a', 'b', 'c', 'd']
+        input: name='I2' type=dtype('int64') shape=[1]
+        Constant(value=[-1]) -> init7_s1_-1
+          Concat(I1, I2, D1, init7_s1_-1, axis=0) -> d--concat
+            Reshape(X, d--concat) -> Y
+        output: name='Y' type=dtype('float32') shape=['a', 'b', 'd', 'c']
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1220,74 +951,28 @@ class StaticConcatReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['I1'],
-                                 value=onh.from_array(np.array([6], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Shape', ['X'], ['D2'], end=3, start=2),
-                    oh.make_node('Concat', ['I1', 'D2'], ['dc'], axis=0),
-                    oh.make_node('Reshape', ['X', 'dc'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('I1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (6, 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=18
+        input: name='I1' type=dtype('int64') shape=[1]
+        input: name='X' type=dtype('float32') shape=[2, 3, 'd']
+        Constant(value=[6]) -> I1
+        Shape(X, end=3, start=2) -> D2
+          Concat(I1, D2, axis=0) -> dc
+            Reshape(X, dc) -> Y
+        output: name='Y' type=dtype('float32') shape=[6, 'd']
 
     Outcome of the fusion:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s1_-1'],
-                                 value=onh.from_array(np.array([-1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Concat', ['I1', 'init7_s1_-1'], ['d--concat'], axis=0),
-                    oh.make_node('Reshape', ['X', 'd--concat'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('I1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (6, 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=18
+        input: name='I1' type=dtype('int64') shape=[1]
+        input: name='X' type=dtype('float32') shape=[2, 3, 'd']
+        Constant(value=[-1]) -> init7_s1_-1
+          Concat(I1, init7_s1_-1, axis=0) -> d--concat
+            Reshape(X, d--concat) -> Y
+        output: name='Y' type=dtype('float32') shape=[6, 'd']
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1389,71 +1074,25 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Shape', ['X'], ['D2'], end=3, start=2),
-                    oh.make_node('Concat', ['I1', 'D2'], ['dshape'], axis=0),
-                    oh.make_node('Reshape', ['X', 'dshape'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (6, 'd')),
-                ],
-                [
-                    onh.from_array(np.array([-1], dtype=np.int64), name='I1'),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=18
+        input: name='X' type=dtype('float32') shape=[2, 3, 'd']
+        init: name='I1' type=int64 shape=(1,) -- array([-1])
+        Shape(X, end=3, start=2) -> D2
+          Concat(I1, D2, axis=0) -> dshape
+            Reshape(X, dshape) -> Y
+        output: name='Y' type=dtype('float32') shape=[6, 'd']
 
     Outcome of the fusion:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s2_6_-1'],
-                                 value=onh.from_array(np.array([6, -1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Reshape', ['X', 'init7_s2_6_-1'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (6, 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=18
+        input: name='X' type=dtype('float32') shape=[2, 3, 'd']
+        Constant(value=[6, -1]) -> init7_s2_6_-1
+          Reshape(X, init7_s2_6_-1) -> Y
+        output: name='Y' type=dtype('float32') shape=[6, 'd']
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1628,71 +1267,25 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Shape', ['X'], ['D2']),
-                    oh.make_node('Concat', ['one', 'D2', 'one'], ['dshape2'], axis=0),
-                    oh.make_node('Reshape', ['X', 'dshape2'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1, 2, 3, 'd', 1)),
-                ],
-                [
-                    onh.from_array(np.array([1], dtype=np.int64), name='one'),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=18
+        input: name='X' type=dtype('float32') shape=[2, 3, 'd']
+        init: name='one' type=int64 shape=(1,) -- array([1])
+        Shape(X) -> D2
+          Concat(one, D2, one, axis=0) -> dshape2
+            Reshape(X, dshape2) -> Y
+        output: name='Y' type=dtype('float32') shape=[1, 2, 3, 'd', 1]
 
     Outcome of the fusion:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s2_0_4'],
-                                 value=onh.from_array(np.array([0, 4], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Unsqueeze', ['X', 'init7_s2_0_4'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (2, 3, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1, 2, 3, 'd', 1)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=18
+        input: name='X' type=dtype('float32') shape=[2, 3, 'd']
+        Constant(value=[0, 4]) -> init7_s2_0_4
+          Unsqueeze(X, init7_s2_0_4) -> Y
+        output: name='Y' type=dtype('float32') shape=[1, 2, 3, 'd', 1]
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1792,73 +1385,25 @@ class UnsqueezeReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['zero'],
-                                 value=onh.from_array(np.array([2], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['shape3'],
-                                 value=onh.from_array(np.array([0, 1, -1, 0], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Unsqueeze', ['X', 'zero'], ['xu0']),
-                    oh.make_node('Reshape', ['xu0', 'shape3'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('e', 'f', 'g', 'h')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=26
+        input: name='X' type=dtype('float32') shape=['a', 'b', 'c']
+        Constant(value=[2]) -> zero
+          Unsqueeze(X, zero) -> xu0
+        Constant(value=[0, 1, -1,...) -> shape3
+          Reshape(xu0, shape3) -> Z
+        output: name='Z' type=dtype('float32') shape=['e', 'f', 'g', 'h']
 
     Outcome of the fusion:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s1_1'],
-                                 value=onh.from_array(np.array([1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Unsqueeze', ['X', 'init7_s1_1'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('e', 'f', 'g', 'h')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=26
+        input: name='X' type=dtype('float32') shape=['a', 'b', 'c']
+        Constant(value=[1]) -> init7_s1_1
+          Unsqueeze(X, init7_s1_1) -> Z
+        output: name='Z' type=dtype('float32') shape=['e', 'f', 'g', 'h']
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1933,70 +1478,26 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['zero'],
-                                 value=onh.from_array(np.array([0], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['shape3'],
-                                 value=onh.from_array(np.array([-1, 128], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Unsqueeze', ['X', 'zero'], ['xu0']),
-                    oh.make_node('Reshape', ['xu0', 'shape3'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 8, 16)),
-                    oh.make_tensor_value_info('shape3', onnx.TensorProto.INT64, (2,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('2*a', 64)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=26
+        input: name='X' type=dtype('float32') shape=['a', 8, 16]
+        input: name='shape3' type=dtype('int64') shape=[2]
+        Constant(value=[0]) -> zero
+          Unsqueeze(X, zero) -> xu0
+        Constant(value=[-1, 128]) -> shape3
+            Reshape(xu0, shape3) -> Z
+        output: name='Z' type=dtype('float32') shape=['2*a', 64]
 
     Outcome of the fusion:
 
-    .. runpython::
-        :showcode:
+    .. code-block:: text
 
-        import onnx
-        import onnx.helper as oh
-
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Reshape', ['X', 'shape3'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 8, 16)),
-                    oh.make_tensor_value_info('shape3', onnx.TensorProto.INT64, (2,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('2*a', 64)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
-
-        from yobx.helpers.onnx_helper import pretty_onnx
-        print(pretty_onnx(model))
+        opset: domain='' version=26
+        input: name='X' type=dtype('float32') shape=['a', 8, 16]
+        input: name='shape3' type=dtype('int64') shape=[2]
+        Reshape(X, shape3) -> Z
+        output: name='Z' type=dtype('float32') shape=['2*a', 64]
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
