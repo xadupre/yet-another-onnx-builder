@@ -39,9 +39,13 @@ jobs:
         if: matrix.torch-version == 'nightly'
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
 
-      - name: Install pytorch 2.10
-        if: matrix.torch-version == '2.10'
+      - name: Install pytorch 2.10 (Linux/Windows)
+        if: matrix.torch-version == '2.10' && matrix.os != 'macos-latest'
         run: pip install torch==2.10.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install pytorch 2.10 (macOS)
+        if: matrix.torch-version == '2.10' && matrix.os == 'macos-latest'
+        run: pip install torch==2.10.0 torchvision torchaudio
 
       - name: Install dependencies
         run: pip install -e ".[dev,torch]"
