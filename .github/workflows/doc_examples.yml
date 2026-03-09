@@ -1,0 +1,36 @@
+name: Documentation Examples
+
+on:
+  workflow_dispatch:
+
+jobs:
+  doc_examples:
+    name: doc examples (ubuntu-latest, py3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install graphviz
+        uses: ts-graphviz/setup-graphviz@v2
+
+      - name: Install nightly pytorch
+        run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,sklearn,spox,tensorflow,torch]"
+
+      - name: pip freeze
+        run: pip freeze
+
+      - name: Run documentation examples
+        env:
+          UNITTEST_DOT: "1"
+        run: |
+          pytest unittests/main/test_documentation_examples.py -v --durations=20
