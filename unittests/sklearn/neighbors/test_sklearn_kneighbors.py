@@ -38,6 +38,51 @@ class TestKNeighborsClassifier(ExtTestCase):
         ort_results = sess.run(None, {"X": X})
         self.assertEqualArray(expected_labels, ort_results[0])
 
+    def test_knn_classifier_float64(self):
+        from sklearn.neighbors import KNeighborsClassifier
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(10)
+        X = rng.standard_normal((30, 4)).astype(np.float64)
+        y = (X[:, 0] > 0).astype(np.int64)
+
+        clf = KNeighborsClassifier(n_neighbors=3)
+        clf.fit(X, y)
+
+        onx = to_onnx(clf, (X,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        labels = results[0]
+
+        expected_labels = clf.predict(X).astype(np.int64)
+        self.assertEqualArray(expected_labels, labels)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_labels, ort_results[0])
+
+    def test_knn_classifier_more_k(self):
+        """Test with larger k values."""
+        from sklearn.neighbors import KNeighborsClassifier
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(11)
+        X = rng.standard_normal((60, 4)).astype(np.float32)
+        y = (X[:, 0] > 0).astype(np.int64)
+
+        for k in [1, 5, 10, 15]:
+            with self.subTest(k=k):
+                clf = KNeighborsClassifier(n_neighbors=k)
+                clf.fit(X, y)
+
+                onx = to_onnx(clf, (X,))
+
+                sess = self.check_ort(onx)
+                ort_results = sess.run(None, {"X": X})
+                expected_labels = clf.predict(X).astype(np.int64)
+                self.assertEqualArray(expected_labels, ort_results[0])
+
     def test_knn_classifier_probabilities(self):
         from sklearn.neighbors import KNeighborsClassifier
         from yobx.sklearn import to_onnx
@@ -143,6 +188,21 @@ class TestKNeighborsClassifier(ExtTestCase):
         expected_labels = clf.predict(X).astype(np.int64)
         self.assertEqualArray(expected_labels, ort_results[0])
 
+    def test_knn_classifier_opset_too_low_raises(self):
+        """Opset < 13 must raise NotImplementedError."""
+        from sklearn.neighbors import KNeighborsClassifier
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(5)
+        X = rng.standard_normal((20, 3)).astype(np.float32)
+        y = (X[:, 0] > 0).astype(np.int64)
+
+        clf = KNeighborsClassifier(n_neighbors=3)
+        clf.fit(X, y)
+
+        with self.assertRaises(NotImplementedError):
+            to_onnx(clf, (X,), target_opset=12)
+
 
 @requires_sklearn("1.4")
 class TestKNeighborsRegressor(ExtTestCase):
@@ -173,6 +233,51 @@ class TestKNeighborsRegressor(ExtTestCase):
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": X})
         self.assertEqualArray(expected, ort_results[0], atol=1e-5)
+
+    def test_knn_regressor_float64(self):
+        from sklearn.neighbors import KNeighborsRegressor
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(20)
+        X = rng.standard_normal((30, 4)).astype(np.float64)
+        y = (X[:, 0] * 2 + 1).astype(np.float64)
+
+        reg = KNeighborsRegressor(n_neighbors=3)
+        reg.fit(X, y)
+
+        onx = to_onnx(reg, (X,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        expected = reg.predict(X).astype(np.float64)
+        self.assertEqualArray(expected, predictions, atol=1e-10)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected, ort_results[0], atol=1e-10)
+
+    def test_knn_regressor_more_k(self):
+        """Test with larger k values."""
+        from sklearn.neighbors import KNeighborsRegressor
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(21)
+        X = rng.standard_normal((60, 4)).astype(np.float32)
+        y = (X[:, 0] * 2 + X[:, 1]).astype(np.float32)
+
+        for k in [1, 5, 10, 15]:
+            with self.subTest(k=k):
+                reg = KNeighborsRegressor(n_neighbors=k)
+                reg.fit(X, y)
+
+                onx = to_onnx(reg, (X,))
+
+                sess = self.check_ort(onx)
+                ort_results = sess.run(None, {"X": X})
+                expected = reg.predict(X).astype(np.float32)
+                self.assertEqualArray(expected, ort_results[0], atol=1e-5)
 
     def test_knn_regressor_pipeline(self):
         from sklearn.neighbors import KNeighborsRegressor
@@ -231,6 +336,22 @@ class TestKNeighborsRegressor(ExtTestCase):
         expected = reg.predict(X).astype(np.float32)
         self.assertEqualArray(expected, ort_results[0], atol=1e-5)
 
+    def test_knn_regressor_opset_too_low_raises(self):
+        """Opset < 18 must raise NotImplementedError."""
+        from sklearn.neighbors import KNeighborsRegressor
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(5)
+        X = rng.standard_normal((20, 3)).astype(np.float32)
+        y = X[:, 0] + 1
+
+        reg = KNeighborsRegressor(n_neighbors=3)
+        reg.fit(X, y)
+
+        with self.assertRaises(NotImplementedError):
+            to_onnx(reg, (X,), target_opset=17)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+

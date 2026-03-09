@@ -54,6 +54,16 @@ def _compute_pairwise_sq_distances(
         return g.op.Max(sq_dists, zero, name=f"{name}_clip")
 
     # Standard ONNX: ||x||² − 2·x·cᵀ + ||c||²
+    # ReduceSum with axes as a second input requires opset >= 13.
+    opset = g.get_opset("")
+    if opset < 13:
+        raise NotImplementedError(
+            f"The standard-ONNX KNN converter requires opset >= 13 "
+            f"(ReduceSum with axes as input was added in opset 13), "
+            f"but the graph builder has opset {opset}. "
+            f"Use target_opset >= 13 or pass target_opset={{..., 'com.microsoft': 1}} "
+            f"to enable the CDist path."
+        )
     training_T = training_data.T  # (F, M)
     c_sq = np.sum(training_data**2, axis=1, keepdims=True).T.astype(dtype)  # (1, M)
 
@@ -124,6 +134,15 @@ def sklearn_knn_classifier(
     """
     assert isinstance(estimator, KNeighborsClassifier)
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
+
+    # ReduceSum with axes-as-input requires opset >= 13.
+    opset = g.get_opset("")
+    if opset < 13:
+        raise NotImplementedError(
+            f"KNeighborsClassifier converter requires opset >= 13 "
+            f"(ReduceSum with axes as input was added in opset 13), "
+            f"but the graph builder has opset {opset}."
+        )
 
     # In older sklearn, outputs_2d_ exists; for newer sklearn it may not.
     # _y is 1-D for a single-output estimator and 2-D for multi-output.
@@ -279,6 +298,15 @@ def sklearn_knn_regressor(
     """
     assert isinstance(estimator, KNeighborsRegressor)
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
+
+    # ReduceMean with axes-as-input requires opset >= 18.
+    opset = g.get_opset("")
+    if opset < 18:
+        raise NotImplementedError(
+            f"KNeighborsRegressor converter requires opset >= 18 "
+            f"(ReduceMean with axes as input was added in opset 18), "
+            f"but the graph builder has opset {opset}."
+        )
 
     # _y is 1-D for a single-output estimator and 2-D for multi-output.
     raw_y = estimator._y
