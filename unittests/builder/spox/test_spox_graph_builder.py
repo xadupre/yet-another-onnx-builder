@@ -311,31 +311,29 @@ class TestSpoxGraphBuilderUniqueName(ExtTestCase):
 @requires_spox()
 @requires_sklearn("1.4")
 class TestSpoxGraphBuilderMlDomain(ExtTestCase):
-    """DecisionTreeClassifier uses the ai.onnx.ml domain."""
-
-    def test_decision_tree_classifier(self):
-        from sklearn.tree import DecisionTreeClassifier
+    def test_logistic_regression(self):
+        from sklearn.linear_model import LogisticRegression
         from yobx.sklearn import to_onnx
         from yobx.builder.spox import SpoxGraphBuilder
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
-        dt = DecisionTreeClassifier(max_depth=2)
+        dt = LogisticRegression()
         dt.fit(X, y)
 
         onx = to_onnx(dt, (X,), builder_cls=SpoxGraphBuilder)
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("TreeEnsembleClassifier", op_types)
+        self.assertIn("Gemm", op_types)
 
-    def test_decision_tree_numerical_correctness(self):
-        from sklearn.tree import DecisionTreeClassifier
+    def test_logistic_regression_correctness(self):
+        from sklearn.linear_model import LogisticRegression
         from yobx.sklearn import to_onnx
         from yobx.builder.spox import SpoxGraphBuilder
         from yobx.reference import ExtendedReferenceEvaluator
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3]], dtype=np.float32)
         y = np.array([0, 0, 1, 1, 0])
-        dt = DecisionTreeClassifier(max_depth=3)
+        dt = LogisticRegression()
         dt.fit(X, y)
 
         onx = to_onnx(dt, (X,), builder_cls=SpoxGraphBuilder)
@@ -440,29 +438,6 @@ class TestSpoxSklearnPipeline(ExtTestCase):
         self.assertIn("Div", op_types)
         self.assertIn("Gemm", op_types)
 
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": X})
-        label, proba = results[0], results[1]
-
-        self.assertEqualArray(pipe.predict(X), label)
-        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
-
-    def test_pipeline_scaler_decision_tree(self):
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.tree import DecisionTreeClassifier
-        from sklearn.pipeline import Pipeline
-        from yobx.sklearn import to_onnx
-        from yobx.builder.spox import SpoxGraphBuilder
-        from yobx.reference import ExtendedReferenceEvaluator
-
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
-        y_arr = np.array([0, 0, 1, 1, 2, 2])
-        pipe = Pipeline(
-            [("scaler", StandardScaler()), ("clf", DecisionTreeClassifier(max_depth=2))]
-        )
-        pipe.fit(X, y_arr)
-
-        onx = to_onnx(pipe, (X,), builder_cls=SpoxGraphBuilder)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]

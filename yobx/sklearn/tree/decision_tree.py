@@ -5,21 +5,12 @@ import onnx.helper as oh
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
-from ...helpers.onnx_helper import choose_consistent_domain_opset
+from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 _LEAF = -1  # sklearn's TREE_LEAF constant
 
 # Mode encoding for the TreeEnsemble operator (ai.onnx.ml opset 5)
 _NODE_MODE_LEQ = np.uint8(0)
-
-
-def _ensure_ml_domain(g: GraphBuilderExtendedProtocol) -> None:
-    """Ensures the 'ai.onnx.ml' domain is registered in the graph builder."""
-    if not g.has_opset("ai.onnx.ml"):
-        g.set_opset(
-            "ai.onnx.ml",
-            choose_consistent_domain_opset("ai.onnx.ml", {"": g.get_opset(""), "ai.onnx.ml": 3}),
-        )
 
 
 def _extract_tree_attributes(tree, n_classes: int, is_classifier: bool):
@@ -351,10 +342,12 @@ def sklearn_decision_tree_classifier(
     classes = estimator.classes_
     n_classes = len(classes)
     tree = estimator.tree_
+    itype = g.get_type(X)
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     if ml_opset >= 5:
         return _sklearn_decision_tree_classifier_v5(
-            g, sts, outputs, estimator, X, name, classes, n_classes, tree, dtype=g.get_type(X)
+            g, sts, outputs, estimator, X, name, classes, n_classes, tree, dtype=dtype
         )
 
     # Legacy path: TreeEnsembleClassifier (ai.onnx.ml opset <= 4)
