@@ -764,9 +764,7 @@ class TestRemoveInline(ExtTestCase):
             torch.arange(5).to(torch.float32),
         )
 
-        from yobx.torch.interpreter.export_options import (
-            ExportOptions as _ExportOptions,
-        )
+        from yobx.torch.export_options import ExportOptions as _ExportOptions
 
         _opts = _ExportOptions()
         _ep = _opts.export(
