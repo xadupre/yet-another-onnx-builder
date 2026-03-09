@@ -447,7 +447,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         Sets the opset version for domain `name`.
 
         :param name: domain name
-        :param versio: domain version
+        :param version: domain version
         """
         if not self.has_opset(name):
             self.opsets[name] = version

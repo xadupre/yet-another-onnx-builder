@@ -2042,8 +2042,8 @@ def set_type_shape_tree_ensemble(self: ShapeBuilder, node: NodeProto):
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
     assert self.has_opset("ai.onnx.ml"), f"Opset ai.onnx.ml is missing{self.get_debug_msg()}"
-    assert self.get_opset("ai.onnx.ml") >= 3, (
-        f"Only opset >= 3 is supported but opset for ai.onnx.ml is "
+    assert self.get_opset("ai.onnx.ml") >= 1, (
+        f"Only opset >= 1 is supported but opset for ai.onnx.ml is "
         f"{self.get_opset('ai.onnx.ml')}{self.get_debug_msg()}"
     )
     if node.op_type == "TreeEnsembleClassifier":

@@ -121,7 +121,7 @@ class ShapeBuilder:
         Sets the opset version for domain `name`.
 
         :param name: domain name
-        :param versio: domain version
+        :param version: domain version
         """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 

@@ -92,9 +92,12 @@ class TestDocumentationExamples(ExtTestCase):
                 and not has_dot
                 and name
                 in {
+                    "plot_dot_graph.py",
                     "plot_dump_intermediate_results.py",
-                    "plot_sklearn_with_sklearn_onnx.py",
                     "plot_input_observer_tiny_llm.py",
+                    "plot_sklearn_kmeans.py",
+                    "plot_sklearn_pipeline.py",
+                    "plot_sklearn_with_sklearn_onnx.py",
                 }
             ):
                 reason = "dot not installed"
