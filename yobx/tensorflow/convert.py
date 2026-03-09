@@ -1,7 +1,9 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
+from onnx import ModelProto
 import tensorflow as tf
 from .. import DEFAULT_TARGET_OPSET
+from ..container import ExtendedModelContainer
 from ..xbuilder import GraphBuilder
 from .register import get_tf_op_converter
 from .tensorflow_helper import tf_dtype_to_np_dtype
@@ -17,7 +19,7 @@ def to_onnx(
     extra_converters: Optional[Dict[str, Callable]] = None,
     large_model: bool = False,
     external_threshold: int = 1024,
-):
+) -> Union[ModelProto, ExtendedModelContainer]:
     """
     Converts a :epkg:`TensorFlow`/:epkg:`Keras` model into ONNX.
 

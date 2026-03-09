@@ -1,7 +1,9 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from onnx import ModelProto
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_is_fitted
 from .. import DEFAULT_TARGET_OPSET
+from ..container import ExtendedModelContainer
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
 from .register import get_sklearn_converter
@@ -29,7 +31,7 @@ def to_onnx(
     extra_converters: Optional[Dict[type, Callable]] = None,
     large_model: bool = False,
     external_threshold: int = 1024,
-):
+) -> Union[ModelProto, ExtendedModelContainer]:
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
     By default, the first dimension is considered as dynamic,
