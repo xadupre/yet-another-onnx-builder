@@ -114,6 +114,7 @@ class TestDocumentationExamples(ExtTestCase):
                     "plot_flattening.py",
                     "plot_input_observer.py",
                     "plot_mini_onnx_builder.py",
+                    "plot_input_observer_tiny_llm.py",
                     "plot_input_observer_transformers.py",
                     "plot_patch_model.py",
                 }

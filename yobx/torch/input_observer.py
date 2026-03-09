@@ -148,7 +148,7 @@ class InputCandidate:
         if dynamic_shapes is None or (
             isinstance(dynamic_shapes, dict) and all(isinstance(k, int) for k in dynamic_shapes)
         ):
-            return [dynamic_shapes]
+            return [dynamic_shapes]  # type: ignore
         if isinstance(dynamic_shapes, (tuple, list)):
             res = []
             for v in dynamic_shapes:
@@ -161,7 +161,7 @@ class InputCandidate:
             return res
         if isinstance(dynamic_shapes, (torch.export.Dim, torch.export.dynamic_shapes._DimHint)):
             # weird case where one input is annotated with a single torch.export.Dim.
-            return [dynamic_shapes]
+            return [dynamic_shapes]  # type: ignore
         raise TypeError(f"Unexpected type {type(dynamic_shapes)} in {dynamic_shapes=}.")
 
     def needs_backed_size_oblivious(self, dynamic_shapes: Any) -> bool:
