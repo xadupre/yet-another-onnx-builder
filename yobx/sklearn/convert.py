@@ -1,7 +1,9 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from onnx import ModelProto
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_is_fitted
 from .. import DEFAULT_TARGET_OPSET
+from ..container import ExtendedModelContainer
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
 from .register import get_sklearn_converter
@@ -27,7 +29,9 @@ def to_onnx(
     verbose: int = 0,
     builder_cls: Union[type, Callable] = GraphBuilder,
     extra_converters: Optional[Dict[type, Callable]] = None,
-):
+    large_model: bool = False,
+    external_threshold: int = 1024,
+) -> Union[ModelProto, ExtendedModelContainer]:
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
     By default, the first dimension is considered as dynamic,
@@ -50,7 +54,14 @@ def to_onnx(
     :param extra_converters: optional mapping from estimator type to converter
         function; entries here take priority over the built-in converters and
         allow converting custom estimators that are not natively supported
-    :return: onnx model
+    :param large_model: if True returns a
+        :class:`onnx.model_container.ModelContainer`, which lets the user
+        decide later whether weights should be embedded in the model or saved
+        as external data
+    :param external_threshold: if ``large_model`` is True, every tensor whose
+        element count exceeds this threshold is stored as external data
+    :return: onnx model or :class:`onnx.model_container.ModelContainer`
+        when *large_model* is True
     """
     check_is_fitted(
         estimator,
@@ -103,4 +114,4 @@ def to_onnx(
 
     for name in output_names:
         g.make_tensor_output(name, indexed=False, allow_untyped_output=True)
-    return g.to_onnx()
+    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
