@@ -185,17 +185,21 @@ def string_type(
         except ImportError:
             _has_torch = False
 
-        if _has_torch and all(isinstance(k, int) for k in obj) and all(
-            isinstance(
-                v,
-                (
-                    str,
-                    _torch.export.dynamic_shapes._Dim,
-                    _torch.export.dynamic_shapes._DerivedDim,
-                    _torch.export.dynamic_shapes._DimHint,
-                ),
+        if (
+            _has_torch
+            and all(isinstance(k, int) for k in obj)
+            and all(
+                isinstance(
+                    v,
+                    (
+                        str,
+                        _torch.export.dynamic_shapes._Dim,
+                        _torch.export.dynamic_shapes._DerivedDim,
+                        _torch.export.dynamic_shapes._DimHint,
+                    ),
+                )
+                for v in obj.values()
             )
-            for v in obj.values()
         ):
             # This is dynamic shapes
             rows = []

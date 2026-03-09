@@ -3544,6 +3544,7 @@ class TestOnnxExportAten(ExtTestCase):
                 got = sess.run(None, {"x": inputs[0].detach().numpy()})
                 self.assertEqualArray(expected, got[0])
 
+    @requires_transformers("5.0")
     def test_aten_grouped_mm_no_offset(self):
         import torch
 
