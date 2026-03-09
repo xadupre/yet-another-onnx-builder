@@ -16,7 +16,8 @@ _TYPENAME = dict(
 )
 
 
-def onnx_dtype_to_torch_dtype(itype: int) -> torch.dtype:
+# keeps quotes, pytest is not happy otherwise
+def onnx_dtype_to_torch_dtype(itype: int) -> "torch.dtype":
     """
     Converts an onnx type into a torch dtype.
 
@@ -58,7 +59,7 @@ def onnx_dtype_to_torch_dtype(itype: int) -> torch.dtype:
     )
 
 
-def torch_dtype_to_onnx_dtype(to: torch.dtype) -> int:
+def torch_dtype_to_onnx_dtype(to: "torch.dtype") -> int:
     """
     Converts a torch dtype into a onnx element type.
 
@@ -108,7 +109,7 @@ def torch_dtype_to_onnx_dtype(to: torch.dtype) -> int:
     raise NotImplementedError(f"Unable to convert torch dtype {to!r} ({type(to)}) to onnx dtype.")
 
 
-def to_numpy(tensor: torch.Tensor) -> np.ndarray:
+def to_numpy(tensor: "torch.Tensor") -> np.ndarray:
     """Converts a :class:`torch.Tensor` to :class:`numpy.ndarray`."""
     try:
         return tensor.detach().cpu().numpy()
@@ -182,7 +183,7 @@ def torch_deepcopy(value: Any) -> Any:
     )
 
 
-def to_tensor(tensor: onnx.TensorProto, base_dir: str = "") -> torch.Tensor:
+def to_tensor(tensor: onnx.TensorProto, base_dir: str = "") -> "torch.Tensor":
     """
     Converts a TensorProto to a torch.Tensor.
 

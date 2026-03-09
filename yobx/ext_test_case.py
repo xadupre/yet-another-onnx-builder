@@ -22,6 +22,19 @@ from numpy.testing import assert_allclose
 BOOLEAN_VALUES = (1, "1", True, "True", "true", "TRUE")
 
 
+def _msg(msg: Union[Callable[[], str], str], add_bracket: bool = True) -> str:
+    if add_bracket:
+        m = _msg(msg, add_bracket=False)
+        if m:
+            if "\n" in m:
+                return f"\n----\n{m}\n---\n"
+            return f" ({m})"
+        return ""
+    if callable(msg):
+        return msg()
+    return msg or ""
+
+
 def is_windows() -> bool:
     return sys.platform == "win32"
 
@@ -34,7 +47,7 @@ def is_linux() -> bool:
     return sys.platform == "linux"
 
 
-def skipif_ci_windows(msg) -> Callable:
+def skipif_ci_windows(msg: str) -> Callable:
     """Skips a unit test if it runs on :epkg:`azure pipeline` on :epkg:`Windows`."""
     if is_windows():
         msg = f"Test does not work on azure pipeline (Windows). {msg}"
@@ -42,7 +55,7 @@ def skipif_ci_windows(msg) -> Callable:
     return lambda x: x
 
 
-def skipif_ci_linux(msg) -> Callable:
+def skipif_ci_linux(msg: str) -> Callable:
     """Skips a unit test if it runs on :epkg:`azure pipeline` on :epkg:`Linux`."""
     if is_linux():
         msg = f"Takes too long (Linux). {msg}"
@@ -50,7 +63,7 @@ def skipif_ci_linux(msg) -> Callable:
     return lambda x: x
 
 
-def skipif_ci_apple(msg) -> Callable:
+def skipif_ci_apple(msg: str) -> Callable:
     """Skips a unit test if it runs on :epkg:`azure pipeline` on :epkg:`Windows`."""
     if is_apple():
         msg = f"Test does not work on azure pipeline (Apple). {msg}"
@@ -167,15 +180,15 @@ def hide_stdout(f: Optional[Callable] = None) -> Callable:
     return wrapper
 
 
-def long_test(msg: str = "") -> Callable:
+def long_test(msg: Optional[Union[Callable[[], str], str]] = None) -> Callable:
     """Skips a unit test if it runs on :epkg:`azure pipeline` on :epkg:`Windows`."""
     if os.environ.get("LONGTEST", "0") in ("0", 0, False, "False", "false"):
-        msg = f"Skipped (set LONGTEST=1 to run it. {msg}"
+        msg = f"Skipped (set LONGTEST=1 to run it. {_msg(msg)}"
         return unittest.skip(msg)
     return lambda x: x
 
 
-def never_test(msg: str = "") -> Callable:
+def never_test(msg: Optional[Union[Callable[[], str], str]] = None) -> Callable:
     """Skips a unit test."""
     if os.environ.get("NEVERTEST", "0") in ("0", 0, False, "False", "false"):
         msg = f"Skipped (set NEVERTEST=1 to run it. {msg}"
@@ -406,12 +419,12 @@ def requires_python(version: Tuple[int, ...], msg: str = ""):
     return lambda x: x
 
 
-def requires_cuda(msg: str = "", version: str = "", memory: int = 0):
+def requires_cuda(version: str = "", msg: str = "", memory: int = 0):
     """
     Skips a test if cuda is not available.
 
-    :param msg: to overwrite the message
     :param version: minimum version
+    :param msg: to overwrite the message
     :param memory: minimum number of Gb to run the test
     """
     if not has_torch():
@@ -503,7 +516,7 @@ def has_torch(version: str = "") -> bool:
     return pv.Version(torch.__version__) >= pv.Version(version)
 
 
-def has_transformers(version: str) -> bool:
+def has_transformers(version: str = "") -> bool:
     "Returns True if transformers version is higher."
     import packaging.version as pv
 
@@ -512,7 +525,10 @@ def has_transformers(version: str) -> bool:
         import transformers
     except (ImportError, AttributeError):
         return False
-
+    if not hasattr(transformers, "__version__"):
+        return False
+    if not version:
+        return True
     return pv.Version(transformers.__version__) >= pv.Version(version)
 
 
@@ -642,7 +658,9 @@ def requires_numpy(version: str, msg: str = "") -> Callable:
 
 
 def requires_transformers(
-    version: str, msg: str = "", or_older_than: Optional[str] = None
+    version: str,
+    msg: str = "",
+    or_older_than: Optional[str] = None,
 ) -> Callable:
     """Skips a unit test if :epkg:`transformers` is not recent enough."""
     if not has_torch():
@@ -671,7 +689,9 @@ def requires_transformers(
 
 
 def requires_diffusers(
-    version: str, msg: str = "", or_older_than: Optional[str] = None
+    version: str,
+    msg: str = "",
+    or_older_than: Optional[str] = None,
 ) -> Callable:
     """Skips a unit test if :epkg:`transformers` is not recent enough."""
 
@@ -811,7 +831,7 @@ def requires_onnxruntime(version: str, msg: str = "") -> Callable:
     return lambda x: x
 
 
-def has_onnxruntime(version: str, msg: str = "") -> Callable:
+def has_onnxruntime(version: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not recent enough."""
     import packaging.version as pv
     import onnxruntime
@@ -820,8 +840,7 @@ def has_onnxruntime(version: str, msg: str = "") -> Callable:
         # development version
         return True
 
-    if pv.Version(onnxruntime.__version__) < pv.Version(version):
-        msg = f"onnxruntime version {onnxruntime.__version__} < {version}: {msg}"
+    if version and pv.Version(onnxruntime.__version__) < pv.Version(version):
         return False
     return True
 
@@ -859,7 +878,9 @@ def has_onnxruntime_genai():
 
 
 def requires_onnxruntime_training(
-    push_back_batch: bool = False, ortmodule: bool = False, msg: str = ""
+    push_back_batch: bool = False,
+    ortmodule: bool = False,
+    msg: str = "",
 ) -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not onnxruntime_training."""
     try:
@@ -993,7 +1014,7 @@ class ExtTestCase(unittest.TestCase):
 
     @classmethod
     def to_onnx(self, *args, **kwargs) -> "ModelProto":  # noqa: F821
-        from yobx.torch_interpreter import to_onnx
+        from yobx.torch.interpreter import to_onnx
 
         return to_onnx(*args, **kwargs)
 
@@ -1047,40 +1068,66 @@ class ExtTestCase(unittest.TestCase):
             f.write(text)
         return fullname
 
-    def assertExists(self, name):
+    def assertExists(self, name, msg: Optional[Union[Callable[[], str], str]] = None):
         """Checks the existing of a file."""
         if not os.path.exists(name):
-            raise AssertionError(f"File or folder {name!r} does not exists.")
+            raise AssertionError(f"File or folder {name!r} does not exists{_msg(msg)}.")
 
-    def assertGreaterOrEqual(self, a, b, msg=None):
+    def assertGreater(self, a, b, msg: Optional[Union[Callable[[], str], str]] = None):
+        """In the name"""
+        if a <= b:
+            raise AssertionError(f"{a} <= {b}, a not strictly greater than b{_msg(msg)}")
+
+    def assertGreaterOrEqual(self, a, b, msg: Optional[Union[Callable[[], str], str]] = None):
         """In the name"""
         if a < b:
-            return AssertionError(f"{a} < {b}, a not greater or equal than b\n{msg or ''}")
+            raise AssertionError(f"{a} < {b}, a not greater or equal than b{_msg(msg)}")
 
-    def assertInOr(self, tofind: Tuple[str, ...], text: str, msg: str = ""):
+    def assertLess(self, a, b, msg: Optional[Union[Callable[[], str], str]] = None):
+        """In the name"""
+        if a >= b:
+            raise AssertionError(f"{a} >= {b}, a not strictly less than b{_msg(msg)}")
+
+    def assertLessOrEqual(self, a, b, msg: Optional[Union[Callable[[], str], str]] = None):
+        """In the name"""
+        if a > b:
+            raise AssertionError(f"{a} > {b}, a not less or equal than b{_msg(msg)}")
+
+    def assertInOr(
+        self,
+        tofind: Tuple[str, ...],
+        text: str,
+        msg: Optional[Union[Callable[[], str], str]] = None,
+    ):
         for tof in tofind:
             if tof in text:
                 return
         raise AssertionError(
-            msg or f"Unable to find one string in the list {tofind!r} in\n--\n{text}"
+            f"Unable to find one string in the list {tofind!r} in {text!r}{_msg(msg)}"
         )
 
-    def assertIn(self, tofind: str, text: str, msg: str = ""):
+    def assertIn(
+        self, tofind: str, text: str, msg: Optional[Union[Callable[[], str], str]] = None
+    ):
         if tofind in text:
             return
         raise AssertionError(
-            msg or f"Unable to find the list of strings {tofind!r} in\n--\n{text}"
+            f"Unable to find the list of strings {tofind!r} in {text!r}{_msg(msg)}"
         )
 
-    def assertHasAttr(self, obj: Any, name: str):
-        assert hasattr(obj, name), f"Unable to find attribute {name!r} in object type {type(obj)}"
+    def assertHasAttr(
+        self, obj: Any, name: str, msg: Optional[Union[Callable[[], str], str]] = None
+    ):
+        assert hasattr(
+            obj, name
+        ), f"Unable to find attribute {name!r} in object type {type(obj)}{_msg(msg)}"
 
-    def assertSetContained(self, set1, set2):
+    def assertSetContained(self, set1, set2, msg: Optional[Union[Callable[[], str], str]] = None):
         "Checks that ``set1`` is contained in ``set2``."
         set1 = set(set1)
         set2 = set(set2)
         if set1 & set2 != set1:
-            raise AssertionError(f"Set {set2} does not contain set {set1}.")
+            raise AssertionError(f"Set {set2} does not contain set {set1}{_msg(msg)}")
 
     def assertEqualArrays(
         self,
@@ -1088,12 +1135,12 @@ class ExtTestCase(unittest.TestCase):
         value: Sequence[numpy.ndarray],
         atol: float = 0,
         rtol: float = 0,
-        msg: Optional[str] = None,
+        msg: Optional[Union[Callable[[], str], str]] = None,
     ):
         """In the name"""
-        self.assertEqual(len(expected), len(value))
+        self.assertEqual(len(expected), len(value), msg=msg)
         for a, b in zip(expected, value):
-            self.assertEqualArray(a, b, atol=atol, rtol=rtol)
+            self.assertEqualArray(a, b, atol=atol, rtol=rtol, msg=msg)
 
     def to_numpy(self, tensor):
         """Converts a :class:`torch.Tensor` to :class:`numpy.ndarray`."""
@@ -1116,22 +1163,12 @@ class ExtTestCase(unittest.TestCase):
         value: Any,
         atol: float = 0,
         rtol: float = 0,
-        msg: Optional[str] = None,
+        msg: Optional[Union[Callable[[], str], str]] = None,
     ):
         """In the name"""
         if hasattr(expected, "detach") and hasattr(value, "detach"):
-            if msg:
-                try:
-                    self.assertEqual(expected.dtype, value.dtype)
-                except AssertionError as e:
-                    raise AssertionError(msg) from e
-                try:
-                    self.assertEqual(expected.shape, value.shape)
-                except AssertionError as e:
-                    raise AssertionError(msg) from e
-            else:
-                self.assertEqual(expected.dtype, value.dtype)
-                self.assertEqual(expected.shape, value.shape)
+            self.assertEqual(expected.dtype, value.dtype, msg=msg)
+            self.assertEqual(expected.shape, value.shape, msg=msg)
 
             import torch
 
@@ -1144,6 +1181,7 @@ class ExtTestCase(unittest.TestCase):
                     f"{msg}\n{e}" if msg else str(e),
                     f"expected max value={expected_max}",
                     f"expected computed value={expected_value}",
+                    _msg(msg, False),
                 ]
                 raise AssertionError("\n".join(rows))  # noqa: B904
             return
@@ -1152,18 +1190,8 @@ class ExtTestCase(unittest.TestCase):
             expected = self.to_numpy(expected.detach().cpu())
         if hasattr(value, "detach"):
             value = self.to_numpy(value.detach().cpu())
-        if msg:
-            try:
-                self.assertEqual(expected.dtype, value.dtype)
-            except AssertionError as e:
-                raise AssertionError(msg) from e
-            try:
-                self.assertEqual(expected.shape, value.shape)
-            except AssertionError as e:
-                raise AssertionError(msg) from e
-        else:
-            self.assertEqual(expected.dtype, value.dtype)
-            self.assertEqual(expected.shape, value.shape)
+        self.assertEqual(expected.dtype, value.dtype, msg=msg)
+        self.assertEqual(expected.shape, value.shape, msg=msg)
 
         try:
             assert_allclose(desired=expected, actual=value, atol=atol, rtol=rtol)
@@ -1177,37 +1205,50 @@ class ExtTestCase(unittest.TestCase):
                 f"expected max value={expected_max}",
                 f"expected computed value={expected_value}\n",
                 f"ratio={tte / ttv}\ndiff={tte - ttv}",
+                _msg(msg, False),
             ]
             raise AssertionError("\n".join(rows))  # noqa: B904
 
-    def assertEqualDataFrame(self, d1, d2, **kwargs):
+    def assertEqualDataFrame(
+        self, d1, d2, msg: Optional[Union[Callable[[], str], str]] = None, **kwargs
+    ):
         """
         Checks that two dataframes are equal.
         Calls :func:`pandas.testing.assert_frame_equal`.
         """
         from pandas.testing import assert_frame_equal
 
-        assert_frame_equal(d1, d2, **kwargs)
+        if msg:
+            try:
+                assert_frame_equal(d1, d2, **kwargs)
+            except AssertionError as e:
+                raise AssertionError(_msg(msg, False)) from e
+        else:
+            assert_frame_equal(d1, d2, **kwargs)
 
-    def assertEqualTrue(self, value: Any, msg: str = ""):
+    def assertEqualTrue(self, value: Any, msg: Optional[Union[Callable[[], str], str]] = None):
         if value is True:
             return
-        raise AssertionError(msg or f"value is not True: {value!r}")
+        raise AssertionError(f"value is not True: {value!r}{_msg(msg)}")
 
-    def assertEqual(self, expected: Any, value: Any, msg: str = ""):
+    def assertEqual(
+        self, expected: Any, value: Any, msg: Optional[Union[Callable[[], str], str]] = None
+    ):
         """Overwrites the error message to get a more explicit message about what is what."""
-        if msg:
-            super().assertEqual(expected, value, msg)
-        else:
-            try:
-                super().assertEqual(expected, value)
-            except AssertionError as e:
-                raise AssertionError(  # noqa: B904
-                    f"expected is {expected!r}, value is {value!r}\n{e}"
-                )
+        try:
+            super().assertEqual(expected, value)
+        except AssertionError as e:
+            raise AssertionError(  # noqa: B904
+                f"expected is {expected!r}, value is {value!r}({_msg(msg)}\n{e}"
+            )
 
     def assertEqualAny(
-        self, expected: Any, value: Any, atol: float = 0, rtol: float = 0, msg: str = ""
+        self,
+        expected: Any,
+        value: Any,
+        atol: float = 0,
+        rtol: float = 0,
+        msg: Optional[Union[Callable[[], str], str]] = None,
     ):
         if isinstance(expected, (int, float, str)):
             self.assertEqual(expected, value, msg=msg)
@@ -1254,7 +1295,12 @@ class ExtTestCase(unittest.TestCase):
             )
 
     def assertEqualArrayAny(
-        self, expected: Any, value: Any, atol: float = 0, rtol: float = 0, msg: str = ""
+        self,
+        expected: Any,
+        value: Any,
+        atol: float = 0,
+        rtol: float = 0,
+        msg: Optional[Union[Callable[[], str], str]] = None,
     ):
         if isinstance(expected, (tuple, list, dict)):
             self.assertIsInstance(value, type(expected), msg=msg)
@@ -1300,13 +1346,14 @@ class ExtTestCase(unittest.TestCase):
         value: numpy.ndarray,
         atol: float = 0,
         rtol: float = 0,
+        msg: Optional[Union[Callable[[], str], str]] = None,
     ):
         """In the name"""
         if not isinstance(expected, numpy.ndarray):
             expected = numpy.array(expected)
         if not isinstance(value, numpy.ndarray):
             value = numpy.array(value).astype(expected.dtype)
-        self.assertEqualArray(expected, value, atol=atol, rtol=rtol)
+        self.assertEqualArray(expected, value, atol=atol, rtol=rtol, msg=msg)
 
     def check_ort(
         self, onx: "onnx.ModelProto"  # noqa: F821
@@ -1330,43 +1377,55 @@ class ExtTestCase(unittest.TestCase):
     ) -> "onnxruntime.InferenceSession":  # noqa: F821
         return self._check_with_ort(onx, cpu=cpu)
 
-    def assertRaise(self, fct: Callable, exc_type: type[Exception], msg: Optional[str] = None):
+    def assertRaise(
+        self,
+        fct: Callable,
+        exc_type: type[Exception],
+        look_for: str = "",
+        msg: Optional[Union[Callable[[], str], str]] = None,
+    ):
         """In the name"""
         try:
             fct()
         except exc_type as e:
             if not isinstance(e, exc_type):
-                raise AssertionError(f"Unexpected exception {type(e)!r}.")  # noqa: B904
-            if msg is not None and msg not in str(e):
-                raise AssertionError(f"Unexpected exception message {e!r}.")  # noqa: B904
+                raise AssertionError(f"Unexpected exception {type(e)!r}{_msg(msg)}")  # noqa: B904
+            if look_for and look_for not in str(e):
+                raise AssertionError(  # noqa: B904
+                    f"Unexpected exception message {e!r}{_msg(msg)}"
+                )
             return
         raise AssertionError("No exception was raised.")  # noqa: B904
 
-    def assertEmpty(self, value: Any):
+    def assertEmpty(self, value: Any, msg: Optional[Union[Callable[[], str], str]] = None):
         """In the name"""
         if value is None:
             return
         if not value:
             return
-        raise AssertionError(f"value is not empty: {value!r}.")
+        raise AssertionError(f"value is not empty: {value!r}{_msg(msg)}")
 
-    def assertNotEmpty(self, value: Any):
+    def assertNotEmpty(self, value: Any, msg: Optional[Union[Callable[[], str], str]] = None):
         """In the name"""
         if value is None:
             raise AssertionError(f"value is empty: {value!r}.")
         if isinstance(value, (list, dict, tuple, set)):
             if not value:
-                raise AssertionError(f"value is empty: {value!r}.")
+                raise AssertionError(f"value is empty: {value!r}{_msg(msg)}")
 
-    def assertStartsWith(self, prefix: str, full: str):
+    def assertStartsWith(
+        self, prefix: str, full: str, msg: Optional[Union[Callable[[], str], str]] = None
+    ):
         """In the name"""
         if not full.startswith(prefix):
-            raise AssertionError(f"prefix={prefix!r} does not start string  {full!r}.")
+            raise AssertionError(f"prefix={prefix!r} does not start string {full!r}{_msg(msg)}")
 
-    def assertEndsWith(self, suffix: str, full: str):
+    def assertEndsWith(
+        self, suffix: str, full: str, msg: Optional[Union[Callable[[], str], str]] = None
+    ):
         """In the name"""
         if not full.endswith(suffix):
-            raise AssertionError(f"suffix={suffix!r} does not end string  {full!r}.")
+            raise AssertionError(f"suffix={suffix!r} does not end string {full!r}{_msg(msg)}")
 
     def capture(self, fct: Callable) -> Tuple[Any, str, str]:
         """
@@ -1388,7 +1447,10 @@ class ExtTestCase(unittest.TestCase):
         return res, sout.getvalue(), serr.getvalue()
 
     def tryCall(
-        self, fct: Callable, msg: Optional[str] = None, none_if: Optional[str] = None
+        self,
+        fct: Callable,
+        msg: Optional[Union[Callable[[], str], str]] = None,
+        none_if: Optional[str] = None,
     ) -> Optional[Any]:
         """
         Calls the function, catch any error.
@@ -1448,3 +1510,34 @@ class ExtTestCase(unittest.TestCase):
         from .helpers import max_diff
 
         return max_diff(*args, **kwargs)
+
+    def assert_conversion_with_ort_on_cpu(
+        self,
+        onx: "onnx.ModelProto",  # noqa: F821
+        expected: Tuple["torch.Tensor", ...],  # noqa: F821
+        inputs: Tuple["torch.Tensor", ...],  # noqa: F821
+        atol: float = 0,
+        rtol: float = 0,
+        msg: Optional[Union[Callable[[], str], str]] = None,
+        use_python: bool = False,
+    ):
+        import onnxruntime
+        from .reference import ExtendedReferenceEvaluator
+
+        if use_python:
+            sess = ExtendedReferenceEvaluator(onx, verbose=10)
+            feeds = dict(zip(sess.input_names, [x.detach().numpy() for x in inputs]))
+        else:
+            sess = onnxruntime.InferenceSession(
+                onx.SerializeToString(), providers=["CPUExecutionProvider"]
+            )
+            feeds = dict(
+                zip([i.name for i in sess.get_inputs()], [x.detach().numpy() for x in inputs])
+            )
+        got = sess.run(None, feeds)
+        if len(got) == 1 and hasattr(expected, "shape"):
+            self.assertEqualArray(expected, got[0], atol=atol, rtol=rtol, msg=msg)
+        else:
+            self.assertEqual(len(expected), len(got))
+            for e, g in zip(expected, got):
+                self.assertEqualArray(e, g, atol=atol, rtol=rtol, msg=msg)

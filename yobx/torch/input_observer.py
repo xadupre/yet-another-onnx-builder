@@ -143,20 +143,71 @@ class InputCandidate:
         self.aligned_spec: pytree.PyTreeSpec | None = None
         self.aligned_flat_list: list[torch.Tensor | None] | None = None
 
-    def remove_inputs(self, input_names: Sequence[str | int]):
-        """Removes inputs."""
+    @classmethod
+    def _flatten_nested_object(cls, dynamic_shapes: Any) -> list[dict[int, int | str | None]]:
+        if dynamic_shapes is None or (
+            isinstance(dynamic_shapes, dict) and all(isinstance(k, int) for k in dynamic_shapes)
+        ):
+            return [dynamic_shapes]  # type: ignore
+        if isinstance(dynamic_shapes, (tuple, list)):
+            res = []
+            for v in dynamic_shapes:
+                res.extend(cls._flatten_nested_object(v))
+            return res
+        if isinstance(dynamic_shapes, dict):
+            res = []
+            for v in dynamic_shapes.values():
+                res.extend(cls._flatten_nested_object(v))
+            return res
+        if isinstance(dynamic_shapes, (torch.export.Dim, torch.export.dynamic_shapes._DimHint)):
+            # weird case where one input is annotated with a single torch.export.Dim.
+            return [dynamic_shapes]  # type: ignore
+        raise TypeError(f"Unexpected type {type(dynamic_shapes)} in {dynamic_shapes=}.")
+
+    def needs_backed_size_oblivious(self, dynamic_shapes: Any) -> bool:
+        """Tells if ``torch.fx.experimental._config.patch(backed_size_oblivious=True):``
+        should be use (a dynamic dimension is 0 or 1 in one of the tensor).
+        """
+        if not dynamic_shapes:
+            return False
+        flat_shapes = self._flatten_nested_object(dynamic_shapes)
+        if len(flat_shapes) > len(self.flat_list):
+            raise RuntimeError(
+                f"The flatten dynamic shapes has not the same size ({len(flat_shapes)})"
+                f"than the flat list of tensors ({len(self.flat_list)})."
+            )
+        for shape, tensor in zip(flat_shapes, self.flat_list):
+            if not isinstance(tensor, torch.Tensor):
+                continue
+            for k, v in shape.items():
+                if k < 0 or k >= tensor.ndim:
+                    raise RuntimeError(
+                        f"Dimension {k} is outside the boundary "
+                        f"for a tensor of rank {tensor.ndim}."
+                    )
+                if isinstance(v, str) or v in (torch.export.Dim.AUTO, torch.export.Dim.DYNAMIC):
+                    if tensor.shape[k] in (0, 1):
+                        return True
+        return False
+
+    def remove_inputs(self, input_names: Sequence[str | int]) -> int:
+        """Removes inputs. Returns 0 if nothing was removed other the number of removal."""
         # Work on a mutable copy of positional arguments.
         args_list = list(self.args)
 
+        res = 0
         for name_or_pos in sorted(input_names, reverse=True):
             if isinstance(name_or_pos, int):
                 idx = name_or_pos
                 if 0 <= idx < len(args_list):
+                    res += 1
                     del args_list[idx]
             else:
                 if name_or_pos in self.kwargs:
+                    res += 1
                     del self.kwargs[name_or_pos]
                 elif name_or_pos in self.cst_kwargs:
+                    res += 1
                     del self.cst_kwargs[name_or_pos]
 
         # Update stored positional arguments.
@@ -167,6 +218,7 @@ class InputCandidate:
         self._n_tensors_for_args_kwargs = None
         self.aligned_spec = None
         self.aligned_flat_list = None
+        return res
 
     def __str__(self) -> str:
         return (
@@ -521,10 +573,16 @@ class InputObserverInfo:
 
         if len(self._best_candidate.flat_list) != len(self._best_candidate.aligned_flat_list):
             raise NotImplementedError(
-                "infer_dynamic_shapes is not implemented "
-                "when the best candidate is not 'aligned'. "
-                "This happens when there is no stored set of inputs where "
-                "all optional inputs showing in other sets are defined."
+                f"infer_dynamic_shapes is not implemented "
+                f"when the best candidate is not 'aligned'. "
+                f"This happens when there is no stored set of inputs where "
+                f"all optional inputs showing in other sets are defined. "
+                f"You need to register the flattening function to infer the argument: "
+                f"with register_flattening_functions(patch_transformers=True): ..."
+                f"\nself._best_candidate.flat_list="
+                f"{string_type(self._best_candidate.flat_list, with_shape=True)}"
+                f"\nself._best_candidate.aligned_flat_list="
+                f"{string_type(self._best_candidate.aligned_flat_list, with_shape=True)}"
             )
 
         if len({inputs.n_aligned_tensors for inputs in self.inputs}) != 1:
@@ -834,16 +892,19 @@ class InputObserverInfo:
             )
         return {**new_kwargs, self.kwargs_name: keywords}
 
-    def remove_inputs(self, input_names: Sequence[str | int]):
-        """Lets the users drops inputs."""
+    def remove_inputs(self, input_names: Sequence[str | int]) -> int:
+        """Lets the users drops inputs. Returns the number of removals."""
         if self.args_name_and_position is not None:
             args_name, args_pos = self.args_name_and_position
             if args_name in input_names or args_pos in input_names:
                 raise ValueError(f"Cannot remove variadic {self.args_name_and_position}")
         if self.kwargs_name is not None and self.kwargs_name in input_names:
             raise ValueError(f"Cannot remove variadic {self.kwargs_name}")
+        r = 0
         for candidate in self.inputs:
-            candidate.remove_inputs(input_names)
+            r += candidate.remove_inputs(input_names)
+        if not r:
+            raise ValueError(f"No input in all candidates was removed from {input_names=}.")
         if self._best_candidate:
             self._best_candidate.remove_inputs(input_names)
 
@@ -868,6 +929,7 @@ class InputObserverInfo:
         self.signature_names = [
             name for name in self.signature_names if name not in input_names_str
         ]
+        return r
 
 
 class InputObserver:
@@ -955,9 +1017,8 @@ class InputObserver:
         with observer(pipe.model):
             pipe(text=messages, max_new_tokens=4)
 
-    Examples can be found in :ref:`l-plot-tiny-llm-export-input-observer`,
-    :ref:`l-plot-whisper-tiny-export-input-observer`,
-    :ref:`l-plot-gemma3-tiny-export-input-observer`.
+    Examples can be found in :ref:`l-plot-input-observer-transformers`,
+    :ref:`l-plot-input-observer-tiny-llm`.
     """
 
     def __init__(self, value_if_missing: dict[str | int, Any] | None = None):

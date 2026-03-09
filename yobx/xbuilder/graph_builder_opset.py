@@ -303,6 +303,8 @@ class Opset:
                 len(args) >= 3
             ), f"DFTAnyOpset for opset < 20 expects at least 3 arguments, got {len(args)}"
             axes_list = self._iaxes("DFT", args[2])
+            if isinstance(axes_list, int):
+                axes_list = [int(axes_list)]
             if not isinstance(axes_list, (list, tuple)):
                 raise TypeError(
                     f"Unexpected type for axes={type(axes_list)!r}, expected list or tuple."

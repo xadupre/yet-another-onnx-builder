@@ -44,7 +44,7 @@ jobs:
             --ignore=unittests/xoptim/test_torch_untrained_models.py \
             --ignore=unittests/sklearn \
             --ignore=unittests/tensorflow \
-            --ignore=unittests/torch \
+            --ignore=unittests/torch
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

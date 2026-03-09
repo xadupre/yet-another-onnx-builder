@@ -25,12 +25,9 @@ The table below summarizes the mapping:
      - Tests
      - CI Workflows
    * - Core / Builder
-     - ``yobx/xbuilder/``, ``yobx/xoptim/``,
-       ``yobx/xshape/``, ``yobx/container/``,
-       ``yobx/helpers/``, ``yobx/reference/``,
-       ``yobx/translate/``
+     - ``yobx/xbuilder/``, ``yobx/xoptim/``, ``yobx/xshape/``, ``yobx/container/``, ``yobx/helpers/``, ``yobx/reference/``, ``yobx/translate/``
      - ``unittests/`` (excluding library sub-directories)
-       ``core_tests.yml``
+     - ``core_tests.yml``
    * - scikit-learn
      - ``yobx/sklearn/``
      - ``unittests/sklearn/``
@@ -38,7 +35,7 @@ The table below summarizes the mapping:
    * - PyTorch / Transformers
      - ``yobx/torch/``
      - ``unittests/torch/``
-     - ``torch_tests.yml``
+     - ``torch_tests.yml``, ``ci_transformers_dev.yml``, ``ci_transformers_releases.yml``
    * - TensorFlow
      - ``yobx/tensorflow/``
      - ``unittests/tensorflow/``

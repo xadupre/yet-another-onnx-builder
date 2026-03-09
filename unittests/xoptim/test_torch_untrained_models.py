@@ -5,25 +5,22 @@ from yobx.helpers import max_diff
 from yobx.helpers.rt_helper import make_feeds
 from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
 from yobx.torch.tiny_models import get_tiny_model
-from yobx.torch import register_flattening_functions, apply_patches_for_model
+from yobx.torch import register_flattening_functions, apply_patches_for_model, to_onnx
 from yobx.torch.torch_helper import torch_deepcopy
 from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.xbuilder import OptimizationOptions
 
-# from yobx.torch_interpreter import to_onnx
-to_onnx = None
-
 
 class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @hide_stdout()
-    @unittest.skipIf(to_onnx is None, "not implement yet")
+    @unittest.skip("missing patches")
     def test_tiny_llm_to_onnx_24(self):
         import onnxruntime
 
         data = get_tiny_model("arnir0/Tiny-LLM")
-        model, inputs, ds = data.model, data.inputs, data.dynamic_shapes
+        model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
 
-        b1 = data["inputs_batch1"]
+        b1 = data.inputs_batch1
         del inputs["position_ids"]
         del ds["position_ids"]
         del b1["position_ids"]
@@ -34,7 +31,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
         with (
             register_flattening_functions(patch_transformers=True),
-            apply_patches_for_model(patch_transformers=True, model=model),
+            apply_patches_for_model(patch_transformers=True, patch_torch=True, model=model),
         ):
             onx = to_onnx(
                 model,
@@ -112,13 +109,13 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         assert diff["abs"] <= 1e-5, f"diff={diff}"
 
     @hide_stdout()
-    @unittest.skipIf(to_onnx is None, "not implement yet")
+    @unittest.skip("missing patches")
     def test_tiny_llm_to_onnx_ort_22(self):
         import onnxruntime
 
         data = get_tiny_model("arnir0/Tiny-LLM")
-        model, inputs, ds = data.model, data.inputs, data.dynamic_shapes
-        b1 = data["inputs_batch1"]
+        model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
+        b1 = data.inputs_batch1
         filename = self.get_dump_file("test_tiny_llm_to_onnx_ort_22.onnx")
         del inputs["position_ids"]
         del ds["position_ids"]

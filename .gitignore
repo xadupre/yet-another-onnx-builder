@@ -207,6 +207,8 @@ marimo/_lsp/
 __marimo__/
 
 # docs
+plot*.onnx
+plot*.png
 docs/_static/require.js
 docs/_static/viz.js
 docs/auto*

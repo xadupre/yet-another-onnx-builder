@@ -2,6 +2,8 @@ rm dump_test* -rf
 rm onnxruntime_profile*
 rm temp*.onnx
 rm test*.onnx
+rm *.ep
+rm *.ep.graph
 
 if [ "$1" == "--all" ]; then
     rm -rf dist/

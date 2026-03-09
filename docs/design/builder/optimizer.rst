@@ -163,12 +163,11 @@ We consider the following simple model:
 
 .. runpython::
     :showcode:
-    :exception:
 
     import torch
     from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.xbuilder import OptimizationOptions
-    from yobx.torch.interpreter import to_onnx
+    from yobx.torch import to_onnx
 
 
     class MLP(torch.nn.Module):
@@ -614,7 +613,7 @@ This information can be built by running shape inference
 on the onnx models. That's what is done in the previous examples.
 However, the best case is when this information comes from torch.
 
-Function :func:`to_onnx <yobx.torch_interpreter.to_onnx>`
+Function :func:`to_onnx <yobx.torch.interpreter.to_onnx>`
 converts a torch model into ONNX. While doing so, it stores the shape
 information coming from torch. There is no need to run shape inference
 on the onnx model it generates before optimizing it.

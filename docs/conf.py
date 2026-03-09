@@ -11,6 +11,7 @@ release = yobx.__version__
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.coverage",
+    "sphinx.ext.duration",
     "sphinx.ext.githubpages",
     "sphinx.ext.graphviz",
     "sphinx.ext.ifconfig",
@@ -66,13 +67,15 @@ intersphinx_mapping = {
     "onnx": ("https://onnx.ai/onnx/", None),
     "onnxruntime": ("https://onnxruntime.ai/docs/api/python/", None),
     "onnxscript": ("https://microsoft.github.io/onnxscript/", None),
-    "onnx_diagnostic": ("https://sdpython.github.io/doc/onnx-diagnostic/dev/", None),
-    "onnx_extended": ("https://sdpython.github.io/doc/onnx-extended/dev/", None),
     "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", None),
     "python": (f"https://docs.python.org/{sys.version_info.major}", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "sklearn": ("https://scikit-learn.org/stable/", None),
     "skl2onnx": ("https://onnx.ai/sklearn-onnx/", None),
+    "tensorflow": (
+        "https://www.tensorflow.org/api_docs/python",
+        "https://github.com/mr-ubik/tensorflow-intersphinx/raw/master/tf2_py_objects.inv",
+    ),
     "torch": ("https://docs.pytorch.org/docs/stable/", None),
 }
 
@@ -106,10 +109,12 @@ sphinx_gallery_conf = {
     "reset_modules": ("matplotlib", "yobx.doc.reset_torch_transformers"),
 }
 
+substring_to_disable = []
 if int(os.environ.get("UNITTEST_GOING", "0")):
-    sphinx_gallery_conf["ignore_pattern"] = (
-        ".*((tiny_llm)|(dort)|(draft_mode)|(hub_codellama.py)|(whisper)|(optimind)|(export_with_modelbuilder)).*"
-    )
+    substring_to_disable = ["tiny_llm"]
+substring = "|".join(f"({s})" for s in substring_to_disable)
+if substring:
+    sphinx_gallery_conf["ignore_pattern"] = f".*({substring}).*"
 
 epkg_dictionary = {
     "aten functions": "https://pytorch.org/cppdocs/api/namespace_at.html#functions",
@@ -167,6 +172,7 @@ epkg_dictionary = {
     "Supported Operators and Data Types": "https://github.com/microsoft/onnxruntime/blob/main/docs/OperatorKernels.md",
     "sympy": "https://www.sympy.org/en/index.html",
     "Keras": "https://keras.io/",
+    "tensorflow": "https://www.tensorflow.org/",
     "TensorFlow": "https://www.tensorflow.org/",
     "tensorflow-onnx": "https://github.com/onnx/tensorflow-onnx",
     "timm": "https://github.com/huggingface/pytorch-image-models",

@@ -2,6 +2,8 @@ from typing import Any
 import torch
 from .export_options import ExportOptions
 from .flatten import register_flattening_functions
+from .input_observer import InputObserver
+from .interpreter import to_onnx, FunctionOptions, Dispatcher, ForceDispatcher
 from .patch import apply_patches_for_model
 from .tracing import (
     CustomProxy,

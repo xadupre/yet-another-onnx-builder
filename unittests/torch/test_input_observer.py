@@ -10,11 +10,7 @@ from yobx.ext_test_case import (
     ignore_warnings,
 )
 from yobx.torch.input_observer import InputCandidate, InputObserver, _infer_dynamic_dimensions
-from yobx.torch import apply_patches_for_model
-
-# from onnx_diagnostic.export.api import to_onnx
-
-to_onnx = lambda *args, **kwargs: None
+from yobx.torch import apply_patches_for_model, to_onnx
 
 
 class TestInputObserver(ExtTestCase):
@@ -697,7 +693,6 @@ class TestInputObserver(ExtTestCase):
             model,
             observer.infer_arguments(),
             dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
-            exporter="custom",
             filename=proto_name,
         )
         if not os.path.exists(proto_name):
@@ -729,7 +724,6 @@ class TestInputObserver(ExtTestCase):
             model,
             observer.infer_arguments(),
             dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
-            exporter="custom",
             filename=proto_name,
         )
         if not os.path.exists(proto_name):

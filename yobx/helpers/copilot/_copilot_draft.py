@@ -154,6 +154,7 @@ def _build_converter_prompt(estimator_class: type) -> str:
         from sklearn.preprocessing import StandardScaler
         from ...typing import GraphBuilderExtendedProtocol
         from ..register import register_sklearn_converter
+        from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 
         @register_sklearn_converter(StandardScaler)
@@ -189,7 +190,7 @@ def _build_converter_prompt(estimator_class: type) -> str:
             assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
             itype = g.get_type(X)
-            dtype = g.onnx_dtype_to_np_dtype(itype)
+            dtype = tensor_dtype_to_np_dtype(itype)
 
             if getattr(estimator, "with_mean", True):
                 mean = estimator.mean_.astype(dtype)
@@ -224,18 +225,14 @@ def _build_converter_prompt(estimator_class: type) -> str:
         ```
 
         Available GraphBuilder API:
-        - `g.op.Gemm(A, B, C, transA=0, transB=0, ...)` - matrix multiplication
+        - `g.op.Gemm(A, B, C, transA=0, transB=0, ...)`
         - `g.op.Add(X, Y, ...)`, `g.op.Sub(...)`, `g.op.Mul(...)`, `g.op.Div(...)`
-        - `g.op.MatMul(A, B, ...)` - matrix multiplication without bias
-        - `g.op.Relu(X, ...)`, `g.op.Sigmoid(X, ...)`, `g.op.Softmax(X, axis=..., ...)`
-        - `g.op.ArgMax(X, axis=..., keepdims=..., ...)`, `g.op.Cast(X, to=..., ...)`
-        - `g.op.Gather(data, indices, axis=..., ...)`, `g.op.Concat(*inputs, axis=..., ...)`
-        - `g.op.Identity(X, ...)` - no-op / rename
+        - `g.op.Identity(X, ...)`
+        - ...
         - `g.make_node(op_type, inputs, outputs=..., domain=..., ...)` - lower-level API
         - `g.has_type(name)`, `g.get_type(name)`, `g.set_type(name, dtype)`
         - `g.has_shape(name)`, `g.get_shape(name)`, `g.set_shape(name, shape)`
         - `g.has_device(name)`, `g.get_device(name)`, `g.set_device(name, device)`
-        - `g.onnx_dtype_to_np_dtype(itype)` - convert ONNX dtype to numpy dtype
         - `g.unique_name(prefix)` - generate a unique tensor name
 
         Write the complete converter function for `{cls_name}`. Requirements:
