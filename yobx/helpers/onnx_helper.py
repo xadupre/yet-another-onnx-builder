@@ -1565,7 +1565,7 @@ def type_info(itype: int, att: str):
         fi = ml_dtypes.finfo(dtype)
     else:
         dtype = tensor_dtype_to_np_dtype(itype)
-        fi = np.iinfo(dtype)
+        fi = np.iinfo(dtype)  # type: ignore
     if att == "min":
         return fi.min
     if att == "max":

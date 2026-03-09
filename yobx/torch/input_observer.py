@@ -190,20 +190,24 @@ class InputCandidate:
                         return True
         return False
 
-    def remove_inputs(self, input_names: Sequence[str | int]):
-        """Removes inputs."""
+    def remove_inputs(self, input_names: Sequence[str | int]) -> int:
+        """Removes inputs. Returns 0 if nothing was removed other the number of removal."""
         # Work on a mutable copy of positional arguments.
         args_list = list(self.args)
 
+        res = 0
         for name_or_pos in sorted(input_names, reverse=True):
             if isinstance(name_or_pos, int):
                 idx = name_or_pos
                 if 0 <= idx < len(args_list):
+                    res += 1
                     del args_list[idx]
             else:
                 if name_or_pos in self.kwargs:
+                    res += 1
                     del self.kwargs[name_or_pos]
                 elif name_or_pos in self.cst_kwargs:
+                    res += 1
                     del self.cst_kwargs[name_or_pos]
 
         # Update stored positional arguments.
@@ -214,6 +218,7 @@ class InputCandidate:
         self._n_tensors_for_args_kwargs = None
         self.aligned_spec = None
         self.aligned_flat_list = None
+        return res
 
     def __str__(self) -> str:
         return (
@@ -571,7 +576,9 @@ class InputObserverInfo:
                 f"infer_dynamic_shapes is not implemented "
                 f"when the best candidate is not 'aligned'. "
                 f"This happens when there is no stored set of inputs where "
-                f"all optional inputs showing in other sets are defined."
+                f"all optional inputs showing in other sets are defined. "
+                f"You need to register the flattening function to infer the argument: "
+                f"with register_flattening_functions(patch_transformers=True): ..."
                 f"\nself._best_candidate.flat_list="
                 f"{string_type(self._best_candidate.flat_list, with_shape=True)}"
                 f"\nself._best_candidate.aligned_flat_list="
@@ -885,16 +892,19 @@ class InputObserverInfo:
             )
         return {**new_kwargs, self.kwargs_name: keywords}
 
-    def remove_inputs(self, input_names: Sequence[str | int]):
-        """Lets the users drops inputs."""
+    def remove_inputs(self, input_names: Sequence[str | int]) -> int:
+        """Lets the users drops inputs. Returns the number of removals."""
         if self.args_name_and_position is not None:
             args_name, args_pos = self.args_name_and_position
             if args_name in input_names or args_pos in input_names:
                 raise ValueError(f"Cannot remove variadic {self.args_name_and_position}")
         if self.kwargs_name is not None and self.kwargs_name in input_names:
             raise ValueError(f"Cannot remove variadic {self.kwargs_name}")
+        r = 0
         for candidate in self.inputs:
-            candidate.remove_inputs(input_names)
+            r += candidate.remove_inputs(input_names)
+        if not r:
+            raise ValueError(f"No input in all candidates was removed from {input_names=}.")
         if self._best_candidate:
             self._best_candidate.remove_inputs(input_names)
 
@@ -919,6 +929,7 @@ class InputObserverInfo:
         self.signature_names = [
             name for name in self.signature_names if name not in input_names_str
         ]
+        return r
 
 
 class InputObserver:
@@ -1006,9 +1017,8 @@ class InputObserver:
         with observer(pipe.model):
             pipe(text=messages, max_new_tokens=4)
 
-    Examples can be found in :ref:`l-plot-tiny-llm-export-input-observer`,
-    :ref:`l-plot-whisper-tiny-export-input-observer`,
-    :ref:`l-plot-gemma3-tiny-export-input-observer`.
+    Examples can be found in :ref:`l-plot-input-observer-transformers`,
+    :ref:`l-plot-input-observer-tiny-llm`.
     """
 
     def __init__(self, value_if_missing: dict[str | int, Any] | None = None):

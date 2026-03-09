@@ -4,6 +4,7 @@ import onnx
 from sklearn.neural_network import MLPClassifier, MLPRegressor
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
+from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 
 def _apply_activation(g: GraphBuilderExtendedProtocol, x: str, activation: str, name: str) -> str:
@@ -86,7 +87,7 @@ def sklearn_mlp_classifier(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
-    dtype = g.onnx_dtype_to_np_dtype(itype)
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     coefs = estimator.coefs_
     intercepts = estimator.intercepts_
@@ -188,7 +189,7 @@ def sklearn_mlp_regressor(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
-    dtype = g.onnx_dtype_to_np_dtype(itype)
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     coefs = estimator.coefs_
     intercepts = estimator.intercepts_

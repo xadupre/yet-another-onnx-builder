@@ -593,7 +593,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if isinstance(dynamic_shapes, cls.WrapDim):
             return dynamic_shapes
         if isinstance(dynamic_shapes, (tuple, list)):
-            return dynamic_shapes.__class__(
+            return dynamic_shapes.__class__(  # type: ignore
                 cls._pre_process_dynamic_shape(i, unique_names) for i in dynamic_shapes
             )
         if isinstance(dynamic_shapes, dict):

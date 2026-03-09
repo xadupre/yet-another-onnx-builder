@@ -9,11 +9,11 @@ from yobx.ext_test_case import (
     ExtTestCase,
     is_windows,
     ignore_errors,
-    has_transformers,
     has_sklearn,
     has_spox,
-    has_torch,
     has_tensorflow,
+    has_torch,
+    has_transformers,
 )
 
 VERBOSE = 0
