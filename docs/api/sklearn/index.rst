@@ -18,6 +18,7 @@ yobx.sklearn
     pipeline/index
     preprocessing/index
     tree/index
+    xgboost/index
 
 register_sklearn_converters
 +++++++++++++++++++++++++++

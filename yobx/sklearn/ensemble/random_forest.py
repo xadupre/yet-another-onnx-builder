@@ -6,7 +6,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
-from ..tree.decision_tree import _get_ml_opset, _LEAF, _NODE_MODE_LEQ, _get_input_dtype
+from ..tree.decision_tree import _LEAF, _NODE_MODE_LEQ
 
 
 def _extract_forest_attributes_legacy(
@@ -386,7 +386,7 @@ def sklearn_random_forest_classifier(
         estimator, RandomForestClassifier
     ), f"Unexpected type {type(estimator)} for estimator."
 
-    ml_opset = _get_ml_opset(g)
+    ml_opset = g.get_opset("ai.onnx.ml")
     classes = estimator.classes_
     n_classes = len(classes)
     n_estimators = estimator.n_estimators
@@ -404,7 +404,7 @@ def sklearn_random_forest_classifier(
             n_classes,
             n_estimators,
             estimators,
-            dtype=_get_input_dtype(g, X),
+            dtype=g.get_type(X),
         )
 
     # Legacy path: TreeEnsembleClassifier (ai.onnx.ml opset <= 4)
@@ -541,7 +541,7 @@ def sklearn_random_forest_regressor(
         estimator, RandomForestRegressor
     ), f"Unexpected type {type(estimator)} for estimator."
 
-    ml_opset = _get_ml_opset(g)
+    ml_opset = g.get_opset("ai.onnx.ml")
     n_estimators = estimator.n_estimators
     estimators = estimator.estimators_
 

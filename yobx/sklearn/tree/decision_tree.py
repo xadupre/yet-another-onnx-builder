@@ -22,12 +22,6 @@ def _ensure_ml_domain(g: GraphBuilderExtendedProtocol) -> None:
         )
 
 
-def _get_ml_opset(g: GraphBuilderExtendedProtocol) -> int:
-    """Returns the resolved ``ai.onnx.ml`` opset version from the builder."""
-    _ensure_ml_domain(g)
-    return g.get_opset("ai.onnx.ml") if g.has_opset("ai.onnx.ml") else 3
-
-
 def _extract_tree_attributes(tree, n_classes: int, is_classifier: bool):
     """
     Extracts the attributes needed by the legacy ONNX ``TreeEnsembleClassifier``
@@ -325,18 +319,6 @@ def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, dtype
     )
 
 
-def _get_input_dtype(g: GraphBuilderExtendedProtocol, X: str):
-    """Returns the numpy dtype matching the ONNX element type of input tensor *X*.
-
-    Defaults to ``np.float32`` when the type is not yet known.
-    """
-    if g.has_type(X):
-        elem_type = g.get_type(X)
-        if elem_type == onnx.TensorProto.DOUBLE:
-            return np.float64
-    return np.float32
-
-
 @register_sklearn_converter((DecisionTreeClassifier,))
 def sklearn_decision_tree_classifier(
     g: GraphBuilderExtendedProtocol,
@@ -365,7 +347,7 @@ def sklearn_decision_tree_classifier(
         estimator, DecisionTreeClassifier
     ), f"Unexpected type {type(estimator)} for estimator."
 
-    ml_opset = _get_ml_opset(g)
+    ml_opset = g.get_opset("ai.onnx.ml")
     classes = estimator.classes_
     n_classes = len(classes)
     tree = estimator.tree_
@@ -381,7 +363,7 @@ def sklearn_decision_tree_classifier(
             classes,
             n_classes,
             tree,
-            dtype=_get_input_dtype(g, X),
+            dtype=g.get_type(X)
         )
 
     # Legacy path: TreeEnsembleClassifier (ai.onnx.ml opset <= 4)
@@ -520,7 +502,7 @@ def sklearn_decision_tree_regressor(
         estimator, DecisionTreeRegressor
     ), f"Unexpected type {type(estimator)} for estimator."
 
-    ml_opset = _get_ml_opset(g)
+    ml_opset = g.get_opset("ai.onnx.ml")
     tree = estimator.tree_
 
     if ml_opset >= 5:

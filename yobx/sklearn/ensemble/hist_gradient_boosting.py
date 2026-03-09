@@ -29,7 +29,7 @@ from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostin
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
-from ..tree.decision_tree import _get_ml_opset, _get_input_dtype, _NODE_MODE_LEQ
+from ..tree.decision_tree import _NODE_MODE_LEQ
 
 _HGB_TYPES = (HistGradientBoostingClassifier, HistGradientBoostingRegressor)
 
@@ -421,7 +421,7 @@ def sklearn_hgb_regressor(
     need_cast = itype == onnx.TensorProto.DOUBLE
     tree_outputs = [f"{outputs[0]}_tree_out"] if need_cast else outputs
 
-    ml_opset = _get_ml_opset(g)
+    ml_opset = g.get_opset("ai.onnx.ml")
     if ml_opset >= 5:
         raw = _build_hgb_raw_output_v5(
             g,
@@ -432,7 +432,7 @@ def sklearn_hgb_regressor(
             n_targets,
             baseline,
             tree_outputs,
-            dtype=_get_input_dtype(g, X),
+            dtype=g.get_type(X),
         )
     else:
         raw = _build_hgb_raw_output_legacy(
@@ -504,8 +504,9 @@ def sklearn_hgb_classifier(
 
     baseline = estimator._baseline_prediction  # shape (1, n_trees_per_iteration_)
 
-    ml_opset = _get_ml_opset(g)
-    dtype = _get_input_dtype(g, X)
+    ml_opset = g.get_opset("ai.onnx.ml")
+    itype = g.get_type(X)
+    dtype = tensor_dtype_to_np_dtype(itype)
     raw_name = g.unique_name(f"{name}_raw")
 
     if ml_opset >= 5:
