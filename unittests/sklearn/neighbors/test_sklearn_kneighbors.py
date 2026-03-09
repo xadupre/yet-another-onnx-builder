@@ -188,6 +188,54 @@ class TestKNeighborsClassifier(ExtTestCase):
         expected_labels = clf.predict(X).astype(np.int64)
         self.assertEqualArray(expected_labels, ort_results[0])
 
+    def test_knn_classifier_metrics(self):
+        """Test various distance metrics for the classifier."""
+        from sklearn.neighbors import KNeighborsClassifier
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(30)
+        X = rng.standard_normal((60, 4)).astype(np.float32)
+        y = (X[:, 0] > 0).astype(np.int64)
+
+        metrics = [
+            ("euclidean", {}),
+            ("cosine", {}),
+            ("manhattan", {}),
+            ("chebyshev", {}),
+            ("minkowski", {"p": 3}),
+        ]
+        for metric, kwargs in metrics:
+            with self.subTest(metric=metric, **kwargs):
+                clf = KNeighborsClassifier(n_neighbors=5, metric=metric, **kwargs)
+                clf.fit(X, y)
+
+                onx = to_onnx(clf, (X,))
+
+                sess = self.check_ort(onx)
+                ort_results = sess.run(None, {"X": X})
+                expected_labels = clf.predict(X).astype(np.int64)
+                self.assertEqualArray(expected_labels, ort_results[0])
+
+    def test_knn_classifier_metrics_minkowski_p1_p2(self):
+        """minkowski with p=1/2 are normalised to manhattan/euclidean."""
+        from sklearn.neighbors import KNeighborsClassifier
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(31)
+        X = rng.standard_normal((40, 3)).astype(np.float32)
+        y = (X[:, 0] > 0).astype(np.int64)
+
+        for p in [1, 2]:
+            with self.subTest(p=p):
+                clf = KNeighborsClassifier(n_neighbors=3, metric="minkowski", p=p)
+                clf.fit(X, y)
+
+                onx = to_onnx(clf, (X,))
+                sess = self.check_ort(onx)
+                ort_results = sess.run(None, {"X": X})
+                expected = clf.predict(X).astype(np.int64)
+                self.assertEqualArray(expected, ort_results[0])
+
     def test_knn_classifier_opset_too_low_raises(self):
         """Opset < 13 must raise NotImplementedError."""
         from sklearn.neighbors import KNeighborsClassifier
@@ -336,6 +384,34 @@ class TestKNeighborsRegressor(ExtTestCase):
         expected = reg.predict(X).astype(np.float32)
         self.assertEqualArray(expected, ort_results[0], atol=1e-5)
 
+    def test_knn_regressor_metrics(self):
+        """Test various distance metrics for the regressor."""
+        from sklearn.neighbors import KNeighborsRegressor
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(40)
+        X = rng.standard_normal((60, 4)).astype(np.float32)
+        y = (X[:, 0] * 2 + X[:, 1]).astype(np.float32)
+
+        metrics = [
+            ("euclidean", {}),
+            ("cosine", {}),
+            ("manhattan", {}),
+            ("chebyshev", {}),
+            ("minkowski", {"p": 3}),
+        ]
+        for metric, kwargs in metrics:
+            with self.subTest(metric=metric, **kwargs):
+                reg = KNeighborsRegressor(n_neighbors=5, metric=metric, **kwargs)
+                reg.fit(X, y)
+
+                onx = to_onnx(reg, (X,))
+
+                sess = self.check_ort(onx)
+                ort_results = sess.run(None, {"X": X})
+                expected = reg.predict(X).astype(np.float32)
+                self.assertEqualArray(expected, ort_results[0], atol=1e-5)
+
     def test_knn_regressor_opset_too_low_raises(self):
         """Opset < 18 must raise NotImplementedError."""
         from sklearn.neighbors import KNeighborsRegressor
@@ -354,4 +430,3 @@ class TestKNeighborsRegressor(ExtTestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-
