@@ -29,8 +29,12 @@ jobs:
       - name: pip freeze
         run: pip freeze
 
-      - name: Run documentation examples
+      - name: Run documentation examples (sphinx-gallery plot_* scripts)
         env:
           UNITTEST_DOT: "1"
         run: |
           pytest unittests/main/test_documentation_examples.py -v --durations=20
+
+      - name: Run documentation examples (runpython and gdot blocks)
+        run: |
+          python -m yobx run-doc-examples docs/ -v 1
