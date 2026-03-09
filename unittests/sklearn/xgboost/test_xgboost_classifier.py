@@ -152,6 +152,7 @@ class TestXGBoostClassifier(ExtTestCase):
                     self.assertEqualArray(expected_proba, proba, atol=1e-5)
                     self.assertEqualArray(expected_label, label)
 
+    @requires_sklearn("1.8")
     def test_xgb_classifier_binary_pipeline(self):
         from xgboost import XGBClassifier
         from sklearn.pipeline import Pipeline

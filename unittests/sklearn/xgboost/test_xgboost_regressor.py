@@ -136,6 +136,7 @@ class TestXGBoostRegressor(ExtTestCase):
                     expected = reg.predict(X32).astype(np.float32).astype(dtype).reshape(-1, 1)
                     self.assertEqualArray(expected, predictions, atol=1e-4)
 
+    @requires_sklearn("1.8")
     def test_xgb_regressor_pipeline(self):
         """XGBRegressor works inside a sklearn Pipeline."""
         from xgboost import XGBRegressor

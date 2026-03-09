@@ -125,7 +125,7 @@ def torch_export(
             if not any(
                 isinstance(f, FakeTensor) for f in flatten_object([aags, kws], drop_keys=True)
             ):
-                cand = InputCandidate(aags, kws or {}, clone=False, cst_kwargs={})
+                cand = InputCandidate(aags, kws or {}, clone=False, cst_kwargs={})  # type: ignore
                 backed_size_oblivious = cand.needs_backed_size_oblivious(ds)
         if verbose:
             print(f"[torch_export] inferred backed_size_oblivious={backed_size_oblivious!r}")
