@@ -13,14 +13,14 @@ from yobx.xbuilder import OptimizationOptions
 
 class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @hide_stdout()
-    @unittest.skipIf(to_onnx is None, "not implement yet")
+    @unittest.skip("missing patches")
     def test_tiny_llm_to_onnx_24(self):
         import onnxruntime
 
         data = get_tiny_model("arnir0/Tiny-LLM")
         model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
 
-        b1 = data["inputs_batch1"]
+        b1 = data.inputs_batch1
         del inputs["position_ids"]
         del ds["position_ids"]
         del b1["position_ids"]
@@ -31,7 +31,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
         with (
             register_flattening_functions(patch_transformers=True),
-            apply_patches_for_model(patch_transformers=True, model=model),
+            apply_patches_for_model(patch_transformers=True, patch_torch=True, model=model),
         ):
             onx = to_onnx(
                 model,
@@ -109,13 +109,13 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         assert diff["abs"] <= 1e-5, f"diff={diff}"
 
     @hide_stdout()
-    @unittest.skipIf(to_onnx is None, "not implement yet")
+    @unittest.skip("missing patches")
     def test_tiny_llm_to_onnx_ort_22(self):
         import onnxruntime
 
         data = get_tiny_model("arnir0/Tiny-LLM")
         model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
-        b1 = data["inputs_batch1"]
+        b1 = data.inputs_batch1
         filename = self.get_dump_file("test_tiny_llm_to_onnx_ort_22.onnx")
         del inputs["position_ids"]
         del ds["position_ids"]

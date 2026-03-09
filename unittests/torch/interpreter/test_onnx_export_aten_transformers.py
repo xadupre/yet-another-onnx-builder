@@ -1,10 +1,11 @@
 import unittest
-from yobx.torch.interpreter import to_onnx
+from yobx.torch.interpreter import to_onnx, requires_transformers
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
 
 
 class TestOnnxExportTransformers(ExtTestCase):
+    @requires_transformers("4.57")
     def test_aten_transformers_grouped_mm_no_offset(self):
         import torch
         import transformers.integrations.moe as tmoe

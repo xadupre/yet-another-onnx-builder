@@ -4,6 +4,7 @@ from yobx.ext_test_case import (
     ExtTestCase,
     skipif_ci_windows,
     requires_torch,
+    requires_transformers,
     ignore_warnings,
 )
 from yobx.xbuilder import FunctionOptions
@@ -661,6 +662,7 @@ class TestOnnxExportSubModules(ExtTestCase):
 
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.6", "owning module is None before that")
+    @requires_transformers("4.57")
     @ignore_warnings(FutureWarning)
     def test_submodule_local_functions_tiny_llm(self):
         """

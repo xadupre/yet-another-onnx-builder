@@ -11,6 +11,7 @@ from yobx.ext_test_case import (
     ExtTestCase,
     skipif_ci_windows,
     requires_torch,
+    requires_transformers,
     ignore_warnings,
     hide_stdout,
 )
@@ -2229,6 +2230,7 @@ class TestOnnxExportAten(ExtTestCase):
                 self.assertEqualArray(expected, got, atol=1e-2)
 
     @ignore_warnings(RuntimeWarning)
+    @requires_transformers("4.57")
     def test_attention_scale_dot_product_attention_gqa(self):
         import torch
 
