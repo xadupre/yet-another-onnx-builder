@@ -6,8 +6,8 @@ Torch Export to ONNX
 
    flatten
    flatten_list
-   input_observer
    patches
    patches_list
+   input_observer
    supported_aten_functions
 
