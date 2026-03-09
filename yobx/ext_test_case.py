@@ -525,7 +525,10 @@ def has_transformers(version: str = "") -> bool:
         import transformers
     except (ImportError, AttributeError):
         return False
-
+    if not hasattr(transformers, "__version__"):
+        return False
+    if not version:
+        return True
     return pv.Version(transformers.__version__) >= pv.Version(version)
 
 
