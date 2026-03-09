@@ -5,7 +5,7 @@ from sklearn.utils.validation import check_is_fitted
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExtendedModelContainer
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
-from ..xbuilder import GraphBuilder
+from ..xbuilder import GraphBuilder, OptimizationOptions
 from .register import get_sklearn_converter
 from .sklearn_helper import get_output_names
 
@@ -46,6 +46,8 @@ def to_onnx(
         e.g. ``{"": 20, "ai.onnx.ml": 5}``.  When ``"ai.onnx.ml"`` is set to
         ``5`` the converter emits the unified ``TreeEnsemble`` operator
         introduced in that opset instead of the older per-task operators.
+        If it includes ``{'com.microsoft': 1}``, the converted model
+        may include optimized kernels specific to :epkg:`onnxruntime`.
     :param verbose: verbosity
     :param builder_cls: by default the graph builder is a
         :class:`yobx.xbuilder.GraphBuilder` but any builder can
@@ -114,4 +116,9 @@ def to_onnx(
 
     for name in output_names:
         g.make_tensor_output(name, indexed=False, allow_untyped_output=True)
-    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
+    opts = (
+        OptimizationOptions(patterns="default+onnxruntime")
+        if g.has_opset("com.microsoft")
+        else None
+    )
+    return g.to_onnx(large_model=large_model, external_threshold=external_threshold, options=opts)

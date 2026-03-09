@@ -4,7 +4,7 @@ from onnx import ModelProto
 import tensorflow as tf
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExtendedModelContainer
-from ..xbuilder import GraphBuilder
+from ..xbuilder import GraphBuilder, OptimizationOptions
 from .register import get_tf_op_converter
 from .tensorflow_helper import tf_dtype_to_np_dtype
 
@@ -33,7 +33,9 @@ def to_onnx(
     :param dynamic_shapes: optional per-input axis-to-dim-name mappings.
         When *None*, axis 0 is treated as a dynamic batch dimension for every input.
     :param target_opset: opset to use; either an integer for the default domain
-        (``""``), or a dictionary mapping domain names to opset versions
+        (``""``), or a dictionary mapping domain names to opset versions.
+        If it includes ``{'com.microsoft': 1}``, the converted model
+        may include optimized kernels specific to :epkg:`onnxruntime`.
     :param verbose: verbosity level (0 = silent)
     :param extra_converters: optional mapping from TF op-type string to converter
         function with signature ``(g, sts, outputs, op, verbose=0)``;
@@ -69,7 +71,12 @@ def to_onnx(
     # Populate an ONNX GraphBuilder by walking the concrete-function graph.
     g = GraphBuilder(target_opset)
     _convert_concrete_function(cf, g, args, input_specs, verbose, extra_converters or {})
-    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
+    opts = (
+        OptimizationOptions(patterns="default+onnxruntime")
+        if g.has_opset("com.microsoft")
+        else None
+    )
+    return g.to_onnx(large_model=large_model, external_threshold=external_threshold, options=opts)  # type: ignore
 
 
 # ---------------------------------------------------------------------------
