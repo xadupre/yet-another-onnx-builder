@@ -15,6 +15,7 @@ yobx.sklearn
     linear_model/index
     multiclass/index
     neural_network/index
+    neighbors/index
     pipeline/index
     preprocessing/index
     tree/index
