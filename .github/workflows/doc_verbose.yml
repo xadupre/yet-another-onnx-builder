@@ -1,0 +1,33 @@
+name: Documentation Verbose
+
+on:
+  workflow_dispatch:
+
+jobs:
+  doc_examples:
+    name: doc verbose (ubuntu-latest, py3.13)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install graphviz
+        uses: ts-graphviz/setup-graphviz@v2
+
+      - name: Install nightly pytorch
+        run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,sklearn,spox,tensorflow,torch]"
+
+      - name: pip freeze
+        run: pip freeze
+
+      - name: Run documentation verbose
+        run: python -m sphinx docs dist/html -v
