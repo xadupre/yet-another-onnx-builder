@@ -2,6 +2,7 @@ from typing import Dict, List
 from sklearn.decomposition import PCA
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
+from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 
 @register_sklearn_converter(PCA)
@@ -39,7 +40,7 @@ def sklearn_pca(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
-    dtype = g.onnx_dtype_to_np_dtype(itype)
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     # Center the data if the model stores a mean vector.
     if estimator.mean_ is not None:

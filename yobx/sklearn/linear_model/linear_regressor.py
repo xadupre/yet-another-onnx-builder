@@ -28,6 +28,7 @@ from sklearn.linear_model import (
 )
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
+from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 # Optional deprecated models
 _EXTRA_REGRESSOR_TYPES = []
@@ -108,7 +109,7 @@ def sklearn_linear_regressor(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
-    dtype = g.onnx_dtype_to_np_dtype(itype)
+    dtype = tensor_dtype_to_np_dtype(itype)
 
     coef = estimator.coef_.astype(dtype)
     intercept = np.atleast_1d(np.asarray(estimator.intercept_)).astype(dtype)
