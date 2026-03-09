@@ -524,7 +524,7 @@ def _make_builder_interpreter(
         import torch.export
 
     if export_options is None:
-        from . import DEFAULT_TARGET_OPSET
+        from ... import DEFAULT_TARGET_OPSET
 
         opset = target_opset or DEFAULT_TARGET_OPSET
         aten_as_function = get_default_aten_as_function(
@@ -1016,7 +1016,7 @@ def to_onnx(
     assert options is None or isinstance(
         options, OptimizationOptions
     ), f"Unexpected type {type(options)} for options"
-    from . import DEFAULT_TARGET_OPSET
+    from ... import DEFAULT_TARGET_OPSET
 
     if target_opset is None:
         target_opset = min(DEFAULT_TARGET_OPSET, onnx_opset_version() - 1)

@@ -98,6 +98,7 @@ class TestDocumentationExamples(ExtTestCase):
                     "plot_sklearn_kmeans.py",
                     "plot_sklearn_pipeline.py",
                     "plot_sklearn_with_sklearn_onnx.py",
+                    "plot_tensorflow_to_onnx.py",
                 }
             ):
                 reason = "dot not installed"
