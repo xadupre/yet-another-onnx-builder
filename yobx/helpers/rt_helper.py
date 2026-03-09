@@ -363,15 +363,12 @@ def onnx_generate(
 
         # The most probable next token is chosen.
         if do_sample:
-            shifted = next_token_logits - next_token_logits.max(axis=-1, keepdims=True)
-            probs = torch.exp(shifted)
-            probs /= probs.sum(axis=-1, keepdims=True)
-            next_token_id = np.array(
-                [[np.random.choice(probs.shape[-1], p=probs[b])] for b in range(batch_size)],
-                dtype=np.int64,
-            )  # [batch, 1]
+            # Sample from the probability distribution over the vocabulary.
+            probs = torch.softmax(next_token_logits, dim=-1)
+            next_token_id = torch.multinomial(probs, num_samples=1)  # [batch, 1]
         else:
-            next_token_id = torch.argmax(next_token_logits, axis=-1, keepdims=True)
+            # Greedy decoding: take the argmax token.
+            next_token_id = torch.argmax(next_token_logits, dim=-1, keepdim=True)
 
         if next_token_id.item() == eos_token_id:
             break
