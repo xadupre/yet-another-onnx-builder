@@ -4,19 +4,39 @@ Implements converters for :mod:`torch` tensor methods
 
 The list of supported methods:
 
-.. runpython::
-    :showcode:
-    :rst:
-
-    from yobx.torch.interpreter import _aten_methods
-
-    rows = []
-    for name, func in sorted(_aten_methods.__dict__.items()):
-        if name.startswith("aten_meth_") and callable(func) and func.__doc__:
-            rows.append(f"* ``{name}`` - {func.__doc__.strip()}")
-    print()
-    print("\\n".join(rows))
-    print()
++------------------------+-------------------+
+| method                 | short description |
++========================+===================+
+| aten_meth___eq__       | equal             |
+| aten_meth_bool         | cast              |
+| aten_meth_clamp_max    | meth_clamp_max    |
+| aten_meth_clamp_min    | meth_clamp_min    |
+| aten_meth_clone        | identity          |
+| aten_meth_contiguous   | identity          |
+| aten_meth_cos          | cos               |
+| aten_meth_cpu          | identity          |
+| aten_meth_detach       | identity          |
+| aten_meth_eq           | equal             |
+| aten_meth_expand       | expand            |
+| aten_meth_expand_as    | expand_as         |
+| aten_meth_float        | cast              |
+| aten_meth_item         | float(x)          |
+| aten_meth_masked_fill  | masked_fill       |
+| aten_meth_masked_fill_ | masked            |
+| aten_meth_mean         | reducemean        |
+| aten_meth_numel        | meth_numel        |
+| aten_meth_pow          | pow               |
+| aten_meth_repeat       | repeat            |
+| aten_meth_reshape      | reshape           |
+| aten_meth_sin          | sin               |
+| aten_meth_size         | size              |
+| aten_meth_sum          | reducesum         |
+| aten_meth_t            | transpose         |
+| aten_meth_to           | cast              |
+| aten_meth_transpose    | transpose         |
+| aten_meth_unsqueeze    | unsqueeze         |
+| aten_meth_view         | view              |
++------------------------+-------------------+
 """
 from typing import Any, Dict, List, Optional, Sequence
 import numpy as np
