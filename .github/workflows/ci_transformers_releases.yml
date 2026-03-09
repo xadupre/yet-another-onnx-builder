@@ -50,7 +50,6 @@ jobs:
       - name: Run tests with transformers==4.57
         run: pytest unittests/torch --durations=10
 
-jobs:
   torch_tests_5:
     name: transformers-releases (ubuntu-latest, py3.13, transformers 5.3/5.2 torch-${{ matrix.torch-version }})
     runs-on: ubuntu-latest
