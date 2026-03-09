@@ -1,3 +1,23 @@
+"""
+Implements converters for :mod:`torch` tensor methods
+(e.g. ``.clone()``, ``.view()``, ``.to()``, etc.) into equivalent ONNX operations.
+
+The list of supported methods:
+
+.. runpython::
+    :showcode:
+    :rst:
+
+    from yobx.torch.interpreter import _aten_methods
+
+    rows = []
+    for name, func in sorted(_aten_methods.__dict__.items()):
+        if name.startswith("aten_meth_") and callable(func) and func.__doc__:
+            rows.append(f"* ``{name}``  - {func.__doc__.strip()}")
+    print()
+    print("\\n".join(rows))
+    print()
+"""
 from typing import Any, Dict, List, Optional, Sequence
 import numpy as np
 from onnx import TensorProto
