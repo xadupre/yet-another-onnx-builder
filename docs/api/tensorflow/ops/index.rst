@@ -8,5 +8,6 @@ yobx.tensorflow.ops
     activations
     binary_ops
     element_wise
+    unary_ops
     const
     matmul
