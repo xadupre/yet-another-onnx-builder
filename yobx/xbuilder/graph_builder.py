@@ -312,7 +312,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self.dynamic_dimensions_source: Dict[str, Any] = {}
         self.dynamic_dimensions_source_flat: Optional[List[Any]] = None
         self.output_dynamic_dimensions_source_flat: Optional[List[Any]] = None
-        unique_names = set()
+        unique_names: Set[str] = set()
         self.dynamic_shapes = self._pre_process_dynamic_shape(dynamic_shapes, unique_names)  # type: ignore
         self.output_dynamic_shapes = self._pre_process_dynamic_shape(
             output_dynamic_shapes, unique_names  # type: ignore
@@ -593,7 +593,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if isinstance(dynamic_shapes, cls.WrapDim):
             return dynamic_shapes
         if isinstance(dynamic_shapes, (tuple, list)):
-            return dynamic_shapes.__class__(
+            return dynamic_shapes.__class__(  # type: ignore
                 cls._pre_process_dynamic_shape(i, unique_names) for i in dynamic_shapes
             )
         if isinstance(dynamic_shapes, dict):

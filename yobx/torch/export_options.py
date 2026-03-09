@@ -287,7 +287,7 @@ class ExportOptions:
         if prefer_deferred_runtime_asserts_over_guards:
             export_kwargs["prefer_deferred_runtime_asserts_over_guards"] = True
         if backed_size_oblivious == "auto":
-            cand = InputCandidate(args, kwargs, clone=False, cst_kwargs={})
+            cand = InputCandidate(args or (), kwargs or {}, clone=False, cst_kwargs={})
             backed_size_oblivious = cand.needs_backed_size_oblivious(dynamic_shapes)
         if backed_size_oblivious is True:
             with torch.fx.experimental._config.patch(backed_size_oblivious=True):  # type: ignore[attr-defined]
@@ -298,7 +298,7 @@ class ExportOptions:
                     dynamic_shapes=dyn_shapes,
                     **export_kwargs,
                 )
-                ep._computed_backed_size_oblivious = True
+                ep._computed_backed_size_oblivious = True  # type: ignore
                 return ep
         assert backed_size_oblivious is False, f"{backed_size_oblivious=}, unexpected"
         return torch.export.export(
