@@ -129,11 +129,6 @@ available:
    * - ``"decall"``
      - full decomposition table, default strict setting
 
-When no strategy is specified, the converter tries the strategies in order
-until one succeeds.  The winning strategy is recorded in
-``interpreter._working_export_options`` and reported in the statistics
-dictionary when ``return_optimize_report=True``.
-
 DynamoInterpreter
 -----------------
 
