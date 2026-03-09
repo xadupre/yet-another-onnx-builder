@@ -107,10 +107,11 @@ sphinx_gallery_conf = {
     "reset_modules": ("matplotlib", "yobx.doc.reset_torch_transformers"),
 }
 
+substring_to_disable = []
 if int(os.environ.get("UNITTEST_GOING", "0")):
-    sphinx_gallery_conf["ignore_pattern"] = (
-        ".*((tiny_llm)|(dort)|(draft_mode)|(hub_codellama.py)|(whisper)|(optimind)|(export_with_modelbuilder)).*"
-    )
+    substring_to_disable = ["tiny_llm"]
+substring = "|".join(f"({s})" for s in substring_to_disable)
+sphinx_gallery_conf["ignore_pattern"] = f".*({substring}).*"
 
 epkg_dictionary = {
     "aten functions": "https://pytorch.org/cppdocs/api/namespace_at.html#functions",

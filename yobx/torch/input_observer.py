@@ -1017,7 +1017,7 @@ class InputObserver:
             pipe(text=messages, max_new_tokens=4)
 
     Examples can be found in :ref:`l-plot-input-observer-transformers`,
-    :ref:`l-plot-tiny-llm-attention-export-input-observer`.
+    :ref:`l-plot-input-observer-tiny-llm`.
     """
 
     def __init__(self, value_if_missing: dict[str | int, Any] | None = None):

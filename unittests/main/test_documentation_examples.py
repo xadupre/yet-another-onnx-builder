@@ -9,11 +9,11 @@ from yobx.ext_test_case import (
     ExtTestCase,
     is_windows,
     ignore_errors,
-    has_transformers,
     has_sklearn,
     has_spox,
-    has_torch,
     has_tensorflow,
+    has_torch,
+    has_transformers,
 )
 
 VERBOSE = 0
@@ -111,10 +111,11 @@ class TestDocumentationExamples(ExtTestCase):
                 and name
                 in {
                     "plot_evaluator_comparison.py",
+                    "plot_export_tiny_llm_attention_input_observer.py",
+                    "plot_input_observer_transformers.py",
                     "plot_flattening.py",
                     "plot_input_observer.py",
                     "plot_mini_onnx_builder.py",
-                    "plot_input_observer_transformers.py",
                     "plot_patch_model.py",
                 }
             ):
