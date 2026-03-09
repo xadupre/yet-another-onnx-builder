@@ -18,6 +18,7 @@ def register_sklearn_converters():
     from .pipeline import register as register_pipeline
     from .preprocessing import register as register_preprocessing
     from .tree import register as register_tree
+    from .lightgbm import register as register_lightgbm
     from .xgboost import register as register_xgboost
 
     register_cluster()
@@ -25,6 +26,7 @@ def register_sklearn_converters():
     register_decomposition()
     register_ensemble()
     register_linear_model()
+    register_lightgbm()
     register_multiclass()
     register_neural_network()
     register_pipeline()
