@@ -2,41 +2,7 @@
 Implements converters for :mod:`torch` tensor methods
 (e.g. ``.clone()``, ``.view()``, ``.to()``, etc.) into equivalent ONNX operations.
 
-The list of supported methods:
-
-+------------------------+-------------------+
-| method                 | short description |
-+========================+===================+
-| aten_meth___eq__       | equal             |
-| aten_meth_bool         | cast              |
-| aten_meth_clamp_max    | meth_clamp_max    |
-| aten_meth_clamp_min    | meth_clamp_min    |
-| aten_meth_clone        | identity          |
-| aten_meth_contiguous   | identity          |
-| aten_meth_cos          | cos               |
-| aten_meth_cpu          | identity          |
-| aten_meth_detach       | identity          |
-| aten_meth_eq           | equal             |
-| aten_meth_expand       | expand            |
-| aten_meth_expand_as    | expand_as         |
-| aten_meth_float        | cast              |
-| aten_meth_item         | float(x)          |
-| aten_meth_masked_fill  | masked_fill       |
-| aten_meth_masked_fill_ | masked            |
-| aten_meth_mean         | reducemean        |
-| aten_meth_numel        | meth_numel        |
-| aten_meth_pow          | pow               |
-| aten_meth_repeat       | repeat            |
-| aten_meth_reshape      | reshape           |
-| aten_meth_sin          | sin               |
-| aten_meth_size         | size              |
-| aten_meth_sum          | reducesum         |
-| aten_meth_t            | transpose         |
-| aten_meth_to           | cast              |
-| aten_meth_transpose    | transpose         |
-| aten_meth_unsqueeze    | unsqueeze         |
-| aten_meth_view         | view              |
-+------------------------+-------------------+
+Each converter function is documented with the ONNX graph it produces.
 """
 from typing import Any, Dict, List, Optional, Sequence
 import numpy as np
@@ -66,7 +32,16 @@ T = str
 
 
 def aten_meth_bool(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
-    "cast"
+    """
+    cast
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        Cast(x, to=9) -> result
+        output: name='result' type=dtype('bool') shape=None
+    """
     import torch
 
     return aten_meth_to(g, sts, outputs, x, dtype=torch.bool)
@@ -80,7 +55,17 @@ def aten_meth_clamp_max(
     max_: T,
     name: str = "meth_clamp_max",
 ) -> T:
-    """meth_clamp_max"""
+    """
+    meth_clamp_max
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        input: name='max_' type=dtype('float32') shape=['a', 'b']
+        Min(x, max_) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     return aten_clamp_max(g, sts, outputs, x, max_, name=name)
 
 
@@ -92,14 +77,33 @@ def aten_meth_clamp_min(
     min_: T,
     name: str = "meth_clamp_min",
 ) -> T:
-    """meth_clamp_min"""
+    """
+    meth_clamp_min
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        input: name='min_' type=dtype('float32') shape=['a', 'b']
+        Max(x, min_) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     return aten_clamp_min(g, sts, outputs, x, min_, name=name)
 
 
 def aten_meth_clone(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
 ) -> T:
-    "identity"
+    """
+    identity
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        Identity(x) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     assert (
         x != outputs[0]
     ), f"Input and output are the same x={x!r}, outputs={outputs!r}{g.get_debug_msg()}"
@@ -109,24 +113,60 @@ def aten_meth_clone(
 def aten_meth_contiguous(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
 ) -> T:
-    "identity"
+    """
+    identity
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        Identity(x) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     return g.make_node("Identity", [x], outputs, name=".contiguous")
 
 
 def aten_meth_cos(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
-    "cos"
+    """
+    cos
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        Cos(x) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     return aten_cos(g, sts, outputs, x, name=".cos")
 
 
 def aten_meth_cpu(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
-    "identity"
+    """
+    identity
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        Identity(x) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     return g.make_node("Identity", [x], outputs, name="cpu")
 
 
 def aten_meth_detach(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
 ) -> T:
-    "identity"
+    """
+    identity
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        Identity(x) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     return g.make_node("Identity", [x], outputs, name="detach")
 
 
@@ -138,7 +178,17 @@ def aten_meth_eq(
     y: T,
     name="meth_eq",
 ) -> T:
-    "equal"
+    """
+    equal
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        input: name='y' type=dtype('float32') shape=['a', 'b']
+        Equal(x, y) -> result
+        output: name='result' type=dtype('bool') shape=None
+    """
     return aten_eq(g, sts, outputs, x, y, name=name)
 
 
@@ -150,7 +200,17 @@ def aten_meth___eq__(
     y: T,
     name="meth__eq___",
 ) -> T:
-    "equal"
+    """
+    equal
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        input: name='y' type=dtype('float32') shape=['a', 'b']
+        Equal(x, y) -> result
+        output: name='result' type=dtype('bool') shape=None
+    """
     return aten_eq(g, sts, outputs, x, y, name=name)
 
 
@@ -161,14 +221,33 @@ def aten_meth_expand(
     x: T,
     *dims: List[int],
 ) -> T:
-    "expand"
+    """
+    expand
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=[3, 4]
+        init: name='init7_s3_2_3_4' type=int64 shape=(3,) -- array([2, 3, 4])
+        Expand(x, init7_s3_2_3_4) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     return aten_expand(g, sts, outputs, x, dims, name=".expand")
 
 
 def aten_meth_float(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
 ) -> T:
-    "cast"
+    """
+    cast
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('int64') shape=['a', 'b']
+        Cast(x, to=1) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     import torch
 
     return aten_meth_to(g, sts, outputs, x, dtype=torch.float32)
@@ -181,7 +260,16 @@ def aten_meth_item(
     x: T,
     name: str = "aten_meth_item",
 ) -> T:
-    "float(x)"
+    """
+    float(x)
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=None
+        Squeeze(x) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     if not g.has_shape(x):
         # Shape is unknown but using this operator means it is a number.
         # Let's unsqueeze
@@ -210,7 +298,18 @@ def aten_meth_expand_as(
     y: T,
     name: str = "aten_meth_expand_as",
 ) -> T:
-    "expand_as"
+    """
+    expand_as
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=[1, 4]
+        input: name='y' type=dtype('float32') shape=[3, 4]
+        Shape(y) -> y::Shape:
+          Expand(x, y::Shape:) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     shape = g.op.Shape(y, name=name)
     res = g.op.Expand(x, shape, name=name, outputs=outputs)
     if not sts:
@@ -232,7 +331,18 @@ def aten_meth_masked_fill(
     value: Any,
     name: str = "aten_meth_masked_fill",
 ) -> T:
-    "masked_fill"
+    """
+    masked_fill
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        input: name='mask' type=dtype('bool') shape=['a', 'b']
+        init: name='init1_s1_' type=float32 shape=(1,) -- array([0.])
+        Where(mask, init1_s1_, x) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     if isinstance(value, float):
         itype = g.get_type(x)
         value_cast = g.make_initializer(
@@ -272,7 +382,12 @@ def aten_meth_masked_fill_(
     mask: T,
     value: Any,
 ) -> T:
-    "masked"
+    """
+    masked (in-place)
+
+    Raises :exc:`RuntimeError` — in-place operations are removed from the fx graph
+    before conversion.
+    """
     raise RuntimeError(
         "These calls should be removed from the fx graph as it is inplace modification "
         "(aten_meth_masked_fill_)."
@@ -287,7 +402,17 @@ def aten_meth_mean(
     dim: T,
     keepdim: bool = False,
 ) -> T:
-    "reducemean"
+    """
+    reducemean
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        init: name='init7_s1_0' type=int64 shape=(1,) -- array([0])
+        ReduceMean(x, init7_s1_0, keepdims=0) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     if isinstance(dim, int):
         cst = g.make_initializer(
             "", np.array([dim], dtype=np.int64), source="aten_meth_mean.cst.1"
@@ -317,7 +442,16 @@ def aten_meth_numel(
     x: T,
     name: str = "meth_numel",
 ) -> T:
-    "meth_numel"
+    """
+    meth_numel
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        Size(x) -> result
+        output: name='result' type=dtype('int64') shape=None
+    """
     res = g.op.Size(x, outputs=outputs, name=name)
     if not sts:
         g.set_type(res, TensorProto.INT64)
@@ -332,7 +466,17 @@ def aten_meth_pow(
     x: T,
     exponent: T,
 ) -> T:
-    "pow"
+    """
+    pow
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        init: name='init1_s_' type=float32 shape=() -- array(2.)
+        Pow(x, init1_s_) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     assert isinstance(x, str), f"Unexpected type {type(x)} (x={x!r}, exponent={exponent!r})"
     if isinstance(exponent, (int, float)):
         cst = g.make_initializer(
@@ -366,7 +510,17 @@ def aten_meth_repeat(
     x: T,
     *repeats: List[int],
 ) -> T:
-    "repeat"
+    """
+    repeat
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=[3, 4]
+        init: name='init7_s2_2_3' type=int64 shape=(2,) -- array([2, 3])
+        Tile(x, init7_s2_2_3) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     return aten_repeat(g, sts, outputs, x, repeats, name=".repeat")
 
 
@@ -378,7 +532,17 @@ def aten_meth_reshape(
     *shape: List[int],
     name: str = "reshape",
 ) -> T:
-    "reshape"
+    """
+    reshape
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=[3, 4]
+        init: name='init7_s2_6_2' type=int64 shape=(2,) -- array([6, 2])
+        Reshape(x, init7_s2_6_2) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     if isinstance(shape, tuple) and len(shape) == 1 and isinstance(shape[0], tuple):
         shape = shape[0]
     if all_int(shape):
@@ -399,7 +563,16 @@ def aten_meth_reshape(
 
 
 def aten_meth_sin(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
-    "sin"
+    """
+    sin
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        Sin(x) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     return aten_sin(g, sts, outputs, x, name=".sin")
 
 
@@ -411,7 +584,16 @@ def aten_meth_size(
     dim: Optional[int] = None,
     name: str = ".size",
 ) -> T:
-    "size"
+    """
+    size
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        Shape(x) -> result
+        output: name='result' type=dtype('int64') shape=None
+    """
     if dim is None:
         res = g.op.Shape(x, name=f"{name}A", outputs=outputs)
         if not sts:
@@ -438,7 +620,17 @@ def aten_meth_sum(
     keepdim: bool = False,
     dim: Optional[int] = None,
 ) -> T:
-    "reducesum"
+    """
+    reducesum
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        init: name='init7_s1_0' type=int64 shape=(1,) -- array([0])
+        ReduceSum(x, init7_s1_0, keepdims=0) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     if axis is not None and isinstance(axis, int):
         axes = np.array([axis], dtype=np.int64)
     elif dim is not None and isinstance(dim, int):
@@ -462,7 +654,16 @@ def aten_meth_sum(
 
 
 def aten_meth_t(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
-    "transpose"
+    """
+    transpose
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        Transpose(x, perm=[1,0]) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     return aten_t(g, sts, outputs, x, name=".t")
 
 
@@ -475,7 +676,16 @@ def aten_meth_to(
     name: str = ".to",
     **kwargs: Dict[str, Any],
 ) -> T:
-    "cast"
+    """
+    cast
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        Cast(x, to=10) -> result
+        output: name='result' type=dtype('float16') shape=None
+    """
     import torch
 
     dtype = kwargs.get("dtype", None)
@@ -519,7 +729,16 @@ def aten_meth_transpose(
     dim0: int,
     dim1: int,
 ) -> T:
-    "transpose"
+    """
+    transpose
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b', 'c']
+        Transpose(x, perm=[2,1,0]) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     assert g.has_rank(input_name), f"{input_name!r} must have a rank{g.get_debug_msg}"
     perm = list(range(g.rank(input_name)))
     assert max(dim0, dim1) < len(perm), (
@@ -547,7 +766,17 @@ def aten_meth_unsqueeze(
     input_name: T,
     dim: int,
 ) -> T:
-    "unsqueeze"
+    """
+    unsqueeze
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=['a', 'b']
+        init: name='x_axes' type=int64 shape=(1,) -- array([0])
+        Unsqueeze(x, x_axes) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     new_name = g.unique_name(f"{input_name}_axes")
     g.make_initializer(
         new_name, np.array([dim], dtype=np.int64), source="aten_meth_unsqueeze.axis"
@@ -572,7 +801,17 @@ def aten_meth_view(
     input_name: T,
     *args: Sequence[int],
 ) -> T:
-    "view"
+    """
+    view
+
+    .. code-block:: text
+
+        opset: domain='' version=18
+        input: name='x' type=dtype('float32') shape=[3, 4]
+        init: name='x_view_shape' type=int64 shape=(2,) -- array([6, 2])
+        Reshape(x, x_view_shape) -> result
+        output: name='result' type=dtype('float32') shape=None
+    """
     if isinstance(args, tuple) and len(args) == 1 and len(outputs) == 1:
         # Maybe the traced model is call this with a wrong signature.
         args = args[0]
