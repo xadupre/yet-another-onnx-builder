@@ -28,6 +28,12 @@ jobs:
             torch-version: "nightly"
           - os: "windows-latest"
             torch-version: "nightly"
+          - os: "ubuntu-latest"
+            python-version: "3.12"
+            torch-version: "nightly"
+          - os: "ubuntu-latest"
+            python-version: "3.13"
+            torch-version: "2.10"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}

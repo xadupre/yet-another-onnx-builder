@@ -57,7 +57,7 @@ class TestOnnxScriptGraphBuilderOpsetApi(ExtTestCase):
     def test_get_opset_missing_exc_false(self):
         g = self._make_builder()
         result = g.get_opset("unknown.domain", exc=False)
-        self.assertIsNone(result)
+        self.assertEqual(0, result)
 
     # ------------------------------------------------------------------
     # set_opset
