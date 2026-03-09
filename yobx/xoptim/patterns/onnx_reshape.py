@@ -58,68 +58,36 @@ class ShapedBasedReshapePattern(ReshapePattern):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
+            %% Nodes
+            X([Input: X <br/> float, 'a', 'b', 'c'])
+            C[Constant <br/> value: 0, 0, -1]
+            R[[Reshape]]
+            xrr([Output: xrr <br/> float, 'a', 'b', 'c'])
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['shape2'],
-                                 value=onh.from_array(np.array([0, 0, -1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Reshape', ['X', 'shape2'], ['xrr']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            %% Flow
+            C -->|shape2| R
+            X --> R
+            R --> xrr
 
-        print("DOT-SECTION", to_dot(model))
+            %% Styling
+            style C fill:#f9f,stroke:#333,stroke-width:2px
+            style R fill:#bbf,stroke:#333,stroke-width:2px
+            style X fill:#dfd
+            style xrr fill:#dfd
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
+            X[Input: X] --> ID[Identity]
+            S[Input: shape2] -.->|Invalid?| ID
+            ID --> xrr[Output: xrr]
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Identity', ['X', 'shape2'], ['xrr']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('shape2', onnx.TensorProto.INT64, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('xrr', onnx.TensorProto.FLOAT, ('a', 'b', 'c')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
-
-        print("DOT-SECTION", to_dot(model))
+            style ID fill:#f9f,stroke:#333,stroke-width:2px
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):

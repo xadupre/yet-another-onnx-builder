@@ -41,6 +41,7 @@ docs = [
     "piccolo-theme",
     "skl2onnx",
     "sphinx>=7",
+    "sphinxcontrib-mermaid",
     "sphinx-copybutton",
     "sphinx-gallery",
     "sphinx-issues",
