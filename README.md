@@ -15,12 +15,12 @@ Yet another onnx builder, patches, flattening functions...
 
 **yet-another-onnx-builder** (`yobx`) is a toolkit for converting machine learning models
 to [ONNX](https://onnx.ai) format from many libraries,
-torch, tensorflow, scikit-learn, xgboost, ligthgbm.
+[torch](https://pytorch.org), [tensorflow](https://www.tensorflow.org), [scikit-learn](https://scikit-learn.org), [xgboost](https://xgboost.readthedocs.io), [lightgbm](https://lightgbm.readthedocs.io).
 It provides:
 
-- A **graph builder API** for constructing and optimizing ONNX graphs, with built-in shape
+- A **[graph builder API](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/api/yobx/builder/graph_builder.html)** for constructing and optimizing ONNX graphs, with built-in shape
   inference and a pattern-based graph optimizer : every converter creates nodes into a class
   of your choice as long as it follows one protocol. One GraphBuilder is provided with
   optimization included but other implementations are also made based on onnxscript / ir-py and spox.
-- A **symbolic shape expression system** for dynamic shape handling at export time (`yobx.xshape`).
-- A **translation tool** that converts ONNX graphs back to executable Python code (`yobx.translate`).
+- A **[symbolic shape expression system](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/api/yobx/xshape/index.html)** for dynamic shape handling at export time (`yobx.xshape`).
+- A **[translation tool](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/api/yobx/translate/index.html)** that converts ONNX graphs back to executable Python code (`yobx.translate`).
