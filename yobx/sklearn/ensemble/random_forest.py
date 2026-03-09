@@ -183,12 +183,10 @@ def _extract_forest_attributes_v5(
     :param n_classes: number of classes (classifiers) or 1 (regressors)
     :param is_classifier: True for classification, False for regression
     :param n_estimators: total number of trees in the forest
-    :param dtype: numpy dtype to use for thresholds and leaf weights
-        (``np.float32`` or ``np.float64``); defaults to ``np.float32``
+    :param itype: onnx type
     :return: dict of ONNX attributes ready to be passed to ``make_node``
     """
     dtype = tensor_dtype_to_np_dtype(itype)
-    onnx_float_type = dtype
     all_nodes_featureids: List[int] = []
     all_nodes_splits: List[float] = []
     all_nodes_modes: List[int] = []
@@ -321,7 +319,7 @@ def _extract_forest_attributes_v5(
     # nodes_splits and leaf_weights use the same float type as the input.
     nodes_splits_tensor = oh.make_tensor(
         "nodes_splits",
-        onnx_float_type,
+        itype,
         (len(all_nodes_splits),),
         np.array(all_nodes_splits, dtype=dtype),
     )
@@ -333,7 +331,7 @@ def _extract_forest_attributes_v5(
     )
     leaf_weights_tensor = oh.make_tensor(
         "leaf_weights",
-        onnx_float_type,
+        itype,
         (len(all_leaf_weights),),
         np.array(all_leaf_weights, dtype=dtype),
     )
@@ -404,7 +402,7 @@ def sklearn_random_forest_classifier(
             n_classes,
             n_estimators,
             estimators,
-            dtype=g.get_type(X),
+            itype=g.get_type(X),
         )
 
     # Legacy path: TreeEnsembleClassifier (ai.onnx.ml opset <= 4)
@@ -443,7 +441,7 @@ def _sklearn_random_forest_classifier_v5(
     n_classes: int,
     n_estimators: int,
     estimators: list,
-    dtype=None,
+    itype: int,
 ) -> Tuple[str, str]:
     """
     Emits a ``TreeEnsemble`` node (``ai.onnx.ml`` opset 5) for a
@@ -456,10 +454,8 @@ def _sklearn_random_forest_classifier_v5(
         tensors; uses ``np.float32`` when ``None``
     :return: tuple ``(label_result_name, proba_result_name)``
     """
-    if dtype is None:
-        dtype = np.float32
     attrs = _extract_forest_attributes_v5(
-        estimators, n_classes, is_classifier=True, n_estimators=n_estimators, dtype=dtype
+        estimators, n_classes, is_classifier=True, n_estimators=n_estimators, itype=itype
     )
 
     # scores: [N, n_classes] float32 - averaged class probabilities
@@ -555,6 +551,7 @@ def sklearn_random_forest_regressor(
             name,
             n_estimators,
             estimators,
+            itype=g.get_type(X),
         )
 
     # Detect float64 input so we can cast the output back to double after the
@@ -602,7 +599,7 @@ def _sklearn_random_forest_regressor_v5(
     name: str,
     n_estimators: int,
     estimators: list,
-    dtype=None,
+    itype: int,
 ) -> str:
     """
     Emits a ``TreeEnsemble`` node (``ai.onnx.ml`` opset 5) for a
@@ -616,7 +613,7 @@ def _sklearn_random_forest_regressor_v5(
     :return: output tensor name
     """
     attrs = _extract_forest_attributes_v5(
-        estimators, n_classes=1, is_classifier=False, n_estimators=n_estimators
+        estimators, n_classes=1, is_classifier=False, n_estimators=n_estimators, itype=itype
     )
 
     result = g.make_node(

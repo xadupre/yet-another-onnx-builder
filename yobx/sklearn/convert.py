@@ -1,6 +1,7 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_is_fitted
+from .. import DEFAULT_TARGET_OPSET
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
 from .register import get_sklearn_converter
@@ -22,7 +23,7 @@ def to_onnx(
     args: Tuple[Any],
     input_names: Optional[Sequence[str]] = None,
     dynamic_shapes: Optional[Tuple[Dict[int, str]]] = None,
-    target_opset: Union[int, Dict[str, int]] = 21,
+    target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
     verbose: int = 0,
     builder_cls: Union[type, Callable] = GraphBuilder,
     extra_converters: Optional[Dict[type, Callable]] = None,

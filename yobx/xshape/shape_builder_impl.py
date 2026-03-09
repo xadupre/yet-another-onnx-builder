@@ -699,13 +699,17 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         exc: bool = False,
     ):
         """Runs inference over a model or a graph."""
-        self.main_opset = 18
+
         self.time_evaluation_constants_ = 0
         if isinstance(model, onnx.ModelProto):
+            self.opsets.clear()
             for opset in model.opset_import:
-                if opset.domain == "":
-                    self.main_opset = opset.version
-                    break
+                self.opsets[opset.domain] = opset.version
+            if "" not in self.opsets:
+                from .. import DEFAULT_TARGET_OPSET
+
+                self.opsets[""] = DEFAULT_TARGET_OPSET
+            self.main_opset = self.opsets[""]
             return self.run_model(
                 model.graph, functions={(f.domain, f.name): f for f in model.functions}
             )
