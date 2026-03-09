@@ -1,5 +1,5 @@
 import unittest
-from yobx.ext_test_case import ExtTestCase, has_onnxruntime
+from yobx.ext_test_case import ExtTestCase, has_onnxruntime, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch import ExportOptions
 from yobx.torch.interpreter import to_onnx
@@ -323,6 +323,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
                 got = sess.run(None, feeds)[0]
                 self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime("1.24.3")
     def test_enable_gqa_in_attention(self):
         import torch
 
