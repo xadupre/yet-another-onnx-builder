@@ -9,17 +9,18 @@
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-yet another onnx builder, patches, flattening functions...
+Yet another onnx builder, patches, flattening functions...
 
-**Documentation**: [https://sdpython.github.io/doc/yet-another-onnx-builder/dev/index.html](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/index.html)
+**[Documentation](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/index.html)**
 
 **yet-another-onnx-builder** (`yobx`) is a toolkit for converting machine learning models
-to [ONNX](https://onnx.ai) format and manipulating ONNX graphs programmatically.
+to [ONNX](https://onnx.ai) format from many libraries,
+torch, tensorflow, scikit-learn, xgboost, ligthgbm.
 It provides:
 
 - A **graph builder API** for constructing and optimizing ONNX graphs, with built-in shape
-  inference and a pattern-based graph optimizer.
-- **Converters** for scikit-learn estimators and pipelines (`yobx.sklearn`).
-- **Utilities** for PyTorch export, including model patching and input flattening (`yobx.torch`).
+  inference and a pattern-based graph optimizer : every converter creates nodes into a class
+  of your choice as long as it follows one protocol. One GraphBuilder is provided with
+  optimization included but other implementations are also made based on onnxscript / ir-py and spox.
 - A **symbolic shape expression system** for dynamic shape handling at export time (`yobx.xshape`).
 - A **translation tool** that converts ONNX graphs back to executable Python code (`yobx.translate`).
