@@ -457,7 +457,6 @@ class TestTensorflowBinaryOpConverters(ExtTestCase):
         self._run_binary_op(tf.math.logical_xor, a, b)
         # Xor may be not used...
 
-
     def test_dense_linear_large_model(self):
         """to_onnx with large_model=True returns an ExtendedModelContainer."""
         from yobx.container import ExtendedModelContainer
@@ -466,6 +465,172 @@ class TestTensorflowBinaryOpConverters(ExtTestCase):
         X = np.random.rand(5, 3).astype(np.float32)
         container = to_onnx(model, (X,), large_model=True)
         self.assertIsInstance(container, ExtendedModelContainer)
+
+@requires_tensorflow("2.18")
+class TestTensorflowUnaryOpConverters(ExtTestCase):
+    """Tests for the unary element-wise op converters in unary_ops.py."""
+
+    def _run_unary_op(self, tf_fn, x, disable_ort=False):
+        """Trace tf_fn(x) to ONNX and compare TF vs ONNX vs ORT results."""
+
+        @tf.function
+        def model(inp):
+            return tf_fn(inp)
+
+        onx = to_onnx(model, (x,), input_names=["X"])
+        expected = model(x).numpy()
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X:0": x})[0]
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+        if disable_ort:
+            return onx
+        ort_result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+        return onx
+
+    # ------------------------------------------------------------------
+    # Exponential / Logarithm
+    # ------------------------------------------------------------------
+
+    def test_exp(self):
+        """TF Exp → ONNX Exp."""
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_unary_op(tf.exp, x)
+        self.assertIn("Exp", [n.op_type for n in onx.graph.node])
+
+    def test_log(self):
+        """TF Log → ONNX Log."""
+        x = np.random.rand(3, 4).astype(np.float32) + 0.1
+        onx = self._run_unary_op(tf.math.log, x)
+        self.assertIn("Log", [n.op_type for n in onx.graph.node])
+
+    # ------------------------------------------------------------------
+    # Trigonometric
+    # ------------------------------------------------------------------
+
+    def test_cos(self):
+        """TF Cos → ONNX Cos."""
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_unary_op(tf.math.cos, x)
+        self.assertIn("Cos", [n.op_type for n in onx.graph.node])
+
+    def test_sin(self):
+        """TF Sin → ONNX Sin."""
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_unary_op(tf.math.sin, x)
+        self.assertIn("Sin", [n.op_type for n in onx.graph.node])
+
+    def test_tan(self):
+        """TF Tan → ONNX Tan."""
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_unary_op(tf.math.tan, x)
+        self.assertIn("Tan", [n.op_type for n in onx.graph.node])
+
+    def test_acos(self):
+        """TF Acos → ONNX Acos."""
+        x = (np.random.rand(3, 4).astype(np.float32) * 2 - 1)
+        onx = self._run_unary_op(tf.math.acos, x)
+        self.assertIn("Acos", [n.op_type for n in onx.graph.node])
+
+    def test_asin(self):
+        """TF Asin → ONNX Asin."""
+        x = (np.random.rand(3, 4).astype(np.float32) * 2 - 1)
+        onx = self._run_unary_op(tf.math.asin, x)
+        self.assertIn("Asin", [n.op_type for n in onx.graph.node])
+
+    def test_atan(self):
+        """TF Atan → ONNX Atan."""
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_unary_op(tf.math.atan, x)
+        self.assertIn("Atan", [n.op_type for n in onx.graph.node])
+
+    # ------------------------------------------------------------------
+    # Hyperbolic
+    # ------------------------------------------------------------------
+
+    def test_cosh(self):
+        """TF Cosh → ONNX Cosh."""
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_unary_op(tf.math.cosh, x)
+        self.assertIn("Cosh", [n.op_type for n in onx.graph.node])
+
+    def test_sinh(self):
+        """TF Sinh → ONNX Sinh."""
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_unary_op(tf.math.sinh, x)
+        self.assertIn("Sinh", [n.op_type for n in onx.graph.node])
+
+    # ------------------------------------------------------------------
+    # Rounding / Magnitude
+    # ------------------------------------------------------------------
+
+    def test_abs(self):
+        """TF Abs → ONNX Abs."""
+        x = (np.random.rand(3, 4).astype(np.float32) - 0.5)
+        onx = self._run_unary_op(tf.math.abs, x)
+        self.assertIn("Abs", [n.op_type for n in onx.graph.node])
+
+    def test_neg(self):
+        """TF Neg → ONNX Neg."""
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_unary_op(tf.math.negative, x)
+        self.assertIn("Neg", [n.op_type for n in onx.graph.node])
+
+    def test_sign(self):
+        """TF Sign → ONNX Sign."""
+        x = (np.random.rand(3, 4).astype(np.float32) - 0.5)
+        onx = self._run_unary_op(tf.math.sign, x)
+        self.assertIn("Sign", [n.op_type for n in onx.graph.node])
+
+    def test_floor(self):
+        """TF Floor → ONNX Floor."""
+        x = (np.random.rand(3, 4).astype(np.float32) * 10 - 5)
+        onx = self._run_unary_op(tf.math.floor, x)
+        self.assertIn("Floor", [n.op_type for n in onx.graph.node])
+
+    def test_ceil(self):
+        """TF Ceil → ONNX Ceil."""
+        x = (np.random.rand(3, 4).astype(np.float32) * 10 - 5)
+        onx = self._run_unary_op(tf.math.ceil, x)
+        self.assertIn("Ceil", [n.op_type for n in onx.graph.node])
+
+    def test_round(self):
+        """TF Round → ONNX Round."""
+        x = (np.random.rand(3, 4).astype(np.float32) * 10 - 5)
+        onx = self._run_unary_op(tf.math.round, x)
+        self.assertIn("Round", [n.op_type for n in onx.graph.node])
+
+    # ------------------------------------------------------------------
+    # Square-root family
+    # ------------------------------------------------------------------
+
+    def test_sqrt(self):
+        """TF Sqrt → ONNX Sqrt."""
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_unary_op(tf.math.sqrt, x)
+        self.assertIn("Sqrt", [n.op_type for n in onx.graph.node])
+
+    def test_rsqrt(self):
+        """TF Rsqrt → ONNX Reciprocal(Sqrt(x))."""
+        x = np.random.rand(3, 4).astype(np.float32) + 0.1
+        onx = self._run_unary_op(tf.math.rsqrt, x)
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Sqrt", op_types)
+        self.assertIn("Reciprocal", op_types)
+
+    def test_square(self):
+        """TF Square → ONNX Mul(x, x)."""
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_unary_op(tf.math.square, x)
+        self.assertIn("Mul", [n.op_type for n in onx.graph.node])
+
+    def test_reciprocal(self):
+        """TF Reciprocal → ONNX Reciprocal."""
+        x = np.random.rand(3, 4).astype(np.float32) + 0.1
+        onx = self._run_unary_op(tf.math.reciprocal, x)
+        self.assertIn("Reciprocal", [n.op_type for n in onx.graph.node])
 
 
 if __name__ == "__main__":
