@@ -1,7 +1,6 @@
 import unittest
 from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.torch.interpreter import to_onnx
 
 
 class TestOnnxExportTransformers(ExtTestCase):
@@ -9,6 +8,7 @@ class TestOnnxExportTransformers(ExtTestCase):
     def test_aten_transformers_grouped_mm_no_offset(self):
         import torch
         import transformers.integrations.moe as tmoe
+        from yobx.torch.interpreter import to_onnx
 
         if not hasattr(tmoe, "_grouped_mm_fallback"):
             self.skipTest(

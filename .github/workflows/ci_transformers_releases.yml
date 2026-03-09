@@ -35,25 +35,40 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev,torch]"
 
+      - name: pip freeze
+        run: pip freeze
+
       - name: install transformers==4.49
         run: pip install transformers==4.49 && pip freeze
       - name: Run tests with transformers==4.49
         run: pytest unittests/torch --durations=10
+
+      - name: pip freeze
+        run: pip freeze
 
       - name: install transformers==4.55
         run: pip install transformers==4.55 && pip freeze
       - name: Run tests with transformers==4.55
         run: pytest unittests/torch --durations=10
 
+      - name: pip freeze
+        run: pip freeze
+
       - name: install transformers==4.57
         run: pip install transformers==4.57 && pip freeze
       - name: Run tests with transformers==4.57
         run: pytest unittests/torch --durations=10
 
+      - name: pip freeze
+        run: pip freeze
+
       - name: install transformers==5.2
         run: pip install transformers==5.2 && pip freeze
       - name: Run tests with transformers==5.2
         run: pytest unittests/torch --durations=10
+
+      - name: pip freeze
+        run: pip freeze
 
       - name: install transformers==5.3
         run: pip install transformers==5.3 && pip freeze

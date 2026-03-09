@@ -31,6 +31,9 @@ jobs:
       - name: Install scikit-learn==${{ matrix.sklearn-version }}
         run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*" && pip freeze
 
+      - name: pip freeze
+        run: pip freeze
+
       - name: Run sklearn tests with coverage
         if: matrix.sklearn-version != '1.8'
         run: |

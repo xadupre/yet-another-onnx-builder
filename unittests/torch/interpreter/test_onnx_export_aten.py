@@ -2162,7 +2162,7 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = ScaledDotProductAttention()
         attn_mask = torch.ones(2, 4, 8, 8).bool()
-        attn_mask[0, 0, 0, :] = False
+        attn_mask[0, 0, 0, 1:] = False
         query = torch.randn(2, 4, 8, 16)
         key = torch.randn(2, 4, 8, 16)
         value = torch.randn(2, 4, 8, 16)
