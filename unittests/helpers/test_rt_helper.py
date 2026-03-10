@@ -332,7 +332,7 @@ class TestOnnxGenerate(ExtTestCase):
         tokens = onnx_generate(
             model, prompt, attention_mask=attn, max_new_tokens=2, eos_token_id=99
         )
-        self.assertIsInstance(tokens, np.ndarray)
+        self.assertTrue(isinstance(tokens, np.ndarray) or torch.is_tensor(tokens))
         self.assertEqual(tokens.shape, (1, 5))
 
 

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, FrozenSet, List, Optional, Sequence, Tuple, Union
 import numpy as np
 import onnx
 from .helper import flatten_object, string_type
@@ -145,14 +145,31 @@ def _get_dim(i: int, s: Union[str, int], batch: int = 1) -> int:
     return 0
 
 
+# Inputs that are never treated as KV-cache slots.
+_KNOWN_NON_CACHE: FrozenSet[str] = frozenset(
+    {"input_ids", "attention_mask", "position_ids", "token_type_ids", "cache_position"}
+)
+
+
 def _make_empty_cache(
     batch: int,
     onnx_input_names: List[str],
     onnx_input_shapes: List[Tuple[Union[int, str], ...]],
     onnx_input_types: List[str],
-    _ORT_TYPE_TO_TORCH,
+    ort_type_to_torch: Dict[str, Any],
+    device: "torch.device",  # noqa: F821
 ) -> Dict[str, "torch.Tensor"]:  # noqa: F821
-    """Creates an empty cache."""
+    """Creates zero-filled KV-cache tensors for the first generation step.
+
+    :param batch: batch size
+    :param onnx_input_names: names of the KV-cache inputs
+    :param onnx_input_shapes: ORT input shapes for those inputs
+    :param onnx_input_types: ORT type strings for those inputs
+    :param ort_type_to_torch: mapping from ORT type strings to ``torch.dtype``
+    :param device: device on which to allocate the tensors (must match the
+        device of ``input_ids`` to avoid mixed-device errors)
+    :return: dict ``{name: zero tensor}``
+    """
     import torch
 
     assert batch > 0, f"batch size = {batch} must be positive"
@@ -162,7 +179,7 @@ def _make_empty_cache(
         assert (
             new_shape and new_shape[0] > 0
         ), f"new_shape={new_shape} cannot have a null batch size, name={name!r}, shape={shape}"
-        feeds[name] = torch.empty(new_shape, dtype=_ORT_TYPE_TO_TORCH[dtype])
+        feeds[name] = torch.zeros(new_shape, dtype=ort_type_to_torch[dtype], device=device)
     return feeds
 
 
@@ -177,7 +194,7 @@ def onnx_generate(
     do_sample: bool = False,
     return_session: bool = False,
     verbose: int = 0,
-) -> np.ndarray:
+) -> Union[np.ndarray, "torch.Tensor"]:  # type: ignore[name-defined] # noqa: F821
     """
     Performs auto-regressive token generation using an exported ONNX model.
 
@@ -205,9 +222,13 @@ def onnx_generate(
     :param do_sample: when *True* sample the next token from the softmax
         distribution; when *False* (default) use greedy argmax.
     :param verbose: verbosity level (0 = silent).
-    :param return_session: return the session and the feeds
-    :return: integer array of shape ``[batch, seq_len + generated_tokens]``
-        containing the original prompt followed by the generated tokens.
+    :param return_session: when *True* return a 3-tuple
+        ``(tokens, session, last_feeds)`` instead of just the tokens.
+    :return: integer array/tensor of shape
+        ``[batch, seq_len + generated_tokens]`` containing the original
+        prompt followed by the generated tokens.  The type matches
+        ``input_ids``: :class:`numpy.ndarray` when the caller passed NumPy
+        arrays, :class:`torch.Tensor` otherwise.
 
     Example with a tiny synthetic ONNX decoder (no KV cache)::
 
@@ -221,7 +242,7 @@ def onnx_generate(
         TFLOAT = onnx.TensorProto.FLOAT
         VOCAB  = 8
 
-        # A minimal "LM head": returns a fixed logits matrix so that the
+        # A minimal "LM head": always returns the same logits so that the
         # argmax always picks token 3.
         fixed_logits = np.zeros((1, 1, VOCAB), dtype=np.float32)
         fixed_logits[0, 0, 3] = 10.0   # token 3 always wins
@@ -229,17 +250,16 @@ def onnx_generate(
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node("Shape", ["input_ids"], ["ids_shape"]),
                     oh.make_node(
-                        "ConstantOfShape",
-                        ["ids_shape"],
+                        "Constant",
+                        [],
                         ["logits"],
-                        value=onh.from_array(fixed_logits.reshape(VOCAB)),
+                        value=onh.from_array(fixed_logits),
                     ),
                 ],
                 "tiny_lm",
                 [oh.make_tensor_value_info("input_ids", TINT64, [1, None])],
-                [oh.make_tensor_value_info("logits", TFLOAT, [1, None, VOCAB])],
+                [oh.make_tensor_value_info("logits", TFLOAT, [1, 1, VOCAB])],
             ),
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
@@ -253,19 +273,20 @@ def onnx_generate(
         When the ONNX model exposes *past key/value* inputs, the function
         automatically creates zero-filled tensors for the initial call and
         feeds back the corresponding outputs on every subsequent step.  The
-        expected naming convention is that every model input that is **not**
-        one of ``input_ids``, ``attention_mask``, ``position_ids``, or
-        ``token_type_ids`` is treated as a KV-cache tensor.  Model outputs
-        are mapped back to KV-cache inputs by position (first
-        ``len(kv_inputs)`` non-logits outputs → KV inputs).
+        KV-cache heuristic treats any input whose name is **not** in
+        ``{input_ids, attention_mask, position_ids, token_type_ids,
+        cache_position}`` as a KV-cache slot.  Present-key/value outputs are
+        mapped back to past-key/value inputs by position (i.e. ``outputs[1]``
+        → ``cache_inputs[0]``, etc.).
     """
     import torch
     from ..reference._inference_session_torch import InferenceSessionForTorch
 
-    _ORT_TYPE_TO_TORCH: Dict[str, type] = {
+    _ORT_TYPE_TO_TORCH: Dict[str, Any] = {
         "tensor(float)": torch.float32,
         "tensor(float32)": torch.float32,
         "tensor(float16)": torch.float16,
+        "tensor(bfloat16)": torch.bfloat16,
         "tensor(double)": torch.float64,
         "tensor(float64)": torch.float64,
         "tensor(int64)": torch.int64,
@@ -279,11 +300,11 @@ def onnx_generate(
         "tensor(bool)": torch.bool,
     }
 
-    return_np = False
+    return_np = isinstance(input_ids, np.ndarray)
     if isinstance(input_ids, np.ndarray):
-        return_np = True
         input_ids = torch.from_numpy(input_ids)
-        attention_mask = torch.from_numpy(attention_mask) if attention_mask is not None else None
+    if isinstance(attention_mask, np.ndarray):
+        attention_mask = torch.from_numpy(attention_mask)
 
     if not isinstance(model_or_path, InferenceSessionForTorch):
         providers = ["CUDAExecutionProvider"] if input_ids.is_cuda else []
@@ -295,120 +316,138 @@ def onnx_generate(
     input_shapes = session.input_shapes
     input_names = session.input_names
     input_types = session.input_types
-    has_position_ids = "position_ids" in session.input_names
-    has_cache_position = "cache_position" in session.input_names
+    has_position_ids = "position_ids" in input_names
+    has_cache_position = "cache_position" in input_names
 
-    assert input_names == ["input_ids"] or (
-        len(input_names) > 2
-        and input_names[:2] == ["input_ids", "attention_mask"]
-        and input_names[3 if has_position_ids else 2].startswith("past_key_values")
-    ), (
-        f"Only text generation is supported but input_names == {input_names}, "
-        f"has_position_ids={has_position_ids}"
-    )
-    assert (
-        not has_position_ids or input_names[2] == "position_ids"
-    ), f"position_ids must the third input but input_names={input_names}"
+    device = input_ids.device
+    batch_size = input_ids.shape[0]
 
-    cache_names, cache_shapes, cache_types = [], [], []
-    for name, shape, dt in zip(input_names, input_shapes, input_types):
-        if name.startswith("past_key_values"):
-            cache_names.append(name)
-            cache_shapes.append(shape)
-            cache_types.append(dt)
+    # Heuristic KV-cache detection: any input not in the set of known
+    # "meta" inputs is treated as a past-key/value slot.
+    cache_names = [n for n in input_names if n not in _KNOWN_NON_CACHE]
+    cache_shapes = [input_shapes[input_names.index(n)] for n in cache_names]
+    cache_types = [input_types[input_names.index(n)] for n in cache_names]
 
-    # First call: prefill
+    # Build the initial attention mask (all ones if not provided).
+    if attention_mask is None:
+        attention_mask = torch.ones(input_ids.shape, dtype=torch.int64, device=device)
+    else:
+        attention_mask = attention_mask.to(device=device)
+
+    # Bootstrap zero-filled KV-cache tensors on the same device as input_ids.
     empty_cache = _make_empty_cache(
-        input_ids.shape[0], cache_names, cache_shapes, cache_types, _ORT_TYPE_TO_TORCH
+        batch_size, cache_names, cache_shapes, cache_types, _ORT_TYPE_TO_TORCH, device
     )
-    feeds = (
-        dict(input_ids=input_ids)
-        if len(input_names) == 1
-        else dict(
-            input_ids=input_ids,
-            attention_mask=(
-                attention_mask
-                if attention_mask is not None
-                else torch.ones(input_ids.shape, dtype=input_ids.dtype, device=input_ids.device)
-            ),
-            **empty_cache,
-        )
-    )
+
+    # ------------------------------------------------------------------ #
+    # Prefill step                                                         #
+    # ------------------------------------------------------------------ #
+    feeds: Dict[str, Any] = {"input_ids": input_ids}
+    if "attention_mask" in input_names:
+        feeds["attention_mask"] = attention_mask
+    feeds.update(empty_cache)
 
     if has_position_ids:
         assert input_ids.shape[1] > 0, f"unexpected value for input_ids shape={input_ids.shape}"
-        position_ids = torch.unsqueeze(
-            torch.arange(input_ids.shape[1], dtype=torch.int64, device=input_ids.device), 0
+        feeds["position_ids"] = (
+            torch.arange(input_ids.shape[1], dtype=torch.int64, device=device)
+            .unsqueeze(0)
+            .expand(batch_size, -1)
         )
-        feeds["position_ids"] = position_ids
 
     if has_cache_position:
-        assert empty_cache, "no cache means no cache_position"
-        first_tensor = next(iter(empty_cache.values()))
-        cache_position = torch.arange(
-            first_tensor.shape[2],
-            input_ids.shape[1] + first_tensor.shape[2],
-            dtype=torch.int64,
-            device=input_ids.device,
+        past_len = (
+            next(iter(empty_cache.values())).shape[2]
+            if empty_cache and next(iter(empty_cache.values())).ndim > 2
+            else 0
         )
-        feeds["cache_position"] = cache_position
+        feeds["cache_position"] = torch.arange(
+            past_len,
+            input_ids.shape[1] + past_len,
+            dtype=torch.int64,
+            device=device,
+        )
 
-    # prefill step
     outputs = session.run(None, feeds)
 
-    # Next calls: decode
-    for _ in range(max_new_tokens):
-        next_token_logits = outputs[0][:, -1, :]
+    # ------------------------------------------------------------------ #
+    # Decode loop                                                          #
+    # ------------------------------------------------------------------ #
+    # Per-batch EOS tracking so that the loop terminates only when *all*
+    # sequences have finished (correct for batch_size > 1).
+    eos_found = torch.zeros(batch_size, dtype=torch.bool, device=device)
 
-        # The most probable next token is chosen.
+    for _ in range(max_new_tokens):
+        next_token_logits = outputs[0][:, -1, :]  # [batch, vocab]
+
         if do_sample:
             # Sample from the probability distribution over the vocabulary.
             probs = torch.softmax(next_token_logits, dim=-1)
             next_token_id = torch.multinomial(probs, num_samples=1)  # [batch, 1]
         else:
             # Greedy decoding: take the argmax token.
-            next_token_id = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+            next_token_id = torch.argmax(next_token_logits, dim=-1, keepdim=True)  # [batch, 1]
 
-        input_ids = torch.cat([input_ids, next_token_id.to(input_ids.device)], dim=-1)
+        # Update per-batch EOS flags and append the new token.
+        if eos_token_id is not None:
+            eos_found |= next_token_id.squeeze(-1) == eos_token_id
 
-        if next_token_id.item() == eos_token_id:
+        input_ids = torch.cat([input_ids, next_token_id.to(device)], dim=-1)
+
+        # Stop once every sequence in the batch has produced EOS.
+        if eos_token_id is not None and eos_found.all():
             break
 
-        feeds = (
-            dict(input_ids=input_ids)
-            if len(input_names) == 1
-            else dict(
-                input_ids=next_token_id,
-                attention_mask=torch.ones(
-                    input_ids.shape, dtype=input_ids.dtype, device=input_ids.device
-                ),
-            )
+        # Extend the attention mask by one column of ones for the new token.
+        attention_mask = torch.cat(
+            [
+                attention_mask,
+                torch.ones((batch_size, 1), dtype=attention_mask.dtype, device=device),
+            ],
+            dim=-1,
         )
+
+        # Build feeds for the next decode step.
+        if not cache_names:
+            # No KV cache: feed the full growing sequence.
+            feeds = {"input_ids": input_ids}
+            if "attention_mask" in input_names:
+                feeds["attention_mask"] = attention_mask
+        else:
+            # KV cache: feed only the single new token; map present outputs
+            # back to past inputs by position.
+            feeds = {"input_ids": next_token_id, "attention_mask": attention_mask}
+            for j, name in enumerate(cache_names):
+                if 1 + j < len(outputs):
+                    feeds[name] = outputs[1 + j]
+
+        if has_position_ids or has_cache_position:
+            last_position = input_ids.shape[1] - 1
+
         if has_position_ids:
-            feeds["position_ids"] = torch.unsqueeze(
-                torch.arange(
-                    input_ids.shape[1],
-                    input_ids.shape[1] + 1,
-                    dtype=torch.int64,
-                    device=input_ids.device,
-                ),
-                0,
+            feeds["position_ids"] = torch.full(
+                (batch_size, 1),
+                last_position,
+                dtype=torch.int64,
+                device=device,
             )
+
         if has_cache_position:
             feeds["cache_position"] = torch.arange(
-                input_ids.shape[1],
-                input_ids.shape[1] + 1,
+                last_position,
+                last_position + 1,
                 dtype=torch.int64,
-                device=input_ids.device,
+                device=device,
             )
 
-        feeds.update(
-            dict(zip([n for n in input_names if n.startswith("past_key_values")], outputs[1:]))
-        )
         outputs = session.run(None, feeds)
 
+    result: Union[np.ndarray, torch.Tensor]  # type: ignore[name-defined] # noqa: F821
     if return_np:
-        input_ids = input_ids.detach().numpy()
+        result = input_ids.detach().cpu().numpy()
+    else:
+        result = input_ids
+
     if return_session:
-        return input_ids, session, feeds
-    return input_ids
+        return result, session, feeds  # type: ignore[return-value]
+    return result
