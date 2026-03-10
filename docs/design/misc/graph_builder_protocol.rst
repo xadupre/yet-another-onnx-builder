@@ -34,38 +34,6 @@ builder.  Some reasons for doing so:
   more convenient to accumulate nodes there directly and avoid a
   round-trip through :class:`onnx.ModelProto`.
 
-Protocol overview
-=================
-
-:class:`GraphBuilderExtendedProtocol <yobx.typing.GraphBuilderExtendedProtocol>`
-extends :class:`GraphBuilderProtocol <yobx.typing.GraphBuilderProtocol>` with
-three additional members required by the converters:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 35 65
-
-   * - Member
-     - Purpose
-   * - ``main_opset``
-     - Read-only property.  Returns the opset version for the main ONNX
-       domain (``""``).
-   * - ``op``
-     - Returns an :class:`OpsetProtocol <yobx.typing.OpsetProtocol>`
-       helper.  Converters use ``g.op.Relu(x)`` as short-hand for
-       ``g.make_node("Relu", [x], 1)``.
-   * - ``set_type_shape_unary_op(name, input_name, itype)``
-     - Propagates type and shape from *input_name* to *name* for
-       elementwise unary operators.
-   * - ``unique_name(prefix)``
-     - Returns a name that starts with *prefix* and is not yet used
-       in the graph.
-   * - ``get_debug_msg()``
-     - Returns a string with diagnostic context that is included in
-       exceptions raised during conversion.
-
-See :ref:`l-design-expected-api` for the full list of methods inherited
-from :class:`GraphBuilderProtocol <yobx.typing.GraphBuilderProtocol>`.
 
 Using OnnxScriptGraphBuilder
 ============================
