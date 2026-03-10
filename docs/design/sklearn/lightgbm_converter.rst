@@ -1,24 +1,31 @@
-.. _l-design-lightgbm-converter:
+.. _l-design-gbm-converters:
 
-==================
-LightGBM Converter
-==================
+=====================================
+Gradient Boosting Converters
+=====================================
 
 :func:`yobx.sklearn.to_onnx` converts fitted
-:class:`lightgbm.LGBMRegressor` and :class:`lightgbm.LGBMClassifier`
+:class:`xgboost.XGBRegressor`, :class:`xgboost.XGBClassifier`,
+:class:`lightgbm.LGBMRegressor`, and :class:`lightgbm.LGBMClassifier`
 estimators to ONNX using the same registry-based architecture as the other
 :mod:`yobx.sklearn` converters.
 
-The implementation lives in :mod:`yobx.sklearn.lightgbm.lgbm` and is
-registered automatically when
-:func:`~yobx.sklearn.register_sklearn_converters` is called.
+Both :epkg:`XGBoost` and :epkg:`LightGBM` are gradient-boosted tree
+libraries — their fitted models consist of an ensemble of binary decision
+trees.  The converters map these trees to ONNX ``TreeEnsemble*`` operators
+and share the same high-level structure, differing only in how split
+conditions are expressed and how the raw margin is post-processed.
 
-Overview
-========
+Implementations:
 
-The fitted model's internal boosted-tree structure is extracted via
-``booster_.dump_model()`` and encoded into an ONNX tree-ensemble operator.
-Two encodings are supported depending on the active ``ai.onnx.ml`` opset:
+* :mod:`yobx.sklearn.xgboost.xgb` — XGBoost converters
+* :mod:`yobx.sklearn.lightgbm.lgbm` — LightGBM converters
+
+Common ONNX encoding
+====================
+
+Both converters support two ``ai.onnx.ml`` encodings, selected
+automatically based on the active opset:
 
 * **Opset ≤ 4 (legacy)** — ``TreeEnsembleRegressor`` /
   ``TreeEnsembleClassifier`` with flat ``nodes_*`` / ``target_*`` (regressor)
@@ -26,39 +33,128 @@ Two encodings are supported depending on the active ``ai.onnx.ml`` opset:
 * **Opset ≥ 5 (modern)** — unified ``TreeEnsemble`` operator with separate
   ``nodes_splits`` / ``leaf_weights`` tensor attributes.
 
-Both encodings are supported for ``float32`` and ``float64`` inputs.
+Both encodings support ``float32`` and ``float64`` inputs.
+
+XGBoost
+=======
+
+The implementation lives in :mod:`yobx.sklearn.xgboost.xgb` and is
+registered automatically when
+:func:`~yobx.sklearn.register_sklearn_converters` is called.
 
 Tree structure
-==============
+--------------
 
-LightGBM trees use a *binary, left-deep* structure where internal nodes
-contain a *split condition* and two child pointers:
+XGBoost trees are extracted via ``booster.get_dump(dump_format='json')``.
+Internal nodes use *less-than* splits:
+
+.. code-block:: text
+
+    internal node
+    ├── nodeid
+    ├── split         (feature name, e.g. "f0")
+    ├── split_condition  (float threshold)
+    ├── yes           (taken when x < threshold)
+    └── no            (taken when x >= threshold)
+
+The ONNX ``BRANCH_LT`` mode (mode 1) matches XGBoost's exact semantics
+(*go to yes-child when* ``x < threshold``).
+
+XGBRegressor
+------------
+
+:func:`~yobx.sklearn.xgboost.xgb.sklearn_xgb_regressor` converts
+:class:`xgboost.XGBRegressor`.
+
+The ``base_score`` bias is read from ``booster.save_config()`` and added to
+the raw margin before the objective-dependent output transform:
+
+===========================================================  ==========================
+Objective                                                    Output transform
+===========================================================  ==========================
+``reg:squarederror``, ``reg:absoluteerror``, …               Identity + base_score bias
+``reg:logistic``                                             ``Sigmoid(margin)``
+``count:poisson``, ``reg:gamma``, ``reg:tweedie``,           ``Exp(margin)``
+``survival:cox``
+===========================================================  ==========================
+
+Unsupported objectives raise :class:`NotImplementedError`.
+
+XGBClassifier
+-------------
+
+:func:`~yobx.sklearn.xgboost.xgb.sklearn_xgb_classifier` converts
+:class:`xgboost.XGBClassifier`.
+
+**Binary classification** (``n_classes == 2``):
+
+.. code-block:: text
+
+    X  ──TreeEnsemble(1 target)──►  raw_score  [N, 1]
+                                        │
+                                    Sigmoid  ──►  p1  [N, 1]
+                                        │
+                               ┌────────┴────────┐
+                            p1  [N,1]        Sub(1, p1)  ──►  p0  [N, 1]
+                               └────────┬────────┘
+                                     Concat  ──►  probabilities  [N, 2]
+                                        │
+                                     ArgMax ──Cast──Gather(classes)  ──►  label
+
+**Multi-class classification** (``n_classes > 2``):
+
+.. code-block:: text
+
+    X  ──TreeEnsemble(n_classes targets)──►  raw_scores  [N, n_classes]
+                                                │
+                                           Softmax  ──►  probabilities  [N, n_classes]
+                                                │
+                                           ArgMax ──Cast──Gather(classes)  ──►  label
+
+.. code-block:: python
+
+    import numpy as np
+    from xgboost import XGBClassifier
+    from yobx.sklearn import to_onnx
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((60, 4)).astype(np.float32)
+    y = (X[:, 0] + X[:, 1] > 0).astype(int)
+
+    clf = XGBClassifier(n_estimators=10, max_depth=3, random_state=0).fit(X, y)
+    label_onx, proba_onx = to_onnx(clf, (X,))
+
+LightGBM
+========
+
+The implementation lives in :mod:`yobx.sklearn.lightgbm.lgbm` and is
+registered automatically when
+:func:`~yobx.sklearn.register_sklearn_converters` is called.
+
+Tree structure
+--------------
+
+LightGBM trees are extracted via ``booster_.dump_model()``.  Internal
+nodes use *less-than-or-equal* splits and, for categorical features,
+set-membership tests:
 
 .. code-block:: text
 
     internal node
     ├── split_feature  (feature index)
-    ├── threshold      (split value or category set)
+    ├── threshold      (float value or category set like '0||1||2')
     ├── decision_type  ('<=' for numerical, '==' for categorical)
     ├── left_child     (taken when condition is TRUE)
     └── right_child    (taken when condition is FALSE)
 
-Numerical splits
-----------------
+**Numerical splits** use ``BRANCH_LEQ`` (mode 0): *go left when*
+``x ≤ threshold``.
 
-Numerical splits use ``decision_type == '<='`` with a floating-point
-threshold.  The ONNX ``BRANCH_LEQ`` mode matches LightGBM's exact semantics
-(*go left when* ``x ≤ threshold``).
-
-Categorical splits
-------------------
-
-Categorical splits use ``decision_type == '=='`` with a threshold string
-such as ``'0||1||2'``, meaning *go left if the feature value is 0, 1, or 2*.
-Because ONNX only supports single-value ``BRANCH_EQ`` (``x == v``), the
-converter calls :func:`~yobx.sklearn.lightgbm.lgbm._expand_categorical_splits`
-to replace each multi-value categorical node with a **chain of single-value
-BRANCH_EQ nodes**:
+**Categorical splits** use ``decision_type == '=='`` with a threshold
+string such as ``'0||1||2'``, meaning *go left if the feature value is 0,
+1, or 2*.  Because ONNX only supports single-value ``BRANCH_EQ``
+(``x == v``), the converter expands each multi-value node into a **chain
+of single-value BRANCH_EQ nodes**:
 
 .. code-block:: text
 
@@ -67,19 +163,19 @@ BRANCH_EQ nodes**:
           BRANCH_EQ(feature==1): true→left_subtree, false→
               BRANCH_EQ(feature==2): true→left_subtree, false→right_subtree
 
-Shared ``left_subtree`` references across the chain are handled by
-:func:`~yobx.sklearn.lightgbm.lgbm._flatten_lgbm_tree`, which uses a
-memoised depth-first traversal keyed on Python object identity, ensuring
-each unique subtree is assigned exactly one flat node ID.
+Shared ``left_subtree`` references across the chain are handled by a
+memoised depth-first traversal, ensuring each unique subtree is assigned
+exactly one flat node ID.
 
 LGBMRegressor
-=============
+-------------
 
 :func:`~yobx.sklearn.lightgbm.lgbm.sklearn_lgbm_regressor` converts
 :class:`lightgbm.LGBMRegressor`.
 
-The raw sum of tree outputs (margin) is post-processed depending on the
-model's objective:
+Unlike XGBoost, LightGBM leaf values are already shrinkage-scaled — there
+is no separate ``base_score`` bias.  The raw sum of tree outputs equals the
+final margin directly:
 
 =======================================  =======================
 Objective                                Output transform
@@ -90,6 +186,16 @@ Objective                                Output transform
 =======================================  =======================
 
 Unsupported objectives raise :class:`NotImplementedError`.
+
+LGBMClassifier
+--------------
+
+:func:`~yobx.sklearn.lightgbm.lgbm.sklearn_lgbm_classifier` converts
+:class:`lightgbm.LGBMClassifier`.
+
+The graph structure is identical to the XGBClassifier graphs above (binary
+→ sigmoid + concat; multi-class → softmax), with ``LGBMClassifier``'s
+``classes_`` used for the final label gather.
 
 .. code-block:: python
 
@@ -104,88 +210,12 @@ Unsupported objectives raise :class:`NotImplementedError`.
     reg = LGBMRegressor(n_estimators=10, max_depth=3, random_state=0).fit(X, y)
     onx = to_onnx(reg, (X,))
 
-Graph structure (regression, identity objective):
+Categorical features (LightGBM only)
+-------------------------------------
 
-.. code-block:: text
-
-    X  ──TreeEnsemble(Σ trees)──►  margin
-                                       │
-                                  Cast(→itype)
-                                       │
-                                  [Exp]  (only for poisson/tweedie)
-                                       │
-                                  Cast  ──►  predictions  [N, 1]
-
-LGBMClassifier
-==============
-
-:func:`~yobx.sklearn.lightgbm.lgbm.sklearn_lgbm_classifier` converts
-:class:`lightgbm.LGBMClassifier`.
-
-**Binary classification** (``n_classes_ == 2``):
-
-.. code-block:: text
-
-    X  ──TreeEnsemble(1 target)──►  raw_score  [N, 1]
-                                        │
-                                    Sigmoid  ──►  p1  [N, 1]
-                                        │
-                               ┌────────┴────────┐
-                            p1  [N,1]        Sub(1, p1)  ──►  p0  [N, 1]
-                               └────────┬────────┘
-                                     Concat  ──►  probabilities  [N, 2]
-                                        │
-                                     ArgMax ──Cast──Gather(classes_)  ──►  label
-
-**Multi-class classification** (``n_classes_ > 2``):
-
-.. code-block:: text
-
-    X  ──TreeEnsemble(n_classes targets)──►  raw_scores  [N, n_classes]
-                                                │
-                                           Softmax  ──►  probabilities  [N, n_classes]
-                                                │
-                                           ArgMax ──Cast──Gather(classes_)  ──►  label
-
-.. code-block:: python
-
-    import numpy as np
-    from lightgbm import LGBMClassifier
-    from yobx.sklearn import to_onnx
-
-    rng = np.random.default_rng(1)
-    X = rng.standard_normal((60, 4)).astype(np.float32)
-    y = (X[:, 0] + X[:, 1] > 0).astype(int)
-
-    clf = LGBMClassifier(n_estimators=10, max_depth=3, random_state=0).fit(X, y)
-    label_onx, proba_onx = to_onnx(clf, (X,))
-
-Supported input dtypes and opsets
-==================================
-
-The converter respects the input dtype (``float32`` or ``float64``) and
-the active ``ai.onnx.ml`` opset:
-
-* ``float32`` input with ``ai.onnx.ml`` opset 3 → ``TreeEnsembleRegressor``
-  / ``TreeEnsembleClassifier`` (float32 weights)
-* ``float64`` input with ``ai.onnx.ml`` opset 3 → legacy operators with
-  float64 routing via an explicit ``Cast`` node
-* ``float32`` or ``float64`` with ``ai.onnx.ml`` opset 5 → unified
-  ``TreeEnsemble`` with matching weight dtype
-
-Specifying the target opset:
-
-.. code-block:: python
-
-    onx = to_onnx(reg, (X.astype(np.float64),),
-                  target_opset={"": 21, "ai.onnx.ml": 3})
-
-Categorical features
-====================
-
-Integer-coded categorical features are supported.  Pass
-``categorical_feature`` to LightGBM's ``fit()`` to mark which columns are
-categorical, then convert as usual:
+Integer-coded categorical features are supported for LightGBM.  Pass
+``categorical_feature`` to ``fit()`` to mark which columns are categorical,
+then convert as usual:
 
 .. code-block:: python
 
@@ -206,16 +236,54 @@ categorical, then convert as usual:
 
 .. note::
 
-    The input to the ONNX model must use the same integer encoding for
-    categorical features as was used during training.  The converter does
-    **not** perform any label-encoding or category mapping — it relies on
-    the integer codes already being in the LightGBM-expected range.
+    XGBoost models with categorical features must encode them as regular
+    numeric columns (e.g. using ``OrdinalEncoder`` or one-hot encoding) before
+    training when using this converter.  The converter reads standard numeric
+    XGBoost splits only.  LightGBM models support integer-coded categoricals
+    natively via the ``categorical_feature`` argument.
+
+Comparison: XGBoost vs LightGBM
+================================
+
+The table below summarises the key differences between the two converters:
+
+==================================  ==============================  ==============================
+Property                            XGBoost                         LightGBM
+==================================  ==============================  ==============================
+Tree dump method                    ``get_dump(dump_format='json')``  ``booster_.dump_model()``
+Split direction (numerical)         ``x < threshold`` (BRANCH_LT)  ``x ≤ threshold`` (BRANCH_LEQ)
+Categorical splits                  Not supported by converter       Expanded to BRANCH_EQ chains
+Base-score bias                     Added from ``base_score`` cfg    None (baked into leaf values)
+Regression transform                Identity / Sigmoid / Exp         Identity / Exp
+Multi-class targets per round       ``n_classes`` trees              ``n_classes`` trees
+Binary classifier raw outputs       1 tree per round (sigmoid)       1 tree per round (sigmoid)
+==================================  ==============================  ==============================
+
+Supported input dtypes and opsets
+==================================
+
+Both converters respect the input dtype and the active ``ai.onnx.ml`` opset:
+
+* ``float32`` input with ``ai.onnx.ml`` opset 3 → ``TreeEnsembleRegressor``
+  / ``TreeEnsembleClassifier`` (float32 weights)
+* ``float64`` input with ``ai.onnx.ml`` opset 3 → legacy operators with
+  float64 routing via an explicit ``Cast`` node
+* ``float32`` or ``float64`` with ``ai.onnx.ml`` opset 5 → unified
+  ``TreeEnsemble`` with matching weight dtype
+
+Specifying the target opset:
+
+.. code-block:: python
+
+    onx = to_onnx(reg, (X.astype(np.float64),),
+                  target_opset={"": 21, "ai.onnx.ml": 3})
 
 Pipeline embedding
 ==================
 
-:class:`lightgbm.LGBMRegressor` and :class:`lightgbm.LGBMClassifier` can
-be used as the final step in a :class:`sklearn.pipeline.Pipeline`:
+Both :class:`xgboost.XGBRegressor` / :class:`xgboost.XGBClassifier` and
+:class:`lightgbm.LGBMRegressor` / :class:`lightgbm.LGBMClassifier` can be
+used as the final step in a :class:`sklearn.pipeline.Pipeline`:
 
 .. code-block:: python
 
@@ -235,3 +303,4 @@ be used as the final step in a :class:`sklearn.pipeline.Pipeline`:
     ]).fit(X, y)
 
     label_onx, proba_onx = to_onnx(pipe, (X,))
+
