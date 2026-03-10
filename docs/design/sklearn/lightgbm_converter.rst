@@ -220,13 +220,13 @@ Integer-coded categorical features are supported for LightGBM.  Pass
 ``categorical_feature`` to ``fit()`` to mark which columns are categorical,
 then convert as usual:
 
-.. runpython:: python
+.. runpython::
     :showcode:
 
     import numpy as np
     from lightgbm import LGBMRegressor
     from yobx.sklearn import to_onnx
-    from yobx.helprs.onnx_helper import pretty_onnx
+    from yobx.helpers.onnx_helper import pretty_onnx
 
     rng = np.random.default_rng(0)
     X_num = rng.standard_normal((200, 3)).astype(np.float32)
@@ -254,7 +254,7 @@ Comparison: XGBoost vs LightGBM
 The table below summarises the key differences between the two converters:
 
 ==================================  ================================  ==============================
-Property                            XGBoost                          LightGBM
+Property                            XGBoost                           LightGBM
 ==================================  ================================  ==============================
 Tree dump method                    ``get_dump(dump_format='json')``  ``booster_.dump_model()``
 Split direction (numerical)         ``x < threshold`` (BRANCH_LT)     ``x ≤ threshold`` (BRANCH_LEQ)
@@ -263,7 +263,7 @@ Base-score bias                     Added from ``base_score`` cfg     None (bake
 Regression transform                Identity / Sigmoid / Exp          Identity / Exp
 Multi-class targets per round       ``n_classes`` trees               ``n_classes`` trees
 Binary classifier raw outputs       1 tree per round (sigmoid)        1 tree per round (sigmoid)
-==================================  ===============================   ==============================
+==================================  ================================  ==============================
 
 Supported input dtypes and opsets
 ==================================
