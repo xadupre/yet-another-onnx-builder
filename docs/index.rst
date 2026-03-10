@@ -32,7 +32,7 @@ It provides:
 - Utilities for **PyTorch** export, including model patching and input flattening (``yobx.torch``).
 - A symbolic :ref:`shape expression system <l-design-shape>` for dynamic shape handling at export time.
 - A :ref:`translation tool <l-design-translate>` that converts ONNX graphs back to executable Python code.
-- **Optimization fucntions** to make the model more efficient.
+- **Optimization functions** to make the model more efficient.
 - It supports multiple opsets and multiple domains.
 - It allows the user to directly onnx model with :epkg:`spox` or :epkg:`onnxscript`/:epkg:`ir-py`.
 
@@ -42,7 +42,7 @@ Its unique API:
 
     # the model is called 
     expected = model(*args, **kwargs)
-    onnx_model = to_onnx(model, args, kwargs, **options)
+    onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, **options)
 
 .. toctree::
    :maxdepth: 2

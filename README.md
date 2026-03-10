@@ -38,5 +38,5 @@ Its unique API:
 ```python
 # the model is called 
 expected = model(*args, **kwargs)
-onnx_model = to_onnx(model, args, kwargs, **options)
+onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, **options)
 ```

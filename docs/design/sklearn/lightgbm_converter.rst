@@ -111,7 +111,7 @@ XGBClassifier
                                                 │
                                            ArgMax ──Cast──Gather(classes)  ──►  label
 
-.. runpython:: python
+.. runpython::
     :showcode:
 
     import numpy as np
@@ -291,7 +291,7 @@ Both :class:`xgboost.XGBRegressor` / :class:`xgboost.XGBClassifier` and
 :class:`lightgbm.LGBMRegressor` / :class:`lightgbm.LGBMClassifier` can be
 used as the final step in a :class:`sklearn.pipeline.Pipeline`:
 
-.. runpython:: python
+.. runpython::
     :showcode:
 
     import numpy as np
