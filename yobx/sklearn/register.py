@@ -61,15 +61,15 @@ def get_sklearn_estimator_coverage():
             ``None`` if ``skl2onnx`` is not available.
     """
     from sklearn.utils import all_estimators
+    import importlib.util
 
-    try:
+    skl2onnx_available = importlib.util.find_spec("skl2onnx") is not None
+    if skl2onnx_available:
         from skl2onnx._supported_operators import sklearn_operator_name_map
 
         skl2onnx_classes = set(sklearn_operator_name_map.keys())
-        skl2onnx_available = True
-    except ImportError:
+    else:
         skl2onnx_classes = set()
-        skl2onnx_available = False
 
     def _public_module(cls):
         parts = cls.__module__.split(".")
