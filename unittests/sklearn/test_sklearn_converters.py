@@ -412,5 +412,69 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertIsInstance(container, ExtendedModelContainer)
 
 
+@requires_sklearn("1.4")
+class TestGetSklearnEstimatorCoverage(ExtTestCase):
+    def setUp(self):
+        from yobx.sklearn import register_sklearn_converters
+
+        register_sklearn_converters()
+
+    def test_returns_list_of_dicts(self):
+        from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+        rows = get_sklearn_estimator_coverage()
+        self.assertIsInstance(rows, list)
+        self.assertGreater(len(rows), 0)
+        for row in rows:
+            self.assertIn("name", row)
+            self.assertIn("cls", row)
+            self.assertIn("module", row)
+            self.assertIn("yobx", row)
+            self.assertIn("skl2onnx", row)
+
+    def test_known_yobx_converters_marked_true(self):
+        from yobx.sklearn.register import get_sklearn_estimator_coverage
+        from sklearn.linear_model import LinearRegression
+        from sklearn.preprocessing import StandardScaler
+
+        rows = get_sklearn_estimator_coverage()
+        by_name = {r["name"]: r for r in rows}
+        self.assertTrue(by_name["LinearRegression"]["yobx"])
+        self.assertTrue(by_name["StandardScaler"]["yobx"])
+
+    def test_transformers_included(self):
+        from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+        rows = get_sklearn_estimator_coverage()
+        names = {r["name"] for r in rows}
+        # Standard trainable transforms must be present
+        self.assertIn("StandardScaler", names)
+        self.assertIn("PCA", names)
+        self.assertIn("MinMaxScaler", names)
+
+    def test_yobx_registered_non_type_filter_classes_included(self):
+        from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+        rows = get_sklearn_estimator_coverage()
+        names = {r["name"] for r in rows}
+        # Pipeline is registered in yobx but has no _estimator_type
+        self.assertIn("Pipeline", names)
+        self.assertTrue(next(r for r in rows if r["name"] == "Pipeline")["yobx"])
+
+    def test_skl2onnx_field_is_bool_or_none(self):
+        from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+        rows = get_sklearn_estimator_coverage()
+        for row in rows:
+            self.assertIn(row["skl2onnx"], (True, False, None))
+
+    def test_sorted_by_name(self):
+        from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+        rows = get_sklearn_estimator_coverage()
+        names = [r["name"] for r in rows]
+        self.assertEqual(names, sorted(names))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

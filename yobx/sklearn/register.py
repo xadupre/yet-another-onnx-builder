@@ -75,8 +75,19 @@ def get_sklearn_estimator_coverage():
         parts = cls.__module__.split(".")
         return ".".join(p for p in parts if not p.startswith("_"))
 
+    # Enumerate all sklearn estimators, explicitly including trainable transforms.
+    # Then add any yobx-registered converters not captured by the type filter.
+    all_pairs = dict(
+        all_estimators(
+            type_filter=["classifier", "regressor", "cluster", "transformer"]
+        )
+    )
+    for cls in SKLEARN_CONVERTERS:
+        if cls.__name__ not in all_pairs:
+            all_pairs[cls.__name__] = cls
+
     rows = []
-    for name, cls in sorted(all_estimators(), key=lambda x: x[0]):
+    for name, cls in sorted(all_pairs.items(), key=lambda x: x[0]):
         rows.append(
             {
                 "name": cls.__name__,
