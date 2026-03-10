@@ -125,10 +125,9 @@ class OnnxGraph:
         """
         existing = self.has_opset(domain)
         if existing:
-            assert existing == version, (
-                f"Version mismatch for domain {domain!r}: "
-                f"existing={existing}, new={version}"
-            )
+            assert (
+                existing == version
+            ), f"Version mismatch for domain {domain!r}: existing={existing}, new={version}"
             return
         if domain == "":
             self.opset = version
