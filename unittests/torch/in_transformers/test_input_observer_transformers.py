@@ -7,8 +7,7 @@ from yobx.torch.input_observer import InputObserver
 from yobx.torch.in_transformers.cache_helper import make_dynamic_cache, make_encoder_decoder_cache
 from yobx.torch import apply_patches_for_model
 from yobx.torch.interpreter import to_onnx
-
-onnx_generate = lambda *args, **kwargs: None
+from yobx.helpers.rt_helper import onnx_generate
 
 
 class TestInputObserverTransformers(ExtTestCase):
