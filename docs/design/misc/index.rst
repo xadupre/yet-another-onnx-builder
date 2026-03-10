@@ -1,15 +1,16 @@
 Miscellaneous
 =============
 
-A collection of standalone topics that do not fit neatly into the main
-builder or sklearn-converter design sections:
-
-* Large-model container (:ref:`l-design-container`) and the light fluent API (:ref:`l-design-light-api`).
-* How to write and plug in an alternative
-  :class:`~yobx.typing.GraphBuilderExtendedProtocol` implementation
-  (:ref:`l-design-graph-builder-extended-protocol`).
-* Inspection utilities, evaluation helpers, translation, and other
-  miscellaneous helpers.
+This section covers miscellaneous utilities and design topics: the fluent
+:ref:`light builder API <l-design-light-api>`, :ref:`ONNX inspection helpers <l-design-onnx-inspection>`,
+the :ref:`translate <l-design-translate>` utility to export models as Python code, the
+:ref:`evaluators <l-design-evaluator>` (reference, OnnxRuntime, Torch), the
+:ref:`ExtendedModelContainer <l-design-container>` for large models,
+:ref:`MiniOnnxBuilder and other helpers <l-design-helpers>`,
+:ref:`CubeLogs <l-cube>` for structured experiment-log analysis, and
+alternatives following
+:class:`~yobx.typing.GraphBuilderExtendedProtocol` implementation
+(:ref:`l-design-graph-builder-extended-protocol`).
 
 .. toctree::
    :maxdepth: 1
