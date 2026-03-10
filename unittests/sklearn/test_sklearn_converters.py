@@ -429,12 +429,10 @@ class TestGetSklearnEstimatorCoverage(ExtTestCase):
             self.assertIn("cls", row)
             self.assertIn("module", row)
             self.assertIn("yobx", row)
-            self.assertIn("skl2onnx", row)
+            self.assertIn("predictable", row)
 
     def test_known_yobx_converters_marked_true(self):
         from yobx.sklearn.register import get_sklearn_estimator_coverage
-        from sklearn.linear_model import LinearRegression
-        from sklearn.preprocessing import StandardScaler
 
         rows = get_sklearn_estimator_coverage()
         by_name = {r["name"]: r for r in rows}
@@ -465,7 +463,7 @@ class TestGetSklearnEstimatorCoverage(ExtTestCase):
 
         rows = get_sklearn_estimator_coverage()
         for row in rows:
-            self.assertIn(row["skl2onnx"], (True, False, None))
+            self.assertIn(row["predictable"], (True, False, None))
 
     def test_sorted_by_name(self):
         from yobx.sklearn.register import get_sklearn_estimator_coverage

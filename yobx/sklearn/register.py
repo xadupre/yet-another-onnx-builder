@@ -48,6 +48,8 @@ def get_sklearn_estimator_coverage():
     list[dict]
         Each entry is a dict with the following keys:
 
+        ``"category"``
+            Estimator class name (``str``).
         ``"name"``
             Estimator class name (``str``).
         ``"cls"``
@@ -55,21 +57,9 @@ def get_sklearn_estimator_coverage():
         ``"module"``
             Public sklearn module path (private submodules stripped).
         ``"yobx"``
-            ``True`` if a converter is registered in :mod:`yobx.sklearn`.
-        ``"skl2onnx"``
-            ``True`` if ``skl2onnx`` is installed and supports this class,
-            ``None`` if ``skl2onnx`` is not available.
+            the converting function if a converter is registered in :mod:`yobx.sklearn`.
     """
     from sklearn.utils import all_estimators
-    import importlib.util
-
-    skl2onnx_available = importlib.util.find_spec("skl2onnx") is not None
-    if skl2onnx_available:
-        from skl2onnx._supported_operators import sklearn_operator_name_map
-
-        skl2onnx_classes = set(sklearn_operator_name_map.keys())
-    else:
-        skl2onnx_classes = set()
 
     def _public_module(cls):
         parts = cls.__module__.split(".")
@@ -77,26 +67,21 @@ def get_sklearn_estimator_coverage():
 
     # Enumerate all sklearn estimators, explicitly including trainable transforms.
     # Then add any yobx-registered converters not captured by the type filter.
-    all_pairs = dict(
-        all_estimators(
-            type_filter=["classifier", "regressor", "cluster", "transformer"]
-        )
-    )
+    all_pairs = dict(all_estimators())
     for cls in SKLEARN_CONVERTERS:
         if cls.__name__ not in all_pairs:
             all_pairs[cls.__name__] = cls
 
     rows = []
-    for name, cls in sorted(all_pairs.items(), key=lambda x: x[0]):
+    for _name, cls in sorted(all_pairs.items(), key=lambda x: x[0]):
         rows.append(
             {
+                "category": cls.__module__.split(".")[-2].strip("_"),
                 "name": cls.__name__,
+                "predictable": hasattr(cls, "transform") or hasattr(cls, "predict"),
                 "cls": cls,
                 "module": _public_module(cls),
-                "yobx": cls in SKLEARN_CONVERTERS,
-                "skl2onnx": (
-                    cls in skl2onnx_classes if skl2onnx_available else None
-                ),
+                "yobx": SKLEARN_CONVERTERS.get(cls, None),
             }
         )
     return rows
