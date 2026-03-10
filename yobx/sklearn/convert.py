@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 from onnx import ModelProto
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_is_fitted
@@ -6,8 +6,12 @@ from .. import DEFAULT_TARGET_OPSET
 from ..container import ExtendedModelContainer
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
+from ..xbuilder.function_options import FunctionOptions
 from .register import get_sklearn_converter
 from .sklearn_helper import get_output_names
+
+# Key used in the *sts* dict to propagate SklearnFunctionOptions through converters.
+_FUNCTION_OPTIONS_KEY = "_sklearn_function_options"
 
 
 def _default_ai_onnx_ml(main_opset: int) -> int:
@@ -18,6 +22,93 @@ def _default_ai_onnx_ml(main_opset: int) -> int:
     if main_opset >= 6:
         return 2
     return 1
+
+
+def _wrap_step_as_function(
+    g: GraphBuilder,
+    fopts: "SklearnFunctionOptions",  # noqa: F821
+    estimator: BaseEstimator,
+    input_names: List[str],
+    output_names: List[str],
+    converter: Callable,
+    name: str,
+) -> None:
+    """
+    Converts *estimator* to ONNX via *converter* and wraps the result as an
+    ONNX local function registered in *g*.
+
+    :param g: the main graph builder
+    :param fopts: :class:`SklearnFunctionOptions` carrying the target domain
+    :param estimator: the fitted estimator to convert
+    :param input_names: input tensor names already present in *g*
+    :param output_names: desired output tensor names to produce in *g*
+    :param converter: the registered sklearn→ONNX converter function
+    :param name: node-name prefix passed to the converter
+    """
+    # Create an isolated sub-builder for the function body.
+    sub_g = GraphBuilder(g.opsets, as_function=True)
+
+    # Use stable, collision-free internal names for the function inputs so that
+    # the sub-builder's namespace is never polluted by main-graph names (which
+    # could match output names and cause "name already exists" errors).
+    sub_input_names = [f"_in{i}_" for i in range(len(input_names))]
+    for sub_inp, orig_inp in zip(sub_input_names, input_names):
+        itype = g.get_type(orig_inp) if g.has_type(orig_inp) else 0
+        ishape = g.get_shape(orig_inp) if g.has_shape(orig_inp) else None
+        sub_g.make_tensor_input(sub_inp, itype, ishape)
+
+    # Determine generic sub-builder output names (independent of the main graph).
+    sub_output_names = list(get_output_names(estimator))
+
+    # Run the converter inside the sub-builder (no function_options propagation).
+    converter(sub_g, {}, sub_output_names, estimator, *sub_input_names, name=name)
+
+    # Register the sub-builder outputs.
+    for out_name in sub_output_names:
+        sub_g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
+
+    # Derive a sanitised function name from the estimator class name.
+    cls_name = type(estimator).__name__.replace("-", "_").replace(".", "_")
+
+    opts = FunctionOptions(
+        name=cls_name,
+        domain=fopts.domain,
+        move_initializer_to_constant=fopts.move_initializer_to_constant,
+        rename_allowed=True,
+    )
+    _new_inits, (fdomain, fname) = g.make_local_function(sub_g, opts, optimize=False)
+
+    # When an output name is already defined in the main graph (e.g. when a
+    # pipeline step's output name collides with a previously produced name)
+    # we write to a fresh temporary name first and then rename via Identity.
+    actual_output_names = []
+    renames: List[tuple] = []
+    for out in output_names:
+        if g.has_name(out):
+            tmp = g.unique_name(f"_tmp_{cls_name}_out_")
+            actual_output_names.append(tmp)
+            renames.append((tmp, out))
+        else:
+            actual_output_names.append(out)
+
+    # Call the local function in the main graph.
+    g.make_node(fname, list(input_names), actual_output_names, domain=fdomain, name=name)
+
+    # Apply any needed Identity renames.
+    for tmp, final in renames:
+        g.make_node("Identity", [tmp], [final], name=f"{name}_rename")
+
+    # Propagate type/shape metadata from the sub-builder to the main graph.
+    for sub_out, actual, desired in zip(sub_output_names, actual_output_names, output_names):
+        for out in (actual, desired):
+            if sub_g.has_type(sub_out):
+                g.set_type(out, sub_g.get_type(sub_out))
+            if sub_g.has_shape(sub_out):
+                g.set_shape(out, sub_g.get_shape(sub_out))
+            elif sub_g.has_rank(sub_out):
+                g.set_rank(out, sub_g.get_rank(sub_out))
+            if sub_g.has_device(sub_out):
+                g.set_device(out, sub_g.get_device(sub_out))
 
 
 def to_onnx(
@@ -31,6 +122,7 @@ def to_onnx(
     extra_converters: Optional[Dict[type, Callable]] = None,
     large_model: bool = False,
     external_threshold: int = 1024,
+    function_options: Optional["SklearnFunctionOptions"] = None,  # noqa: F821
 ) -> Union[ModelProto, ExtendedModelContainer]:
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
@@ -60,6 +152,12 @@ def to_onnx(
         as external data
     :param external_threshold: if ``large_model`` is True, every tensor whose
         element count exceeds this threshold is stored as external data
+    :param function_options: when a :class:`SklearnFunctionOptions` is
+        provided every non-container estimator is exported as a separate ONNX
+        local function.  :class:`~sklearn.pipeline.Pipeline` and
+        :class:`~sklearn.compose.ColumnTransformer` are treated as
+        orchestrators — their individual steps/sub-transformers are each
+        wrapped as a function instead of the container itself.
     :return: onnx model or :class:`onnx.model_container.ModelContainer`
         when *large_model* is True
     """
@@ -109,9 +207,40 @@ def to_onnx(
             shape[axis] = dim
         g.make_tensor_input(name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1)
 
-    output_names = get_output_names(estimator)
-    fct(g, {}, output_names, estimator, *input_names, name="main")
+    # Build the sts dict; if function_options is set, propagate it so that
+    # Pipeline / ColumnTransformer converters can wrap their steps.
+    sts: Dict[str, Any] = {}
+    if function_options is not None:
+        sts[_FUNCTION_OPTIONS_KEY] = function_options
+
+    output_names = list(get_output_names(estimator))
+
+    from sklearn.pipeline import Pipeline
+    from sklearn.compose import ColumnTransformer
+
+    is_container = isinstance(estimator, (Pipeline, ColumnTransformer))
+
+    if function_options is not None and not is_container:
+        # Wrap the single top-level estimator as a local function.
+        _wrap_step_as_function(
+            g,
+            function_options,
+            estimator,
+            list(input_names),
+            output_names,
+            fct,
+            name="main",
+        )
+    else:
+        fct(g, sts, output_names, estimator, *input_names, name="main")
 
     for name in output_names:
         g.make_tensor_output(name, indexed=False, allow_untyped_output=True)
-    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
+    # When local functions are requested we must NOT inline them; pass inline=False
+    # so the function bodies are preserved in the returned ModelProto.
+    keep_functions = function_options is not None
+    return g.to_onnx(
+        large_model=large_model,
+        external_threshold=external_threshold,
+        inline=not keep_functions,
+    )

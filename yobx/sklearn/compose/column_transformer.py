@@ -4,6 +4,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import FunctionTransformer
 from ...typing import GraphBuilderExtendedProtocol
 from ..register import register_sklearn_converter, get_sklearn_converter
+from ..convert import _FUNCTION_OPTIONS_KEY, _wrap_step_as_function
 
 
 def _resolve_columns(columns: Union[list, slice, np.ndarray], n_features: int) -> np.ndarray:
@@ -96,6 +97,7 @@ def sklearn_column_transformer(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     n_features = estimator.n_features_in_
+    fopts = sts.get(_FUNCTION_OPTIONS_KEY) if sts else None
 
     parts: List[str] = []
     for trans_name, transformer, columns in estimator.transformers_:
@@ -119,7 +121,20 @@ def sklearn_column_transformer(
                     f"of type {type(transformer)!r} inside {type(estimator).__name__!r}."
                 ) from e
             sub_outputs = [g.unique_name(f"{name}__{trans_name}_out")]
-            fct(g, sts, sub_outputs, transformer, X_sub, name=f"{name}__{trans_name}")
+            step_node_name = f"{name}__{trans_name}"
+            if fopts is not None:
+                assert isinstance(X_sub, str)  # type happiness
+                _wrap_step_as_function(
+                    g,
+                    fopts,
+                    transformer,
+                    [X_sub],
+                    sub_outputs,
+                    fct,
+                    step_node_name,
+                )
+            else:
+                fct(g, sts, sub_outputs, transformer, X_sub, name=step_node_name)
             parts.append(sub_outputs[0])
 
     if not parts:

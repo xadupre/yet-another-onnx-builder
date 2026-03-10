@@ -1,4 +1,7 @@
 from .convert import to_onnx
+from .function_options import SklearnFunctionOptions
+
+__all__ = ["SklearnFunctionOptions", "to_onnx"]
 
 
 def register_sklearn_converters():
