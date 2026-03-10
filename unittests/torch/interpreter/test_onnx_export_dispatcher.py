@@ -1,5 +1,5 @@
 import unittest
-from typing import List, Optional
+from typing import List
 
 import onnx
 from yobx.ext_test_case import (
@@ -87,7 +87,7 @@ class TestForceDispatcher(ExtTestCase):
         self.assertAlmostEqual(kwargs[1][1], 0.0)
 
     def test_process_signature_with_list_annotation(self):
-        def my_func(x, dims: Optional[List[int]] = None):
+        def my_func(x, dims: List[int] = None):  # noqa: RUF013
             pass
 
         dispatcher = ForceDispatcher()
