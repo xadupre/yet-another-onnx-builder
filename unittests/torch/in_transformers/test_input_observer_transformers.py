@@ -403,14 +403,24 @@ class TestInputObserverTransformers(ExtTestCase):
         self.assertIsNotNone(kwargs)
         self.assertIsNotNone(ds)
 
-        filenamec = self.get_dump_file("test_input_observer_llama_attention.onnx")
-        with (
-            register_flattening_functions(patch_transformers=True),
-            apply_patches_for_model(patch_transformers=True, patch_torch=True, model=model),
-        ):
-            to_onnx(model, (), kwargs=kwargs, dynamic_shapes=ds, filename=filenamec)
+        for opset in (22, 24):
+            filenamec = self.get_dump_file(
+                f"test_input_observer_llama_attention_{opset}.onnx"
+            )
+            with (
+                register_flattening_functions(patch_transformers=True),
+                apply_patches_for_model(patch_transformers=True, patch_torch=True, model=model),
+            ):
+                to_onnx(
+                    model,
+                    (),
+                    kwargs=kwargs,
+                    dynamic_shapes=ds,
+                    filename=filenamec,
+                    target_opset=opset,
+                )
 
-        self.assertTrue(os.path.exists(filenamec))
+            self.assertTrue(os.path.exists(filenamec))
 
 
 if __name__ == "__main__":
