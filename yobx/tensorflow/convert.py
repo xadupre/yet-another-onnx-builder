@@ -88,10 +88,10 @@ def to_onnx(
         if "com.microsoft" in dict_target_opset
         else {}
     )
-    g = GraphBuilder(dict_target_opset, **kwargs)
+    g = builder_cls(dict_target_opset, **kwargs)  # type: ignore
 
     _convert_concrete_function(cf, g, args, input_specs, verbose, extra_converters or {})
-    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
+    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)  # type: ignore
 
 
 # ---------------------------------------------------------------------------

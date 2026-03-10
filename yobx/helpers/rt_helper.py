@@ -157,8 +157,8 @@ def _make_empty_cache(
     onnx_input_shapes: List[Tuple[Union[int, str], ...]],
     onnx_input_types: List[str],
     ort_type_to_torch: Dict[str, Any],
-    device: "torch.device",  # noqa: F821
-) -> Dict[str, "torch.Tensor"]:  # noqa: F821
+    device: "torch.device",  # type: ignore # noqa: F821
+) -> Dict[str, "torch.Tensor"]:  # type: ignore # noqa: F821
     """Creates zero-filled KV-cache tensors for the first generation step.
 
     :param batch: batch size
@@ -375,6 +375,7 @@ def onnx_generate(
     # ------------------------------------------------------------------ #
     # Per-batch EOS tracking so that the loop terminates only when *all*
     # sequences have finished (correct for batch_size > 1).
+    last_position = 0
     eos_found = torch.zeros(batch_size, dtype=torch.bool, device=device)
 
     for _ in range(max_new_tokens):
