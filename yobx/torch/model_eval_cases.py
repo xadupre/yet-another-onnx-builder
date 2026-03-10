@@ -328,7 +328,6 @@ def _make_exporter_onnx(
 
         opts = {}
         opts["strict"] = "-strict" in exporter
-        opts["fallback"] = "-fallback" in exporter
         opts["tracing"] = "-tracing" in exporter
         opts["jit"] = "-jit" in exporter
         if "-dec" in exporter:
