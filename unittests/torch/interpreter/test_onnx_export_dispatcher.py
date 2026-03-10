@@ -1,6 +1,5 @@
 import unittest
-from collections import Counter
-from typing import Any, Dict, List
+from typing import List, Optional
 
 import onnx
 from yobx.ext_test_case import (
@@ -88,7 +87,7 @@ class TestForceDispatcher(ExtTestCase):
         self.assertAlmostEqual(kwargs[1][1], 0.0)
 
     def test_process_signature_with_list_annotation(self):
-        def my_func(x, dims: List[int] = None):
+        def my_func(x, dims: Optional[List[int]] = None):
             pass
 
         dispatcher = ForceDispatcher()
@@ -124,7 +123,7 @@ class TestForceDispatcher(ExtTestCase):
         dispatcher = ForceDispatcher(signatures={"func_a": func_a, "func_b": func_b})
         self.assertIn("func_a", dispatcher.sigs_)
         self.assertIn("func_b", dispatcher.sigs_)
-        args_a, kwargs_a = dispatcher.sigs_["func_a"]
+        args_a, _kwargs_a = dispatcher.sigs_["func_a"]
         self.assertEqual(args_a, ["x", "y"])
         args_b, kwargs_b = dispatcher.sigs_["func_b"]
         self.assertEqual(args_b, ["x"])
