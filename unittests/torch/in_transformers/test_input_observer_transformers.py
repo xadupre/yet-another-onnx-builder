@@ -310,17 +310,49 @@ class TestInputObserverTransformers(ExtTestCase):
         }
         self.assertEqual(expected, shapes)
 
-    @requires_transformers("4.45")
-    def test_input_observer_llama_attention(self):
+    def _run_llama_attention_export(self, inputs1, inputs2, tag):
+        """Helper: observe two forward passes, infer shapes, export with opset 22 and 24."""
         import os
-        from transformers.models.llama.modeling_llama import LlamaAttention, LlamaRotaryEmbedding
-        from yobx.torch.in_transformers.models import get_cached_configuration
         from yobx.torch.torch_helper import torch_deepcopy
 
-        config = get_cached_configuration("arnir0/Tiny-LLM")
+        model = inputs1.pop("_model")
+        inputs2.pop("_model")
 
-        # Wrapper that combines RotaryEmbedding + LlamaAttention so the module
-        # can be called with plain tensor inputs (no pre-computed position embeddings).
+        observer = InputObserver()
+        with (
+            register_flattening_functions(patch_transformers=True),
+            observer(model),
+        ):
+            model(**torch_deepcopy(inputs1))
+            model(**torch_deepcopy(inputs2))
+
+        with register_flattening_functions(patch_transformers=True):
+            kwargs = observer.infer_arguments()
+            ds = observer.infer_dynamic_shapes(set_batch_dimension_for=True)
+
+        self.assertIsNotNone(kwargs)
+        self.assertIsNotNone(ds)
+
+        for opset in (22, 24):
+            filenamec = self.get_dump_file(f"{tag}_{opset}.onnx")
+            with (
+                register_flattening_functions(patch_transformers=True),
+                apply_patches_for_model(patch_transformers=True, patch_torch=True, model=model),
+            ):
+                to_onnx(
+                    model,
+                    (),
+                    kwargs=kwargs,
+                    dynamic_shapes=ds,
+                    filename=filenamec,
+                    target_opset=opset,
+                )
+            self.assertTrue(os.path.exists(filenamec))
+
+    def _make_llama_attention_inputs(self, config, seq1, seq2, use_position_ids, use_cache_position):
+        """Return (inputs1, inputs2) dicts for LlamaAttentionWrapper forward calls."""
+        from transformers.models.llama.modeling_llama import LlamaAttention, LlamaRotaryEmbedding
+
         class LlamaAttentionWrapper(torch.nn.Module):
             def __init__(self, config):
                 super().__init__()
@@ -348,79 +380,73 @@ class TestInputObserverTransformers(ExtTestCase):
                 return attn_output, past_key_value
 
         bsize = 1
-        n_kv_heads = config.num_key_value_heads  # 1
-        head_dim = config.head_dim  # 96
+        n_kv_heads = config.num_key_value_heads
+        head_dim = config.head_dim
         initial_cache_len = 4
-
         model = LlamaAttentionWrapper(config)
 
-        # Two calls with different sequence / cache lengths to expose dynamic dims.
-        inputs1 = dict(
-            hidden_states=torch.randn(bsize, 3, config.hidden_size),
-            attention_mask=None,
-            position_ids=torch.arange(3, dtype=torch.int64).unsqueeze(0).expand(bsize, -1),
-            past_key_value=make_dynamic_cache(
-                [
-                    (
-                        torch.randn(bsize, n_kv_heads, initial_cache_len, head_dim),
-                        torch.randn(bsize, n_kv_heads, initial_cache_len, head_dim),
-                    )
-                ]
-            ),
-            cache_position=torch.arange(
-                initial_cache_len, initial_cache_len + 3, dtype=torch.int64
-            ),
-        )
-        inputs2 = dict(
-            hidden_states=torch.randn(bsize, 5, config.hidden_size),
-            attention_mask=None,
-            position_ids=torch.arange(5, dtype=torch.int64).unsqueeze(0).expand(bsize, -1),
-            past_key_value=make_dynamic_cache(
-                [
-                    (
-                        torch.randn(bsize, n_kv_heads, initial_cache_len + 2, head_dim),
-                        torch.randn(bsize, n_kv_heads, initial_cache_len + 2, head_dim),
-                    )
-                ]
-            ),
-            cache_position=torch.arange(
-                initial_cache_len + 2, initial_cache_len + 7, dtype=torch.int64
-            ),
-        )
-
-        observer = InputObserver()
-        with (
-            register_flattening_functions(patch_transformers=True),
-            observer(model),
-        ):
-            model(**torch_deepcopy(inputs1))
-            model(**torch_deepcopy(inputs2))
-
-        with register_flattening_functions(patch_transformers=True):
-            kwargs = observer.infer_arguments()
-            ds = observer.infer_dynamic_shapes(set_batch_dimension_for=True)
-
-        self.assertIsNotNone(kwargs)
-        self.assertIsNotNone(ds)
-
-        for opset in (22, 24):
-            filenamec = self.get_dump_file(
-                f"test_input_observer_llama_attention_{opset}.onnx"
+        def _make(seq, cache_len):
+            return dict(
+                _model=model,
+                hidden_states=torch.randn(bsize, seq, config.hidden_size),
+                attention_mask=None,
+                position_ids=(
+                    torch.arange(seq, dtype=torch.int64).unsqueeze(0).expand(bsize, -1)
+                    if use_position_ids
+                    else None
+                ),
+                past_key_value=make_dynamic_cache(
+                    [
+                        (
+                            torch.randn(bsize, n_kv_heads, cache_len, head_dim),
+                            torch.randn(bsize, n_kv_heads, cache_len, head_dim),
+                        )
+                    ]
+                ),
+                cache_position=(
+                    torch.arange(cache_len, cache_len + seq, dtype=torch.int64)
+                    if use_cache_position
+                    else None
+                ),
             )
-            with (
-                register_flattening_functions(patch_transformers=True),
-                apply_patches_for_model(patch_transformers=True, patch_torch=True, model=model),
-            ):
-                to_onnx(
-                    model,
-                    (),
-                    kwargs=kwargs,
-                    dynamic_shapes=ds,
-                    filename=filenamec,
-                    target_opset=opset,
-                )
 
-            self.assertTrue(os.path.exists(filenamec))
+        return _make(seq1, initial_cache_len), _make(seq2, initial_cache_len + 2)
+
+    @requires_transformers("4.45")
+    def test_input_observer_llama_attention(self):
+        from yobx.torch.in_transformers.models import get_cached_configuration
+
+        config = get_cached_configuration("arnir0/Tiny-LLM")
+        inputs1, inputs2 = self._make_llama_attention_inputs(
+            config, seq1=3, seq2=5, use_position_ids=True, use_cache_position=True
+        )
+        self._run_llama_attention_export(
+            inputs1, inputs2, tag="test_input_observer_llama_attention"
+        )
+
+    @requires_transformers("4.45")
+    def test_input_observer_llama_attention_no_position_ids(self):
+        from yobx.torch.in_transformers.models import get_cached_configuration
+
+        config = get_cached_configuration("arnir0/Tiny-LLM")
+        inputs1, inputs2 = self._make_llama_attention_inputs(
+            config, seq1=3, seq2=5, use_position_ids=False, use_cache_position=True
+        )
+        self._run_llama_attention_export(
+            inputs1, inputs2, tag="test_input_observer_llama_attention_no_position_ids"
+        )
+
+    @requires_transformers("4.45")
+    def test_input_observer_llama_attention_no_cache_position(self):
+        from yobx.torch.in_transformers.models import get_cached_configuration
+
+        config = get_cached_configuration("arnir0/Tiny-LLM")
+        inputs1, inputs2 = self._make_llama_attention_inputs(
+            config, seq1=3, seq2=5, use_position_ids=True, use_cache_position=False
+        )
+        self._run_llama_attention_export(
+            inputs1, inputs2, tag="test_input_observer_llama_attention_no_cache_position"
+        )
 
 
 if __name__ == "__main__":
