@@ -37,5 +37,5 @@ export arguments and dynamic shapes automatically
    patches_list
    input_observer
    supported_aten_functions
-   export_dynamic
+   case_coverage
 

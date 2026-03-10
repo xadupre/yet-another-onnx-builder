@@ -1,6 +1,6 @@
-=================================
-Exported ONNX with Dynamic Shapes
-=================================
+=========================
+Overview of Exportability
+=========================
 
 The following script shows the exported program for many short cases
 to retrieve an ONNX model equivalent to the original model.
