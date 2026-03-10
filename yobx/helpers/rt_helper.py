@@ -355,7 +355,6 @@ def onnx_generate(
 
     # prefill step
     outputs = session.run(None, feeds)
-    batch_size = input_ids.shape[0]
 
     # Next calls: decode
     for _ in range(max_new_tokens):
@@ -370,10 +369,10 @@ def onnx_generate(
             # Greedy decoding: take the argmax token.
             next_token_id = torch.argmax(next_token_logits, dim=-1, keepdim=True)
 
+        input_ids = torch.cat([input_ids, next_token_id.to(input_ids.device)], dim=-1)
+
         if next_token_id.item() == eos_token_id:
             break
-
-        input_ids = torch.cat([input_ids, next_token_id.to(input_ids.device)], dim=-1)
 
         feeds = (
             dict(input_ids=input_ids)
