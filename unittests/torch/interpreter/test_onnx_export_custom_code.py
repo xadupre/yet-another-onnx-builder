@@ -509,5 +509,54 @@ class TestOnnxExportCustomCode(ExtTestCase):
         self.assertEqualArray(expected, ref.run(None, {"x": x.detach().numpy()})[0])
 
 
+@requires_torch()
+class TestMakeUndefinedDimension(ExtTestCase):
+    """Tests for :func:`yobx.torch.interpreter.make_undefined_dimension`."""
+
+    def test_make_undefined_dimension_returns_expected_value(self):
+        from yobx.torch.interpreter import make_undefined_dimension
+
+        for i in [1, 5, 10, 100]:
+            with self.subTest(i=i):
+                result = make_undefined_dimension(i)
+                self.assertEqual(int(result), i)
+
+    def test_make_undefined_dimension_zero(self):
+        from yobx.torch.interpreter import make_undefined_dimension
+
+        result = make_undefined_dimension(0)
+        self.assertEqual(int(result), 0)
+
+    @requires_torch("2.4")
+    def test_make_undefined_dimension_in_symbolic_shape(self):
+        """Verifies that make_undefined_dimension produces a SymInt during export tracing."""
+        import torch
+        from yobx.torch.interpreter import make_undefined_dimension
+
+        @torch.library.custom_op("testlib_mud::op", mutates_args=(), device_types="cpu")
+        def op(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+            n = min(x.shape[1], y.shape[0])
+            return x[:, :n].clone()
+
+        @op.register_fake
+        def op_fake(x, y):
+            return torch.empty(
+                x.shape[0],
+                make_undefined_dimension(min(x.shape[1], y.shape[0])),
+                dtype=x.dtype,
+            )
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return torch.ops.testlib_mud.op(x, y)
+
+        model = Model()
+        x = torch.randn(3, 4)
+        y = torch.randn(2)
+        expected = model(x, y)
+        self.assertEqual(expected.shape, (3, 2))
+        self.assertEqualArray(x[:, :2], expected)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
