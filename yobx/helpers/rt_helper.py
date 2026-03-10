@@ -186,7 +186,7 @@ def _make_empty_cache(
 def onnx_generate(
     model_or_path: Union[str, onnx.ModelProto],
     input_ids: Union[np.ndarray, "torch.Tensor"],  # type: ignore[name-defined] # noqa: F821
-    attention_mask: Optional[
+    attention_mask: Optional[  # type: ignore
         Union[np.ndarray, "torch.Tensor"]  # type: ignore[name-defined] # noqa: F821
     ] = None,
     eos_token_id: Optional[int] = None,
