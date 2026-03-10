@@ -310,6 +310,108 @@ class TestInputObserverTransformers(ExtTestCase):
         }
         self.assertEqual(expected, shapes)
 
+    @requires_transformers("4.45")
+    def test_input_observer_llama_attention(self):
+        import os
+        from transformers.models.llama.modeling_llama import LlamaAttention, LlamaRotaryEmbedding
+        from yobx.torch.in_transformers.models import get_cached_configuration
+        from yobx.torch.torch_helper import torch_deepcopy
+
+        config = get_cached_configuration("arnir0/Tiny-LLM")
+
+        # Wrapper that combines RotaryEmbedding + LlamaAttention so the module
+        # can be called with plain tensor inputs (no pre-computed position embeddings).
+        class LlamaAttentionWrapper(torch.nn.Module):
+            def __init__(self, config):
+                super().__init__()
+                self.rotary_emb = LlamaRotaryEmbedding(config=config)
+                self.self_attn = LlamaAttention(config=config, layer_idx=0)
+
+            def forward(
+                self,
+                hidden_states,
+                attention_mask=None,
+                position_ids=None,
+                past_key_value=None,
+                cache_position=None,
+            ):
+                position_embeddings = self.rotary_emb(hidden_states, position_ids)
+                attn_output, _, past_key_value = self.self_attn(
+                    hidden_states=hidden_states,
+                    attention_mask=attention_mask,
+                    past_key_value=past_key_value,
+                    output_attentions=False,
+                    use_cache=True,
+                    cache_position=cache_position,
+                    position_embeddings=position_embeddings,
+                )
+                return attn_output, past_key_value
+
+        bsize = 1
+        n_kv_heads = config.num_key_value_heads  # 1
+        head_dim = config.head_dim  # 96
+        initial_cache_len = 4
+
+        model = LlamaAttentionWrapper(config)
+
+        # Two calls with different sequence / cache lengths to expose dynamic dims.
+        inputs1 = dict(
+            hidden_states=torch.randn(bsize, 3, config.hidden_size),
+            attention_mask=None,
+            position_ids=torch.arange(3, dtype=torch.int64).unsqueeze(0).expand(bsize, -1),
+            past_key_value=make_dynamic_cache(
+                [
+                    (
+                        torch.randn(bsize, n_kv_heads, initial_cache_len, head_dim),
+                        torch.randn(bsize, n_kv_heads, initial_cache_len, head_dim),
+                    )
+                ]
+            ),
+            cache_position=torch.arange(
+                initial_cache_len, initial_cache_len + 3, dtype=torch.int64
+            ),
+        )
+        inputs2 = dict(
+            hidden_states=torch.randn(bsize, 5, config.hidden_size),
+            attention_mask=None,
+            position_ids=torch.arange(5, dtype=torch.int64).unsqueeze(0).expand(bsize, -1),
+            past_key_value=make_dynamic_cache(
+                [
+                    (
+                        torch.randn(bsize, n_kv_heads, initial_cache_len + 2, head_dim),
+                        torch.randn(bsize, n_kv_heads, initial_cache_len + 2, head_dim),
+                    )
+                ]
+            ),
+            cache_position=torch.arange(
+                initial_cache_len + 2, initial_cache_len + 7, dtype=torch.int64
+            ),
+        )
+
+        observer = InputObserver()
+        with (
+            register_flattening_functions(patch_transformers=True),
+            observer(model),
+        ):
+            model(**torch_deepcopy(inputs1))
+            model(**torch_deepcopy(inputs2))
+
+        with register_flattening_functions(patch_transformers=True):
+            kwargs = observer.infer_arguments()
+            ds = observer.infer_dynamic_shapes(set_batch_dimension_for=True)
+
+        self.assertIsNotNone(kwargs)
+        self.assertIsNotNone(ds)
+
+        filenamec = self.get_dump_file("test_input_observer_llama_attention.onnx")
+        with (
+            register_flattening_functions(patch_transformers=True),
+            apply_patches_for_model(patch_transformers=True, patch_torch=True, model=model),
+        ):
+            to_onnx(model, (), kwargs=kwargs, dynamic_shapes=ds, filename=filenamec)
+
+        self.assertTrue(os.path.exists(filenamec))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
