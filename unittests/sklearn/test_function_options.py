@@ -1,10 +1,10 @@
 """
-Unit tests for the SklearnFunctionOptions feature of yobx.sklearn.to_onnx.
+Unit tests for the function_options feature of yobx.sklearn.to_onnx.
 
-When ``function_options`` is provided every non-container estimator is
-exported as a separate ONNX local function.  Pipeline and ColumnTransformer
-are treated as orchestrators — their individual steps/sub-transformers each
-become a local function.
+When ``function_options`` (a :class:`~yobx.xbuilder.FunctionOptions`) is
+provided every non-container estimator is exported as a separate ONNX local
+function.  Pipeline and ColumnTransformer are treated as orchestrators —
+their individual steps/sub-transformers each become a local function.
 """
 
 import unittest
@@ -15,7 +15,8 @@ from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from yobx.sklearn import SklearnFunctionOptions, to_onnx
+from yobx.xbuilder import FunctionOptions
+from yobx.sklearn import to_onnx
 
 
 @requires_sklearn("1.4")
@@ -26,19 +27,26 @@ class TestSklearnFunctionOptions(ExtTestCase):
         rng = np.random.default_rng(0)
         self.X = rng.standard_normal((10, 4)).astype(np.float32)
         self.y = (self.X[:, 0] > 0).astype(int)
-        self.fopts = SklearnFunctionOptions(domain="test_sklearn")
+        # FunctionOptions template: domain is what matters; the per-step
+        # function name is always derived from the estimator class name.
+        self.fopts = FunctionOptions(
+            name="sklearn_op",
+            domain="test_sklearn",
+            move_initializer_to_constant=True,
+        )
 
     # ------------------------------------------------------------------
-    # SklearnFunctionOptions construction
+    # Default False → no wrapping (backward compatible)
     # ------------------------------------------------------------------
 
-    def test_sklearn_function_options_repr(self):
-        opts = SklearnFunctionOptions(domain="my_domain")
-        self.assertIn("my_domain", repr(opts))
-
-    def test_sklearn_function_options_empty_domain_raises(self):
-        with self.assertRaises(ValueError):
-            SklearnFunctionOptions(domain="")
+    def test_default_false_produces_flat_graph(self):
+        ss = StandardScaler().fit(self.X)
+        # default function_options=False
+        onx = to_onnx(ss, (self.X,))
+        self.assertEqual(len(onx.functions), 0)
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Sub", op_types)
+        self.assertIn("Div", op_types)
 
     # ------------------------------------------------------------------
     # Standalone estimator → wrapped as a single local function
@@ -80,20 +88,6 @@ class TestSklearnFunctionOptions(ExtTestCase):
         )
 
     # ------------------------------------------------------------------
-    # Without function_options → backward-compatible flat graph
-    # ------------------------------------------------------------------
-
-    def test_no_function_options_produces_flat_graph(self):
-        ss = StandardScaler().fit(self.X)
-        onx = to_onnx(ss, (self.X,))
-        # No local functions when option is not provided.
-        self.assertEqual(len(onx.functions), 0)
-        # Raw ops are present in the graph.
-        op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("Sub", op_types)
-        self.assertIn("Div", op_types)
-
-    # ------------------------------------------------------------------
     # Pipeline → each step is a separate local function
     # ------------------------------------------------------------------
 
@@ -124,7 +118,7 @@ class TestSklearnFunctionOptions(ExtTestCase):
         )
 
     def test_pipeline_not_wrapped_without_function_options(self):
-        """Pipeline without function_options keeps the flat graph."""
+        """Pipeline with default function_options=False keeps the flat graph."""
         pipe = Pipeline(
             [("scaler", StandardScaler()), ("clf", LogisticRegression(max_iter=200))]
         ).fit(self.X, self.y)
@@ -168,20 +162,15 @@ class TestSklearnFunctionOptions(ExtTestCase):
 
     def test_custom_domain_is_used(self):
         ss = StandardScaler().fit(self.X)
-        custom_opts = SklearnFunctionOptions(domain="acme.corp.v1")
+        custom_opts = FunctionOptions(
+            name="sklearn_op",
+            domain="acme.corp.v1",
+            move_initializer_to_constant=True,
+        )
         onx = to_onnx(ss, (self.X,), function_options=custom_opts)
 
         self.assertEqual(len(onx.functions), 1)
         self.assertEqual(onx.functions[0].domain, "acme.corp.v1")
-
-    # ------------------------------------------------------------------
-    # SklearnFunctionOptions is exported from the sklearn package
-    # ------------------------------------------------------------------
-
-    def test_import_from_sklearn_package(self):
-        from yobx.sklearn import SklearnFunctionOptions as SFO
-
-        self.assertIs(SFO, SklearnFunctionOptions)
 
 
 if __name__ == "__main__":

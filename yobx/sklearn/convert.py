@@ -12,7 +12,7 @@ from ..xbuilder.function_options import FunctionOptions
 from .register import get_sklearn_converter
 from .sklearn_helper import get_output_names
 
-# Key used in the *sts* dict to propagate SklearnFunctionOptions through converters.
+# Key used in the *sts* dict to propagate FunctionOptions through converters.
 _FUNCTION_OPTIONS_KEY = "_sklearn_function_options"
 
 
@@ -28,7 +28,7 @@ def _default_ai_onnx_ml(main_opset: int) -> int:
 
 def _wrap_step_as_function(
     g: GraphBuilder,
-    fopts: "SklearnFunctionOptions",  # noqa: F821
+    fopts: FunctionOptions,
     estimator: BaseEstimator,
     input_names: List[str],
     output_names: List[str],
@@ -40,7 +40,9 @@ def _wrap_step_as_function(
     ONNX local function registered in *g*.
 
     :param g: the main graph builder
-    :param fopts: :class:`SklearnFunctionOptions` carrying the target domain
+    :param fopts: :class:`~yobx.xbuilder.FunctionOptions` carrying the target
+        domain and other options; the ``name`` field is ignored — the function
+        name is always derived from the estimator's class name
     :param estimator: the fitted estimator to convert
     :param input_names: input tensor names already present in *g*
     :param output_names: desired output tensor names to produce in *g*
@@ -124,7 +126,7 @@ def to_onnx(
     extra_converters: Optional[Dict[type, Callable]] = None,
     large_model: bool = False,
     external_threshold: int = 1024,
-    function_options: Optional["SklearnFunctionOptions"] = None,  # noqa: F821
+    function_options: Union[bool, FunctionOptions] = False,
 ) -> Union[ModelProto, ExtendedModelContainer]:
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
@@ -154,12 +156,16 @@ def to_onnx(
         as external data
     :param external_threshold: if ``large_model`` is True, every tensor whose
         element count exceeds this threshold is stored as external data
-    :param function_options: when a :class:`SklearnFunctionOptions` is
-        provided every non-container estimator is exported as a separate ONNX
+    :param function_options: when a :class:`~yobx.xbuilder.FunctionOptions`
+        is provided every non-container estimator is exported as a separate ONNX
         local function.  :class:`~sklearn.pipeline.Pipeline` and
         :class:`~sklearn.compose.ColumnTransformer` are treated as
         orchestrators — their individual steps/sub-transformers are each
-        wrapped as a function instead of the container itself.
+        wrapped as a function instead of the container itself.  The
+        ``name`` field of the provided :class:`~yobx.xbuilder.FunctionOptions`
+        is used as a template; the actual function name for each step is
+        always derived from the estimator's class name.  Pass ``False``
+        (the default) to disable function wrapping and produce a flat graph.
     :return: onnx model or :class:`onnx.model_container.ModelContainer`
         when *large_model* is True
     """
@@ -212,14 +218,14 @@ def to_onnx(
     # Build the sts dict; if function_options is set, propagate it so that
     # Pipeline / ColumnTransformer converters can wrap their steps.
     sts: Dict[str, Any] = {}
-    if function_options is not None:
+    if function_options is not False:
         sts[_FUNCTION_OPTIONS_KEY] = function_options
 
     output_names = list(get_output_names(estimator))
 
     is_container = isinstance(estimator, (Pipeline, ColumnTransformer))
 
-    if function_options is not None and not is_container:
+    if function_options is not False and not is_container:
         # Wrap the single top-level estimator as a local function.
         _wrap_step_as_function(
             g,
@@ -237,7 +243,7 @@ def to_onnx(
         g.make_tensor_output(name, indexed=False, allow_untyped_output=True)
     # When local functions are requested we must NOT inline them; pass inline=False
     # so the function bodies are preserved in the returned ModelProto.
-    keep_functions = function_options is not None
+    keep_functions = function_options is not False
     return g.to_onnx(
         large_model=large_model,
         external_threshold=external_threshold,

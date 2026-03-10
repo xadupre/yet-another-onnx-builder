@@ -25,13 +25,13 @@ def sklearn_pipeline(
     :meth:`GraphBuilder.unique_name <yobx.xbuilder.GraphBuilder.unique_name>`
     to avoid collisions.
 
-    When ``sts`` contains a :class:`~yobx.sklearn.SklearnFunctionOptions`
+    When ``sts`` contains a :class:`~yobx.xbuilder.FunctionOptions`
     under the ``_FUNCTION_OPTIONS_KEY`` key each step is exported as a
     separate ONNX local function instead of being inlined into the graph.
 
     :param g: the graph builder to add nodes to
     :param sts: shapes and types defined by :epkg:`scikit-learn`; also carries
-        an optional :class:`~yobx.sklearn.SklearnFunctionOptions` value under
+        an optional :class:`~yobx.xbuilder.FunctionOptions` value under
         the key :data:`~yobx.sklearn.convert._FUNCTION_OPTIONS_KEY`
     :param outputs: desired output tensor names for the pipeline result
     :param estimator: a fitted :class:`sklearn.pipeline.Pipeline`
