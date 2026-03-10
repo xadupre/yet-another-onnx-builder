@@ -234,5 +234,188 @@ class TestOnnxDtypeToTorchDtype(ExtTestCase):
             self.convert(onnx.TensorProto.STRING)
 
 
+@requires_torch("2.9")
+class TestTorchDeepcopy(ExtTestCase):
+    @classmethod
+    def setUpClass(cls):
+        import torch
+
+        cls.torch = torch
+
+    def setUp(self):
+        from yobx.torch.torch_helper import torch_deepcopy
+
+        self.torch_deepcopy = torch_deepcopy
+
+    def test_none(self):
+        self.assertIsNone(self.torch_deepcopy(None))
+
+    def test_int(self):
+        self.assertEqual(self.torch_deepcopy(42), 42)
+
+    def test_float(self):
+        self.assertEqual(self.torch_deepcopy(3.14), 3.14)
+
+    def test_str(self):
+        self.assertEqual(self.torch_deepcopy("hello"), "hello")
+
+    def test_tuple(self):
+        result = self.torch_deepcopy((1, 2, 3))
+        self.assertEqual(result, (1, 2, 3))
+        self.assertIsInstance(result, tuple)
+
+    def test_list(self):
+        original = [1, 2, 3]
+        result = self.torch_deepcopy(original)
+        self.assertEqual(result, [1, 2, 3])
+        self.assertIsNot(result, original)
+
+    def test_set(self):
+        result = self.torch_deepcopy({1, 2, 3})
+        self.assertEqual(result, {1, 2, 3})
+        self.assertIsInstance(result, set)
+
+    def test_dict(self):
+        original = {"a": 1, "b": 2}
+        result = self.torch_deepcopy(original)
+        self.assertEqual(result, {"a": 1, "b": 2})
+        self.assertIsNot(result, original)
+
+    def test_numpy_array(self):
+        original = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        result = self.torch_deepcopy(original)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqualArray(result, original)
+        self.assertIsNot(result, original)
+
+    def test_torch_tensor(self):
+        original = self.torch.tensor([1.0, 2.0, 3.0])
+        result = self.torch_deepcopy(original)
+        self.assertIsInstance(result, self.torch.Tensor)
+        self.assertEqualArray(result.numpy(), original.numpy())
+        self.assertIsNot(result, original)
+
+    def test_nested_list_of_tensors(self):
+        t1 = self.torch.tensor([1.0, 2.0])
+        t2 = self.torch.tensor([3.0, 4.0])
+        original = [t1, t2]
+        result = self.torch_deepcopy(original)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        self.assertIsNot(result, original)
+        self.assertIsNot(result[0], t1)
+        self.assertIsNot(result[1], t2)
+
+    def test_tuple_of_tensors(self):
+        t1 = self.torch.tensor([1.0])
+        t2 = self.torch.tensor([2.0])
+        result = self.torch_deepcopy((t1, t2))
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+
+    def test_unsupported_type_raises(self):
+        class _Unsupported:
+            pass
+
+        with self.assertRaises(NotImplementedError):
+            self.torch_deepcopy(_Unsupported())
+
+
+@requires_torch("2.9")
+class TestToTensor(ExtTestCase):
+    @classmethod
+    def setUpClass(cls):
+        import torch
+
+        cls.torch = torch
+
+    def setUp(self):
+        from yobx.torch.torch_helper import to_tensor
+        import onnx.numpy_helper as onh
+
+        self.to_tensor = to_tensor
+        self.onh = onh
+
+    def test_float32_from_numpy(self):
+        arr = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        proto = self.onh.from_array(arr)
+        result = self.to_tensor(proto)
+        self.assertIsInstance(result, self.torch.Tensor)
+        self.assertEqual(result.dtype, self.torch.float32)
+        self.assertEqual(result.shape, (3,))
+        self.assertEqualArray(result.numpy(), arr)
+
+    def test_int64_from_numpy(self):
+        arr = np.array([1, 2, 3], dtype=np.int64)
+        proto = self.onh.from_array(arr)
+        result = self.to_tensor(proto)
+        self.assertIsInstance(result, self.torch.Tensor)
+        self.assertEqual(result.dtype, self.torch.int64)
+        self.assertEqualArray(result.numpy(), arr)
+
+    def test_float64_from_numpy(self):
+        arr = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        proto = self.onh.from_array(arr)
+        result = self.to_tensor(proto)
+        self.assertIsInstance(result, self.torch.Tensor)
+        self.assertEqual(result.dtype, self.torch.float64)
+        self.assertEqualArray(result.numpy(), arr)
+
+    def test_2d_tensor(self):
+        arr = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        proto = self.onh.from_array(arr)
+        result = self.to_tensor(proto)
+        self.assertIsInstance(result, self.torch.Tensor)
+        self.assertEqual(result.shape, (2, 2))
+        self.assertEqualArray(result.numpy(), arr)
+
+    def test_float32_raw_data(self):
+        import struct
+
+        proto = onnx.TensorProto()
+        proto.data_type = onnx.TensorProto.FLOAT
+        proto.dims.extend([3])
+        proto.raw_data = struct.pack("3f", 1.0, 2.0, 3.0)
+        result = self.to_tensor(proto)
+        self.assertIsInstance(result, self.torch.Tensor)
+        self.assertEqual(result.dtype, self.torch.float32)
+        self.assertEqualArray(result.numpy(), np.array([1.0, 2.0, 3.0], dtype=np.float32))
+
+    def test_int64_raw_data(self):
+        import struct
+
+        proto = onnx.TensorProto()
+        proto.data_type = onnx.TensorProto.INT64
+        proto.dims.extend([3])
+        proto.raw_data = struct.pack("3q", 10, 20, 30)
+        result = self.to_tensor(proto)
+        self.assertIsInstance(result, self.torch.Tensor)
+        self.assertEqual(result.dtype, self.torch.int64)
+        self.assertEqualArray(result.numpy(), np.array([10, 20, 30], dtype=np.int64))
+
+    def test_empty_tensor(self):
+        proto = onnx.TensorProto()
+        proto.data_type = onnx.TensorProto.FLOAT
+        proto.dims.extend([0])
+        proto.raw_data = b""
+        result = self.to_tensor(proto)
+        self.assertIsInstance(result, self.torch.Tensor)
+        self.assertEqual(result.shape, (0,))
+
+    def test_string_raises(self):
+        proto = onnx.TensorProto()
+        proto.data_type = onnx.TensorProto.STRING
+        proto.dims.extend([1])
+        with self.assertRaises(AssertionError):
+            self.to_tensor(proto)
+
+    def test_undefined_raises(self):
+        proto = onnx.TensorProto()
+        proto.data_type = onnx.TensorProto.UNDEFINED
+        proto.dims.extend([1])
+        with self.assertRaises(AssertionError):
+            self.to_tensor(proto)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
