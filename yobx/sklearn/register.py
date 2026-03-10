@@ -33,3 +33,55 @@ def get_sklearn_converters():
     """Returns all registered converters as a mapping from type to converter function."""
     global SKLEARN_CONVERTERS
     return dict(SKLEARN_CONVERTERS)
+
+
+def get_sklearn_estimator_coverage():
+    """Return a coverage report for scikit-learn estimators.
+
+    Enumerates every estimator/transformer exposed by
+    :func:`sklearn.utils.all_estimators` and reports which ones already have
+    a converter registered in :mod:`yobx.sklearn` and which ones are supported
+    by :epkg:`sklearn-onnx` (``skl2onnx``), when that package is installed.
+
+    Returns
+    -------
+    list[dict]
+        Each entry is a dict with the following keys:
+
+        ``"category"``
+            Estimator class name (``str``).
+        ``"name"``
+            Estimator class name (``str``).
+        ``"cls"``
+            The estimator class itself.
+        ``"module"``
+            Public sklearn module path (private submodules stripped).
+        ``"yobx"``
+            the converting function if a converter is registered in :mod:`yobx.sklearn`.
+    """
+    from sklearn.utils import all_estimators
+
+    def _public_module(cls):
+        parts = cls.__module__.split(".")
+        return ".".join(p for p in parts if not p.startswith("_"))
+
+    # Enumerate all sklearn estimators, explicitly including trainable transforms.
+    # Then add any yobx-registered converters not captured by the type filter.
+    all_pairs = dict(all_estimators())
+    for cls in SKLEARN_CONVERTERS:
+        if cls.__name__ not in all_pairs:
+            all_pairs[cls.__name__] = cls
+
+    rows = []
+    for _name, cls in sorted(all_pairs.items(), key=lambda x: x[0]):
+        rows.append(
+            {
+                "category": cls.__module__.split(".")[-2].strip("_"),
+                "name": cls.__name__,
+                "predictable": hasattr(cls, "transform") or hasattr(cls, "predict"),
+                "cls": cls,
+                "module": _public_module(cls),
+                "yobx": SKLEARN_CONVERTERS.get(cls, None),
+            }
+        )
+    return rows
