@@ -136,6 +136,7 @@ epkg_dictionary = {
     "HuggingFace": "https://huggingface.co/docs/hub/en/index",
     "huggingface_hub": "https://github.com/huggingface/huggingface_hub",
     "ir-py": "https://onnx.ai/ir-py/",
+    "LightGBM": "https://lightgbm.readthedocs.io/en/latest/",
     "Linux": "https://www.linux.org/",
     "ml_dtypes": "https://github.com/jax-ml/ml_dtypes",
     "ModelBuilder": "https://onnxruntime.ai/docs/genai/howto/build-model.html",
@@ -188,6 +189,7 @@ epkg_dictionary = {
     "vocos": "https://github.com/gemelo-ai/vocos",
     "Windows": "https://www.microsoft.com/windows",
     "xgboost": "https://xgboost.readthedocs.io/en/stable/get_started.html",
+    "XGBoost": "https://xgboost.readthedocs.io/en/stable/get_started.html",
 }
 
 # models
