@@ -35,14 +35,14 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
     if hasattr(estimator, "get_feature_names_out"):
         if isinstance(estimator, Pipeline):
             last_step = estimator.steps[-1][1]
-            if not isinstance(last_step, ClusterMixin):
+            if not isinstance(last_step, ClusterMixin) and not is_classifier(last_step):
                 try:
                     return post_process_output_names(
                         last_step, list(last_step.get_feature_names_out())
                     )
                 except AttributeError:
                     pass
-        elif not isinstance(estimator, ClusterMixin):
+        elif not isinstance(estimator, ClusterMixin) and not is_classifier(estimator):
             try:
                 return post_process_output_names(
                     estimator, list(estimator.get_feature_names_out())
