@@ -11,6 +11,7 @@ yobx.sklearn
     cluster/index
     compose/index
     decomposition/index
+    discriminant_analysis/index
     ensemble/index
     linear_model/index
     multiclass/index

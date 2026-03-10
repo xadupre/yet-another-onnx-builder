@@ -22,6 +22,7 @@ example :ref:`l-plot-sklearn-with-sklearn-onnx` shows how to plug
 
     CATEGORY_TITLES = {
         "cluster": "Cluster Models",
+        "discriminant_analysis": "Discriminant Analysis",
         "preprocessing": "Preprocessing",
         "linear_model": "Linear Models",
         "tree": "Tree Models",
