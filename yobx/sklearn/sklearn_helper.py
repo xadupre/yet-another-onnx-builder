@@ -32,23 +32,8 @@ def get_n_expected_outputs(estimator: BaseEstimator) -> int:
 
 def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
     """Returns output names for every estimator."""
-    if hasattr(estimator, "get_feature_names_out"):
-        if isinstance(estimator, Pipeline):
-            last_step = estimator.steps[-1][1]
-            if not isinstance(last_step, ClusterMixin):
-                try:
-                    return post_process_output_names(
-                        last_step, list(last_step.get_feature_names_out())
-                    )
-                except AttributeError:
-                    pass
-        elif not isinstance(estimator, ClusterMixin):
-            try:
-                return post_process_output_names(
-                    estimator, list(estimator.get_feature_names_out())
-                )
-            except AttributeError:
-                pass
+    # Classifiers always use label/probabilities names regardless of whether
+    # they also implement get_feature_names_out as transformers (e.g. LDA).
     if is_classifier(estimator):
         if _classifier_has_predict_proba(estimator):
             return ["label", "probabilities"]
