@@ -3679,6 +3679,195 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertIn("Split", [n.op_type for n in onx.functions[0].node])
         self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b, offs), atol=1e-4)
 
+    def test_aten_max_pool3d(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.nn.functional.max_pool3d(x, kernel_size=2, stride=1)
+
+        model = Model()
+        inputs = (torch.rand((2, 4, 6, 6, 6), dtype=torch.float32),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_max_pool3d.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_avg_pool3d(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.nn.functional.avg_pool3d(x, kernel_size=2, stride=1)
+
+        model = Model()
+        inputs = (torch.rand((2, 4, 6, 6, 6), dtype=torch.float32),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_avg_pool3d.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_addmm(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, bias, x, weight):
+                return torch.addmm(bias, x, weight)
+
+        model = Model()
+        inputs = (
+            torch.rand((4,), dtype=torch.float32),
+            torch.rand((3, 5), dtype=torch.float32),
+            torch.rand((5, 4), dtype=torch.float32),
+        )
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_addmm.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_all_dim(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.all(x, dim=1)
+
+        model = Model()
+        inputs = (torch.tensor([[True, False, True], [True, True, True]]),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_all_dim.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
+
+    def test_aten_or(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x | y
+
+        model = Model()
+        inputs = (
+            torch.tensor([True, False, True, False]),
+            torch.tensor([True, True, False, False]),
+        )
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_or.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
+
+    def test_aten_any(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.any(x)
+
+        model = Model()
+        inputs = (torch.tensor([False, True, False]),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_any.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
+
+    def test_aten_any_dim(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.any(x, dim=1)
+
+        model = Model()
+        inputs = (torch.tensor([[False, True], [False, False]]),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_any_dim.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
+
+    def test_aten_argmax(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.argmax(x, dim=1)
+
+        model = Model()
+        inputs = (torch.rand((3, 5), dtype=torch.float32),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_argmax.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
+
+    def test_aten_argmin(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.argmin(x, dim=1)
+
+        model = Model()
+        inputs = (torch.rand((3, 5), dtype=torch.float32),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_argmin.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
+
+    def test_aten_asin(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.asin(x)
+
+        model = Model()
+        inputs = (torch.rand((3, 4), dtype=torch.float32) * 0.9,)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_asin.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_asinh(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.asinh(x)
+
+        model = Model()
+        inputs = (torch.rand((3, 4), dtype=torch.float32),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_asinh.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_atan(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.atan(x)
+
+        model = Model()
+        inputs = (torch.rand((3, 4), dtype=torch.float32),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_atan.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_atanh(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.atanh(x)
+
+        model = Model()
+        inputs = (torch.rand((3, 4), dtype=torch.float32) * 0.9,)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.dump_onnx("test_aten_atanh.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
