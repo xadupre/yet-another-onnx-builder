@@ -385,7 +385,6 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(pipe.predict(X), label)
         self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
-
     def test_standard_scaler_large_model(self):
         """to_onnx with large_model=True returns an ExtendedModelContainer."""
         from yobx.container import ExtendedModelContainer

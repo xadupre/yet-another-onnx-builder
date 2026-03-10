@@ -289,7 +289,9 @@ def _build_lgbm_tree_attrs_legacy(
         for node in sorted(internal_nodes, key=lambda n: n["id"]):
             node_id = node["id"]
             true_id = n_internal + node["true_id"] if node["true_is_leaf"] else node["true_id"]
-            false_id = n_internal + node["false_id"] if node["false_is_leaf"] else node["false_id"]
+            false_id = (
+                n_internal + node["false_id"] if node["false_is_leaf"] else node["false_id"]
+            )
 
             all_nodeids.append(node_id)
             all_treeids.append(tree_idx)
