@@ -51,8 +51,9 @@ class TestLGBMRegressor(ExtTestCase):
         rng = np.random.default_rng(3)
         X = rng.standard_normal((50, 4)).astype(np.float32)
         y = rng.poisson(lam=3, size=50).astype(np.float32) + 1.0
-        reg = LGBMRegressor(n_estimators=5, max_depth=3, random_state=0, verbose=-1,
-                            objective="poisson")
+        reg = LGBMRegressor(
+            n_estimators=5, max_depth=3, random_state=0, verbose=-1, objective="poisson"
+        )
         reg.fit(X, y)
 
         onx = to_onnx(reg, (X,))
@@ -78,8 +79,9 @@ class TestLGBMRegressor(ExtTestCase):
         rng = np.random.default_rng(4)
         X = rng.standard_normal((50, 4)).astype(np.float32)
         y = np.abs(rng.standard_normal(50)).astype(np.float32) + 0.5
-        reg = LGBMRegressor(n_estimators=5, max_depth=3, random_state=0, verbose=-1,
-                            objective="tweedie")
+        reg = LGBMRegressor(
+            n_estimators=5, max_depth=3, random_state=0, verbose=-1, objective="tweedie"
+        )
         reg.fit(X, y)
 
         onx = to_onnx(reg, (X,))
