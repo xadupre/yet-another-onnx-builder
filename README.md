@@ -31,7 +31,7 @@ It provides:
 - A **translation tool** that converts ONNX graphs back to executable Python code (`yobx.translate`).
 - **Optimization functions** to make the model more efficient.
 - It supports multiple opsets and multiple domains.
-- It allows the user to directly onnx model with [Spox]() or [onnxscript]()/[ir-py]().
+- It allows the user to directly onnx model with [Spox](https://spox.readthedocs.io/en/latest/) or [onnxscript](https://microsoft.github.io/onnxscript/)/[ir-py](https://onnx.ai/ir-py/).
 
 Its unique API:
 
