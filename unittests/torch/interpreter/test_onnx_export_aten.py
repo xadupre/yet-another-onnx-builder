@@ -3690,7 +3690,6 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.rand((2, 4, 6, 6, 6), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_max_pool3d.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_avg_pool3d(self):
@@ -3704,7 +3703,6 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.rand((2, 4, 6, 6, 6), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_avg_pool3d.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_addmm(self):
@@ -3722,7 +3720,6 @@ class TestOnnxExportAten(ExtTestCase):
         )
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_addmm.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_all_dim(self):
@@ -3736,7 +3733,6 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.tensor([[True, False, True], [True, True, True]]),)
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_all_dim.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_or(self):
@@ -3753,7 +3749,6 @@ class TestOnnxExportAten(ExtTestCase):
         )
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_or.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_any(self):
@@ -3767,7 +3762,6 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.tensor([False, True, False]),)
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_any.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_any_dim(self):
@@ -3781,7 +3775,6 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.tensor([[False, True], [False, False]]),)
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_any_dim.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_argmax(self):
@@ -3795,7 +3788,6 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.rand((3, 5), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_argmax.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_argmin(self):
@@ -3809,7 +3801,6 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.rand((3, 5), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_argmin.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_asin(self):
@@ -3823,7 +3814,6 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.rand((3, 4), dtype=torch.float32) * 0.9,)
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_asin.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_asinh(self):
@@ -3837,7 +3827,6 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.rand((3, 4), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_asinh.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_atan(self):
@@ -3851,7 +3840,6 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.rand((3, 4), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_atan.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_atanh(self):
@@ -3865,7 +3853,6 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.rand((3, 4), dtype=torch.float32) * 0.9,)
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
-        self.dump_onnx("test_aten_atanh.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
 
