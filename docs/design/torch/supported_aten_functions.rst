@@ -58,7 +58,7 @@ Non-Aten Functions
 
 Functions registered via :mod:`yobx.torch.interpreter._non_aten_functions`.
 These converters handle ONNX-specific symbolic operations that are not
-part of the standard :epkg:`aten` namespace.
+part of the standard namespace for the :epkg:`aten functions`.
 
 .. runpython::
     :showcode:

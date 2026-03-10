@@ -41,13 +41,13 @@ def _compute_pairwise_distances(
 
     The *metric* argument selects the distance function:
 
-    * ``"sqeuclidean"`` — squared Euclidean ``||x−c||²`` (default sklearn
+    * ``"sqeuclidean"`` — squared Euclidean ``||x-c||²`` (default sklearn
       default after effective-metric normalisation with p=2).
-    * ``"euclidean"`` — Euclidean ``||x−c||``.
-    * ``"cosine"`` — ``1 − (x·c)/(||x||·||c||)`` ∈ [0, 2].
-    * ``"manhattan"`` (also ``"cityblock"``, ``"l1"``) — ``||x−c||₁``.
-    * ``"chebyshev"`` — ``||x−c||∞ = max_k |x_k − c_k|``.
-    * ``"minkowski"`` — ``||x−c||_p``; pass ``p=<value>`` in *metric_params*.
+    * ``"euclidean"`` — Euclidean ``||x-c||``.
+    * ``"cosine"`` — ``1 - (x·c)/(||x||·||c||)`` ∈ [0, 2].
+    * ``"manhattan"`` (also ``"cityblock"``, ``"l1"``) — ``||x-c||₁``.
+    * ``"chebyshev"`` — ``||x-c||∞ = max_k |x_k - c_k|``.
+    * ``"minkowski"`` — ``||x-c||_p``; pass ``p=<value>`` in *metric_params*.
       ``p=1`` and ``p=2`` are redirected to the ``manhattan`` and ``euclidean``
       branches respectively; other values use a generic Pow/ReduceSum/Pow graph.
       sklearn always provides ``p`` via ``effective_metric_params_``; if absent
@@ -67,8 +67,8 @@ def _compute_pairwise_distances(
       (``ReduceMax`` with axes as input).
 
     :param g: graph builder
-    :param X: input tensor name – shape ``(N, F)``
-    :param training_data: training feature matrix – shape ``(M, F)``
+    :param X: input tensor name - shape ``(N, F)``
+    :param training_data: training feature matrix - shape ``(M, F)``
     :param itype: ONNX element type of *X*
     :param metric: distance metric name (canonical or aliased)
     :param name: node name prefix
@@ -93,9 +93,7 @@ def _compute_pairwise_distances(
 
     # ------------------------------------------------------------------ CDist
     if g.has_opset("com.microsoft") and metric in _CDIST_METRICS:
-        training_data_name = g.make_initializer(
-            f"{name}_training_data", training_data
-        )
+        training_data_name = g.make_initializer(f"{name}_training_data", training_data)
         dists = g.make_node(
             "CDist",
             [X, training_data_name],
@@ -127,7 +125,7 @@ def _compute_pairwise_distances(
 
     if metric in ("sqeuclidean", "euclidean"):
         # Efficient O(N·F + M·F + N·M) implementation:
-        # ||x − c||² = ||x||² − 2·x·cᵀ + ||c||²
+        # ||x - c||² = ||x||² - 2·x·cᵀ + ||c||²
         training_T = training_data.T.astype(dtype)  # (F, M)
         c_sq = np.sum(training_data**2, axis=1, keepdims=True).T.astype(dtype)  # (1, M)
 
@@ -149,7 +147,7 @@ def _compute_pairwise_distances(
         return g.op.Sqrt(sq_dists, name=f"{name}_sqrt")
 
     if metric == "cosine":
-        # cosine_dist(x, c) = 1 − (x · c) / (||x|| · ||c||)
+        # cosine_dist(x, c) = 1 - (x · c) / (||x|| · ||c||)
         norm_eps = np.array([1e-12], dtype=dtype)  # minimum norm to avoid division by zero
         x_sq = g.op.Mul(X, X, name=f"{name}_x_sq")
         x_sq_sum = g.op.ReduceSum(
@@ -165,9 +163,7 @@ def _compute_pairwise_distances(
         x_normalized = g.op.Div(X, x_norm, name=f"{name}_x_normd")  # (N, F)
 
         # Normalise C as a constant (M, F) → (F, M) for matmul
-        c_norm = np.maximum(
-            np.linalg.norm(training_data, axis=1, keepdims=True), 1e-12
-        )  # (M, 1)
+        c_norm = np.maximum(np.linalg.norm(training_data, axis=1, keepdims=True), 1e-12)  # (M, 1)
         c_normalized_T = (training_data / c_norm).T.astype(dtype)  # (F, M)
 
         cos_sim = g.op.MatMul(x_normalized, c_normalized_T, name=f"{name}_cos_sim")
@@ -183,12 +179,10 @@ def _compute_pairwise_distances(
         return cos_dist
 
     if metric == "manhattan":
-        # ||x − c||₁  — expand to (N, M, F), take abs, reduce-sum over features
+        # ||x - c||₁  — expand to (N, M, F), take abs, reduce-sum over features
         M, F = training_data.shape
         c_3d = training_data.reshape(1, M, F).astype(dtype)  # (1, M, F) constant
-        x_3d = g.op.Unsqueeze(
-            X, np.array([1], dtype=np.int64), name=f"{name}_unsq"
-        )  # (N, 1, F)
+        x_3d = g.op.Unsqueeze(X, np.array([1], dtype=np.int64), name=f"{name}_unsq")  # (N, 1, F)
         diff = g.op.Sub(x_3d, c_3d, name=f"{name}_diff")  # (N, M, F)
         abs_diff = g.op.Abs(diff, name=f"{name}_abs")  # (N, M, F)
         return g.op.ReduceSum(
@@ -199,12 +193,10 @@ def _compute_pairwise_distances(
         )  # (N, M)
 
     if metric == "chebyshev":
-        # ||x − c||∞ = max_k |x_k − c_k|  — requires opset >= 18 for ReduceMax
+        # ||x - c||∞ = max_k |x_k - c_k|  — requires opset >= 18 for ReduceMax
         M, F = training_data.shape
         c_3d = training_data.reshape(1, M, F).astype(dtype)  # (1, M, F)
-        x_3d = g.op.Unsqueeze(
-            X, np.array([1], dtype=np.int64), name=f"{name}_unsq"
-        )  # (N, 1, F)
+        x_3d = g.op.Unsqueeze(X, np.array([1], dtype=np.int64), name=f"{name}_unsq")  # (N, 1, F)
         diff = g.op.Sub(x_3d, c_3d, name=f"{name}_diff")  # (N, M, F)
         abs_diff = g.op.Abs(diff, name=f"{name}_abs")  # (N, M, F)
         return g.op.ReduceMax(
@@ -222,20 +214,14 @@ def _compute_pairwise_distances(
             # Use the efficient euclidean branch (no extra recursion since
             # metric has already been alias-resolved above).
             metric = "euclidean"
-            return _compute_pairwise_distances(
-                g, X, training_data, itype, metric, name
-            )
+            return _compute_pairwise_distances(g, X, training_data, itype, metric, name)
         if p == 1:
             metric = "manhattan"
-            return _compute_pairwise_distances(
-                g, X, training_data, itype, metric, name
-            )
+            return _compute_pairwise_distances(g, X, training_data, itype, metric, name)
         # General p: (sum |x_k - c_k|^p)^(1/p)
         M, F = training_data.shape
         c_3d = training_data.reshape(1, M, F).astype(dtype)
-        x_3d = g.op.Unsqueeze(
-            X, np.array([1], dtype=np.int64), name=f"{name}_unsq"
-        )
+        x_3d = g.op.Unsqueeze(X, np.array([1], dtype=np.int64), name=f"{name}_unsq")
         diff = g.op.Sub(x_3d, c_3d, name=f"{name}_diff")
         abs_diff = g.op.Abs(diff, name=f"{name}_abs")
         p_arr = np.array([p], dtype=dtype)
@@ -284,17 +270,19 @@ def sklearn_knn_classifier(
           │
           └─── pairwise distances ────────────────────────────────────► dists (N, M)
                                                                                │
-                                                     TopK(k, axis=1, largest=0) ──► indices (N, k)
-                                                                               │
-                                        Gather(training_labels_encoded) ──────► neighbor_labels (N, k)
-                                                                               │
-                                Reshape(-1) → OneHot(n_classes) → Reshape(N, k, n_classes) ──►
-                                                                               │
-                                                           ReduceSum(axis=1) ──► votes (N, n_classes)
-                                                                               │
-                                             ArgMax(axis=1) → Gather(classes_) ──► labels (N,)
-                                                                               │
-                                           Div(votes, ReduceSum(votes, axis=1)) ──► probabilities (N, n_classes)
+                                                        +----------------------+
+                                                        │
+                                TopK(k, axis=1, largest=0) ──► indices (N, k)
+                                                        │
+                Gather(training_labels_encoded) ──────► neighbor_labels (N, k)
+                                                        │
+        Reshape(-1) → OneHot(n_classes) → Reshape(N, k, n_classes) ──►
+                                                        │
+                                    ReduceSum(axis=1) ──► votes (N, n_classes)
+                                                        │
+                        ArgMax(axis=1) → Gather(classes_) ──► labels (N,)
+                                                        │
+                    Div(votes, ReduceSum(votes, axis=1)) ──► probabilities (N, n_classes)
 
     :param g: graph builder
     :param sts: shapes defined by :epkg:`scikit-learn`
@@ -320,9 +308,9 @@ def sklearn_knn_classifier(
     # In older sklearn, outputs_2d_ exists; for newer sklearn it may not.
     # _y is 1-D for a single-output estimator and 2-D for multi-output.
     raw_y = estimator._y
-    assert raw_y.ndim == 1 or raw_y.shape[1] == 1, (
-        "Multi-output KNeighborsClassifier is not yet supported."
-    )
+    assert (
+        raw_y.ndim == 1 or raw_y.shape[1] == 1
+    ), "Multi-output KNeighborsClassifier is not yet supported."
 
     itype = g.get_type(X)
     k = estimator.n_neighbors
@@ -330,9 +318,9 @@ def sklearn_knn_classifier(
     metric = estimator.effective_metric_
     metric_params = estimator.effective_metric_params_
 
-    training_labels_encoded = (
-        raw_y.ravel() if raw_y.ndim == 1 else raw_y[:, 0]
-    ).astype(np.int64)  # (M,)
+    training_labels_encoded = (raw_y.ravel() if raw_y.ndim == 1 else raw_y[:, 0]).astype(
+        np.int64
+    )  # (M,)
 
     # classes_ may be a plain ndarray (single output) or a list of arrays
     # (multi-output).  Normalise to a plain ndarray.
@@ -345,7 +333,7 @@ def sklearn_knn_classifier(
         g, X, training_data, itype, metric, f"{name}_dist", **metric_params
     )
 
-    # 2. k nearest neighbours – values (N, k) and indices (N, k)
+    # 2. k nearest neighbours - values (N, k) and indices (N, k)
     _topk_values, nn_indices = g.op.TopK(
         dists,
         np.array([k], dtype=np.int64),
@@ -491,9 +479,9 @@ def sklearn_knn_regressor(
 
     # _y is 1-D for a single-output estimator and 2-D for multi-output.
     raw_y = estimator._y
-    assert raw_y.ndim == 1 or raw_y.shape[1] == 1, (
-        "Multi-output KNeighborsRegressor is not yet supported."
-    )
+    assert (
+        raw_y.ndim == 1 or raw_y.shape[1] == 1
+    ), "Multi-output KNeighborsRegressor is not yet supported."
 
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
@@ -502,9 +490,7 @@ def sklearn_knn_regressor(
     metric = estimator.effective_metric_
     metric_params = estimator.effective_metric_params_
 
-    training_targets = (
-        raw_y.ravel() if raw_y.ndim == 1 else raw_y[:, 0]
-    ).astype(dtype)  # (M,)
+    training_targets = (raw_y.ravel() if raw_y.ndim == 1 else raw_y[:, 0]).astype(dtype)  # (M,)
 
     # 1. Pairwise distances: (N, M)
     dists = _compute_pairwise_distances(

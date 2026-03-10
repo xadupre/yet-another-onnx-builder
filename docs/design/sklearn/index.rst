@@ -57,6 +57,14 @@ for a model not already covered but this library. This package includes
 a function able to query *Copilot* to get that first draft.
 That saves quite some time.
 
+**Opsets**
+
+:func:`yobx.sklearn.convert.to_onnx` converts scikit-learn models into
+ONNX. The function exposes arguments **target_opset**.
+The conversion is done for opset 18 if ``target_opset==18``.
+The conversion may includes optimized kernels for :epkg:`onnxruntime`
+if ``target_opsets={'': 18, 'com.microsoft': 1}``.
+
 .. toctree::
    :maxdepth: 1
 

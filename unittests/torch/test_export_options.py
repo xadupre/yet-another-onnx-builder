@@ -764,31 +764,26 @@ class TestRemoveInline(ExtTestCase):
             torch.arange(5).to(torch.float32),
         )
 
-        try:
-            from experimental_experiment.torch_interpreter.export_options import (
-                ExportOptions as _ExportOptions,
-            )
+        from yobx.torch.export_options import ExportOptions as _ExportOptions
 
-            _opts = _ExportOptions()
-            _ep = _opts.export(
-                model,
-                args=xs,
-                kwargs=None,
-                tracing_mode=False,
-                dynamic_shapes=None,
-                same_signature=False,
-                verbose=10,
+        _opts = _ExportOptions()
+        _ep = _opts.export(
+            model,
+            args=xs,
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=False,
+            verbose=10,
+        )
+        for node in _ep.graph.nodes:
+            if node.op == "output":
+                continue
+            self.assertGreater(
+                len(node.users),
+                0,
+                msg=lambda: f"node with no users {node.name!r}\n{str(_ep.graph)}",
             )
-            for node in _ep.graph.nodes:
-                if node.op == "output":
-                    continue
-                self.assertGreater(
-                    len(node.users),
-                    0,
-                    msg=lambda: f"node with no users {node.name!r}\n{str(_ep.graph)}",
-                )
-        except ImportError:
-            _ep = None
 
         opts = ExportOptions()
         ep = opts.export(

@@ -5,12 +5,14 @@ yobx.torch
     :maxdepth: 1
     :caption: modules
 
+    _model_eval_cases
     export_helper
     export_options
     fake_tensor_helper
     flatten
     flatten_helper
     input_observer
+    model_eval_cases
     patch
     tiny_models
     torch_helper

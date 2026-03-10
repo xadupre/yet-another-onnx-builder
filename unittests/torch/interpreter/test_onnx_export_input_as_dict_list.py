@@ -2,7 +2,6 @@ import unittest
 from yobx.ext_test_case import (
     ExtTestCase,
     requires_torch,
-    requires_onnx_diagnostic,
     skipif_ci_windows,
 )
 from yobx.reference import ExtendedReferenceEvaluator
@@ -109,7 +108,6 @@ class TestOnnxExportInputDictList(ExtTestCase):
 
     @skipif_ci_windows("not yet supported on Windows")
     @requires_torch("2.4")
-    @requires_onnx_diagnostic("0.7.13")
     def test_input_list_dynamic(self):
         import torch
 
@@ -143,7 +141,6 @@ class TestOnnxExportInputDictList(ExtTestCase):
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
-    @requires_onnx_diagnostic("0.8.8")
     def test_tensor_input_tracer(self):
         import torch
 
@@ -178,7 +175,6 @@ class TestOnnxExportInputDictList(ExtTestCase):
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
-    @requires_onnx_diagnostic("0.8.8")
     @requires_torch("2.9.99")
     def test_list_input_tracer(self):
         import torch
@@ -220,7 +216,6 @@ class TestOnnxExportInputDictList(ExtTestCase):
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
-    @requires_onnx_diagnostic("0.8.8")
     def test_neuron_tracer(self):
         import torch
 

@@ -466,6 +466,7 @@ class TestTensorflowBinaryOpConverters(ExtTestCase):
         container = to_onnx(model, (X,), large_model=True)
         self.assertIsInstance(container, ExtendedModelContainer)
 
+
 @requires_tensorflow("2.18")
 class TestTensorflowUnaryOpConverters(ExtTestCase):
     """Tests for the unary element-wise op converters in unary_ops.py."""

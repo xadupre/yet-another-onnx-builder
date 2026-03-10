@@ -1,8 +1,8 @@
 .. _l-design-gbm-converters:
 
-=====================================
-Gradient Boosting Converters
-=====================================
+================================================
+Gradient Boosting Converters (XGBoost, LightGBM)
+================================================
 
 :func:`yobx.sklearn.to_onnx` converts fitted
 :class:`xgboost.XGBRegressor`, :class:`xgboost.XGBClassifier`,
@@ -111,10 +111,12 @@ XGBClassifier
                                                 │
                                            ArgMax ──Cast──Gather(classes)  ──►  label
 
-.. code-block:: python
+.. runpython:: python
+    :showcode:
 
     import numpy as np
     from xgboost import XGBClassifier
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.sklearn import to_onnx
 
     rng = np.random.default_rng(0)
@@ -122,7 +124,8 @@ XGBClassifier
     y = (X[:, 0] + X[:, 1] > 0).astype(int)
 
     clf = XGBClassifier(n_estimators=10, max_depth=3, random_state=0).fit(X, y)
-    label_onx, proba_onx = to_onnx(clf, (X,))
+    onx = to_onnx(clf, (X,))
+    print(pretty_onnx(onx))
 
 LightGBM
 ========
@@ -217,11 +220,13 @@ Integer-coded categorical features are supported for LightGBM.  Pass
 ``categorical_feature`` to ``fit()`` to mark which columns are categorical,
 then convert as usual:
 
-.. code-block:: python
+.. runpython:: python
+    :showcode:
 
     import numpy as np
     from lightgbm import LGBMRegressor
     from yobx.sklearn import to_onnx
+    from yobx.helprs.onnx_helper import pretty_onnx
 
     rng = np.random.default_rng(0)
     X_num = rng.standard_normal((200, 3)).astype(np.float32)
@@ -233,6 +238,7 @@ then convert as usual:
         X, y, categorical_feature=[3]
     )
     onx = to_onnx(reg, (X,))
+    print(pretty_onnx(onx))
 
 .. note::
 
@@ -247,17 +253,17 @@ Comparison: XGBoost vs LightGBM
 
 The table below summarises the key differences between the two converters:
 
-==================================  ==============================  ==============================
-Property                            XGBoost                         LightGBM
-==================================  ==============================  ==============================
+==================================  ================================  ==============================
+Property                            XGBoost                          LightGBM
+==================================  ================================  ==============================
 Tree dump method                    ``get_dump(dump_format='json')``  ``booster_.dump_model()``
-Split direction (numerical)         ``x < threshold`` (BRANCH_LT)  ``x ≤ threshold`` (BRANCH_LEQ)
-Categorical splits                  Not supported by converter       Expanded to BRANCH_EQ chains
-Base-score bias                     Added from ``base_score`` cfg    None (baked into leaf values)
-Regression transform                Identity / Sigmoid / Exp         Identity / Exp
-Multi-class targets per round       ``n_classes`` trees              ``n_classes`` trees
-Binary classifier raw outputs       1 tree per round (sigmoid)       1 tree per round (sigmoid)
-==================================  ==============================  ==============================
+Split direction (numerical)         ``x < threshold`` (BRANCH_LT)     ``x ≤ threshold`` (BRANCH_LEQ)
+Categorical splits                  Not supported by converter        Expanded to BRANCH_EQ chains
+Base-score bias                     Added from ``base_score`` cfg     None (baked into leaf values)
+Regression transform                Identity / Sigmoid / Exp          Identity / Exp
+Multi-class targets per round       ``n_classes`` trees               ``n_classes`` trees
+Binary classifier raw outputs       1 tree per round (sigmoid)        1 tree per round (sigmoid)
+==================================  ===============================   ==============================
 
 Supported input dtypes and opsets
 ==================================
@@ -276,7 +282,7 @@ Specifying the target opset:
 .. code-block:: python
 
     onx = to_onnx(reg, (X.astype(np.float64),),
-                  target_opset={"": 21, "ai.onnx.ml": 3})
+                  target_opset={"": 21, "ai.onnx.ml": 5})
 
 Pipeline embedding
 ==================
@@ -285,12 +291,14 @@ Both :class:`xgboost.XGBRegressor` / :class:`xgboost.XGBClassifier` and
 :class:`lightgbm.LGBMRegressor` / :class:`lightgbm.LGBMClassifier` can be
 used as the final step in a :class:`sklearn.pipeline.Pipeline`:
 
-.. code-block:: python
+.. runpython:: python
+    :showcode:
 
     import numpy as np
     from sklearn.pipeline import Pipeline
     from sklearn.preprocessing import StandardScaler
     from lightgbm import LGBMClassifier
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.sklearn import to_onnx
 
     rng = np.random.default_rng(0)
@@ -302,5 +310,6 @@ used as the final step in a :class:`sklearn.pipeline.Pipeline`:
         ("clf", LGBMClassifier(n_estimators=5, random_state=0)),
     ]).fit(X, y)
 
-    label_onx, proba_onx = to_onnx(pipe, (X,))
+    onx = to_onnx(pipe, (X,))
+    print(pretty_onnx(onx))
 
