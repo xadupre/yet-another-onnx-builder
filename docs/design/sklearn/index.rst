@@ -62,6 +62,7 @@ That saves quite some time.
 
    expected_api
    sklearn_converter
+   lightgbm_converter
    supported_converters
    custom_converter
    copilot_draft

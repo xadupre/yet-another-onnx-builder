@@ -606,6 +606,42 @@ def requires_xgboost(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
+def has_lightgbm(version: str = "") -> bool:
+    "Returns True if LightGBM is installed and its version is high enough."
+    import packaging.version as pv
+
+    try:
+        import lightgbm
+    except (ImportError, AttributeError):
+        return False
+    if not hasattr(lightgbm, "__version__"):
+        return False
+    if not version:
+        return True
+    return pv.Version(lightgbm.__version__) >= pv.Version(version)
+
+
+def requires_lightgbm(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`lightgbm` is not recent enough."""
+    try:
+        import lightgbm
+    except (AttributeError, ImportError):
+        return unittest.skip(msg or "lightgbm not installed")
+
+    if not hasattr(lightgbm, "__version__"):
+        return unittest.skip(msg or "lightgbm not installed")
+
+    if not version:
+        return lambda x: x
+
+    import packaging.version as pv
+
+    if pv.Version(lightgbm.__version__) < pv.Version(version):
+        msg = f"lightgbm version {lightgbm.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def requires_onnx_diagnostic(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx-diagnostic` is not recent enough."""
     try:
