@@ -29,8 +29,9 @@ It provides:
   [ir-py](https://onnx.ai/ir-py/) and [spox](https://spox.readthedocs.io/en/latest/).
 - A **symbolic shape expression system** for dynamic shape handling at export time (`yobx.xshape`).
 - A **translation tool** that converts ONNX graphs back to executable Python code (`yobx.translate`).
-- **Optimization fucntions** to make the model more efficient.
+- **Optimization functions** to make the model more efficient.
 - It supports multiple opsets and multiple domains.
+- It allows the user to directly onnx model with [Spox]() or [onnxscript]()/[ir-py]().
 
 Its unique API:
 

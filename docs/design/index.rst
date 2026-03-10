@@ -1,6 +1,8 @@
 Elements of Design
 ==================
 
+copilot summarize
+
 .. toctree::
    :maxdepth: 1
 

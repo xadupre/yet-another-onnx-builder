@@ -34,6 +34,7 @@ It provides:
 - A :ref:`translation tool <l-design-translate>` that converts ONNX graphs back to executable Python code.
 - **Optimization fucntions** to make the model more efficient.
 - It supports multiple opsets and multiple domains.
+- It allows the user to directly onnx model with :epkg:`spox` or :epkg:`onnxscript`/:epkg:`ir-py`.
 
 Its unique API:
 
