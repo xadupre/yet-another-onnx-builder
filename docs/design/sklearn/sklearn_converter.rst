@@ -271,6 +271,104 @@ to avoid collisions.
     model = to_onnx(pipe, (X,))
     print("DOT-SECTION", to_dot(model))
 
+VotingClassifier
+----------------
+
+:func:`sklearn_voting_classifier
+<yobx.sklearn.ensemble.voting.sklearn_voting_classifier>`
+converts :class:`sklearn.ensemble.VotingClassifier` for both
+``voting='soft'`` and ``voting='hard'``, with optional per-estimator
+``weights``.
+
+**Soft voting** — average class probabilities across estimators, then
+take the argmax:
+
+.. code-block:: text
+
+    X ──[sub-est 0]──► (_, proba_0)  ──Unsqueeze──► (1, N, C)
+    X ──[sub-est 1]──► (_, proba_1)  ──Unsqueeze──► (1, N, C)
+                          Concat(axis=0) ──► stacked (E, N, C)
+                              ReduceMean(axis=0) ──► avg_proba (N, C)
+                                  ArgMax(axis=1) ──Cast──Gather(classes_) ──► label
+
+**Hard voting** — each estimator casts one (weighted) vote; the class
+with the most votes wins:
+
+.. code-block:: text
+
+    X ──[sub-est 0]──► label_0 (N,)
+    X ──[sub-est 1]──► label_1 (N,)
+        label → class index (Equal+ArgMax) ──Unsqueeze──► (N, 1)
+            Equal(range_classes) ──Cast(float) ──► votes (N, C)
+                Add(votes_0, votes_1, ...) ──► total_votes (N, C)
+                    ArgMax(axis=1) ──Cast──Gather(classes_) ──► label
+
+Soft voting returns ``(label, probabilities)``; hard voting returns
+only ``(label,)`` — consistent with sklearn's behaviour where
+``predict_proba`` is absent for hard-voting estimators.
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from sklearn.ensemble import VotingClassifier
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.tree import DecisionTreeClassifier
+    from yobx.sklearn import to_onnx
+    from yobx.helpers.onnx_helper import pretty_onnx
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((20, 4)).astype(np.float32)
+    y = (X[:, 0] > 0).astype(np.int64)
+
+    clf = VotingClassifier(
+        estimators=[
+            ("lr", LogisticRegression(random_state=0)),
+            ("dt", DecisionTreeClassifier(random_state=0)),
+        ],
+        voting="soft",
+    ).fit(X, y)
+    model = to_onnx(clf, (X,))
+    print(pretty_onnx(model))
+
+VotingRegressor
+---------------
+
+:func:`sklearn_voting_regressor
+<yobx.sklearn.ensemble.voting.sklearn_voting_regressor>`
+converts :class:`sklearn.ensemble.VotingRegressor`.
+
+Each sub-estimator's predictions are collected and then averaged
+(optionally weighted):
+
+.. code-block:: text
+
+    X ──[sub-est 0]──► pred_0 (N,) ──Reshape──► (N, 1)
+    X ──[sub-est 1]──► pred_1 (N,) ──Reshape──► (N, 1)
+            Concat(axis=1) ──► stacked (N, E)
+                ReduceMean(axis=1) ──► predictions (N,)
+
+With ``weights``, a weighted sum is used instead of a plain mean.
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from sklearn.ensemble import VotingRegressor
+    from sklearn.linear_model import LinearRegression, Ridge
+    from yobx.sklearn import to_onnx
+    from yobx.helpers.onnx_helper import pretty_onnx
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((20, 4)).astype(np.float32)
+    y = X[:, 0] + 0.5 * X[:, 1]
+
+    reg = VotingRegressor(
+        estimators=[("lr", LinearRegression()), ("ridge", Ridge())],
+    ).fit(X, y)
+    model = to_onnx(reg, (X,))
+    print(pretty_onnx(model))
+
 Adding a new converter
 ======================
 
