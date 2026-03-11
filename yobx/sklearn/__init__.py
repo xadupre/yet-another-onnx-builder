@@ -21,6 +21,7 @@ def register_sklearn_converters():
     from .preprocessing import register as register_preprocessing
     from .tree import register as register_tree
     from .lightgbm import register as register_lightgbm
+    from .svm import register as register_svm
     from .xgboost import register as register_xgboost
 
     register_cluster()
@@ -35,5 +36,6 @@ def register_sklearn_converters():
     register_neural_network()
     register_pipeline()
     register_preprocessing()
+    register_svm()
     register_tree()
     register_xgboost()
