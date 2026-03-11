@@ -96,24 +96,18 @@ class TestSklearnDummyClassifier(ExtTestCase):
             self.assertEqualArray(expected_proba, ort_results[1], atol=atol)
 
     def test_dummy_classifier_most_frequent(self):
-        self._check_classifier(
-            DummyClassifier(strategy="most_frequent"), self._X, self._y
-        )
+        self._check_classifier(DummyClassifier(strategy="most_frequent"), self._X, self._y)
 
     def test_dummy_classifier_prior(self):
         self._check_classifier(DummyClassifier(strategy="prior"), self._X, self._y)
 
     def test_dummy_classifier_constant(self):
-        self._check_classifier(
-            DummyClassifier(strategy="constant", constant=1), self._X, self._y
-        )
+        self._check_classifier(DummyClassifier(strategy="constant", constant=1), self._X, self._y)
 
     def test_dummy_classifier_binary(self):
         """Binary classification (two classes)."""
         y_bin = np.array([0, 0, 0, 1, 1, 1])
-        self._check_classifier(
-            DummyClassifier(strategy="most_frequent"), self._X, y_bin
-        )
+        self._check_classifier(DummyClassifier(strategy="most_frequent"), self._X, y_bin)
 
     def test_dummy_classifier_unsupported_strategy(self):
         """Unsupported strategies raise NotImplementedError."""

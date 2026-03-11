@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple
 
 import numpy as np
 import onnx
@@ -75,9 +75,7 @@ def sklearn_dummy_regressor(
         # Broadcast constant_ (1, n_outputs) to (N, n_outputs).
         constant = estimator.constant_.astype(dtype)  # (1, n_outputs)
         n_out_tensor = np.array([n_outputs], dtype=np.int64)
-        target_shape = g.op.Concat(
-            batch_size, n_out_tensor, axis=0, name=f"{name}_target_shape"
-        )
+        target_shape = g.op.Concat(batch_size, n_out_tensor, axis=0, name=f"{name}_target_shape")
         result = g.op.Expand(constant, target_shape, name=name, outputs=outputs)
 
     assert isinstance(result, str)
@@ -136,9 +134,7 @@ def sklearn_dummy_classifier(
         )
 
     if estimator.n_outputs_ > 1:
-        raise NotImplementedError(
-            "DummyClassifier with multiple outputs is not yet supported."
-        )
+        raise NotImplementedError("DummyClassifier with multiple outputs is not yet supported.")
 
     assert isinstance(
         estimator, DummyClassifier
@@ -185,9 +181,7 @@ def sklearn_dummy_classifier(
     # Broadcast proba_row (1, n_classes) → (N, n_classes).
     proba_const = proba_row.reshape(1, n_classes)
     n_classes_tensor = np.array([n_classes], dtype=np.int64)
-    proba_shape = g.op.Concat(
-        batch_size, n_classes_tensor, axis=0, name=f"{name}_proba_shape"
-    )
+    proba_shape = g.op.Concat(batch_size, n_classes_tensor, axis=0, name=f"{name}_proba_shape")
     proba = g.op.Expand(
         proba_const, proba_shape, name=f"{name}_expand_proba", outputs=outputs[1:]
     )
@@ -198,9 +192,7 @@ def sklearn_dummy_classifier(
     # Broadcast the predicted class (1,) → (N,).
     if np.issubdtype(classes.dtype, np.integer):
         class_const = np.array([classes[predicted_idx]], dtype=np.int64)
-        label = g.op.Expand(
-            class_const, batch_size, name=f"{name}_label", outputs=outputs[:1]
-        )
+        label = g.op.Expand(class_const, batch_size, name=f"{name}_label", outputs=outputs[:1])
         assert isinstance(label, str)
         if not sts:
             g.set_type(label, onnx.TensorProto.INT64)
