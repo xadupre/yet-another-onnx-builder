@@ -282,14 +282,14 @@ def sklearn_calibrated_classifier_cv(
     Converts a :class:`sklearn.calibration.CalibratedClassifierCV` into ONNX.
 
     Both ``method='sigmoid'`` (Platt scaling) and ``method='isotonic'`` are
+    supported, for binary and multiclass problems. Probabilities from all
+    cross-validation folds are averaged to produce the final estimate.
 
     The raw predictions fed to the calibrators mirror sklearn's
     ``_get_response_values`` priority: **decision_function** is used when the
     base estimator has ``coef_`` and ``intercept_`` attributes (all linear
     models), and **predict_proba** is used otherwise (e.g.
     :class:`~sklearn.ensemble.RandomForestClassifier`).
-
-    **Sigmoid calibration**:
 
     **Sigmoid calibration**:
 
