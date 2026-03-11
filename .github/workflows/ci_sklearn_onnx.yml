@@ -39,56 +39,17 @@ jobs:
         run: pip freeze
 
       # ------------------------------------------------------------------
-      # Clone the upstream sklearn-onnx repository
-      # ------------------------------------------------------------------
-
-      - name: Clone sklearn-onnx
-        run: git clone --depth 1 https://github.com/onnx/sklearn-onnx.git /tmp/sklearn-onnx
-
-      # ------------------------------------------------------------------
-      # Copy the conftest.py script into the cloned tests/ directory.
-      # pytest loads conftest.py before importing any test file, so
-      # patching skl2onnx.convert_sklearn here ensures that every
-      # ``from skl2onnx import convert_sklearn`` in the test suite gets
-      # yobx's implementation.
-      # ------------------------------------------------------------------
-
-      - name: Install conftest.py to replace convert_sklearn with yobx
-        run: cp _tools/sklearn_onnx_conftest.py /tmp/sklearn-onnx/tests/conftest.py
-
-      # ------------------------------------------------------------------
-      # Run the upstream sklearn-onnx test suite.
-      # Tests that yobx does not yet support will fail; this is expected.
-      # continue-on-error keeps the job alive so results are always uploaded.
+      # Run the upstream sklearn-onnx test suite via the local helper script.
+      # The script clones sklearn-onnx, installs the conftest.py patch, and
+      # runs pytest.  Tests that yobx does not yet support will fail; this is
+      # expected.  continue-on-error keeps the job alive so results are always
+      # uploaded.  Run the same script locally with:
+      #   bash _tools/run_sklearn_onnx_tests.sh
       # ------------------------------------------------------------------
 
       - name: Run sklearn-onnx tests with yobx converter
-        working-directory: /tmp/sklearn-onnx
         continue-on-error: true
-        run: |
-          pytest tests/ \
-            --ignore=tests/test_algebra_cascade.py \
-            --ignore=tests/test_algebra_complex.py \
-            --ignore=tests/test_algebra_converters.py \
-            --ignore=tests/test_algebra_custom_model.py \
-            --ignore=tests/test_algebra_custom_model_sub_estimator.py \
-            --ignore=tests/test_algebra_deprecation.py \
-            --ignore=tests/test_algebra_double.py \
-            --ignore=tests/test_algebra_onnx_doc.py \
-            --ignore=tests/test_algebra_onnx_operator_mixin_syntax.py \
-            --ignore=tests/test_algebra_onnx_operators.py \
-            --ignore=tests/test_algebra_onnx_operators_if.py \
-            --ignore=tests/test_algebra_onnx_operators_opset.py \
-            --ignore=tests/test_algebra_onnx_operators_scan.py \
-            --ignore=tests/test_algebra_onnx_operators_sparse.py \
-            --ignore=tests/test_algebra_onnx_operators_sub_estimator.py \
-            --ignore=tests/test_algebra_onnx_operators_wrapped.py \
-            --ignore=tests/test_algebra_symbolic.py \
-            --ignore=tests/test_algebra_test_helper.py \
-            --ignore=tests/test_utils_sklearn.py \
-            --durations=20 \
-            -q \
-            2>&1 | tee /tmp/sklearn-onnx-test-results.txt || true
+        run: bash _tools/run_sklearn_onnx_tests.sh /tmp/sklearn-onnx /tmp/sklearn-onnx-test-results.txt
 
       - name: Upload sklearn-onnx test results
         if: always()
