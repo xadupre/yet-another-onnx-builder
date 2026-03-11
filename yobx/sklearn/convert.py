@@ -257,9 +257,8 @@ def to_onnx(
         g.make_tensor_output(name, indexed=False, allow_untyped_output=True)
     # When local functions are requested we must NOT inline them; pass inline=False
     # so the function bodies are preserved in the returned ModelProto.
-    keep_functions = function_options is not False
     return g.to_onnx(
         large_model=large_model,
         external_threshold=external_threshold,
-        inline=not keep_functions,
+        inline=(not function_options) or not function_options.export_as_function,
     )
