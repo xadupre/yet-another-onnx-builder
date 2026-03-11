@@ -59,7 +59,7 @@ def _emit_pairwise_sq_dist(
     """
     # Pre-normalise training data at conversion time
     X_ref_norm = (X_ref / length_scale).astype(dtype)  # (M, F)
-    c_sq = np.sum(X_ref_norm**2, axis=1, keepdims=True).T.astype(dtype)  # (1, M)
+    c_sq = np.sum(X_ref_norm**2, axis=1)[np.newaxis, :].astype(dtype)  # (1, M)
 
     # Normalise query data at run time
     ls = np.asarray(length_scale, dtype=dtype).reshape(1, -1)  # (1, F)
@@ -195,7 +195,7 @@ def _emit_kernel_matrix(
         return g.op.Add(x_zero, zero_row, name=f"{name}_wk_K")
 
     elif isinstance(kernel, DotProduct):
-        sigma_sq = np.array([[kernel.sigma_0**2]], dtype=dtype)  # (1, 1) to avoid scalar Add issues
+        sigma_sq = np.array(kernel.sigma_0**2, dtype=dtype).reshape(1, 1)  # (1, 1)
         cross = g.op.MatMul(X, X_ref.T, name=f"{name}_dp_cross")  # (N, M)
         return g.op.Add(cross, sigma_sq, name=f"{name}_dp_K")
 
@@ -345,7 +345,9 @@ def _emit_gpc_binary_pi_star(
     X_train = be.X_train_.astype(dtype)  # (M, F)
     coef = (be.y_train_ - be.pi_).astype(dtype)  # (M,)
 
-    # Pre-compute M_pre = L⁻¹ · diag(W_sr) at conversion time
+    # Pre-compute M_pre = L⁻¹ · diag(W_sr) at conversion time.
+    # We solve L @ X = I for X = L⁻¹ using back-substitution; this is a one-time
+    # cost at conversion, not at inference, so the full inverse is acceptable here.
     L_inv = solve_triangular(be.L_, np.eye(len(be.L_)), lower=True).astype(dtype)
     M_pre = (L_inv * be.W_sr_[np.newaxis, :]).astype(dtype)  # (M, M)
 
@@ -368,6 +370,8 @@ def _emit_gpc_binary_pi_star(
         v_sq, np.array([0], dtype=np.int64), keepdims=0, name=f"{name}_vss"
     )  # (N,)
     latent_var = g.op.Sub(kdiag, v_sq_sum, name=f"{name}_lv_raw")
+    # Clamp to a small positive value to keep latent_var > 0 in the presence
+    # of numerical round-off (the sqrt and 1/(2*var) below require positivity).
     latent_var = g.op.Max(latent_var, np.array(1e-10, dtype=dtype), name=f"{name}_lv")  # (N,)
 
     # ── Williams-Barber approximation ─────────────────────────────────────
