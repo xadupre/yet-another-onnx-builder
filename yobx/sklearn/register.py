@@ -65,7 +65,7 @@ def get_sklearn_estimator_coverage():
         parts = cls.__module__.split(".")
         return ".".join(p for p in parts if not p.startswith("_"))
 
-    # Enumerate all sklearn estimators, explicitly including trainable transforms.
+    # Enumerates all sklearn estimators, explicitly including *predictable* transforms.
     # Then add any yobx-registered converters not captured by the type filter.
     all_pairs = dict(all_estimators())
     for cls in SKLEARN_CONVERTERS:

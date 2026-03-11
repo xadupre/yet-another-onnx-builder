@@ -268,7 +268,7 @@ The helper :meth:`set_type_shape_unary_op
     return result
 
 Alternative implementations
-============================
+===========================
 
 Any class that satisfies the two-part API above can be passed as
 ``builder_cls``.  The package ships with:
