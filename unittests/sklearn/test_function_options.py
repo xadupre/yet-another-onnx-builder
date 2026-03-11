@@ -164,7 +164,6 @@ class TestSklearnFunctionOptions(ExtTestCase):
             ]
         ).fit(self.X, self.y)
         onx = to_onnx(pipe, (self.X,), function_options=self.fopts)
-        self.print_onnx(onx)
 
         func_names = [f.name for f in onx.functions]
         # Both steps must appear as local functions.

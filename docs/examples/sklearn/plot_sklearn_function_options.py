@@ -197,7 +197,7 @@ X_ct_test = rng.standard_normal((15, 4)).astype(np.float32)
 sess_ct = onnxruntime.InferenceSession(
     onx_pipe_ct.SerializeToString(), providers=["CPUExecutionProvider"]
 )
-result_ct = sess_ct.run(None, {"X": X_ct_test})[0]
+result_ct = sess_ct.run(None, {"X": X_ct_test})[1]
 expected_ct = pipe_ct.predict_proba(X_ct_test).astype(np.float32)
 assert np.allclose(expected_ct, result_ct, atol=1e-5), "Pipeline+CT output mismatch!"
 print("Pipeline+ColumnTransformer output matches sklearn ✓")
