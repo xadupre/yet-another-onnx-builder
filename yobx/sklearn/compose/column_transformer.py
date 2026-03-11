@@ -1,10 +1,12 @@
 import numpy as np
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.preprocessing import FunctionTransformer
 from ...typing import GraphBuilderExtendedProtocol
+from ...xbuilder import FunctionOptions
 from ..register import register_sklearn_converter, get_sklearn_converter
-from ..convert import _FUNCTION_OPTIONS_KEY, _wrap_step_as_function
+from ..convert import _wrap_step_as_function
 
 
 def _resolve_columns(columns: Union[list, slice, np.ndarray], n_features: int) -> np.ndarray:
@@ -57,6 +59,7 @@ def sklearn_column_transformer(
     estimator: ColumnTransformer,
     X: str,
     name: str = "column_transformer",
+    function_options: Optional[FunctionOptions] = None,
 ) -> str:
     """
     Converts a :class:`sklearn.compose.ColumnTransformer` into ONNX.
@@ -88,6 +91,7 @@ def sklearn_column_transformer(
     :param estimator: a fitted :class:`~sklearn.compose.ColumnTransformer`
     :param X: name of the input tensor
     :param name: prefix used for names of nodes added by this converter
+    :param function_options: function options
     :return: name of the output tensor
     :raises ValueError: when all transformers are ``'drop'`` (empty output)
     """
@@ -97,7 +101,6 @@ def sklearn_column_transformer(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     n_features = estimator.n_features_in_
-    fopts = sts.get(_FUNCTION_OPTIONS_KEY) if sts else None
 
     parts: List[str] = []
     for trans_name, transformer, columns in estimator.transformers_:
@@ -122,16 +125,28 @@ def sklearn_column_transformer(
                 ) from e
             sub_outputs = [g.unique_name(f"{name}__{trans_name}_out")]
             step_node_name = f"{name}__{trans_name}"
-            if fopts is not None:
+
+            is_container = isinstance(X_sub, (Pipeline, ColumnTransformer, FeatureUnion))
+            if function_options and function_options.export_as_function and not is_container:
                 assert isinstance(X_sub, str)  # type happiness
                 _wrap_step_as_function(
                     g,
-                    fopts,
+                    function_options,
                     transformer,
                     [X_sub],
                     sub_outputs,
                     fct,
                     step_node_name,
+                )
+            elif is_container:
+                fct(
+                    g,
+                    sts,
+                    sub_outputs,
+                    transformer,
+                    X_sub,
+                    name=step_node_name,
+                    function_options=function_options,
                 )
             else:
                 fct(g, sts, sub_outputs, transformer, X_sub, name=step_node_name)

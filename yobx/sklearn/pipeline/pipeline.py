@@ -1,9 +1,11 @@
-from typing import Tuple, Dict, List, Union
-from sklearn.pipeline import Pipeline
+from typing import Tuple, Dict, List, Optional, Union
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline, FeatureUnion
 from ...typing import GraphBuilderExtendedProtocol
+from ...xbuilder import FunctionOptions
 from ..register import register_sklearn_converter, get_sklearn_converter
 from ..sklearn_helper import get_output_names
-from ..convert import _FUNCTION_OPTIONS_KEY, _wrap_step_as_function
+from ..convert import _wrap_step_as_function
 
 
 @register_sklearn_converter(Pipeline)
@@ -14,6 +16,7 @@ def sklearn_pipeline(
     estimator: Pipeline,
     X: str,
     name: str = "pipeline",
+    function_options: Optional[FunctionOptions] = None,
 ) -> Union[str, Tuple[str, ...]]:
     """
     Converts a :class:`sklearn.pipeline.Pipeline` into ONNX using registered
@@ -37,12 +40,11 @@ def sklearn_pipeline(
     :param estimator: a fitted :class:`sklearn.pipeline.Pipeline`
     :param X: name of the input tensor to the pipeline
     :param name: prefix used for names of nodes added for each pipeline step
+    :param fucntion_options: to export every step as a local function
     :return: name of the output tensor, or a tuple of output tensor names
     """
     assert isinstance(estimator, Pipeline), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
-
-    fopts = sts.get(_FUNCTION_OPTIONS_KEY) if sts else None
 
     current_input = [X]
     for i, (step_name, step) in enumerate(estimator.steps):
@@ -53,15 +55,26 @@ def sklearn_pipeline(
             output_names = [g.unique_name(n) for n in output_names]
         fct = get_sklearn_converter(type(step))
         step_node_name = f"{name}__{step_name}"
-        if fopts is not None:
+        is_container = isinstance(step, (Pipeline, ColumnTransformer, FeatureUnion))
+        if function_options and function_options.export_as_function and not is_container:
             _wrap_step_as_function(
                 g,
-                fopts,
+                function_options,
                 step,
                 current_input,
                 output_names,
                 fct,
                 step_node_name,
+            )
+        elif is_container:
+            fct(
+                g,
+                sts,
+                output_names,
+                step,
+                *current_input,
+                name=step_node_name,
+                function_options=function_options,
             )
         else:
             fct(g, sts, output_names, step, *current_input, name=step_node_name)

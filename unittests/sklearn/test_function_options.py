@@ -33,6 +33,7 @@ class TestSklearnFunctionOptions(ExtTestCase):
             name="sklearn_op",
             domain="test_sklearn",
             move_initializer_to_constant=True,
+            export_as_function=True,
         )
 
     # ------------------------------------------------------------------
@@ -149,6 +150,40 @@ class TestSklearnFunctionOptions(ExtTestCase):
         result = ref.run(None, {"X": X})[0]
         expected = ct.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_pipeline_column_transformer_steps_as_functions(self):
+        pipe = Pipeline(
+            [
+                (
+                    "ct",
+                    ColumnTransformer(
+                        [("std", StandardScaler(), [0, 1]), ("mms", MinMaxScaler(), [2, 3])]
+                    ),
+                ),
+                ("clf", LogisticRegression(max_iter=200)),
+            ]
+        ).fit(self.X, self.y)
+        onx = to_onnx(pipe, (self.X,), function_options=self.fopts)
+        self.print_onnx(onx)
+
+        func_names = [f.name for f in onx.functions]
+        # Both steps must appear as local functions.
+        self.assertIn("StandardScaler", func_names)
+        self.assertIn("LogisticRegression", func_names)
+        # The pipeline container itself is NOT a function.
+        self.assertNotIn("Pipeline", func_names)
+        self.assertNotIn("ColumnTransformer", func_names)
+
+        # No raw ops from the individual converters in the main graph.
+        graph_ops = [n.op_type for n in onx.graph.node]
+        self.assertNotIn("Sub", graph_ops)
+        self.assertNotIn("Gemm", graph_ops)
+
+        # Numerical correctness.
+        ref = ExtendedReferenceEvaluator(onx)
+        label, proba = ref.run(None, {"X": self.X})
+        self.assertEqualArray(pipe.predict(self.X), label)
+        self.assertEqualArray(pipe.predict_proba(self.X).astype(np.float32), proba, atol=1e-5)
 
     # ------------------------------------------------------------------
     # Custom domain is preserved

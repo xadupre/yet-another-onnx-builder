@@ -2,7 +2,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 from onnx import ModelProto
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.utils.validation import check_is_fitted
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExtendedModelContainer
@@ -11,9 +11,6 @@ from ..xbuilder import GraphBuilder, OptimizationOptions
 from ..xbuilder.function_options import FunctionOptions
 from .register import get_sklearn_converter
 from .sklearn_helper import get_output_names
-
-# Key used in the *sts* dict to propagate FunctionOptions through converters.
-_FUNCTION_OPTIONS_KEY = "_sklearn_function_options"
 
 
 def _default_ai_onnx_ml(main_opset: int) -> int:
@@ -128,7 +125,7 @@ def to_onnx(
     extra_converters: Optional[Dict[type, Callable]] = None,
     large_model: bool = False,
     external_threshold: int = 1024,
-    function_options: Union[bool, FunctionOptions] = False,
+    function_options: Optional[FunctionOptions] = None,
 ) -> Union[ModelProto, ExtendedModelContainer]:
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
@@ -168,7 +165,7 @@ def to_onnx(
         wrapped as a function instead of the container itself.  The
         ``name`` field of the provided :class:`~yobx.xbuilder.FunctionOptions`
         is used as a template; the actual function name for each step is
-        always derived from the estimator's class name.  Pass ``False``
+        always derived from the estimator's class name.  Pass ``None``
         (the default) to disable function wrapping and produce a flat graph.
     :return: onnx model or :class:`onnx.model_container.ModelContainer`
         when *large_model* is True
@@ -228,14 +225,11 @@ def to_onnx(
     # Build the sts dict; if function_options is set, propagate it so that
     # Pipeline / ColumnTransformer converters can wrap their steps.
     sts: Dict[str, Any] = {}
-    if function_options is not False:
-        sts[_FUNCTION_OPTIONS_KEY] = function_options
-
     output_names = list(get_output_names(estimator))
 
-    is_container = isinstance(estimator, (Pipeline, ColumnTransformer))
+    is_container = isinstance(estimator, (Pipeline, ColumnTransformer, FeatureUnion))
 
-    if function_options is not False and not is_container:
+    if function_options and function_options.export_as_function and not is_container:
         # Wrap the single top-level estimator as a local function.
         _wrap_step_as_function(
             g,
@@ -245,6 +239,16 @@ def to_onnx(
             output_names,
             fct,
             name="main",
+        )
+    elif is_container:
+        fct(
+            g,
+            sts,
+            output_names,
+            estimator,
+            *input_names,
+            name="main",
+            function_options=function_options,
         )
     else:
         fct(g, sts, output_names, estimator, *input_names, name="main")

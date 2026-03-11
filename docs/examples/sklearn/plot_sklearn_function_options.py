@@ -102,6 +102,7 @@ fopts = FunctionOptions(
     name="sklearn_op",
     domain="myapp",
     move_initializer_to_constant=True,
+    export_as_function=True,
 )
 
 # %%
