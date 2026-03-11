@@ -222,8 +222,8 @@ def to_onnx(
             shape[axis] = dim
         g.make_tensor_input(name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1)
 
-    # Build the sts dict; if function_options is set, propagate it so that
-    # Pipeline / ColumnTransformer converters can wrap their steps.
+    # Build the sts dict (shared state for converters). function_options, if set,
+    # is passed explicitly to container converters below.
     sts: Dict[str, Any] = {}
     output_names = list(get_output_names(estimator))
 
