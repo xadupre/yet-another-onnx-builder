@@ -130,7 +130,7 @@ def sklearn_column_transformer(
             if function_options and function_options.export_as_function and not is_container:
                 assert isinstance(X_sub, str)  # type happiness
                 _wrap_step_as_function(
-                    g,
+                    g,  # type: ignore
                     function_options,
                     transformer,
                     [X_sub],

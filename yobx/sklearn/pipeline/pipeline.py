@@ -58,7 +58,7 @@ def sklearn_pipeline(
         is_container = isinstance(step, (Pipeline, ColumnTransformer, FeatureUnion))
         if function_options and function_options.export_as_function and not is_container:
             _wrap_step_as_function(
-                g,
+                g,  # type: ignore
                 function_options,
                 step,
                 current_input,
