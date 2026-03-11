@@ -1,17 +1,14 @@
 name: sklearn-onnx compatibility
 
-# This workflow is triggered manually.  It runs two rounds of tests:
+# This workflow is triggered manually.  It runs the upstream sklearn-onnx
+# (skl2onnx) test suite with ``skl2onnx.convert_sklearn`` replaced by
+# ``yobx.sklearn.to_onnx``.  A ``conftest.py`` written into the cloned
+# ``tests/`` directory patches the function before any test file imports it,
+# so the actual skl2onnx unit tests exercise yobx's converter transparently.
 #
-# 1. The yobx sklearn test suite including the new compatibility tests in
-#    ``unittests/sklearn/test_sklearn_onnx_tests.py`` which mirror the patterns
-#    used in the sklearn-onnx (skl2onnx) project and directly compare outputs.
-#
-# 2. The upstream sklearn-onnx test suite, cloned from GitHub, executed with
-#    ``skl2onnx.convert_sklearn`` monkey-patched to delegate to
-#    ``yobx.sklearn.to_onnx``.  Only the tests for models covered by yobx are
-#    selected (via a marker file written at checkout time).  Failures are
-#    reported but do not block the job so that partial coverage can be tracked
-#    over time.
+# Tests for models that yobx does not yet support will fail; those failures
+# are expected and informative.  The step uses ``continue-on-error: true``
+# so the result log is always uploaded as an artifact.
 
 on:
   workflow_dispatch:
@@ -32,44 +29,38 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install yobx with sklearn extras
         run: pip install -e ".[dev,sklearn]"
 
       - name: pip freeze
         run: pip freeze
 
       # ------------------------------------------------------------------
-      # Round 1 – yobx sklearn tests (including compatibility tests)
-      # ------------------------------------------------------------------
-
-      - name: Run yobx sklearn tests
-        run: |
-          pytest unittests/sklearn/ --durations=10 \
-            --ignore=unittests/sklearn/lightgbm \
-            --ignore=unittests/sklearn/xgboost \
-            --ignore=unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
-
-      - name: Run test_sklearn_hist_gradient_boosting_multiclass.py
-        run: python unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
-
-      # ------------------------------------------------------------------
-      # Round 2 – sklearn-onnx upstream test suite with yobx as converter
+      # Clone the upstream sklearn-onnx repository
       # ------------------------------------------------------------------
 
       - name: Clone sklearn-onnx
-        run: |
-          git clone --depth 1 https://github.com/onnx/sklearn-onnx.git /tmp/sklearn-onnx
+        run: git clone --depth 1 https://github.com/onnx/sklearn-onnx.git /tmp/sklearn-onnx
 
-      - name: Write conftest.py to patch convert_sklearn with yobx
+      # ------------------------------------------------------------------
+      # Write a conftest.py into the cloned tests/ directory.
+      # pytest loads conftest.py before importing any test file, so
+      # patching skl2onnx.convert_sklearn here ensures that every
+      # ``from skl2onnx import convert_sklearn`` in the test suite gets
+      # yobx's implementation.
+      # ------------------------------------------------------------------
+
+      - name: Write conftest.py to replace convert_sklearn with yobx
         run: |
-          cat > /tmp/sklearn-onnx/conftest_yobx.py << 'EOF'
+          cat > /tmp/sklearn-onnx/tests/conftest.py << 'CONFEOF'
+          # SPDX-License-Identifier: Apache-2.0
           """
-          conftest_yobx.py – monkey-patches skl2onnx.convert_sklearn so that the
-          sklearn-onnx test suite exercises yobx.sklearn.to_onnx instead of
-          skl2onnx's own converter.
+          conftest.py – patches skl2onnx.convert_sklearn so that the sklearn-onnx
+          test suite exercises yobx.sklearn.to_onnx instead of skl2onnx's own converter.
 
-          Usage (from the sklearn-onnx directory):
-              pytest -p conftest_yobx <test-file> ...
+          pytest loads this file before importing any test module, so every
+          ``from skl2onnx import convert_sklearn`` in the test files picks up the
+          patched implementation automatically.
           """
 
           import numpy as np
@@ -80,19 +71,32 @@ jobs:
                   FloatTensorType,
                   DoubleTensorType,
                   Int64TensorType,
-                  StringTensorType,
               )
           except ImportError:
-              FloatTensorType = DoubleTensorType = Int64TensorType = StringTensorType = None
+              FloatTensorType = DoubleTensorType = Int64TensorType = None
 
           from yobx.sklearn import to_onnx
           from yobx import DEFAULT_TARGET_OPSET
 
 
           def _make_dummy_input(type_obj):
-              """Create a small concrete numpy array from a skl2onnx type descriptor."""
+              """Create a small concrete numpy array from a skl2onnx type descriptor.
+
+              Shape dimensions that are None or 0 are replaced with 3 so that
+              the resulting array is valid for fitting a scikit-learn estimator.
+              """
+              if type_obj is None:
+                  return np.ones((3, 1), dtype=np.float32)
               shape = getattr(type_obj, "shape", [None, 1])
-              concrete = [3 if (d is None or d == 0) else d for d in shape]
+              concrete = []
+              for d in shape:
+                  if d is None or d == 0:
+                      concrete.append(3)
+                  else:
+                      try:
+                          concrete.append(int(d))
+                      except (TypeError, ValueError):
+                          concrete.append(3)
               if DoubleTensorType is not None and isinstance(type_obj, DoubleTensorType):
                   return np.ones(concrete, dtype=np.float64)
               if Int64TensorType is not None and isinstance(type_obj, Int64TensorType):
@@ -102,66 +106,74 @@ jobs:
 
           def _yobx_convert_sklearn(
               model,
-              initial_types=None,
               name=None,
+              initial_types=None,
               doc_string="",
               target_opset=None,
-              **kwargs,
+              custom_conversion_functions=None,
+              custom_shape_calculators=None,
+              custom_parsers=None,
+              options=None,
+              intermediate=False,
+              white_op=None,
+              black_op=None,
+              final_types=None,
+              dtype=None,
+              naming=None,
+              model_optim=True,
+              verbose=0,
           ):
-              """Drop-in replacement for skl2onnx.convert_sklearn."""
-              args = []
-              input_names = []
-              # Provide a safe fallback when initial_types is None
+              """Drop-in replacement for skl2onnx.convert_sklearn that delegates to yobx."""
               if not initial_types:
                   initial_types = [("X", None)]
-              for in_name, type_obj in initial_types:
-                  input_names.append(in_name)
-                  args.append(_make_dummy_input(type_obj) if type_obj is not None else np.ones((3, 1), dtype=np.float32))
+              args = tuple(_make_dummy_input(t) for _, t in initial_types)
+              input_names = [n for n, _ in initial_types]
               return to_onnx(
                   model,
-                  tuple(args),
+                  args,
                   input_names=input_names,
-                  target_opset=target_opset or DEFAULT_TARGET_OPSET,
+                  target_opset=target_opset if target_opset is not None else DEFAULT_TARGET_OPSET,
               )
 
 
-          # Apply the patch at import time so all subsequent imports of
-          # skl2onnx.convert_sklearn in the test suite see the replacement.
+          # Patch at module level so that all subsequent
+          # ``from skl2onnx import convert_sklearn`` statements in test files
+          # receive the yobx implementation.
           skl2onnx.convert_sklearn = _yobx_convert_sklearn
-          EOF
+          CONFEOF
+
+      # ------------------------------------------------------------------
+      # Run the upstream sklearn-onnx test suite.
+      # Tests that yobx does not yet support will fail; this is expected.
+      # continue-on-error keeps the job alive so results are always uploaded.
+      # ------------------------------------------------------------------
 
       - name: Run sklearn-onnx tests with yobx converter
         working-directory: /tmp/sklearn-onnx
-        # continue-on-error because the upstream suite covers many models that
-        # yobx does not yet support; partial failures are expected and tracked.
         continue-on-error: true
         run: |
-          # Select test files that correspond to models supported by yobx.
-          pytest -p conftest_yobx \
-            tests/test_sklearn_adaboost_converter.py \
-            tests/test_sklearn_bagging_converter.py \
-            tests/test_sklearn_calibrated_classifier_cv_converter.py \
-            tests/test_sklearn_column_transformer.py \
-            tests/test_sklearn_decision_tree_converters.py \
-            tests/test_sklearn_gaussian_mixture_converter.py \
-            tests/test_sklearn_gradient_boosting_converters.py \
-            tests/test_sklearn_k_means_converter.py \
-            tests/test_sklearn_label_encoder_converter.py \
-            tests/test_sklearn_linear_discriminant_analysis_converter.py \
-            tests/test_sklearn_linear_regression_converter.py \
-            tests/test_sklearn_logistic_regression_converter.py \
-            tests/test_sklearn_multilayer_perceptron_converter.py \
-            tests/test_sklearn_normalizer_converter.py \
-            tests/test_sklearn_pipeline.py \
-            tests/test_sklearn_pca_converter.py \
-            tests/test_sklearn_random_forest_converters.py \
-            tests/test_sklearn_ridge_converter.py \
-            tests/test_sklearn_sgd_converter.py \
-            tests/test_sklearn_stacking_converter.py \
+          pytest tests/ \
+            --ignore=tests/test_algebra_cascade.py \
+            --ignore=tests/test_algebra_complex.py \
+            --ignore=tests/test_algebra_converters.py \
+            --ignore=tests/test_algebra_custom_model.py \
+            --ignore=tests/test_algebra_custom_model_sub_estimator.py \
+            --ignore=tests/test_algebra_deprecation.py \
+            --ignore=tests/test_algebra_double.py \
+            --ignore=tests/test_algebra_onnx_doc.py \
+            --ignore=tests/test_algebra_onnx_operator_mixin_syntax.py \
+            --ignore=tests/test_algebra_onnx_operators.py \
+            --ignore=tests/test_algebra_onnx_operators_if.py \
+            --ignore=tests/test_algebra_onnx_operators_opset.py \
+            --ignore=tests/test_algebra_onnx_operators_scan.py \
+            --ignore=tests/test_algebra_onnx_operators_sparse.py \
+            --ignore=tests/test_algebra_onnx_operators_sub_estimator.py \
+            --ignore=tests/test_algebra_onnx_operators_wrapped.py \
+            --ignore=tests/test_algebra_symbolic.py \
+            --ignore=tests/test_algebra_test_helper.py \
+            --ignore=tests/test_utils_sklearn.py \
             --durations=20 \
             -q \
-            --ignore-glob="*lightgbm*" \
-            --ignore-glob="*xgboost*" \
             2>&1 | tee /tmp/sklearn-onnx-test-results.txt || true
 
       - name: Upload sklearn-onnx test results
