@@ -71,6 +71,7 @@ if ``target_opsets={'': 18, 'com.microsoft': 1}``.
    expected_api
    sklearn_converter
    lightgbm_converter
+   svm_converter
    supported_converters
    custom_converter
    copilot_draft
