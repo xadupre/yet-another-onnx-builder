@@ -951,5 +951,363 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
 
+@requires_tensorflow("2.18")
+class TestTensorflowMathConverters(ExtTestCase):
+    """Tests for tf.math function converters."""
+
+    # ------------------------------------------------------------------
+    # Hyperbolic
+    # ------------------------------------------------------------------
+
+    def test_acosh(self):
+        """TF Acosh → ONNX Acosh."""
+        x = np.array([[1.5, 2.0, 3.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.acosh(t)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("Acosh", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_asinh(self):
+        """TF Asinh → ONNX Asinh."""
+        x = np.array([[1.0, 2.0, 3.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.asinh(t)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("Asinh", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_atanh(self):
+        """TF Atanh → ONNX Atanh."""
+        x = np.array([[0.1, 0.5, -0.3]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.atanh(t)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("Atanh", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    # ------------------------------------------------------------------
+    # Special functions
+    # ------------------------------------------------------------------
+
+    def test_erf(self):
+        """TF Erf → ONNX Erf."""
+        x = np.array([[0.5, -0.5, 1.0, 0.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.erf(t)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("Erf", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_erfc(self):
+        """TF Erfc → ONNX Sub(1, Erf(x))."""
+        x = np.array([[0.5, -0.5, 1.0, 0.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.erfc(t)
+
+        onx = to_onnx(fn, (x,))
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_log1p(self):
+        """TF Log1p → ONNX Log(Add(x, 1))."""
+        x = np.array([[0.5, 1.0, 2.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.log1p(t)
+
+        onx = to_onnx(fn, (x,))
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_expm1(self):
+        """TF Expm1 → ONNX Sub(Exp(x), 1)."""
+        x = np.array([[0.5, 1.0, -0.5]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.expm1(t)
+
+        onx = to_onnx(fn, (x,))
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_softplus(self):
+        """TF Softplus → ONNX Softplus."""
+        x = np.array([[0.5, -1.0, 2.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.softplus(t)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("Softplus", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_softsign(self):
+        """TF Softsign → ONNX Softsign."""
+        x = np.array([[0.5, -1.0, 2.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.softsign(t)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("Softsign", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_rint(self):
+        """TF Rint → ONNX Round (both use half-to-even rounding)."""
+        x = np.array([[1.5, 2.5, -0.5, 3.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.rint(t)
+
+        onx = to_onnx(fn, (x,))
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-6)
+
+    # ------------------------------------------------------------------
+    # Reduction
+    # ------------------------------------------------------------------
+
+    def test_reduce_sum(self):
+        """TF reduce_sum → ONNX ReduceSum."""
+        x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.reduce_sum(t, axis=1)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("ReduceSum", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_reduce_sum_keepdims(self):
+        """TF reduce_sum with keepdims=True → ONNX ReduceSum(keepdims=1)."""
+        x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.reduce_sum(t, axis=1, keepdims=True)
+
+        onx = to_onnx(fn, (x,))
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_reduce_max(self):
+        """TF reduce_max → ONNX ReduceMax."""
+        x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.reduce_max(t, axis=1)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("ReduceMax", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_reduce_min(self):
+        """TF reduce_min → ONNX ReduceMin."""
+        x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.reduce_min(t, axis=1)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("ReduceMin", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_reduce_mean(self):
+        """TF reduce_mean → ONNX ReduceMean."""
+        x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.reduce_mean(t, axis=1)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("ReduceMean", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_reduce_prod(self):
+        """TF reduce_prod → ONNX ReduceProd."""
+        x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.reduce_prod(t, axis=1)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("ReduceProd", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_cumsum(self):
+        """TF cumsum → ONNX CumSum."""
+        x = np.array([[1.0, 2.0, 3.0, 4.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.cumsum(t, axis=1)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("CumSum", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_cumsum_exclusive(self):
+        """TF cumsum with exclusive=True → ONNX CumSum(exclusive=1)."""
+        x = np.array([[1.0, 2.0, 3.0, 4.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.cumsum(t, axis=1, exclusive=True)
+
+        onx = to_onnx(fn, (x,))
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    # ------------------------------------------------------------------
+    # ArgMax / ArgMin
+    # ------------------------------------------------------------------
+
+    def test_argmax(self):
+        """TF argmax → ONNX ArgMax."""
+        x = np.array([[1.0, 3.0, 2.0], [4.0, 2.0, 6.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.argmax(t, axis=1)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("ArgMax", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result)
+
+    def test_argmin(self):
+        """TF argmin → ONNX ArgMin."""
+        x = np.array([[3.0, 1.0, 2.0], [6.0, 4.0, 2.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.argmin(t, axis=1)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("ArgMin", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result)
+
+    # ------------------------------------------------------------------
+    # TopK
+    # ------------------------------------------------------------------
+
+    def test_topk(self):
+        """TF top_k → ONNX TopK (values output)."""
+        x = np.array([[5.0, 1.0, 3.0, 2.0, 4.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.top_k(t, k=3).values
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("TopK", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-6)
+
+    # ------------------------------------------------------------------
+    # Predicate
+    # ------------------------------------------------------------------
+
+    def test_is_nan(self):
+        """TF is_nan → ONNX IsNaN."""
+        x = np.array([[1.0, float("nan"), 3.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.is_nan(t)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("IsNaN", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result)
+
+    def test_is_inf(self):
+        """TF is_inf → ONNX IsInf."""
+        x = np.array([[1.0, float("inf"), float("-inf"), 0.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.is_inf(t)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("IsInf", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result)
+
+    def test_is_finite(self):
+        """TF is_finite → ONNX Not(Or(IsNaN, IsInf))."""
+        x = np.array([[1.0, float("nan"), float("inf"), 0.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.is_finite(t)
+
+        onx = to_onnx(fn, (x,))
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
