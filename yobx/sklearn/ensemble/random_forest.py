@@ -2,7 +2,12 @@ from typing import Tuple, Dict, List
 import numpy as np
 import onnx
 import onnx.helper as oh
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import (
+    ExtraTreesClassifier,
+    ExtraTreesRegressor,
+    RandomForestClassifier,
+    RandomForestRegressor,
+)
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
@@ -628,3 +633,169 @@ def _sklearn_random_forest_regressor_v5(
     )
 
     return result if isinstance(result, str) else result[0]
+
+
+@register_sklearn_converter((ExtraTreesClassifier,))
+def sklearn_extra_trees_classifier(
+    g: GraphBuilderExtendedProtocol,
+    sts: Dict,
+    outputs: List[str],
+    estimator: ExtraTreesClassifier,
+    X: str,
+    name: str = "extra_trees_classifier",
+) -> Tuple[str, str]:
+    """
+    Converts a :class:`sklearn.ensemble.ExtraTreesClassifier` into ONNX.
+
+    Extra Trees share the same internal tree structure as Random Forests
+    (a list of fitted base estimators with a ``tree_`` attribute).  This
+    converter therefore delegates entirely to the same attribute-extraction
+    helpers used by :func:`sklearn_random_forest_classifier`.
+
+    When ``ai.onnx.ml`` opset 5 (or later) is active in the graph builder
+    the unified ``TreeEnsemble`` operator is used; otherwise the legacy
+    ``TreeEnsembleClassifier`` operator is emitted.
+
+    :param g: the graph builder to add nodes to
+    :param sts: shapes defined by :epkg:`scikit-learn`
+    :param estimator: a fitted ``ExtraTreesClassifier``
+    :param outputs: desired output names (label, probabilities)
+    :param X: input tensor name
+    :param name: prefix for node names added to the graph
+    :return: tuple ``(label_result_name, proba_result_name)``
+    """
+    assert isinstance(
+        estimator, ExtraTreesClassifier
+    ), f"Unexpected type {type(estimator)} for estimator."
+
+    ml_opset = g.get_opset("ai.onnx.ml")
+    classes = estimator.classes_
+    n_classes = len(classes)
+    n_estimators = estimator.n_estimators
+    estimators = estimator.estimators_
+
+    if ml_opset >= 5:
+        return _sklearn_random_forest_classifier_v5(
+            g,
+            sts,
+            outputs,
+            estimator,
+            X,
+            name,
+            classes,
+            n_classes,
+            n_estimators,
+            estimators,
+            itype=g.get_type(X),
+        )
+
+    # Legacy path: TreeEnsembleClassifier (ai.onnx.ml opset <= 4)
+    attrs = _extract_forest_attributes_legacy(
+        estimators, n_classes, is_classifier=True, n_estimators=n_estimators
+    )
+
+    if np.issubdtype(classes.dtype, np.integer):  # type: ignore
+        classlabels = classes.astype(np.int64).tolist()  # type: ignore
+        label_kwargs = {"classlabels_int64s": classlabels}
+    else:
+        classlabels = classes.astype(str).tolist()  # type: ignore
+        label_kwargs = {"classlabels_strings": classlabels}
+
+    g.make_node(
+        "TreeEnsembleClassifier",
+        [X],
+        outputs=outputs,
+        domain="ai.onnx.ml",
+        name=name,
+        post_transform="NONE",
+        **attrs,  # type: ignore
+        **label_kwargs,
+    )
+    return tuple(outputs)
+
+
+@register_sklearn_converter((ExtraTreesRegressor,))
+def sklearn_extra_trees_regressor(
+    g: GraphBuilderExtendedProtocol,
+    sts: Dict,
+    outputs: List[str],
+    estimator: ExtraTreesRegressor,
+    X: str,
+    name: str = "extra_trees_regressor",
+) -> str:
+    """
+    Converts a :class:`sklearn.ensemble.ExtraTreesRegressor` into ONNX.
+
+    Extra Trees share the same internal tree structure as Random Forests.
+    This converter delegates to the same attribute-extraction helpers used
+    by :func:`sklearn_random_forest_regressor`.
+
+    When ``ai.onnx.ml`` opset 5 (or later) is active in the graph builder
+    the unified ``TreeEnsemble`` operator is used (leaf weights pre-divided
+    by ``n_estimators`` so that ``SUM`` aggregation yields the average);
+    otherwise the legacy ``TreeEnsembleRegressor`` operator is emitted with
+    ``aggregate_function="AVERAGE"``.
+
+    :param g: the graph builder to add nodes to
+    :param sts: shapes defined by :epkg:`scikit-learn`
+    :param estimator: a fitted ``ExtraTreesRegressor``
+    :param outputs: desired output names (predictions)
+    :param X: input tensor name
+    :param name: prefix for node names added to the graph
+    :return: output tensor name
+    """
+    assert isinstance(
+        estimator, ExtraTreesRegressor
+    ), f"Unexpected type {type(estimator)} for estimator."
+
+    ml_opset = g.get_opset("ai.onnx.ml")
+    n_estimators = estimator.n_estimators
+    estimators = estimator.estimators_
+
+    if ml_opset >= 5:
+        return _sklearn_random_forest_regressor_v5(
+            g,
+            sts,
+            outputs,
+            estimator,
+            X,
+            name,
+            n_estimators,
+            estimators,
+            itype=g.get_type(X),
+        )
+
+    # Detect float64 input so we can cast the output back to double after the
+    # tree node (TreeEnsembleRegressor / TreeEnsemble always output float32).
+    itype = g.get_type(X)
+
+    # When a cast is needed, direct the tree node into a temporary intermediate name.
+    tree_outputs = [f"{outputs[0]}_tree_out"]
+
+    # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4)
+    attrs = _extract_forest_attributes_legacy(
+        estimators, n_classes=1, is_classifier=False, n_estimators=n_estimators
+    )
+
+    node_result = g.make_node(
+        "TreeEnsembleRegressor",
+        [X],
+        outputs=tree_outputs,
+        domain="ai.onnx.ml",
+        name=name,
+        n_targets=1,
+        aggregate_function="AVERAGE",
+        post_transform="NONE",
+        **attrs,  # type: ignore
+    )
+    tree_result = node_result if isinstance(node_result, str) else node_result[0]
+
+    # Cast float32 output back to float64 to match the input dtype.
+    cast_result = g.make_node(
+        "Cast",
+        [tree_result],
+        outputs=outputs,
+        name=f"{name}_cast_f64",
+        to=itype,
+    )
+    return cast_result if isinstance(cast_result, str) else cast_result[0]
