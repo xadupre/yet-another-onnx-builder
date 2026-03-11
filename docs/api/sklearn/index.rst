@@ -15,6 +15,7 @@ yobx.sklearn
     :maxdepth: 1
     :caption: converters
 
+    calibration/index
     decomposition/index
     discriminant_analysis/index
     dummy/index
