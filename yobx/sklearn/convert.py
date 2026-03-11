@@ -162,12 +162,12 @@ def to_onnx(
         local function.  :class:`~sklearn.pipeline.Pipeline` and
         :class:`~sklearn.compose.ColumnTransformer` are treated as
         orchestrators — their individual steps/sub-transformers are each
-        wrapped as a function instead of the container itself.  The
-        ``name`` field of the provided :class:`~yobx.xbuilder.FunctionOptions`
-        is used as a template; the actual function name for each step is
-        always derived from the estimator's class name.  Pass ``None``
-        (the default) to disable function wrapping and produce a flat graph.
-    :return: onnx model or :class:`onnx.model_container.ModelContainer`
+        wrapped as a function instead of the container itself.  Function
+        names for each step are always derived from the estimator's class
+        name; the ``name`` field of the provided
+        :class:`~yobx.xbuilder.FunctionOptions` is not used by this helper
+        to customize function naming.  Pass ``None`` (the default) to disable
+        function wrapping and produce a flat graph.
         when *large_model* is True
     """
     check_is_fitted(
@@ -222,8 +222,8 @@ def to_onnx(
             shape[axis] = dim
         g.make_tensor_input(name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1)
 
-    # Build the sts dict; if function_options is set, propagate it so that
-    # Pipeline / ColumnTransformer converters can wrap their steps.
+    # Build the sts dict (shared state for converters). function_options, if set,
+    # is passed explicitly to container converters below.
     sts: Dict[str, Any] = {}
     output_names = list(get_output_names(estimator))
 

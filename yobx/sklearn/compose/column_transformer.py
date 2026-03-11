@@ -126,7 +126,7 @@ def sklearn_column_transformer(
             sub_outputs = [g.unique_name(f"{name}__{trans_name}_out")]
             step_node_name = f"{name}__{trans_name}"
 
-            is_container = isinstance(X_sub, (Pipeline, ColumnTransformer, FeatureUnion))
+            is_container = isinstance(transformer, (Pipeline, ColumnTransformer, FeatureUnion))
             if function_options and function_options.export_as_function and not is_container:
                 assert isinstance(X_sub, str)  # type happiness
                 _wrap_step_as_function(

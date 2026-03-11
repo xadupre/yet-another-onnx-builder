@@ -40,7 +40,7 @@ def sklearn_pipeline(
     :param estimator: a fitted :class:`sklearn.pipeline.Pipeline`
     :param X: name of the input tensor to the pipeline
     :param name: prefix used for names of nodes added for each pipeline step
-    :param fucntion_options: to export every step as a local function
+    :param function_options: to export every step as a local function
     :return: name of the output tensor, or a tuple of output tensor names
     """
     assert isinstance(estimator, Pipeline), f"Unexpected type {type(estimator)} for estimator."
