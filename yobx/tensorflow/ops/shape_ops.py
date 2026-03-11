@@ -25,12 +25,8 @@ def convert_reshape(
     The TF ``shape`` input (second input) may be int32; it is cast to int64
     as required by the ONNX ``Reshape`` specification.
     """
-    shape_i64 = g.op.Cast(
-        op.inputs[1].name, to=TensorProto.INT64, name=f"{op.name}_shape_cast"
-    )
-    return g.op.Reshape(
-        op.inputs[0].name, shape_i64, outputs=outputs[:1], name=op.name
-    )
+    shape_i64 = g.op.Cast(op.inputs[1].name, to=TensorProto.INT64, name=f"{op.name}_shape_cast")
+    return g.op.Reshape(op.inputs[0].name, shape_i64, outputs=outputs[:1], name=op.name)
 
 
 @register_tf_op_converter("Squeeze")
@@ -50,7 +46,5 @@ def convert_squeeze(
     squeeze_dims = list(op.get_attr("squeeze_dims"))
     if squeeze_dims:
         axes = np.array(squeeze_dims, dtype=np.int64)
-        return g.op.Squeeze(
-            op.inputs[0].name, axes, outputs=outputs[:1], name=op.name
-        )
+        return g.op.Squeeze(op.inputs[0].name, axes, outputs=outputs[:1], name=op.name)
     return g.op.Squeeze(op.inputs[0].name, outputs=outputs[:1], name=op.name)

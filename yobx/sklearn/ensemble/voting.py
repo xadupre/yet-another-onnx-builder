@@ -123,9 +123,9 @@ def sklearn_voting_regressor(
     :param name: prefix used for names of nodes added by this converter
     :return: name of the predictions output tensor
     """
-    assert isinstance(estimator, VotingRegressor), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(
+        estimator, VotingRegressor
+    ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
@@ -225,9 +225,9 @@ def sklearn_voting_classifier(
     :return: label tensor name (hard voting) or tuple ``(label, probabilities)``
         (soft voting)
     """
-    assert isinstance(estimator, VotingClassifier), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(
+        estimator, VotingClassifier
+    ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
@@ -295,18 +295,12 @@ def sklearn_voting_classifier(
             total_w = np.array(float(sum(weights)), dtype=dtype)
             avg_proba = g.op.Div(wsum, total_w, name=f"{name}_wdiv")  # (N, C)
 
-        label_idx_raw = g.op.ArgMax(
-            avg_proba, axis=1, keepdims=0, name=f"{name}_argmax"
-        )
-        label_idx = g.op.Cast(
-            label_idx_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast_idx"
-        )
+        label_idx_raw = g.op.ArgMax(avg_proba, axis=1, keepdims=0, name=f"{name}_argmax")
+        label_idx = g.op.Cast(label_idx_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast_idx")
         label = _build_label_output(g, label_idx, classes, outputs, name)
 
         if emit_proba:
-            proba_out = g.op.Identity(
-                avg_proba, name=f"{name}_proba", outputs=outputs[1:]
-            )
+            proba_out = g.op.Identity(avg_proba, name=f"{name}_proba", outputs=outputs[1:])
             assert isinstance(proba_out, str)
             return label, proba_out
 
@@ -344,12 +338,8 @@ def sklearn_voting_classifier(
             np.array([1], dtype=np.int64),
             name=f"{sub_name}_unsqueeze_cidx",
         )
-        vote_bool = g.op.Equal(
-            class_idx_2d, range_classes, name=f"{sub_name}_vote_bool"
-        )
-        vote = g.op.Cast(
-            vote_bool, to=onnx.TensorProto.FLOAT, name=f"{sub_name}_vote_cast"
-        )
+        vote_bool = g.op.Equal(class_idx_2d, range_classes, name=f"{sub_name}_vote_bool")
+        vote = g.op.Cast(vote_bool, to=onnx.TensorProto.FLOAT, name=f"{sub_name}_vote_cast")
         # Set type explicitly so subsequent Add can infer its output type.
         g.set_type(vote, onnx.TensorProto.FLOAT)
 
@@ -370,9 +360,7 @@ def sklearn_voting_classifier(
             g.set_type(total_votes, onnx.TensorProto.FLOAT)
 
     winner_raw = g.op.ArgMax(total_votes, axis=1, keepdims=0, name=f"{name}_argmax")
-    winner_idx = g.op.Cast(
-        winner_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast_winner"
-    )
+    winner_idx = g.op.Cast(winner_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast_winner")
 
     label = _build_label_output(g, winner_idx, classes, outputs, name)
     return label
