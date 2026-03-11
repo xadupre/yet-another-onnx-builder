@@ -7,3 +7,4 @@ yobx.sklearn.ensemble
 
     hist_gradient_boosting
     random_forest
+    extra_trees
