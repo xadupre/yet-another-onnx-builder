@@ -35,7 +35,8 @@ which can (*predictable*).
     print("    * - category")
     print("      - estimator")
     print("      - predictable")
-    print("      - yobx converter")
+    print("      - yobx")
+    print("      - converter")
 
     n_possible = 0
     n_done = 0
@@ -43,17 +44,17 @@ which can (*predictable*).
         cat = row["category"]
         fct = row["yobx"]
         yobx_mark = "✓" if fct else ""
-        trainable = "✓" if row["trainable"] else ""
+        predictable = "✓" if row["predictable"] else ""
         cls = f":class:`{row['name']} <{row['module']}.{row['name']}>`"
         cvt = f":func:`{fct.__name__} <{fct.__module__}.{fct.__name__}>`" if fct else ""
         print(f"    * - {cat}")
         print(f"      - {cls}")
-        print(f"      - {trainable}")
+        print(f"      - {predictable}")
         print(f"      - {yobx_mark}")
         print(f"      - {cvt}")
         if yobx_mark:
             n_done += 1
-        if trainable:
+        if predictable:
             n_possible += 1
     print()
     print()
