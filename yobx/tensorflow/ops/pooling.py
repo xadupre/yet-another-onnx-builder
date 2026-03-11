@@ -47,9 +47,7 @@ def _explicit_pads(
     begins, ends = [], []
     for in_size, k, s in zip(input_spatial, kernel_shape, strides):
         if in_size is None:
-            raise ValueError(
-                "Cannot compute explicit SAME pads for a dynamic spatial dimension."
-            )
+            raise ValueError("Cannot compute explicit SAME pads for a dynamic spatial dimension.")
         out_size = math.ceil(in_size / s)
         total = max(0, (out_size - 1) * s + k - in_size)
         begins.append(total // 2)
@@ -74,8 +72,8 @@ def _set_pool_nchw_shape(
     """
     if not g.has_shape(x_nchw):
         return
-    nchw_in = g.get_shape(x_nchw)      # (batch, C_in, H_in, W_in)
-    batch_dim = nchw_in[0]              # may be an int or a symbolic string
+    nchw_in = g.get_shape(x_nchw)  # (batch, C_in, H_in, W_in)
+    batch_dim = nchw_in[0]  # may be an int or a symbolic string
 
     tf_out = op.outputs[0].shape.as_list()  # NHWC: [N, H_out, W_out, C]
     if len(tf_out) != 4:
@@ -105,11 +103,9 @@ def convert_max_pool(
     """
     data_format = op.get_attr("data_format").decode()
     if data_format != "NHWC":
-        raise NotImplementedError(
-            f"MaxPool with data_format={data_format!r} is not supported."
-        )
+        raise NotImplementedError(f"MaxPool with data_format={data_format!r} is not supported.")
 
-    ksize = list(op.get_attr("ksize"))      # [1, kH, kW, 1]
+    ksize = list(op.get_attr("ksize"))  # [1, kH, kW, 1]
     strides = list(op.get_attr("strides"))  # [1, sH, sW, 1]
     padding = _decode(op.get_attr("padding"))
 
@@ -117,22 +113,20 @@ def convert_max_pool(
     onnx_strides = strides[1:3]
 
     nhwc_shape = op.inputs[0].shape.as_list()  # [N, H, W, C]
-    input_spatial = nhwc_shape[1:3]            # [H, W]
+    input_spatial = nhwc_shape[1:3]  # [H, W]
 
     try:
         pads = _explicit_pads(padding, kernel_shape, onnx_strides, input_spatial)
-        pool_kwargs: Dict[str, Any] = dict(kernel_shape=kernel_shape, strides=onnx_strides,
-                                           pads=pads)
+        pool_kwargs: Dict[str, Any] = dict(
+            kernel_shape=kernel_shape, strides=onnx_strides, pads=pads
+        )
     except ValueError:
         # Dynamic spatial dims — fall back to auto_pad
         auto_pad = "SAME_UPPER" if padding == "SAME" else "VALID"
-        pool_kwargs = dict(kernel_shape=kernel_shape, strides=onnx_strides,
-                           auto_pad=auto_pad)
+        pool_kwargs = dict(kernel_shape=kernel_shape, strides=onnx_strides, auto_pad=auto_pad)
 
     # NHWC → NCHW
-    x_nchw = g.op.Transpose(
-        op.inputs[0].name, perm=[0, 3, 1, 2], name=f"{op.name}_in_t"
-    )
+    x_nchw = g.op.Transpose(op.inputs[0].name, perm=[0, 3, 1, 2], name=f"{op.name}_in_t")
     # Apply MaxPool in NCHW; request exactly one output to avoid returning indices
     pool_out = f"{op.name}_nchw_out"
     g.op.MaxPool(x_nchw, outputs=[pool_out], name=f"{op.name}_pool", **pool_kwargs)
@@ -158,11 +152,9 @@ def convert_avg_pool(
     """
     data_format = op.get_attr("data_format").decode()
     if data_format != "NHWC":
-        raise NotImplementedError(
-            f"AvgPool with data_format={data_format!r} is not supported."
-        )
+        raise NotImplementedError(f"AvgPool with data_format={data_format!r} is not supported.")
 
-    ksize = list(op.get_attr("ksize"))      # [1, kH, kW, 1]
+    ksize = list(op.get_attr("ksize"))  # [1, kH, kW, 1]
     strides = list(op.get_attr("strides"))  # [1, sH, sW, 1]
     padding = _decode(op.get_attr("padding"))
 
@@ -170,21 +162,19 @@ def convert_avg_pool(
     onnx_strides = strides[1:3]
 
     nhwc_shape = op.inputs[0].shape.as_list()  # [N, H, W, C]
-    input_spatial = nhwc_shape[1:3]            # [H, W]
+    input_spatial = nhwc_shape[1:3]  # [H, W]
 
     try:
         pads = _explicit_pads(padding, kernel_shape, onnx_strides, input_spatial)
-        pool_kwargs: Dict[str, Any] = dict(kernel_shape=kernel_shape, strides=onnx_strides,
-                                           pads=pads)
+        pool_kwargs: Dict[str, Any] = dict(
+            kernel_shape=kernel_shape, strides=onnx_strides, pads=pads
+        )
     except ValueError:
         auto_pad = "SAME_UPPER" if padding == "SAME" else "VALID"
-        pool_kwargs = dict(kernel_shape=kernel_shape, strides=onnx_strides,
-                           auto_pad=auto_pad)
+        pool_kwargs = dict(kernel_shape=kernel_shape, strides=onnx_strides, auto_pad=auto_pad)
 
     # NHWC → NCHW
-    x_nchw = g.op.Transpose(
-        op.inputs[0].name, perm=[0, 3, 1, 2], name=f"{op.name}_in_t"
-    )
+    x_nchw = g.op.Transpose(op.inputs[0].name, perm=[0, 3, 1, 2], name=f"{op.name}_in_t")
     # Apply AveragePool in NCHW
     pool_out = f"{op.name}_nchw_out"
     g.op.AveragePool(x_nchw, outputs=[pool_out], name=f"{op.name}_pool", **pool_kwargs)

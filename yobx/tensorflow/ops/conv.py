@@ -52,9 +52,7 @@ def _explicit_pads(
     begins, ends = [], []
     for in_size, k, s, d in zip(input_spatial, kernel_shape, strides, dilations):
         if in_size is None:
-            raise ValueError(
-                "Cannot compute explicit SAME pads for a dynamic spatial dimension."
-            )
+            raise ValueError("Cannot compute explicit SAME pads for a dynamic spatial dimension.")
         effective_k = (k - 1) * d + 1
         out_size = math.ceil(in_size / s)
         total = max(0, (out_size - 1) * s + effective_k - in_size)
@@ -80,11 +78,9 @@ def convert_conv2d(
     """
     data_format = op.get_attr("data_format").decode()
     if data_format != "NHWC":
-        raise NotImplementedError(
-            f"Conv2D with data_format={data_format!r} is not supported."
-        )
+        raise NotImplementedError(f"Conv2D with data_format={data_format!r} is not supported.")
 
-    strides = list(op.get_attr("strides"))      # [1, sH, sW, 1]
+    strides = list(op.get_attr("strides"))  # [1, sH, sW, 1]
     dilations = list(op.get_attr("dilations"))  # [1, dH, dW, 1]
     padding_raw = op.get_attr("padding")
     padding = padding_raw.decode() if isinstance(padding_raw, bytes) else padding_raw
@@ -97,26 +93,21 @@ def convert_conv2d(
     kernel_shape = filter_shape[:2]  # [kH, kW]
 
     nhwc_shape = op.inputs[0].shape.as_list()  # [N, H, W, C]
-    input_spatial = nhwc_shape[1:3]            # [H, W]
+    input_spatial = nhwc_shape[1:3]  # [H, W]
 
     try:
-        pads = _explicit_pads(padding, kernel_shape, onnx_strides, onnx_dilations,
-                               input_spatial)
-        conv_kwargs: Dict[str, Any] = dict(strides=onnx_strides, dilations=onnx_dilations,
-                                           pads=pads)
+        pads = _explicit_pads(padding, kernel_shape, onnx_strides, onnx_dilations, input_spatial)
+        conv_kwargs: Dict[str, Any] = dict(
+            strides=onnx_strides, dilations=onnx_dilations, pads=pads
+        )
     except ValueError:
         auto_pad = "SAME_UPPER" if padding == "SAME" else "VALID"
-        conv_kwargs = dict(strides=onnx_strides, dilations=onnx_dilations,
-                           auto_pad=auto_pad)
+        conv_kwargs = dict(strides=onnx_strides, dilations=onnx_dilations, auto_pad=auto_pad)
 
     # Input: NHWC → NCHW
-    x_nchw = g.op.Transpose(
-        op.inputs[0].name, perm=[0, 3, 1, 2], name=f"{op.name}_in_t"
-    )
+    x_nchw = g.op.Transpose(op.inputs[0].name, perm=[0, 3, 1, 2], name=f"{op.name}_in_t")
     # Filter: HWIO → OIHW
-    w_oihw = g.op.Transpose(
-        op.inputs[1].name, perm=[3, 2, 0, 1], name=f"{op.name}_w_t"
-    )
+    w_oihw = g.op.Transpose(op.inputs[1].name, perm=[3, 2, 0, 1], name=f"{op.name}_w_t")
     # ONNX Conv (NCHW)
     y_nchw = g.op.Conv(
         x_nchw,

@@ -174,9 +174,7 @@ class TestSklearnVotingRegressor(ExtTestCase):
     def test_regressor_in_pipeline(self):
         """VotingRegressor as last step in a Pipeline."""
         Xd = self._X.astype(np.float32)
-        reg = VotingRegressor(
-            estimators=[("lr", LinearRegression()), ("ridge", Ridge())]
-        )
+        reg = VotingRegressor(estimators=[("lr", LinearRegression()), ("ridge", Ridge())])
         pipe = Pipeline([("scaler", StandardScaler()), ("reg", reg)])
         pipe.fit(Xd, self._y)
 

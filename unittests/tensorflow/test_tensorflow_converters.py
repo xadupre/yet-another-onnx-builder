@@ -723,8 +723,11 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
     def test_maxpool_valid(self):
         """TF MaxPool with VALID padding → ONNX MaxPool."""
         model = tf.keras.Sequential(
-            [tf.keras.layers.MaxPooling2D(pool_size=(2, 2), padding="valid",
-                                          input_shape=(8, 8, 4))]
+            [
+                tf.keras.layers.MaxPooling2D(
+                    pool_size=(2, 2), padding="valid", input_shape=(8, 8, 4)
+                )
+            ]
         )
         X = np.random.rand(2, 8, 8, 4).astype(np.float32)
         expected = model(X).numpy()
@@ -741,8 +744,11 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
     def test_maxpool_same(self):
         """TF MaxPool with SAME padding → ONNX MaxPool with explicit pads."""
         model = tf.keras.Sequential(
-            [tf.keras.layers.MaxPooling2D(pool_size=(2, 2), padding="same",
-                                          input_shape=(8, 8, 4))]
+            [
+                tf.keras.layers.MaxPooling2D(
+                    pool_size=(2, 2), padding="same", input_shape=(8, 8, 4)
+                )
+            ]
         )
         X = np.random.rand(2, 8, 8, 4).astype(np.float32)
         expected = model(X).numpy()
@@ -759,8 +765,11 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
     def test_maxpool_strides(self):
         """TF MaxPool with custom strides → ONNX MaxPool."""
         model = tf.keras.Sequential(
-            [tf.keras.layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2),
-                                          padding="valid", input_shape=(8, 8, 4))]
+            [
+                tf.keras.layers.MaxPooling2D(
+                    pool_size=(3, 3), strides=(2, 2), padding="valid", input_shape=(8, 8, 4)
+                )
+            ]
         )
         X = np.random.rand(2, 8, 8, 4).astype(np.float32)
         expected = model(X).numpy()
@@ -781,8 +790,11 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
     def test_avgpool_valid(self):
         """TF AvgPool with VALID padding → ONNX AveragePool."""
         model = tf.keras.Sequential(
-            [tf.keras.layers.AveragePooling2D(pool_size=(2, 2), padding="valid",
-                                              input_shape=(8, 8, 4))]
+            [
+                tf.keras.layers.AveragePooling2D(
+                    pool_size=(2, 2), padding="valid", input_shape=(8, 8, 4)
+                )
+            ]
         )
         X = np.random.rand(2, 8, 8, 4).astype(np.float32)
         expected = model(X).numpy()
@@ -799,8 +811,11 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
     def test_avgpool_same(self):
         """TF AvgPool with SAME padding → ONNX AveragePool with explicit pads."""
         model = tf.keras.Sequential(
-            [tf.keras.layers.AveragePooling2D(pool_size=(3, 3), padding="same",
-                                              strides=(1, 1), input_shape=(8, 8, 4))]
+            [
+                tf.keras.layers.AveragePooling2D(
+                    pool_size=(3, 3), padding="same", strides=(1, 1), input_shape=(8, 8, 4)
+                )
+            ]
         )
         X = np.random.rand(2, 8, 8, 4).astype(np.float32)
         expected = model(X).numpy()
@@ -821,8 +836,11 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
     def test_conv2d_valid(self):
         """TF Conv2D with VALID padding → ONNX Conv."""
         model = tf.keras.Sequential(
-            [tf.keras.layers.Conv2D(8, (3, 3), padding="valid",
-                                    use_bias=False, input_shape=(8, 8, 3))]
+            [
+                tf.keras.layers.Conv2D(
+                    8, (3, 3), padding="valid", use_bias=False, input_shape=(8, 8, 3)
+                )
+            ]
         )
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         expected = model(X).numpy()
@@ -839,8 +857,11 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
     def test_conv2d_same(self):
         """TF Conv2D with SAME padding → ONNX Conv with explicit pads."""
         model = tf.keras.Sequential(
-            [tf.keras.layers.Conv2D(8, (3, 3), padding="same",
-                                    use_bias=False, input_shape=(8, 8, 3))]
+            [
+                tf.keras.layers.Conv2D(
+                    8, (3, 3), padding="same", use_bias=False, input_shape=(8, 8, 3)
+                )
+            ]
         )
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         expected = model(X).numpy()
@@ -857,8 +878,11 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
     def test_conv2d_with_bias(self):
         """TF Conv2D with bias → ONNX Conv + BiasAdd (Add)."""
         model = tf.keras.Sequential(
-            [tf.keras.layers.Conv2D(8, (3, 3), padding="valid",
-                                    use_bias=True, input_shape=(8, 8, 3))]
+            [
+                tf.keras.layers.Conv2D(
+                    8, (3, 3), padding="valid", use_bias=True, input_shape=(8, 8, 3)
+                )
+            ]
         )
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         expected = model(X).numpy()
@@ -875,8 +899,16 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
     def test_conv2d_strides(self):
         """TF Conv2D with custom strides → ONNX Conv."""
         model = tf.keras.Sequential(
-            [tf.keras.layers.Conv2D(4, (3, 3), strides=(2, 2), padding="valid",
-                                    use_bias=False, input_shape=(8, 8, 3))]
+            [
+                tf.keras.layers.Conv2D(
+                    4,
+                    (3, 3),
+                    strides=(2, 2),
+                    padding="valid",
+                    use_bias=False,
+                    input_shape=(8, 8, 3),
+                )
+            ]
         )
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         expected = model(X).numpy()
@@ -893,8 +925,16 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
     def test_conv2d_relu(self):
         """TF Conv2D followed by ReLU activation → ONNX Conv + Relu."""
         model = tf.keras.Sequential(
-            [tf.keras.layers.Conv2D(8, (3, 3), activation="relu", padding="valid",
-                                    use_bias=False, input_shape=(8, 8, 3))]
+            [
+                tf.keras.layers.Conv2D(
+                    8,
+                    (3, 3),
+                    activation="relu",
+                    padding="valid",
+                    use_bias=False,
+                    input_shape=(8, 8, 3),
+                )
+            ]
         )
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         expected = model(X).numpy()
