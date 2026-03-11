@@ -202,7 +202,7 @@ def sklearn_bernoulli_nb(
 
     .. code-block:: text
 
-        neg_prob  = log(1 - exp(feature_log_prob_))   (C × F)  — precomputed
+        neg_prob  = log1p(-exp(feature_log_prob_))   (C × F)  — precomputed
         diff      = feature_log_prob_ - neg_prob       (C × F)  — precomputed
         neg_sum   = Σ_f neg_prob                       (C,)     — precomputed
 
@@ -232,7 +232,7 @@ def sklearn_bernoulli_nb(
     class_log_prior = estimator.class_log_prior_.astype(dtype)  # (C,)
 
     # Precompute constants
-    neg_prob = np.log(1.0 - np.exp(feature_log_prob)).astype(dtype)  # (C, F)
+    neg_prob = np.log1p(-np.exp(feature_log_prob)).astype(dtype)  # (C, F)
     diff = (feature_log_prob - neg_prob).astype(dtype)  # (C, F)
     bias = (class_log_prior + neg_prob.sum(axis=1)).astype(dtype)  # (C,)
 
