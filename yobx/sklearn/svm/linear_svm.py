@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List
 import numpy as np
 import onnx
 from sklearn.svm import LinearSVC, LinearSVR
@@ -84,9 +84,7 @@ def sklearn_linear_svc(
     :param name: prefix for added node names
     :return: label tensor name
     """
-    assert isinstance(estimator, LinearSVC), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(estimator, LinearSVC), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
@@ -149,9 +147,7 @@ def sklearn_linear_svr(
     :param name: prefix for added node names
     :return: output tensor name
     """
-    assert isinstance(estimator, LinearSVR), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(estimator, LinearSVR), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)

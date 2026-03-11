@@ -4,7 +4,6 @@ from sklearn.svm import NuSVC, NuSVR, SVC, SVR
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
 
-
 # Mapping from sklearn kernel names to ONNX kernel type strings.
 _KERNEL_MAP = {
     "linear": "LINEAR",
@@ -28,8 +27,7 @@ def _get_kernel_params(estimator) -> Tuple[str, List[float]]:
         kernel_type = _KERNEL_MAP.get(kernel)
         if kernel_type is None:
             raise NotImplementedError(
-                f"Kernel {kernel!r} is not supported. "
-                f"Supported kernels: {list(_KERNEL_MAP)}."
+                f"Kernel {kernel!r} is not supported. Supported kernels: {list(_KERNEL_MAP)}."
             )
     else:
         raise NotImplementedError(
@@ -81,9 +79,7 @@ def sklearn_svc(
     :param name: prefix for added node names
     :return: label tensor name, or tuple ``(label, probabilities)``
     """
-    assert isinstance(estimator, _SVC_TYPES), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(estimator, _SVC_TYPES), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     classes = estimator.classes_
@@ -190,9 +186,7 @@ def sklearn_svr(
     :param name: prefix for added node names
     :return: output tensor name
     """
-    assert isinstance(estimator, _SVR_TYPES), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(estimator, _SVR_TYPES), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     kernel_type, kernel_params = _get_kernel_params(estimator)

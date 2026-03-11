@@ -12,26 +12,30 @@ def register_sklearn_converters():
     from .compose import register as register_compose
     from .decomposition import register as register_decomposition
     from .discriminant_analysis import register as register_discriminant_analysis
+    from .dummy import register as register_dummy
     from .ensemble import register as register_ensemble
+    from .lightgbm import register as register_lightgbm
     from .linear_model import register as register_linear_model
     from .multiclass import register as register_multiclass
+    from .naive_bayes import register as register_naive_bayes
     from .neighbors import register as register_neighbors
     from .neural_network import register as register_neural_network
     from .pipeline import register as register_pipeline
     from .preprocessing import register as register_preprocessing
-    from .tree import register as register_tree
-    from .lightgbm import register as register_lightgbm
     from .svm import register as register_svm
+    from .tree import register as register_tree
     from .xgboost import register as register_xgboost
 
     register_cluster()
     register_compose()
     register_decomposition()
     register_discriminant_analysis()
+    register_dummy()
     register_ensemble()
     register_linear_model()
     register_lightgbm()
     register_multiclass()
+    register_naive_bayes()
     register_neighbors()
     register_neural_network()
     register_pipeline()

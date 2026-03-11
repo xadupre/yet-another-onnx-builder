@@ -51,7 +51,9 @@ class TestSklearnLinearSVC(ExtTestCase):
 
     def test_linear_svc_in_pipeline(self):
         Xd = self._X_bin.astype(np.float32)
-        pipe = Pipeline([("scaler", StandardScaler()), ("clf", LinearSVC(random_state=42, max_iter=5000))])
+        pipe = Pipeline(
+            [("scaler", StandardScaler()), ("clf", LinearSVC(random_state=42, max_iter=5000))]
+        )
         pipe.fit(Xd, self._y_bin)
         onx = to_onnx(pipe, (Xd,))
         sess = self.check_ort(onx)
@@ -88,7 +90,9 @@ class TestSklearnLinearSVR(ExtTestCase):
 
     def test_linear_svr_in_pipeline(self):
         Xd = self._X.astype(np.float32)
-        pipe = Pipeline([("scaler", StandardScaler()), ("reg", LinearSVR(random_state=42, max_iter=5000))])
+        pipe = Pipeline(
+            [("scaler", StandardScaler()), ("reg", LinearSVR(random_state=42, max_iter=5000))]
+        )
         pipe.fit(Xd, self._y)
         onx = to_onnx(pipe, (Xd,))
         sess = self.check_ort(onx)
@@ -100,9 +104,7 @@ class TestSklearnLinearSVR(ExtTestCase):
 @requires_sklearn("1.4")
 class TestSklearnSVC(ExtTestCase):
 
-    _X_bin, _y_bin = make_classification(
-        n_samples=40, n_features=4, n_classes=2, random_state=42
-    )
+    _X_bin, _y_bin = make_classification(n_samples=40, n_features=4, n_classes=2, random_state=42)
     _X_bin = _X_bin.astype(np.float32)
 
     _X_multi, _y_multi = make_classification(
@@ -117,7 +119,9 @@ class TestSklearnSVC(ExtTestCase):
 
         expected_n_outputs = 2 if probability else 1
         output_names = [o.name for o in onx.graph.output]
-        self.assertEqual(len(output_names), expected_n_outputs, f"Expected {expected_n_outputs} outputs")
+        self.assertEqual(
+            len(output_names), expected_n_outputs, f"Expected {expected_n_outputs} outputs"
+        )
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": X})
@@ -162,9 +166,7 @@ class TestSklearnSVC(ExtTestCase):
 @requires_sklearn("1.4")
 class TestSklearnNuSVC(ExtTestCase):
 
-    _X_bin, _y_bin = make_classification(
-        n_samples=40, n_features=4, n_classes=2, random_state=42
-    )
+    _X_bin, _y_bin = make_classification(n_samples=40, n_features=4, n_classes=2, random_state=42)
     _X_bin = _X_bin.astype(np.float32)
 
     _X_multi, _y_multi = make_classification(
