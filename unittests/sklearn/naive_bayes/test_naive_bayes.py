@@ -12,17 +12,13 @@ from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
 
 
-@requires_sklearn("1.4")
+@requires_sklearn("1.8")
 class TestSklearnNaiveBayes(ExtTestCase):
 
-    _X_bin = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [0, 1], [9, 10]], dtype=np.float32
-    )
+    _X_bin = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [0, 1], [9, 10]], dtype=np.float32)
     _y_bin = np.array([0, 0, 1, 1, 0, 1])
 
-    _X_multi = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32
-    )
+    _X_multi = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
     _y_multi = np.array([0, 0, 1, 1, 2, 2])
 
     def _check_classifier(self, estimator, X, y, atol=1e-5):
@@ -62,9 +58,7 @@ class TestSklearnNaiveBayes(ExtTestCase):
         for dtype in (np.float32, np.float64):
             Xd = self._X_multi.astype(dtype)
             y = self._y_multi
-            pipe = Pipeline(
-                [("scaler", StandardScaler()), ("clf", GaussianNB())]
-            )
+            pipe = Pipeline([("scaler", StandardScaler()), ("clf", GaussianNB())])
             pipe.fit(Xd, y)
             onx = to_onnx(pipe, (Xd,))
 
@@ -91,9 +85,7 @@ class TestSklearnNaiveBayes(ExtTestCase):
         y = np.array([0] * 10 + [1] * 10 + [2] * 10)
         for dtype in (np.float32, np.float64):
             Xd = X.astype(dtype)
-            pipe = Pipeline(
-                [("scaler", MinMaxScaler()), ("clf", MultinomialNB())]
-            )
+            pipe = Pipeline([("scaler", MinMaxScaler()), ("clf", MultinomialNB())])
             pipe.fit(Xd, y)
             onx = to_onnx(pipe, (Xd,))
 
@@ -127,9 +119,7 @@ class TestSklearnNaiveBayes(ExtTestCase):
         for dtype in (np.float32, np.float64):
             Xd = self._X_multi.astype(dtype)
             y = self._y_multi
-            pipe = Pipeline(
-                [("scaler", StandardScaler()), ("clf", BernoulliNB(binarize=None))]
-            )
+            pipe = Pipeline([("scaler", StandardScaler()), ("clf", BernoulliNB(binarize=None))])
             pipe.fit(Xd, y)
             onx = to_onnx(pipe, (Xd,))
 
@@ -156,9 +146,7 @@ class TestSklearnNaiveBayes(ExtTestCase):
         y = np.array([0] * 10 + [1] * 10 + [2] * 10)
         for dtype in (np.float32, np.float64):
             Xd = X.astype(dtype)
-            pipe = Pipeline(
-                [("scaler", MinMaxScaler()), ("clf", ComplementNB())]
-            )
+            pipe = Pipeline([("scaler", MinMaxScaler()), ("clf", ComplementNB())])
             pipe.fit(Xd, y)
             onx = to_onnx(pipe, (Xd,))
 

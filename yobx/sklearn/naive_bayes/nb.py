@@ -76,13 +76,13 @@ def sklearn_gaussian_nb(
 
     .. code-block:: text
 
-        A  = -0.5 / var_          (C × F)
-        B  = θ_ / var_            (C × F)
+        A  = -0.5 / var_          (C x F)
+        B  = θ_ / var_            (C x F)
         K  = log(prior)
              - 0.5 · Σ_f log(2π·var)
              - 0.5 · Σ_f θ²/var   (C,)
 
-        jll = (X² @ Aᵀ) + (X @ Bᵀ) + K    (N × C)
+        jll = (X² @ Aᵀ) + (X @ Bᵀ) + K    (N x C)
 
     probabilities  ← Softmax(jll, axis=1)
     label          ← classes_[ArgMax(jll, axis=1)]
@@ -95,9 +95,7 @@ def sklearn_gaussian_nb(
     :param name: prefix for added node names
     :return: tuple ``(label_result_name, proba_result_name)``
     """
-    assert isinstance(estimator, GaussianNB), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(estimator, GaussianNB), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
@@ -114,7 +112,9 @@ def sklearn_gaussian_nb(
         log_prior
         - 0.5 * np.sum(np.log(2.0 * np.pi * var), axis=1)
         - 0.5 * np.sum(theta**2 / var, axis=1)
-    ).astype(dtype)  # (C,)
+    ).astype(
+        dtype
+    )  # (C,)
 
     # X^2
     X2 = g.op.Mul(X, X, name=f"{name}_x2")
@@ -124,7 +124,7 @@ def sklearn_gaussian_nb(
     lin = g.op.MatMul(X, B.T, name=f"{name}_lin")
     jll = g.op.Add(g.op.Add(quad, lin, name=f"{name}_ql"), K, name=f"{name}_jll")
 
-    return _emit_label_and_proba(g, sts, jll, estimator.classes_, dtype, name, outputs, itype)
+    return _emit_label_and_proba(g, sts, jll, estimator.classes_, dtype, name, outputs, itype)  # type: ignore
 
 
 @register_sklearn_converter((MultinomialNB, ComplementNB))
@@ -144,13 +144,13 @@ def sklearn_multinomial_nb(
 
     .. code-block:: text
 
-        jll = X @ feature_log_prob_ᵀ + class_log_prior_    (N × C)
+        jll = X @ feature_log_prob_ᵀ + class_log_prior_    (N x C)
 
     **ComplementNB** (multi-class, no ``class_log_prior_`` added):
 
     .. code-block:: text
 
-        jll = X @ feature_log_prob_ᵀ                       (N × C)
+        jll = X @ feature_log_prob_ᵀ                       (N x C)
 
     probabilities  ← Softmax(jll, axis=1)
     label          ← classes_[ArgMax(jll, axis=1)]
@@ -163,9 +163,9 @@ def sklearn_multinomial_nb(
     :param name: prefix for added node names
     :return: tuple ``(label_result_name, proba_result_name)``
     """
-    assert isinstance(estimator, (MultinomialNB, ComplementNB)), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(
+        estimator, (MultinomialNB, ComplementNB)
+    ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
@@ -181,9 +181,7 @@ def sklearn_multinomial_nb(
         class_log_prior = estimator.class_log_prior_.astype(dtype)  # (C,)
         jll = g.op.Add(jll, class_log_prior, name=f"{name}_jll")
 
-    return _emit_label_and_proba(
-        g, sts, jll, estimator.classes_, dtype, name, outputs, itype
-    )
+    return _emit_label_and_proba(g, sts, jll, estimator.classes_, dtype, name, outputs, itype)  # type: ignore
 
 
 @register_sklearn_converter(BernoulliNB)
@@ -202,12 +200,12 @@ def sklearn_bernoulli_nb(
 
     .. code-block:: text
 
-        neg_prob  = log1p(-exp(feature_log_prob_))   (C × F)  — precomputed
-        diff      = feature_log_prob_ - neg_prob       (C × F)  — precomputed
+        neg_prob  = log1p(-exp(feature_log_prob_))   (C x F)  — precomputed
+        diff      = feature_log_prob_ - neg_prob       (C x F)  — precomputed
         neg_sum   = Σ_f neg_prob                       (C,)     — precomputed
 
         X_bin     = (X > binarize).astype(dtype)       if binarize is not None
-        jll       = X_bin @ diffᵀ  +  class_log_prior_  +  neg_sum   (N × C)
+        jll       = X_bin @ diffᵀ  +  class_log_prior_  +  neg_sum   (N x C)
 
     probabilities  ← Softmax(jll, axis=1)
     label          ← classes_[ArgMax(jll, axis=1)]
@@ -220,9 +218,7 @@ def sklearn_bernoulli_nb(
     :param name: prefix for added node names
     :return: tuple ``(label_result_name, proba_result_name)``
     """
-    assert isinstance(estimator, BernoulliNB), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(estimator, BernoulliNB), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
@@ -253,4 +249,4 @@ def sklearn_bernoulli_nb(
         name=f"{name}_jll",
     )
 
-    return _emit_label_and_proba(g, sts, jll, estimator.classes_, dtype, name, outputs, itype)
+    return _emit_label_and_proba(g, sts, jll, estimator.classes_, dtype, name, outputs, itype)  # type: ignore
