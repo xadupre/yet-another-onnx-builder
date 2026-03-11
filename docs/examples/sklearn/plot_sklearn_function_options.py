@@ -69,6 +69,22 @@ ct = ColumnTransformer(
     ]
 ).fit(X)
 
+pipe_ct = Pipeline(
+    [
+        (
+            "ct",
+            ColumnTransformer(
+                [
+                    ("std", StandardScaler(), [0, 1]),
+                    ("mms", MinMaxScaler(), [2, 3]),
+                ]
+            ),
+        ),
+        ("clf", LogisticRegression(max_iter=200)),
+    ]
+).fit(X, y)
+
+
 # %%
 # 2. Create FunctionOptions
 # --------------------------
@@ -164,19 +180,26 @@ assert np.allclose(expected_ct, result_ct, atol=1e-5), "CT output mismatch!"
 print("ColumnTransformer output matches sklearn ✓")
 
 # %%
-# 6. Comparison: flat graph vs. function graph
-# ---------------------------------------------
+# 6. Pipeline and ColumnTransformer
+# ---------------------------------
 #
 # The flat graph (default) inlines all operators.  The function graph keeps
 # the structure clean in the main graph proto.
 
-onx_flat = to_onnx(scaler, (X[:1],))
-print("\n=== Flat vs. function graph for StandardScaler ===")
-print(f"Flat  — functions: {len(onx_flat.functions)}, nodes: {len(onx_flat.graph.node)}")
-print(
-    f"Funcs — functions: {len(onx_scaler.functions)}, "
-    f"main-graph nodes: {len(onx_scaler.graph.node)}"
+onx_pipe_ct = to_onnx(pipe_ct, (X[:1],), function_options=fopts)
+print("\n=== Pipeline and ColumnTransformer ===")
+print(f"Local functions : {[f.name for f in onx_pipe_ct.functions]}")
+ct_ops = [n.op_type for n in onx_pipe_ct.graph.node]
+print(f"Main graph nodes: {ct_ops}")
+
+X_ct_test = rng.standard_normal((15, 4)).astype(np.float32)
+sess_ct = onnxruntime.InferenceSession(
+    onx_ct.SerializeToString(), providers=["CPUExecutionProvider"]
 )
+result_ct = sess_ct.run(None, {"X": X_ct_test})[0]
+expected_ct = ct.transform(X_ct_test).astype(np.float32)
+assert np.allclose(expected_ct, result_ct, atol=1e-5), "CT output mismatch!"
+print("ColumnTransformer output matches sklearn ✓")
 
 # %%
 # 7. Visualize the function graph
@@ -184,4 +207,4 @@ print(
 #
 # The main graph of the pipeline model shows two function-call nodes.
 
-plot_dot(onx_pipe)
+plot_dot(onx_pipe_ct)
