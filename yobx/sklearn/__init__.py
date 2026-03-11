@@ -14,6 +14,7 @@ def register_sklearn_converters():
     from .compose import register as register_compose
     from .decomposition import register as register_decomposition
     from .discriminant_analysis import register as register_discriminant_analysis
+    from .dummy import register as register_dummy
     from .ensemble import register as register_ensemble
     from .linear_model import register as register_linear_model
     from .multiclass import register as register_multiclass
@@ -29,6 +30,7 @@ def register_sklearn_converters():
     register_compose()
     register_decomposition()
     register_discriminant_analysis()
+    register_dummy()
     register_ensemble()
     register_linear_model()
     register_lightgbm()
