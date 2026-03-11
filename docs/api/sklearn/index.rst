@@ -22,6 +22,7 @@ yobx.sklearn
     tree/index
     xgboost/index
     lightgbm/index
+    svm/index
 
 register_sklearn_converters
 +++++++++++++++++++++++++++
