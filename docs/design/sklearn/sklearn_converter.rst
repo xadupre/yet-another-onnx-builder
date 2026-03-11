@@ -271,6 +271,127 @@ to avoid collisions.
     model = to_onnx(pipe, (X,))
     print("DOT-SECTION", to_dot(model))
 
+StackingRegressor
+-----------------
+
+:func:`sklearn_stacking_regressor
+<yobx.sklearn.ensemble.stacking.sklearn_stacking_regressor>`
+converts :class:`sklearn.ensemble.StackingRegressor`.
+
+For each base estimator the ``predict`` converter is called.  The 1-D
+prediction vector is reshaped to ``(N, 1)`` and all base-estimator outputs
+are concatenated along axis 1 to form the meta-feature matrix.  When
+``passthrough=True`` the original input features are appended to the
+meta-feature matrix before the final estimator is applied.
+
+.. code-block:: text
+
+    X ──[est 0 converter]──► pred_0 (N,) ──Reshape(N,1)──┐
+    X ──[est 1 converter]──► pred_1 (N,) ──Reshape(N,1)──┤
+    ...                                                    │
+                                          Concat(axis=1) ─►meta (N, n_est)
+                                                           │
+                                [Concat(meta, X, axis=1)] ─┤ (passthrough only)
+                                                           │
+                                    [final_estimator] ──────► predictions
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from sklearn.ensemble import StackingRegressor
+    from sklearn.linear_model import Ridge
+    from sklearn.tree import DecisionTreeRegressor
+    from yobx.sklearn import to_onnx
+    from yobx.helpers.onnx_helper import pretty_onnx
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((30, 4)).astype(np.float32)
+    y = rng.standard_normal(30).astype(np.float32)
+
+    est = StackingRegressor(
+        estimators=[
+            ("dt", DecisionTreeRegressor(max_depth=2, random_state=0)),
+            ("ridge", Ridge()),
+        ],
+        final_estimator=Ridge(),
+    ).fit(X, y)
+
+    model = to_onnx(est, (X,))
+    print(pretty_onnx(model))
+
+StackingClassifier
+------------------
+
+:func:`sklearn_stacking_classifier
+<yobx.sklearn.ensemble.stacking.sklearn_stacking_classifier>`
+converts :class:`sklearn.ensemble.StackingClassifier`.
+
+The meta-feature matrix is assembled by calling each base estimator's
+registered converter and extracting the appropriate output columns,
+matching the behaviour of
+:meth:`sklearn.ensemble.StackingClassifier._concatenate_predictions`:
+
+* ``stack_method_ == 'predict_proba'`` — **binary**: only column 1 of the
+  probability matrix is kept (shape ``(N, 1)``); **multiclass**: all columns
+  are kept (shape ``(N, n_classes)``).
+* ``stack_method_ == 'predict'`` — the label output is cast to the input
+  float dtype and reshaped to ``(N, 1)``.
+
+When ``passthrough=True`` the original input features are appended to the
+meta-feature matrix before the final estimator is applied.
+
+**Binary classification** (``predict_proba``, ``len(classes_) == 2``):
+
+.. code-block:: text
+
+    X ──[est 0 converter]──► proba_0 (N,2) ──Slice[:,1:]──► (N,1)──┐
+    X ──[est 1 converter]──► proba_1 (N,2) ──Slice[:,1:]──► (N,1)──┤
+    ...                                                              │
+                                                Concat(axis=1) ─────► meta (N, n_est)
+                                                                     │
+                                      [Concat(meta, X, axis=1)] ─────┤ (passthrough only)
+                                                                     │
+                                          [final_estimator] ─────────► label [, probabilities]
+
+**Multiclass classification** (``predict_proba``, ``len(classes_) > 2``):
+
+.. code-block:: text
+
+    X ──[est 0 converter]──► proba_0 (N,C) ──┐
+    X ──[est 1 converter]──► proba_1 (N,C) ──┤
+    ...                                       │
+                                 Concat(axis=1)──► meta (N, n_est * n_classes)
+                                              │
+                      [Concat(meta, X, axis=1)]──┤ (passthrough only)
+                                              │
+                          [final_estimator] ───► label [, probabilities]
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from sklearn.ensemble import StackingClassifier
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.tree import DecisionTreeClassifier
+    from yobx.sklearn import to_onnx
+    from yobx.helpers.onnx_helper import pretty_onnx
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((30, 4)).astype(np.float32)
+    y = (rng.standard_normal(30) > 0).astype(int)
+
+    est = StackingClassifier(
+        estimators=[
+            ("dt", DecisionTreeClassifier(max_depth=2, random_state=0)),
+            ("lr", LogisticRegression(max_iter=200)),
+        ],
+        final_estimator=LogisticRegression(max_iter=200),
+    ).fit(X, y)
+
+    model = to_onnx(est, (X,))
+    print(pretty_onnx(model))
+
 Adding a new converter
 ======================
 
