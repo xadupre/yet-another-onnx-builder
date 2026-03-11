@@ -103,7 +103,9 @@ def _wrap_step_as_function(
         g.make_node("Identity", [tmp], [final], name=f"{name}_rename")
 
     # Propagate type/shape metadata from the sub-builder to the main graph.
-    for func_out, actual, desired in zip(function_output_names, actual_output_names, output_names):
+    for func_out, actual, desired in zip(
+        function_output_names, actual_output_names, output_names
+    ):
         for out in (actual, desired):
             if sub_g.has_type(func_out):
                 g.set_type(out, sub_g.get_type(func_out))

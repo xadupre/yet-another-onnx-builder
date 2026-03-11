@@ -83,9 +83,7 @@ class TestSklearnFunctionOptions(ExtTestCase):
         ref = ExtendedReferenceEvaluator(onx)
         label, proba = ref.run(None, {"X": self.X})
         self.assertEqualArray(lr.predict(self.X), label)
-        self.assertEqualArray(
-            lr.predict_proba(self.X).astype(np.float32), proba, atol=1e-5
-        )
+        self.assertEqualArray(lr.predict_proba(self.X).astype(np.float32), proba, atol=1e-5)
 
     # ------------------------------------------------------------------
     # Pipeline → each step is a separate local function
@@ -113,9 +111,7 @@ class TestSklearnFunctionOptions(ExtTestCase):
         ref = ExtendedReferenceEvaluator(onx)
         label, proba = ref.run(None, {"X": self.X})
         self.assertEqualArray(pipe.predict(self.X), label)
-        self.assertEqualArray(
-            pipe.predict_proba(self.X).astype(np.float32), proba, atol=1e-5
-        )
+        self.assertEqualArray(pipe.predict_proba(self.X).astype(np.float32), proba, atol=1e-5)
 
     def test_pipeline_not_wrapped_without_function_options(self):
         """Pipeline with default function_options=False keeps the flat graph."""
@@ -133,9 +129,7 @@ class TestSklearnFunctionOptions(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_column_transformer_transformers_as_functions(self):
-        X = np.array(
-            [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]], dtype=np.float32
-        )
+        X = np.array([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]], dtype=np.float32)
         ct = ColumnTransformer(
             [("std", StandardScaler(), [0, 1]), ("mms", MinMaxScaler(), [2, 3])]
         ).fit(X)
