@@ -12,6 +12,7 @@ yobx.sklearn
     compose/index
     decomposition/index
     discriminant_analysis/index
+    dummy/index
     ensemble/index
     linear_model/index
     multiclass/index
@@ -22,6 +23,7 @@ yobx.sklearn
     tree/index
     xgboost/index
     lightgbm/index
+    naive_bayes/index
 
 register_sklearn_converters
 +++++++++++++++++++++++++++
