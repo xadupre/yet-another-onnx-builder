@@ -1,2 +1,2 @@
 def register():
-    from . import min_max_scaler, standard_scaler
+    from . import min_max_scaler, robust_scaler, standard_scaler
