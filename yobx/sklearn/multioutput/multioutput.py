@@ -80,6 +80,12 @@ def sklearn_multi_output_regressor(
 
     if not sts:
         g.set_type(predictions, itype)
+        n_targets = len(estimator.estimators_)
+        if g.has_shape(X):
+            batch_dim = g.get_shape(X)[0]
+            g.set_shape(predictions, (batch_dim, n_targets))
+        elif g.has_rank(X):
+            g.set_rank(predictions, 2)
 
     return predictions
 
@@ -224,6 +230,12 @@ def sklearn_multi_output_classifier(
             labels,
             onnx.TensorProto.INT64 if all_integer else onnx.TensorProto.STRING,
         )
+        n_targets = len(estimator.estimators_)
+        if g.has_shape(X):
+            batch_dim = g.get_shape(X)[0]
+            g.set_shape(labels, (batch_dim, n_targets))
+        elif g.has_rank(X):
+            g.set_rank(labels, 2)
 
     if not emit_proba:
         return labels
@@ -256,5 +268,13 @@ def sklearn_multi_output_classifier(
 
     if not sts and not g.has_type(probabilities):
         g.set_type(probabilities, onnx.TensorProto.FLOAT)
+    if not sts:
+        n_targets = len(estimator.estimators_)
+        n_classes = classes_list[0].shape[0]
+        if g.has_shape(X):
+            batch_dim = g.get_shape(X)[0]
+            g.set_shape(probabilities, (batch_dim, n_targets, n_classes))
+        elif g.has_rank(X):
+            g.set_rank(probabilities, 3)
 
     return labels, probabilities
