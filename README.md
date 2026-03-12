@@ -1,6 +1,8 @@
 # yet-another-onnx-builder
 
-[![Tests](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/tests.yml/badge.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/tests.yml)
+[![scikit-learn](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_sklearn.yml/badge.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_sklearn.yml)
+[![tensorflow](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_tensorflow.yml/badge.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_tensorflow.yml)
+[![pytorch](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_tensorflow.yml/ci_torch.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_torch.yml)
 [![Documentation](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/docs.yml/badge.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/docs.yml)
 [![Style](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/style.yml/badge.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/style.yml)
 [![Spelling](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/spelling.yml/badge.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/spelling.yml)
@@ -13,7 +15,7 @@ Yet another onnx builder, patches, flattening functions...
 
 **[Documentation](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/index.html)**
 
-**yet-another-onnx-builder** (`yobx`) is a toolkit for converting machine learning models
+**yet-another-onnx-builder** (`yobx`) proposes a unique API to convert machine learning models
 to [ONNX](https://onnx.ai) format from many libraries,
 [torch](https://pytorch.org), [tensorflow](https://www.tensorflow.org),
 [scikit-learn](https://scikit-learn.org),
@@ -29,3 +31,14 @@ It provides:
   [ir-py](https://onnx.ai/ir-py/) and [spox](https://spox.readthedocs.io/en/latest/).
 - A **symbolic shape expression system** for dynamic shape handling at export time (`yobx.xshape`).
 - A **translation tool** that converts ONNX graphs back to executable Python code (`yobx.translate`).
+- **Optimization functions** to make the model more efficient.
+- It supports multiple opsets and multiple domains.
+- It allows the user to directly onnx model with [Spox](https://spox.readthedocs.io/en/latest/) or [onnxscript](https://microsoft.github.io/onnxscript/)/[ir-py](https://onnx.ai/ir-py/).
+
+Its unique API:
+
+```python
+# the model is called 
+expected = model(*args, **kwargs)
+onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, **options)
+```

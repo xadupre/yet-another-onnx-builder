@@ -34,7 +34,7 @@ def convert_const(
     converted to a numpy array.  It will be embedded as an ONNX initializer
     when first consumed by a downstream op.
     """
-    value = tf.constant(op.get_attr("value")).numpy()
+    value = tf.make_ndarray(op.get_attr("value"))
     return g.op.Identity(value, outputs=outputs, name=op.name)
 
 

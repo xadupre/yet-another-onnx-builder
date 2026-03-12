@@ -31,3 +31,58 @@ img.logo {
     text-align: center;
     font-family: "Courier New", Courier, monospace;
 }
+
+/* Mermaid dark-mode node colours.
+   These classes are defined via classDef in each diagram and need to be
+   overridden here rather than via inline styles so that theme switching works.
+   piccolo_theme signals dark mode via data-mode="dark" or "darkest" on <html>.
+
+   Colour rationale (dark-theme counterparts of the light-theme classDef colours):
+     constNode  – deep rose fill / light pink stroke  (light: #f9f pink)
+     opNode     – deep navy fill / light blue stroke   (light: #bbf blue)
+     ioNode     – deep forest fill / light green stroke (light: #dfd green)
+     interNode  – dark charcoal fill / medium grey stroke (light: #eee grey)
+*/
+:root[data-mode=dark] .mermaid .constNode rect,
+:root[data-mode=dark] .mermaid .constNode polygon,
+:root[data-mode=darkest] .mermaid .constNode rect,
+:root[data-mode=darkest] .mermaid .constNode polygon {
+    fill: #5c2040 !important;
+    stroke: #cc88aa !important;
+}
+
+:root[data-mode=dark] .mermaid .opNode rect,
+:root[data-mode=dark] .mermaid .opNode polygon,
+:root[data-mode=darkest] .mermaid .opNode rect,
+:root[data-mode=darkest] .mermaid .opNode polygon {
+    fill: #1e2a5e !important;
+    stroke: #8898dd !important;
+}
+
+:root[data-mode=dark] .mermaid .ioNode rect,
+:root[data-mode=dark] .mermaid .ioNode polygon,
+:root[data-mode=darkest] .mermaid .ioNode rect,
+:root[data-mode=darkest] .mermaid .ioNode polygon {
+    fill: #1a4a1a !important;
+    stroke: #88cc88 !important;
+}
+
+:root[data-mode=dark] .mermaid .interNode rect,
+:root[data-mode=dark] .mermaid .interNode polygon,
+:root[data-mode=darkest] .mermaid .interNode rect,
+:root[data-mode=darkest] .mermaid .interNode polygon {
+    fill: #2d2d2d !important;
+    stroke: #888 !important;
+}
+
+:root[data-mode=dark] .mermaid .node .label,
+:root[data-mode=dark] .mermaid .nodeLabel,
+:root[data-mode=darkest] .mermaid .node .label,
+:root[data-mode=darkest] .mermaid .nodeLabel {
+    color: #ddd !important;
+}
+
+:root[data-mode=dark] .mermaid text,
+:root[data-mode=darkest] .mermaid text {
+    fill: #ddd !important;
+}
