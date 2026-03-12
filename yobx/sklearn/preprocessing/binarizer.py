@@ -33,9 +33,7 @@ def sklearn_binarizer(
     :param name: prefix name for the added nodes
     :return: output name
     """
-    assert isinstance(
-        estimator, Binarizer
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, Binarizer), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)

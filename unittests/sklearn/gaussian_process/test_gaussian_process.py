@@ -46,9 +46,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
             onx = to_onnx(estimator, (Xd,))
 
             output_names = [o.name for o in onx.graph.output]
-            self.assertEqual(
-                len(output_names), 1, f"Expected 1 output, got {output_names}"
-            )
+            self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
@@ -69,9 +67,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
             onx = to_onnx(estimator, (Xd,))
 
             output_names = [o.name for o in onx.graph.output]
-            self.assertEqual(
-                len(output_names), 2, f"Expected 2 outputs, got {output_names}"
-            )
+            self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
@@ -105,9 +101,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
 
     def test_gpr_rbf_ard_kernel(self):
         """ARD-RBF kernel (per-feature length scale)."""
-        gpr = GaussianProcessRegressor(
-            kernel=RBF(length_scale=[1.0, 2.0]), optimizer=None
-        )
+        gpr = GaussianProcessRegressor(kernel=RBF(length_scale=[1.0, 2.0]), optimizer=None)
         self._check_regressor(gpr, self._X, self._y_reg)
 
     def test_gpr_matern_nu05(self):
