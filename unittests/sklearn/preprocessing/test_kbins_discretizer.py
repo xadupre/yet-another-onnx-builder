@@ -11,9 +11,7 @@ from yobx.reference import ExtendedReferenceEvaluator
 @requires_sklearn("1.4")
 class TestKBinsDiscretizer(ExtTestCase):
     def _make_data(self):
-        return np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]], dtype=np.float32
-        )
+        return np.array([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]], dtype=np.float32)
 
     def test_ordinal_uniform(self):
         from sklearn.preprocessing import KBinsDiscretizer
@@ -104,9 +102,7 @@ class TestKBinsDiscretizer(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         X = self._make_data()
-        kbd = KBinsDiscretizer(
-            n_bins=[2, 4], encode="onehot-dense", strategy="uniform"
-        )
+        kbd = KBinsDiscretizer(n_bins=[2, 4], encode="onehot-dense", strategy="uniform")
         kbd.fit(X)
 
         onx = to_onnx(kbd, (X,))

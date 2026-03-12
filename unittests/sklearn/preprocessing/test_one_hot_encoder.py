@@ -125,9 +125,7 @@ class TestOneHotEncoder(ExtTestCase):
         from sklearn.linear_model import LogisticRegression
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[0.0, 1.0], [1.0, 0.0], [0.0, 0.0], [1.0, 1.0]], dtype=np.float32
-        )
+        X = np.array([[0.0, 1.0], [1.0, 0.0], [0.0, 0.0], [1.0, 1.0]], dtype=np.float32)
         y = np.array([0, 1, 0, 1])
         pipe = Pipeline(
             [

@@ -5,11 +5,12 @@ yobx.sklearn.preprocessing
     :maxdepth: 1
     :caption: modules
 
-    kbins_discretizer
     binarizer
+    kbins_discretizer
     min_max_scaler
     one_hot_encoder
-    robust_scaler
-    quantile_transformer
     polynomial_features
+    quantile_transformer
+    robust_scaler
+    spline_transformer
     standard_scaler

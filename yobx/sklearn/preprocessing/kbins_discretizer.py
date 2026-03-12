@@ -1,6 +1,6 @@
 import numpy as np
 import onnx
-from typing import Dict, List, Union
+from typing import Dict, List
 
 from sklearn.preprocessing import KBinsDiscretizer
 
@@ -113,9 +113,7 @@ def sklearn_kbins_discretizer(
     bin_indices = g.op.Min(bin_indices, max_idx, name=f"{name}_clip_hi")
 
     if encode == "ordinal":
-        res = g.op.Cast(
-            bin_indices, to=itype, name=f"{name}_cast_out", outputs=outputs
-        )
+        res = g.op.Cast(bin_indices, to=itype, name=f"{name}_cast_out", outputs=outputs)
         assert isinstance(res, str)
         if not sts:
             g.set_type_shape_unary_op(res, X)
@@ -151,9 +149,7 @@ def sklearn_kbins_discretizer(
     if len(one_hot_cols) == 1:
         res = g.op.Identity(one_hot_cols[0], name=f"{name}_identity", outputs=outputs)
     else:
-        res = g.op.Concat(
-            *one_hot_cols, axis=1, name=f"{name}_concat", outputs=outputs
-        )
+        res = g.op.Concat(*one_hot_cols, axis=1, name=f"{name}_concat", outputs=outputs)
     assert isinstance(res, str)
     if not sts:
         g.set_type(res, itype)

@@ -1,6 +1,5 @@
 from typing import Dict, List, Optional
 import numpy as np
-import onnx
 from sklearn.preprocessing import OneHotEncoder
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
@@ -99,9 +98,7 @@ def sklearn_one_hot_encoder(
         if drop_idx is not None and drop_idx[i] is not None:
             n_cats = len(cats)
             drop_col = int(drop_idx[i])
-            keep_indices = np.array(
-                [j for j in range(n_cats) if j != drop_col], dtype=np.int64
-            )
+            keep_indices = np.array([j for j in range(n_cats) if j != drop_col], dtype=np.int64)
             if len(keep_indices) == 0:
                 # All categories dropped for this feature – skip entirely.
                 continue

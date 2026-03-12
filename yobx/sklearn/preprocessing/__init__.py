@@ -7,5 +7,6 @@ def register():
         polynomial_features,
         quantile_transformer,
         robust_scaler,
+        spline_transformer,
         standard_scaler,
     )
