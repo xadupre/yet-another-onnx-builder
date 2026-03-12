@@ -10,7 +10,7 @@ that maintain code quality across the project.
 
 .. toctree::
    :maxdepth: 1
-   :capture: Libraries
+   :caption: Libraries
 
    sklearn/index
    tensorflow/index
@@ -18,7 +18,7 @@ that maintain code quality across the project.
 
 .. toctree::
    :maxdepth: 1
-   :capture: GraphBuilder and other classes
+   :caption: GraphBuilder and other classes
 
    builder/index
    misc/index
