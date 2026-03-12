@@ -90,7 +90,7 @@ def sklearn_one_hot_encoder(
         # ------------------------------------------------------------------
         # 3. Cast bool → float
         # ------------------------------------------------------------------
-        part: str = g.op.Cast(eq, to=float_onnx_type, name=f"{name}_cast_{i}")
+        part = g.op.Cast(eq, to=float_onnx_type, name=f"{name}_cast_{i}")
 
         # ------------------------------------------------------------------
         # 4. Apply drop: remove the column for the dropped category.

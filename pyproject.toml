@@ -164,6 +164,7 @@ module = [
     "yobx.reference.ops.*",
     "yobx.sklearn.calibration.*",
     "yobx.sklearn.ensemble.*",
+    "yobx.sklearn.gaussian_process.*",
     "yobx.sklearn.linear_model.*",
     "yobx.sklearn.lightgbm.*",
     "yobx.sklearn.multiclass.*",
