@@ -8,5 +8,6 @@ def register():
         power_transformer,
         quantile_transformer,
         robust_scaler,
+        spline_transformer,
         standard_scaler,
     )
