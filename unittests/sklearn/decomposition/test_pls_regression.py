@@ -66,6 +66,52 @@ class TestPLSRegression(ExtTestCase):
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
+    @requires_sklearn("1.8")
+    def test_pls_regression_single_target_float64(self):
+        from sklearn.cross_decomposition import PLSRegression
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(3)
+        X = rng.standard_normal((20, 4)).astype(np.float64)
+        y = rng.standard_normal(20).astype(np.float64)
+        pls = PLSRegression(n_components=2)
+        pls.fit(X, y)
+
+        onx = to_onnx(pls, (X,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X": X})[0]
+        expected = pls.predict(X).astype(np.float64)
+        self.assertEqual(expected.shape, result.shape)
+        self.assertEqualArray(expected, result, atol=1e-10)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-10)
+
+    @requires_sklearn("1.8")
+    def test_pls_regression_multi_target_float64(self):
+        from sklearn.cross_decomposition import PLSRegression
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(4)
+        X = rng.standard_normal((30, 5)).astype(np.float64)
+        y = rng.standard_normal((30, 3)).astype(np.float64)
+        pls = PLSRegression(n_components=3)
+        pls.fit(X, y)
+
+        onx = to_onnx(pls, (X,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X": X})[0]
+        expected = pls.predict(X).astype(np.float64)
+        self.assertEqual(expected.shape, result.shape)
+        self.assertEqualArray(expected, result, atol=1e-10)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-10)
+
     def test_pls_regression_in_pipeline(self):
         from sklearn.cross_decomposition import PLSRegression
         from sklearn.pipeline import Pipeline
