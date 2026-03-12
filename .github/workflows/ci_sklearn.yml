@@ -60,10 +60,13 @@ jobs:
               --ignore=unittests/xoptim/test_torch_untrained_models.py \
               --ignore=unittests/tensorflow \
               --ignore=unittests/torch \
-              --ignore unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py  # AttributeError: module 'torch' has no attribute 'Tensor'
+              --ignore unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py \
+              --ignore unittests/sklearn/ensemble/test_power_transformer.py  # AttributeError: module 'torch' has no attribute 'Tensor'
 
       - name: Run test_sklearn_hist_gradient_boosting_multiclass.py
-        run: python unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
+        run:|
+          python unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
+          python unittests/sklearn/ensemble/test_power_transformer.py
 
       - name: Upload coverage to Codecov
         if: matrix.sklearn-version == '1.8'
