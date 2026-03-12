@@ -25,6 +25,7 @@ yobx.sklearn
     linear_model/index
     mixture/index
     multiclass/index
+    multioutput/index
     naive_bayes/index
     neural_network/index
     neighbors/index
