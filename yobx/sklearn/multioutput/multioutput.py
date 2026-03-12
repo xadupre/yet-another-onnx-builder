@@ -70,9 +70,7 @@ def sklearn_multi_output_regressor(
 
     # Concatenate along axis 1: (N, 1) × n_targets → (N, n_targets)
     if len(per_target_preds) == 1:
-        predictions = g.op.Identity(
-            per_target_preds[0], name=f"{name}_pred", outputs=outputs[:1]
-        )
+        predictions = g.op.Identity(per_target_preds[0], name=f"{name}_pred", outputs=outputs[:1])
     else:
         predictions = g.op.Concat(
             *per_target_preds, axis=1, name=f"{name}_concat", outputs=outputs[:1]
@@ -118,8 +116,10 @@ def sklearn_multi_output_classifier(
 
         X ──[sub-est 0 converter]──► label_0 (N,) ──Cast(INT64)──Reshape(N,1)──┐
         X ──[sub-est 1 converter]──► label_1 (N,) ──Cast(INT64)──Reshape(N,1)──┤
-        ...                                                                      │
-                                                        Concat(axis=1) ─────────► labels (N, n_targets)
+        ...                                                                    │
+                         +-----------------------------------------------------+
+                         │
+        Concat(axis=1) ─────────► labels (N, n_targets)
 
     Graph structure (with probabilities, all targets same n_classes):
 
@@ -127,8 +127,10 @@ def sklearn_multi_output_classifier(
 
         X ──[sub-est 0 converter]──► proba_0 (N, n_cls) ──Unsqueeze──► (N,1,n_cls)──┐
         X ──[sub-est 1 converter]──► proba_1 (N, n_cls) ──Unsqueeze──► (N,1,n_cls)──┤
-        ...                                                                           │
-                                                           Concat(axis=1) ───────────► probabilities (N, n_targets, n_cls)
+        ...                                                                         │
+                              +-----------------------------------------------------+
+                              │
+            Concat(axis=1) ───────────► probabilities (N, n_targets, n_cls)
 
     :param g: the graph builder to add nodes to
     :param sts: shapes and types defined by :epkg:`scikit-learn`
@@ -201,9 +203,7 @@ def sklearn_multi_output_classifier(
 
         if all_integer:
             # Normalise to INT64 so all targets share the same label dtype.
-            label_typed = g.op.Cast(
-                sub_label, to=onnx.TensorProto.INT64, name=f"{sub_name}_cast"
-            )
+            label_typed = g.op.Cast(sub_label, to=onnx.TensorProto.INT64, name=f"{sub_name}_cast")
         else:
             label_typed = sub_label
 
@@ -217,9 +217,7 @@ def sklearn_multi_output_classifier(
 
     # Concatenate labels along axis 1: (N, 1) × n_targets → (N, n_targets)
     if len(per_target_labels) == 1:
-        labels = g.op.Identity(
-            per_target_labels[0], name=f"{name}_label", outputs=outputs[:1]
-        )
+        labels = g.op.Identity(per_target_labels[0], name=f"{name}_label", outputs=outputs[:1])
     else:
         labels = g.op.Concat(
             *per_target_labels, axis=1, name=f"{name}_label_concat", outputs=outputs[:1]
@@ -258,9 +256,7 @@ def sklearn_multi_output_classifier(
         unsqueezed.append(unsq)
 
     if len(unsqueezed) == 1:
-        probabilities = g.op.Identity(
-            unsqueezed[0], name=f"{name}_proba", outputs=outputs[1:]
-        )
+        probabilities = g.op.Identity(unsqueezed[0], name=f"{name}_proba", outputs=outputs[1:])
     else:
         probabilities = g.op.Concat(
             *unsqueezed, axis=1, name=f"{name}_proba_concat", outputs=outputs[1:]
