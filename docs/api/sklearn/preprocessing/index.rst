@@ -13,5 +13,6 @@ yobx.sklearn.preprocessing
     power_transformer
     quantile_transformer
     robust_scaler
+    simple_imputer
     spline_transformer
     standard_scaler
