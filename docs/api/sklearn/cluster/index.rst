@@ -5,4 +5,5 @@ yobx.sklearn.cluster
     :maxdepth: 1
     :caption: modules
 
+    affinity_propagation
     kmeans
