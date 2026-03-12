@@ -6,9 +6,11 @@ from onnx.reference.op_run import OpRun
 class Gather(OpRun):
     """Overrides the ONNX reference ``Gather`` op to ensure contiguous arrays.
 
-    ONNX ≥ 1.20 has a bug where ``indices.ascontiguousarray()`` is called instead
-    of ``np.ascontiguousarray(indices)``.  This override guards against that by
-    making both inputs contiguous before calling ``np.take``.
+    ONNX 1.20.x has a bug where ``indices.ascontiguousarray()`` is called instead
+    of ``np.ascontiguousarray(indices)``.  Non-contiguous index arrays (e.g. produced
+    by ``Split`` + ``Squeeze``) trigger an ``AttributeError`` in the upstream
+    implementation.  This override guards against that by making both inputs
+    contiguous before calling ``np.take``.
     """
 
     def _run(self, x, indices, axis=None):

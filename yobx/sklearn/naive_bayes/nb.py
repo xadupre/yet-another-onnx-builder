@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 import onnx
 from sklearn.naive_bayes import BernoulliNB, CategoricalNB, ComplementNB, GaussianNB, MultinomialNB
@@ -300,7 +300,7 @@ def sklearn_categorical_nb(
     X_int = g.op.Cast(X, to=onnx.TensorProto.INT64, name=f"{name}_cast_int")
 
     # Accumulate contributions from each feature
-    jll: str | None = None
+    jll: Optional[str] = None
     for f in range(n_features):
         # feature_log_prob_[f] shape: (C, n_categories[f])
         # Transpose to (n_categories[f], C) for row-wise Gather
