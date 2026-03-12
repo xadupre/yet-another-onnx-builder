@@ -7,4 +7,5 @@ yobx.sklearn.preprocessing
 
     binarizer
     min_max_scaler
+    polynomial_features
     standard_scaler
