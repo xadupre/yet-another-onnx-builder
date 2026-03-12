@@ -10,6 +10,7 @@ yobx.tensorflow.ops
     conv
     element_wise
     math_ops
+    nn_ops
     unary_ops
     const
     matmul

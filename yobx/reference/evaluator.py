@@ -21,6 +21,7 @@ from .ops.op__extended_scatternd_of_shape import MaskedScatterNDOfShape, Scatter
 from .ops.op__extended_transpose_cast import Transpose2DCastFP16, Transpose2DCastFP32
 from .ops.op__extended_tri_matrix import TriMatrix
 from .ops.op__overwrite_gather_elements import GatherElements
+from .ops.op__overwrite_gather import Gather
 from .ops.op__overwrite_scatter_elements import ScatterElements
 from .ops.op_attention import Attention
 from .ops.op_bias_softmax import BiasSoftmax
@@ -152,6 +153,7 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
 
     default_ops: List[type[OpRun]] = [
         # overwritten
+        Gather,
         GatherElements,
         ScatterElements,
         # com.microsoft
