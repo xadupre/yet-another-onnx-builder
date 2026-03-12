@@ -61,6 +61,11 @@ class ShapedBasedReshapePattern(ReshapePattern):
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c'])
             C[Constant <br/> value: 0, 0, -1]
@@ -73,21 +78,26 @@ class ShapedBasedReshapePattern(ReshapePattern):
             R --> xrr
 
             %% Styling
-            style C fill:#f9f,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style xrr fill:#dfd
+            class C constNode
+            class R opNode
+            class X ioNode
+            class xrr ioNode
 
     Outcome of the fusion:
 
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             X[Input: X] --> ID[Identity]
             S[Input: shape2] -.->|Invalid?| ID
             ID --> xrr[Output: xrr]
 
-            style ID fill:#f9f,stroke:#333,stroke-width:2px
+            class ID constNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -124,6 +134,11 @@ class ReduceReshapePattern(PatternOptimization):
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 3, 2])
             C[Constant <br/> value: 3]
@@ -139,18 +154,23 @@ class ReduceReshapePattern(PatternOptimization):
             R --> Y
 
             %% Styling
-            style C fill:#f9f,stroke:#333,stroke-width:2px
-            style RS fill:#bbf,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style Y fill:#dfd
-            style xr fill:#eee,stroke:#999
+            class C constNode
+            class RS opNode
+            class R opNode
+            class X ioNode
+            class Y ioNode
+            class xr interNode
 
     Outcome of the fusion:
 
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 3, 2])
             RS[[ReduceSum <br/> axes=1, keepdims=0]]
@@ -161,9 +181,9 @@ class ReduceReshapePattern(PatternOptimization):
             RS --> Y
 
             %% Styling
-            style RS fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style Y fill:#dfd
+            class RS opNode
+            class X ioNode
+            class Y ioNode
     """
 
     def match(
@@ -258,6 +278,11 @@ class ReshapeReshapePattern(PatternOptimization):
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 128])
             C1[Constant <br/> value: 4096, 7, 7, 128]
@@ -275,19 +300,24 @@ class ReshapeReshapePattern(PatternOptimization):
             R2 --> s2
 
             %% Styling
-            style C1 fill:#f9f,stroke:#333,stroke-width:2px
-            style C2 fill:#f9f,stroke:#333,stroke-width:2px
-            style R1 fill:#bbf,stroke:#333,stroke-width:2px
-            style R2 fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style s2 fill:#dfd
-            style s1 fill:#eee,stroke:#999
+            class C1 constNode
+            class C2 constNode
+            class R1 opNode
+            class R2 opNode
+            class X ioNode
+            class s2 ioNode
+            class s1 interNode
 
     Outcome of the fusion:
 
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 128])
             C2[Constant <br/> value: 4096, 49, 128]
@@ -300,10 +330,10 @@ class ReshapeReshapePattern(PatternOptimization):
             R --> s2
 
             %% Styling
-            style C2 fill:#f9f,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style s2 fill:#dfd
+            class C2 constNode
+            class R opNode
+            class X ioNode
+            class s2 ioNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -559,6 +589,11 @@ class Reshape2Of3Pattern(PatternOptimization):
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 2, 3, 4])
             Y([Input: Y <br/> float, 2, 3, 4])
@@ -588,26 +623,31 @@ class Reshape2Of3Pattern(PatternOptimization):
             xrr_int --> xrr
 
             %% Styling
-            style C1 fill:#f9f,stroke:#333,stroke-width:2px
-            style C2 fill:#f9f,stroke:#333,stroke-width:2px
-            style C3 fill:#f9f,stroke:#333,stroke-width:2px
-            style R1 fill:#bbf,stroke:#333,stroke-width:2px
-            style R2 fill:#bbf,stroke:#333,stroke-width:2px
-            style R3 fill:#bbf,stroke:#333,stroke-width:2px
-            style M fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style Y fill:#dfd
-            style xrr fill:#dfd
-            style Z fill:#dfd
-            style xr fill:#eee,stroke:#999
-            style yr fill:#eee,stroke:#999
-            style xrr_int fill:#eee,stroke:#999
+            class C1 constNode
+            class C2 constNode
+            class C3 constNode
+            class R1 opNode
+            class R2 opNode
+            class R3 opNode
+            class M opNode
+            class X ioNode
+            class Y ioNode
+            class xrr ioNode
+            class Z ioNode
+            class xr interNode
+            class yr interNode
+            class xrr_int interNode
 
     Outcome of the fusion:
 
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 2, 3, 4])
             Y([Input: Y <br/> float, 2, 3, 4])
@@ -627,14 +667,14 @@ class Reshape2Of3Pattern(PatternOptimization):
             R --> xrr
 
             %% Styling
-            style C2 fill:#f9f,stroke:#333,stroke-width:2px
-            style M fill:#bbf,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style Y fill:#dfd
-            style xrr fill:#dfd
-            style Z fill:#dfd
-            style z_int fill:#eee,stroke:#999
+            class C2 constNode
+            class M opNode
+            class R opNode
+            class X ioNode
+            class Y ioNode
+            class xrr ioNode
+            class Z ioNode
+            class z_int interNode
     """
 
     _op_types = element_wise_binary_op_types()
@@ -828,6 +868,11 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 'a', 4])
             Y([Input: Y <br/> float, 'a', 4])
@@ -850,22 +895,27 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
             A --> Z
 
             %% Styling
-            style C1 fill:#f9f,stroke:#333,stroke-width:2px
-            style C2 fill:#f9f,stroke:#333,stroke-width:2px
-            style R1 fill:#bbf,stroke:#333,stroke-width:2px
-            style R2 fill:#bbf,stroke:#333,stroke-width:2px
-            style A fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style Y fill:#dfd
-            style Z fill:#dfd
-            style xc fill:#eee,stroke:#999
-            style yc fill:#eee,stroke:#999
+            class C1 constNode
+            class C2 constNode
+            class R1 opNode
+            class R2 opNode
+            class A opNode
+            class X ioNode
+            class Y ioNode
+            class Z ioNode
+            class xc interNode
+            class yc interNode
 
     Outcome of the fusion:
 
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 'a', 4])
             Y([Input: Y <br/> float, 'a', 4])
@@ -883,13 +933,13 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
             R --> Z
 
             %% Styling
-            style C1 fill:#f9f,stroke:#333,stroke-width:2px
-            style A fill:#bbf,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style Y fill:#dfd
-            style Z fill:#dfd
-            style add_out fill:#eee,stroke:#999
+            class C1 constNode
+            class A opNode
+            class R opNode
+            class X ioNode
+            class Y ioNode
+            class Z ioNode
+            class add_out interNode
     """
 
     _op_types = element_wise_binary_op_types()
@@ -965,6 +1015,11 @@ class ConcatReshapePattern(PatternOptimization):
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c', 'd'])
             I1([Input: I1 <br/> int64, 1])
@@ -990,23 +1045,28 @@ class ConcatReshapePattern(PatternOptimization):
             R --> Y
 
             %% Styling
-            style SH1 fill:#bbf,stroke:#333,stroke-width:2px
-            style SH2 fill:#bbf,stroke:#333,stroke-width:2px
-            style CC fill:#bbf,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style I1 fill:#dfd
-            style I2 fill:#dfd
-            style Y fill:#dfd
-            style D1 fill:#eee,stroke:#999
-            style D2 fill:#eee,stroke:#999
-            style d fill:#eee,stroke:#999
+            class SH1 opNode
+            class SH2 opNode
+            class CC opNode
+            class R opNode
+            class X ioNode
+            class I1 ioNode
+            class I2 ioNode
+            class Y ioNode
+            class D1 interNode
+            class D2 interNode
+            class d interNode
 
     Outcome of the fusion:
 
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c', 'd'])
             I1([Input: I1 <br/> int64, 1])
@@ -1028,15 +1088,15 @@ class ConcatReshapePattern(PatternOptimization):
             R --> Y
 
             %% Styling
-            style CM1 fill:#f9f,stroke:#333,stroke-width:2px
-            style CC fill:#bbf,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style I1 fill:#dfd
-            style I2 fill:#dfd
-            style D1 fill:#dfd
-            style Y fill:#dfd
-            style d_concat fill:#eee,stroke:#999
+            class CM1 constNode
+            class CC opNode
+            class R opNode
+            class X ioNode
+            class I1 ioNode
+            class I2 ioNode
+            class D1 ioNode
+            class Y ioNode
+            class d_concat interNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1155,6 +1215,11 @@ class StaticConcatReshapePattern(PatternOptimization):
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             I1([Input: I1 <br/> int64, 1])
@@ -1174,20 +1239,25 @@ class StaticConcatReshapePattern(PatternOptimization):
             R --> Y
 
             %% Styling
-            style SH fill:#bbf,stroke:#333,stroke-width:2px
-            style CC fill:#bbf,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style I1 fill:#dfd
-            style Y fill:#dfd
-            style D2 fill:#eee,stroke:#999
-            style dc fill:#eee,stroke:#999
+            class SH opNode
+            class CC opNode
+            class R opNode
+            class X ioNode
+            class I1 ioNode
+            class Y ioNode
+            class D2 interNode
+            class dc interNode
 
     Outcome of the fusion:
 
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             I1([Input: I1 <br/> int64, 1])
@@ -1205,13 +1275,13 @@ class StaticConcatReshapePattern(PatternOptimization):
             R --> Y
 
             %% Styling
-            style CM1 fill:#f9f,stroke:#333,stroke-width:2px
-            style CC fill:#bbf,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style I1 fill:#dfd
-            style Y fill:#dfd
-            style d_concat fill:#eee,stroke:#999
+            class CM1 constNode
+            class CC opNode
+            class R opNode
+            class X ioNode
+            class I1 ioNode
+            class Y ioNode
+            class d_concat interNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1316,6 +1386,11 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             I1[Initializer <br/> value: -1]
@@ -1335,20 +1410,25 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
             R --> Y
 
             %% Styling
-            style I1 fill:#f9f,stroke:#333,stroke-width:2px
-            style SH fill:#bbf,stroke:#333,stroke-width:2px
-            style CC fill:#bbf,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style Y fill:#dfd
-            style D2 fill:#eee,stroke:#999
-            style dshape fill:#eee,stroke:#999
+            class I1 constNode
+            class SH opNode
+            class CC opNode
+            class R opNode
+            class X ioNode
+            class Y ioNode
+            class D2 interNode
+            class dshape interNode
 
     Outcome of the fusion:
 
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             C[Constant <br/> value: 6, -1]
@@ -1361,10 +1441,10 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
             R --> Y
 
             %% Styling
-            style C fill:#f9f,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style Y fill:#dfd
+            class C constNode
+            class R opNode
+            class X ioNode
+            class Y ioNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1542,6 +1622,11 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             one[Initializer <br/> value: 1]
@@ -1562,20 +1647,25 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
             R --> Y
 
             %% Styling
-            style one fill:#f9f,stroke:#333,stroke-width:2px
-            style SH fill:#bbf,stroke:#333,stroke-width:2px
-            style CC fill:#bbf,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style Y fill:#dfd
-            style D2 fill:#eee,stroke:#999
-            style dshape2 fill:#eee,stroke:#999
+            class one constNode
+            class SH opNode
+            class CC opNode
+            class R opNode
+            class X ioNode
+            class Y ioNode
+            class D2 interNode
+            class dshape2 interNode
 
     Outcome of the fusion:
 
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             C[Constant <br/> value: 0, 4]
@@ -1588,10 +1678,10 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
             U --> Y
 
             %% Styling
-            style C fill:#f9f,stroke:#333,stroke-width:2px
-            style U fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style Y fill:#dfd
+            class C constNode
+            class U opNode
+            class X ioNode
+            class Y ioNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1694,6 +1784,11 @@ class UnsqueezeReshapePattern(PatternOptimization):
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c'])
             C1[Constant <br/> value: 2]
@@ -1711,19 +1806,24 @@ class UnsqueezeReshapePattern(PatternOptimization):
             R --> Z
 
             %% Styling
-            style C1 fill:#f9f,stroke:#333,stroke-width:2px
-            style C2 fill:#f9f,stroke:#333,stroke-width:2px
-            style U fill:#bbf,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style Z fill:#dfd
-            style xu0 fill:#eee,stroke:#999
+            class C1 constNode
+            class C2 constNode
+            class U opNode
+            class R opNode
+            class X ioNode
+            class Z ioNode
+            class xu0 interNode
 
     Outcome of the fusion:
 
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c'])
             C[Constant <br/> value: 1]
@@ -1736,10 +1836,10 @@ class UnsqueezeReshapePattern(PatternOptimization):
             U --> Z
 
             %% Styling
-            style C fill:#f9f,stroke:#333,stroke-width:2px
-            style U fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style Z fill:#dfd
+            class C constNode
+            class U opNode
+            class X ioNode
+            class Z ioNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1817,6 +1917,11 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 'a', 8, 16])
             S3([Input: shape3 <br/> int64, 2])
@@ -1834,19 +1939,24 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
             R --> Z
 
             %% Styling
-            style C fill:#f9f,stroke:#333,stroke-width:2px
-            style U fill:#bbf,stroke:#333,stroke-width:2px
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style S3 fill:#dfd
-            style Z fill:#dfd
-            style xu0 fill:#eee,stroke:#999
+            class C constNode
+            class U opNode
+            class R opNode
+            class X ioNode
+            class S3 ioNode
+            class Z ioNode
+            class xu0 interNode
 
     Outcome of the fusion:
 
     .. mermaid::
 
         graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
+            classDef ioNode fill:#dfd,stroke:#333
+            classDef interNode fill:#eee,stroke:#999
             %% Nodes
             X([Input: X <br/> float, 'a', 8, 16])
             S3([Input: shape3 <br/> int64, 2])
@@ -1859,10 +1969,10 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
             R --> Z
 
             %% Styling
-            style R fill:#bbf,stroke:#333,stroke-width:2px
-            style X fill:#dfd
-            style S3 fill:#dfd
-            style Z fill:#dfd
+            class R opNode
+            class X ioNode
+            class S3 ioNode
+            class Z ioNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
