@@ -8,6 +8,7 @@ yobx.sklearn
     convert
     register
     sklearn_helper
+    tests_helper
 
 .. toctree::
     :maxdepth: 1
