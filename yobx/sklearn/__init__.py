@@ -1,5 +1,7 @@
 from .convert import to_onnx
 
+__all__ = ["to_onnx"]
+
 
 def register_sklearn_converters():
     """Registers all converters implemented in this package."""

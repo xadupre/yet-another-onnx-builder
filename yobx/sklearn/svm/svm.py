@@ -146,7 +146,7 @@ def sklearn_svc(
     )
 
     if isinstance(result, (list, tuple)):
-        label, proba = result[0], result[1]
+        label, proba = result[0], result[1]  # type: ignore
     else:
         label = result
         proba = node_outputs[1]

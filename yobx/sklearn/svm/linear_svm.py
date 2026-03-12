@@ -114,7 +114,7 @@ def sklearn_linear_svc(
         label_idx_raw = g.op.ArgMax(decision, axis=1, keepdims=0, name=f"{name}_argmax")
         label_idx = g.op.Cast(label_idx_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast")
 
-    return _build_label(g, classes, label_idx, name, outputs, sts)
+    return _build_label(g, classes, label_idx, name, outputs, sts)  # type: ignore
 
 
 @register_sklearn_converter(LinearSVR)
