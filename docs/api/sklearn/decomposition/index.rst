@@ -8,3 +8,4 @@ yobx.sklearn.decomposition
     gaussian_random_projection
     pca
     pls_regression
+    truncated_svd
