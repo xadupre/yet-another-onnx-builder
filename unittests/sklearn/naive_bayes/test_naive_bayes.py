@@ -4,7 +4,13 @@ Unit tests for sklearn Naive Bayes converters.
 
 import unittest
 import numpy as np
-from sklearn.naive_bayes import BernoulliNB, CategoricalNB, ComplementNB, GaussianNB, MultinomialNB
+from sklearn.naive_bayes import (
+    BernoulliNB,
+    CategoricalNB,
+    ComplementNB,
+    GaussianNB,
+    MultinomialNB,
+)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
@@ -181,7 +187,6 @@ class TestSklearnNaiveBayes(ExtTestCase):
 
             sess = self.check_ort(onx)
             self.assertEqualArray(pipe.predict(Xd), sess.run(None, {"X": Xd})[0])
-
 
     # ── CategoricalNB ─────────────────────────────────────────────────────────
 

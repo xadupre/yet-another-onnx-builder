@@ -43,7 +43,9 @@ def sklearn_categorical_nb(
     :param name: prefix for added node names
     :return: tuple ``(label_result_name, proba_result_name)``
     """
-    assert isinstance(estimator, CategoricalNB), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(
+        estimator, CategoricalNB
+    ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
@@ -75,11 +77,11 @@ def sklearn_categorical_nb(
         contrib = g.op.Gather(table, X_f, axis=0, name=f"{name}_contrib_{f}")
 
         if jll is None:
-            jll = contrib
+            jll = contrib  # type: ignore
         else:
-            jll = g.op.Add(jll, contrib, name=f"{name}_add_{f}")
+            jll = g.op.Add(jll, contrib, name=f"{name}_add_{f}")  # type: ignore
 
     # Add class log-prior
-    jll = g.op.Add(jll, class_log_prior, name=f"{name}_jll")
+    jll = g.op.Add(jll, class_log_prior, name=f"{name}_jll")  # type: ignore
 
     return _emit_label_and_proba(g, sts, jll, estimator.classes_, dtype, name, outputs, itype)  # type: ignore

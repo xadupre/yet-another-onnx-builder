@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 import numpy as np
 import onnx
 from sklearn.naive_bayes import BernoulliNB, ComplementNB, GaussianNB, MultinomialNB
