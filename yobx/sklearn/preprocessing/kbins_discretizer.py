@@ -157,4 +157,10 @@ def sklearn_kbins_discretizer(
     assert isinstance(res, str)
     if not sts:
         g.set_type(res, itype)
+        total_bins = int(n_bins.sum())
+        if g.has_shape(X):
+            shape = g.get_shape(X)
+            g.set_shape(res, (shape[0], total_bins))
+        elif g.has_rank(X):
+            g.set_rank(res, 2)
     return res
