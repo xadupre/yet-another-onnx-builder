@@ -1,7 +1,7 @@
 import contextlib
 import inspect
 import time
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Generator, Sequence
 import onnx
 import torch
 import torch.utils._pytree as pytree
@@ -1054,7 +1054,7 @@ class InputObserver:
         model: torch.nn.Module,
         store_n_calls: int = 3,
         method_name: str = "forward",
-    ):
+    ) -> Generator:
         """Starts collecting inputs and outputs of a specific method.
         The model method is replaced by a new one collecting tensors
         before and after the inner one is called.
