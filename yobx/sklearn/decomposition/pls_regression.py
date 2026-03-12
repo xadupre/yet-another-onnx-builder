@@ -70,4 +70,16 @@ def sklearn_pls_regression(
     assert isinstance(res, str)
     if not sts:
         g.set_type(res, itype)
+        if g.has_shape(X):
+            batch_dim = g.get_shape(X)[0]
+            if estimator._predict_1d:
+                g.set_shape(res, (batch_dim,))
+            else:
+                n_targets = estimator.coef_.shape[0]
+                g.set_shape(res, (batch_dim, n_targets))
+        elif g.has_rank(X):
+            if estimator._predict_1d:
+                g.set_rank(res, 1)
+            else:
+                g.set_rank(res, 2)
     return res
