@@ -6,4 +6,5 @@ yobx.sklearn.preprocessing
     :caption: modules
 
     min_max_scaler
+    polynomial_features
     standard_scaler
