@@ -1,5 +1,4 @@
 from typing import Dict, List
-import numpy as np
 from sklearn.neural_network import BernoulliRBM
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
