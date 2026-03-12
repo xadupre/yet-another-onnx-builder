@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import onnx
@@ -348,9 +348,9 @@ def sklearn_calibrated_classifier_cv(
         ``intercept_`` (e.g. :class:`~sklearn.svm.SVC` without
         ``probability=True``)
     """
-    assert isinstance(estimator, CalibratedClassifierCV), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(
+        estimator, CalibratedClassifierCV
+    ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
@@ -420,9 +420,7 @@ def sklearn_calibrated_classifier_cv(
                 keepdims=1,
                 name=f"{fold_name}_row_sum",
             )  # (N, 1)
-            fold_proba = g.op.Div(
-                fold_proba_unnorm, row_sum, name=f"{fold_name}_norm"
-            )  # (N, C)
+            fold_proba = g.op.Div(fold_proba_unnorm, row_sum, name=f"{fold_name}_norm")  # (N, C)
 
         # Unsqueeze to (1, N, C) for stacking across folds.
         fold_proba_3d = g.op.Unsqueeze(
@@ -436,9 +434,7 @@ def sklearn_calibrated_classifier_cv(
             fold_probas[0], np.array([0], dtype=np.int64), name=f"{name}_squeeze_single"
         )  # (N, C)
     else:
-        stacked = g.op.Concat(
-            *fold_probas, axis=0, name=f"{name}_stack_folds"
-        )  # (K, N, C)
+        stacked = g.op.Concat(*fold_probas, axis=0, name=f"{name}_stack_folds")  # (K, N, C)
         avg_proba = g.op.ReduceMean(
             stacked,
             np.array([0], dtype=np.int64),
@@ -448,9 +444,7 @@ def sklearn_calibrated_classifier_cv(
 
     # Derive predicted class labels from the averaged probabilities.
     label_idx_raw = g.op.ArgMax(avg_proba, axis=1, keepdims=0, name=f"{name}_argmax")
-    label_idx = g.op.Cast(
-        label_idx_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast_idx"
-    )
+    label_idx = g.op.Cast(label_idx_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast_idx")
 
     if np.issubdtype(classes.dtype, np.integer):
         classes_arr = classes.astype(np.int64)

@@ -151,8 +151,8 @@ def sklearn_spline_transformer(
         x_col = g.op.Gather(X, col_idx, axis=1, name=f"{feat_name}_col")
 
         # ── Step 2: handle extrapolation ──────────────────────────────────────
-        xmin = float(t[feat_degree])           # left boundary of B-spline support
-        xmax = float(t[-feat_degree - 1])      # right boundary of B-spline support
+        xmin = float(t[feat_degree])  # left boundary of B-spline support
+        xmax = float(t[-feat_degree - 1])  # right boundary of B-spline support
 
         if estimator.extrapolation == "constant":
             x_eff = g.op.Clip(
@@ -234,16 +234,10 @@ def sklearn_spline_transformer(
     if not estimator.include_bias:
         # The last column of each feature's n_splines block is removed.
         keep_cols = np.array(
-            [
-                i
-                for i in range(n_features * n_splines)
-                if (i + 1) % n_splines != 0
-            ],
+            [i for i in range(n_features * n_splines) if (i + 1) % n_splines != 0],
             dtype=np.int64,
         )
-        res = g.op.Gather(
-            full_dm, keep_cols, axis=1, name=name, outputs=outputs
-        )
+        res = g.op.Gather(full_dm, keep_cols, axis=1, name=name, outputs=outputs)
     else:
         res = g.op.Identity(full_dm, name=name, outputs=outputs)
 

@@ -6,8 +6,11 @@ yobx.sklearn.preprocessing
     :caption: modules
 
     binarizer
+    kbins_discretizer
     min_max_scaler
-    spline_transformer
-    quantile_transformer
+    one_hot_encoder
     polynomial_features
+    quantile_transformer
+    robust_scaler
+    spline_transformer
     standard_scaler

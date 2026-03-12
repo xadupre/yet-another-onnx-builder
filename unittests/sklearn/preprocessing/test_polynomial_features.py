@@ -142,9 +142,7 @@ class TestPolynomialFeatures(ExtTestCase):
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
-        pipe = Pipeline(
-            [("poly", PolynomialFeatures(degree=2)), ("lr", LinearRegression())]
-        )
+        pipe = Pipeline([("poly", PolynomialFeatures(degree=2)), ("lr", LinearRegression())])
         pipe.fit(X, y)
 
         onx = to_onnx(pipe, (X,))

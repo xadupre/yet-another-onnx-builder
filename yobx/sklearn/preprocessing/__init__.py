@@ -1,2 +1,12 @@
 def register():
-    from . import binarizer, min_max_scaler, spline_transformer, quantile_transformer, standard_scaler, polynomial_features
+    from . import (
+        binarizer,
+        kbins_discretizer,
+        min_max_scaler,
+        one_hot_encoder,
+        polynomial_features,
+        quantile_transformer,
+        robust_scaler,
+        spline_transformer,
+        standard_scaler,
+    )
