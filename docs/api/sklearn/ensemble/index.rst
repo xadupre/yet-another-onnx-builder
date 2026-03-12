@@ -5,6 +5,8 @@ yobx.sklearn.ensemble
     :maxdepth: 1
     :caption: modules
 
+    adaboost
+    bagging
     gradient_boosting
     hist_gradient_boosting
     random_forest
