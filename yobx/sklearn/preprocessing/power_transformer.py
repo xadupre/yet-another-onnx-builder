@@ -35,8 +35,8 @@ def _yeo_johnson_transform(
     lam_safe_pos = np.where(lambdas == 0, ones, lambdas)
     lam_safe_neg = np.where(lambdas == 2, ones, 2.0 - lambdas)
 
-    lam_is_zero = (lambdas == 0)  # bool array: selects log branch for positive side
-    lam_is_two = (lambdas == 2)  # bool array: selects log branch for negative side
+    lam_is_zero = lambdas == 0  # bool array: selects log branch for positive side
+    lam_is_two = lambdas == 2  # bool array: selects log branch for negative side
 
     # ── Positive branch  (y >= 0) ────────────────────────────────────────────
     x_p1 = g.op.Add(X, ones, name=f"{name}_xp1")
@@ -90,7 +90,7 @@ def _box_cox_transform(
 
     lam_safe = np.where(lambdas == 0, ones, lambdas)
     # bool array passed to Where; the graph builder converts it to an ONNX constant
-    lam_is_zero = (lambdas == 0)
+    lam_is_zero = lambdas == 0
 
     pow_result = g.op.Pow(X, lam_safe, name=f"{name}_pow")
     power_result = g.op.Div(

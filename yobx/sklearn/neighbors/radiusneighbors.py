@@ -162,9 +162,7 @@ def sklearn_radius_neighbors_classifier(
     else:
         classes_init = classes_arr
 
-    predicted_label = g.op.Gather(
-        classes_init, class_idx, axis=0, name=f"{name}_pred"
-    )
+    predicted_label = g.op.Gather(classes_init, class_idx, axis=0, name=f"{name}_pred")
 
     # 9. Handle outlier points (no neighbour within radius)
     #    outlier_label_ is a list [label] or None when outlier_label=None.
@@ -196,9 +194,7 @@ def sklearn_radius_neighbors_classifier(
             outputs=outputs[:1],
         )
     else:
-        labels = g.op.Identity(
-            predicted_label, name=f"{name}_labels", outputs=outputs[:1]
-        )
+        labels = g.op.Identity(predicted_label, name=f"{name}_labels", outputs=outputs[:1])
 
     assert isinstance(labels, str)
     if not sts:
@@ -219,9 +215,7 @@ def sklearn_radius_neighbors_classifier(
             name=f"{name}_total",
         )  # (N, 1) float32
         # Clamp denominator to 1 to avoid NaN for outlier points (total == 0)
-        safe_total = g.op.Max(
-            total, np.array([1.0], dtype=np.float32), name=f"{name}_safe_total"
-        )
+        safe_total = g.op.Max(total, np.array([1.0], dtype=np.float32), name=f"{name}_safe_total")
         probabilities = g.op.Div(
             vote_counts,
             safe_total,
@@ -319,9 +313,7 @@ def sklearn_radius_neighbors_regressor(
     metric = estimator.effective_metric_
     metric_params = estimator.effective_metric_params_
 
-    training_targets = (raw_y.ravel() if raw_y.ndim == 1 else raw_y[:, 0]).astype(
-        dtype
-    )  # (M,)
+    training_targets = (raw_y.ravel() if raw_y.ndim == 1 else raw_y[:, 0]).astype(dtype)  # (M,)
 
     # 1. Pairwise distances: (N, M)
     dists = _compute_pairwise_distances(

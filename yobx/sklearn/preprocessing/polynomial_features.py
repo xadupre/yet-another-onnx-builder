@@ -69,7 +69,7 @@ def sklearn_polynomial_features(
     powers_3d = powers.reshape(1, n_output_features, n_features_in).astype(dtype)
 
     # Boolean mask: True where exponent == 0. Stored as a constant initializer.
-    zero_mask_3d = (powers.reshape(1, n_output_features, n_features_in) == 0)
+    zero_mask_3d = powers.reshape(1, n_output_features, n_features_in) == 0
 
     # 1. Expand X from (N, F) → (N, 1, F)
     x_3d = g.op.Unsqueeze(X, np.array([1], dtype=np.int64), name=f"{name}_unsq")

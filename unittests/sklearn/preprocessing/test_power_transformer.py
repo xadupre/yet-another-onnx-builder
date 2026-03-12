@@ -103,9 +103,7 @@ class TestPowerTransformer(ExtTestCase):
 
         X = self._make_data(n=40)
         y = (X[:, 0] > 0).astype(np.int64)
-        pipe = Pipeline(
-            [("pt", PowerTransformer()), ("clf", LogisticRegression())]
-        ).fit(X, y)
+        pipe = Pipeline([("pt", PowerTransformer()), ("clf", LogisticRegression())]).fit(X, y)
 
         onx = to_onnx(pipe, (X,))
 
