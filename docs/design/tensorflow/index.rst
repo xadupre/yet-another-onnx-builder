@@ -76,6 +76,78 @@ Quick example
     X = np.random.rand(5, 4).astype(np.float32)
     onx = to_onnx(model, (X,))
 
+Using ``tf.math`` ops
+=====================
+
+``tf.math`` functions are fully supported.  They translate to their ONNX
+equivalents automatically:
+
+.. code-block:: python
+
+    import numpy as np
+    import tensorflow as tf
+    from yobx.tensorflow import to_onnx
+
+    x = np.random.rand(4, 8).astype(np.float32)
+
+    @tf.function
+    def model(t):
+        # Reductions
+        s = tf.math.reduce_sum(t, axis=1)          # → ReduceSum
+        m = tf.math.reduce_mean(t, axis=1)          # → ReduceMean
+        # Special functions
+        e = tf.math.erf(s)                          # → Erf
+        lp = tf.math.log1p(tf.math.abs(m))          # → Log(Add(|m|, 1))
+        # Hyperbolic
+        h = tf.math.acosh(tf.math.abs(s) + 1.0)    # → Acosh
+        return e + lp + h
+
+    onx = to_onnx(model, (x,))
+
+The following ``tf.math`` ops are handled out of the box:
+
++-----------------------------+----------------------------------------------+
+| ``tf.math`` function        | ONNX mapping                                 |
++=============================+==============================================+
+| ``acosh`` / ``asinh``       | ``Acosh`` / ``Asinh``                        |
+| / ``atanh``                 | / ``Atanh``                                  |
++-----------------------------+----------------------------------------------+
+| ``erf``                     | ``Erf``                                      |
++-----------------------------+----------------------------------------------+
+| ``erfc``                    | ``Sub(1, Erf(x))``                           |
++-----------------------------+----------------------------------------------+
+| ``log1p``                   | ``Log(Add(x, 1))``                           |
++-----------------------------+----------------------------------------------+
+| ``expm1``                   | ``Sub(Exp(x), 1)``                           |
++-----------------------------+----------------------------------------------+
+| ``softplus`` / ``softsign`` | ``Softplus`` / ``Softsign``                  |
++-----------------------------+----------------------------------------------+
+| ``rint``                    | ``Round``                                    |
++-----------------------------+----------------------------------------------+
+| ``reduce_sum``              | ``ReduceSum``                                |
++-----------------------------+----------------------------------------------+
+| ``reduce_max``              | ``ReduceMax``                                |
++-----------------------------+----------------------------------------------+
+| ``reduce_min``              | ``ReduceMin``                                |
++-----------------------------+----------------------------------------------+
+| ``reduce_mean``             | ``ReduceMean``                               |
++-----------------------------+----------------------------------------------+
+| ``reduce_prod``             | ``ReduceProd``                               |
++-----------------------------+----------------------------------------------+
+| ``cumsum``                  | ``CumSum`` (``exclusive`` / ``reverse``      |
+|                             | attrs forwarded)                             |
++-----------------------------+----------------------------------------------+
+| ``argmax`` / ``argmin``     | ``ArgMax`` / ``ArgMin``                      |
++-----------------------------+----------------------------------------------+
+| ``top_k``                   | ``TopK``                                     |
++-----------------------------+----------------------------------------------+
+| ``is_nan``                  | ``IsNaN``                                    |
++-----------------------------+----------------------------------------------+
+| ``is_inf``                  | ``IsInf``                                    |
++-----------------------------+----------------------------------------------+
+| ``is_finite``               | ``Not(Or(IsNaN(x), IsInf(x)))``              |
++-----------------------------+----------------------------------------------+
+
 
 Converter registry
 ==================
@@ -211,6 +283,7 @@ To extend the built-in op coverage:
 
     # yobx/tensorflow/ops/reduce.py
     import numpy as np
+    from onnx import TensorProto
     from ..register import register_tf_op_converter
     from ...xbuilder import GraphBuilder
 
@@ -218,8 +291,10 @@ To extend the built-in op coverage:
     @register_tf_op_converter("Sum")
     def convert_reduce_sum(g: GraphBuilder, sts: dict, outputs: list, op) -> str:
         """TF ``Sum`` → ONNX ``ReduceSum``."""
-        axes = op.inputs[1].name  # axis tensor
         keepdims = int(op.get_attr("keep_dims"))
+        # TF may pass a 0-D scalar for single-axis reductions; ONNX requires 1-D.
+        axes_i64 = g.op.Cast(op.inputs[1].name, to=TensorProto.INT64, name=f"{op.name}_cast")
+        axes = g.op.Reshape(axes_i64, np.array([-1], dtype=np.int64), name=f"{op.name}_axes")
         return g.op.ReduceSum(
             op.inputs[0].name, axes, keepdims=keepdims, outputs=outputs, name=op.name
         )
