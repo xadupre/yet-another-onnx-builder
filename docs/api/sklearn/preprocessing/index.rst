@@ -7,4 +7,5 @@ yobx.sklearn.preprocessing
 
     min_max_scaler
     quantile_transformer
+    polynomial_features
     standard_scaler

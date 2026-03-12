@@ -1,2 +1,2 @@
 def register():
-    from . import min_max_scaler, quantile_transformer, standard_scaler
+    from . import min_max_scaler, quantile_transformer, standard_scaler, polynomial_features
