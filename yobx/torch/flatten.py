@@ -1,7 +1,7 @@
 import contextlib
 import pprint
 import re
-from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple
 import optree
 import torch.utils._pytree as pytree
 from ..helpers import string_type
@@ -264,7 +264,7 @@ def unregister_cache_flattening(undo: Dict[type, bool], verbose: int = 0):
 @contextlib.contextmanager
 def register_flattening_functions(
     patch_transformers: bool = False, verbose: int = 0
-) -> Iterator[Callable]:
+) -> Generator[Callable, None, None]:
     """
     The context manager registers flattening functions
     the exporter needs to handle any custom class.
