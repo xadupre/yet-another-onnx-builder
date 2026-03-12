@@ -104,9 +104,7 @@ def sklearn_gaussian_mixture(
     if cov_type == "full":
         L = prec_chol.astype(dtype)  # (K, F, F)
         # log |L_k| = sum of log(diag(L_k))
-        log_det = np.array(
-            [np.sum(np.log(np.diag(L[k]))) for k in range(K)], dtype=dtype
-        )  # (K,)
+        log_det = np.array([np.sum(np.log(np.diag(L[k]))) for k in range(K)], dtype=dtype)  # (K,)
         c = (log_weights + log_det - 0.5 * F * np.log(2.0 * np.pi)).astype(dtype)  # (K,)
 
         # Precompute b[k] = mu[k] @ L[k] for all k → (K, F)
@@ -160,14 +158,16 @@ def sklearn_gaussian_mixture(
         A = (L**2).astype(dtype)  # (K, F) - precisions
         log_det = np.sum(np.log(L), axis=1).astype(dtype)  # (K,)
         mu_sq_prec = np.sum(means**2 * A, axis=1).astype(dtype)  # (K,)
-        c = (
-            log_weights + log_det - 0.5 * F * np.log(2.0 * np.pi) - 0.5 * mu_sq_prec
-        ).astype(dtype)  # (K,)
+        c = (log_weights + log_det - 0.5 * F * np.log(2.0 * np.pi) - 0.5 * mu_sq_prec).astype(
+            dtype
+        )  # (K,)
 
         B = (means * A).astype(dtype)  # (K, F)
 
         X2 = g.op.Mul(X, X, name=f"{name}_X2")  # (N, F)
-        term1 = g.op.Mul(half, g.op.MatMul(X2, A.T, name=f"{name}_X2_dot_AT"), name=f"{name}_half_X2_dot_AT")
+        term1 = g.op.Mul(
+            half, g.op.MatMul(X2, A.T, name=f"{name}_X2_dot_AT"), name=f"{name}_half_X2_dot_AT"
+        )
         term2 = g.op.MatMul(X, B.T, name=f"{name}_X_dot_BT")  # (N, K)
         log_p = g.op.Add(
             g.op.Sub(term2, term1, name=f"{name}_sub"),
@@ -180,9 +180,9 @@ def sklearn_gaussian_mixture(
         prec = (L**2).astype(dtype)  # (K,)
         log_det = (F * np.log(L)).astype(dtype)  # (K,)
         mu_sq = np.sum(means**2, axis=1).astype(dtype)  # (K,)
-        c = (
-            log_weights + log_det - 0.5 * F * np.log(2.0 * np.pi) - 0.5 * prec * mu_sq
-        ).astype(dtype)  # (K,)
+        c = (log_weights + log_det - 0.5 * F * np.log(2.0 * np.pi) - 0.5 * prec * mu_sq).astype(
+            dtype
+        )  # (K,)
 
         x_sq = g.op.ReduceSum(
             g.op.Mul(X, X, name=f"{name}_X2"),
@@ -219,4 +219,3 @@ def sklearn_gaussian_mixture(
         g.set_type(label, onnx.TensorProto.INT64)
         g.set_type(proba, itype)
     return label, proba
-
