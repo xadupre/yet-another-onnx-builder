@@ -23,7 +23,6 @@ import tensorflow as tf
 from ..register import register_tf_op_converter
 from ...typing import GraphBuilderExtendedProtocol
 
-
 # ---------------------------------------------------------------------------
 # Argument reduction
 # ---------------------------------------------------------------------------
@@ -35,7 +34,9 @@ def convert_argmax(
 ) -> str:
     """TF ``ArgMax`` (tf.math.argmax) → ONNX ``ArgMax``."""
     axis = int(tf.make_ndarray(op.inputs[1].op.get_attr("value")))
-    return g.op.ArgMax(op.inputs[0].name, axis=axis, keepdims=0, outputs=outputs[:1], name=op.name)
+    return g.op.ArgMax(
+        op.inputs[0].name, axis=axis, keepdims=0, outputs=outputs[:1], name=op.name
+    )
 
 
 @register_tf_op_converter("ArgMin")
@@ -44,7 +45,9 @@ def convert_argmin(
 ) -> str:
     """TF ``ArgMin`` (tf.math.argmin) → ONNX ``ArgMin``."""
     axis = int(tf.make_ndarray(op.inputs[1].op.get_attr("value")))
-    return g.op.ArgMin(op.inputs[0].name, axis=axis, keepdims=0, outputs=outputs[:1], name=op.name)
+    return g.op.ArgMin(
+        op.inputs[0].name, axis=axis, keepdims=0, outputs=outputs[:1], name=op.name
+    )
 
 
 # ---------------------------------------------------------------------------

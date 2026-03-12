@@ -158,21 +158,23 @@ def _emit_kernel_matrix(
                 name=f"{name}_mat_inf_K",
             )
         elif nu == 0.5:
-            # k = exp(−r),  r = sqrt(D)
+            # k = exp(-r),  r = sqrt(D)
             r = g.op.Sqrt(D, name=f"{name}_mat05_r")
             return g.op.Exp(
                 g.op.Mul(np.array(-1.0, dtype=dtype), r, name=f"{name}_mat05_nr"),
                 name=f"{name}_mat05_K",
             )
         elif nu == 1.5:
-            # k = (1 + √3·r) · exp(−√3·r)
+            # k = (1 + √3·r) · exp(-√3·r)
             sqrt3 = np.array(np.sqrt(3.0), dtype=dtype)
             r = g.op.Mul(sqrt3, g.op.Sqrt(D, name=f"{name}_mat15_sqD"), name=f"{name}_mat15_r")
             one_plus_r = g.op.Add(np.array(1.0, dtype=dtype), r, name=f"{name}_mat15_1pr")
             neg_r = g.op.Mul(np.array(-1.0, dtype=dtype), r, name=f"{name}_mat15_nr")
-            return g.op.Mul(one_plus_r, g.op.Exp(neg_r, name=f"{name}_mat15_exp"), name=f"{name}_mat15_K")
+            return g.op.Mul(
+                one_plus_r, g.op.Exp(neg_r, name=f"{name}_mat15_exp"), name=f"{name}_mat15_K"
+            )
         elif nu == 2.5:
-            # k = (1 + √5·r + 5·r²/3) · exp(−√5·r)
+            # k = (1 + √5·r + 5·r²/3) · exp(-√5·r)
             sqrt5 = np.array(np.sqrt(5.0), dtype=dtype)
             r = g.op.Mul(sqrt5, g.op.Sqrt(D, name=f"{name}_mat25_sqD"), name=f"{name}_mat25_r")
             r2_3 = g.op.Div(
@@ -186,7 +188,9 @@ def _emit_kernel_matrix(
                 name=f"{name}_mat25_poly",
             )
             neg_r = g.op.Mul(np.array(-1.0, dtype=dtype), r, name=f"{name}_mat25_nr")
-            return g.op.Mul(poly, g.op.Exp(neg_r, name=f"{name}_mat25_exp"), name=f"{name}_mat25_K")
+            return g.op.Mul(
+                poly, g.op.Exp(neg_r, name=f"{name}_mat25_exp"), name=f"{name}_mat25_K"
+            )
         else:
             raise NotImplementedError(
                 f"Matern kernel with nu={nu} is not supported. "
@@ -235,7 +239,8 @@ def _emit_kernel_matrix(
     else:
         raise NotImplementedError(
             f"Kernel {type(kernel).__name__} is not supported in ONNX conversion. "
-            "Supported kernels: RBF, ConstantKernel, WhiteKernel, Matern (nu ∈ {0.5, 1.5, 2.5, ∞}), "
+            "Supported kernels: RBF, ConstantKernel, WhiteKernel, "
+            "Matern (nu ∈ {0.5, 1.5, 2.5, ∞}), "
             "DotProduct, Product, Sum."
         )
 
@@ -320,9 +325,7 @@ def _emit_kernel_diag(
         d2 = _emit_kernel_diag(g, kernel.k2, X, f"{name}_sk2", dtype)
         return g.op.Add(d1, d2, name=f"{name}_sum_diag")
 
-    raise NotImplementedError(
-        f"Kernel diagonal for {type(kernel).__name__} is not supported."
-    )
+    raise NotImplementedError(f"Kernel diagonal for {type(kernel).__name__} is not supported.")
 
 
 # ── binary GPC helper ─────────────────────────────────────────────────────────
@@ -349,9 +352,9 @@ def _emit_gpc_binary_pi_star(
     .. code-block:: text
 
         K_trans = kernel(X, X_train)              # (N, M) — kernel matrix
-        latent_mean = K_trans @ (y_train − π)      # (N,)   — posterior mean
+        latent_mean = K_trans @ (y_train - π)      # (N,)   — posterior mean
         v = M_pre @ K_trans.T                     # (M, N) — M_pre precomputed
-        latent_var  = diag(K(X,X)) − sum(v², 0)  # (N,)   — posterior variance
+        latent_var  = diag(K(X,X)) - sum(v², 0)  # (N,)   — posterior variance
         π* = Σ_j COEFS[j] · integral_j + 0.5·ΣCOEFS   # (N,)
 
     *M_pre = L⁻¹ · diag(W_sr)* is precomputed once at conversion time using
@@ -386,7 +389,7 @@ def _emit_gpc_binary_pi_star(
     K_trans_T = g.op.Transpose(K_trans, perm=[1, 0], name=f"{name}_KtT")
     v = g.op.MatMul(M_pre, K_trans_T, name=f"{name}_v")  # (M, N)
 
-    # latent_var = kernel_diag(X) − sum(v², axis=0) → (N,)
+    # latent_var = kernel_diag(X) - sum(v², axis=0) → (N,)
     kdiag = _emit_kernel_diag(g, kernel, X, f"{name}_kdiag", dtype)  # (N,)
     v_sq = g.op.Mul(v, v, name=f"{name}_vsq")
     v_sq_sum = g.op.ReduceSum(
@@ -406,7 +409,9 @@ def _emit_gpc_binary_pi_star(
     )
 
     # γ = ΛΛΛΛΛ · latent_mean  → (5, N):  broadcast (5,1) × (1,N)
-    lm_2d = g.op.Unsqueeze(latent_mean, np.array([0], dtype=np.int64), name=f"{name}_lm2d")  # (1,N)
+    lm_2d = g.op.Unsqueeze(
+        latent_mean, np.array([0], dtype=np.int64), name=f"{name}_lm2d"
+    )  # (1,N)
     lambdas_col = _LAMBDAS_1D.reshape(-1, 1).astype(dtype)  # (5, 1)
     gamma = g.op.Mul(lambdas_col, lm_2d, name=f"{name}_gamma")  # (5, N)
 
@@ -429,7 +434,9 @@ def _emit_gpc_binary_pi_star(
     )
 
     # 2 · √(latent_var · 2π)  → (1, N)
-    lv_2d = g.op.Unsqueeze(latent_var, np.array([0], dtype=np.int64), name=f"{name}_lv2d")  # (1,N)
+    lv_2d = g.op.Unsqueeze(
+        latent_var, np.array([0], dtype=np.int64), name=f"{name}_lv2d"
+    )  # (1,N)
     two_sqrt_lv2pi = g.op.Mul(
         np.array(2.0, dtype=dtype),
         g.op.Sqrt(
@@ -610,11 +617,11 @@ def sklearn_gaussian_process_classifier(
     .. code-block:: text
 
         K_trans  = kernel(X, X_train)                      # (N, M)
-        f_mean   = K_trans @ (y_train − π)                 # (N,)   posterior mean
+        f_mean   = K_trans @ (y_train - π)                 # (N,)   posterior mean
         v        = M_pre @ K_trans.T                       # (M, N) M_pre precomputed
-        f_var    = diag(K(X,X)) − Σ_col(v²)              # (N,)   posterior variance
+        f_var    = diag(K(X,X)) - Σ_col(v²)              # (N,)   posterior variance
         π*       ≈ Williams-Barber 5-point approximation   # (N,)
-        proba    = [[1−π*, π*]]                             # (N, 2)
+        proba    = [[1-π*, π*]]                             # (N, 2)
 
     where ``M_pre = L⁻¹ · diag(W_sr)`` is precomputed once at conversion
     time.
@@ -661,7 +668,7 @@ def sklearn_gaussian_process_classifier(
     if estimator.n_classes_ == 2:
         # Binary: base_estimator_ is _BinaryGaussianProcessClassifierLaplace
         pi_star = _emit_gpc_binary_pi_star(g, be.kernel_, be, f"{name}_bin", X, dtype)
-        # proba = [[1−π*, π*]]  → (N, 2)
+        # proba = [[1-π*, π*]]  → (N, 2)
         pi_star_2d = g.op.Unsqueeze(pi_star, np.array([1], dtype=np.int64), name=f"{name}_ps2d")
         one_minus = g.op.Sub(np.array(1.0, dtype=dtype), pi_star_2d, name=f"{name}_1mp")
         proba = g.op.Concat(one_minus, pi_star_2d, axis=1, name=name, outputs=outputs[1:])

@@ -55,15 +55,15 @@ class TestSklearnCalibratedClassifierCV(ExtTestCase):
             self.assertEqualArray(expected_proba, ort_results[1], atol=atol)
 
     def test_binary_sigmoid(self):
-        clf = CalibratedClassifierCV(
-            LogisticRegression(), cv=2, method="sigmoid"
-        ).fit(self._X_bin, self._y_bin)
+        clf = CalibratedClassifierCV(LogisticRegression(), cv=2, method="sigmoid").fit(
+            self._X_bin, self._y_bin
+        )
         self._check(clf, self._X_bin)
 
     def test_binary_isotonic(self):
-        clf = CalibratedClassifierCV(
-            LogisticRegression(), cv=2, method="isotonic"
-        ).fit(self._X_bin, self._y_bin)
+        clf = CalibratedClassifierCV(LogisticRegression(), cv=2, method="isotonic").fit(
+            self._X_bin, self._y_bin
+        )
         self._check(clf, self._X_bin, atol=1e-4)
 
     def test_multiclass_sigmoid(self):
