@@ -520,4 +520,3 @@ def sklearn_decision_tree_regressor(
         to=g.get_type(X),
     )
     return cast_result
-
