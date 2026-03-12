@@ -6,6 +6,7 @@ def register():
     from . import const  # noqa: F401
     from . import math_ops  # noqa: F401
     from . import matmul  # noqa: F401
+    from . import nn_ops  # noqa: F401
     from . import padding  # noqa: F401
     from . import pooling  # noqa: F401
     from . import reduction_ops  # noqa: F401
