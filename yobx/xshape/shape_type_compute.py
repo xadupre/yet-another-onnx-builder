@@ -1103,10 +1103,10 @@ def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
 def _compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
     if -1 not in shape2:
         return shape2
-    total_int1 = np.prod([i for i in shape1 if isinstance(i, int)])
+    total_int1 = int(np.prod([i for i in shape1 if isinstance(i, int)]))
     if total_int1 == 0:
         return tuple(s if s != -1 else 0 for s in shape2)
-    total_int2 = np.prod([i for i in shape2 if isinstance(i, int) and i != -1])
+    total_int2 = int(np.prod([i for i in shape2 if isinstance(i, int) and i != -1]))
     if total_int1 > total_int2 and total_int1 % total_int2 == 0:
         intpart = total_int1 // total_int2
     else:
@@ -1116,14 +1116,20 @@ def _compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
     common = exist1 & exist2
     left1 = exist1 - common
     left2 = exist2 - common
-    if left2:
-        resp = "x".join(f"({s})" for s in left1)
-        resm = "x".join(f"({s})" for s in left2)
+    if left1 and left2:
+        resp = "*".join(f"({s})" for s in left1)
+        resm = "*".join(f"({s})" for s in left2)
         ok = f"{resp}//({resm})"
+    elif left1:
+        ok = "*".join(f"({s})" for s in left1)
+    elif left2:
+        resm = "*".join(f"({s})" for s in left2)
+        ok = f"1//{resm}"
     else:
-        ok = resp
+        ok = ""
     if intpart != 1:
-        ok = f"{ok}*{intpart}"
+        ok = f"{ok}*{intpart}" if ok else intpart
+    assert ok, f"Unable to compute a shape with {shape1=} and {shape2=}."
     return tuple(s if s != -1 else ok for s in shape2)
 
 
