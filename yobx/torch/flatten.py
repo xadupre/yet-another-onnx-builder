@@ -264,7 +264,7 @@ def unregister_cache_flattening(undo: Dict[type, bool], verbose: int = 0):
 @contextlib.contextmanager
 def register_flattening_functions(
     patch_transformers: bool = False, verbose: int = 0
-) -> Generator[Callable]:
+) -> Generator[Callable, None, None]:
     """
     The context manager registers flattening functions
     the exporter needs to handle any custom class.

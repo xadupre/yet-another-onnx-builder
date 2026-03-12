@@ -15,9 +15,6 @@ from .tracing import (
 )
 from .tiny_models import get_tiny_model
 
-# This helps to avoid is_torch_array crashing.
-Tensor = None
-
 
 def use_dyn_not_str(dynamic_shapes: Any, default_value=None) -> Any:
     """

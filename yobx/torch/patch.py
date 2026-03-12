@@ -25,7 +25,7 @@ def apply_patches_for_model(
     patch_transformers: bool = False,
     verbose: int = 0,
     model: Optional[torch.nn.Module] = None,
-) -> Generator[PatchDetails]:
+) -> Generator[PatchDetails, None, None]:
     """
     The context manager apply patches, usually before exporting a model.
 
