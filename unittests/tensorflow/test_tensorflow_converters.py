@@ -86,6 +86,48 @@ class TestTensorflowBaseConverters(ExtTestCase):
         ort_result = _ort_run(onx, feeds)
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
+    def test_elu(self):
+        """TF Elu → ONNX Elu."""
+        x = np.array([[-1.0, 0.0, 1.0, 2.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.nn.elu(t)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("Elu", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_selu(self):
+        """TF Selu → ONNX Selu."""
+        x = np.array([[-1.0, 0.0, 1.0, 2.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.nn.selu(t)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("Selu", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_leaky_relu(self):
+        """TF LeakyRelu → ONNX LeakyRelu."""
+        x = np.array([[-2.0, -1.0, 0.0, 1.0, 2.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.nn.leaky_relu(t, alpha=0.2)
+
+        onx = to_onnx(fn, (x,))
+        self.assertIn("LeakyRelu", [n.op_type for n in onx.graph.node])
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
     def test_sequential_multi_layer(self):
         """Sequential model with multiple Dense layers."""
         model = tf.keras.Sequential(
