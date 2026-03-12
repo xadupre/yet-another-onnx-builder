@@ -1097,7 +1097,88 @@ class TestShapeTypeCompute(ExtTestCase):
         b = BasicShapeBuilder()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
-        self.assertEqual(b.get_rank("Y"), 2)
+        self.assertEqual(b.get_shape("Y"), (3, 6))
+
+    def test_op_slice_no_axes(self):
+        # No axes input: default axis order applied
+        model = _make_model(
+            [oh.make_node("Slice", ["X", "starts", "ends"], ["Y"])],
+            [_mkv_("X", TFLOAT, [10, 8])],
+            [_mkv_("Y", TFLOAT, [None, None])],
+            [
+                onh.from_array(np.array([2, 1], dtype=np.int64), name="starts"),
+                onh.from_array(np.array([7, 5], dtype=np.int64), name="ends"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_shape("Y"), (5, 4))
+
+    def test_op_slice_with_step(self):
+        # step=2 on axis 0
+        model = _make_model(
+            [oh.make_node("Slice", ["X", "starts", "ends", "axes", "steps"], ["Y"])],
+            [_mkv_("X", TFLOAT, [10, 4])],
+            [_mkv_("Y", TFLOAT, [None, None])],
+            [
+                onh.from_array(np.array([0], dtype=np.int64), name="starts"),
+                onh.from_array(np.array([10], dtype=np.int64), name="ends"),
+                onh.from_array(np.array([0], dtype=np.int64), name="axes"),
+                onh.from_array(np.array([2], dtype=np.int64), name="steps"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_shape("Y"), (5, 4))
+
+    def test_op_slice_int64max_end(self):
+        # INT64_MAX as end means "slice to the end of the dimension"
+        model = _make_model(
+            [oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])],
+            [_mkv_("X", TFLOAT, [5, 6])],
+            [_mkv_("Y", TFLOAT, [None, None])],
+            [
+                onh.from_array(np.array([0], dtype=np.int64), name="starts"),
+                onh.from_array(np.array([9223372036854775807], dtype=np.int64), name="ends"),
+                onh.from_array(np.array([0], dtype=np.int64), name="axes"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_shape("Y"), (5, 6))
+
+    def test_op_slice_negative_start(self):
+        # negative start wraps around: start=-2 on dim=5 → start=3
+        model = _make_model(
+            [oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])],
+            [_mkv_("X", TFLOAT, [5, 6])],
+            [_mkv_("Y", TFLOAT, [None, None])],
+            [
+                onh.from_array(np.array([-2], dtype=np.int64), name="starts"),
+                onh.from_array(np.array([9223372036854775807], dtype=np.int64), name="ends"),
+                onh.from_array(np.array([0], dtype=np.int64), name="axes"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_shape("Y"), (2, 6))
+
+    def test_op_slice_symbolic_dim_preserved(self):
+        # When the sliced dimension is symbolic, it cannot be computed; keep as-is
+        model = _make_model(
+            [oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])],
+            [_mkv_("X", TFLOAT, ["batch", 6])],
+            [_mkv_("Y", TFLOAT, [None, None])],
+            [
+                onh.from_array(np.array([0], dtype=np.int64), name="starts"),
+                onh.from_array(np.array([3], dtype=np.int64), name="ends"),
+                onh.from_array(np.array([1], dtype=np.int64), name="axes"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        # axis 1 (integer 6) is sliced: output[1] = 3; axis 0 is "batch" (symbolic)
+        self.assertEqual(b.get_shape("Y"), ("batch", 3))
 
     def test_op_split(self):
         model = _make_model(

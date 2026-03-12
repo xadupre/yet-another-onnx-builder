@@ -1226,11 +1226,75 @@ def _set_shape_type_op_any_size(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Slice."
-    # TODO: complete when shape are available
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
+    if self.has_shape(node.input[0]):
+        input_shape = self.get_shape(node.input[0])
+        rank = len(input_shape)
+        # When starts and ends are known constants, compute the output shape dimension
+        # by dimension.  Axes and steps are optional ONNX inputs.
+        if (
+            len(node.input) >= 3
+            and self.is_constant(node.input[1])
+            and self.is_constant(node.input[2])
+        ):
+            _starts = self.get_constant(node.input[1], exc=False, computed_value=True)
+            _ends = self.get_constant(node.input[2], exc=False, computed_value=True)
+            if _starts is None or _ends is None:
+                # Constants are present but cannot be evaluated yet; fall back to rank.
+                self.set_rank(node.output[0], rank)
+                return True
+            starts = [int(s) for s in _starts]
+            ends = [int(e) for e in _ends]
+            # axes: optional input[3]; default is [0, 1, ..., len(starts)-1]
+            if len(node.input) > 3 and node.input[3] and self.is_constant(node.input[3]):
+                _axes = self.get_constant(node.input[3], exc=False, computed_value=True)
+                axes = [int(a) for a in _axes] if _axes is not None else list(range(len(starts)))
+            else:
+                axes = list(range(len(starts)))
+            # steps: optional input[4]; default is 1 for each slice
+            if len(node.input) > 4 and node.input[4] and self.is_constant(node.input[4]):
+                _steps = self.get_constant(node.input[4], exc=False, computed_value=True)
+                steps = [int(d) for d in _steps] if _steps is not None else [1] * len(starts)
+            else:
+                steps = [1] * len(starts)
+            # Normalise negative axis indices and validate bounds
+            axes = [a if a >= 0 else a + rank for a in axes]
+            if not all(0 <= a < rank for a in axes):
+                # Out-of-range axis — cannot compute shape safely; fall back to rank.
+                self.set_rank(node.output[0], rank)
+                return True
+            # Build output shape: copy input, then update each sliced axis
+            output_shape = list(input_shape)
+            for s, e, a, d in zip(starts, ends, axes, steps):
+                n = input_shape[a]
+                if not isinstance(n, int):
+                    # Symbolic dimension — cannot compute an integer size; leave as-is
+                    continue
+                if d > 0:
+                    # Normalise start: negative wraps, positive is clamped to [0, n]
+                    s = max(0, min(n, s if s >= 0 else s + n))
+                    # Normalise end: negative wraps, positive clamped (INT64_MAX → n)
+                    e = max(0, min(n, e if e >= 0 else e + n))
+                    # ceil((e - s) / d) using integer arithmetic; clamp diff to ≥0
+                    diff = max(0, e - s)
+                    output_shape[a] = (diff + d - 1) // d
+                elif d < 0:
+                    # Backward slice: start defaults to last element, end to before first
+                    s = max(-1, min(n - 1, s if s >= 0 else s + n))
+                    e = max(-1, min(n - 1, e if e >= 0 else e + n))
+                    # ceil((s - e) / |d|) using integer arithmetic; clamp diff to ≥0
+                    diff = max(0, s - e)
+                    output_shape[a] = (diff + (-d) - 1) // (-d)
+                # d == 0 is invalid per the ONNX spec; leave dimension unchanged
+            new_shape = tuple(output_shape)
+            self.set_shape(node.output[0], new_shape, allow_zero=0 in new_shape)
+            return new_shape
+        # starts/ends not available as constants — preserve rank at minimum
+        self.set_rank(node.output[0], rank)
+        return True
     if self.has_rank(node.input[0]):
         self.set_rank(node.output[0], self.get_rank(node.input[0]))
         return True
