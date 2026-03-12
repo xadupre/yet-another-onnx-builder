@@ -61,7 +61,7 @@ jobs:
               --ignore=unittests/tensorflow \
               --ignore=unittests/torch \
               --ignore unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py \
-              --ignore unittests/sklearn/ensemble/test_power_transformer.py  # AttributeError: module 'torch' has no attribute 'Tensor'
+              --ignore unittests/sklearn/preprocessing/test_power_transformer.py  # AttributeError: module 'torch' has no attribute 'Tensor'
 
       - name: Run test_sklearn_hist_gradient_boosting_multiclass.py
         if: matrix.sklearn-version != '1.8'
@@ -73,7 +73,7 @@ jobs:
         if: matrix.sklearn-version == '1.8'
         run: |
           python -m coverage run --append unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
-          python -m coverage run --append unittests/sklearn/ensemble/test_power_transformer.py
+          python -m coverage run --append unittests/sklearn/preprocessing/test_power_transformer.py
           coverage xml
 
       - name: Upload coverage to Codecov
