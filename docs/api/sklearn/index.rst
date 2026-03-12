@@ -23,6 +23,7 @@ yobx.sklearn
     gaussian_process/index
     lightgbm/index
     linear_model/index
+    mixture/index
     multiclass/index
     naive_bayes/index
     neural_network/index
