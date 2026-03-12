@@ -716,6 +716,140 @@ class TestSklearnDecisionTree(ExtTestCase):
             ort_results = sess.run(None, {"X": X_test})
             self.assertEqualArray(expected, ort_results[0], atol=1e-5)
 
+    def test_extra_tree_classifier_binary(self):
+        from sklearn.tree import ExtraTreeClassifier
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        dt = ExtraTreeClassifier(random_state=0)
+        dt.fit(X, y)
+
+        onx = to_onnx(dt, (X,), target_opset=18)
+
+        # Check graph structure
+        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        self.assertIn("ai.onnx.ml", ml_opsets)
+        self.assertLess(ml_opsets["ai.onnx.ml"], 5)
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsembleClassifier", op_types)
+
+        # Check outputs
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        expected_label = dt.predict(X)
+        expected_proba = dt.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
+
+    def test_extra_tree_classifier_multiclass(self):
+        from sklearn.tree import ExtraTreeClassifier
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1, 2, 2])
+        dt = ExtraTreeClassifier(random_state=0)
+        dt.fit(X, y)
+
+        onx = to_onnx(dt, (X,), target_opset=18)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        expected_label = dt.predict(X)
+        expected_proba = dt.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
+
+    def test_extra_tree_regressor(self):
+        from sklearn.tree import ExtraTreeRegressor
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([1.5, 2.5, 3.5, 4.5], dtype=np.float32)
+        dt = ExtraTreeRegressor(random_state=0)
+        dt.fit(X, y)
+
+        onx = to_onnx(dt, (X,), target_opset=18)
+
+        # Check graph structure
+        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        self.assertIn("ai.onnx.ml", ml_opsets)
+        self.assertLess(ml_opsets["ai.onnx.ml"], 5)
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsembleRegressor", op_types)
+
+        # Check outputs
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        expected_predictions = dt.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected_predictions, predictions, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_predictions, ort_results[0], atol=1e-5)
+
+    def test_extra_tree_classifier_v5(self):
+        from sklearn.tree import ExtraTreeClassifier
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1, 2, 2])
+        dt = ExtraTreeClassifier(random_state=0)
+        dt.fit(X, y)
+
+        onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
+
+        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        self.assertGreaterEqual(ml_opsets.get("ai.onnx.ml", 0), 5)
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TreeEnsemble", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        expected_label = dt.predict(X)
+        expected_proba = dt.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+    def test_extra_tree_regressor_v5(self):
+        from sklearn.tree import ExtraTreeRegressor
+
+        rng = np.random.default_rng(0)
+        X_train = rng.standard_normal((100, 5)).astype(np.float32)
+        y_train = rng.standard_normal(100).astype(np.float32)
+        X_test = rng.standard_normal((50, 5)).astype(np.float32)
+
+        dt = ExtraTreeRegressor(max_depth=5, random_state=0)
+        dt.fit(X_train, y_train)
+
+        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+            onx = to_onnx(dt, (X_train,), **opset_kw)
+
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": X_test})
+            predictions = results[0]
+
+            expected = dt.predict(X_test).astype(np.float32).reshape(-1, 1)
+            self.assertEqualArray(expected, predictions, atol=1e-5)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": X_test})
+            self.assertEqualArray(expected, ort_results[0], atol=1e-5)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

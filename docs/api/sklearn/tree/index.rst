@@ -6,3 +6,4 @@ yobx.sklearn.tree
     :caption: modules
 
     decision_tree
+    extra_tree
