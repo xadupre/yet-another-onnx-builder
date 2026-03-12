@@ -229,8 +229,20 @@ class TestSklearnGradientBoosting(ExtTestCase):
     def test_gb_classifier_multiclass_float32(self):
         """GBClassifier multiclass (3 classes), float32 input, legacy opset."""
         X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5],
-             [1, 3], [3, 5], [5, 7], [7, 9], [2, 4], [4, 6]],
+            [
+                [1, 2],
+                [3, 4],
+                [5, 6],
+                [7, 8],
+                [2, 3],
+                [4, 5],
+                [1, 3],
+                [3, 5],
+                [5, 7],
+                [7, 9],
+                [2, 4],
+                [4, 6],
+            ],
             dtype=np.float32,
         )
         y = np.array([0, 0, 1, 1, 2, 2, 0, 0, 1, 1, 2, 2])
@@ -263,8 +275,20 @@ class TestSklearnGradientBoosting(ExtTestCase):
     def test_gb_classifier_multiclass_v5(self):
         """GBClassifier multiclass, float32 input, ai.onnx.ml opset 5."""
         X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5],
-             [1, 3], [3, 5], [5, 7], [7, 9], [2, 4], [4, 6]],
+            [
+                [1, 2],
+                [3, 4],
+                [5, 6],
+                [7, 8],
+                [2, 3],
+                [4, 5],
+                [1, 3],
+                [3, 5],
+                [5, 7],
+                [7, 9],
+                [2, 4],
+                [4, 6],
+            ],
             dtype=np.float32,
         )
         y = np.array([0, 0, 1, 1, 2, 2, 0, 0, 1, 1, 2, 2])

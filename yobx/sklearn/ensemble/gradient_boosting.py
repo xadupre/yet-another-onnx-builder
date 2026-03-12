@@ -491,12 +491,25 @@ def sklearn_gradient_boosting_regressor(
     ml_opset = g.get_opset("ai.onnx.ml")
     if ml_opset >= 5:
         raw = _build_gb_raw_output_v5(
-            g, X, name, estimators, learning_rate, n_targets, baseline,
-            tree_outputs, itype=itype,
+            g,
+            X,
+            name,
+            estimators,
+            learning_rate,
+            n_targets,
+            baseline,
+            tree_outputs,
+            itype=itype,
         )
     else:
         raw = _build_gb_raw_output_legacy(
-            g, X, name, estimators, learning_rate, n_targets, baseline,
+            g,
+            X,
+            name,
+            estimators,
+            learning_rate,
+            n_targets,
+            baseline,
             tree_outputs,
         )
 
@@ -566,12 +579,25 @@ def sklearn_gradient_boosting_classifier(
 
     if ml_opset >= 5:
         raw = _build_gb_raw_output_v5(
-            g, X, name, estimators, learning_rate, n_targets, baseline,
-            [raw_name], itype=itype,
+            g,
+            X,
+            name,
+            estimators,
+            learning_rate,
+            n_targets,
+            baseline,
+            [raw_name],
+            itype=itype,
         )
     else:
         raw = _build_gb_raw_output_legacy(
-            g, X, name, estimators, learning_rate, n_targets, baseline,
+            g,
+            X,
+            name,
+            estimators,
+            learning_rate,
+            n_targets,
+            baseline,
             [raw_name],
         )
 
