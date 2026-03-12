@@ -9,6 +9,7 @@ from yobx.reference import ExtendedReferenceEvaluator
 from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.linear_model import LogisticRegression
+from yobx.xbuilder import FunctionOptions
 from yobx.sklearn import to_onnx
 
 
@@ -133,6 +134,76 @@ class TestSklearnFeatureUnion(ExtTestCase):
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-5)
+
+    def test_feature_union_as_functions(self):
+        """Each sub-transformer of FeatureUnion is exported as a local function."""
+        X = np.array(
+            [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]],
+            dtype=np.float32,
+        )
+        fu = FeatureUnion([("std", StandardScaler()), ("mm", MinMaxScaler())])
+        fu.fit(X)
+
+        fopts = FunctionOptions(
+            name="sklearn_op",
+            domain="test_sklearn",
+            move_initializer_to_constant=True,
+            export_as_function=True,
+        )
+        onx = to_onnx(fu, (X,), function_options=fopts)
+
+        # Both sub-transformers must appear as local functions.
+        func_names = [f.name for f in onx.functions]
+        self.assertIn("StandardScaler", func_names)
+        self.assertIn("MinMaxScaler", func_names)
+        # FeatureUnion itself is not wrapped as a function.
+        self.assertNotIn("FeatureUnion", func_names)
+
+        # The main graph still has Concat (FeatureUnion orchestration) but
+        # no raw ops from the individual converters.
+        graph_ops = [n.op_type for n in onx.graph.node]
+        self.assertIn("Concat", graph_ops)
+        self.assertNotIn("Sub", graph_ops)
+
+        # Numerical correctness.
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X": X})[0]
+        expected = fu.transform(X).astype(np.float32)
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_pipeline_feature_union_steps_as_functions(self):
+        """Pipeline with FeatureUnion: each leaf transformer is a local function."""
+        X = np.array(
+            [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12], [2, 3, 4], [5, 6, 7]],
+            dtype=np.float32,
+        )
+        y = np.array([0, 0, 1, 1, 0, 1])
+
+        fu = FeatureUnion([("std", StandardScaler()), ("mm", MinMaxScaler())])
+        pipe = Pipeline([("features", fu), ("clf", LogisticRegression())])
+        pipe.fit(X, y)
+
+        fopts = FunctionOptions(
+            name="sklearn_op",
+            domain="test_sklearn",
+            move_initializer_to_constant=True,
+            export_as_function=True,
+        )
+        onx = to_onnx(pipe, (X,), function_options=fopts)
+
+        func_names = [f.name for f in onx.functions]
+        self.assertIn("StandardScaler", func_names)
+        self.assertIn("MinMaxScaler", func_names)
+        self.assertIn("LogisticRegression", func_names)
+        # Container types are not wrapped.
+        self.assertNotIn("Pipeline", func_names)
+        self.assertNotIn("FeatureUnion", func_names)
+
+        # Numerical correctness.
+        ref = ExtendedReferenceEvaluator(onx)
+        label, proba = ref.run(None, {"X": X})
+        self.assertEqualArray(pipe.predict(X), label)
+        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
 
 if __name__ == "__main__":
