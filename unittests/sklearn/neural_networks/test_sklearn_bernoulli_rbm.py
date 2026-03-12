@@ -62,7 +62,7 @@ class TestSklearnBernoulliRBM(ExtTestCase):
         (ort_result,) = sess.run(None, {"X": X})
         self.assertEqualArray(expected, ort_result, atol=1e-10)
 
-    def test_bernoulli_rbm_output_shape(self):
+    def test_bernoulli_rbm_output_shape_float32(self):
         from sklearn.neural_network import BernoulliRBM
 
         X = self._make_data(n_samples=10, n_features=6, dtype=np.float32)
@@ -72,12 +72,31 @@ class TestSklearnBernoulliRBM(ExtTestCase):
 
         onx = to_onnx(rbm, (X,))
 
+        self.assertEqual(onx.graph.input[0].type.tensor_type.elem_type, 1)  # FLOAT
+
         ref = ExtendedReferenceEvaluator(onx)
         (result,) = ref.run(None, {"X": X})
 
         self.assertEqual(result.shape, (10, n_components))
 
-    def test_bernoulli_rbm_output_in_range(self):
+    def test_bernoulli_rbm_output_shape_float64(self):
+        from sklearn.neural_network import BernoulliRBM
+
+        X = self._make_data(n_samples=10, n_features=6, dtype=np.float64)
+        n_components = 5
+        rbm = BernoulliRBM(n_components=n_components, n_iter=5, random_state=0)
+        rbm.fit(X)
+
+        onx = to_onnx(rbm, (X,))
+
+        self.assertEqual(onx.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
+
+        ref = ExtendedReferenceEvaluator(onx)
+        (result,) = ref.run(None, {"X": X})
+
+        self.assertEqual(result.shape, (10, n_components))
+
+    def test_bernoulli_rbm_output_in_range_float32(self):
         from sklearn.neural_network import BernoulliRBM
 
         X = self._make_data(dtype=np.float32)
@@ -85,6 +104,26 @@ class TestSklearnBernoulliRBM(ExtTestCase):
         rbm.fit(X)
 
         onx = to_onnx(rbm, (X,))
+
+        self.assertEqual(onx.graph.input[0].type.tensor_type.elem_type, 1)  # FLOAT
+
+        ref = ExtendedReferenceEvaluator(onx)
+        (result,) = ref.run(None, {"X": X})
+
+        # Probabilities must be in [0, 1]
+        self.assertTrue(np.all(result >= 0.0), "Output contains values < 0")
+        self.assertTrue(np.all(result <= 1.0), "Output contains values > 1")
+
+    def test_bernoulli_rbm_output_in_range_float64(self):
+        from sklearn.neural_network import BernoulliRBM
+
+        X = self._make_data(dtype=np.float64)
+        rbm = BernoulliRBM(n_components=8, n_iter=5, random_state=0)
+        rbm.fit(X)
+
+        onx = to_onnx(rbm, (X,))
+
+        self.assertEqual(onx.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
 
         ref = ExtendedReferenceEvaluator(onx)
         (result,) = ref.run(None, {"X": X})
