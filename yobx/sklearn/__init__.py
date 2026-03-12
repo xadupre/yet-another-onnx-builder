@@ -21,6 +21,7 @@ def register_sklearn_converters():
     from .lightgbm import register as register_lightgbm
     from .linear_model import register as register_linear_model
     from .multiclass import register as register_multiclass
+    from .multioutput import register as register_multioutput
     from .naive_bayes import register as register_naive_bayes
     from .neighbors import register as register_neighbors
     from .neural_network import register as register_neural_network
@@ -41,6 +42,7 @@ def register_sklearn_converters():
     register_linear_model()
     register_lightgbm()
     register_multiclass()
+    register_multioutput()
     register_naive_bayes()
     register_neighbors()
     register_neural_network()
