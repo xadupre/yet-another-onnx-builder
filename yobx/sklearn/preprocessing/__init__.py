@@ -1,2 +1,2 @@
 def register():
-    from . import min_max_scaler, polynomial_features, standard_scaler
+    from . import binarizer, min_max_scaler, standard_scaler, polynomial_features
