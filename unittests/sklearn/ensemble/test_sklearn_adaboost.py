@@ -81,23 +81,29 @@ class TestSklearnAdaBoostClassifier(ExtTestCase):
         self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_custom_base_estimator(self):
-        """AdaBoostClassifier with a deeper base estimator."""
-        Xd = self._X.astype(np.float32)
+        """AdaBoostClassifier with a deeper base estimator, float32 and float64."""
         y = self._y_bin
-        clf = AdaBoostClassifier(
-            estimator=DecisionTreeClassifier(max_depth=2),
-            n_estimators=5,
-            random_state=0,
-        )
-        clf.fit(Xd, y)
-        onx = to_onnx(clf, (Xd,))
+        for dtype in (np.float32, np.float64):
+            Xd = self._X.astype(dtype)
+            clf = AdaBoostClassifier(
+                estimator=DecisionTreeClassifier(max_depth=2),
+                n_estimators=5,
+                random_state=0,
+            )
+            clf.fit(Xd, y)
+            onx = to_onnx(clf, (Xd,))
 
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": Xd})
-        expected_label = clf.predict(Xd)
-        expected_proba = clf.predict_proba(Xd).astype(np.float32)
-        self.assertEqualArray(expected_label, results[0])
-        self.assertEqualArray(expected_proba, results[1], atol=1e-5)
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": Xd})
+            expected_label = clf.predict(Xd)
+            expected_proba = clf.predict_proba(Xd).astype(dtype)
+            self.assertEqualArray(expected_label, results[0])
+            self.assertEqualArray(expected_proba, results[1], atol=1e-5)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": Xd})
+            self.assertEqualArray(expected_label, ort_results[0])
+            self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
 
 @requires_sklearn("1.4")
@@ -156,20 +162,26 @@ class TestSklearnAdaBoostRegressor(ExtTestCase):
         self.assertEqualArray(expected_pred, ort_results[0].ravel(), atol=1e-5)
 
     def test_custom_base_estimator(self):
-        """AdaBoostRegressor with a deeper base estimator."""
-        Xd = self._X.astype(np.float32)
-        reg = AdaBoostRegressor(
-            estimator=DecisionTreeRegressor(max_depth=2),
-            n_estimators=5,
-            random_state=0,
-        )
-        reg.fit(Xd, self._y)
-        onx = to_onnx(reg, (Xd,))
+        """AdaBoostRegressor with a deeper base estimator, float32 and float64."""
+        for dtype in (np.float32, np.float64):
+            Xd = self._X.astype(dtype)
+            yd = self._y.astype(dtype)
+            reg = AdaBoostRegressor(
+                estimator=DecisionTreeRegressor(max_depth=2),
+                n_estimators=5,
+                random_state=0,
+            )
+            reg.fit(Xd, yd)
+            onx = to_onnx(reg, (Xd,))
 
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": Xd})
-        expected_pred = reg.predict(Xd).astype(np.float32)
-        self.assertEqualArray(expected_pred, results[0].ravel(), atol=1e-5)
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": Xd})
+            expected_pred = reg.predict(Xd).astype(dtype)
+            self.assertEqualArray(expected_pred, results[0].ravel(), atol=1e-5)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": Xd})
+            self.assertEqualArray(expected_pred, ort_results[0].ravel(), atol=1e-5)
 
 
 if __name__ == "__main__":
