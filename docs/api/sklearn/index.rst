@@ -20,6 +20,7 @@ yobx.sklearn
     discriminant_analysis/index
     dummy/index
     ensemble/index
+    gaussian_process/index
     lightgbm/index
     linear_model/index
     multiclass/index
