@@ -241,9 +241,7 @@ class TestSklearnOnnxTreeModels(ExtTestCase):
         sess = self.check_ort(onx)
         label, proba = sess.run(None, {"X": X})
         self.assertEqualArray(estimator.predict(X).astype(np.int64), label)
-        self.assertEqualArray(
-            estimator.predict_proba(X).astype(np.float32), proba, atol=atol
-        )
+        self.assertEqualArray(estimator.predict_proba(X).astype(np.float32), proba, atol=atol)
 
     def _check_regressor(self, estimator, X, y, atol=1e-4):
         estimator.fit(X, y)
@@ -276,49 +274,37 @@ class TestSklearnOnnxTreeModels(ExtTestCase):
         from sklearn.ensemble import RandomForestClassifier
 
         X, y = _make_binary()
-        self._check_classifier(
-            RandomForestClassifier(n_estimators=5, random_state=0), X, y
-        )
+        self._check_classifier(RandomForestClassifier(n_estimators=5, random_state=0), X, y)
 
     def test_random_forest_classifier_multiclass(self):
         from sklearn.ensemble import RandomForestClassifier
 
         X, y = _make_multiclass()
-        self._check_classifier(
-            RandomForestClassifier(n_estimators=5, random_state=0), X, y
-        )
+        self._check_classifier(RandomForestClassifier(n_estimators=5, random_state=0), X, y)
 
     def test_random_forest_regressor(self):
         from sklearn.ensemble import RandomForestRegressor
 
         X, y = _make_regression()
-        self._check_regressor(
-            RandomForestRegressor(n_estimators=5, random_state=0), X, y
-        )
+        self._check_regressor(RandomForestRegressor(n_estimators=5, random_state=0), X, y)
 
     def test_hist_gradient_boosting_classifier_binary(self):
         from sklearn.ensemble import HistGradientBoostingClassifier
 
         X, y = _make_binary(n=80)
-        self._check_classifier(
-            HistGradientBoostingClassifier(max_iter=20, random_state=0), X, y
-        )
+        self._check_classifier(HistGradientBoostingClassifier(max_iter=20, random_state=0), X, y)
 
     def test_hist_gradient_boosting_classifier_multiclass(self):
         from sklearn.ensemble import HistGradientBoostingClassifier
 
         X, y = _make_multiclass(n=90)
-        self._check_classifier(
-            HistGradientBoostingClassifier(max_iter=20, random_state=0), X, y
-        )
+        self._check_classifier(HistGradientBoostingClassifier(max_iter=20, random_state=0), X, y)
 
     def test_hist_gradient_boosting_regressor(self):
         from sklearn.ensemble import HistGradientBoostingRegressor
 
         X, y = _make_regression(n=80)
-        self._check_regressor(
-            HistGradientBoostingRegressor(max_iter=20, random_state=0), X, y
-        )
+        self._check_regressor(HistGradientBoostingRegressor(max_iter=20, random_state=0), X, y)
 
 
 @requires_sklearn("1.4")
@@ -428,9 +414,7 @@ class TestSklearnOnnxClusterAndDecomposition(ExtTestCase):
         sess = self.check_ort(onx)
         label, proba = sess.run(None, {"X": X})
         self.assertEqualArray(est.predict(X).astype(np.int64), label)
-        self.assertEqualArray(
-            est.predict_proba(X).astype(np.float32), proba, atol=1e-5
-        )
+        self.assertEqualArray(est.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
 
 @requires_sklearn("1.4")
@@ -448,9 +432,7 @@ class TestSklearnOnnxNeuralNetworks(ExtTestCase):
         sess = self.check_ort(onx)
         label, proba = sess.run(None, {"X": X})
         self.assertEqualArray(est.predict(X).astype(np.int64), label)
-        self.assertEqualArray(
-            est.predict_proba(X).astype(np.float32), proba, atol=1e-5
-        )
+        self.assertEqualArray(est.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_mlp_classifier_multiclass(self):
         from sklearn.neural_network import MLPClassifier
@@ -463,9 +445,7 @@ class TestSklearnOnnxNeuralNetworks(ExtTestCase):
         sess = self.check_ort(onx)
         label, proba = sess.run(None, {"X": X})
         self.assertEqualArray(est.predict(X).astype(np.int64), label)
-        self.assertEqualArray(
-            est.predict_proba(X).astype(np.float32), proba, atol=1e-5
-        )
+        self.assertEqualArray(est.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_mlp_regressor(self):
         from sklearn.neural_network import MLPRegressor
@@ -500,9 +480,7 @@ class TestSklearnOnnxPipeline(ExtTestCase):
         sess = self.check_ort(onx)
         label, proba = sess.run(None, {"X": X})
         self.assertEqualArray(pipe.predict(X).astype(np.int64), label)
-        self.assertEqualArray(
-            pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5
-        )
+        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_pipeline_scaler_rf(self):
         from sklearn.pipeline import Pipeline
@@ -522,9 +500,7 @@ class TestSklearnOnnxPipeline(ExtTestCase):
         sess = self.check_ort(onx)
         label, proba = sess.run(None, {"X": X})
         self.assertEqualArray(pipe.predict(X).astype(np.int64), label)
-        self.assertEqualArray(
-            pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5
-        )
+        self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_pipeline_pca_regressor(self):
         from sklearn.pipeline import Pipeline
@@ -568,17 +544,13 @@ class TestSklearnOnnxMulticlass(ExtTestCase):
         from sklearn.linear_model import LogisticRegression
 
         X, y = _make_multiclass()
-        est = OneVsRestClassifier(
-            LogisticRegression(random_state=0, max_iter=300)
-        ).fit(X, y)
+        est = OneVsRestClassifier(LogisticRegression(random_state=0, max_iter=300)).fit(X, y)
         onx = to_onnx(est, (X,))
         onnx.checker.check_model(onnx.shape_inference.infer_shapes(onx))
         sess = self.check_ort(onx)
         label, proba = sess.run(None, {"X": X})
         self.assertEqualArray(est.predict(X).astype(np.int64), label)
-        self.assertEqualArray(
-            est.predict_proba(X).astype(np.float32), proba, atol=1e-5
-        )
+        self.assertEqualArray(est.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
 
 @requires_sklearn("1.4")
