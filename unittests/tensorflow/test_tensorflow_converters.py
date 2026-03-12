@@ -1309,5 +1309,68 @@ class TestTensorflowMathConverters(ExtTestCase):
         self.assertEqualArray(expected, result)
 
 
+@requires_tensorflow("2.18")
+class TestTensorflowNnOpConverters(ExtTestCase):
+    """Tests for the tf.nn op converters in nn_ops.py."""
+
+    def _run_unary_op(self, tf_fn, x, disable_ort=False):
+        """Trace tf_fn(x) to ONNX and compare TF vs ONNX vs ORT results."""
+
+        @tf.function
+        def model(inp):
+            return tf_fn(inp)
+
+        onx = to_onnx(model, (x,), input_names=["X"])
+        expected = model(x).numpy()
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X:0": x})[0]
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+        if disable_ort:
+            return onx
+        ort_result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+        return onx
+
+    def test_elu(self):
+        """TF Elu (tf.nn.elu) → ONNX Elu."""
+        x = np.random.rand(3, 4).astype(np.float32) * 4 - 2
+        onx = self._run_unary_op(tf.nn.elu, x)
+        self.assertIn("Elu", [n.op_type for n in onx.graph.node])
+
+    def test_selu(self):
+        """TF Selu (tf.nn.selu) → ONNX Selu."""
+        x = np.random.rand(3, 4).astype(np.float32) * 4 - 2
+        onx = self._run_unary_op(tf.nn.selu, x)
+        self.assertIn("Selu", [n.op_type for n in onx.graph.node])
+
+    def test_leaky_relu(self):
+        """TF LeakyRelu (tf.nn.leaky_relu) → ONNX LeakyRelu."""
+        x = np.random.rand(3, 4).astype(np.float32) * 4 - 2
+
+        @tf.function
+        def model(inp):
+            return tf.nn.leaky_relu(inp, alpha=0.2)
+
+        onx = to_onnx(model, (x,), input_names=["X"])
+        expected = model(x).numpy()
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X:0": x})[0]
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+        ort_result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
+        self.assertIn("LeakyRelu", [n.op_type for n in onx.graph.node])
+
+    def test_log_softmax(self):
+        """TF LogSoftmax (tf.nn.log_softmax) → ONNX LogSoftmax."""
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = self._run_unary_op(tf.nn.log_softmax, x)
+        self.assertIn("LogSoftmax", [n.op_type for n in onx.graph.node])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
