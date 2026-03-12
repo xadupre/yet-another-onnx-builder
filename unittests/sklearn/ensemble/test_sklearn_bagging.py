@@ -5,7 +5,7 @@ Unit tests for the BaggingClassifier and BaggingRegressor converters.
 import unittest
 import numpy as np
 from sklearn.ensemble import BaggingClassifier, BaggingRegressor
-from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge
+from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
