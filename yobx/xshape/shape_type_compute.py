@@ -1100,6 +1100,33 @@ def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
     )
 
 
+def _compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
+    if -1 not in shape2:
+        return shape2
+    total_int1 = np.prod([i for i in shape1 if isinstance(i, int)])
+    if total_int1 == 0:
+        return tuple(s if s != -1 else 0 for s in shape2)
+    total_int2 = np.prod([i for i in shape2 if isinstance(i, int) and i != -1])
+    if total_int1 > total_int2 and total_int1 % total_int2 == 0:
+        intpart = total_int1 // total_int2
+    else:
+        intpart = f"{total_int1}//{total_int2}"
+    exist1 = {s for s in shape1 if isinstance(s, str)}
+    exist2 = {s for s in shape2 if isinstance(s, str)}
+    common = exist1 & exist2
+    left1 = exist1 - common
+    left2 = exist2 - common
+    if left2:
+        resp = "x".join(f"({s})" for s in left1)
+        resm = "x".join(f"({s})" for s in left2)
+        ok = f"{resp}//({resm})"
+    else:
+        ok = resp
+    if intpart != 1:
+        ok = f"{ok}*{intpart}"
+    return tuple(s if s != -1 else ok for s in shape2)
+
+
 def _set_shape_type_op_any_reshape(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Reshape."
     if self.has_device(node.input[0]):
@@ -1124,6 +1151,11 @@ def _set_shape_type_op_any_reshape(self: ShapeBuilder, node: NodeProto):
                 if new_shape is not None:
                     self.set_shape(k, new_shape, allow_zero=0 in sh)
                     return new_shape
+        if self.has_shape(node.input[0]):
+            combined_shape = _compute_reshape_shape(self.get_shape(node.input[0]), value)
+            if combined_shape is not None:
+                self.set_shape(node.output[0], combined_shape, allow_zero=0 in combined_shape)
+                return combined_shape
 
     if self.has_shape(node.input[1]):
         rk = self.get_shape(node.input[1])
@@ -1188,6 +1220,7 @@ def _set_shape_type_op_any_size(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Slice."
+    # TODO: complete when shape are available
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):

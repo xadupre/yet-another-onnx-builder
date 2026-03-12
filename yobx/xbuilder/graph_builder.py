@@ -4476,6 +4476,18 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         node.doc_string += ".\n" + self._info_shape_type(node.output) + "\n"
 
+        assert not self._debug_shape_missing or all(
+            self.has_shape(o) for o in node.output if o
+        ), (
+            f"One output among {node.output} shape is missing in "
+            f"{[(self.get_shape(o) if self.has_shape(o) else '?') for o in node.output if o]}, "
+            f"({shape_set=})"
+            f"\ninput shapes are "
+            f"{[(self.get_shape(i) if self.has_shape(i) else '?') for i in node.input if i]}"
+            f"\nvalue shapes are "
+            f"{[self.value_as_shape(i) for i in node.input if i]}"
+            f"\nnode is {self.pretty_node(node)}{self.get_debug_msg()}"
+        )
         if len(output_names) == 1:
             return output_names[0]
         return tuple(output_names)

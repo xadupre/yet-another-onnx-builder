@@ -364,6 +364,7 @@ class EasyPatternOptimization(PatternOptimization):
             itype = string_to_elem_type(ann)
             g2.make_tensor_input(name, itype, None, False, marker=f"_build_pattern2_{name}")
 
+        assert not g2._debug_shape_missing
         self.add_local_functions_to_builder(g2)
         output = fct(g2, *args, **kwargs)
         if isinstance(output, str):

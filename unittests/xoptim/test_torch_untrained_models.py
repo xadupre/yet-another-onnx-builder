@@ -243,6 +243,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         produces at least one local function (e.g. a fused attention function).
         """
         proto = self._export_tiny_llm(opset=22, patterns="default")
+        self.dump_onnx("test_tiny_llm_shape_default_opset_22.onnx", proto)
         missing = self._get_missing_shapes(proto)
         self.assertEqual(
             [],
