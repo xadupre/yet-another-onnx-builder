@@ -6,3 +6,4 @@ yobx.sklearn.neighbors
     :caption: modules
 
     kneighbors
+    radiusneighbors

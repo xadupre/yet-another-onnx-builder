@@ -5,6 +5,9 @@ yobx.sklearn.preprocessing
     :maxdepth: 1
     :caption: modules
 
+    binarizer
     min_max_scaler
     spline_transformer
+    quantile_transformer
+    polynomial_features
     standard_scaler
