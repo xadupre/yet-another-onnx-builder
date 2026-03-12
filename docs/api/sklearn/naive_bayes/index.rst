@@ -5,4 +5,5 @@ yobx.sklearn.naive_bayes
     :maxdepth: 1
     :caption: modules
 
+    categorical_nb
     nb
