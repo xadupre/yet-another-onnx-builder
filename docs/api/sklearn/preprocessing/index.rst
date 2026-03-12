@@ -5,6 +5,7 @@ yobx.sklearn.preprocessing
     :maxdepth: 1
     :caption: modules
 
+    kbins_discretizer
     binarizer
     min_max_scaler
     one_hot_encoder
