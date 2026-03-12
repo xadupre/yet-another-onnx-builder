@@ -176,7 +176,7 @@ def to_dot(model: onnx.ModelProto) -> str:
             continue
 
         sess = Inference(node)
-        value = sess.run(None, {})[0]
+        value = sess.run(None, {})[0]  # type: ignore
         inits.append(onh.from_array(value, name=node.output[0]))
 
     for init in inits:

@@ -8,14 +8,14 @@ yobx.sklearn
     convert
     register
     sklearn_helper
-    cluster/index
-    compose/index
 
 .. toctree::
     :maxdepth: 1
     :caption: converters
 
     calibration/index
+    cluster/index
+    compose/index
     decomposition/index
     discriminant_analysis/index
     dummy/index
