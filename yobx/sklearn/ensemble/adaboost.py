@@ -105,9 +105,7 @@ def sklearn_adaboost_classifier(
         )
         # one_hot_bool: (N, C) — True where label[i] matches classes_[k]
         one_hot_bool = g.op.Equal(label_2d, classes_const, name=f"{sub_name}_eq")
-        one_hot = g.op.Cast(
-            one_hot_bool, to=itype, name=f"{sub_name}_cast"
-        )
+        one_hot = g.op.Cast(one_hot_bool, to=itype, name=f"{sub_name}_cast")
         g.set_type(one_hot, itype)
 
         # SAMME vote: wᵢ where predicted class, -wᵢ/(C-1) elsewhere.
@@ -123,13 +121,11 @@ def sklearn_adaboost_classifier(
     # Sum votes across all estimators → (N, C)
     total_votes: str = vote_tensors[0]
     for vt in vote_tensors[1:]:
-        total_votes = g.op.Add(total_votes, vt, name=f"{name}_add_votes")
+        total_votes = g.op.Add(total_votes, vt, name=f"{name}_add_votes")  # type: ignore
         g.set_type(total_votes, itype)
 
     # Divide by total weight → decision (N, C)
-    decision = g.op.Div(
-        total_votes, weight_sum, name=f"{name}_decision"
-    )
+    decision = g.op.Div(total_votes, weight_sum, name=f"{name}_decision")
     g.set_type(decision, itype)
 
     # ------------------------------------------------------------------
@@ -149,12 +145,8 @@ def sklearn_adaboost_classifier(
         g.set_type(decision_1d, itype)
 
         # predict: classes_.take(decision_1d > 0)
-        pred_gt0 = g.op.Greater(
-            decision_1d, np.array(0.0, dtype=dtype), name=f"{name}_gt0"
-        )
-        pred_idx = g.op.Cast(
-            pred_gt0, to=onnx.TensorProto.INT64, name=f"{name}_idx"
-        )
+        pred_gt0 = g.op.Greater(decision_1d, np.array(0.0, dtype=dtype), name=f"{name}_gt0")
+        pred_idx = g.op.Cast(pred_gt0, to=onnx.TensorProto.INT64, name=f"{name}_idx")
         label = _build_label_output(g, pred_idx, classes, outputs, name)
 
         if emit_proba:
@@ -167,9 +159,7 @@ def sklearn_adaboost_classifier(
             neg_dec = g.op.Neg(dec_2d, name=f"{name}_neg_dec")
             stacked = g.op.Concat(neg_dec, dec_2d, axis=1, name=f"{name}_stack")
             half = g.op.Div(stacked, np.array(2.0, dtype=dtype), name=f"{name}_half")
-            proba = g.op.Softmax(
-                half, axis=1, name=f"{name}_softmax", outputs=outputs[1:]
-            )
+            proba = g.op.Softmax(half, axis=1, name=f"{name}_softmax", outputs=outputs[1:])
             assert isinstance(proba, str)
             return label, proba
 
@@ -180,9 +170,7 @@ def sklearn_adaboost_classifier(
     # ------------------------------------------------------------------
     # predict: classes_.take(argmax(decision, axis=1))
     winner_raw = g.op.ArgMax(decision, axis=1, keepdims=0, name=f"{name}_argmax")
-    winner_idx = g.op.Cast(
-        winner_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast_winner"
-    )
+    winner_idx = g.op.Cast(winner_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast_winner")
     label = _build_label_output(g, winner_idx, classes, outputs, name)
 
     if emit_proba:
@@ -190,9 +178,7 @@ def sklearn_adaboost_classifier(
         proba_decision = g.op.Div(
             decision, np.array(n_classes - 1, dtype=dtype), name=f"{name}_proba_div"
         )
-        proba = g.op.Softmax(
-            proba_decision, axis=1, name=f"{name}_softmax", outputs=outputs[1:]
-        )
+        proba = g.op.Softmax(proba_decision, axis=1, name=f"{name}_softmax", outputs=outputs[1:])
         assert isinstance(proba, str)
         return label, proba
 
@@ -297,9 +283,7 @@ def sklearn_adaboost_regressor(
     # ------------------------------------------------------------------
     # weights_sorted[i, j] = estimator_weights_[sorted_idx[i, j]]
     weights_const = weights  # shape (E,)
-    weights_sorted = g.op.Gather(
-        weights_const, sorted_idx, axis=0, name=f"{name}_gather_w"
-    )
+    weights_sorted = g.op.Gather(weights_const, sorted_idx, axis=0, name=f"{name}_gather_w")
 
     # Cumulative sum along estimator axis → (N, E)
     cumsum = g.op.CumSum(
@@ -309,12 +293,8 @@ def sklearn_adaboost_regressor(
     )
 
     # Find first position where cumsum >= 0.5 * total_weight
-    at_or_above = g.op.GreaterOrEqual(
-        cumsum, half_total, name=f"{name}_ge"
-    )
-    at_or_above_int = g.op.Cast(
-        at_or_above, to=onnx.TensorProto.INT64, name=f"{name}_cast_bool"
-    )
+    at_or_above = g.op.GreaterOrEqual(cumsum, half_total, name=f"{name}_ge")
+    at_or_above_int = g.op.Cast(at_or_above, to=onnx.TensorProto.INT64, name=f"{name}_cast_bool")
     median_pos = g.op.ArgMax(
         at_or_above_int, axis=1, keepdims=0, name=f"{name}_median_pos"
     )  # (N,)
