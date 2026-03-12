@@ -6,3 +6,4 @@ yobx.sklearn.decomposition
     :caption: modules
 
     pca
+    pls_regression
