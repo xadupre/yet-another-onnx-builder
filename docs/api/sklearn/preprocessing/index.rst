@@ -7,6 +7,7 @@ yobx.sklearn.preprocessing
 
     binarizer
     min_max_scaler
+    one_hot_encoder
     robust_scaler
     quantile_transformer
     polynomial_features
