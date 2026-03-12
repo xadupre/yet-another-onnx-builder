@@ -3,9 +3,12 @@ from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Union, Tuple
 import numpy as np
 import onnx
+from onnx import numpy_helper as onnx_numpy_helper
+from onnx.model_container import make_large_tensor_proto
 import onnx_ir as ir
 from ...typing import GraphBuilderExtendedProtocol, OpsetProtocol
 from ...container import ExtendedModelContainer
+from ...helpers.helper import size_type
 from ...helpers.onnx_helper import _default_OPSET_TO_IR_VERSION
 from ...xshape.shape_type_compute import set_type_shape_unary_op
 from ...xshape._shape_helper import DYNAMIC_SHAPE
@@ -615,6 +618,9 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
 
     def to_onnx(
         self,
+        large_model: bool = False,
+        external_threshold: int = 1024,
+        inline: bool = True,
     ) -> Union[
         onnx.FunctionProto,
         onnx.ModelProto,
@@ -622,7 +628,15 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         ExtendedModelContainer,
         Dict[str, Any],
     ]:
-        """Exports the graph as an ONNX :class:`~onnx.ModelProto`."""
+        """Exports the graph as an ONNX :class:`~onnx.ModelProto`.
+
+        :param large_model: if True returns a :class:`onnx.model_container.ModelContainer`,
+            it lets the user to decide later if the weights should be part of the model
+            or saved as external weights
+        :param external_threshold: if large_model is True, every tensor above this limit
+            (in bytes) is stored as external
+        :param inline: inline local function it any (this is currently not used)
+        """
         ir_model = ir.Model(self._graph, ir_version=self.ir_version)
         proto = ir.to_proto(ir_model)
 
@@ -635,4 +649,33 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
             ) and not value_info.type.tensor_type.HasField("shape"):
                 value_info.type.tensor_type.shape.CopyFrom(onnx.TensorShapeProto())
 
-        return proto
+        if not large_model:
+            return proto
+
+        # Extract initializers that exceed the threshold into an ExtendedModelContainer.
+        large_initializers: Dict[str, np.ndarray] = {}
+        new_initializers = []
+        for init in proto.graph.initializer:
+            size = int(np.prod(init.dims) if init.dims else 1) * size_type(init.data_type)
+            if size >= external_threshold:
+                # The location must start with '#' so that onnx's check_model
+                # skips it (it is treated as an in-memory external reference).
+                location = f"#{init.name}"
+                arr = onnx_numpy_helper.to_array(init)
+                large_tensor = make_large_tensor_proto(
+                    location, init.name, init.data_type, list(init.dims)
+                )
+                new_initializers.append(large_tensor)
+                large_initializers[location] = arr
+            else:
+                new_initializers.append(init)
+
+        del proto.graph.initializer[:]
+        proto.graph.initializer.extend(new_initializers)
+
+        lm = ExtendedModelContainer()
+        lm.model_proto = proto
+        if large_initializers:
+            lm.set_large_initializers(large_initializers)
+            lm.check_large_initializers()
+        return lm

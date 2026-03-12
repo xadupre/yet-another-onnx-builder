@@ -211,6 +211,7 @@ To extend the built-in op coverage:
 
     # yobx/tensorflow/ops/reduce.py
     import numpy as np
+    from onnx import TensorProto
     from ..register import register_tf_op_converter
     from ...xbuilder import GraphBuilder
 
@@ -218,8 +219,10 @@ To extend the built-in op coverage:
     @register_tf_op_converter("Sum")
     def convert_reduce_sum(g: GraphBuilder, sts: dict, outputs: list, op) -> str:
         """TF ``Sum`` → ONNX ``ReduceSum``."""
-        axes = op.inputs[1].name  # axis tensor
         keepdims = int(op.get_attr("keep_dims"))
+        # TF may pass a 0-D scalar for single-axis reductions; ONNX requires 1-D.
+        axes_i64 = g.op.Cast(op.inputs[1].name, to=TensorProto.INT64, name=f"{op.name}_cast")
+        axes = g.op.Reshape(axes_i64, np.array([-1], dtype=np.int64), name=f"{op.name}_axes")
         return g.op.ReduceSum(
             op.inputs[0].name, axes, keepdims=keepdims, outputs=outputs, name=op.name
         )

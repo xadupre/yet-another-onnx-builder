@@ -978,6 +978,40 @@ def aten_argmax(
     return res
 
 
+def aten_argmin(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[int] = None,
+    keepdim: bool = False,
+) -> T:
+    "argmin"
+    if dim is None:
+        xf = g.op.Reshape(x, g.MINUS_ONE)
+        res = g.op.SqueezeAnyOpset(
+            g.op.ArgMin(xf, keepdims=(1 if keepdim else 0)),
+            outputs=outputs,
+            name="argmin",
+        )
+    elif isinstance(dim, int):
+        res = g.op.ArgMin(
+            x, axis=dim, keepdims=1 if keepdim else 0, outputs=outputs, name="argmin"
+        )
+    else:
+        raise RuntimeError(f"Unexpected type {type(dim)} for dim")
+    if not sts:
+        g.set_type(res, TensorProto.INT64)
+        if dim is None:
+            g.set_shape(res, (1,))
+        elif g.has_shape(x):
+            sh = g.get_shape(x)
+            g.set_shape(res, (sh[dim],))
+        else:
+            g.set_rank(res, 1)
+    return res
+
+
 def aten_argsort(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],

@@ -385,6 +385,93 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(pipe.predict(X), label)
         self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
+    def test_standard_scaler_large_model(self):
+        """to_onnx with large_model=True returns an ExtendedModelContainer."""
+        from yobx.container import ExtendedModelContainer
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        ss = StandardScaler()
+        ss.fit(X)
+
+        container = to_onnx(ss, (X,), large_model=True)
+        self.assertIsInstance(container, ExtendedModelContainer)
+
+    def test_logistic_regression_large_model(self):
+        """to_onnx with large_model=True returns an ExtendedModelContainer."""
+        from yobx.container import ExtendedModelContainer
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X).astype(np.float32)
+        lr = LogisticRegression()
+        lr.fit(X_scaled, y)
+
+        container = to_onnx(lr, (X,), large_model=True)
+        self.assertIsInstance(container, ExtendedModelContainer)
+
+
+@requires_sklearn("1.4")
+class TestGetSklearnEstimatorCoverage(ExtTestCase):
+    def setUp(self):
+        from yobx.sklearn import register_sklearn_converters
+
+        register_sklearn_converters()
+
+    def test_returns_list_of_dicts(self):
+        from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+        rows = get_sklearn_estimator_coverage()
+        self.assertIsInstance(rows, list)
+        self.assertGreater(len(rows), 0)
+        for row in rows:
+            self.assertIn("name", row)
+            self.assertIn("cls", row)
+            self.assertIn("module", row)
+            self.assertIn("yobx", row)
+            self.assertIn("predictable", row)
+
+    def test_known_yobx_converters_marked_true(self):
+        from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+        rows = get_sklearn_estimator_coverage()
+        by_name = {r["name"]: r for r in rows}
+        self.assertTrue(by_name["LinearRegression"]["yobx"])
+        self.assertTrue(by_name["StandardScaler"]["yobx"])
+
+    def test_transformers_included(self):
+        from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+        rows = get_sklearn_estimator_coverage()
+        names = {r["name"] for r in rows}
+        # Standard trainable transforms must be present
+        self.assertIn("StandardScaler", names)
+        self.assertIn("PCA", names)
+        self.assertIn("MinMaxScaler", names)
+
+    def test_yobx_registered_non_type_filter_classes_included(self):
+        from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+        rows = get_sklearn_estimator_coverage()
+        names = {r["name"] for r in rows}
+        # Pipeline is registered in yobx but has no _estimator_type
+        self.assertIn("Pipeline", names)
+        self.assertTrue(next(r for r in rows if r["name"] == "Pipeline")["yobx"])
+
+    def test_skl2onnx_field_is_bool_or_none(self):
+        from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+        rows = get_sklearn_estimator_coverage()
+        for row in rows:
+            self.assertIn(row["predictable"], (True, False, None))
+
+    def test_sorted_by_name(self):
+        from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+        rows = get_sklearn_estimator_coverage()
+        names = [r["name"] for r in rows]
+        self.assertEqual(names, sorted(names))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

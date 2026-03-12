@@ -110,9 +110,7 @@ Parameter      Description
 =============  =====================================================
 ``g``          :class:`GraphBuilder <yobx.xbuilder.GraphBuilder>`
                — call ``g.op.<OpType>(…)`` to emit ONNX nodes.
-``sts``        ``Dict`` of shape/type metadata provided by
-               :epkg:`scikit-learn` (empty ``{}`` in the default
-               path; reserved for future shape propagation).
+``sts``        unused
 ``outputs``    ``List[str]`` of pre-allocated output tensor names
                that the converter **must** write to.
 ``estimator``  The fitted :epkg:`scikit-learn` object.
@@ -139,137 +137,6 @@ determines the list of output tensor names for an estimator:
 * **Classifiers** default to ``["label", "probabilities"]``.
 * **Regressors** default to ``["predictions"]``.
 * Everything else defaults to ``["Y"]``.
-
-Implemented converters
-======================
-
-StandardScaler
---------------
-
-:func:`sklearn_standard_scaler
-<yobx.sklearn.preprocessing.standard_scaler.sklearn_standard_scaler>`
-converts :class:`sklearn.preprocessing.StandardScaler`.
-
-The implementation respects the ``with_mean`` and ``with_std`` flags:
-
-.. code-block:: text
-
-    X  ──Sub(mean)──►  centered  ──Div(scale)──►  output
-         (if with_mean)               (if with_std)
-
-When ``with_mean=False`` the ``Sub`` node is skipped; when
-``with_std=False`` the ``Div`` node is replaced by an ``Identity``.
-
-.. runpython::
-    :showcode:
-
-    import numpy as np
-    from sklearn.preprocessing import StandardScaler
-    from yobx.sklearn import to_onnx
-    from yobx.helpers.onnx_helper import pretty_onnx
-
-    rng = np.random.default_rng(1)
-    X = rng.standard_normal((5, 3)).astype(np.float32)
-    model = to_onnx(StandardScaler(with_std=False).fit(X), (X,))
-    print(pretty_onnx(model))
-
-LogisticRegression
-------------------
-
-:func:`sklearn_logistic_regression
-<yobx.sklearn.linear_model.logistic_regression.sklearn_logistic_regression>`
-converts :class:`sklearn.linear_model.LogisticRegression` and
-:class:`sklearn.linear_model.LogisticRegressionCV`.
-
-The graph structure depends on the number of classes:
-
-**Binary classification** (``coef_.shape[0] == 1``):
-
-.. code-block:: text
-
-    X  ──Gemm(coef, intercept)──►  decision
-                                       │
-                              ┌────────┴────────┐
-                           Sigmoid           Sub(1, ·)
-                              │                  │
-                           proba_pos          proba_neg
-                              └────────┬────────┘
-                                    Concat  ──►  probabilities
-                                       │
-                                    ArgMax ──Cast──Gather(classes) ──►  label
-
-**Multiclass** (``coef_.shape[0] > 1``):
-
-.. code-block:: text
-
-    X  ──Gemm(coef, intercept)──►  decision
-                                       │
-                                   Softmax  ──►  probabilities
-                                       │
-                                   ArgMax ──Cast──Gather(classes)  ──►  label
-
-PCA
----
-
-:func:`sklearn_pca
-<yobx.sklearn.decomposition.pca.sklearn_pca>`
-converts :class:`sklearn.decomposition.PCA`.
-
-The implementation centres the input (when ``mean_`` is not ``None``) and
-then projects it onto the principal components:
-
-.. code-block:: text
-
-    X  ──Sub(mean_)──►  centered  ──MatMul(components_.T)──►  output
-         (if mean_ is not None)
-
-When ``mean_`` is ``None`` the ``Sub`` node is skipped.
-
-.. runpython::
-    :showcode:
-
-    import numpy as np
-    from sklearn.decomposition import PCA
-    from yobx.sklearn import to_onnx
-    from yobx.helpers.onnx_helper import pretty_onnx
-
-    rng = np.random.default_rng(0)
-    X = rng.standard_normal((10, 4)).astype(np.float32)
-    model = to_onnx(PCA(n_components=2).fit(X), (X,))
-    print(pretty_onnx(model))
-
-Pipeline
---------
-
-:func:`sklearn_pipeline
-<yobx.sklearn.pipeline.pipeline.sklearn_pipeline>`
-converts :class:`sklearn.pipeline.Pipeline` by iterating over the
-pipeline steps and chaining each step's converter output into the
-next step's input.  Intermediate tensor names are generated with
-:meth:`GraphBuilder.unique_name <yobx.xbuilder.GraphBuilder.unique_name>`
-to avoid collisions.
-
-.. gdot::
-    :script: DOT-SECTION
-
-    import numpy as np
-    from sklearn.pipeline import Pipeline
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.linear_model import LogisticRegression
-    from yobx.sklearn import to_onnx
-    from yobx.helpers.dot_helper import to_dot
-
-    rng = np.random.default_rng(2)
-    X = rng.standard_normal((20, 4)).astype(np.float32)
-    y = (X[:, 0] > 0).astype(np.int64)
-
-    pipe = Pipeline([
-        ("scaler", StandardScaler()),
-        ("clf", LogisticRegression()),
-    ]).fit(X, y)
-
-    model = to_onnx(pipe, (X,))
-    print("DOT-SECTION", to_dot(model))
 
 Adding a new converter
 ======================

@@ -21,8 +21,7 @@ import pandas
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from yobx import doc
 from yobx.helpers import string_type
-
-# from yobx.helpers.rt_helper import onnx_generate
+from yobx.helpers.rt_helper import onnx_generate
 from yobx.torch import (
     register_flattening_functions,
     apply_patches_for_model,
@@ -176,21 +175,26 @@ data = observer.check_discrepancies(filename, progress_bar=True)
 print(pandas.DataFrame(data))
 
 # %%
+# %%
 # ONNX Prompt
 # +++++++++++
+#
+# :func:`onnx_generate <yobx.helpers.rt_helper.onnx_generate>` runs the
+# exported ONNX model in a greedy auto-regressive loop, feeding the
+# *present* key/value tensors back as *past* key/values on every subsequent
+# call, just like the HuggingFace ``generate`` method.
 
-# not yet implemented
-# onnx_tokens = onnx_generate(
-#    filenamec,
-#    input_ids=inputs["input_ids"],
-#    attention_mask=inputs["attention_mask"],
-#    eos_token_id=model.config.eos_token_id,
-#    max_new_tokens=50,
-# )
-# onnx_generated_text = tokenizer.decode(onnx_tokens, skip_special_tokens=True)
-# print("-----------------")
-# print("\n".join(onnx_generated_text))
-# print("-----------------")
+onnx_tokens = onnx_generate(
+    filenamec,
+    input_ids=inputs["input_ids"],
+    attention_mask=inputs["attention_mask"],
+    eos_token_id=model.config.eos_token_id,
+    max_new_tokens=50,
+)
+onnx_generated_text = tokenizer.decode(onnx_tokens[0], skip_special_tokens=True)
+print("-----------------")
+print(onnx_generated_text)
+print("-----------------")
 
 # %%
 doc.save_fig(doc.plot_dot(filename), f"{filename}.png", dpi=400)

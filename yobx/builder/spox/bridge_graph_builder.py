@@ -706,8 +706,20 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
     # Export
     # ------------------------------------------------------------------
 
-    def to_onnx(self) -> onnx.ModelProto:
-        """Exports the accumulated graph as an :class:`onnx.ModelProto`."""
+    def to_onnx(
+        self,
+        large_model: bool = False,
+        external_threshold: int = 1024,
+        inline: bool = True,
+    ) -> onnx.ModelProto:
+        """Exports the accumulated graph as an :class:`onnx.ModelProto`.
+
+        :param large_model: currently unused; present for API compatibility
+            with :class:`yobx.xbuilder.GraphBuilder`
+        :param external_threshold: currently unused; present for API compatibility
+            with :class:`yobx.xbuilder.GraphBuilder`
+        :param inline: inline local functions (this is currently not used)
+        """
         inputs_dict = {n: self._name_to_var[n] for n in self._input_names}
         outputs_dict = {n: self._name_to_var[n] for n in self._output_names}
 

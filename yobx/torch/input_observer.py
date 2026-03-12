@@ -1,7 +1,7 @@
 import contextlib
 import inspect
 import time
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Generator, Sequence
 import onnx
 import torch
 import torch.utils._pytree as pytree
@@ -173,7 +173,7 @@ class InputCandidate:
         flat_shapes = self._flatten_nested_object(dynamic_shapes)
         if len(flat_shapes) > len(self.flat_list):
             raise RuntimeError(
-                f"The flatten dynamic shapes has not the same size ({len(flat_shapes)})"
+                f"The flatten dynamic shapes has not the same size ({len(flat_shapes)}) "
                 f"than the flat list of tensors ({len(self.flat_list)})."
             )
         for shape, tensor in zip(flat_shapes, self.flat_list):
@@ -1054,7 +1054,7 @@ class InputObserver:
         model: torch.nn.Module,
         store_n_calls: int = 3,
         method_name: str = "forward",
-    ):
+    ) -> Generator:
         """Starts collecting inputs and outputs of a specific method.
         The model method is replaced by a new one collecting tensors
         before and after the inner one is called.

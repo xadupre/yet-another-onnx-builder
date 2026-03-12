@@ -124,17 +124,25 @@ can choose the right operator variant or register an additional domain
    * - ``main_opset``
      - Read-only property.  Returns the opset version for the main ONNX
        domain (``""``).  Equivalent to ``g.opsets[""]``.
+   * - ``has_opset(domain)``
+     - Returns the opset version (an ``int``) for *domain*, or ``0`` if the
+       domain is not registered.  Because ``0`` is falsy and any valid version
+       is truthy, the return value can be used directly in a boolean context:
+       ``if g.has_opset("ai.onnx.ml"): ...``.
    * - ``get_opset(domain, exc=True)``
      - Returns the opset version for *domain*.  When ``exc=True`` (default)
        an ``AssertionError`` is raised if the domain is not registered;
-       set ``exc=False`` to get ``None`` instead.
-   * - ``add_domain(domain, version=1)``
+       set ``exc=False`` to get ``0`` instead.
+   * - ``set_opset(domain, version=1)``
      - Registers *domain* with the given *version*.  If the domain is already
-       registered, the call is a no-op (provided *version* matches).
+       registered with the same version the call is a no-op; a version
+       mismatch raises an ``AssertionError``.
+   * - ``add_domain(domain, version=1)``
+     - Deprecated alias for ``set_opset``.
 
 A converter that targets the main ONNX domain only needs to read
 ``g.main_opset``.  A converter that also emits nodes from a secondary domain
-(e.g. ``"ai.onnx.ml"``) should first call ``g.add_domain(domain, version)``
+(e.g. ``"ai.onnx.ml"``) should first call ``g.set_opset(domain, version)``
 to ensure the domain is recorded in the exported model, then query its
 version with ``g.get_opset(domain)``.
 
@@ -148,10 +156,13 @@ version with ``g.get_opset(domain)``.
         opset = g.main_opset
 
         # Register and query the ai.onnx.ml domain when needed.
-        g.add_domain("ai.onnx.ml", 3)
+        g.set_opset("ai.onnx.ml", 3)
         ml_opset = g.get_opset("ai.onnx.ml")
 
-        if opset >= 20:
+        # Check whether an optional domain is already registered.
+        if g.has_opset("com.microsoft"):
+            result = g.op.MicrosoftOp(X)
+        elif opset >= 20:
             result = g.op.SomeNewOp(X)
         else:
             result = g.op.SomeLegacyOp(X)
@@ -257,7 +268,7 @@ The helper :meth:`set_type_shape_unary_op
     return result
 
 Alternative implementations
-============================
+===========================
 
 Any class that satisfies the two-part API above can be passed as
 ``builder_cls``.  The package ships with:

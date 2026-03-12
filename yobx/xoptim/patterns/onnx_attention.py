@@ -234,7 +234,6 @@ class FunctionAttentionPattern(PatternOptimization):
                     oh.make_tensor_value_info('init7_s4_0_8_-1_32', onnx.TensorProto.INT64, (4,)),
                     oh.make_tensor_value_info('init7_s5_1_1_2_1_1', onnx.TensorProto.INT64, (5,)),
                 ],
-                "fused",
                 [
                     oh.make_tensor_value_info('init1_s_::RSh1', onnx.TensorProto.FLOAT, (1,)),
                     oh.make_tensor_value_info('query', onnx.TensorProto.FLOAT,

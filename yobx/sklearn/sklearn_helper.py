@@ -1,5 +1,6 @@
 from typing import Sequence
 from sklearn.base import BaseEstimator, ClusterMixin, is_classifier, is_regressor
+from sklearn.mixture._base import BaseMixture
 from sklearn.pipeline import Pipeline
 
 
@@ -25,7 +26,7 @@ def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
     if is_classifier(estimator):
         return 2 if _classifier_has_predict_proba(estimator) else 1
-    if isinstance(estimator, ClusterMixin):
+    if isinstance(estimator, (ClusterMixin, BaseMixture)):
         return 2
     return 1
 
@@ -35,14 +36,14 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
     if hasattr(estimator, "get_feature_names_out"):
         if isinstance(estimator, Pipeline):
             last_step = estimator.steps[-1][1]
-            if not isinstance(last_step, ClusterMixin):
+            if not isinstance(last_step, ClusterMixin) and not is_classifier(last_step):
                 try:
                     return post_process_output_names(
                         last_step, list(last_step.get_feature_names_out())
                     )
                 except AttributeError:
                     pass
-        elif not isinstance(estimator, ClusterMixin):
+        elif not isinstance(estimator, ClusterMixin) and not is_classifier(estimator):
             try:
                 return post_process_output_names(
                     estimator, list(estimator.get_feature_names_out())
@@ -53,11 +54,15 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
         if _classifier_has_predict_proba(estimator):
             return ["label", "probabilities"]
         return ["label"]
+    if isinstance(estimator, BaseMixture):
+        return ["label", "probabilities"]
     if is_regressor(estimator):
         return ["predictions"]
     last = estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
     if isinstance(last, ClusterMixin):
         return ["label", "distances"]
+    if isinstance(last, BaseMixture):
+        return ["label", "probabilities"]
     return ["Y"]
 
 

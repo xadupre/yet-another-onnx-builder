@@ -4,7 +4,7 @@ import math
 import operator
 import textwrap
 import types
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
 import torch
 import torch.utils._pytree as pytree
 from torch.fx import Node
@@ -281,7 +281,7 @@ class CondCCOp(torch._ops.HigherOrderOperator):
 
 
 @contextlib.contextmanager
-def replace_problematic_function_before_tracing():
+def replace_problematic_function_before_tracing() -> Generator:
     """
     Replaces function that cannot be traced with the default tracer
     such as :func:`torch.cat`.

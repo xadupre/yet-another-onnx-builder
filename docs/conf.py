@@ -35,6 +35,29 @@ if shutil.which("latex"):
 graphviz_output_format = "svg"
 graphviz_dot_args = ["-Gbgcolor=transparent"]
 
+mermaid_init_js = """
+document.addEventListener("DOMContentLoaded", function () {
+    // piccolo_theme sets data-mode="dark" or "darkest" on <html> for dark variants.
+    const darkModes = ["dark", "darkest"];
+    function getMermaidTheme() {
+        const mode = document.documentElement.getAttribute("data-mode");
+        return darkModes.includes(mode) ? "dark" : "default";
+    }
+    mermaid.initialize({ startOnLoad: true, theme: getMermaidTheme() });
+    new MutationObserver(function () {
+        const theme = getMermaidTheme();
+        document.querySelectorAll(".mermaid[data-processed]").forEach(function (el) {
+            el.removeAttribute("data-processed");
+        });
+        mermaid.initialize({ startOnLoad: false, theme: theme });
+        mermaid.run();
+    }).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-mode"],
+    });
+});
+"""
+
 templates_path = ["_templates"]
 exclude_patterns = ["_build"]
 html_theme = "piccolo_theme"
@@ -136,6 +159,8 @@ epkg_dictionary = {
     "HuggingFace": "https://huggingface.co/docs/hub/en/index",
     "huggingface_hub": "https://github.com/huggingface/huggingface_hub",
     "ir-py": "https://onnx.ai/ir-py/",
+    "lightgbm": "https://lightgbm.readthedocs.io/en/latest/",
+    "LightGBM": "https://lightgbm.readthedocs.io/en/latest/",
     "Linux": "https://www.linux.org/",
     "ml_dtypes": "https://github.com/jax-ml/ml_dtypes",
     "ModelBuilder": "https://onnxruntime.ai/docs/genai/howto/build-model.html",
@@ -188,6 +213,7 @@ epkg_dictionary = {
     "vocos": "https://github.com/gemelo-ai/vocos",
     "Windows": "https://www.microsoft.com/windows",
     "xgboost": "https://xgboost.readthedocs.io/en/stable/get_started.html",
+    "XGBoost": "https://xgboost.readthedocs.io/en/stable/get_started.html",
 }
 
 # models

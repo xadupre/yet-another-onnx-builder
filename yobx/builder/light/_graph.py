@@ -83,6 +83,59 @@ class OnnxGraph:
         "Returns the output names."
         return [v.name for v in self.outputs]
 
+    @property
+    def main_opset(self) -> int:
+        """Returns the opset version for the main ONNX domain (``""``)."""
+        return self.opset if self.opset is not None else onnx_opset_version() - 1
+
+    def has_opset(self, domain: str) -> int:
+        """
+        Returns the opset version for *domain*, or ``0`` if not registered.
+
+        :param domain: domain name
+        :return: opset version, or ``0`` if the domain is unknown
+        """
+        if domain == "":
+            return self.main_opset
+        if self.opsets is None:
+            return 0
+        return self.opsets.get(domain, 0)
+
+    def get_opset(self, domain: str, exc: bool = True) -> int:
+        """
+        Returns the opset version for *domain*.
+
+        :param domain: domain name
+        :param exc: raise an ``AssertionError`` if the domain is not registered
+        :return: version or ``0`` when *exc* is ``False`` and the domain is unknown
+        """
+        version = self.has_opset(domain)
+        assert not exc or version, f"Domain {domain!r} is not registered."
+        return version
+
+    def set_opset(self, domain: str, version: int = 1) -> None:
+        """
+        Registers *domain* with the given opset *version*.
+
+        If the domain is already registered with the same version this call is a
+        no-op.  A version mismatch raises an ``AssertionError``.
+
+        :param domain: domain name
+        :param version: opset version (default: ``1``)
+        """
+        existing = self.has_opset(domain)
+        if existing:
+            assert (
+                existing == version
+            ), f"Version mismatch for domain {domain!r}: existing={existing}, new={version}"
+            return
+        if domain == "":
+            self.opset = version
+        else:
+            if self.opsets is None:
+                self.opsets = {}
+            self.opsets[domain] = version
+
     def has_name(self, name: str) -> bool:
         "Returns ``True`` if *name* is already registered."
         return name in self.unique_names_

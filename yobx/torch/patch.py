@@ -1,6 +1,6 @@
 import contextlib
 import traceback
-from typing import Iterator, Optional
+from typing import Generator, Optional
 import torch
 from ..helpers.patch_helper import PatchDetails
 
@@ -19,13 +19,13 @@ def retrieve_stacktrace():
     return "\n".join(rows)
 
 
-@contextlib.contextmanager
+@contextlib.contextmanager  # type: ignore
 def apply_patches_for_model(
     patch_torch: bool = False,
     patch_transformers: bool = False,
     verbose: int = 0,
     model: Optional[torch.nn.Module] = None,
-) -> Iterator[PatchDetails]:
+) -> Generator[PatchDetails, None, None]:
     """
     The context manager apply patches, usually before exporting a model.
 

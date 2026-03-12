@@ -721,7 +721,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         else ((prefix, k) if isinstance(prefix, (str, int)) else (*prefix, k))
                     )
                     u = _unfold(v, p)
-                    res.extend(u)
+                    res.extend(u)  # type: ignore
                 return res
             if isinstance(obj, (list, tuple)):
                 res = []
@@ -734,10 +734,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         else ((prefix, k) if isinstance(prefix, (str, int)) else (*prefix, k))
                     )
                     u = _unfold(v, p)
-                    res.extend(u)
+                    res.extend(u)  # type: ignore
                 return res
             if self._has_torch and isinstance(obj, (str, self.torch.export.dynamic_shapes._Dim)):  # type: ignore
-                _prefixes.append(prefix)
+                _prefixes.append(prefix)  # type: ignore
                 return [(prefix, obj)]
             raise TypeError(f"Unexpected type {type(obj)} and prefix={prefix!r}")
 

@@ -1,2 +1,2 @@
 def register():
-    from . import kmeans
+    from . import affinity_propagation, kmeans
