@@ -53,9 +53,9 @@ class TestAffinityPropagation(ExtTestCase):
         _labels, distances = results[0], results[1]
 
         # Distances should match Euclidean distances to cluster centers.
-        expected_distances = pairwise_distances(
-            X, ap.cluster_centers_.astype(np.float32)
-        ).astype(np.float32)
+        expected_distances = pairwise_distances(X, ap.cluster_centers_.astype(np.float32)).astype(
+            np.float32
+        )
         self.assertEqualArray(expected_distances, distances, atol=1e-3)
 
         sess = self.check_ort(onx)
