@@ -1,10 +1,9 @@
-from typing import Tuple, Dict, List, Optional, Union
+from typing import Dict, List, Optional
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline, FeatureUnion
 from ...typing import GraphBuilderExtendedProtocol
 from ...xbuilder import FunctionOptions
 from ..register import register_sklearn_converter, get_sklearn_converter
-from ..sklearn_helper import get_output_names
 from ..convert import _wrap_step_as_function
 
 
@@ -47,9 +46,9 @@ def sklearn_feature_union(
     :return: name of the output tensor
     :raises ValueError: when all transformers are ``'drop'`` (empty output)
     """
-    assert isinstance(estimator, FeatureUnion), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(
+        estimator, FeatureUnion
+    ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     transformer_weights = estimator.transformer_weights or {}
