@@ -6,5 +6,7 @@ yobx.sklearn.preprocessing
     :caption: modules
 
     kbins_discretizer
+    binarizer
     min_max_scaler
+    polynomial_features
     standard_scaler
