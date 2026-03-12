@@ -95,9 +95,7 @@ class TestSklearnStackingRegressor(ExtTestCase):
             estimators=[
                 (
                     "pipe",
-                    Pipeline(
-                        [("scaler", StandardScaler()), ("ridge", Ridge())]
-                    ),
+                    Pipeline([("scaler", StandardScaler()), ("ridge", Ridge())]),
                 ),
                 ("dt", DecisionTreeRegressor(max_depth=2, random_state=0)),
             ],

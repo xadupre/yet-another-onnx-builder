@@ -9,7 +9,6 @@ from ...typing import GraphBuilderExtendedProtocol
 from ..sklearn_helper import get_n_expected_outputs
 
 
-
 @register_sklearn_converter(StackingRegressor)
 def sklearn_stacking_regressor(
     g: GraphBuilderExtendedProtocol,
