@@ -14,9 +14,7 @@ class TestSimpleImputer(ExtTestCase):
         from sklearn.impute import SimpleImputer
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2], [np.nan, 3], [7, 6]], dtype=np.float32
-        )
+        X = np.array([[1, 2], [np.nan, 3], [7, 6]], dtype=np.float32)
         imp = SimpleImputer(strategy="mean")
         imp.fit(X)
 
@@ -39,9 +37,7 @@ class TestSimpleImputer(ExtTestCase):
         from sklearn.impute import SimpleImputer
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2], [np.nan, 3], [7, 6], [4, np.nan]], dtype=np.float32
-        )
+        X = np.array([[1, 2], [np.nan, 3], [7, 6], [4, np.nan]], dtype=np.float32)
         imp = SimpleImputer(strategy="median")
         imp.fit(X)
 
@@ -60,9 +56,7 @@ class TestSimpleImputer(ExtTestCase):
         from sklearn.impute import SimpleImputer
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2], [np.nan, 2], [1, 6]], dtype=np.float32
-        )
+        X = np.array([[1, 2], [np.nan, 2], [1, 6]], dtype=np.float32)
         imp = SimpleImputer(strategy="most_frequent")
         imp.fit(X)
 
@@ -81,9 +75,7 @@ class TestSimpleImputer(ExtTestCase):
         from sklearn.impute import SimpleImputer
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2], [np.nan, 3], [7, np.nan]], dtype=np.float32
-        )
+        X = np.array([[1, 2], [np.nan, 3], [7, np.nan]], dtype=np.float32)
         imp = SimpleImputer(strategy="constant", fill_value=0.0)
         imp.fit(X)
 
@@ -102,9 +94,7 @@ class TestSimpleImputer(ExtTestCase):
         from sklearn.impute import SimpleImputer
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2], [-1, 3], [7, -1]], dtype=np.float32
-        )
+        X = np.array([[1, 2], [-1, 3], [7, -1]], dtype=np.float32)
         imp = SimpleImputer(missing_values=-1, strategy="mean")
         imp.fit(X)
 
@@ -128,9 +118,7 @@ class TestSimpleImputer(ExtTestCase):
         from sklearn.impute import SimpleImputer
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2], [np.nan, 3], [7, 6]], dtype=np.float32
-        )
+        X = np.array([[1, 2], [np.nan, 3], [7, 6]], dtype=np.float32)
         imp = SimpleImputer(add_indicator=True)
         imp.fit(X)
 
@@ -143,13 +131,9 @@ class TestSimpleImputer(ExtTestCase):
         from sklearn.pipeline import Pipeline
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2], [np.nan, 3], [7, 6], [4, np.nan]], dtype=np.float32
-        )
+        X = np.array([[1, 2], [np.nan, 3], [7, 6], [4, np.nan]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
-        pipe = Pipeline(
-            [("imp", SimpleImputer(strategy="mean")), ("clf", LogisticRegression())]
-        )
+        pipe = Pipeline([("imp", SimpleImputer(strategy="mean")), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
         onx = to_onnx(pipe, (X,))

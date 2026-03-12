@@ -64,9 +64,7 @@ def sklearn_simple_imputer(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     if getattr(estimator, "add_indicator", False):
-        raise NotImplementedError(
-            "SimpleImputer with add_indicator=True is not supported."
-        )
+        raise NotImplementedError("SimpleImputer with add_indicator=True is not supported.")
 
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
