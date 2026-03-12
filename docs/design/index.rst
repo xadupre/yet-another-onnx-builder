@@ -10,10 +10,16 @@ that maintain code quality across the project.
 
 .. toctree::
    :maxdepth: 1
+   :caption: Libraries
 
    sklearn/index
-   torch/index
    tensorflow/index
+   torch/index
+
+.. toctree::
+   :maxdepth: 1
+   :caption: GraphBuilder and other classes
+
    builder/index
    misc/index
    ci

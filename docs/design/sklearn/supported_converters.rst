@@ -27,6 +27,7 @@ which can (*predictable*).
     register_sklearn_converters()
 
     rows = get_sklearn_estimator_coverage()
+    rows = sorted(rows, key=lambda x: (x["category"], x["name"]))
 
     # Header
     print(".. list-table::")

@@ -1,8 +1,17 @@
 yet-another-onnx-builder documentation
 ======================================
 
-.. image:: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/tests.yml/badge.svg
-    :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/tests.yml
+.. image:: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_sklearn.yml/badge.svg
+    :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_sklearn.yml
+    :alt: scikit-learn
+
+.. image:: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_tensorflow.yml/badge.svg
+    :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_tensorflow.yml
+    :alt: tensorflow
+
+.. image:: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_torch.yml/badge.svg
+    :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_torch.yml
+    :alt: pytorch
 
 .. image:: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/docs.yml/badge.svg
     :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/docs.yml
