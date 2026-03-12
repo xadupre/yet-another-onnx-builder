@@ -620,6 +620,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         self,
         large_model: bool = False,
         external_threshold: int = 1024,
+        inline: bool = True,
     ) -> Union[
         onnx.FunctionProto,
         onnx.ModelProto,
@@ -634,6 +635,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
             or saved as external weights
         :param external_threshold: if large_model is True, every tensor above this limit
             (in bytes) is stored as external
+        :param inline: inline local function it any (this is currently not used)
         """
         ir_model = ir.Model(self._graph, ir_version=self.ir_version)
         proto = ir.to_proto(ir_model)

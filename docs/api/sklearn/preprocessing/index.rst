@@ -7,4 +7,5 @@ yobx.sklearn.preprocessing
 
     min_max_scaler
     robust_scaler
+    polynomial_features
     standard_scaler

@@ -1,9 +1,12 @@
 import numpy as np
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.preprocessing import FunctionTransformer
 from ...typing import GraphBuilderExtendedProtocol
+from ...xbuilder import FunctionOptions
 from ..register import register_sklearn_converter, get_sklearn_converter
+from ..convert import _wrap_step_as_function
 
 
 def _resolve_columns(columns: Union[list, slice, np.ndarray], n_features: int) -> np.ndarray:
@@ -56,6 +59,7 @@ def sklearn_column_transformer(
     estimator: ColumnTransformer,
     X: str,
     name: str = "column_transformer",
+    function_options: Optional[FunctionOptions] = None,
 ) -> str:
     """
     Converts a :class:`sklearn.compose.ColumnTransformer` into ONNX.
@@ -87,6 +91,7 @@ def sklearn_column_transformer(
     :param estimator: a fitted :class:`~sklearn.compose.ColumnTransformer`
     :param X: name of the input tensor
     :param name: prefix used for names of nodes added by this converter
+    :param function_options: function options
     :return: name of the output tensor
     :raises ValueError: when all transformers are ``'drop'`` (empty output)
     """
@@ -119,7 +124,32 @@ def sklearn_column_transformer(
                     f"of type {type(transformer)!r} inside {type(estimator).__name__!r}."
                 ) from e
             sub_outputs = [g.unique_name(f"{name}__{trans_name}_out")]
-            fct(g, sts, sub_outputs, transformer, X_sub, name=f"{name}__{trans_name}")
+            step_node_name = f"{name}__{trans_name}"
+
+            is_container = isinstance(transformer, (Pipeline, ColumnTransformer, FeatureUnion))
+            if function_options and function_options.export_as_function and not is_container:
+                assert isinstance(X_sub, str)  # type happiness
+                _wrap_step_as_function(
+                    g,  # type: ignore
+                    function_options,
+                    transformer,
+                    [X_sub],
+                    sub_outputs,
+                    fct,
+                    step_node_name,
+                )
+            elif is_container:
+                fct(
+                    g,
+                    sts,
+                    sub_outputs,
+                    transformer,
+                    X_sub,
+                    name=step_node_name,
+                    function_options=function_options,
+                )
+            else:
+                fct(g, sts, sub_outputs, transformer, X_sub, name=step_node_name)
             parts.append(sub_outputs[0])
 
     if not parts:

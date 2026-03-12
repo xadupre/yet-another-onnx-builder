@@ -19,7 +19,7 @@ def retrieve_stacktrace():
     return "\n".join(rows)
 
 
-@contextlib.contextmanager
+@contextlib.contextmanager  # type: ignore
 def apply_patches_for_model(
     patch_torch: bool = False,
     patch_transformers: bool = False,

@@ -1,5 +1,7 @@
 from .convert import to_onnx
 
+__all__ = ["to_onnx"]
+
 
 def register_sklearn_converters():
     """Registers all converters implemented in this package."""
@@ -8,12 +10,14 @@ def register_sklearn_converters():
     if SKLEARN_CONVERTERS:
         # already done
         return
+    from .calibration import register as register_calibration
     from .cluster import register as register_cluster
     from .compose import register as register_compose
     from .decomposition import register as register_decomposition
     from .discriminant_analysis import register as register_discriminant_analysis
     from .dummy import register as register_dummy
     from .ensemble import register as register_ensemble
+    from .gaussian_process import register as register_gaussian_process
     from .lightgbm import register as register_lightgbm
     from .linear_model import register as register_linear_model
     from .multiclass import register as register_multiclass
@@ -26,12 +30,14 @@ def register_sklearn_converters():
     from .tree import register as register_tree
     from .xgboost import register as register_xgboost
 
+    register_calibration()
     register_cluster()
     register_compose()
     register_decomposition()
     register_discriminant_analysis()
     register_dummy()
     register_ensemble()
+    register_gaussian_process()
     register_linear_model()
     register_lightgbm()
     register_multiclass()
