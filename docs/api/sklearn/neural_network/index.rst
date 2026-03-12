@@ -5,4 +5,5 @@ yobx.sklearn.neural_network
     :maxdepth: 1
     :caption: modules
 
+    bernoulli_rbm
     mlp
