@@ -35,6 +35,29 @@ if shutil.which("latex"):
 graphviz_output_format = "svg"
 graphviz_dot_args = ["-Gbgcolor=transparent"]
 
+mermaid_init_js = """
+document.addEventListener("DOMContentLoaded", function () {
+    // piccolo_theme sets data-mode="dark" or "darkest" on <html> for dark variants.
+    const darkModes = ["dark", "darkest"];
+    function getMermaidTheme() {
+        const mode = document.documentElement.getAttribute("data-mode");
+        return darkModes.includes(mode) ? "dark" : "default";
+    }
+    mermaid.initialize({ startOnLoad: true, theme: getMermaidTheme() });
+    new MutationObserver(function () {
+        const theme = getMermaidTheme();
+        document.querySelectorAll(".mermaid[data-processed]").forEach(function (el) {
+            el.removeAttribute("data-processed");
+        });
+        mermaid.initialize({ startOnLoad: false, theme: theme });
+        mermaid.run();
+    }).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-mode"],
+    });
+});
+"""
+
 templates_path = ["_templates"]
 exclude_patterns = ["_build"]
 html_theme = "piccolo_theme"
