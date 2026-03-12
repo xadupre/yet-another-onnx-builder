@@ -6,4 +6,5 @@ yobx.sklearn.preprocessing
     :caption: modules
 
     min_max_scaler
+    robust_scaler
     standard_scaler
