@@ -210,7 +210,7 @@ def fit_multilabel_classification_model(
     :return: A tuple ``(fitted_model, X_test)`` where *X_test* is the
         held-out feature matrix.
     """
-    X, y = make_multilabel_classification(
+    X, y = make_multilabel_classification(  # type: ignore
         n_classes=n_classes,
         n_labels=n_labels,
         n_features=n_features,
@@ -288,7 +288,7 @@ def fit_regression_model(
     :return: A tuple ``(fitted_model, X_test)`` where *X_test* is the
         held-out feature matrix.
     """
-    X, y = make_regression(
+    X, y = make_regression(  # type: ignore
         n_features=n_features,
         n_samples=n_samples,
         n_targets=n_targets,
