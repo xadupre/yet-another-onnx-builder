@@ -211,6 +211,40 @@ class TestSklearnGaussianProcess(ExtTestCase):
         with self.assertRaises(NotImplementedError):
             to_onnx(gpr, (self._X.astype(np.float32),))
 
+    # ── com.microsoft CDist path ───────────────────────────────────────────────
+
+    def test_gpr_com_microsoft_cdist(self):
+        """GPR uses com.microsoft.CDist when the domain is available."""
+        X = self._X.astype(np.float32)
+        gpr = GaussianProcessRegressor(kernel=RBF(1.0), optimizer=None)
+        gpr.fit(self._X, self._y_reg)
+
+        onx = to_onnx(gpr, (X,), target_opset={"": 20, "ai.onnx.ml": 3, "com.microsoft": 1})
+
+        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        self.assertIn(("CDist", "com.microsoft"), op_types)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        expected = gpr.predict(self._X).astype(np.float32)
+        self.assertEqualArray(expected, ort_results[0], atol=1e-4)
+
+    def test_gpc_com_microsoft_cdist(self):
+        """GPC uses com.microsoft.CDist when the domain is available."""
+        X = self._X.astype(np.float32)
+        gpc = GaussianProcessClassifier(random_state=0)
+        gpc.fit(self._X, self._y_bin)
+
+        onx = to_onnx(gpc, (X,), target_opset={"": 20, "ai.onnx.ml": 3, "com.microsoft": 1})
+
+        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        self.assertIn(("CDist", "com.microsoft"), op_types)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        expected_proba = gpc.predict_proba(self._X).astype(np.float32)
+        self.assertEqualArray(expected_proba, ort_results[1], atol=5e-4)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -44,10 +44,20 @@ def _emit_pairwise_sq_dist(
     normalisation) between rows of *X* (shape ``(N, F)``, graph node) and
     rows of *X_ref* (shape ``(M, F)``, fixed constant).
 
-    The formula used is the numerically stable expand-expand trick::
+    The formula used is::
 
         D[i,j] = ||X[i]/l - X_ref[j]/l||²
-               = ||X[i]/l||² + ||X_ref[j]/l||² - 2 · X[i]/l · X_ref[j]/l
+
+    When the ``com.microsoft`` domain is registered in the graph builder the
+    computation is delegated to ``com.microsoft.CDist`` with
+    ``metric="sqeuclidean"``, which is hardware-accelerated by ONNX Runtime.
+    The length-scale normalisation is absorbed into the inputs:
+    ``X`` is divided at runtime and ``X_ref`` is pre-divided at conversion time.
+
+    For the standard-ONNX path the numerically stable expand-expand trick is
+    used::
+
+        D[i,j] = ||X[i]/l||² + ||X_ref[j]/l||² - 2 · X[i]/l · X_ref[j]/l
 
     :param g: graph builder
     :param X: input tensor name, shape ``(N, F)``
@@ -57,13 +67,27 @@ def _emit_pairwise_sq_dist(
     :param dtype: numpy dtype
     :return: ONNX tensor name of shape ``(N, M)``
     """
-    # Pre-normalise training data at conversion time
+    # Pre-normalise training data at conversion time (constant)
     X_ref_norm = (X_ref / length_scale).astype(dtype)  # (M, F)
-    c_sq = np.sum(X_ref_norm**2, axis=1)[np.newaxis, :].astype(dtype)  # (1, M)
 
     # Normalise query data at run time
     ls = np.asarray(length_scale, dtype=dtype).reshape(1, -1)  # (1, F)
     X_norm = g.op.Div(X, ls, name=f"{name}_xnorm")  # (N, F)
+
+    # ── CDist path (com.microsoft) ─────────────────────────────────────────
+    if g.has_opset("com.microsoft"):
+        X_ref_norm_name = g.make_initializer(f"{name}_Xref_norm", X_ref_norm)
+        D = g.make_node(
+            "CDist",
+            [X_norm, X_ref_norm_name],
+            domain="com.microsoft",
+            metric="sqeuclidean",
+            name=f"{name}_cdist",
+        )
+        return g.op.Max(D, np.array(0.0, dtype=dtype), name=f"{name}_Dclamp")
+
+    # ── Standard ONNX path ─────────────────────────────────────────────────
+    c_sq = np.sum(X_ref_norm**2, axis=1)[np.newaxis, :].astype(dtype)  # (1, M)
 
     # ||X_norm[i]||² → (N, 1)
     x_sq = g.op.Mul(X_norm, X_norm, name=f"{name}_xsq")
@@ -80,8 +104,7 @@ def _emit_pairwise_sq_dist(
     D = g.op.Sub(sq_plus, two_cross, name=f"{name}_D")
 
     # Clip to non-negative to guard against tiny floating-point negatives
-    D = g.op.Max(D, np.array(0.0, dtype=dtype), name=f"{name}_Dclamp")
-    return D
+    return g.op.Max(D, np.array(0.0, dtype=dtype), name=f"{name}_Dclamp")
 
 
 def _emit_kernel_matrix(
