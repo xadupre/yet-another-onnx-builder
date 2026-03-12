@@ -40,6 +40,11 @@ def sklearn_pls_regression(
     :param X: input tensor name
     :param name: prefix name for the added nodes
     :return: output tensor name
+
+    .. note:: discrepancies
+
+        The conversion shows discrepancies for ``scikit-learn==1.4``
+        at least in unit tests.
     """
     assert isinstance(
         estimator, PLSRegression

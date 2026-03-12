@@ -10,6 +10,7 @@ from yobx.reference import ExtendedReferenceEvaluator
 
 @requires_sklearn("1.4")
 class TestPLSRegression(ExtTestCase):
+    @requires_sklearn("1.8")
     def test_pls_regression_single_target(self):
         from sklearn.cross_decomposition import PLSRegression
         from yobx.sklearn import to_onnx
@@ -42,6 +43,7 @@ class TestPLSRegression(ExtTestCase):
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
+    @requires_sklearn("1.8")
     def test_pls_regression_multi_target(self):
         from sklearn.cross_decomposition import PLSRegression
         from yobx.sklearn import to_onnx
