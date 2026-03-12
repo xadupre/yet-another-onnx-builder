@@ -10,6 +10,7 @@ def register_sklearn_converters():
     if SKLEARN_CONVERTERS:
         # already done
         return
+    from .calibration import register as register_calibration
     from .cluster import register as register_cluster
     from .compose import register as register_compose
     from .decomposition import register as register_decomposition
@@ -28,6 +29,7 @@ def register_sklearn_converters():
     from .tree import register as register_tree
     from .xgboost import register as register_xgboost
 
+    register_calibration()
     register_cluster()
     register_compose()
     register_decomposition()

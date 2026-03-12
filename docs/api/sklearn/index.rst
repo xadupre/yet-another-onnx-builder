@@ -13,6 +13,7 @@ yobx.sklearn
     :maxdepth: 1
     :caption: converters
 
+    calibration/index
     cluster/index
     compose/index
     decomposition/index
