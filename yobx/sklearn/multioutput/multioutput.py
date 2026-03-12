@@ -266,8 +266,6 @@ def sklearn_multi_output_classifier(
             *unsqueezed, axis=1, name=f"{name}_proba_concat", outputs=outputs[1:]
         )
 
-    if not sts and not g.has_type(probabilities):
-        g.set_type(probabilities, onnx.TensorProto.FLOAT)
     if not sts:
         n_targets = len(estimator.estimators_)
         n_classes = classes_list[0].shape[0]
