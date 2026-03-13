@@ -11,9 +11,11 @@ from yobx.reference import ExtendedReferenceEvaluator
 @requires_sklearn("1.4")
 class TestKernelPCA(ExtTestCase):
     def _make_data(self, seed=0, n_samples=30, n_features=5):
-        return np.random.default_rng(seed).standard_normal(
-            (n_samples, n_features)
-        ).astype(np.float32)
+        return (
+            np.random.default_rng(seed)
+            .standard_normal((n_samples, n_features))
+            .astype(np.float32)
+        )
 
     def _run_kernel(self, kernel, n_components=3, **kpca_kwargs):
         from sklearn.decomposition import KernelPCA
