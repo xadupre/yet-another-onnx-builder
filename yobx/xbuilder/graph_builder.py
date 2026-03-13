@@ -2363,6 +2363,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         the builder may be confused as a dynamic dimension can take part
         of a known value for a shape.
         """
+        assert ":" not in prefix, f"':' not allowed in a dimension {prefix!r}"
         existing = set(self.dynamic_objects) | set(self._unique_names)
         for shape in self._known_shapes:
             existing |= set(shape)
@@ -6386,9 +6387,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         update[n2].add(n1)
                     k2 = rename_expression(k, {n1: n2})
                     vv2 = rename_expression(vv, {n2: n1})
-                    assert (
-                        k != k2 or vv != vv2
-                    ), f"{k=}, {k2=}, {vv=}, {vv2=}, {n1=}, {n2=}, {v=}, {self.constraints_=}"
+                    assert k != k2 or vv != vv2, (
+                        f"{k=}, {k2=}, {vv=}, {vv2=}, {n1=}, {n2=}, {v=}, "
+                        f"{self.constraints_=}{self.get_debug_msg()}"
+                    )
                     eq = {k, k2, vv, vv2}
                     for e in eq:
                         if e not in update:

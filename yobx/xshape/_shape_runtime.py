@@ -2,6 +2,7 @@ from typing import Any, List
 import numpy as np
 import onnx
 from ._shape_helper import all_int
+from .simplify_expressions import simplify_expression
 
 
 class _ShapeRuntime:
@@ -27,6 +28,7 @@ class _ShapeRuntime:
             "Range",
             "Scatter",
             "Shape",
+            "Size",
             "Slice",
             "Squeeze",
             "Sub",
@@ -305,11 +307,14 @@ class _ShapeRuntime:
         else:
             cst = tuple(self.get_attribute(node, "axes").ints)
             assert cst, f"Value={cst!r} is wrong for {node.input[0]}{self.get_debug_msg()}"
-        if cst is not None and len(cst) == 1 and self.get_rank(node.input[0]) == 0:
+        if cst is not None and len(cst) == 1 and values_0 is not None:
             node.doc_string += "#SV-Unsq4"
-            self.set_value_shape(
-                node.output[0], (node.input[0],) if values_0 is None else (values_0,)
-            )
+            if isinstance(values_0, (str, int)):
+                self.set_value_shape(node.output[0], (values_0,))
+            else:
+                values_0 = list(values_0)
+                values_0.insert(cst[0], 1)
+                self.set_value_shape(node.output[0], tuple(values_0))
             return True
         return False
 
@@ -395,7 +400,7 @@ class _ShapeRuntime:
             return True
         if isinstance(m1, (int, str)) and isinstance(m2, (int, str)):
             node.doc_string += f"#SV-{node.op_type}2"
-            self.set_value_shape(node.output[0], f"{m1}{symbol}{m2}")
+            self.set_value_shape(node.output[0], simplify_expression(f"({m1}){symbol}({m2})"))
             return True
 
         # One of them is a tuple.
@@ -409,7 +414,7 @@ class _ShapeRuntime:
                 res.append(
                     fct(s1, s2)
                     if isinstance(s1, int) and isinstance(s2, int)
-                    else f"{s1}{symbol}{s2}"
+                    else simplify_expression(f"({s1}){symbol}({s2})")
                 )
             self.set_value_shape(node.output[0], tuple(res))
             node.doc_string += f"#SV-{node.op_type}3"
@@ -421,7 +426,7 @@ class _ShapeRuntime:
                 res.append(
                     fct(m1[0], s2)
                     if isinstance(m1[0], int) and isinstance(s2, int)
-                    else f"{m1[0]}{symbol}{s2}"
+                    else simplify_expression(f"({m1[0]}){symbol}({s2})")
                 )
             self.set_value_shape(node.output[0], tuple(res))
             node.doc_string += f"#SV-{node.op_type}4"
@@ -432,7 +437,7 @@ class _ShapeRuntime:
                 res.append(
                     fct(s1, m2[0])
                     if isinstance(s1, int) and isinstance(m2[0], int)
-                    else f"{s1}{symbol}{m2[0]}"
+                    else simplify_expression(f"({s1}){symbol}({m2[0]})")
                 )
             self.set_value_shape(node.output[0], tuple(res))
             node.doc_string += f"#SV-{node.op_type}4"

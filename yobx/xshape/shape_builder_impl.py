@@ -550,6 +550,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
 
     def unique_dimension_name(self, base: str) -> str:
         """Returns a unique dimension name based on *base*."""
+        assert ":" not in base, f"':' not allowed in a dimension {base!r}"
         i = 0
         while f"{base}_{i}" in self.dynamic_dimensions_:
             i += 1

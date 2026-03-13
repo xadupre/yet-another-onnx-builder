@@ -1392,23 +1392,26 @@ class ExtTestCase(unittest.TestCase):
         self.assertEqualArray(expected, value, atol=atol, rtol=rtol, msg=msg)
 
     def check_ort(
-        self, onx: "onnx.ModelProto"  # noqa: F821
+        self, onx: Union["onnx.ModelProto", str]  # noqa: F821
     ) -> "onnxruntime.InferenceSession":  # noqa: F821
         return self._check_with_ort(onx, cpu=True)
 
     def _check_with_ort(
-        self, proto: "onnx.ModelProto", cpu: bool = False  # noqa: F821
+        self, proto: Union["onnx.ModelProto", str], cpu: bool = False  # noqa: F821
     ) -> "onnxruntime.InferenceSession":  # noqa: F821
         from onnxruntime import InferenceSession, get_available_providers
 
         providers = ["CPUExecutionProvider"]
         if not cpu and "CUDAExecutionProvider" in get_available_providers():
             providers.insert(0, "CUDAExecutionProvider")
-        return InferenceSession(proto.SerializeToString(), providers=providers)
+        return InferenceSession(
+            proto.SerializeToString() if hasattr(proto, "SerializeToString") else proto,
+            providers=providers,
+        )
 
     def make_inference_session(
         self,
-        onx: "onnx.ModelProto",  # noqa: F821
+        onx: Union["onnx.ModelProto", str],  # noqa: F821
         cpu: bool = True,
     ) -> "onnxruntime.InferenceSession":  # noqa: F821
         return self._check_with_ort(onx, cpu=cpu)

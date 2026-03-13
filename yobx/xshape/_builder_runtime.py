@@ -179,19 +179,22 @@ class _BuilderRuntime:
             if not mul:
                 mul = ["1"]
             if not div:
-                rest = mul[0] if len(mul) == 1 else f"{'*'.join(f'{_(s)}' for s in mul)}"
-            elif not mul:
                 rest = (
+                    mul[0]
+                    if len(mul) == 1
+                    else simplify_expression(f"{'*'.join(f'({_(s)})' for s in mul)}")
+                )
+            elif not mul:
+                rest = simplify_expression(
                     f"1//{_(div[0])}"
                     if len(div) == 1
                     else f"1//({'*'.join(f'{_(s)}' for s in div)})"
                 )
             else:
-                rest = (
+                rest = simplify_expression(
                     f"(({'*'.join(f'{_(s)}' for s in mul)})"
                     f"//({'*'.join(f'{_(s)}' for s in div)}))"
                 )
-            rest = simplify_expression(rest)
         return tuple(s if s != -1 else rest for s in new_shape)
 
     def _apply_expand_to_shape(

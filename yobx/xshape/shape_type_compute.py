@@ -1119,7 +1119,7 @@ def _compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
     if total_int1 > total_int2 and total_int1 % total_int2 == 0:
         intpart = total_int1 // total_int2
     else:
-        intpart = f"{total_int1}//{total_int2}"
+        intpart = simplify_expression(f"({total_int1})//({total_int2})")
     exist1 = {s for s in shape1 if isinstance(s, str)}
     exist2 = {s for s in shape2 if isinstance(s, str)}
     common = exist1 & exist2
@@ -1128,16 +1128,16 @@ def _compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
     if left1 and left2:
         resp = "*".join(f"({s})" for s in left1)
         resm = "*".join(f"({s})" for s in left2)
-        ok = f"{resp}//({resm})"
+        ok = simplify_expression(f"({resp})//({resm})")
     elif left1:
         ok = "*".join(f"({s})" for s in left1)
     elif left2:
         resm = "*".join(f"({s})" for s in left2)
-        ok = f"1//{resm}"
+        ok = simplify_expression(f"1//({resm})")
     else:
         ok = ""
     if intpart != 1:
-        ok = f"{ok}*{intpart}" if ok else intpart
+        ok = simplify_expression(f"({ok})*({intpart})") if ok else intpart
     assert ok, f"Unable to compute a shape with {shape1=} and {shape2=}."
     return tuple(s if s != -1 else ok for s in shape2)
 
@@ -1230,6 +1230,18 @@ def _set_shape_type_op_any_size(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Sign."
     self.set_type(node.output[0], TensorProto.INT64)
     self.set_shape(node.output[0], tuple())
+    if self.has_shape(node.input[0]):
+        shape = self.get_shape(node.input[0])
+        if all(isinstance(s, int) for s in shape):
+            self.set_value_shape(node.output[0], int(np.prod(shape)))
+        else:
+            int_part = [i for i in shape if isinstance(i, int)]
+            s_part = [i for i in shape if isinstance(i, str)]
+            t = "*".join(f"({s})" for s in s_part)
+            self.set_value_shape(
+                node.output[0],
+                simplify_expression(f"{int(np.prod(int_part))}*{t}" if int_part else t),
+            )
     return True
 
 
@@ -1295,7 +1307,7 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
                     continue
                 if isinstance(input_shape[a], int):
                     d = input_shape[a]
-                    if s < d:
+                    if s < 0:
                         s += d
                     if e < 0:
                         e += d
@@ -1883,9 +1895,10 @@ def _set_shape_type_op_any_depth_to_space(self: ShapeBuilder, node: NodeProto):
         n, c = shape[0], shape[1]
         spatial = shape[2:]
         b_pow = blocksize ** len(spatial)
-        new_c = (c // b_pow) if isinstance(c, int) else f"{c}//{b_pow}"
+        new_c = (c // b_pow) if isinstance(c, int) else simplify_expression(f"({c})//({b_pow})")
         new_spatial = tuple(
-            (s * blocksize if isinstance(s, int) else f"{s}*{blocksize}") for s in spatial
+            (s * blocksize if isinstance(s, int) else simplify_expression(f"({s})*({blocksize})"))
+            for s in spatial
         )
         new_shape = (n, new_c, *new_spatial)
         self.set_shape(node.output[0], new_shape)
@@ -1933,9 +1946,14 @@ def _set_shape_type_op_any_space_to_depth(self: ShapeBuilder, node: NodeProto):
         n, c = shape[0], shape[1]
         spatial = shape[2:]
         b_pow = blocksize ** len(spatial)
-        new_c = (c * b_pow) if isinstance(c, int) else f"{c}*{b_pow}"
+        new_c = (c * b_pow) if isinstance(c, int) else simplify_expression(f"({c})*({b_pow})")
         new_spatial = tuple(
-            (s // blocksize if isinstance(s, int) else f"{s}//{blocksize}") for s in spatial
+            (
+                s // blocksize
+                if isinstance(s, int)
+                else simplify_expression(f"({s})//({blocksize})")
+            )
+            for s in spatial
         )
         new_shape = (n, new_c, *new_spatial)
         self.set_shape(node.output[0], new_shape)
@@ -1993,7 +2011,11 @@ def _set_shape_type_op_any_resize(self: ShapeBuilder, node: NodeProto):
         if scales is not None and scales.size > 0:
             shape = self.get_shape(node.input[0])
             new_shape = tuple(
-                int(np.floor(d * s)) if isinstance(d, int) else f"int(floor({d}*{s}))"
+                (
+                    int(np.floor(d * s))
+                    if isinstance(d, int)
+                    else f"int(floor({simplify_expression(f'({d})*({s})')}))"
+                )
                 for d, s in zip(shape, scales.tolist())
             )
             self.set_shape(node.output[0], new_shape)
