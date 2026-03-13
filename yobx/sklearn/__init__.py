@@ -1,6 +1,31 @@
 from .convert import to_onnx
 
-__all__ = ["to_onnx"]
+__all__ = ["NumericalDiscrepancyWarning", "register_sklearn_converters", "to_onnx"]
+
+
+def has_sklearn(version: str = ""):
+    """Tells if scikit-learn is available and more recent than the given version."""
+    try:
+        import sklearn
+    except ImportError:
+        return False
+    if not hasattr(sklearn, "__version__"):
+        return False
+    if not version:
+        return True
+    import packaging.version as pv
+
+    return pv.Version(version) <= pv.Version(sklearn.__version__)
+
+
+class NumericalDiscrepancyWarning(UserWarning):
+    """
+    The exported model has discrepancies for a particular version
+    of scikit-learn while running unit tests.
+    scikit-learn>=1.8 is more strict about types and does not implicitly switch
+    to float64 in many models relying on a matrix multiplication or a
+    normalization.
+    """
 
 
 def register_sklearn_converters():
