@@ -309,7 +309,11 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             )
             if self.verbose > 2:
                 print(f"[GraphBuilder-{self._hash()}.set_value_shape] {name}:{value}")
-            self._known_value_shape[name] = value
+            self._known_value_shape[name] = (
+                tuple(simplify_expression(s) for s in value)
+                if isinstance(value, tuple)
+                else simplify_expression(value)
+            )
             return
 
         assert (
@@ -330,6 +334,11 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         # The logic is to get rid of one value instead of keeping
         # a mapping between equivalent values.
         new_value = self._known_value_shape[equal_to[0]]
+        new_value = (
+            tuple(simplify_expression(s) for s in new_value)
+            if isinstance(value, tuple)
+            else simplify_expression(new_value)
+        )
         for n in equal_to:
             if n not in self._known_value_shape:
                 self._known_value_shape[n] = new_value

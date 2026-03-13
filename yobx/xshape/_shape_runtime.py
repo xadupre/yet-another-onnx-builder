@@ -321,6 +321,7 @@ class _ShapeRuntime:
         for v in values:
             concatenated.extend(v if isinstance(v, tuple) else (v,))
         self.set_value_shape(node.output[0], tuple(concatenated))
+        self.set_shape(node.output[0], (len(concatenated),))
         return True
 
     def _update_value_shape_with_values_Range(

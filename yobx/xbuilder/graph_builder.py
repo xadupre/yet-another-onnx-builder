@@ -381,7 +381,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._debug_node_output = os.environ.get("ONNXSTOPOUTPUT", "")
         self._debug_node_type = os.environ.get("ONNXNODETYPE", "")
         self._debug_quiet = int(os.environ.get("ONNXQUIET", "0"))
-        self._debug_shape_missing = int(os.environ.get("ONNXSHAPECOMPUTE", "0"))
+        self._debug_shape_missing = not self.as_function and int(
+            os.environ.get("ONNXSHAPECOMPUTE", "0")
+        )
         self._debug_constant_folding = int(os.environ.get("ONNXCONSTANTFOLD", "0"))
         self._debug_foldnot = int(os.environ.get("ONNXFOLDNOT", "0"))
         self._debug_dyn_dim = set(os.environ.get("ONNXDYNDIM", "").split(","))
@@ -2271,7 +2273,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             f"Unexpected value for shape {name!r}, value={value!r}, "
             f"types={string_type(value)}{self.get_debug_msg()}"
         )
-        if not self.has_rank(name):
+        if not self.has_shape(name):
             self.set_shape(name, (len(value),) if isinstance(value, tuple) else tuple())
         assert self.has_rank(name), (
             f"name={name!r}, has no rank, but it should, value={value!r}"
@@ -2336,7 +2338,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 self._set_known_value_shape(n, new_value)
 
     def _set_known_value_shape(self, name: str, value: DYNAMIC_SHAPE):
-        self._known_value_shape[name] = value
+        self._known_value_shape[name] = (
+            tuple(simplify_expression(s) for s in value)
+            if isinstance(value, tuple)
+            else simplify_expression(value)
+        )
 
     def unique_function_name(self, prefix: str) -> str:
         """Returns a function which does not exist yet."""
@@ -10142,8 +10148,18 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         First supported expression:
 
-        * ``f("dim", "d1", "+", "d2")  ->  dimension == args[0] + args[2]``
+        * ``f("dim", "d1") -> dim == d2``
+        * ``f("dim", "d1", "+", "d2")  ->  dim == args[0] + args[2]``
         """
+        if len(args) == 1:
+            dim2 = args[0]
+            if dim2 == dimension:
+                return True
+            if dim2 in self.constraints_ and dimension in self.constraints_[dim2]:
+                return True
+            if dimension in self.constraints_ and dim2 in self.constraints_[dimension]:
+                return True
+            return False
         if len(args) == 3:
             if args[1] == "+":
                 d1, d2 = args[0], args[2]

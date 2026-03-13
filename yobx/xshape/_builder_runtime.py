@@ -226,7 +226,11 @@ class _BuilderRuntime:
                 continue
             if i < len(input_shape):
                 if isinstance(s, str) and isinstance(input_shape[i], str):
-                    if s != input_shape[i]:
+                    if s != input_shape[
+                        i
+                    ] and not self.evaluate_dimension_equality_with_constraints(
+                        s, input_shape[i]
+                    ):
                         return None
                     nsh.append(s)
                     continue

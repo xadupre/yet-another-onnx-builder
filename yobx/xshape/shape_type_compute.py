@@ -521,6 +521,15 @@ def _set_shape_type_op_any_concat(self: ShapeBuilder, node: NodeProto):
             self.set_device(node.output[0], devs.pop())
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
+    if all(self.value_as_shape(s) is not None for s in node.input):
+        axis = self.get_attribute(node, "axis").i
+        assert (
+            axis == 0
+        ), f"Unexpected value for axis={axis} in {self.pretty_node(node)}{self.get_debug_msg()}"
+        shape = []
+        for s in node.input:
+            shape.extend(self.value_as_shape(s))
+        self.set_shape_value(node.output[0], tuple(shape))
     if all(self.has_shape(s) for s in node.input):
         axis = self.get_attribute(node, "axis").i
         shapes = [self.get_shape(i) for i in node.input]
@@ -538,18 +547,18 @@ def _set_shape_type_op_any_concat(self: ShapeBuilder, node: NodeProto):
         new_shape = tuple(new_shape)
         self.set_shape(node.output[0], new_shape)
         return new_shape
-    elif all(map(self.has_rank, node.input)):
+
+    if all(map(self.has_rank, node.input)):
         ranks = [self.get_rank(i) for i in node.input]
         assert (
             len(set(ranks)) == 1
         ), f"Unexpected ranks={ranks} for node {node.op_type!r}{self.get_debug_msg()}"
         self.set_rank(node.output[0], ranks[0])
         return True
-    else:
-        assert not self._debug_shape_missing, (
-            f"Unable to compute shape for node: "
-            f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
-        )
+    assert not self._debug_shape_missing, (
+        f"Unable to compute shape for node: "
+        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+    )
 
 
 def _set_shape_type_op_any_conv_max_pool(self: ShapeBuilder, node: NodeProto):
@@ -2085,8 +2094,12 @@ def set_shape_type_op_any(self: ShapeBuilder, node: NodeProto, exc: bool = False
     if node.op_type in self._op_type_element_wise_types:
         r = set_type_shape_binary_op(self, node.output[0], *node.input)
         assert r is not None or not self._debug_shape_missing, (
-            f"No function to compute shape for node: "
-            f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+            f"No function to compute shape for node {node.op_type!r}"
+            f"\ninput shapes are "
+            f"{[(self.get_shape(i) if self.has_shape(i) else '?') for i in node.input if i]}"
+            f"\nvalue shapes are "
+            f"{[self.value_as_shape(i) for i in node.input if i]}"
+            f"\nnode is {self.pretty_node(node)}{self.get_debug_msg()}"
         )
         return r
     if node.op_type in {"DequantizeLinear", "DynamicQuantizeLinear"}:
