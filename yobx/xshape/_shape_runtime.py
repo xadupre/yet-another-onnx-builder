@@ -307,15 +307,25 @@ class _ShapeRuntime:
         else:
             cst = tuple(self.get_attribute(node, "axes").ints)
             assert cst, f"Value={cst!r} is wrong for {node.input[0]}{self.get_debug_msg()}"
-        if cst is not None and len(cst) == 1 and values_0 is not None:
-            node.doc_string += "#SV-Unsq4"
-            if isinstance(values_0, (str, int)):
-                self.set_value_shape(node.output[0], (values_0,))
-            else:
-                values_0 = list(values_0)
-                values_0.insert(cst[0], 1)
-                self.set_value_shape(node.output[0], tuple(values_0))
-            return True
+        if cst is not None and len(cst) == 1:
+            if values_0 is not None:
+                node.doc_string += "#SV-Unsq4"
+                if isinstance(values_0, (str, int)):
+                    self.set_value_shape(node.output[0], (values_0,))
+                else:
+                    values_0 = list(values_0)
+                    values_0.insert(cst[0], 1)
+                    self.set_value_shape(node.output[0], tuple(values_0))
+                return True
+            if (
+                self.has_rank(node.input[0])
+                and self.get_rank(node.input[0]) == 0
+                and self.has_type(node.input[0])
+                and self.get_type(node.input[0]) == onnx.TensorProto.INT64
+                and "::" not in node.input[0]
+            ):
+                self.set_value_shape(node.output[0], (node.input[0],))
+                return True
         return False
 
     def _update_value_shape_with_values_Concat(
