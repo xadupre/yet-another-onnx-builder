@@ -7,6 +7,7 @@ from yobx.ext_test_case import ExtTestCase
 from yobx.xshape import ShapeBuilder, BasicShapeBuilder
 from yobx.xshape.shape_type_compute import (
     broadcast_shape,
+    _compute_reshape_shape,
     set_type_shape_binary_op,
     set_type_shape_fused_matmul,
     set_type_shape_gemm,
@@ -2578,6 +2579,102 @@ class TestDevicePropagation(ExtTestCase):
         b.set_type("Y2", TFLOAT)
         _set_shape_type_op_any_reduce(b, node)
         self.assertEqual(b.get_device("Y2"), -1)
+
+
+class TestComputeReshapeShape(ExtTestCase):
+    """Unit tests for the _compute_reshape_shape helper."""
+
+    # ------------------------------------------------------------------
+    # Early-exit: no -1 in shape2
+    # ------------------------------------------------------------------
+
+    def test_no_neg1_returns_shape2_unchanged(self):
+        # When shape2 has no -1, the function returns shape2 as-is regardless of shape1.
+        result = _compute_reshape_shape((3, 4), (12,))
+        self.assertEqual(result, (12,))
+
+    def test_no_neg1_with_mixed_shapes(self):
+        result = _compute_reshape_shape((3, 4), (2, 6))
+        self.assertEqual(result, (2, 6))
+
+    # ------------------------------------------------------------------
+    # All-integer shapes with a single -1
+    # ------------------------------------------------------------------
+
+    def test_all_int_clean_division(self):
+        # 3*4=12, new shape (2,-1): 12/2=6 → (2, 6)
+        result = _compute_reshape_shape((3, 4), (2, -1))
+        self.assertEqual(result, (2, 6))
+
+    def test_all_int_clean_division_to_1(self):
+        # total_int1 == total_int2 (12==12): strict-greater condition fails,
+        # so the function falls back to a symbolic "12//12" expression.
+        result = _compute_reshape_shape((3, 4), (12, -1))
+        self.assertEqual(result[0], 12)
+        self.assertIn("12", result[1])
+
+    def test_all_int_flatten(self):
+        # 2*3*4=24, new shape (-1,): 24 → (24,)
+        result = _compute_reshape_shape((2, 3, 4), (-1,))
+        self.assertEqual(result, (24,))
+
+    def test_all_int_non_divisible_returns_symbolic(self):
+        # 3*5=15 is not divisible by 2 → symbolic expression "15//2"
+        result = _compute_reshape_shape((3, 5), (2, -1))
+        self.assertEqual(result[0], 2)
+        self.assertIn("15", result[1])
+        self.assertIn("2", result[1])
+
+    # ------------------------------------------------------------------
+    # Zero dimension in shape1
+    # ------------------------------------------------------------------
+
+    def test_zero_in_shape1_yields_zero_for_neg1(self):
+        # total_int1 = 0*4 = 0 → -1 becomes 0
+        result = _compute_reshape_shape((0, 4), (3, -1))
+        self.assertEqual(result, (3, 0))
+
+    def test_zero_only_in_shape1(self):
+        result = _compute_reshape_shape((0,), (-1, 2))
+        self.assertEqual(result, (0, 2))
+
+    # ------------------------------------------------------------------
+    # Symbolic dimensions
+    # ------------------------------------------------------------------
+
+    def test_symbolic_common_dim_with_int_factor(self):
+        # shape1=("batch", 4), shape2=("batch", -1)
+        # total_int1=4, total_int2=1 (no ints besides -1 in shape2)
+        # intpart=4, left1={}, left2={} → ok=4 → ("batch", 4)
+        result = _compute_reshape_shape(("batch", 4), ("batch", -1))
+        self.assertEqual(result, ("batch", 4))
+
+    def test_symbolic_left_in_shape1_only(self):
+        # shape1=("batch", "h", 4), shape2=("batch", -1)
+        # total_int1=4, total_int2=1, intpart=4
+        # left1={"h"}, left2={} → ok="(h)" then "*4" → ("batch", "(h)*4")
+        result = _compute_reshape_shape(("batch", "h", 4), ("batch", -1))
+        self.assertEqual(result[0], "batch")
+        self.assertIn("h", result[1])
+        self.assertIn("4", result[1])
+
+    def test_symbolic_left_in_shape2_only(self):
+        # shape1=(12,), shape2=("d", -1)
+        # total_int1=12, total_int2=1, intpart=12
+        # left1={}, left2={"d"} → ok="1//(d)" then "*12" → ("d", "1//(d)*12")
+        result = _compute_reshape_shape((12,), ("d", -1))
+        self.assertEqual(result[0], "d")
+        self.assertIn("d", result[1])
+        self.assertIn("12", result[1])
+
+    def test_symbolic_left_in_both(self):
+        # shape1=("a", 4), shape2=("b", -1)
+        # total_int1=4, total_int2=1, intpart=4
+        # left1={"a"}, left2={"b"} → ok="(a)//((b))"  then "*4"
+        result = _compute_reshape_shape(("a", 4), ("b", -1))
+        self.assertEqual(result[0], "b")
+        self.assertIn("a", result[1])
+        self.assertIn("b", result[1])
 
 
 if __name__ == "__main__":
