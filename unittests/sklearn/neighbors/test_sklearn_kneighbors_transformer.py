@@ -70,13 +70,6 @@ class TestKNeighborsTransformer(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         rng = np.random.default_rng(2)
-        X = rng.standard_normal((20, 4)).astype(np.float64)
-
-    def test_knn_transformer_distance_float64(self):
-        from sklearn.neighbors import KNeighborsTransformer
-        from yobx.sklearn import to_onnx
-
-        rng = np.random.default_rng(2)
         X_train = rng.standard_normal((20, 4)).astype(np.float64)
         X_new = rng.standard_normal((6, 4)).astype(np.float64)
 
