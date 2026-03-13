@@ -164,7 +164,7 @@ def sklearn_bisecting_kmeans(
         sq_plus = g.op.Add(x_sq_sum, c_sq, name=f"{name}_sq_plus")
         sq_dists = g.op.Sub(sq_plus, two_cross, name=f"{name}_sq_dists")
         sq_dists_clipped = g.op.Max(sq_dists, zero, name=f"{name}_clip")
-        eucl_dists = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt_pre")
+        eucl_dists = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt")
 
     n_outputs = len(outputs)
 
