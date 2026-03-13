@@ -17,6 +17,7 @@ yobx.sklearn
     calibration/index
     cluster/index
     compose/index
+    covariance/index
     decomposition/index
     discriminant_analysis/index
     dummy/index
