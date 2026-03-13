@@ -52,6 +52,7 @@ class TestSklearnAdaBoostClassifier(ExtTestCase):
     def test_binary_more_estimators(self):
         self._check_classifier(self._X, self._y_bin, n_estimators=10)
 
+    @requires_sklearn("1.8")
     def test_multiclass(self):
         self._check_classifier(self._X, self._y_multi, n_estimators=10)
 
