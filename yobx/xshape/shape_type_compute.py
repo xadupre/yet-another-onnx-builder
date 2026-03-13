@@ -1296,7 +1296,8 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
             for s, e, a, d in zip(starts, ends, axes, steps):
                 n = input_shape[a]
                 if not isinstance(n, int):
-                    # Symbolic dimension — cannot compute an integer size; leave as-is
+                    # Symbolic dimension — assign a fresh dynamic dim for the sliced axis
+                    output_shape[a] = self.unique_dimension_name("NEWDIM_slice")
                     continue
                 if d > 0:
                     # Normalise start: negative wraps, positive is clamped to [0, n]
@@ -1353,16 +1354,24 @@ def _set_shape_type_op_any_split(self: ShapeBuilder, node: NodeProto):
             self.set_device(o, device)
     att = self.get_attribute(node, "axis", exc=False)
     axis = 0 if att is None else att.i
-    if self.has_shape(node.input[0]) and len(node.input) > 1 and self.is_constant(node.input[1]):
-        splits = list(self.get_constant(node.input[1]))
-        assert len(splits) == len(
-            node.output
-        ), f"Unexpected number of outputs, output={node.output} splits={splits}"
-        sh = list(self.get_shape(node.input[0]))
-        for i, o in enumerate(node.output):
-            sh[axis] = int(splits[i])
-            self.set_shape(o, tuple(sh), allow_zero=True)
-        return [self.get_shape(o) for o in node.output]
+    if self.has_shape(node.input[0]) and len(node.input) > 1:
+        _splits_cst = None
+        if self.is_constant(node.input[1]):
+            _splits_cst = list(self.get_constant(node.input[1]))
+        else:
+            sv = self.value_as_shape(node.input[1])
+            if isinstance(sv, tuple) and all(isinstance(x, int) for x in sv):
+                _splits_cst = list(sv)
+        if _splits_cst is not None:
+            splits = _splits_cst
+            assert len(splits) == len(
+                node.output
+            ), f"Unexpected number of outputs, output={node.output} splits={splits}"
+            sh = list(self.get_shape(node.input[0]))
+            for i, o in enumerate(node.output):
+                sh[axis] = int(splits[i])
+                self.set_shape(o, tuple(sh), allow_zero=True)
+            return [self.get_shape(o) for o in node.output]
     num_outputs = self.get_attribute(node, "num_outputs", exc=False)
     if num_outputs is not None:
         no = num_outputs.i

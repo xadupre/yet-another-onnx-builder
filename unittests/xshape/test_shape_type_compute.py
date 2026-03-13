@@ -1181,6 +1181,42 @@ class TestShapeTypeCompute(ExtTestCase):
         # axis 1 (integer 6) is sliced: output[1] = 3; axis 0 is "batch" (symbolic)
         self.assertEqual(b.get_shape("Y"), ("batch", 3))
 
+    def test_op_slice_symbolic_dim_gets_newdim(self):
+        # When the sliced axis itself is symbolic, a fresh NEWDIM_slice dim is created.
+        model = _make_model(
+            [oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])],
+            [_mkv_("X", TFLOAT, ["batch", 6])],
+            [_mkv_("Y", TFLOAT, [None, None])],
+            [
+                onh.from_array(np.array([0], dtype=np.int64), name="starts"),
+                onh.from_array(np.array([3], dtype=np.int64), name="ends"),
+                onh.from_array(np.array([0], dtype=np.int64), name="axes"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        result_shape = b.get_shape("Y")
+        # axis 0 ("batch") is sliced → fresh symbolic NEWDIM_slice; axis 1 stays 6
+        self.assertEqual(len(result_shape), 2)
+        self.assertIsInstance(result_shape[0], str)
+        self.assertNotEqual(result_shape[0], "batch")  # must be a new dim, not the original
+        self.assertEqual(result_shape[1], 6)
+
+    def test_op_split_value_as_shape(self):
+        # splits tensor is NOT a constant but is tracked via value_as_shape
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_split
+
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (6, 4))
+        # splits tracked as shape value, not a constant
+        b.set_value_shape("sp", (3, 3))
+        node = oh.make_node("Split", ["X", "sp"], ["A", "B"], axis=0)
+        _set_shape_type_op_any_split(b, node)
+        self.assertEqual(b.get_type("A"), TFLOAT)
+        self.assertEqual(b.get_shape("A"), (3, 4))
+        self.assertEqual(b.get_shape("B"), (3, 4))
+
     def test_op_slice_value_as_shape_starts_ends(self):
         # starts/ends are NOT constants but their values are tracked via value_as_shape
         from yobx.xshape.shape_type_compute import _set_shape_type_op_any_slice
