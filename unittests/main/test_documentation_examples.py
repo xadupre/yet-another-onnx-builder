@@ -140,6 +140,9 @@ class TestDocumentationExamples(ExtTestCase):
             if not reason and not has_sklearn() and "sklearn" in name:
                 reason = "scikit-learn not installed"
 
+            if not reason and not has_sklearn("1.8") and name in {"plot_sklearn_pls_float32.py"}:
+                reason = "expected discrepancies with scikit-learn<1.8"
+
             if not reason and not has_spox() and "spox" in name:
                 reason = "spox not installed"
 
