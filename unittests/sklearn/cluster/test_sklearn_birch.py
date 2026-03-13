@@ -141,9 +141,7 @@ class TestBirch(ExtTestCase):
 
                 centers = model.subcluster_centers_.astype(dtype)
                 expected_distances = np.sqrt(
-                    np.sum(
-                        (X[:, np.newaxis, :] - centers[np.newaxis, :, :]) ** 2, axis=2
-                    )
+                    np.sum((X[:, np.newaxis, :] - centers[np.newaxis, :, :]) ** 2, axis=2)
                 )
                 self.assertEqualArray(expected_distances, distances, atol=1e-4)
 
