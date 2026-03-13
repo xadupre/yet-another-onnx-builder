@@ -1,5 +1,5 @@
 """
-Converter for element-wise TF ops → ONNX ``Add``.
+Converters for element-wise TF ops: ``AddV2``, ``BiasAdd``, ``ConcatV2``.
 """
 
 from typing import Any, Dict, List
@@ -20,3 +20,21 @@ def convert_element_wise(
     numpy-style broadcasting.
     """
     return g.op.Add(op.inputs[0].name, op.inputs[1].name, outputs=outputs[:1], name=op.name)
+
+
+@register_tf_op_converter("ConcatV2")
+def convert_concat_v2(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
+    """
+    Converts TF ``ConcatV2`` → ONNX ``Concat``.
+
+    TF ``ConcatV2`` takes *N* tensor inputs followed by a scalar ``axis``
+    constant as the last input.  The axis value is read from that constant
+    and forwarded as the ``axis`` attribute of the ONNX ``Concat`` node.
+    """
+    # The last input is the axis scalar constant.
+    axis_op = op.inputs[-1].op
+    axis = int(tf.make_ndarray(axis_op.get_attr("value")))
+    tensor_inputs = [inp.name for inp in op.inputs[:-1]]
+    return g.op.Concat(*tensor_inputs, axis=axis, outputs=outputs[:1], name=op.name)
