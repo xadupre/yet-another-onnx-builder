@@ -1181,6 +1181,39 @@ class TestShapeTypeCompute(ExtTestCase):
         # axis 1 (integer 6) is sliced: output[1] = 3; axis 0 is "batch" (symbolic)
         self.assertEqual(b.get_shape("Y"), ("batch", 3))
 
+    def test_op_slice_value_as_shape_starts_ends(self):
+        # starts/ends are NOT constants but their values are tracked via value_as_shape
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_slice
+
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (10, 8))
+        # register dynamic starts/ends as shape values (not constants)
+        b.set_value_shape("starts", (2,))
+        b.set_value_shape("ends", (7,))
+        # no axes input: axis 0 is used by default (len(starts)=1)
+        node = oh.make_node("Slice", ["X", "starts", "ends"], ["Y"])
+        _set_shape_type_op_any_slice(b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        # axis 0: slice [2:7] on dim 10 → length 5; axis 1 unchanged = 8
+        self.assertEqual(b.get_shape("Y"), (5, 8))
+
+    def test_op_slice_value_as_shape_with_dynamic_axes(self):
+        # starts/ends/axes are all tracked via value_as_shape (no constants)
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_slice
+
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (10, 8))
+        b.set_value_shape("starts", (1,))
+        b.set_value_shape("ends", (6,))
+        b.set_value_shape("axes", (1,))  # slice along axis 1
+        node = oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])
+        _set_shape_type_op_any_slice(b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        # axis 1: slice [1:6] on dim 8 → length 5; axis 0 unchanged = 10
+        self.assertEqual(b.get_shape("Y"), (10, 5))
+
     def test_op_split(self):
         model = _make_model(
             [oh.make_node("Split", ["X", "sp"], ["A", "B"], axis=0)],
