@@ -66,7 +66,6 @@ class TestPLSRegression(ExtTestCase):
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
-    @requires_sklearn("1.8")
     def test_pls_regression_single_target_float64(self):
         from sklearn.cross_decomposition import PLSRegression
         from yobx.sklearn import to_onnx
@@ -89,7 +88,6 @@ class TestPLSRegression(ExtTestCase):
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-10)
 
-    @requires_sklearn("1.8")
     def test_pls_regression_multi_target_float64(self):
         from sklearn.cross_decomposition import PLSRegression
         from yobx.sklearn import to_onnx
@@ -112,6 +110,7 @@ class TestPLSRegression(ExtTestCase):
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-10)
 
+    @requires_sklearn("1.8")
     def test_pls_regression_in_pipeline(self):
         from sklearn.cross_decomposition import PLSRegression
         from sklearn.pipeline import Pipeline
