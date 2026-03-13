@@ -64,9 +64,9 @@ def sklearn_kneighbors_transformer(
           │
           └─── pairwise distances ─────────────────────────────────────► dists (N, M)
                                                                                │
-                                       TopK(k, axis=1, largest=0) ──► values (N, k),  indices (N, k)
+                                TopK(k, axis=1, largest=0) ──► values (N, k),  indices (N, k)
                                                                                │
-                    zeros (1, M)  ──► Expand(N, M) ──► zeros_NM (N, M)        │
+                     zeros (1, M)  ──► Expand(N, M) ──► zeros_NM (N, M)        │
                                                               │                │
                           ScatterElements(axis=1) ─────────────────────► output (N, M)
 

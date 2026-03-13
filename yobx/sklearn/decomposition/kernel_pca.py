@@ -46,7 +46,7 @@ def _compute_sq_euclidean(
         name=f"{name}_xsq",
     )
     # ||X_fit[j]||^2  → (1, M)  (static, folded as constant)
-    Xfit_sq = (X_fit ** 2).sum(axis=1, keepdims=True).T.astype(dtype)  # (1, M)
+    Xfit_sq = (X_fit**2).sum(axis=1, keepdims=True).T.astype(dtype)  # (1, M)
 
     # Cross term −2 X @ X_fit.T  → (N, M)
     cross = g.op.MatMul(X, X_fit.T, name=f"{name}_cross")
@@ -134,9 +134,7 @@ def sklearn_kernel_pca(
     :raises NotImplementedError: for ``kernel='precomputed'``, callable kernels,
         or ``kernel='laplacian'``
     """
-    assert isinstance(
-        estimator, KernelPCA
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, KernelPCA), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     kernel = estimator.kernel
