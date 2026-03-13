@@ -83,9 +83,7 @@ def sklearn_isomap(
     :param name: prefix name for the added nodes
     :return: output tensor name
     """
-    assert isinstance(
-        estimator, Isomap
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, Isomap), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
