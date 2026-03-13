@@ -98,6 +98,80 @@ class TestBirch(ExtTestCase):
         expected_labels = model.predict(X).astype(np.int64)
         self.assertEqualArray(expected_labels, ort_results[0])
 
+    def test_birch_labels_dtypes(self):
+        from sklearn.cluster import Birch
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(4)
+        X32 = rng.standard_normal((30, 4)).astype(np.float32)
+        for dtype in (np.float32, np.float64):
+            with self.subTest(dtype=dtype):
+                X = X32.astype(dtype)
+                model = Birch(n_clusters=3)
+                model.fit(X)
+                onx = to_onnx(model, (X,))
+
+                ref = ExtendedReferenceEvaluator(onx)
+                results = ref.run(None, {"X": X})
+                labels = results[0]
+
+                expected_labels = model.predict(X).astype(np.int64)
+                self.assertEqualArray(expected_labels, labels)
+
+                sess = self.check_ort(onx)
+                ort_results = sess.run(None, {"X": X})
+                self.assertEqualArray(expected_labels, ort_results[0])
+
+    def test_birch_distances_dtypes(self):
+        from sklearn.cluster import Birch
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(5)
+        X32 = rng.standard_normal((20, 3)).astype(np.float32)
+        for dtype in (np.float32, np.float64):
+            with self.subTest(dtype=dtype):
+                X = X32.astype(dtype)
+                model = Birch(n_clusters=4)
+                model.fit(X)
+                onx = to_onnx(model, (X,))
+
+                ref = ExtendedReferenceEvaluator(onx)
+                results = ref.run(None, {"X": X})
+                distances = results[1]
+
+                centers = model.subcluster_centers_.astype(dtype)
+                expected_distances = np.sqrt(
+                    np.sum(
+                        (X[:, np.newaxis, :] - centers[np.newaxis, :, :]) ** 2, axis=2
+                    )
+                )
+                self.assertEqualArray(expected_distances, distances, atol=1e-4)
+
+                sess = self.check_ort(onx)
+                ort_results = sess.run(None, {"X": X})
+                self.assertEqualArray(expected_distances, ort_results[1], atol=1e-4)
+
+    def test_birch_com_microsoft_cdist_dtypes(self):
+        from sklearn.cluster import Birch
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(6)
+        X32 = rng.standard_normal((30, 4)).astype(np.float32)
+        for dtype in (np.float32, np.float64):
+            with self.subTest(dtype=dtype):
+                X = X32.astype(dtype)
+                model = Birch(n_clusters=3)
+                model.fit(X)
+                onx = to_onnx(model, (X,), target_opset={"": 18, "com.microsoft": 1})
+
+                op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+                self.assertIn(("CDist", "com.microsoft"), op_types)
+
+                sess = self.check_ort(onx)
+                ort_results = sess.run(None, {"X": X})
+                expected_labels = model.predict(X).astype(np.int64)
+                self.assertEqualArray(expected_labels, ort_results[0])
+
     def test_birch_pipeline(self):
         from sklearn.cluster import Birch
         from sklearn.preprocessing import StandardScaler
