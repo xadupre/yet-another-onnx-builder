@@ -288,7 +288,7 @@ def sklearn_knn_imputer(  # noqa: C901
         else:  # weights == "distance"
             # Inverse-distance weights; IEEE 754 guarantees 1/inf = 0, so
             # inf-distance (invalid) donors automatically get zero weight.
-            assert eps is None, f"{eps=}, unexpected value"
+            assert eps is not None, f"{eps=}, unexpected value"
             inv_dists_f = g.op.Div(
                 one1,
                 g.op.Max(top_k_dists_f, eps, name=f"{name}_sdists_{f}"),
