@@ -36,6 +36,32 @@ class TestFactorAnalysis(ExtTestCase):
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
+    def test_factor_analysis_float64(self):
+        from sklearn.decomposition import FactorAnalysis
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(3)
+        X = rng.standard_normal((50, 4)).astype(np.float64)
+        fa = FactorAnalysis(n_components=2)
+        fa.fit(X)
+
+        onx = to_onnx(fa, (X,))
+
+        # Check that Sub (centering) and MatMul (projection) are present.
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Sub", op_types)
+        self.assertIn("MatMul", op_types)
+
+        # Check numerical output.
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X": X})[0]
+        expected = fa.transform(X)
+        self.assertEqualArray(expected, result, atol=1e-10)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-10)
+
     def test_factor_analysis_all_components(self):
         from sklearn.decomposition import FactorAnalysis
         from yobx.sklearn import to_onnx
