@@ -1478,7 +1478,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         assert self.has_name(name), f"No result name={name!r}{self.get_debug_msg()}"
         assert isinstance(dtype, (int, tuple)), (
             f"Only one type is allowed in onnx sequences but dtype={dtype!r}, "
-            f"the interpret allows multiple types for simplicity"
+            f"the interpreter allows multiple types for simplicity"
             f"{self.get_debug_msg()}"
         )
         if isinstance(dtype, dict):
