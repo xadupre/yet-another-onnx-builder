@@ -1,7 +1,3 @@
-"""
-Unit tests for the AdaBoostClassifier and AdaBoostRegressor converters.
-"""
-
 import unittest
 import numpy as np
 from sklearn.ensemble import AdaBoostClassifier, AdaBoostRegressor
@@ -58,7 +54,6 @@ class TestSklearnAdaBoostClassifier(ExtTestCase):
         self._check_classifier(self._X, self._y_multi, n_estimators=10)
 
     def test_in_pipeline(self):
-        """AdaBoostClassifier as last step in a Pipeline."""
         Xd = self._X.astype(np.float32)
         y = self._y_bin
         clf = AdaBoostClassifier(n_estimators=5, random_state=0)
@@ -79,7 +74,6 @@ class TestSklearnAdaBoostClassifier(ExtTestCase):
         self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_custom_base_estimator(self):
-        """AdaBoostClassifier with a deeper base estimator, float32 and float64."""
         y = self._y_bin
         for dtype in (np.float32, np.float64):
             Xd = self._X.astype(dtype)
@@ -141,7 +135,6 @@ class TestSklearnAdaBoostRegressor(ExtTestCase):
         self._check_regressor(self._X, self._y, n_estimators=10)
 
     def test_in_pipeline(self):
-        """AdaBoostRegressor as last step in a Pipeline."""
         Xd = self._X.astype(np.float32)
         reg = AdaBoostRegressor(n_estimators=5, random_state=0)
         pipe = Pipeline([("scaler", StandardScaler()), ("reg", reg)])
@@ -158,7 +151,6 @@ class TestSklearnAdaBoostRegressor(ExtTestCase):
         self.assertEqualArray(expected_pred, ort_results[0].ravel(), atol=1e-5)
 
     def test_custom_base_estimator(self):
-        """AdaBoostRegressor with a deeper base estimator, float32 and float64."""
         for dtype in (np.float32, np.float64):
             Xd = self._X.astype(dtype)
             yd = self._y.astype(dtype)
