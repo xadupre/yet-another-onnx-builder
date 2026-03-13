@@ -27,11 +27,10 @@ def _collect_leaf_paths(node, X_mean: np.ndarray, path_conditions: list) -> list
     left_c = (node.left.center + X_mean).copy()
     right_c = (node.right.center + X_mean).copy()
     condition = (left_c, right_c)
-    return _collect_leaf_paths(
-        node.left, X_mean, path_conditions + [(condition, True)]
-    ) + _collect_leaf_paths(
-        node.right, X_mean, path_conditions + [(condition, False)]
-    )
+    return [
+        *_collect_leaf_paths(node.left, X_mean, [*path_conditions, (condition, True)]),
+        *_collect_leaf_paths(node.right, X_mean, [*path_conditions, (condition, False)]),
+    ]
 
 
 @register_sklearn_converter(BisectingKMeans)
@@ -185,9 +184,7 @@ def sklearn_bisecting_kmeans(
     # Labels output: bisection-tree traversal
     # ------------------------------------------------------------------
     # Collect all leaf paths from the tree.
-    leaf_paths = _collect_leaf_paths(
-        estimator._bisecting_tree, X_mean, []
-    )
+    leaf_paths = _collect_leaf_paths(estimator._bisecting_tree, X_mean, [])
 
     # Cache go_left masks for each (left_center, right_center) pair so that
     # shared internal nodes are only computed once.
@@ -215,10 +212,12 @@ def sklearn_bisecting_kmeans(
         )  # (1,)
 
         dot = g.op.MatMul(X, direction, name=f"{name}_node{node_idx}_dot")  # (N, 1)
-        dot_1d = g.op.Squeeze(dot, np.array([1], dtype=np.int64), name=f"{name}_node{node_idx}_1d")  # (N,)
+        dot_1d = g.op.Squeeze(
+            dot, np.array([1], dtype=np.int64), name=f"{name}_node{node_idx}_1d"
+        )  # (N,)
         mask = g.op.LessOrEqual(dot_1d, threshold, name=f"{name}_node{node_idx}_mask")  # (N,)
 
-        node_go_left_cache[cache_key] = mask
+        node_go_left_cache[cache_key] = mask  # type: ignore
         return mask
 
     # Build label tensor as the sum of (leaf_mask * leaf_label) over all leaves.
@@ -233,17 +232,13 @@ def sklearn_bisecting_kmeans(
             node_idx = next(node_counter)
             go_left_mask = _go_left_mask(left_c, right_c, node_idx)
             cond_mask = (
-                go_left_mask
-                if go_left
-                else g.op.Not(go_left_mask, name=f"{name}_not{node_idx}")
+                go_left_mask if go_left else g.op.Not(go_left_mask, name=f"{name}_not{node_idx}")
             )
             if leaf_mask is None:
                 leaf_mask = cond_mask
             else:
                 and_idx = next(node_counter)
-                leaf_mask = g.op.And(
-                    leaf_mask, cond_mask, name=f"{name}_and{and_idx}"
-                )
+                leaf_mask = g.op.And(leaf_mask, cond_mask, name=f"{name}_and{and_idx}")
 
         if leaf_mask is None:
             # Degenerate case: single-leaf tree (n_clusters=1).  All samples
@@ -276,20 +271,14 @@ def sklearn_bisecting_kmeans(
         elif contrib is None:
             pass  # nothing to add
         else:
-            label_sum = g.op.Add(
-                label_sum, contrib, name=f"{name}_labelacc{leaf_label}"
-            )
+            label_sum = g.op.Add(label_sum, contrib, name=f"{name}_labelacc{leaf_label}")
 
     # If label_sum is still None (all leaf labels were 0), create a zero tensor.
     if label_sum is None:
         shape_x = g.op.Shape(X, name=f"{name}_shape_x")
-        n_dim = g.op.Gather(
-            shape_x, np.array(0, dtype=np.int64), name=f"{name}_n_dim"
-        )
+        n_dim = g.op.Gather(shape_x, np.array(0, dtype=np.int64), name=f"{name}_n_dim")
         shape_1d = g.op.Unsqueeze(n_dim, np.array([0], dtype=np.int64), name=f"{name}_shape_1d")
-        label_sum = g.op.Expand(
-            np.array([0], dtype=np.int64), shape_1d, name=f"{name}_zeros"
-        )
+        label_sum = g.op.Expand(np.array([0], dtype=np.int64), shape_1d, name=f"{name}_zeros")
 
     labels = g.op.Identity(label_sum, name=f"{name}_labels", outputs=outputs[:1])
     assert isinstance(labels, str)
