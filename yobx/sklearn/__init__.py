@@ -47,6 +47,7 @@ def register_sklearn_converters():
     from .lightgbm import register as register_lightgbm
     from .linear_model import register as register_linear_model
     from .mixture import register as register_mixture
+    from .model_selection import register as register_model_selection
     from .multiclass import register as register_multiclass
     from .multioutput import register as register_multioutput
     from .naive_bayes import register as register_naive_bayes
@@ -70,6 +71,7 @@ def register_sklearn_converters():
     register_linear_model()
     register_lightgbm()
     register_mixture()
+    register_model_selection()
     register_multiclass()
     register_multioutput()
     register_naive_bayes()
