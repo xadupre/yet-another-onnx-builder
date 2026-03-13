@@ -7,6 +7,7 @@ yobx.sklearn.decomposition
 
     factor_analysis
     gaussian_random_projection
+    incremental_pca
     pca
     pls_regression
     truncated_svd

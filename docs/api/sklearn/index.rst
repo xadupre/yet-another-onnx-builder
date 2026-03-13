@@ -26,6 +26,7 @@ yobx.sklearn
     lightgbm/index
     linear_model/index
     mixture/index
+    model_selection/index
     multiclass/index
     multioutput/index
     naive_bayes/index
