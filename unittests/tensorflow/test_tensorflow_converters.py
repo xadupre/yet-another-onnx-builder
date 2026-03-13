@@ -1521,9 +1521,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
 
     def test_keras_dropout_inference(self):
         """Dropout is a no-op at inference time → output equals input."""
-        model = tf.keras.Sequential(
-            [tf.keras.layers.Dense(8), tf.keras.layers.Dropout(0.5)]
-        )
+        model = tf.keras.Sequential([tf.keras.layers.Dense(8), tf.keras.layers.Dropout(0.5)])
         X = np.random.rand(4, 4).astype(np.float32)
         model(X, training=False)
 

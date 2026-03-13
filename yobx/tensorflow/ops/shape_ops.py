@@ -33,7 +33,6 @@ import tensorflow as tf
 from ..register import register_tf_op_converter
 from ...typing import GraphBuilderExtendedProtocol
 
-
 # Mapping from TF dtype to ONNX TensorProto type.
 _TF_DTYPE_TO_ONNX = {
     tf.float16.as_datatype_enum: TensorProto.FLOAT16,
@@ -79,7 +78,7 @@ def convert_reshape(
         if tf_dims is not None and g.has_shape(op.inputs[0].name):
             in_shape = g.get_shape(op.inputs[0].name)
             # Build a map from position-in-output to a symbolic or concrete dimension value.
-            # For None (dynamic) dims, re-use the symbolic name from the input if available.
+            # For None (dynamic) dims, reuse the symbolic name from the input if available.
             in_dynamic = [d for d in in_shape if isinstance(d, str)]
 
             def _map_dim(d: Any, idx: int) -> Any:
@@ -212,11 +211,11 @@ def convert_strided_slice(
             if len(shrink_axes) == 1:
                 axis = shrink_axes[0]
                 # Extract the element at begin[axis] along the given axis.
-                idx = int(begin_val[axis]) if hasattr(begin_val, "__getitem__") else int(begin_val)
-                idx_scalar = np.array(idx, dtype=np.int64)
-                return g.op.Gather(
-                    x, idx_scalar, axis=axis, outputs=outputs[:1], name=op.name
+                idx = (
+                    int(begin_val[axis]) if hasattr(begin_val, "__getitem__") else int(begin_val)
                 )
+                idx_scalar = np.array(idx, dtype=np.int64)
+                return g.op.Gather(x, idx_scalar, axis=axis, outputs=outputs[:1], name=op.name)
 
     # General case: cast begin/end to int64 and use Slice.
     begin_i64 = g.op.Cast(op.inputs[1].name, to=TensorProto.INT64, name=f"{op.name}_begin_cast")
@@ -298,4 +297,3 @@ def convert_transpose(
     perm_op = op.inputs[1].op
     perm = list(tf.make_ndarray(perm_op.get_attr("value")).astype(int))
     return g.op.Transpose(op.inputs[0].name, perm=perm, outputs=outputs[:1], name=op.name)
-
