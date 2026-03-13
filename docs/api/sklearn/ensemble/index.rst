@@ -9,6 +9,7 @@ yobx.sklearn.ensemble
     bagging
     gradient_boosting
     hist_gradient_boosting
+    isolation_forest
     random_forest
     stacking
     voting
