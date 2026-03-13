@@ -62,7 +62,7 @@ def sklearn_knn_imputer(  # noqa: C901
 
     .. code-block:: text
 
-        D_f = Where(train_valid[:, f], D, ∞)          [N, M]
+        D_f = Where(train_valid[:, f], D, inf)          [N, M]
         top_k_dists_f, top_k_idx_f = TopK(D_f, k, axis=1, largest=False)
                                                         [N, k]
         neighbor_vals_f = Gather(train_filled[:, f], top_k_idx_f.flat())
@@ -187,7 +187,7 @@ def sklearn_knn_imputer(  # noqa: C901
     scale = g.op.Div(n_feat_arr, denom, name=f"{name}_scale")
     dist_sq = g.op.Mul(scale, sum_sq, name=f"{name}_dist_sq")
 
-    # Distance is ∞ when no features are valid in both samples.
+    # Distance is inf when no features are valid in both samples.
     inf_arr = np.array([np.inf], dtype=dtype)
     n_valid_zero = g.op.Equal(n_valid, zeros1, name=f"{name}_n_valid_zero")
     dist_sq = g.op.Where(
@@ -199,7 +199,7 @@ def sklearn_knn_imputer(  # noqa: C901
     # Step 3: Per-feature imputation
     #
     # For each feature f, distances to training samples that have NaN in
-    # feature f are set to ∞ so that TopK selects only valid donors.
+    # feature f are set to inf so that TopK selects only valid donors.
     # This matches sklearn's behaviour of using min(k, |valid_donors_f|)
     # nearest valid donors for feature f.
     # ------------------------------------------------------------------
@@ -217,7 +217,7 @@ def sklearn_knn_imputer(  # noqa: C901
         # Column f of the zero-filled training matrix.
         train_col_f = train_filled[:, f].astype(dtype)  # [M]
 
-        # Make non-valid donors unreachable by setting their distance to ∞.
+        # Make non-valid donors unreachable by setting their distance to inf.
         D_f = g.op.Where(
             valid_donors_f, dists, inf_arr, name=f"{name}_D_{f}"
         )  # [N, M]
@@ -266,7 +266,7 @@ def sklearn_knn_imputer(  # noqa: C901
             imputed_fv = g.op.Div(sum_f, safe_cnt, name=f"{name}_imp_{f}")
 
         else:  # weights == "distance"
-            # Inverse-distance weights; IEEE 754 guarantees 1/∞ = 0, so
+            # Inverse-distance weights; IEEE 754 guarantees 1/inf = 0, so
             # inf-distance (invalid) donors automatically get zero weight.
             inv_dists_f = g.op.Div(
                 one1,

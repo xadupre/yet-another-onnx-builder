@@ -18,4 +18,3 @@ yobx.sklearn.preprocessing
     simple_imputer
     spline_transformer
     standard_scaler
-
