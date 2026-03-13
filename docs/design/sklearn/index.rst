@@ -73,7 +73,7 @@ if ``target_opsets={'': 18, 'com.microsoft': 1}``.
    lightgbm_converter
    supported_converters
    custom_converter
-   cdist
+   contrib_ops
    copilot_draft
    debug
 
