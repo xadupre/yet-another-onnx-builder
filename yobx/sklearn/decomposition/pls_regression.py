@@ -54,7 +54,9 @@ def sklearn_pls_regression(
     ), f"Unexpected type {type(estimator)} for estimator."
     if not has_sklearn("1.8"):
         warnings.warn(
-            "Discrepancies were observed for scikit-learn==1.4 but not for 1.8",
+            "Discrepancies were observed for scikit-learn==1.4 but not for 1.8."
+            "This is probably because scikit-learn>=1.8 is more consistent with computation "
+            "types and does not implicitly switch to float64.",
             NumericalDiscrepancyWarning,
         )
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"

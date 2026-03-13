@@ -44,15 +44,18 @@ class TestSklearnAdaBoostClassifier(ExtTestCase):
             self.assertEqualArray(expected_label, ort_results[0])
             self.assertEqualArray(expected_proba, ort_results[1], atol=atol)
 
+    @requires_sklearn("1.8")
     def test_binary(self):
         self._check_classifier(self._X, self._y_bin)
 
+    @requires_sklearn("1.8")
     def test_binary_more_estimators(self):
         self._check_classifier(self._X, self._y_bin, n_estimators=10)
 
     def test_multiclass(self):
         self._check_classifier(self._X, self._y_multi, n_estimators=10)
 
+    @requires_sklearn("1.8")
     def test_in_pipeline(self):
         rng = np.random.default_rng(42)
         y = self._y_bin
@@ -75,6 +78,7 @@ class TestSklearnAdaBoostClassifier(ExtTestCase):
             self.assertEqualArray(expected_label, ort_results[0])
             self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
+    @requires_sklearn("1.8")
     def test_custom_base_estimator(self):
         y = self._y_bin
         for dtype in (np.float32, np.float64):
