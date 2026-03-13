@@ -160,6 +160,77 @@ class TestKNNImputer(ExtTestCase):
         expected = imp.transform(X).astype(np.float32)
         self.assertEqualArray(expected, ort_result, atol=1e-3)
 
+    def test_knn_imputer_cdist_uniform(self):
+        """CDist path: uniform weights, float32."""
+        from sklearn.impute import KNNImputer
+        from yobx.sklearn import to_onnx
+
+        X = np.array(
+            [[1, 2, np.nan], [3, 4, 3], [np.nan, 6, 5], [8, 8, 7]],
+            dtype=np.float32,
+        )
+        imp = KNNImputer(n_neighbors=2, weights="uniform")
+        imp.fit(X)
+
+        onx = to_onnx(imp, (X,), target_opset={"": 18, "com.microsoft": 1})
+
+        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        self.assertIn(("CDist", "com.microsoft"), op_types)
+
+        expected = imp.transform(X).astype(np.float32)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-4)
+
+    def test_knn_imputer_cdist_distance_weights(self):
+        """CDist path: distance weights, float32."""
+        from sklearn.impute import KNNImputer
+        from yobx.sklearn import to_onnx
+
+        X = np.array(
+            [[1, 2, np.nan], [3, 4, 3], [np.nan, 6, 5], [8, 8, 7]],
+            dtype=np.float32,
+        )
+        imp = KNNImputer(n_neighbors=2, weights="distance")
+        imp.fit(X)
+
+        onx = to_onnx(imp, (X,), target_opset={"": 18, "com.microsoft": 1})
+
+        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        self.assertIn(("CDist", "com.microsoft"), op_types)
+
+        expected = imp.transform(X).astype(np.float32)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-4)
+
+    def test_knn_imputer_cdist_float64(self):
+        """CDist path: float64 input."""
+        from sklearn.impute import KNNImputer
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(7)
+        X = rng.random((15, 4)).astype(np.float64)
+        X[0, 1] = np.nan
+        X[3, 2] = np.nan
+        X[8, 0] = np.nan
+
+        imp = KNNImputer(n_neighbors=3)
+        imp.fit(X)
+
+        onx = to_onnx(imp, (X,), target_opset={"": 18, "com.microsoft": 1})
+
+        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        self.assertIn(("CDist", "com.microsoft"), op_types)
+
+        expected = imp.transform(X)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
     def test_knn_imputer_add_indicator_raises(self):
         """add_indicator=True is not supported."""
         from sklearn.impute import KNNImputer
