@@ -6,4 +6,5 @@ yobx.sklearn.neighbors
     :caption: modules
 
     kneighbors
+    local_outlier_factor
     radiusneighbors
