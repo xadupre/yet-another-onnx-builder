@@ -29,13 +29,32 @@ def sklearn_birch(
     After fitting, :class:`~sklearn.cluster.Birch` exposes
     ``subcluster_centers_`` (shape ``(K, F)``), which are the centroids
     used to assign new samples.  Prediction is nearest-centroid assignment
-    based on Euclidean distance, reproduced here via the identity:
+    based on Euclidean distance.
+
+    **CDist path** (``com.microsoft`` domain available):
+
+    When the ``com.microsoft`` opset is registered in the graph builder,
+    the pairwise Euclidean distances are computed by a single
+    ``com.microsoft.CDist`` node, which ONNX Runtime executes via a fused
+    C++ kernel.
+
+    .. code-block:: text
+
+        X (N,F)  centers (K,F)
+              `---- CDist(metric="euclidean") --► distances (N,K)
+                                                       │
+                              ArgMin(axis=1) ──────────► subcluster_idx (N,)
+                                                       │
+                              Gather(subcluster_labels_) ► labels (N,)
+
+    **Standard ONNX path** (fallback):
+
+    When the ``com.microsoft`` domain is absent the distances are computed
+    via the squared-distance identity:
 
     .. code-block:: text
 
         ||x - c||² = ||x||² - 2·x·cᵀ + ||c||²
-
-    Full graph structure:
 
     .. code-block:: text
 
@@ -68,54 +87,69 @@ def sklearn_birch(
 
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
+    zero = np.array([0], dtype=dtype)
 
     centers = estimator.subcluster_centers_.astype(dtype)  # (K, F)
-    centers_T = centers.T  # (F, K)
 
-    # ||x||² - sum of squares over the feature axis for every sample → (N, 1)
-    x_sq = g.op.Mul(X, X, name=f"{name}_x_sq")
-    x_sq_sum = g.op.ReduceSum(
-        x_sq,
-        np.array([1], dtype=np.int64),
-        keepdims=1,
-        name=f"{name}_x_sq_sum",
-    )  # (N, 1)
+    # ------------------------------------------------------------------ CDist
+    if g.has_opset("com.microsoft"):
+        centers_name = g.make_initializer(f"{name}_centers", centers)
+        distances_raw = g.make_node(
+            "CDist",
+            [X, centers_name],
+            domain="com.microsoft",
+            metric="euclidean",
+            name=f"{name}_cdist",
+        )
+        distances_clipped = g.op.Max(distances_raw, zero, name=f"{name}_clip")
 
-    # ||c||² - precomputed constant for each centre → (1, K)
-    c_sq = np.sum(centers**2, axis=1, keepdims=True).T.astype(dtype)  # (1, K)
+    # ------------------------------------------------ Standard ONNX fallback
+    else:
+        centers_T = centers.T  # (F, K)
 
-    # Cross term: X @ centersᵀ → (N, K)
-    cross = g.op.MatMul(X, centers_T, name=f"{name}_cross")  # (N, K)
+        # ||x||² — sum of squares over the feature axis → (N, 1)
+        x_sq = g.op.Mul(X, X, name=f"{name}_x_sq")
+        x_sq_sum = g.op.ReduceSum(
+            x_sq,
+            np.array([1], dtype=np.int64),
+            keepdims=1,
+            name=f"{name}_x_sq_sum",
+        )  # (N, 1)
 
-    # Squared distances: x_sq + c_sq - 2 * cross → (N, K)
-    two = np.array([2], dtype=dtype)
-    two_cross = g.op.Mul(two, cross, name=f"{name}_two_cross")
-    sq_plus = g.op.Add(x_sq_sum, c_sq, name=f"{name}_sq_plus")
-    sq_dists = g.op.Sub(sq_plus, two_cross, name=f"{name}_sq_dists")
+        # ||c||² — precomputed constant for each centre → (1, K)
+        c_sq = np.sum(centers**2, axis=1, keepdims=True).T.astype(dtype)  # (1, K)
 
-    # Clip negative values to zero before sqrt (numerical safety).
-    zero = np.array([0], dtype=dtype)
-    sq_dists_clipped = g.op.Max(sq_dists, zero, name=f"{name}_clip")
+        # Cross term: X @ centersᵀ → (N, K)
+        cross = g.op.MatMul(X, centers_T, name=f"{name}_cross")  # (N, K)
+
+        # Squared distances: x_sq + c_sq - 2 * cross → (N, K)
+        two = np.array([2], dtype=dtype)
+        two_cross = g.op.Mul(two, cross, name=f"{name}_two_cross")
+        sq_plus = g.op.Add(x_sq_sum, c_sq, name=f"{name}_sq_plus")
+        sq_dists = g.op.Sub(sq_plus, two_cross, name=f"{name}_sq_dists")
+
+        # Clip negative values to zero before sqrt (numerical safety).
+        sq_dists_clipped = g.op.Max(sq_dists, zero, name=f"{name}_sq_clip")
+        distances_clipped = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt_tmp")
 
     n_outputs = len(outputs)
 
     # Distances output (optional second output).
     if n_outputs >= 2:
-        distances = g.op.Sqrt(
-            sq_dists_clipped,
-            name=f"{name}_sqrt",
+        distances = g.op.Identity(
+            distances_clipped,
+            name=f"{name}_distances",
             outputs=outputs[1:2],
         )
         assert isinstance(distances, str)
         if not sts:
             g.set_type(distances, itype)
     else:
-        distances = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt")
-        assert isinstance(distances, str)
+        distances = distances_clipped
 
     # Nearest subcluster index → (N,)
     subcluster_idx = g.op.ArgMin(
-        sq_dists_clipped,
+        distances_clipped,
         axis=1,
         keepdims=0,
         name=f"{name}_argmin",

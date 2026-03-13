@@ -79,6 +79,25 @@ class TestBirch(ExtTestCase):
         expected_labels = model.predict(X).astype(np.int64)
         self.assertEqualArray(expected_labels, labels)
 
+    def test_birch_com_microsoft_cdist(self):
+        from sklearn.cluster import Birch
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(3)
+        X = rng.standard_normal((30, 4)).astype(np.float32)
+        model = Birch(n_clusters=3)
+        model.fit(X)
+
+        onx = to_onnx(model, (X,), target_opset={"": 18, "com.microsoft": 1})
+
+        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        self.assertIn(("CDist", "com.microsoft"), op_types)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        expected_labels = model.predict(X).astype(np.int64)
+        self.assertEqualArray(expected_labels, ort_results[0])
+
     def test_birch_pipeline(self):
         from sklearn.cluster import Birch
         from sklearn.preprocessing import StandardScaler
