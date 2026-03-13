@@ -12,28 +12,36 @@ With the following versions:
 
 .. runpython::
 
-    import numpy    
+    import lightgbm
+    import numpy
     import ml_dtypes
+    import scipy
     import sklearn
     import onnx
     import onnx_ir
     import onnxruntime
     import onnxscript
     import optree
+    import tensorflow
     import torch
     import transformers
+    import xgboost
 
     for m in [
+        lightgbm,
         numpy,
         ml_dtypes,
+        scipy,
         sklearn,
         optree,
         onnx,
         onnx_ir,
         onnxruntime,
         onnxscript,
+        tensorflow,
         torch,
         transformers,
+        xgboost,
     ]:
         print(f"{m.__name__}: {getattr(m, '__version__', 'dev')}")
 

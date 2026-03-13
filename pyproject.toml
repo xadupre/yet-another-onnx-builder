@@ -259,6 +259,7 @@ bad-assignment = false
 bad-index = false  # tuple[str, str] != tuple[str, ...]
 bad-return = false
 missing-attribute = false
+missing-module-attribute = false
 
 [[tool.pyrefly.sub-config]]
 matches = "yobx/tensorflow/ops/*.py"
