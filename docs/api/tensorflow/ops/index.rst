@@ -9,6 +9,7 @@ yobx.tensorflow.ops
     binary_ops
     conv
     element_wise
+    gather_ops
     math_ops
     nn_ops
     unary_ops

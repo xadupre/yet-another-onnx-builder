@@ -22,9 +22,7 @@ class CastPattern(PatternOptimization):
 
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node('Cast', ['_onx_mul045'], ['mul_34'], to=10),
-                ],
+                [oh.make_node('Cast', ['_onx_mul045'], ['mul_34'], to=10)],
                 'pattern',
                 [
                     oh.make_tensor_value_info('_onx_mul045', onnx.TensorProto.FLOAT16,
@@ -53,9 +51,7 @@ class CastPattern(PatternOptimization):
 
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node('Identity', ['_onx_mul045'], ['mul_34']),
-                ],
+                [oh.make_node('Identity', ['_onx_mul045'], ['mul_34'])],
                 'pattern',
                 [
                     oh.make_tensor_value_info('_onx_mul045', onnx.TensorProto.FLOAT16,
@@ -135,12 +131,8 @@ class CastCastPattern(PatternOptimization):
                     oh.make_node('Cast', ['x2'], ['Y'], to=1),
                 ],
                 'pattern',
-                [
-                    oh.make_tensor_value_info('x1', onnx.TensorProto.FLOAT16, ('b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('b', 'c')),
-                ],
+                [oh.make_tensor_value_info('x1', onnx.TensorProto.FLOAT16, ('b', 'c'))],
+                [oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('b', 'c'))],
             ),
             functions=[],
             opset_imports=[oh.make_opsetid('', 18)],
@@ -160,16 +152,10 @@ class CastCastPattern(PatternOptimization):
 
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node('Cast', ['x1'], ['Y'], to=1),
-                ],
+                [oh.make_node('Cast', ['x1'], ['Y'], to=1)],
                 'pattern',
-                [
-                    oh.make_tensor_value_info('x1', onnx.TensorProto.FLOAT16, ('b', 'c')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('b', 'c')),
-                ],
+                [oh.make_tensor_value_info('x1', onnx.TensorProto.FLOAT16, ('b', 'c'))],
+                [oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('b', 'c'))],
             ),
             functions=[],
             opset_imports=[oh.make_opsetid('', 18)],
@@ -281,9 +267,7 @@ class CastCastBinaryPattern(PatternOptimization):
                     oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 4)),
                     oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 4)),
                 ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT16, ('a', 4)),
-                ],
+                [oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT16, ('a', 4))],
             ),
             functions=[],
             opset_imports=[oh.make_opsetid('', 26)],
@@ -312,9 +296,7 @@ class CastCastBinaryPattern(PatternOptimization):
                     oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 4)),
                     oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 4)),
                 ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT16, ('a', 4)),
-                ],
+                [oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT16, ('a', 4))],
             ),
             functions=[],
             opset_imports=[oh.make_opsetid('', 26)],
@@ -428,9 +410,7 @@ class CastOpCastPattern(PatternOptimization):
                     oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, ('a', 'b')),
                     oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
                 ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT16, ('a', 'b')),
-                ],
+                [oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT16, ('a', 'b'))],
             ),
             functions=[],
             opset_imports=[oh.make_opsetid('', 26)],
@@ -459,9 +439,7 @@ class CastOpCastPattern(PatternOptimization):
                     oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, ('a', 'b')),
                     oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
                 ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT16, ('a', 'b')),
-                ],
+                [oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT16, ('a', 'b'))],
             ),
             functions=[],
             opset_imports=[oh.make_opsetid('', 26)],
@@ -653,9 +631,7 @@ class ComputationCastOpCastPattern(PatternOptimization):
                     oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, ('a', 'b')),
                     oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
                 ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b')),
-                ],
+                [oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b'))],
             ),
             functions=[],
             opset_imports=[oh.make_opsetid('', 26)],
@@ -686,9 +662,7 @@ class ComputationCastOpCastPattern(PatternOptimization):
                     oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, ('a', 'b')),
                     oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
                 ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b')),
-                ],
+                [oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b'))],
             ),
             functions=[],
             opset_imports=[oh.make_opsetid('', 26)],
