@@ -66,9 +66,7 @@ class TestTruncatedSVD(ExtTestCase):
         X = rng.standard_normal((30, 6)).astype(np.float32)
         y = (X[:, 0] > 0).astype(np.int64)
 
-        pipe = Pipeline(
-            [("svd", TruncatedSVD(n_components=3)), ("clf", LogisticRegression())]
-        )
+        pipe = Pipeline([("svd", TruncatedSVD(n_components=3)), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
         onx = to_onnx(pipe, (X,))
