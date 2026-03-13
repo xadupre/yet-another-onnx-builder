@@ -2,6 +2,26 @@
 Converters for TF shape-manipulation ops:
 ``Reshape``, ``Squeeze``, ``Shape``, ``StridedSlice``, ``Pack``,
 ``ExpandDims``, ``Transpose``, ``Cast``.
+
+Reshape / squeeze
+-----------------
+``Reshape``, ``Squeeze``
+
+Type casting
+------------
+``Cast``
+
+Shape / indexing
+----------------
+``Shape``, ``StridedSlice``
+
+Stack / pack
+------------
+``Pack``
+
+Dimension insertion / permutation
+----------------------------------
+``ExpandDims``, ``Transpose``
 """
 
 from typing import Any, Dict, List

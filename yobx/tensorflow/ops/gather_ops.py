@@ -1,5 +1,9 @@
 """
 Converter for TF ``GatherV2`` op → ONNX ``Gather``.
+
+Indexing / lookup
+-----------------
+``GatherV2``
 """
 
 from typing import Any, Dict, List

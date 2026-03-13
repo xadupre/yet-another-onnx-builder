@@ -1,5 +1,13 @@
 """
 Converters for element-wise TF ops: ``AddV2``, ``BiasAdd``, ``ConcatV2``.
+
+Addition / bias
+---------------
+``AddV2``, ``BiasAdd``
+
+Concatenation
+-------------
+``ConcatV2``
 """
 
 from typing import Any, Dict, List
