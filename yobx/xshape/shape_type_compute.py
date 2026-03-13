@@ -1110,6 +1110,14 @@ def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
 
 
 def _compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
+    if 0 in shape2:
+        # 0 means keeping the dimension coming from shape1
+        new_shape2 = []
+        for s1, s2 in zip(shape1, shape2):
+            new_shape2.append(s1 if s2 == 0 else s2)
+        new_shape2.extend(shape2[len(new_shape2) :])
+        shape2 = tuple(new_shape2)
+
     if -1 not in shape2:
         return shape2
     total_int1 = int(np.prod([i for i in shape1 if isinstance(i, int)]))
