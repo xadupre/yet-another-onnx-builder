@@ -20,6 +20,7 @@ def register_sklearn_converters():
     from .gaussian_process import register as register_gaussian_process
     from .lightgbm import register as register_lightgbm
     from .linear_model import register as register_linear_model
+    from .manifold import register as register_manifold
     from .mixture import register as register_mixture
     from .multiclass import register as register_multiclass
     from .multioutput import register as register_multioutput
@@ -42,6 +43,7 @@ def register_sklearn_converters():
     register_gaussian_process()
     register_linear_model()
     register_lightgbm()
+    register_manifold()
     register_mixture()
     register_multiclass()
     register_multioutput()

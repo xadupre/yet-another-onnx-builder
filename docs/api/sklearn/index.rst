@@ -24,6 +24,7 @@ yobx.sklearn
     gaussian_process/index
     lightgbm/index
     linear_model/index
+    manifold/index
     mixture/index
     multiclass/index
     multioutput/index
