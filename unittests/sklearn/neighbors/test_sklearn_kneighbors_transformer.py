@@ -65,6 +65,66 @@ class TestKNeighborsTransformer(ExtTestCase):
         ort_results = sess.run(None, {"X": X})
         self.assertEqualArray(sklearn_out, ort_results[0], atol=1e-5)
 
+    def test_knn_transformer_connectivity_float32(self):
+        from sklearn.neighbors import KNeighborsTransformer
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(9)
+        X_train = rng.standard_normal((20, 4)).astype(np.float32)
+        X_new = rng.standard_normal((8, 4)).astype(np.float32)
+
+        est = KNeighborsTransformer(n_neighbors=3, mode="connectivity")
+        est.fit(X_train)
+
+        onx = to_onnx(est, (X_train,))
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("TopK", op_types)
+        self.assertIn("ScatterElements", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X_new})
+        output = results[0]
+
+        # Build expected: 1.0 at k-NN positions, 0.0 elsewhere
+        _, inds = est.kneighbors(X_new, n_neighbors=3)
+        expected = np.zeros((8, 20), dtype=np.float32)
+        for i in range(8):
+            expected[i, inds[i]] = 1.0
+        self.assertEqualArray(expected, output, atol=1e-7)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X_new})
+        self.assertEqualArray(expected, ort_results[0], atol=1e-7)
+
+    def test_knn_transformer_connectivity_float64(self):
+        from sklearn.neighbors import KNeighborsTransformer
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(10)
+        X_train = rng.standard_normal((20, 4)).astype(np.float64)
+        X_new = rng.standard_normal((6, 4)).astype(np.float64)
+
+        est = KNeighborsTransformer(n_neighbors=3, mode="connectivity")
+        est.fit(X_train)
+
+        onx = to_onnx(est, (X_train,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X_new})
+        output = results[0]
+
+        # Build expected: 1.0 at k-NN positions, 0.0 elsewhere
+        _, inds = est.kneighbors(X_new, n_neighbors=3)
+        expected = np.zeros((6, 20), dtype=np.float64)
+        for i in range(6):
+            expected[i, inds[i]] = 1.0
+        self.assertEqualArray(expected, output, atol=1e-10)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X_new})
+        self.assertEqualArray(expected, ort_results[0], atol=1e-10)
+
     def test_knn_transformer_distance_float64(self):
         from sklearn.neighbors import KNeighborsTransformer
         from yobx.sklearn import to_onnx
