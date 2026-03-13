@@ -6,4 +6,5 @@ yobx.sklearn.cluster
     :caption: modules
 
     affinity_propagation
+    birch
     kmeans
