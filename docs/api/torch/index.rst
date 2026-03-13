@@ -25,3 +25,8 @@ register_flattening_functions
 +++++++++++++++++++++++++++++
 
 .. autofunction:: yobx.torch.register_flattening_functions
+
+to_onnx
++++++++
+
+.. autofunction:: yobx.sklean.to_onnx

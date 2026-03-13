@@ -59,12 +59,12 @@ from yobx.sklearn import to_onnx
 
 X, y = make_regression(n_samples=200, n_features=10, n_informative=5, random_state=0)
 # X and y are float64 here
-print("X dtype :", X.dtype)   # float64
-print("y dtype :", y.dtype)   # float64
+print("X dtype :", X.dtype)  # float64
+print("y dtype :", y.dtype)  # float64
 
 pls = PLSRegression(n_components=3)
 pls.fit(X, y)
-print("coef_ dtype   :", pls.coef_.dtype)    # float64
+print("coef_ dtype   :", pls.coef_.dtype)  # float64
 print("_x_mean dtype :", pls._x_mean.dtype)  # float64
 
 # %%

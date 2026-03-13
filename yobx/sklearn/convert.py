@@ -169,6 +169,15 @@ def to_onnx(
         to customize function naming.  Pass ``None`` (the default) to disable
         function wrapping and produce a flat graph.
         when *large_model* is True
+
+    .. note::
+
+        :epkg:`scikit-learn==1.8` is more strict with computation types and
+        the number of discrepancies is reduced. Switch to float32 in a matrix
+        multiplication when the order of magnitude of the coefficient is quite
+        large usually introduces discrepancies. That is often the case when
+        a matrix is the inverse of another one.
+        See :ref:`l-plot-sklearn-pls-float32`.
     """
     check_is_fitted(
         estimator,
