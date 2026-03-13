@@ -45,6 +45,10 @@ class TestSimplifyExpressions(ExtTestCase):
         self.assertEqual("x", simplify_expression("(x*(y+1))//(y+1)"))
         self.assertEqual("c//2", simplify_expression("((c)//(2))"))
 
+    def test_simplify_expression_bracket_max(self):
+        self.assertEqual("x^1+y", simplify_expression("(x)^(y+1)"))
+        self.assertEqual("1+x^y", simplify_expression("(x+1)^(y)"))
+
     def test_simplify_add_sub(self):
         self.assertEqual("b+c", simplify_expression("b+c-CeilToInt(b+c,2)+CeilToInt(b+c,2)"))
 

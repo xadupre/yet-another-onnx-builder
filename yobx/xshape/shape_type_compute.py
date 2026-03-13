@@ -1233,103 +1233,69 @@ def _set_shape_type_op_any_size(self: ShapeBuilder, node: NodeProto):
     return True
 
 
+def _resolve_int_tuple_or_shape(self: ShapeBuilder, name: str):
+    if self.is_constant(name):
+        cst = self.get_constant(name, exc=False, computed_value=True)
+        if cst is not None:
+            return tuple(int(v) for v in cst)
+    sv = self.value_as_shape(name)
+    if isinstance(sv, tuple) and all(isinstance(x, (str, int)) for x in sv):
+        return sv
+    return None
+
+
 def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Slice."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
+
     if self.has_shape(node.input[0]):
         input_shape = self.get_shape(node.input[0])
         rank = len(input_shape)
-        # When starts and ends are known (as constants or as tracked value_as_shape),
-        # compute the output shape dimension by dimension.
-        # Axes and steps are optional ONNX inputs.
-        if len(node.input) >= 3:
 
-            def _resolve_int_tuple(name):
-                """Try constant first, then value_as_shape; return all-int tuple or None."""
-                if self.is_constant(name):
-                    cst = self.get_constant(name, exc=False, computed_value=True)
-                    if cst is not None:
-                        return tuple(int(v) for v in cst)
-                sv = self.value_as_shape(name)
-                if isinstance(sv, tuple) and all(isinstance(x, int) for x in sv):
-                    return sv
-                return None
+        starts = _resolve_int_tuple_or_shape(self, node.input[1])
+        ends = _resolve_int_tuple_or_shape(self, node.input[2])
+        if starts is None or ends is None:
+            self.set_rank(node.output[0], rank)
+            return True
 
-            _starts = _resolve_int_tuple(node.input[1])
-            _ends = _resolve_int_tuple(node.input[2])
-            if _starts is None or _ends is None:
-                # starts/ends unresolvable — try to use axes to build a partial shape
-                # where each sliced axis gets a fresh dynamic dimension and unsliced
-                # axes retain their input dimension.
-                _axes_partial = None
-                if len(node.input) > 3 and node.input[3]:
-                    _axes_partial = _resolve_int_tuple(node.input[3])
-                if _axes_partial is not None:
-                    # Normalise and validate axis indices
-                    _axes_partial = [a if a >= 0 else a + rank for a in _axes_partial]
-                    if all(0 <= a < rank for a in _axes_partial):
-                        output_shape = list(input_shape)
-                        for a in _axes_partial:
-                            if isinstance(output_shape[a], int):
-                                output_shape[a] = self.unique_dimension_name("NEWDIM_slice")
-                        new_shape = tuple(output_shape)
-                        self.set_shape(node.output[0], new_shape)
-                        return new_shape
-                self.set_rank(node.output[0], rank)
-                return True
-            starts = list(_starts)
-            ends = list(_ends)
-            # axes: optional input[3]; default is [0, 1, ..., len(starts)-1]
-            if len(node.input) > 3 and node.input[3]:
-                _axes = _resolve_int_tuple(node.input[3])
-                axes = list(_axes) if _axes is not None else list(range(len(starts)))
-            else:
-                axes = list(range(len(starts)))
-            # steps: optional input[4]; default is 1 for each slice
-            if len(node.input) > 4 and node.input[4]:
-                _steps = _resolve_int_tuple(node.input[4])
-                steps = list(_steps) if _steps is not None else [1] * len(starts)
-            else:
-                steps = [1] * len(starts)
-            # Normalise negative axis indices and validate bounds
-            axes = [a if a >= 0 else a + rank for a in axes]
-            if not all(0 <= a < rank for a in axes):
-                # Out-of-range axis — cannot compute shape safely; fall back to rank.
-                self.set_rank(node.output[0], rank)
-                return True
-            # Build output shape: copy input, then update each sliced axis
-            output_shape = list(input_shape)
-            for s, e, a, d in zip(starts, ends, axes, steps):
-                n = input_shape[a]
-                if not isinstance(n, int):
-                    # Symbolic dimension — assign a fresh dynamic dim for the sliced axis
-                    output_shape[a] = self.unique_dimension_name("NEWDIM_slice")
+        axes = (
+            _resolve_int_tuple_or_shape(self, node.input[3])
+            if len(node.input) > 3
+            else np.arange(len(starts))
+        )
+        steps = _resolve_int_tuple_or_shape(self, node.input[4]) if len(node.input) > 4 else None
+        if steps is not None and (max(steps) != 1 or min(steps) != 1):
+            # will do later
+            self.set_rank(node.output[0], rank)
+            return True
+
+        output_shape = list(input_shape)
+        for s, e, a in zip(starts, ends, axes):
+            if isinstance(s, int) and isinstance(e, int):
+                if e >= s >= 0:
+                    output_shape[a] = e - s
                     continue
-                if d > 0:
-                    # Normalise start: negative wraps, positive is clamped to [0, n]
-                    s = max(0, min(n, s if s >= 0 else s + n))
-                    # Normalise end: negative wraps, positive clamped (INT64_MAX → n)
-                    e = max(0, min(n, e if e >= 0 else e + n))
-                    # ceil((e - s) / d) using integer arithmetic; clamp diff to ≥0
-                    diff = max(0, e - s)
-                    output_shape[a] = (diff + d - 1) // d
-                elif d < 0:
-                    # Backward slice: start defaults to last element, end to before first
-                    s = max(-1, min(n - 1, s if s >= 0 else s + n))
-                    e = max(-1, min(n - 1, e if e >= 0 else e + n))
-                    # ceil((s - e) / |d|) using integer arithmetic; clamp diff to ≥0
-                    diff = max(0, s - e)
-                    output_shape[a] = (diff + (-d) - 1) // (-d)
-                # d == 0 is invalid per the ONNX spec; leave dimension unchanged
-            new_shape = tuple(output_shape)
-            self.set_shape(node.output[0], new_shape, allow_zero=0 in new_shape)
-            return new_shape
-        # starts/ends inputs not present — preserve rank at minimum
-        self.set_rank(node.output[0], rank)
-        return True
+                if isinstance(output_shape[a], int):
+                    d = output_shape[a]
+                    s = (s + d) % d
+                    e = (e + d) % d
+                    output_shape[a] = e - s
+                    continue
+            d = input_shape[a]
+            if isinstance(s, int) and s < 0:
+                s = f"(({d}){e})"
+            if isinstance(e, int) and e < 0:
+                e = f"(({d}){e})"
+            output_shape[a] = simplify_expression(f"{e}-{s}")
+            continue
+
+        new_shape = tuple(output_shape)
+        self.set_shape(node.output[0], new_shape, allow_zero=0 in new_shape)
+        return new_shape
+
     if self.has_rank(node.input[0]):
         self.set_rank(node.output[0], self.get_rank(node.input[0]))
         return True

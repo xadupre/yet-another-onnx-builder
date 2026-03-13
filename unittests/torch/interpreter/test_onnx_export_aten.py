@@ -3514,6 +3514,7 @@ class TestOnnxExportAten(ExtTestCase):
             inputs,
             dynamic_shapes=({0: "batch"},),
             export_options=ExportOptions(aten_as_function=set()),
+            optimize=True,
         )
         self.dump_onnx("test_aten_histc_float_00.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
