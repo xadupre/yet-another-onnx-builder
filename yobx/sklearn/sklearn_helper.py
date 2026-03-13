@@ -3,6 +3,11 @@ from sklearn.base import BaseEstimator, ClusterMixin, is_classifier, is_regresso
 from sklearn.mixture._base import BaseMixture
 from sklearn.pipeline import Pipeline
 
+try:
+    from sklearn.base import OutlierMixin
+except ImportError:
+    OutlierMixin = None  # type: ignore
+
 
 def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
     """
@@ -26,6 +31,8 @@ def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
     if is_classifier(estimator):
         return 2 if _classifier_has_predict_proba(estimator) else 1
+    if OutlierMixin is not None and isinstance(estimator, OutlierMixin):
+        return 2
     if isinstance(estimator, (ClusterMixin, BaseMixture)):
         return 2
     return 1
@@ -54,11 +61,15 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
         if _classifier_has_predict_proba(estimator):
             return ["label", "probabilities"]
         return ["label"]
+    if OutlierMixin is not None and isinstance(estimator, OutlierMixin):
+        return ["label", "scores"]
     if isinstance(estimator, BaseMixture):
         return ["label", "probabilities"]
     if is_regressor(estimator):
         return ["predictions"]
     last = estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
+    if OutlierMixin is not None and isinstance(last, OutlierMixin):
+        return ["label", "scores"]
     if isinstance(last, ClusterMixin):
         return ["label", "distances"]
     if isinstance(last, BaseMixture):
