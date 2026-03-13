@@ -168,6 +168,7 @@ module = [
     "yobx.sklearn.decomposition.*",
     "yobx.sklearn.ensemble.*",
     "yobx.sklearn.gaussian_process.*",
+    "yobx.sklearn.impute.*",
     "yobx.sklearn.linear_model.*",
     "yobx.sklearn.lightgbm.*",
     "yobx.sklearn.manifold.*",
