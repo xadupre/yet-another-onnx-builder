@@ -54,24 +54,26 @@ class TestSklearnAdaBoostClassifier(ExtTestCase):
         self._check_classifier(self._X, self._y_multi, n_estimators=10)
 
     def test_in_pipeline(self):
-        Xd = self._X.astype(np.float32)
+        rng = np.random.default_rng(42)
         y = self._y_bin
-        clf = AdaBoostClassifier(n_estimators=5, random_state=0)
-        pipe = Pipeline([("scaler", StandardScaler()), ("clf", clf)])
-        pipe.fit(Xd, y)
+        for dtype in (np.float32, np.float64):
+            Xd = rng.standard_normal((8, 2)).astype(dtype)
+            clf = AdaBoostClassifier(n_estimators=5, random_state=0)
+            pipe = Pipeline([("scaler", StandardScaler()), ("clf", clf)])
+            pipe.fit(Xd, y)
 
-        onx = to_onnx(pipe, (Xd,))
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": Xd})
-        expected_label = pipe.predict(Xd)
-        expected_proba = pipe.predict_proba(Xd).astype(np.float32)
-        self.assertEqualArray(expected_label, results[0])
-        self.assertEqualArray(expected_proba, results[1], atol=1e-5)
+            onx = to_onnx(pipe, (Xd,))
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": Xd})
+            expected_label = pipe.predict(Xd)
+            expected_proba = pipe.predict_proba(Xd).astype(dtype)
+            self.assertEqualArray(expected_label, results[0])
+            self.assertEqualArray(expected_proba, results[1], atol=1e-5)
 
-        sess = self.check_ort(onx)
-        ort_results = sess.run(None, {"X": Xd})
-        self.assertEqualArray(expected_label, ort_results[0])
-        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": Xd})
+            self.assertEqualArray(expected_label, ort_results[0])
+            self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
     def test_custom_base_estimator(self):
         y = self._y_bin
@@ -135,20 +137,23 @@ class TestSklearnAdaBoostRegressor(ExtTestCase):
         self._check_regressor(self._X, self._y, n_estimators=10)
 
     def test_in_pipeline(self):
-        Xd = self._X.astype(np.float32)
-        reg = AdaBoostRegressor(n_estimators=5, random_state=0)
-        pipe = Pipeline([("scaler", StandardScaler()), ("reg", reg)])
-        pipe.fit(Xd, self._y)
+        rng = np.random.default_rng(42)
+        for dtype in (np.float32, np.float64):
+            Xd = rng.standard_normal((8, 2)).astype(dtype)
+            yd = self._y.astype(dtype)
+            reg = AdaBoostRegressor(n_estimators=5, random_state=0)
+            pipe = Pipeline([("scaler", StandardScaler()), ("reg", reg)])
+            pipe.fit(Xd, yd)
 
-        onx = to_onnx(pipe, (Xd,))
-        ref = ExtendedReferenceEvaluator(onx)
-        results = ref.run(None, {"X": Xd})
-        expected_pred = pipe.predict(Xd).astype(np.float32)
-        self.assertEqualArray(expected_pred, results[0].ravel(), atol=1e-5)
+            onx = to_onnx(pipe, (Xd,))
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": Xd})
+            expected_pred = pipe.predict(Xd).astype(dtype)
+            self.assertEqualArray(expected_pred, results[0].ravel(), atol=1e-5)
 
-        sess = self.check_ort(onx)
-        ort_results = sess.run(None, {"X": Xd})
-        self.assertEqualArray(expected_pred, ort_results[0].ravel(), atol=1e-5)
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": Xd})
+            self.assertEqualArray(expected_pred, ort_results[0].ravel(), atol=1e-5)
 
     def test_custom_base_estimator(self):
         for dtype in (np.float32, np.float64):
