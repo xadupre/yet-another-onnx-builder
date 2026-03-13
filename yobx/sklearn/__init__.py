@@ -22,7 +22,7 @@ class NumericalDiscrepancyWarning(UserWarning):
     """
     The exported model has discrepancies for a particular version
     of scikit-learn while running unit tests.
-    scikit-learn>=1.8 is more strict about types and does not implicity switch
+    scikit-learn>=1.8 is more strict about types and does not implicitly switch
     to float64 in many models relying on a matrix multiplication or a
     normalization.
     """
