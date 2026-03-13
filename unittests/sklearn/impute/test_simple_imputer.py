@@ -1,7 +1,3 @@
-"""
-Unit tests for yobx.sklearn.preprocessing.SimpleImputer converter.
-"""
-
 import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
