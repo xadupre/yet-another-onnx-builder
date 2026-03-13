@@ -17,6 +17,7 @@ yobx.sklearn
     calibration/index
     cluster/index
     compose/index
+    covariance/index
     decomposition/index
     discriminant_analysis/index
     dummy/index
@@ -26,6 +27,7 @@ yobx.sklearn
     linear_model/index
     manifold/index
     mixture/index
+    model_selection/index
     multiclass/index
     multioutput/index
     naive_bayes/index

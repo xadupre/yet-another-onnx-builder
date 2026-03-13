@@ -6,6 +6,14 @@ Reduction
 ``Sum`` (reduce_sum), ``Max`` (reduce_max), ``Min`` (reduce_min),
 ``Mean`` (reduce_mean), ``Prod`` (reduce_prod)
 
+Variance / standard deviation
+------------------------------
+``tf.math.reduce_variance`` and ``tf.math.reduce_std`` are Python-level
+TensorFlow functions that decompose into primitive graph ops (``Mean``,
+``SquaredDifference``, ``Sqrt``, etc.).  Because every component op has a
+registered converter, these high-level functions are automatically supported
+without a dedicated single-op converter.
+
 Cumulative
 ----------
 ``Cumsum``
@@ -48,7 +56,7 @@ def convert_reduce_sum(
     """TF ``Sum`` (tf.math.reduce_sum) → ONNX ``ReduceSum``."""
     keep_dims = int(op.get_attr("keep_dims"))
     axes = _axes_i64(g, op)
-    return g.op.ReduceSum(
+    return g.op.ReduceSumAnyOpset(
         op.inputs[0].name, axes, keepdims=keep_dims, outputs=outputs[:1], name=op.name
     )
 
@@ -60,7 +68,7 @@ def convert_reduce_max(
     """TF ``Max`` (tf.math.reduce_max) → ONNX ``ReduceMax``."""
     keep_dims = int(op.get_attr("keep_dims"))
     axes = _axes_i64(g, op)
-    return g.op.ReduceMax(
+    return g.op.ReduceMaxAnyOpset(
         op.inputs[0].name, axes, keepdims=keep_dims, outputs=outputs[:1], name=op.name
     )
 
@@ -72,7 +80,7 @@ def convert_reduce_min(
     """TF ``Min`` (tf.math.reduce_min) → ONNX ``ReduceMin``."""
     keep_dims = int(op.get_attr("keep_dims"))
     axes = _axes_i64(g, op)
-    return g.op.ReduceMin(
+    return g.op.ReduceMinAnyOpset(
         op.inputs[0].name, axes, keepdims=keep_dims, outputs=outputs[:1], name=op.name
     )
 
@@ -84,7 +92,7 @@ def convert_reduce_mean(
     """TF ``Mean`` (tf.math.reduce_mean) → ONNX ``ReduceMean``."""
     keep_dims = int(op.get_attr("keep_dims"))
     axes = _axes_i64(g, op)
-    return g.op.ReduceMean(
+    return g.op.ReduceMeanAnyOpset(
         op.inputs[0].name, axes, keepdims=keep_dims, outputs=outputs[:1], name=op.name
     )
 
@@ -96,7 +104,7 @@ def convert_reduce_prod(
     """TF ``Prod`` (tf.math.reduce_prod) → ONNX ``ReduceProd``."""
     keep_dims = int(op.get_attr("keep_dims"))
     axes = _axes_i64(g, op)
-    return g.op.ReduceProd(
+    return g.op.ReduceProdAnyOpset(
         op.inputs[0].name, axes, keepdims=keep_dims, outputs=outputs[:1], name=op.name
     )
 

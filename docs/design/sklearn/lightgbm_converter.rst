@@ -1,8 +1,8 @@
 .. _l-design-gbm-converters:
 
-================================================
-Gradient Boosting Converters (XGBoost, LightGBM)
-================================================
+======================================
+External Libraries (XGBoost, LightGBM)
+======================================
 
 :func:`yobx.sklearn.to_onnx` converts fitted
 :class:`xgboost.XGBRegressor`, :class:`xgboost.XGBClassifier`,
@@ -264,52 +264,3 @@ Regression transform                Identity / Sigmoid / Exp          Identity /
 Multi-class targets per round       ``n_classes`` trees               ``n_classes`` trees
 Binary classifier raw outputs       1 tree per round (sigmoid)        1 tree per round (sigmoid)
 ==================================  ================================  ==============================
-
-Supported input dtypes and opsets
-==================================
-
-Both converters respect the input dtype and the active ``ai.onnx.ml`` opset:
-
-* ``float32`` input with ``ai.onnx.ml`` opset 3 → ``TreeEnsembleRegressor``
-  / ``TreeEnsembleClassifier`` (float32 weights)
-* ``float64`` input with ``ai.onnx.ml`` opset 3 → legacy operators with
-  float64 routing via an explicit ``Cast`` node
-* ``float32`` or ``float64`` with ``ai.onnx.ml`` opset 5 → unified
-  ``TreeEnsemble`` with matching weight dtype
-
-Specifying the target opset:
-
-.. code-block:: python
-
-    onx = to_onnx(reg, (X.astype(np.float64),),
-                  target_opset={"": 21, "ai.onnx.ml": 5})
-
-Pipeline embedding
-==================
-
-Both :class:`xgboost.XGBRegressor` / :class:`xgboost.XGBClassifier` and
-:class:`lightgbm.LGBMRegressor` / :class:`lightgbm.LGBMClassifier` can be
-used as the final step in a :class:`sklearn.pipeline.Pipeline`:
-
-.. runpython::
-    :showcode:
-
-    import numpy as np
-    from sklearn.pipeline import Pipeline
-    from sklearn.preprocessing import StandardScaler
-    from lightgbm import LGBMClassifier
-    from yobx.helpers.onnx_helper import pretty_onnx
-    from yobx.sklearn import to_onnx
-
-    rng = np.random.default_rng(0)
-    X = rng.standard_normal((50, 4)).astype(np.float32)
-    y = (X[:, 0] > 0).astype(int)
-
-    pipe = Pipeline([
-        ("scaler", StandardScaler()),
-        ("clf", LGBMClassifier(n_estimators=5, random_state=0)),
-    ]).fit(X, y)
-
-    onx = to_onnx(pipe, (X,))
-    print(pretty_onnx(onx))
-

@@ -163,6 +163,8 @@ module = [
     "yobx.helpers.helper",
     "yobx.reference.ops.*",
     "yobx.sklearn.calibration.*",
+    "yobx.sklearn.cluster.*",
+    "yobx.sklearn.coveriance.*",
     "yobx.sklearn.decomposition.*",
     "yobx.sklearn.ensemble.*",
     "yobx.sklearn.gaussian_process.*",
@@ -253,6 +255,7 @@ bad-return = false
 matches = "yobx/sklearn/**/*.py"
 [tool.pyrefly.sub-config.errors]
 bad-argument-type = false
+bad-assignment = false
 bad-index = false  # tuple[str, str] != tuple[str, ...]
 bad-return = false
 missing-attribute = false

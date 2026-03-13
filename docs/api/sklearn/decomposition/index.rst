@@ -5,7 +5,9 @@ yobx.sklearn.decomposition
     :maxdepth: 1
     :caption: modules
 
+    factor_analysis
     gaussian_random_projection
+    incremental_pca
     pca
     pls_regression
     truncated_svd
