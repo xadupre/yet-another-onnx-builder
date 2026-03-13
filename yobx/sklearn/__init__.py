@@ -1,6 +1,28 @@
 from .convert import to_onnx
 
-__all__ = ["to_onnx"]
+__all__ = ["NumericalDiscrepancyWarning", "register_sklearn_converters", "to_onnx"]
+
+
+def has_sklearn(version: str = ""):
+    """Tells if scikit-learn is available and more recent than the given version."""
+    try:
+        import sklearn
+    except ImportError:
+        return False
+    if not hasattr(sklearn, "__version__"):
+        return False
+    if not version:
+        return True
+    import packaging.version as pv
+
+    return pv.Version(version) <= pv.Version(sklearn.__version__)
+
+
+class NumericalDiscrepancyWarning(UserWarning):
+    """
+    The exported model has discrepancies for a particular version
+    of scikit-learn while running unit tests.
+    """
 
 
 def register_sklearn_converters():

@@ -62,6 +62,7 @@ jobs:
       - name: Run unittest files with coverage, not pytest
         if: matrix.sklearn-version == '1.8'
         run: |
+          python -m coverage run --append unittests/sklearn/ensemble/test_sklearn_gradient_boosting_multiclass.py
           python -m coverage run --append unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
           python -m coverage run --append unittests/sklearn/preprocessing/test_power_transformer.py
           coverage xml
@@ -78,6 +79,7 @@ jobs:
               --ignore=unittests/xoptim/test_torch_untrained_models.py \
               --ignore=unittests/tensorflow \
               --ignore=unittests/torch \
+              --ignore unittests/sklearn/ensemble/test_sklearn_gradient_boosting_multiclass.py \
               --ignore unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py \
               --ignore unittests/sklearn/preprocessing/test_power_transformer.py  # AttributeError: module 'torch' has no attribute 'Tensor'
 

@@ -1,6 +1,8 @@
+import warnings
 from typing import Dict, List
 import numpy as np
 from sklearn.cross_decomposition import PLSRegression
+from .. import NumericalDiscrepancyWarning, has_sklearn
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
@@ -44,11 +46,17 @@ def sklearn_pls_regression(
     .. note:: discrepancies
 
         The conversion shows discrepancies for ``scikit-learn==1.4``
-        at least in unit tests.
+        at least in unit tests. It is safe to assume it only works
+        for ``scikit-learn>=1.8``.
     """
     assert isinstance(
         estimator, PLSRegression
     ), f"Unexpected type {type(estimator)} for estimator."
+    if not has_sklearn("1.8"):
+        warnings.warn(
+            "Discrepancies were observed for scikit-learn==1.4 but not for 1.8",
+            NumericalDiscrepancyWarning,
+        )
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
