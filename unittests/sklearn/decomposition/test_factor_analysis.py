@@ -92,9 +92,7 @@ class TestFactorAnalysis(ExtTestCase):
         X = rng.standard_normal((60, 6)).astype(np.float32)
         y = (X[:, 0] > 0).astype(np.int64)
 
-        pipe = Pipeline(
-            [("fa", FactorAnalysis(n_components=3)), ("clf", LogisticRegression())]
-        )
+        pipe = Pipeline([("fa", FactorAnalysis(n_components=3)), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
         onx = to_onnx(pipe, (X,))
