@@ -1,8 +1,8 @@
 .. _l-design-sklearn-contrib-ops:
 
-======================================================
+===================================================
 ONNX Runtime Contrib Ops (``com.microsoft`` domain)
-======================================================
+===================================================
 
 ONNX Runtime ships a set of *contributed operators* in the
 ``com.microsoft`` custom domain.  These operators go beyond the standard
@@ -11,14 +11,14 @@ They are **not** part of the standard ONNX spec, so they are only
 available on runtimes that implement them — primarily ONNX Runtime.
 
 The ``com.microsoft`` domain
-=============================
+============================
 
 The ``com.microsoft`` domain groups ONNX Runtime's proprietary extensions.
 Any model that references nodes in this domain will fail on runtimes that
 do not recognise it.  ONNX Runtime is the reference implementation.
 
 Enabling contrib ops
-=====================
+====================
 
 Pass a ``dict`` as ``target_opset`` that includes ``"com.microsoft": 1``
 alongside the standard opset::
@@ -111,16 +111,6 @@ of standard ONNX nodes into single ``com.microsoft`` kernels:
    * - ``RotaryEmbedding``
      - Rotary positional embedding sequence
 
-Reference evaluator
---------------------
-
-:class:`yobx.reference.ExtendedReferenceEvaluator` includes pure-Python
-implementations of several ``com.microsoft`` ops so that models using
-them can be evaluated without ONNX Runtime during development and testing:
-
-``FusedMatMul``, ``Attention``, ``BiasSoftmax``, ``QLinearAveragePool``,
-``QLinearConv``, ``QuickGelu``, ``SkipLayerNormalization``.
-
 When to use contrib ops
 ========================
 
@@ -141,9 +131,6 @@ CDist example
 
 The following examples show the difference between the standard ONNX
 path and the CDist-enabled path for sklearn estimators.
-
-KNeighborsClassifier
----------------------
 
 .. runpython::
     :showcode:
@@ -168,29 +155,6 @@ KNeighborsClassifier
     cd_nodes = {(n.op_type, n.domain or "") for n in onx_cd.graph.node}
     print("CDist path op types:", sorted({t for t, _ in cd_nodes}))
     print("CDist present:", ("CDist", "com.microsoft") in cd_nodes)
-
-Birch
-------
-
-.. runpython::
-    :showcode:
-
-    import numpy as np
-    from sklearn.cluster import Birch
-    from yobx.sklearn import to_onnx
-
-    rng = np.random.default_rng(1)
-    X = rng.standard_normal((60, 3)).astype(np.float32)
-
-    birch = Birch(n_clusters=3, threshold=0.5).fit(X)
-
-    # Standard ONNX path
-    onx_std = to_onnx(birch, (X,))
-    print("Standard path:", sorted({n.op_type for n in onx_std.graph.node}))
-
-    # CDist path
-    onx_cd = to_onnx(birch, (X,), target_opset={"": 18, "com.microsoft": 1})
-    print("CDist path:", sorted({n.op_type for n in onx_cd.graph.node}))
 
 Both paths produce identical results
 --------------------------------------
