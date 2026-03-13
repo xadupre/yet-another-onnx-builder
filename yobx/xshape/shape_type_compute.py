@@ -529,7 +529,7 @@ def _set_shape_type_op_any_concat(self: ShapeBuilder, node: NodeProto):
         shape = []
         for s in node.input:
             shape.extend(self.value_as_shape(s))
-        self.set_shape_value(node.output[0], tuple(shape))
+        self.set_value_shape(node.output[0], tuple(shape))
     if all(self.has_shape(s) for s in node.input):
         axis = self.get_attribute(node, "axis").i
         shapes = [self.get_shape(i) for i in node.input]
