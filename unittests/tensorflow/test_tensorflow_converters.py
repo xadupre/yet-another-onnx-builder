@@ -1228,6 +1228,58 @@ class TestTensorflowMathConverters(ExtTestCase):
         result = _ort_run(onx, {"X:0": x})
         self.assertEqualArray(expected, result, atol=1e-5)
 
+    def test_reduce_variance(self):
+        """TF reduce_variance decomposes into Mean/SquaredDifference/Mean → ONNX."""
+        x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.reduce_variance(t, axis=1)
+
+        onx = to_onnx(fn, (x,))
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_reduce_variance_keepdims(self):
+        """TF reduce_variance with keepdims=True."""
+        x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.reduce_variance(t, axis=1, keepdims=True)
+
+        onx = to_onnx(fn, (x,))
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_reduce_std(self):
+        """TF reduce_std decomposes into Mean/SquaredDifference/Mean/Sqrt → ONNX."""
+        x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.reduce_std(t, axis=1)
+
+        onx = to_onnx(fn, (x,))
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_reduce_std_keepdims(self):
+        """TF reduce_std with keepdims=True."""
+        x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
+
+        @tf.function
+        def fn(t):
+            return tf.math.reduce_std(t, axis=1, keepdims=True)
+
+        onx = to_onnx(fn, (x,))
+        expected = fn(x).numpy()
+        result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
     def test_cumsum(self):
         """TF cumsum → ONNX CumSum."""
         x = np.array([[1.0, 2.0, 3.0, 4.0]], dtype=np.float32)

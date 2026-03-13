@@ -1,6 +1,31 @@
 from .convert import to_onnx
 
-__all__ = ["to_onnx"]
+__all__ = ["NumericalDiscrepancyWarning", "register_sklearn_converters", "to_onnx"]
+
+
+def has_sklearn(version: str = ""):
+    """Tells if scikit-learn is available and more recent than the given version."""
+    try:
+        import sklearn
+    except ImportError:
+        return False
+    if not hasattr(sklearn, "__version__"):
+        return False
+    if not version:
+        return True
+    import packaging.version as pv
+
+    return pv.Version(version) <= pv.Version(sklearn.__version__)
+
+
+class NumericalDiscrepancyWarning(UserWarning):
+    """
+    The exported model has discrepancies for a particular version
+    of scikit-learn while running unit tests.
+    scikit-learn>=1.8 is more strict about types and does not implicitly switch
+    to float64 in many models relying on a matrix multiplication or a
+    normalization.
+    """
 
 
 def register_sklearn_converters():
@@ -21,7 +46,9 @@ def register_sklearn_converters():
     from .gaussian_process import register as register_gaussian_process
     from .lightgbm import register as register_lightgbm
     from .linear_model import register as register_linear_model
+    from .manifold import register as register_manifold
     from .mixture import register as register_mixture
+    from .model_selection import register as register_model_selection
     from .multiclass import register as register_multiclass
     from .multioutput import register as register_multioutput
     from .naive_bayes import register as register_naive_bayes
@@ -44,7 +71,9 @@ def register_sklearn_converters():
     register_gaussian_process()
     register_linear_model()
     register_lightgbm()
+    register_manifold()
     register_mixture()
+    register_model_selection()
     register_multiclass()
     register_multioutput()
     register_naive_bayes()

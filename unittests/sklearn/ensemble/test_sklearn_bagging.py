@@ -75,6 +75,7 @@ class TestSklearnBaggingRegressor(ExtTestCase):
             expected_pred = reg.predict(Xd).astype(dtype)
             self.assertEqualArray(expected_pred, results[0].ravel(), atol=1e-5)
 
+    @requires_sklearn("1.8")
     def test_regressor_in_pipeline(self):
         """BaggingRegressor as last step in a Pipeline."""
         Xd = self._X.astype(np.float32)

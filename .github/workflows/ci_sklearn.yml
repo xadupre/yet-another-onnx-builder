@@ -34,6 +34,15 @@ jobs:
       - name: pip freeze
         run: pip freeze
 
+      - name: Run unittest files having an issue with pytest
+        if: matrix.sklearn-version != '1.8'
+        run: |
+          python unittests/sklearn/decomposition/test_pls_regression.py
+          python unittests/sklearn/ensemble/test_sklearn_gradient_boosting.py
+          python unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
+          python unittests/sklearn/mixture/test_gaussian_mixture.py
+          python unittests/sklearn/preprocessing/test_power_transformer.py
+
       - name: Run sklearn tests with no coverage
         if: matrix.sklearn-version != '1.8'
         run: |
@@ -46,7 +55,19 @@ jobs:
               --ignore=unittests/xoptim/test_torch_untrained_models.py \
               --ignore=unittests/tensorflow \
               --ignore=unittests/torch \
-              --ignore unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py  # AttributeError: module 'torch' has no attribute 'Tensor'
+              --ignore unittests/sklearn/decomposition/test_pls_regression.py \
+              --ignore unittests/sklearn/ensemble/test_sklearn_gradient_boosting.py \
+              --ignore unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py \
+              --ignore unittests/sklearn/mixture/test_gaussian_mixture.py \
+              --ignore unittests/sklearn/preprocessing/test_power_transformer.py  # AttributeError: module 'torch' has no attribute 'Tensor'
+
+      - name: Run unittest files with coverage, not pytest
+        if: matrix.sklearn-version == '1.8'
+        run: |
+          python -m coverage run --append unittests/sklearn/ensemble/test_sklearn_gradient_boosting.py
+          python -m coverage run --append unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
+          python -m coverage run --append unittests/sklearn/preprocessing/test_power_transformer.py
+          coverage xml
 
       - name: Run sklearn tests with coverage
         if: matrix.sklearn-version == '1.8'
@@ -60,13 +81,9 @@ jobs:
               --ignore=unittests/xoptim/test_torch_untrained_models.py \
               --ignore=unittests/tensorflow \
               --ignore=unittests/torch \
+              --ignore unittests/sklearn/ensemble/test_sklearn_gradient_boosting.py \
               --ignore unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py \
-              --ignore unittests/sklearn/ensemble/test_power_transformer.py  # AttributeError: module 'torch' has no attribute 'Tensor'
-
-      - name: Run test_sklearn_hist_gradient_boosting_multiclass.py
-        run:|
-          python unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
-          python unittests/sklearn/ensemble/test_power_transformer.py
+              --ignore unittests/sklearn/preprocessing/test_power_transformer.py  # AttributeError: module 'torch' has no attribute 'Tensor'
 
       - name: Upload coverage to Codecov
         if: matrix.sklearn-version == '1.8'

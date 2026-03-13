@@ -25,7 +25,9 @@ yobx.sklearn
     gaussian_process/index
     lightgbm/index
     linear_model/index
+    manifold/index
     mixture/index
+    model_selection/index
     multiclass/index
     multioutput/index
     naive_bayes/index
@@ -41,3 +43,8 @@ register_sklearn_converters
 +++++++++++++++++++++++++++
 
 .. autofunction:: yobx.sklearn.register_sklearn_converters
+
+to_onnx
++++++++
+
+.. autofunction:: yobx.sklearn.to_onnx
