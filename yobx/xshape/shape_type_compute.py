@@ -1120,14 +1120,17 @@ def _compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
 
     if -1 not in shape2:
         return shape2
+
     total_int1 = int(np.prod([i for i in shape1 if isinstance(i, int)]))
     if total_int1 == 0:
         return tuple(s if s != -1 else 0 for s in shape2)
+
     total_int2 = int(np.prod([i for i in shape2 if isinstance(i, int) and i != -1]))
-    if total_int1 > total_int2 and total_int1 % total_int2 == 0:
+    if total_int1 >= total_int2 and total_int1 % total_int2 == 0:
         intpart = total_int1 // total_int2
     else:
         intpart = simplify_expression(f"({total_int1})//({total_int2})")
+
     exist1 = {s for s in shape1 if isinstance(s, str)}
     exist2 = {s for s in shape2 if isinstance(s, str)}
     common = exist1 & exist2
@@ -1144,6 +1147,8 @@ def _compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
         ok = simplify_expression(f"1//({resm})")
     else:
         ok = ""
+    if not ok and isinstance(intpart, int):
+        return tuple(s if s != -1 else intpart for s in shape2)
     if intpart != 1:
         ok = simplify_expression(f"({ok})*({intpart})") if ok else intpart
     assert ok, f"Unable to compute a shape with {shape1=} and {shape2=}."

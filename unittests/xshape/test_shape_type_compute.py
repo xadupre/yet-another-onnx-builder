@@ -2697,8 +2697,7 @@ class TestComputeReshapeShape(ExtTestCase):
         # total_int1 == total_int2 (12==12): strict-greater condition fails,
         # so the function falls back to a symbolic "12//12" expression.
         result = _compute_reshape_shape((3, 4), (12, -1))
-        self.assertEqual(result[0], 12)
-        self.assertIn("12", result[1])
+        self.assertEqual((12, 1), result)
 
     def test_all_int_flatten(self):
         # 2*3*4=24, new shape (-1,): 24 → (24,)
