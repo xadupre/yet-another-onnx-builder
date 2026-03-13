@@ -1282,8 +1282,8 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
 
         output_shape = list(input_shape)
         for s, e, a in zip(starts, ends, axes):
-            st = steps[a] if steps is not None else 1
-            if e >= 922337203685477580:
+            st = steps[a] if steps is not None and a < len(steps) else 1
+            if isinstance(e, int) and e >= 922337203685477580:
                 e = input_shape[a]
             if isinstance(s, int) and isinstance(e, int):
                 if e >= s >= 0:
