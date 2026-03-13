@@ -29,4 +29,4 @@ register_flattening_functions
 to_onnx
 +++++++
 
-.. autofunction:: yobx.sklean.to_onnx
+.. autofunction:: yobx.torch.to_onnx

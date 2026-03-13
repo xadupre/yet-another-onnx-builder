@@ -13,4 +13,4 @@ yobx.tensorflow
 to_onnx
 +++++++
 
-.. autofunction:: yobx.sklean.to_onnx
+.. autofunction:: yobx.tensorflow.to_onnx

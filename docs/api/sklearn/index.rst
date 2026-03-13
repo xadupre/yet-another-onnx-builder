@@ -46,4 +46,4 @@ register_sklearn_converters
 to_onnx
 +++++++
 
-.. autofunction:: yobx.sklean.to_onnx
+.. autofunction:: yobx.sklearn.to_onnx
