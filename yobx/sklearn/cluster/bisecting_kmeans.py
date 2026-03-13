@@ -80,9 +80,13 @@ def sklearn_bisecting_kmeans(
 
     **Distance computation** (transform output):
 
+    When the ``com.microsoft`` opset is available the ``CDist`` operator is
+    used directly (``metric="euclidean"``).  Otherwise the distances are
+    computed manually:
+
     .. code-block:: text
 
-        ||x - c||² = ||x||² - 2·x·cᵀ + ||c||²
+        ||x - c||² = ||x||² - 2·x·cᵀ + ||c||²  →  Sqrt
 
     Full graph structure (three-cluster example):
 
@@ -127,43 +131,54 @@ def sklearn_bisecting_kmeans(
     )
 
     # ------------------------------------------------------------------
-    # Distances output (transform):  ||x - c||² = x_sq - 2·x·cᵀ + c_sq
+    # Distances output (transform):  Euclidean distances to each center.
+    # Use com.microsoft CDist when available; fall back to the manual
+    # ||x - c||² = ||x||² - 2·x·cᵀ + ||c||² path otherwise.
     # ------------------------------------------------------------------
     centers = estimator.cluster_centers_.astype(dtype)  # (K, F)
-    centers_T = centers.T  # (F, K)
-
-    x_sq = g.op.Mul(X, X, name=f"{name}_x_sq")
-    x_sq_sum = g.op.ReduceSum(
-        x_sq,
-        np.array([1], dtype=np.int64),
-        keepdims=1,
-        name=f"{name}_x_sq_sum",
-    )  # (N, 1)
-
-    c_sq = (np.sum(centers**2, axis=1, keepdims=True).T).astype(dtype)  # (1, K)
-    cross = g.op.MatMul(X, centers_T, name=f"{name}_cross")  # (N, K)
-
-    two = np.array([2], dtype=dtype)
-    two_cross = g.op.Mul(two, cross, name=f"{name}_two_cross")
-    sq_plus = g.op.Add(x_sq_sum, c_sq, name=f"{name}_sq_plus")
-    sq_dists = g.op.Sub(sq_plus, two_cross, name=f"{name}_sq_dists")
-
     zero = np.array([0], dtype=dtype)
-    sq_dists_clipped = g.op.Max(sq_dists, zero, name=f"{name}_clip")
+
+    if g.has_opset("com.microsoft"):
+        centers_name = g.make_initializer(f"{name}_centers", centers)
+        cdist_out = g.make_node(
+            "CDist",
+            [X, centers_name],
+            domain="com.microsoft",
+            metric="euclidean",
+            name=f"{name}_cdist",
+        )
+        eucl_dists = g.op.Max(cdist_out, zero, name=f"{name}_clip")
+    else:
+        centers_T = centers.T  # (F, K)
+        x_sq = g.op.Mul(X, X, name=f"{name}_x_sq")
+        x_sq_sum = g.op.ReduceSum(
+            x_sq,
+            np.array([1], dtype=np.int64),
+            keepdims=1,
+            name=f"{name}_x_sq_sum",
+        )  # (N, 1)
+        c_sq = (np.sum(centers**2, axis=1, keepdims=True).T).astype(dtype)  # (1, K)
+        cross = g.op.MatMul(X, centers_T, name=f"{name}_cross")  # (N, K)
+        two = np.array([2], dtype=dtype)
+        two_cross = g.op.Mul(two, cross, name=f"{name}_two_cross")
+        sq_plus = g.op.Add(x_sq_sum, c_sq, name=f"{name}_sq_plus")
+        sq_dists = g.op.Sub(sq_plus, two_cross, name=f"{name}_sq_dists")
+        sq_dists_clipped = g.op.Max(sq_dists, zero, name=f"{name}_clip")
+        eucl_dists = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt_pre")
 
     n_outputs = len(outputs)
 
     if n_outputs >= 2:
-        distances = g.op.Sqrt(
-            sq_dists_clipped,
-            name=f"{name}_sqrt",
+        distances = g.op.Identity(
+            eucl_dists,
+            name=f"{name}_distances",
             outputs=outputs[1:2],
         )
         assert isinstance(distances, str)
         if not sts:
             g.set_type(distances, itype)
     else:
-        distances = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt")
+        distances = eucl_dists
         assert isinstance(distances, str)
 
     # ------------------------------------------------------------------
