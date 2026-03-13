@@ -88,23 +88,13 @@ def sklearn_isotonic_regression(
     K = len(xp)
 
     # Flatten input to 1D: handles both (N,) and (N, 1) shapes.
-    x_flat = g.op.Reshape(
-        X, np.array([-1], dtype=np.int64), name=f"{name}_flatten"
-    )  # (N,)
+    x_flat = g.op.Reshape(X, np.array([-1], dtype=np.int64), name=f"{name}_flatten")  # (N,)
 
     # --- Constant model (K == 1) ------------------------------------------
     if K == 1:
         const = fp.reshape(1)  # (1,)
         x_shape = g.op.Shape(x_flat, name=f"{name}_shape")
-        res = g.op.Expand(const, x_shape, name=name, outputs=outputs)
-        assert isinstance(res, str)
-        if not sts:
-            g.set_type(res, itype)
-            if g.has_shape(X):
-                g.set_shape(res, (g.get_shape(X)[0],))
-            elif g.has_rank(X):
-                g.set_rank(res, 1)
-        return res
+        return g.op.Expand(const, x_shape, name=name, outputs=outputs)
 
     # --- Piecewise-linear interpolation (K >= 2) --------------------------
 
@@ -153,13 +143,4 @@ def sklearn_isotonic_regression(
     # result = fp_lo + t * (fp_hi - fp_lo)
     fp_diff = g.op.Sub(fp_hi, fp_lo, name=f"{name}_fp_diff")  # (N,)
     interp = g.op.Mul(t, fp_diff, name=f"{name}_interp")  # (N,)
-    res = g.op.Add(fp_lo, interp, name=name, outputs=outputs)  # (N,)
-
-    assert isinstance(res, str)
-    if not sts:
-        g.set_type(res, itype)
-        if g.has_shape(X):
-            g.set_shape(res, (g.get_shape(X)[0],))
-        elif g.has_rank(X):
-            g.set_rank(res, 1)
-    return res
+    return g.op.Add(fp_lo, interp, name=name, outputs=outputs)  # (N,)
