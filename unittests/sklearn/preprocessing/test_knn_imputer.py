@@ -139,6 +139,10 @@ class TestKNNImputer(ExtTestCase):
         expected = imp.transform(X).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
 
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
     def test_knn_imputer_larger_k(self):
         """Larger k with distance weights on random data."""
         from sklearn.impute import KNNImputer
