@@ -84,9 +84,7 @@ class TestKNNImputer(ExtTestCase):
         from sklearn.impute import KNNImputer
         from yobx.sklearn import to_onnx
 
-        X_train = np.array(
-            [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=np.float32
-        )
+        X_train = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=np.float32)
         X_test = np.array([[2.0, 3.0], [4.0, 5.0]], dtype=np.float32)
         imp = KNNImputer(n_neighbors=2)
         imp.fit(X_train)
@@ -254,13 +252,9 @@ class TestKNNImputer(ExtTestCase):
         from sklearn.pipeline import Pipeline
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2], [np.nan, 3], [7, 6], [4, np.nan]], dtype=np.float32
-        )
+        X = np.array([[1, 2], [np.nan, 3], [7, 6], [4, np.nan]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
-        pipe = Pipeline(
-            [("imp", KNNImputer(n_neighbors=2)), ("clf", LogisticRegression())]
-        )
+        pipe = Pipeline([("imp", KNNImputer(n_neighbors=2)), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
         onx = to_onnx(pipe, (X,))

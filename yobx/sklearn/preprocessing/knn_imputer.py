@@ -103,21 +103,16 @@ def sklearn_knn_imputer(  # noqa: C901
     :param name: prefix name for the added nodes
     :return: output name
     """
-    assert isinstance(estimator, KNNImputer), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(estimator, KNNImputer), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     if getattr(estimator, "add_indicator", False):
-        raise NotImplementedError(
-            "KNNImputer with add_indicator=True is not supported."
-        )
+        raise NotImplementedError("KNNImputer with add_indicator=True is not supported.")
 
     metric = getattr(estimator, "metric", "nan_euclidean")
     if callable(metric) or metric != "nan_euclidean":
         raise NotImplementedError(
-            f"KNNImputer converter only supports metric='nan_euclidean', "
-            f"got {metric!r}."
+            f"KNNImputer converter only supports metric='nan_euclidean', got {metric!r}."
         )
 
     opset = g.get_opset("")
@@ -139,7 +134,7 @@ def sklearn_knn_imputer(  # noqa: C901
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
 
-    M, F = fit_X.shape
+    _M, F = fit_X.shape
 
     # Training matrices with NaN replaced by 0.
     train_filled = np.where(mask_fit_X, 0, fit_X).astype(dtype)  # [M, F]
@@ -164,9 +159,7 @@ def sklearn_knn_imputer(  # noqa: C901
     )  # [N, F] float: 1.0 = valid
 
     zeros1 = np.zeros(1, dtype=dtype)
-    x_filled = g.op.Where(
-        mask_X_node, zeros1, X, name=f"{name}_x_filled"
-    )  # [N, F]
+    x_filled = g.op.Where(mask_X_node, zeros1, X, name=f"{name}_x_filled")  # [N, F]
     ax_sq = g.op.Mul(x_filled, x_filled, name=f"{name}_ax_sq")  # [N, F]
 
     one1 = np.ones(1, dtype=dtype)
@@ -176,9 +169,7 @@ def sklearn_knn_imputer(  # noqa: C901
     # ------------------------------------------------------------------
     # n_valid[i,j] = count of features valid in both test_i and train_j.
     # Always computed — needed for scaling regardless of path.
-    n_valid = g.op.MatMul(
-        vx_float, train_valid_T, name=f"{name}_n_valid"
-    )  # [N, M]
+    n_valid = g.op.MatMul(vx_float, train_valid_T, name=f"{name}_n_valid")  # [N, M]
 
     if g.has_opset("com.microsoft"):
         # ----- CDist fast path -------------------------------------------
@@ -188,9 +179,7 @@ def sklearn_knn_imputer(  # noqa: C901
         #     + Σ_f y_f²[j] * x_nan[i,f]   (y terms where test is NaN)
         #     + Σ_f x_f²[i] * y_nan[j,f]   (x terms where train is NaN)
         # => nan_sq = CDist² - y_sq_invalid - x_sq_invalid
-        train_filled_init = g.make_initializer(
-            f"{name}_train_filled", train_filled
-        )
+        train_filled_init = g.make_initializer(f"{name}_train_filled", train_filled)
         sq_dists_raw = g.make_node(
             "CDist",
             [x_filled, train_filled_init],
@@ -211,15 +200,9 @@ def sklearn_knn_imputer(  # noqa: C901
         sum_sq = g.op.Sub(sub1, x_sq_invalid, name=f"{name}_sum_sq_raw")
     else:
         # ----- Standard four-MatMul path ---------------------------------
-        cross = g.op.MatMul(
-            x_filled, train_filled_T, name=f"{name}_cross"
-        )  # [N, M]
-        x_sq_contrib = g.op.MatMul(
-            ax_sq, train_valid_T, name=f"{name}_x_sq_c"
-        )  # [N, M]
-        t_sq_contrib = g.op.MatMul(
-            vx_float, train_sq_T, name=f"{name}_t_sq_c"
-        )  # [N, M]
+        cross = g.op.MatMul(x_filled, train_filled_T, name=f"{name}_cross")  # [N, M]
+        x_sq_contrib = g.op.MatMul(ax_sq, train_valid_T, name=f"{name}_x_sq_c")  # [N, M]
+        t_sq_contrib = g.op.MatMul(vx_float, train_sq_T, name=f"{name}_t_sq_c")  # [N, M]
         two = np.array([2.0], dtype=dtype)
         two_cross = g.op.Mul(two, cross, name=f"{name}_two_cross")
         sq_plus = g.op.Add(x_sq_contrib, t_sq_contrib, name=f"{name}_sq_plus")
@@ -234,9 +217,7 @@ def sklearn_knn_imputer(  # noqa: C901
     # Distance is inf when no features are valid in both samples.
     inf_arr = np.array([np.inf], dtype=dtype)
     n_valid_zero = g.op.Equal(n_valid, zeros1, name=f"{name}_n_valid_zero")
-    dist_sq = g.op.Where(
-        n_valid_zero, inf_arr, dist_sq, name=f"{name}_dist_sq_safe"
-    )
+    dist_sq = g.op.Where(n_valid_zero, inf_arr, dist_sq, name=f"{name}_dist_sq_safe")
     dists = g.op.Sqrt(dist_sq, name=f"{name}_dists")  # [N, M]
 
     # ------------------------------------------------------------------
@@ -251,6 +232,7 @@ def sklearn_knn_imputer(  # noqa: C901
     axis1 = np.array([1], dtype=np.int64)
     nk_shape = np.array([-1, n_neighbors], dtype=np.int64)
 
+    eps = None
     if weights == "distance":
         eps = np.array([np.finfo(dtype).eps], dtype=dtype)
 
@@ -262,9 +244,7 @@ def sklearn_knn_imputer(  # noqa: C901
         train_col_f = train_filled[:, f].astype(dtype)  # [M]
 
         # Make non-valid donors unreachable by setting their distance to inf.
-        D_f = g.op.Where(
-            valid_donors_f, dists, inf_arr, name=f"{name}_D_{f}"
-        )  # [N, M]
+        D_f = g.op.Where(valid_donors_f, dists, inf_arr, name=f"{name}_D_{f}")  # [N, M]
 
         # k nearest valid donors.
         top_k_dists_f, top_k_idx_f = g.op.TopK(
@@ -297,12 +277,8 @@ def sklearn_knn_imputer(  # noqa: C901
 
         if weights == "uniform":
             # Weighted sum / count of valid donors.
-            wvals_f = g.op.Mul(
-                neighbor_vals_f, valid_float_f, name=f"{name}_wv_{f}"
-            )
-            sum_f = g.op.ReduceSum(
-                wvals_f, axis1, keepdims=0, name=f"{name}_sum_{f}"
-            )  # [N]
+            wvals_f = g.op.Mul(neighbor_vals_f, valid_float_f, name=f"{name}_wv_{f}")
+            sum_f = g.op.ReduceSum(wvals_f, axis1, keepdims=0, name=f"{name}_sum_{f}")  # [N]
             cnt_f = g.op.ReduceSum(
                 valid_float_f, axis1, keepdims=0, name=f"{name}_cnt_{f}"
             )  # [N]
@@ -312,21 +288,16 @@ def sklearn_knn_imputer(  # noqa: C901
         else:  # weights == "distance"
             # Inverse-distance weights; IEEE 754 guarantees 1/inf = 0, so
             # inf-distance (invalid) donors automatically get zero weight.
+            assert eps is None, f"{eps=}, unexpected value"
             inv_dists_f = g.op.Div(
                 one1,
                 g.op.Max(top_k_dists_f, eps, name=f"{name}_sdists_{f}"),
                 name=f"{name}_invd_{f}",
             )  # [N, k]: 0 for inf-dist donors
             # Explicitly zero out invalid donors for numerical safety.
-            combined_w_f = g.op.Mul(
-                inv_dists_f, valid_float_f, name=f"{name}_cw_{f}"
-            )  # [N, k]
-            wvals_f = g.op.Mul(
-                neighbor_vals_f, combined_w_f, name=f"{name}_wv_{f}"
-            )
-            sum_f = g.op.ReduceSum(
-                wvals_f, axis1, keepdims=0, name=f"{name}_sum_{f}"
-            )  # [N]
+            combined_w_f = g.op.Mul(inv_dists_f, valid_float_f, name=f"{name}_cw_{f}")  # [N, k]
+            wvals_f = g.op.Mul(neighbor_vals_f, combined_w_f, name=f"{name}_wv_{f}")
+            sum_f = g.op.ReduceSum(wvals_f, axis1, keepdims=0, name=f"{name}_sum_{f}")  # [N]
             sumw_f = g.op.ReduceSum(
                 combined_w_f, axis1, keepdims=0, name=f"{name}_sumw_{f}"
             )  # [N]
