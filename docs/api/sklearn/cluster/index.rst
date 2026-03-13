@@ -7,4 +7,5 @@ yobx.sklearn.cluster
 
     affinity_propagation
     birch
+    bisecting_kmeans
     kmeans
