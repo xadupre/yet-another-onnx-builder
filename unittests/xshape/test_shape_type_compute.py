@@ -1214,6 +1214,25 @@ class TestShapeTypeCompute(ExtTestCase):
         # axis 1: slice [1:6] on dim 8 → length 5; axis 0 unchanged = 10
         self.assertEqual(b.get_shape("Y"), (10, 5))
 
+    def test_op_slice_dynamic_starts_ends_known_axes(self):
+        # starts/ends fully dynamic (not constants, not value_as_shape),
+        # but axes is a constant → sliced axis gets a fresh dynamic dimension.
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_slice
+
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (10, 8))
+        # axes is a constant initializer; starts/ends are completely unknown
+        b.constants_["axes"] = onh.from_array(np.array([0], dtype=np.int64), name="axes")
+        node = oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])
+        _set_shape_type_op_any_slice(b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        # axis 1 is unchanged (=8); axis 0 becomes a new dynamic dimension
+        result_shape = b.get_shape("Y")
+        self.assertEqual(len(result_shape), 2)
+        self.assertIsInstance(result_shape[0], str)  # new symbolic dim
+        self.assertEqual(result_shape[1], 8)  # unchanged
+
     def test_op_split(self):
         model = _make_model(
             [oh.make_node("Split", ["X", "sp"], ["A", "B"], axis=0)],

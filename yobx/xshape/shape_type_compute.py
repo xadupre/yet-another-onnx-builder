@@ -1252,7 +1252,23 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
             _starts = _resolve_int_tuple(node.input[1])
             _ends = _resolve_int_tuple(node.input[2])
             if _starts is None or _ends is None:
-                # Cannot resolve starts or ends; fall back to rank.
+                # starts/ends unresolvable — try to use axes to build a partial shape
+                # where each sliced axis gets a fresh dynamic dimension and unsliced
+                # axes retain their input dimension.
+                _axes_partial = None
+                if len(node.input) > 3 and node.input[3]:
+                    _axes_partial = _resolve_int_tuple(node.input[3])
+                if _axes_partial is not None:
+                    # Normalise and validate axis indices
+                    _axes_partial = [a if a >= 0 else a + rank for a in _axes_partial]
+                    if all(0 <= a < rank for a in _axes_partial):
+                        output_shape = list(input_shape)
+                        for a in _axes_partial:
+                            if isinstance(output_shape[a], int):
+                                output_shape[a] = self.unique_dimension_name("NEWDIM_slice")
+                        new_shape = tuple(output_shape)
+                        self.set_shape(node.output[0], new_shape)
+                        return new_shape
                 self.set_rank(node.output[0], rank)
                 return True
             starts = list(_starts)
