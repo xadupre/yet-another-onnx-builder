@@ -4,7 +4,13 @@ Unit tests for sklearn Naive Bayes converters.
 
 import unittest
 import numpy as np
-from sklearn.naive_bayes import BernoulliNB, ComplementNB, GaussianNB, MultinomialNB
+from sklearn.naive_bayes import (
+    BernoulliNB,
+    CategoricalNB,
+    ComplementNB,
+    GaussianNB,
+    MultinomialNB,
+)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
@@ -37,6 +43,31 @@ class TestSklearnNaiveBayes(ExtTestCase):
 
             expected_label = estimator.predict(Xd)
             expected_proba = estimator.predict_proba(Xd).astype(dtype)
+
+            self.assertEqualArray(expected_label, label)
+            self.assertEqualArray(expected_proba, proba, atol=atol)
+
+            sess = self.check_ort(onx)
+            ort_results = sess.run(None, {"X": Xd})
+            self.assertEqualArray(expected_label, ort_results[0])
+            self.assertEqualArray(expected_proba, ort_results[1], atol=atol)
+
+    def _check_classifier_int(self, estimator, X, y, atol=1e-5):
+        """Fit, convert to ONNX, and compare outputs against sklearn for integer inputs."""
+        for dtype in (np.float32, np.float64):
+            Xd = X.astype(dtype)
+            estimator.fit(X, y)
+            onx = to_onnx(estimator, (Xd,))
+
+            output_names = [o.name for o in onx.graph.output]
+            self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
+
+            ref = ExtendedReferenceEvaluator(onx)
+            results = ref.run(None, {"X": Xd})
+            label, proba = results[0], results[1]
+
+            expected_label = estimator.predict(X)
+            expected_proba = estimator.predict_proba(X).astype(dtype)
 
             self.assertEqualArray(expected_label, label)
             self.assertEqualArray(expected_proba, proba, atol=atol)
@@ -156,6 +187,36 @@ class TestSklearnNaiveBayes(ExtTestCase):
 
             sess = self.check_ort(onx)
             self.assertEqualArray(pipe.predict(Xd), sess.run(None, {"X": Xd})[0])
+
+    # ── CategoricalNB ─────────────────────────────────────────────────────────
+
+    _X_cat_bin = np.array([[0, 1], [1, 0], [1, 1], [0, 0], [1, 1], [0, 0]], dtype=np.int64)
+    _y_cat_bin = np.array([0, 0, 1, 1, 1, 0])
+
+    _X_cat_multi = np.array(
+        [[0, 1], [1, 0], [2, 1], [0, 0], [1, 1], [2, 0], [0, 1], [1, 1], [2, 0]],
+        dtype=np.int64,
+    )
+    _y_cat_multi = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2])
+
+    def test_categorical_nb_binary(self):
+        self._check_classifier_int(CategoricalNB(), self._X_cat_bin, self._y_cat_bin)
+
+    def test_categorical_nb_multiclass(self):
+        self._check_classifier_int(CategoricalNB(), self._X_cat_multi, self._y_cat_multi)
+
+    def test_categorical_nb_mixed_categories(self):
+        """CategoricalNB with different numbers of categories per feature."""
+        rng = np.random.default_rng(3)
+        X = np.column_stack(
+            [
+                rng.integers(0, 4, size=30),  # 4 categories
+                rng.integers(0, 2, size=30),  # 2 categories
+                rng.integers(0, 3, size=30),  # 3 categories
+            ]
+        ).astype(np.int64)
+        y = rng.integers(0, 3, size=30)
+        self._check_classifier_int(CategoricalNB(), X, y)
 
 
 if __name__ == "__main__":

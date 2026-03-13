@@ -1,6 +1,7 @@
 """
 Converters for TF activation ops:
-``Relu``, ``Relu6``, ``Sigmoid``, ``Tanh``, ``Softmax``.
+``Relu``, ``Relu6``, ``Sigmoid``, ``Tanh``, ``Softmax``,
+``Elu``, ``Selu``, ``LeakyRelu``.
 """
 
 from typing import Any, Dict, List

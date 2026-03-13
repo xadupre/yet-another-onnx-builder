@@ -170,6 +170,7 @@ module = [
     "yobx.sklearn.lightgbm.*",
     "yobx.sklearn.multiclass.*",
     "yobx.sklearn.multioutput.*",
+    "yobx.sklearn.naive_bayes.*",
     "yobx.sklearn.neighbors.*",
     "yobx.sklearn.neural_network.*",
     "yobx.sklearn.preprocessing.*",
