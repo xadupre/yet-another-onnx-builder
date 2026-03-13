@@ -71,15 +71,13 @@ class TestSklearnGridSearchCV(ExtTestCase):
             self.assertEqualArray(expected_pred, ort_results[0], atol=atol)
 
     def test_classifier_binary(self):
-        clf = GridSearchCV(
-            LogisticRegression(solver="lbfgs"), {"C": [0.1, 1.0, 10.0]}, cv=2
-        ).fit(self._X, self._y_bin)
+        clf = GridSearchCV(LogisticRegression(solver="lbfgs"), {"C": [0.1, 1.0, 10.0]}, cv=2).fit(
+            self._X, self._y_bin
+        )
         self._check_classifier(clf, self._X)
 
     def test_regressor(self):
-        reg = GridSearchCV(Ridge(), {"alpha": [0.1, 1.0, 10.0]}, cv=2).fit(
-            self._X, self._y_reg
-        )
+        reg = GridSearchCV(Ridge(), {"alpha": [0.1, 1.0, 10.0]}, cv=2).fit(self._X, self._y_reg)
         self._check_regressor(reg, self._X)
 
     def test_classifier_in_pipeline(self):
@@ -92,9 +90,9 @@ class TestSklearnGridSearchCV(ExtTestCase):
         self._check_classifier(pipe, self._X)
 
     def test_classifier_svc(self):
-        clf = GridSearchCV(
-            SVC(kernel="linear", probability=True), {"C": [0.1, 1.0]}, cv=2
-        ).fit(self._X, self._y_bin)
+        clf = GridSearchCV(SVC(kernel="linear", probability=True), {"C": [0.1, 1.0]}, cv=2).fit(
+            self._X, self._y_bin
+        )
         # SVC always outputs float32 probabilities; test only with float32 input.
         self._check_classifier(clf, self._X, dtypes=(np.float32,))
 

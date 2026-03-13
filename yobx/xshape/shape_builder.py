@@ -429,6 +429,12 @@ class ShapeBuilder:
         shape = self.get_shape(name)
         return tuple(evaluate_expression(s, context) for s in shape)
 
+    def evaluate_dimension_equality_with_constraints(self, d1: str, *args) -> bool:
+        """Tells if two dimensions are equal."""
+        assert len(args) == 1, f"Not implemented with d1={d1!r} and args={args}"
+        d2 = args[0]
+        return d1 == d2
+
     def compare_computed_shape_with_tensor(
         self, name: str, tensor: np.ndarray, context: Dict[str, int]
     ) -> Tuple[Tuple[str, int, int], ...]:

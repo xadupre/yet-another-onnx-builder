@@ -1257,9 +1257,21 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
 
         starts = _resolve_int_tuple_or_shape(self, node.input[1])
         ends = _resolve_int_tuple_or_shape(self, node.input[2])
+        if len(node.input) > 3 and self.is_constant(node.input[3]):
+            axes = self.get_constant(node.input[3])
+        else:
+            axes = None
+
         if starts is None or ends is None:
-            self.set_rank(node.output[0], rank)
-            return True
+            if axes is None:
+                self.set_rank(node.output[0], rank)
+                return True
+            output_shape = list(input_shape)
+            for a in axes:
+                output_shape[a] = self.unique_dimension_name("NEWDIM_slice")
+            new_shape = tuple(output_shape)
+            self.set_shape(node.output[0], new_shape, allow_zero=0 in new_shape)
+            return new_shape
 
         axes = (
             _resolve_int_tuple_or_shape(self, node.input[3])
@@ -1267,29 +1279,38 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
             else np.arange(len(starts))
         )
         steps = _resolve_int_tuple_or_shape(self, node.input[4]) if len(node.input) > 4 else None
-        if steps is not None and (max(steps) != 1 or min(steps) != 1):
-            # will do later
-            self.set_rank(node.output[0], rank)
-            return True
 
         output_shape = list(input_shape)
         for s, e, a in zip(starts, ends, axes):
+            st = steps[a] if steps is not None else 1
+            if e >= 922337203685477580:
+                e = input_shape[a]
             if isinstance(s, int) and isinstance(e, int):
                 if e >= s >= 0:
-                    output_shape[a] = e - s
+                    output_shape[a] = (
+                        (e - s) // st
+                        if isinstance(st, int)
+                        else simplify_expression(f"({e-s})//({st})")
+                    )
                     continue
-                if isinstance(output_shape[a], int):
-                    d = output_shape[a]
-                    s = (s + d) % d
-                    e = (e + d) % d
-                    output_shape[a] = e - s
+                if isinstance(input_shape[a], int):
+                    d = input_shape[a]
+                    if s < d:
+                        s += d
+                    if e < 0:
+                        e += d
+                    output_shape[a] = (
+                        (e - s) // st
+                        if isinstance(st, int)
+                        else simplify_expression(f"({e-s})//({st})")
+                    )
                     continue
             d = input_shape[a]
             if isinstance(s, int) and s < 0:
                 s = f"(({d}){e})"
             if isinstance(e, int) and e < 0:
                 e = f"(({d}){e})"
-            output_shape[a] = simplify_expression(f"{e}-{s}")
+            output_shape[a] = simplify_expression(f"{e}-{s}" if st == 1 else f"({e}-{s})//({st})")
             continue
 
         new_shape = tuple(output_shape)

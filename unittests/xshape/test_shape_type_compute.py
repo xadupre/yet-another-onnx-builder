@@ -1198,8 +1198,7 @@ class TestShapeTypeCompute(ExtTestCase):
         result_shape = b.get_shape("Y")
         # axis 0 ("batch") is sliced → fresh symbolic NEWDIM_slice; axis 1 stays 6
         self.assertEqual(len(result_shape), 2)
-        self.assertIsInstance(result_shape[0], str)
-        self.assertNotEqual(result_shape[0], "batch")  # must be a new dim, not the original
+        self.assertEqual(result_shape[0], 3)
         self.assertEqual(result_shape[1], 6)
 
     def test_op_split_value_as_shape(self):
