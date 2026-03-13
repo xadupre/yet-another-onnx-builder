@@ -1,7 +1,6 @@
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
-import onnx
 from sklearn.covariance import EllipticEnvelope
 
 from ..register import register_sklearn_converter
@@ -83,8 +82,8 @@ def sklearn_elliptic_envelope(
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
 
-    location = estimator.location_.astype(dtype)       # (F,)
-    precision = estimator.precision_.astype(dtype)     # (F, F)
+    location = estimator.location_.astype(dtype)  # (F,)
+    precision = estimator.precision_.astype(dtype)  # (F, F)
     offset = np.array([estimator.offset_], dtype=dtype)  # (1,)
 
     # Center the input: X_centered = X - location_
@@ -112,10 +111,6 @@ def sklearn_elliptic_envelope(
             score_samples, offset, name=f"{name}_decision", outputs=outputs[1:2]
         )  # (N,)
         assert isinstance(decision, str)
-        if not sts:
-            g.set_type(decision, itype)
-            if g.has_rank(X):
-                g.set_rank(decision, 1)
     else:
         decision = g.op.Sub(score_samples, offset, name=f"{name}_decision")  # (N,)
         assert isinstance(decision, str)
@@ -126,14 +121,8 @@ def sklearn_elliptic_envelope(
 
     one = np.array([1], dtype=np.int64)
     minus_one = np.array([-1], dtype=np.int64)
-    label = g.op.Where(
-        mask, one, minus_one, name=f"{name}_where", outputs=outputs[:1]
-    )  # (N,)
+    label = g.op.Where(mask, one, minus_one, name=f"{name}_where", outputs=outputs[:1])  # (N,)
     assert isinstance(label, str)
-    if not sts:
-        g.set_type(label, onnx.TensorProto.INT64)
-        if g.has_rank(X):
-            g.set_rank(label, 1)
 
     if n_outputs >= 2:
         return label, decision
