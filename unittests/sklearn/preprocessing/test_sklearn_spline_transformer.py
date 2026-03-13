@@ -158,6 +158,7 @@ class TestSplineTransformer(ExtTestCase):
         expected = st.transform(X)
         self.assertEqualArray(expected, result, atol=1e-10)
 
+    @requires_sklearn("1.8")
     def test_spline_transformer_pipeline_with_linear_regression(self):
         from sklearn.preprocessing import SplineTransformer
         from sklearn.linear_model import LinearRegression
