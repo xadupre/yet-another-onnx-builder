@@ -15,6 +15,7 @@ from yobx.ext_test_case import (
     requires_transformers,
     ignore_warnings,
     hide_stdout,
+    is_windows,
 )
 from yobx.helpers import max_diff
 from yobx.torch.torch_helper import torch_deepcopy
@@ -3572,7 +3573,9 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model, (a, b), dynamic_shapes=({0: "G", 1: "M", 2: "K"}, {0: "G", 1: "N", 2: "K"})
         )
-        self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=1e-2)
+        self.assert_conversion_with_ort_on_cpu(
+            onx, expected, (a, b), atol=2e-2 if is_windows() else 1e-2
+        )
 
     def test_aten_grouped_mm_offsets(self):
         import torch

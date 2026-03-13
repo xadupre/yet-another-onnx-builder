@@ -1,5 +1,5 @@
 from typing import Sequence
-from sklearn.base import BaseEstimator, ClusterMixin, is_classifier, is_regressor
+from sklearn.base import BaseEstimator, ClusterMixin, OutlierMixin, is_classifier, is_regressor
 from sklearn.mixture._base import BaseMixture
 from sklearn.pipeline import Pipeline
 
@@ -31,9 +31,7 @@ def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
     if is_classifier(estimator):
         return 2 if _classifier_has_predict_proba(estimator) else 1
-    if OutlierMixin is not None and isinstance(estimator, OutlierMixin):
-        return 2
-    if isinstance(estimator, (ClusterMixin, BaseMixture)):
+    if isinstance(estimator, (ClusterMixin, BaseMixture, OutlierMixin)):
         return 2
     return 1
 
@@ -65,6 +63,8 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
         return ["label", "scores"]
     if isinstance(estimator, BaseMixture):
         return ["label", "probabilities"]
+    if isinstance(estimator, OutlierMixin):
+        return ["label", "scores"]
     if is_regressor(estimator):
         return ["predictions"]
     last = estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
@@ -74,6 +74,8 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
         return ["label", "distances"]
     if isinstance(last, BaseMixture):
         return ["label", "probabilities"]
+    if isinstance(last, OutlierMixin):
+        return ["label", "scores"]
     return ["Y"]
 
 

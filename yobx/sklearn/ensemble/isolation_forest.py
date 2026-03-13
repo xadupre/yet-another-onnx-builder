@@ -86,9 +86,7 @@ def _extract_iforest_attributes_legacy(
     all_target_ids: List[int] = []
     all_target_weights: List[float] = []
 
-    for tree_id, (base_estimator, features) in enumerate(
-        zip(estimators, estimators_features)
-    ):
+    for tree_id, (base_estimator, features) in enumerate(zip(estimators, estimators_features)):
         tree = base_estimator.tree_
         n_nodes = tree.node_count
         feature = tree.feature
@@ -269,19 +267,13 @@ def _extract_iforest_attributes_v5(
         # leaf_* arrays: precomputed path-length contribution / n_estimators
         if not leaf_nodes:
             # Degenerate: single leaf from the root node.
-            leaf_val = float(
-                depths[0]
-                + _average_path_length([int(n_node_samples[0])])[0]
-                - 1.0
-            )
+            leaf_val = float(depths[0] + _average_path_length([int(n_node_samples[0])])[0] - 1.0)
             all_leaf_targetids.append(0)
             all_leaf_weights.append(leaf_val / n_estimators)
         else:
             for nid in leaf_nodes:
                 leaf_val = float(
-                    depths[nid]
-                    + _average_path_length([int(n_node_samples[nid])])[0]
-                    - 1.0
+                    depths[nid] + _average_path_length([int(n_node_samples[nid])])[0] - 1.0
                 )
                 all_leaf_targetids.append(0)
                 all_leaf_weights.append(leaf_val / n_estimators)
@@ -413,9 +405,7 @@ def sklearn_isolation_forest(
         np_dtype = np.float64 if itype == onnx.TensorProto.DOUBLE else np.float32
     else:
         # Legacy path: TreeEnsembleRegressor (AVERAGE aggregation, float32 output)
-        attrs = _extract_iforest_attributes_legacy(
-            estimators, estimators_features, n_estimators
-        )
+        attrs = _extract_iforest_attributes_legacy(estimators, estimators_features, n_estimators)
         g.make_node(
             "TreeEnsembleRegressor",
             [X],
@@ -481,11 +471,8 @@ def sklearn_isolation_forest(
 
     emit_scores = len(outputs) > 1
     if emit_scores:
-        scores_out = g.op.Identity(
-            decision, name=f"{name}_scores", outputs=outputs[1:]
-        )
+        scores_out = g.op.Identity(decision, name=f"{name}_scores", outputs=outputs[1:])
         assert isinstance(scores_out, str)
         return label, scores_out
 
     return label
-

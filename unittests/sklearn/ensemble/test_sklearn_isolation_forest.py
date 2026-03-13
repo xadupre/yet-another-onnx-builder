@@ -38,9 +38,7 @@ class TestSklearnIsolationForest(ExtTestCase):
             onx = to_onnx(clf, (Xd,))
 
             output_names = [o.name for o in onx.graph.output]
-            self.assertEqual(
-                len(output_names), 2, f"Expected 2 outputs, got {output_names}"
-            )
+            self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
