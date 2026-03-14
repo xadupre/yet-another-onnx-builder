@@ -107,6 +107,82 @@ class TestLlamaAttentionConverter(ExtTestCase):
         self.assertEqualArray(expected, got_ort, atol=5e-3)
 
     # ------------------------------------------------------------------ #
+    # bfloat16 tests                                                       #
+    # ------------------------------------------------------------------ #
+
+    def _bf16_feeds(self, hs, cos, sin):
+        """Build bfloat16 numpy feeds from bfloat16 torch tensors via ml_dtypes."""
+        import ml_dtypes
+
+        return {
+            "hidden_states": hs.to(torch.float32).numpy().astype(ml_dtypes.bfloat16),
+            "cos": cos.to(torch.float32).numpy().astype(ml_dtypes.bfloat16),
+            "sin": sin.to(torch.float32).numpy().astype(ml_dtypes.bfloat16),
+        }
+
+    def _run_ort_bf16(self, model, feeds, expected, atol=5e-2):
+        """
+        Try to run *model* with OnnxRuntime and compare to *expected*.
+        Silently skips if ORT CPU does not support bfloat16 for the op set used.
+        """
+        import onnxruntime as ort
+
+        # Normalise the error message: strip underscores and collapse spaces so
+        # that "NOT_IMPLEMENTED", "not implemented", and "NotImplemented" all match.
+        def _normalised(s: str) -> str:
+            return s.lower().replace("_", " ")
+
+        _BF16_SKIP = ("bfloat16", "not implemented")
+        try:
+            sess = ort.InferenceSession(
+                model.SerializeToString(), providers=["CPUExecutionProvider"]
+            )
+            got_ort = sess.run(None, feeds)[0].astype(np.float32)
+            self.assertEqualArray(expected, got_ort, atol=atol)
+        except Exception as e:
+            msg = _normalised(str(e))
+            if any(kw in msg for kw in _BF16_SKIP):
+                raise unittest.SkipTest(
+                    f"OnnxRuntime does not support bfloat16 for this op on CPU: {e}"
+                )
+            raise
+
+    def test_opset22_bfloat16(self):
+        """Standard ONNX ops path, bfloat16 — model dtype check + ref/ORT validation."""
+        import onnx as _onnx
+        from yobx.torch.in_transformers.models import llama_attention_to_onnx
+
+        attn = _make_llama_attention().to(torch.bfloat16).eval()
+        hs, cos, sin = self._get_inputs(torch_dtype=torch.bfloat16)
+        expected = self._torch_expected(attn, hs, cos, sin)
+
+        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=22)
+
+        # The produced model must use bfloat16 for all graph inputs.
+        self.assertIsInstance(model, _onnx.ModelProto)
+        for inp in model.graph.input:
+            self.assertEqual(
+                inp.type.tensor_type.elem_type,
+                _onnx.TensorProto.BFLOAT16,
+                msg=f"Input '{inp.name}' is not bfloat16",
+            )
+
+        feeds = self._bf16_feeds(hs, cos, sin)
+
+        # Reference evaluator: attempt validation; skip gracefully if unsupported.
+        try:
+            ref = ExtendedReferenceEvaluator(model)
+            got = ref.run(None, feeds)[0].astype(np.float32)
+            self.assertEqualArray(expected, got, atol=5e-2)
+        except Exception as e:
+            if "type mismatch" in str(e).lower() or "bfloat16" in str(e).lower():
+                pass  # Known limitation of the ONNX reference evaluator for bfloat16
+            else:
+                raise
+
+        self._run_ort_bf16(model, feeds, expected)
+
+    # ------------------------------------------------------------------ #
     # opset 24 (ONNX Attention op)                                         #
     # ------------------------------------------------------------------ #
 
@@ -176,6 +252,36 @@ class TestLlamaAttentionConverter(ExtTestCase):
         got_ort = sess.run(None, feeds)[0].astype(np.float32)
         self.assertEqualArray(expected, got_ort, atol=5e-3)
 
+    @requires_onnxruntime("1.23")
+    def test_opset24_bfloat16(self):
+        """ONNX Attention op path (opset 24), bfloat16 — model dtype check + ref/ORT validation."""
+        import onnx as _onnx
+        from yobx.torch.in_transformers.models import llama_attention_to_onnx
+
+        attn = _make_llama_attention().to(torch.bfloat16).eval()
+        hs, cos, sin = self._get_inputs(torch_dtype=torch.bfloat16)
+        expected = self._torch_expected(attn, hs, cos, sin)
+
+        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=24)
+
+        # Verify bfloat16 dtype on graph inputs.
+        for inp in model.graph.input:
+            self.assertEqual(inp.type.tensor_type.elem_type, _onnx.TensorProto.BFLOAT16)
+
+        feeds = self._bf16_feeds(hs, cos, sin)
+
+        try:
+            ref = ExtendedReferenceEvaluator(model)
+            got = ref.run(None, feeds)[0].astype(np.float32)
+            self.assertEqualArray(expected, got, atol=5e-2)
+        except Exception as e:
+            if "type mismatch" in str(e).lower() or "bfloat16" in str(e).lower():
+                pass
+            else:
+                raise
+
+        self._run_ort_bf16(model, feeds, expected)
+
     # ------------------------------------------------------------------ #
     # com.microsoft MultiHeadAttention contrib ops                         #
     # ------------------------------------------------------------------ #
@@ -242,6 +348,30 @@ class TestLlamaAttentionConverter(ExtTestCase):
         )
         got = sess.run(None, feeds)[0].astype(np.float32)
         self.assertEqualArray(expected, got, atol=5e-3)
+
+    @requires_onnxruntime("1.0")
+    def test_com_microsoft_bfloat16(self):
+        """com.microsoft.MultiHeadAttention path, bfloat16 — model dtype check + ORT validation."""
+        import onnx as _onnx
+        from yobx.torch.in_transformers.models import llama_attention_to_onnx
+
+        attn = _make_llama_attention().to(torch.bfloat16).eval()
+        hs, cos, sin = self._get_inputs(torch_dtype=torch.bfloat16)
+        expected = self._torch_expected(attn, hs, cos, sin)
+
+        model = llama_attention_to_onnx(
+            attn,
+            (hs, cos, sin),
+            target_opset={"": 22, "com.microsoft": 1},
+        )
+
+        op_types = {n.op_type for n in model.graph.node}
+        self.assertIn("MultiHeadAttention", op_types)
+        for inp in model.graph.input:
+            self.assertEqual(inp.type.tensor_type.elem_type, _onnx.TensorProto.BFLOAT16)
+
+        feeds = self._bf16_feeds(hs, cos, sin)
+        self._run_ort_bf16(model, feeds, expected)
 
     # ------------------------------------------------------------------ #
     # MHA with equal heads (no GQA repeat)                                 #

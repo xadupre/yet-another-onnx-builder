@@ -19,6 +19,10 @@ the requested target opset:
 * **opset ≤ 22** (default fallback):
   Uses basic ONNX ops (``MatMul``, ``Softmax``, ``Transpose``, …).
 
+Supported dtypes:
+    ``float32``, ``float16``, and ``bfloat16`` are all supported.
+    The dtype is inferred automatically from the first element of *args*.
+
 Inputs to the produced ONNX model:
 
 * ``hidden_states``: ``(batch, seq, hidden_size)``
@@ -29,6 +33,39 @@ Inputs to the produced ONNX model:
 Output:
 
 * ``attn_output``: ``(batch, seq, hidden_size)``
+
+Example::
+
+    import torch
+    from transformers import LlamaConfig
+    from transformers.models.llama.modeling_llama import LlamaAttention
+    from yobx.torch.in_transformers.models import llama_attention_to_onnx
+
+    config = LlamaConfig(
+        hidden_size=64, num_attention_heads=4, num_key_value_heads=2, head_dim=16
+    )
+    attn = LlamaAttention(config, layer_idx=0).eval()
+    hs  = torch.randn(2, 10, 64, dtype=torch.float32)
+    cos = torch.randn(2, 10, 16, dtype=torch.float32)
+    sin = torch.randn(2, 10, 16, dtype=torch.float32)
+
+    # opset 22 — plain ONNX ops (MatMul, Softmax, …)
+    model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=22)
+
+    # opset 24 — ONNX Attention op (opset ≥ 24)
+    model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=24)
+
+    # OnnxRuntime contrib ops
+    model = llama_attention_to_onnx(
+        attn, (hs, cos, sin), target_opset={"": 22, "com.microsoft": 1}
+    )
+
+    # bfloat16
+    attn_bf16 = LlamaAttention(config, layer_idx=0).to(torch.bfloat16).eval()
+    hs_bf16, cos_bf16, sin_bf16 = hs.bfloat16(), cos.bfloat16(), sin.bfloat16()
+    model_bf16 = llama_attention_to_onnx(
+        attn_bf16, (hs_bf16, cos_bf16, sin_bf16), target_opset=22
+    )
 """
 
 from typing import Any, Dict, Optional, Tuple, Union
@@ -38,6 +75,7 @@ from onnx import ModelProto, TensorProto
 
 from ....helpers.onnx_helper import np_dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
 from ....xbuilder import GraphBuilder
+from ...torch_helper import to_numpy, torch_dtype_to_onnx_dtype
 
 T = str
 
@@ -290,18 +328,72 @@ def llama_attention_to_onnx(
     Converts a :class:`transformers.models.llama.modeling_llama.LlamaAttention`
     module into an ONNX model.
 
-    :param attn: a fitted ``LlamaAttention`` module (weights must be initialised)
-    :param args: example inputs used only to determine shapes and dtype; a tuple of
-        ``(hidden_states, cos, sin)`` or ``(hidden_states, cos, sin, attention_mask)``
-    :param target_opset: target opset — either an integer for the default domain
-        (``""``), or a dictionary mapping domain names to opset versions,
-        e.g. ``{"": 22}`` (standard), ``{"": 22, "com.microsoft": 1}`` (ORT
-        contrib ops), or ``{"": 24}`` (ONNX Attention op)
-    :param with_mask: if ``True`` add an ``attention_mask`` input even when
-        not provided in *args*
-    :param input_names: optional names for the ONNX inputs; defaults to
-        ``("hidden_states", "cos", "sin")`` / ``("hidden_states", "cos", "sin", "attention_mask")``
-    :return: :class:`onnx.ModelProto`
+    The output dtype (``float32``, ``float16``, or ``bfloat16``) is inferred
+    automatically from the first element of *args*.  Model weights are cast to
+    match.
+
+    Three backends are available, controlled by *target_opset*:
+
+    * **com.microsoft** — ``MultiHeadAttention`` contrib op (OnnxRuntime).
+      Pass ``{"": 22, "com.microsoft": 1}`` to select this path.
+      GQA KV heads are expanded to match the query head count before the op.
+    * **opset ≥ 24** — standard ONNX ``Attention`` op.  Pass an integer ≥ 24
+      or ``{"": 24}``.
+    * **opset ≤ 22** — plain ONNX ops (``MatMul``, ``Softmax``,
+      ``Transpose``, …).  This is the default path.
+
+    :param attn: a fitted ``LlamaAttention`` module (weights must be
+        initialised; the module may be in any of ``float32``, ``float16``, or
+        ``bfloat16``)
+    :param args: example inputs used to determine shapes and dtype; a tuple of
+        ``(hidden_states, cos, sin)`` or
+        ``(hidden_states, cos, sin, attention_mask)``.
+        Elements may be :class:`torch.Tensor` or :class:`numpy.ndarray`.
+    :param target_opset: target opset — either an integer for the default
+        domain (``""``), or a mapping from domain names to opset versions,
+        e.g. ``{"": 22}`` (plain ops), ``{"": 22, "com.microsoft": 1}`` (ORT
+        contrib), or ``{"": 24}`` (ONNX Attention op).  Defaults to ``22``.
+    :param with_mask: if ``True``, add an ``attention_mask`` input even when
+        *args* contains only three elements
+    :param input_names: optional names for the ONNX graph inputs; defaults to
+        ``("hidden_states", "cos", "sin")`` or
+        ``("hidden_states", "cos", "sin", "attention_mask")``
+    :return: :class:`onnx.ModelProto` — the converted ONNX model
+
+    Example::
+
+        import torch
+        from transformers import LlamaConfig
+        from transformers.models.llama.modeling_llama import LlamaAttention
+        from yobx.torch.in_transformers.models import llama_attention_to_onnx
+
+        config = LlamaConfig(
+            hidden_size=64, num_attention_heads=4,
+            num_key_value_heads=2, head_dim=16,
+        )
+        attn = LlamaAttention(config, layer_idx=0).eval()
+        hs  = torch.randn(2, 10, 64, dtype=torch.float32)
+        cos = torch.randn(2, 10, 16, dtype=torch.float32)
+        sin = torch.randn(2, 10, 16, dtype=torch.float32)
+
+        # opset 22 — plain ONNX ops
+        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=22)
+
+        # opset 24 — ONNX Attention op
+        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=24)
+
+        # OnnxRuntime MultiHeadAttention contrib op
+        model = llama_attention_to_onnx(
+            attn, (hs, cos, sin),
+            target_opset={"": 22, "com.microsoft": 1},
+        )
+
+        # bfloat16
+        attn_bf16 = LlamaAttention(config, layer_idx=0).to(torch.bfloat16).eval()
+        hs_bf16 = hs.bfloat16()
+        model_bf16 = llama_attention_to_onnx(
+            attn_bf16, (hs_bf16, cos.bfloat16(), sin.bfloat16()), target_opset=22
+        )
     """
     import torch
 
@@ -315,16 +407,17 @@ def llama_attention_to_onnx(
 
     # ------------------------------------------------------------------ #
     # Inspect module weights                                               #
+    # Use to_numpy() so that bfloat16 weights are handled correctly.      #
     # ------------------------------------------------------------------ #
-    q_w = attn.q_proj.weight.detach().cpu().numpy()  # (num_heads*head_dim, hidden)
-    k_w = attn.k_proj.weight.detach().cpu().numpy()  # (num_kv_heads*head_dim, hidden)
-    v_w = attn.v_proj.weight.detach().cpu().numpy()  # (num_kv_heads*head_dim, hidden)
-    o_w = attn.o_proj.weight.detach().cpu().numpy()  # (hidden, num_heads*head_dim)
+    q_w = to_numpy(attn.q_proj.weight)  # (num_heads*head_dim, hidden)
+    k_w = to_numpy(attn.k_proj.weight)  # (num_kv_heads*head_dim, hidden)
+    v_w = to_numpy(attn.v_proj.weight)  # (num_kv_heads*head_dim, hidden)
+    o_w = to_numpy(attn.o_proj.weight)  # (hidden, num_heads*head_dim)
 
-    q_b = attn.q_proj.bias.detach().cpu().numpy() if attn.q_proj.bias is not None else None
-    k_b = attn.k_proj.bias.detach().cpu().numpy() if attn.k_proj.bias is not None else None
-    v_b = attn.v_proj.bias.detach().cpu().numpy() if attn.v_proj.bias is not None else None
-    o_b = attn.o_proj.bias.detach().cpu().numpy() if attn.o_proj.bias is not None else None
+    q_b = to_numpy(attn.q_proj.bias) if attn.q_proj.bias is not None else None
+    k_b = to_numpy(attn.k_proj.bias) if attn.k_proj.bias is not None else None
+    v_b = to_numpy(attn.v_proj.bias) if attn.v_proj.bias is not None else None
+    o_b = to_numpy(attn.o_proj.bias) if attn.o_proj.bias is not None else None
 
     num_heads: int = attn.config.num_attention_heads
     num_kv_heads: int = attn.config.num_key_value_heads
@@ -335,9 +428,11 @@ def llama_attention_to_onnx(
 
     # ------------------------------------------------------------------ #
     # Determine ONNX dtype from example inputs                            #
+    # Use torch_dtype_to_onnx_dtype for torch.Tensor to handle bfloat16  #
+    # (numpy does not have a native bfloat16 dtype).                      #
     # ------------------------------------------------------------------ #
     if isinstance(args[0], torch.Tensor):
-        onnx_dtype = np_dtype_to_tensor_dtype(args[0].detach().cpu().numpy().dtype)
+        onnx_dtype = torch_dtype_to_onnx_dtype(args[0].dtype)
     elif isinstance(args[0], np.ndarray):
         onnx_dtype = np_dtype_to_tensor_dtype(args[0].dtype)
     else:
