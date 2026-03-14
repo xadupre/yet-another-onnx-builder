@@ -30,6 +30,7 @@ def validate_model(
     do_run: bool = True,
     patch: bool = True,
     quiet: bool = False,
+    tokenized_inputs: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
     Validates an ONNX export for any HuggingFace ``model_id`` by capturing real
@@ -72,6 +73,11 @@ def validate_model(
         ``register_flattening_functions`` during export (default ``True``).
     :param quiet: When ``True``, exceptions are caught and reported in the
         returned summary dictionary rather than re-raised.
+    :param tokenized_inputs: Optional pre-tokenized inputs to use instead of
+        running the tokenizer on *prompt*.  Should be a dict with at least
+        ``"input_ids"`` and optionally ``"attention_mask"`` (mirrors the output
+        of a HuggingFace tokenizer).  When provided the tokenizer is not loaded
+        and *prompt* is only stored in the summary for reference.
     :return: A 2-tuple ``(summary, data)`` where *summary* is a flat
         ``{str: value}`` dictionary suitable for display or logging, and
         *data* collects all intermediate artefacts.
@@ -107,13 +113,16 @@ def validate_model(
     if verbose:
         print(f"[validate_model] loading tokenizer for {model_id!r}")
 
-    try:
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
-    except Exception as exc:
-        summary["error_tokenizer"] = str(exc)
-        if not quiet:
-            raise
-        return summary, collected_data
+    if tokenized_inputs is None:
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_id)
+        except Exception as exc:
+            summary["error_tokenizer"] = str(exc)
+            if not quiet:
+                raise
+            return summary, collected_data
+    else:
+        tokenizer = None
 
     if verbose:
         print(f"[validate_model] loading model for {model_id!r}")
@@ -134,9 +143,14 @@ def validate_model(
     collected_data["model"] = model
 
     # ---------------------------------------------------------- tokenise prompt
-    inputs = tokenizer(prompt, return_tensors="pt")
+    if tokenized_inputs is not None:
+        inputs = tokenized_inputs
+    else:
+        inputs = tokenizer(prompt, return_tensors="pt")
     input_ids = inputs["input_ids"].to(torch_device)
-    attention_mask = inputs["attention_mask"].to(torch_device)
+    attention_mask = inputs.get("attention_mask")
+    if attention_mask is not None:
+        attention_mask = attention_mask.to(torch_device)
 
     collected_data["input_ids"] = input_ids
     collected_data["attention_mask"] = attention_mask
@@ -153,12 +167,14 @@ def validate_model(
             apply_patches_for_model(patch_transformers=patch, model=model) if patch else contextlib.nullcontext(),
             observer(model),
         ):
-            model.generate(
+            generate_kwargs: Dict[str, Any] = dict(
                 input_ids=input_ids,
-                attention_mask=attention_mask,
                 do_sample=False,
                 max_new_tokens=max_new_tokens,
             )
+            if attention_mask is not None:
+                generate_kwargs["attention_mask"] = attention_mask
+            model.generate(**generate_kwargs)
     except Exception as exc:
         summary["error_observer"] = str(exc)
         if not quiet:

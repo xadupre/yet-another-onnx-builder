@@ -20,6 +20,16 @@ def _has_network() -> bool:
 @requires_torch("2.0")
 @requires_transformers("5.0")
 class TestValidateModel(ExtTestCase):
+    def test_validate_model_tokenized_inputs_param(self):
+        """validate_model accepts tokenized_inputs kwarg without error (no network needed)."""
+        import inspect
+        from yobx.torch.validate import validate_model
+
+        sig = inspect.signature(validate_model)
+        self.assertIn("tokenized_inputs", sig.parameters)
+        p = sig.parameters["tokenized_inputs"]
+        self.assertIsNone(p.default)
+
     def test_default_prompt(self):
         from yobx.torch.validate import DEFAULT_PROMPT
 
