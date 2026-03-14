@@ -14,6 +14,7 @@ from .tracing import (
     CustomTracer,
 )
 from .tiny_models import get_tiny_model
+from .validate import validate_model, DEFAULT_PROMPT
 
 
 def use_dyn_not_str(dynamic_shapes: Any, default_value=None) -> Any:
