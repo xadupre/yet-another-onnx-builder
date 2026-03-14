@@ -16,6 +16,31 @@ DEFAULT_PROMPT = "Continue: it rains, what should I do?"
 """Default text prompt used when validating text-generation models."""
 
 
+def _to_onnx(*args, exporter: str = "yobx", **kwargs):
+    if exporter == "yobx":
+        from ..xbuilder import OptimizationOptions
+        from . import to_onnx
+
+        new_kwargs = {}
+        for k, v in kwargs.items():
+            if k == "opset_version":
+                new_kwargs["target_opset"] = v
+            elif k == "optimization":
+                if v in ("default", "default+onnxruntime"):
+                    new_kwargs["options"] = OptimizationOptions(patterns=v)
+                else:
+                    raise ValueError(f"unexpected value {v!r} for k={k!r}")
+            else:
+                new_kwargs[k] = v
+
+        return to_onnx(*args, **new_kwargs)
+    if exporter in ("dynamo", "onnx-dynamo"):
+        import torch
+
+        return torch.onnx.export(*args, **kwargs)
+    raise NotImplementedError(f"exporter={exporter!r} not implemented.")
+
+
 def validate_model(
     model_id: str,
     prompt: str = DEFAULT_PROMPT,
@@ -110,7 +135,6 @@ def validate_model(
 
     from .flatten import register_flattening_functions
     from .input_observer import InputObserver
-    from .interpreter import to_onnx
     from .patch import apply_patches_for_model
 
     summary: Dict[str, Any] = {"model_id": model_id, "prompt": prompt}
@@ -300,7 +324,7 @@ def validate_model(
                 else contextlib.nullcontext()
             ),
         ):
-            to_onnx(
+            _to_onnx(
                 model,
                 (),
                 kwargs=kwargs,

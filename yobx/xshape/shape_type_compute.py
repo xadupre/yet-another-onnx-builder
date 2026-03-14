@@ -1337,9 +1337,9 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
                     continue
             d = input_shape[a]
             if isinstance(s, int) and s < 0:
-                s = f"(({d}){e})"
+                s = f"(({d})+({e}))"
             if isinstance(e, int) and e < 0:
-                e = f"(({d}){e})"
+                e = f"(({d})+({e}))"
             output_shape[a] = simplify_expression(f"{e}-{s}" if st == 1 else f"({e}-{s})//({st})")
             continue
 
