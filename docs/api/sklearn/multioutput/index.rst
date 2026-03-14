@@ -7,3 +7,4 @@ yobx.sklearn.multioutput
 
     classifier_chain
     multioutput
+    regressor_chain
