@@ -72,9 +72,7 @@ def sklearn_mean_shift(
     :return: tuple ``(labels, distances)`` when two outputs are requested,
         otherwise just ``labels``
     """
-    assert isinstance(
-        estimator, MeanShift
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, MeanShift), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
