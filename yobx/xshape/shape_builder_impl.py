@@ -336,7 +336,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         new_value = self._known_value_shape[equal_to[0]]
         new_value = (
             tuple(simplify_expression(s) for s in new_value)
-            if isinstance(value, tuple)
+            if isinstance(new_value, tuple)
             else simplify_expression(new_value)
         )
         for n in equal_to:

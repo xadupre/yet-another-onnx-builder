@@ -245,7 +245,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         produces at least one local function (e.g. a fused attention function).
         """
         proto, builder = self._export_tiny_llm(opset=22, patterns="default", return_builder=True)
-        if self.builder.has_name("_onx_concat_sym_size_int_19::UnSq02"):
+        if builder.has_name("_onx_concat_sym_size_int_19::UnSq02"):
             self.assertTrue(builder.has_shape("_onx_concat_sym_size_int_19::UnSq02"))
             self.assertEqual((4,), builder.get_shape("_onx_concat_sym_size_int_19::UnSq02"))
             self.assertEqual(

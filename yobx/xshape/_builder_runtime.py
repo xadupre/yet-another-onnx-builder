@@ -168,10 +168,6 @@ class _BuilderRuntime:
             )
             rest = muli // divi
         else:
-
-            def _(s):
-                return f"({s})" if set(s) & set("+/-*%()") else s
-
             if muli != 1:
                 mul.append(str(muli))
             if divi != 1:
@@ -182,18 +178,18 @@ class _BuilderRuntime:
                 rest = (
                     mul[0]
                     if len(mul) == 1
-                    else simplify_expression(f"{'*'.join(f'({_(s)})' for s in mul)}")
+                    else simplify_expression(f"{'*'.join(f'({s})' for s in mul)}")
                 )
             elif not mul:
                 rest = simplify_expression(
-                    f"1//{_(div[0])}"
+                    f"1//({div[0]})"
                     if len(div) == 1
-                    else f"1//({'*'.join(f'{_(s)}' for s in div)})"
+                    else f"1//({'*'.join(f'({s})' for s in div)})"
                 )
             else:
                 rest = simplify_expression(
-                    f"(({'*'.join(f'{_(s)}' for s in mul)})"
-                    f"//({'*'.join(f'{_(s)}' for s in div)}))"
+                    f"(({'*'.join(f'({s})' for s in mul)})"
+                    f"//({'*'.join(f'({s})' for s in div)}))"
                 )
         return tuple(s if s != -1 else rest for s in new_shape)
 
