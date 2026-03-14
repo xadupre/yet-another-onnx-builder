@@ -41,6 +41,301 @@ def _to_onnx(*args, exporter: str = "yobx", **kwargs):
     raise NotImplementedError(f"exporter={exporter!r} not implemented.")
 
 
+def _load_config(
+    model_id: str,
+    config_overrides: Optional[Dict[str, Any]],
+    verbose: int,
+    quiet: bool,
+    summary: Dict[str, Any],
+    collected_data: Dict[str, Any],
+):
+    """Load the model config (bundled → local HF cache → network) and apply overrides."""
+    from transformers import AutoConfig
+
+    if verbose:
+        print(f"[validate_model] loading config for {model_id!r}")
+
+    try:
+        from .in_transformers.models import get_cached_configuration
+
+        _cached = get_cached_configuration(model_id)
+        if _cached is not None:
+            config = _cached
+            summary["config_from_cache"] = "bundled"
+        else:
+            try:
+                config = AutoConfig.from_pretrained(model_id, local_files_only=True)
+                summary["config_from_cache"] = "local"
+            except OSError:
+                config = AutoConfig.from_pretrained(model_id)
+                summary["config_from_cache"] = False
+    except Exception as exc:
+        summary["error_config"] = str(exc)
+        if not quiet:
+            raise
+        return None
+
+    if config_overrides:
+        for k, v in config_overrides.items():
+            setattr(config, k, v)
+        summary["config_overrides"] = str(config_overrides)
+
+    collected_data["config"] = config
+    return config
+
+
+def _load_tokenizer(
+    model_id: str,
+    verbose: int,
+    quiet: bool,
+    summary: Dict[str, Any],
+):
+    """Load the tokenizer (local HF cache first, then network)."""
+    from transformers import AutoTokenizer
+
+    if verbose:
+        print(f"[validate_model] loading tokenizer for {model_id!r}")
+
+    try:
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
+        except OSError:
+            tokenizer = AutoTokenizer.from_pretrained(model_id)
+    except Exception as exc:
+        summary["error_tokenizer"] = str(exc)
+        if not quiet:
+            raise
+        return None
+
+    return tokenizer
+
+
+def _load_model(
+    model_id: str,
+    config,
+    random_weights: bool,
+    torch_dtype,
+    torch_device,
+    verbose: int,
+    quiet: bool,
+    summary: Dict[str, Any],
+    collected_data: Dict[str, Any],
+):
+    """Load (or instantiate with random weights) the CausalLM model."""
+    import torch
+    from transformers import AutoModelForCausalLM
+
+    if verbose:
+        if random_weights:
+            print(
+                f"[validate_model] creating model from config (random weights) for {model_id!r}"
+            )
+        else:
+            print(f"[validate_model] loading model for {model_id!r}")
+
+    dtype_kwargs: Dict[str, Any] = {"torch_dtype": torch_dtype} if torch_dtype is not None else {}
+    try:
+        if random_weights:
+            model: torch.nn.Module = AutoModelForCausalLM.from_config(config, **dtype_kwargs)
+        else:
+            try:
+                model = AutoModelForCausalLM.from_pretrained(
+                    model_id, config=config, local_files_only=True, **dtype_kwargs
+                )
+                summary["model_from_cache"] = True
+            except OSError:
+                model = AutoModelForCausalLM.from_pretrained(
+                    model_id, config=config, **dtype_kwargs
+                )
+                summary["model_from_cache"] = False
+        model = model.to(torch_device)
+        model.eval()
+    except Exception as exc:
+        summary["error_model"] = str(exc)
+        if not quiet:
+            raise
+        return None
+
+    collected_data["model"] = model
+    return model
+
+
+def _capture_inputs(
+    model,
+    input_ids,
+    attention_mask,
+    max_new_tokens: int,
+    patch: bool,
+    prompt: str,
+    verbose: int,
+    quiet: bool,
+    summary: Dict[str, Any],
+    collected_data: Dict[str, Any],
+):
+    """Run model.generate under an InputObserver to capture real inputs."""
+    from .flatten import register_flattening_functions
+    from .input_observer import InputObserver
+    from .patch import apply_patches_for_model
+
+    if verbose:
+        print(f"[validate_model] capturing inputs with InputObserver (prompt={prompt!r})")
+
+    observer = InputObserver()
+
+    try:
+        with (
+            register_flattening_functions(patch_transformers=patch),
+            (
+                apply_patches_for_model(patch_transformers=patch, model=model)
+                if patch
+                else contextlib.nullcontext()
+            ),
+            observer(model),
+        ):
+            generate_kwargs: Dict[str, Any] = dict(
+                input_ids=input_ids,
+                do_sample=False,
+                max_new_tokens=max_new_tokens,
+            )
+            if attention_mask is not None:
+                generate_kwargs["attention_mask"] = attention_mask
+            model.generate(**generate_kwargs)
+    except Exception as exc:
+        summary["error_observer"] = str(exc)
+        if not quiet:
+            raise
+        return None
+
+    collected_data["observer"] = observer
+    summary["n_captured"] = len(observer.info)
+
+    if verbose:
+        print(f"[validate_model] captured {len(observer.info)} input set(s)")
+
+    return observer
+
+
+def _infer_shapes(observer, patch: bool, verbose: int, collected_data: Dict[str, Any]):
+    """Infer export kwargs and dynamic shapes from the captured observer."""
+    from .flatten import register_flattening_functions
+
+    with register_flattening_functions(patch_transformers=patch):
+        kwargs = observer.infer_arguments()
+        dynamic_shapes = observer.infer_dynamic_shapes(set_batch_dimension_for=True)
+
+    collected_data["kwargs"] = kwargs
+    collected_data["dynamic_shapes"] = dynamic_shapes
+
+    if verbose:
+        from ..helpers import string_type
+
+        print(f"[validate_model] kwargs: {string_type(kwargs, with_shape=True)}")
+        print(f"[validate_model] dynamic_shapes: {dynamic_shapes}")
+
+    return kwargs, dynamic_shapes
+
+
+def _export(
+    model,
+    model_id: str,
+    kwargs: Dict[str, Any],
+    dynamic_shapes,
+    exporter: str,
+    opset: int,
+    optimization: Optional[str],
+    patch: bool,
+    dump_folder: Optional[str],
+    verbose: int,
+    quiet: bool,
+    summary: Dict[str, Any],
+    collected_data: Dict[str, Any],
+):
+    """Export the model to ONNX and store the output filename."""
+    from .flatten import register_flattening_functions
+    from .patch import apply_patches_for_model
+
+    if dump_folder is not None:
+        os.makedirs(dump_folder, exist_ok=True)
+        model_name = model_id.replace("/", "-")
+        filename = os.path.join(dump_folder, f"{model_name}.onnx")
+    else:
+        import tempfile
+
+        _tmpdir = tempfile.mkdtemp()
+        model_name = model_id.replace("/", "-")
+        filename = os.path.join(_tmpdir, f"{model_name}.onnx")
+
+    collected_data["filename"] = filename
+
+    if verbose:
+        print(f"[validate_model] exporting to ONNX ({exporter=}, {opset=}) -> {filename!r}")
+
+    try:
+        export_kwargs: Dict[str, Any] = {}
+        if optimization is not None:
+            export_kwargs["optimization"] = optimization
+
+        with (
+            register_flattening_functions(patch_transformers=patch),
+            (
+                apply_patches_for_model(patch_torch=patch, patch_transformers=patch, model=model)
+                if patch
+                else contextlib.nullcontext()
+            ),
+        ):
+            _to_onnx(
+                model,
+                (),
+                kwargs=kwargs,
+                dynamic_shapes=dynamic_shapes,
+                filename=filename,
+                exporter=exporter,
+                opset_version=opset,
+                verbose=max(0, verbose - 1),
+                **export_kwargs,
+            )
+        summary["export"] = "OK"
+    except Exception as exc:
+        summary["export"] = "FAILED"
+        summary["error_export"] = str(exc)
+        if not quiet:
+            raise
+        return False
+
+    if verbose:
+        print(f"[validate_model] export succeeded -> {filename!r}")
+
+    return True
+
+
+def _check_discrepancies(
+    observer,
+    filename: str,
+    verbose: int,
+    quiet: bool,
+    summary: Dict[str, Any],
+    collected_data: Dict[str, Any],
+):
+    """Run ONNX Runtime on every captured input set and compare against PyTorch outputs."""
+    if verbose:
+        print("[validate_model] checking discrepancies ...")
+    try:
+        disc_data = observer.check_discrepancies(filename)
+        collected_data["discrepancies"] = disc_data
+        n_ok = sum(1 for row in disc_data if row.get("SUCCESS", False))
+        n_total = len(disc_data)
+        summary["discrepancies_ok"] = n_ok
+        summary["discrepancies_total"] = n_total
+        summary["discrepancies"] = "OK" if n_ok == n_total else "FAILED"
+        if verbose:
+            print(f"[validate_model] discrepancies: {n_ok}/{n_total} OK")
+    except Exception as exc:
+        summary["discrepancies"] = "FAILED"
+        summary["error_discrepancies"] = str(exc)
+        if not quiet:
+            raise
+
+
 def validate_model(
     model_id: str,
     prompt: str = DEFAULT_PROMPT,
@@ -131,107 +426,38 @@ def validate_model(
             print(f":{k},{v};")
     """
     import torch
-    from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
-
-    from .flatten import register_flattening_functions
-    from .input_observer import InputObserver
-    from .patch import apply_patches_for_model
 
     summary: Dict[str, Any] = {"model_id": model_id, "prompt": prompt}
     collected_data: Dict[str, Any] = {}
 
-    # ------------------------------------------------------------------ device
+    # ------------------------------------------------------------------ device / dtype
     torch_device = torch.device(device or "cpu")
-
-    # ----------------------------------------------------------------- dtype
     torch_dtype: Optional[torch.dtype] = None
     if dtype is not None:
         torch_dtype = getattr(torch, dtype)
 
     # ----------------------------------------------------------------- config
-    if verbose:
-        print(f"[validate_model] loading config for {model_id!r}")
-
-    try:
-        from .in_transformers.models import get_cached_configuration
-
-        _cached = get_cached_configuration(model_id)
-        if _cached is not None:
-            config = _cached
-            summary["config_from_cache"] = "bundled"
-        else:
-            try:
-                config = AutoConfig.from_pretrained(model_id, local_files_only=True)
-                summary["config_from_cache"] = "local"
-            except OSError:
-                config = AutoConfig.from_pretrained(model_id)
-                summary["config_from_cache"] = False
-    except Exception as exc:
-        summary["error_config"] = str(exc)
-        if not quiet:
-            raise
+    config = _load_config(model_id, config_overrides, verbose, quiet, summary, collected_data)
+    if config is None:
         return summary, collected_data
 
-    if config_overrides:
-        for k, v in config_overrides.items():
-            setattr(config, k, v)
-        summary["config_overrides"] = str(config_overrides)
-
-    collected_data["config"] = config
-
     # --------------------------------------------------------------- tokenizer
-    if verbose:
-        print(f"[validate_model] loading tokenizer for {model_id!r}")
-
     if tokenized_inputs is None:
-        try:
-            try:
-                tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
-            except OSError:
-                tokenizer = AutoTokenizer.from_pretrained(model_id)
-        except Exception as exc:
-            summary["error_tokenizer"] = str(exc)
-            if not quiet:
-                raise
+        tokenizer = _load_tokenizer(model_id, verbose, quiet, summary)
+        if tokenizer is None:
             return summary, collected_data
     else:
         tokenizer = None
 
     # --------------------------------------------------------------- load model
-    if verbose:
-        if random_weights:
-            print(
-                f"[validate_model] creating model from config (random weights) for {model_id!r}"
-            )
-        else:
-            print(f"[validate_model] loading model for {model_id!r}")
-
-    dtype_kwargs: Dict[str, Any] = {"torch_dtype": torch_dtype} if torch_dtype is not None else {}
-    try:
-        if random_weights:
-            model: torch.nn.Module = AutoModelForCausalLM.from_config(config, **dtype_kwargs)
-        else:
-            try:
-                model = AutoModelForCausalLM.from_pretrained(
-                    model_id, config=config, local_files_only=True, **dtype_kwargs
-                )
-                summary["model_from_cache"] = True
-            except OSError:
-                model = AutoModelForCausalLM.from_pretrained(
-                    model_id, config=config, **dtype_kwargs
-                )
-                summary["model_from_cache"] = False
-        model = model.to(torch_device)
-        model.eval()
-    except Exception as exc:
-        summary["error_model"] = str(exc)
-        if not quiet:
-            raise
+    model = _load_model(
+        model_id, config, random_weights, torch_dtype, torch_device,
+        verbose, quiet, summary, collected_data,
+    )
+    if model is None:
         return summary, collected_data
 
-    collected_data["model"] = model
-
-    # ---------------------------------------------------------- tokenise prompt
+    # ---------------------------------------------------------- tokenise prompt / use supplied
     if tokenized_inputs is not None:
         inputs = tokenized_inputs
     else:
@@ -245,125 +471,28 @@ def validate_model(
     collected_data["attention_mask"] = attention_mask
 
     # ------------------------------------------------------- capture with observer
-    if verbose:
-        print(f"[validate_model] capturing inputs with InputObserver (prompt={prompt!r})")
-
-    observer = InputObserver()
-
-    try:
-        with (
-            register_flattening_functions(patch_transformers=patch),
-            (
-                apply_patches_for_model(patch_transformers=patch, model=model)
-                if patch
-                else contextlib.nullcontext()
-            ),
-            observer(model),
-        ):
-            generate_kwargs: Dict[str, Any] = dict(
-                input_ids=input_ids,
-                do_sample=False,
-                max_new_tokens=max_new_tokens,
-            )
-            if attention_mask is not None:
-                generate_kwargs["attention_mask"] = attention_mask
-            model.generate(**generate_kwargs)
-    except Exception as exc:
-        summary["error_observer"] = str(exc)
-        if not quiet:
-            raise
+    observer = _capture_inputs(
+        model, input_ids, attention_mask, max_new_tokens, patch,
+        prompt, verbose, quiet, summary, collected_data,
+    )
+    if observer is None:
         return summary, collected_data
-
-    collected_data["observer"] = observer
-    summary["n_captured"] = len(observer.info)
-
-    if verbose:
-        print(f"[validate_model] captured {len(observer.info)} input set(s)")
 
     # ---------------------------------------------------- infer args & shapes
-    with register_flattening_functions(patch_transformers=patch):
-        kwargs = observer.infer_arguments()
-        dynamic_shapes = observer.infer_dynamic_shapes(set_batch_dimension_for=True)
-
-    collected_data["kwargs"] = kwargs
-    collected_data["dynamic_shapes"] = dynamic_shapes
-
-    if verbose:
-        from ..helpers import string_type
-
-        print(f"[validate_model] kwargs: {string_type(kwargs, with_shape=True)}")
-        print(f"[validate_model] dynamic_shapes: {dynamic_shapes}")
+    kwargs, dynamic_shapes = _infer_shapes(observer, patch, verbose, collected_data)
 
     # ------------------------------------------------------------------- export
-    if dump_folder is not None:
-        os.makedirs(dump_folder, exist_ok=True)
-        model_name = model_id.replace("/", "-")
-        filename = os.path.join(dump_folder, f"{model_name}.onnx")
-    else:
-        import tempfile
-
-        _tmpdir = tempfile.mkdtemp()
-        model_name = model_id.replace("/", "-")
-        filename = os.path.join(_tmpdir, f"{model_name}.onnx")
-
-    collected_data["filename"] = filename
-
-    if verbose:
-        print(f"[validate_model] exporting to ONNX ({exporter=}, {opset=}) -> {filename!r}")
-
-    try:
-        export_kwargs: Dict[str, Any] = {}
-        if optimization is not None:
-            export_kwargs["optimization"] = optimization
-
-        with (
-            register_flattening_functions(patch_transformers=patch),
-            (
-                apply_patches_for_model(patch_torch=patch, patch_transformers=patch, model=model)
-                if patch
-                else contextlib.nullcontext()
-            ),
-        ):
-            _to_onnx(
-                model,
-                (),
-                kwargs=kwargs,
-                dynamic_shapes=dynamic_shapes,
-                filename=filename,
-                exporter=exporter,
-                opset_version=opset,
-                verbose=max(0, verbose - 1),
-                **export_kwargs,
-            )
-        summary["export"] = "OK"
-    except Exception as exc:
-        summary["export"] = "FAILED"
-        summary["error_export"] = str(exc)
-        if not quiet:
-            raise
+    ok = _export(
+        model, model_id, kwargs, dynamic_shapes, exporter, opset, optimization,
+        patch, dump_folder, verbose, quiet, summary, collected_data,
+    )
+    if not ok:
         return summary, collected_data
-
-    if verbose:
-        print(f"[validate_model] export succeeded -> {filename!r}")
 
     # --------------------------------------------------------- check discrepancies
     if do_run:
-        if verbose:
-            print("[validate_model] checking discrepancies ...")
-        try:
-            disc_data = observer.check_discrepancies(filename)
-            collected_data["discrepancies"] = disc_data
-            n_ok = sum(1 for row in disc_data if row.get("SUCCESS", False))
-            n_total = len(disc_data)
-            summary["discrepancies_ok"] = n_ok
-            summary["discrepancies_total"] = n_total
-            summary["discrepancies"] = "OK" if n_ok == n_total else "FAILED"
-            if verbose:
-                print(f"[validate_model] discrepancies: {n_ok}/{n_total} OK")
-        except Exception as exc:
-            summary["discrepancies"] = "FAILED"
-            summary["error_discrepancies"] = str(exc)
-            if not quiet:
-                raise
+        _check_discrepancies(
+            observer, collected_data["filename"], verbose, quiet, summary, collected_data,
+        )
 
     return summary, collected_data
