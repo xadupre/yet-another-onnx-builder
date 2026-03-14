@@ -1,5 +1,6 @@
 import collections
 import unittest
+import onnx
 import torch
 from yobx.helpers import max_diff
 from yobx.helpers.rt_helper import make_feeds
@@ -204,7 +205,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         diff = max_diff(expected, got)
         assert diff["abs"] <= 1e-5, f"diff={diff}"
 
-    def _export_tiny_llm(self, opset: int, patterns: str):
+    def _export_tiny_llm(self, opset: int, patterns: str, return_builder: bool = False):
         """
         Export ``arnir0/Tiny-LLM`` and return the main ``ModelProto``.
 
@@ -227,6 +228,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
                 verbose=0,
                 options=OptimizationOptions(patterns=patterns),
                 target_opset=opset,
+                return_builder=return_builder,
             )
         # to_onnx returns ModelProto when large_model=False (the default)
         return onx
@@ -242,7 +244,12 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         information on every node output, and that ``patterns="default"``
         produces at least one local function (e.g. a fused attention function).
         """
-        proto = self._export_tiny_llm(opset=22, patterns="default")
+        proto, builder = self._export_tiny_llm(opset=22, patterns="default", return_builder=True)
+        self.assertTrue(builder.has_shape("_onx_concat_sym_size_int_19::UnSq02"))
+        self.assertEqual((4,), builder.get_shape("_onx_concat_sym_size_int_19::UnSq02"))
+        self.assertEqual(
+            onnx.TensorProto.INT64, builder.get_type("_onx_concat_sym_size_int_19::UnSq02")
+        )
         self.dump_onnx("test_tiny_llm_shape_default_opset_22.onnx", proto)
         missing = self._get_missing_shapes(proto)
         self.assertEqual(

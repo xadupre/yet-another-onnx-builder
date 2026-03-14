@@ -381,8 +381,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._debug_node_output = os.environ.get("ONNXSTOPOUTPUT", "")
         self._debug_node_type = os.environ.get("ONNXNODETYPE", "")
         self._debug_quiet = int(os.environ.get("ONNXQUIET", "0"))
-        self._debug_shape_missing = not self.as_function and int(
-            os.environ.get("ONNXSHAPECOMPUTE", "0")
+        self._debug_shape_missing = (
+            not self.as_function and int(os.environ.get("ONNXSHAPECOMPUTE", "0")) == 1
         )
         self._debug_constant_folding = int(os.environ.get("ONNXCONSTANTFOLD", "0"))
         self._debug_foldnot = int(os.environ.get("ONNXFOLDNOT", "0"))
@@ -4332,10 +4332,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             # No need.
             return output_names[0]
         if op_type == "Concat":
-            types = [self.get_rank(t) for t in inputs if self.has_rank(t)]
-            assert not types or len(set(types)) == 1, (
+            ranks = [self.get_rank(t) for t in inputs if self.has_rank(t)]
+            assert not ranks or len(set(ranks)) == 1, (
                 f"All inputs must have the same rank for Concat, "
-                f"types={types}, inputs={inputs}{self.get_debug_msg()}"
+                f"types={ranks}, inputs={inputs}{self.get_debug_msg()}"
             )
 
         if check is not False:
