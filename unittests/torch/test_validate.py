@@ -97,12 +97,18 @@ class TestValidateModel(ExtTestCase):
         self.assertIn("dynamic_shapes", data)
         self.assertIn("filename", data)
 
-    @unittest.skipUnless(_has_network(), "No network access — skipping HuggingFace download.")
     def test_validate_model_captures_inputs(self):
+        import torch
         from yobx.torch.validate import validate_model
 
+        tokenized = {
+            "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
+            "attention_mask": torch.ones(1, 5, dtype=torch.int64),
+        }
         summary, data = validate_model(
             "arnir0/Tiny-LLM",
+            tokenized_inputs=tokenized,
+            random_weights=True,
             max_new_tokens=3,
             do_run=False,
             verbose=0,
