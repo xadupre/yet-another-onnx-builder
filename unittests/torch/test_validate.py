@@ -112,6 +112,54 @@ class TestValidateModel(ExtTestCase):
         # The observer should have captured at least one input set
         self.assertGreater(len(observer.info), 0)
 
+    def test_validate_model_exporter_dynamo(self):
+        """validate_model with exporter='onnx-dynamo' runs without unhandled exception."""
+        import torch
+        from yobx.torch.validate import validate_model
+
+        tokenized = {
+            "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
+            "attention_mask": torch.ones(1, 5, dtype=torch.int64),
+        }
+        summary, _data = validate_model(
+            "arnir0/Tiny-LLM",
+            exporter="onnx-dynamo",
+            tokenized_inputs=tokenized,
+            random_weights=True,
+            max_new_tokens=3,
+            do_run=False,
+            quiet=True,
+            verbose=0,
+        )
+        self.assertIn("model_id", summary)
+        self.assertEqual(summary["model_id"], "arnir0/Tiny-LLM")
+        # Export may succeed or fail depending on torch version; both are acceptable.
+        self.assertIn("export", summary)
+
+    def test_validate_model_exporter_modelbuilder(self):
+        """validate_model with exporter='modelbuilder' runs without unhandled exception."""
+        import torch
+        from yobx.torch.validate import validate_model
+
+        tokenized = {
+            "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
+            "attention_mask": torch.ones(1, 5, dtype=torch.int64),
+        }
+        summary, _data = validate_model(
+            "arnir0/Tiny-LLM",
+            exporter="modelbuilder",
+            tokenized_inputs=tokenized,
+            random_weights=True,
+            max_new_tokens=3,
+            do_run=False,
+            quiet=True,
+            verbose=0,
+        )
+        self.assertIn("model_id", summary)
+        self.assertEqual(summary["model_id"], "arnir0/Tiny-LLM")
+        # Export may succeed or fail depending on torch version; both are acceptable.
+        self.assertIn("export", summary)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

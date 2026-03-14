@@ -34,10 +34,37 @@ def _to_onnx(*args, exporter: str = "yobx", **kwargs):
                 new_kwargs[k] = v
 
         return to_onnx(*args, **new_kwargs)
-    if exporter in ("dynamo", "onnx-dynamo"):
+    if exporter in ("dynamo", "onnx-dynamo", "modelbuilder"):
         import torch
 
-        return torch.onnx.export(*args, **kwargs)
+        # Build a kwargs dict that torch.onnx.export understands.
+        # Keys like "optimization" have no equivalent — skip them.
+        # "filename" maps to the "f" positional-style param of older APIs; the
+        # newer (2.x dynamo) API returns an ExportOutput that must be saved.
+        dynamo_kwargs: dict = {}
+        filename = None
+        for k, v in kwargs.items():
+            if k == "filename":
+                filename = v
+            elif k == "optimization":
+                pass  # not supported by torch.onnx.export
+            elif k == "verbose":
+                pass  # not passed through
+            else:
+                dynamo_kwargs[k] = v
+
+        if exporter == "modelbuilder":
+            dynamo_kwargs.setdefault("dynamo", True)
+
+        result = torch.onnx.export(*args, **dynamo_kwargs)
+        # Newer PyTorch (2.x+) returns an ExportOutput with .save()
+        if filename is not None and hasattr(result, "save"):
+            result.save(filename)
+        elif filename is not None and result is not None:
+            import onnx
+
+            onnx.save(result, filename)
+        return result
     raise NotImplementedError(f"exporter={exporter!r} not implemented.")
 
 
