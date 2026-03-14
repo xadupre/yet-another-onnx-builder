@@ -9,6 +9,7 @@ yobx.sklearn.decomposition
     gaussian_random_projection
     incremental_pca
     kernel_pca
+    latent_dirichlet_allocation
     pca
     pls_regression
     truncated_svd
