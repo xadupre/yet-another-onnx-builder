@@ -865,11 +865,7 @@ class BatchNormalizationPattern(PatternOptimization):
 
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         new_node = g.make_node(
             "Identity",
             node.input[:1],
@@ -919,11 +915,7 @@ class BatchNormalizationTrainingPattern(PatternOptimization):
 
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         nname = f"{self.__class__.__name__}--{node.name}"
         rk = g.get_rank(node.input[0])
         axes = tuple(np.delete(np.arange(rk), 1))
@@ -1179,16 +1171,7 @@ class RMSNormalizationPattern(PatternOptimization):
             else:
                 cast_1 = None
 
-        nodes = [
-            cast_1,
-            node_pow,
-            node,
-            node_add,
-            node_sqrt,
-            node_reciprocal,
-            node_mul,
-            cast_2,
-        ]
+        nodes = [cast_1, node_pow, node, node_add, node_sqrt, node_reciprocal, node_mul, cast_2]
         return MatchResult(self, nodes, self.apply, insert_at=node)
 
     def apply(
@@ -1364,10 +1347,7 @@ class RMSNormalizationMulPattern(PatternOptimization):
         return MatchResult(self, [node, mul_node], self.apply, insert_at=mul_node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        rms_node: NodeProto,
-        mul_node: NodeProto,
+        self, g: "GraphBuilder", rms_node: NodeProto, mul_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         other = (
             mul_node.input[1] if mul_node.input[0] == rms_node.output[0] else mul_node.input[0]

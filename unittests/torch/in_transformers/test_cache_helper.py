@@ -79,11 +79,7 @@ class TestCacheHelpers(ExtTestCase):
         self.assertEqual(expected.shape, (4, 4, 4, 4))
         DYN = torch.export.Dim.DYNAMIC
         sh = {0: DYN, 1: DYN, 2: DYN, 3: DYN}
-        ep = torch.export.export(
-            model,
-            inputs,
-            dynamic_shapes=({0: DYN, 1: DYN}, sh, sh),
-        )
+        ep = torch.export.export(model, inputs, dynamic_shapes=({0: DYN, 1: DYN}, sh, sh))
         self.assertNotEmpty(ep)
 
     def test_cache_key_value_none(self):

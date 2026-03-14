@@ -59,9 +59,7 @@ model = oh.make_model(
             oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq", "d_model"]),
         ],
         [oh.make_tensor_value_info("Z", TFLOAT, [None, None, None])],
-        [
-            onh.from_array(np.array([0, 0, -1], dtype=np.int64), name="reshape_shape"),
-        ],
+        [onh.from_array(np.array([0, 0, -1], dtype=np.int64), name="reshape_shape")],
     ),
     opset_imports=[oh.make_opsetid("", 18)],
     ir_version=10,
@@ -181,12 +179,7 @@ table_data = [
 
 fig, ax = plt.subplots(figsize=(8, 2.5))
 ax.axis("off")
-tbl = ax.table(
-    cellText=table_data,
-    colLabels=col_labels,
-    loc="center",
-    cellLoc="center",
-)
+tbl = ax.table(cellText=table_data, colLabels=col_labels, loc="center", cellLoc="center")
 tbl.auto_set_font_size(False)
 tbl.set_fontsize(9)
 tbl.auto_set_column_width([0, 1, 2])

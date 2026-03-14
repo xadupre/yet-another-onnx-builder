@@ -1,12 +1,7 @@
 from typing import Dict, List, Tuple, Union
 import numpy as np
 import onnx
-from sklearn.linear_model import (
-    Perceptron,
-    RidgeClassifier,
-    RidgeClassifierCV,
-    SGDClassifier,
-)
+from sklearn.linear_model import Perceptron, RidgeClassifier, RidgeClassifierCV, SGDClassifier
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
@@ -41,11 +36,7 @@ def _build_label(
     if np.issubdtype(classes.dtype, np.integer):
         classes_arr = classes.astype(np.int64)
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label",
-            outputs=outputs[:1],
+            classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:
@@ -53,11 +44,7 @@ def _build_label(
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label_string",
-            outputs=outputs[:1],
+            classes_arr, label_idx, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:
@@ -178,10 +165,7 @@ def sklearn_linear_classifier(
             # apply sigmoid to each score, then normalise so rows sum to 1.
             sig = g.op.Sigmoid(decision, name=f"{name}_sigmoid")
             sum_ = g.op.ReduceSum(
-                sig,
-                np.array([1], dtype=np.int64),
-                keepdims=1,
-                name=f"{name}_sum",
+                sig, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_sum"
             )
             proba = g.op.Div(sig, sum_, name=f"{name}_normalize", outputs=outputs[1:])
             assert isinstance(proba, str)

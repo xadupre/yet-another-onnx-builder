@@ -30,10 +30,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         for optimize in [False, True]:
             with self.subTest(optimize=optimize):
                 onx = to_onnx(
-                    model,
-                    (x,),
-                    optimize=optimize,
-                    export_options=ExportOptions(strict=False),
+                    model, (x,), optimize=optimize, export_options=ExportOptions(strict=False)
                 )
                 self.dump_onnx(f"test_scan_1_{optimize}.onnx", onx)
                 names = [(f.domain, f.name) for f in onx.functions]
@@ -85,10 +82,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         for optimize in [False, True]:
             with self.subTest(optimize=optimize):
                 onx = to_onnx(
-                    model,
-                    (x,),
-                    optimize=optimize,
-                    export_options=ExportOptions(strict=False),
+                    model, (x,), optimize=optimize, export_options=ExportOptions(strict=False)
                 )
                 names = [(f.domain, f.name) for f in onx.functions]
                 self.assertEqual(len(names), len(set(names)))
@@ -367,12 +361,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                 row[: p.item()] = padded[: p.item()]
                 return (row,)
 
-            return torch.ops.higher_order.scan(
-                pad_row,
-                [],
-                [padded, pos],
-                [],
-            )
+            return torch.ops.higher_order.scan(pad_row, [], [padded, pos], [])
 
         def select_when_exporting(f, f_scan):
             return f_scan if torch.compiler.is_exporting() else f

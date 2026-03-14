@@ -175,9 +175,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
     """
 
     def __init__(
-        self,
-        target_opset_or_opsets: Union[int, Dict[str, int]],
-        ir_version: Optional[int] = None,
+        self, target_opset_or_opsets: Union[int, Dict[str, int]], ir_version: Optional[int] = None
     ) -> None:
         if isinstance(target_opset_or_opsets, int):
             self.opsets: Dict[str, int] = {"": target_opset_or_opsets}
@@ -229,10 +227,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
         return candidate
 
     def set_type_shape_unary_op(
-        self,
-        name: str,
-        input_name: str,
-        itype: Optional[int] = None,
+        self, name: str, input_name: str, itype: Optional[int] = None
     ) -> bool:
         return set_type_shape_unary_op(self, name, input_name, itype)  # type: ignore[arg-type]
 
@@ -646,13 +641,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
         # Convert input strings → Var objects
         input_vars = [self._arg_to_var(inp) for inp in inputs]
 
-        result_names = self._dispatch_op(
-            op_type,
-            input_vars,
-            output_names,
-            domain,
-            **kwargs,
-        )
+        result_names = self._dispatch_op(op_type, input_vars, output_names, domain, **kwargs)
 
         # When fewer names were requested than produced, trim (rare edge case)
         if output_names is None:
@@ -685,13 +674,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
 
         output_names_list: Optional[List[str]] = list(outputs) if outputs else None
 
-        result_names = self._dispatch_op(
-            op_type,
-            input_vars,
-            output_names_list,
-            domain,
-            **kwargs,
-        )
+        result_names = self._dispatch_op(op_type, input_vars, output_names_list, domain, **kwargs)
 
         if len(result_names) == 1:
             return result_names[0]
@@ -707,10 +690,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
     # ------------------------------------------------------------------
 
     def to_onnx(
-        self,
-        large_model: bool = False,
-        external_threshold: int = 1024,
-        inline: bool = True,
+        self, large_model: bool = False, external_threshold: int = 1024, inline: bool = True
     ) -> onnx.ModelProto:
         """Exports the accumulated graph as an :class:`onnx.ModelProto`.
 

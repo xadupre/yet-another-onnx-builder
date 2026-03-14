@@ -111,11 +111,7 @@ class ConvBiasNullPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         new_node = g.make_node(
             "Conv",
             node.input[:2],

@@ -114,10 +114,7 @@ class TestOnnxExportSubModules(ExtTestCase):
                 super().__init__()
 
             def forward(self, x):
-                return (
-                    torch.sigmoid(x),
-                    torch.sigmoid(x * x),
-                )
+                return (torch.sigmoid(x), torch.sigmoid(x * x))
 
         class Neuron2(torch.nn.Module):
             def __init__(self, n_dims: int = 5, n_targets: int = 3):

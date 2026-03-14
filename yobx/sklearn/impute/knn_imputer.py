@@ -248,12 +248,7 @@ def sklearn_knn_imputer(  # noqa: C901
 
         # k nearest valid donors.
         top_k_dists_f, top_k_idx_f = g.op.TopK(
-            D_f,
-            k_arr,
-            axis=1,
-            largest=0,
-            sorted=1,
-            name=f"{name}_topk_{f}",
+            D_f, k_arr, axis=1, largest=0, sorted=1, name=f"{name}_topk_{f}"
         )  # [N, k] each
 
         # Gather the feature-f values of the k selected donors.
@@ -306,9 +301,7 @@ def sklearn_knn_imputer(  # noqa: C901
 
         # Unsqueeze to [N, 1] for later Concat along axis=1.
         imputed_col = g.op.Unsqueeze(
-            imputed_fv,
-            np.array([1], dtype=np.int64),
-            name=f"{name}_col_{f}",
+            imputed_fv, np.array([1], dtype=np.int64), name=f"{name}_col_{f}"
         )  # [N, 1]
         imputed_cols.append(imputed_col)
 

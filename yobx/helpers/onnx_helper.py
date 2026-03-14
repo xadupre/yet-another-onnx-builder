@@ -110,10 +110,7 @@ class ResultFound:
     __slots__ = ("consumer", "name", "producer")
 
     def __init__(
-        self,
-        name: str,
-        producer: Optional[NodeCoordinates],
-        consumer: Optional[NodeCoordinates],
+        self, name: str, producer: Optional[NodeCoordinates], consumer: Optional[NodeCoordinates]
     ):
         assert isinstance(name, str), f"unexpected type {type(name)} for name"
         self.name = name
@@ -1231,11 +1228,7 @@ def make_model_with_local_functions(
                 continue
 
             lf = make_subfunction(
-                function_name,
-                function_nodes,
-                model.opset_import,
-                outputs,
-                domain=domain,
+                function_name, function_nodes, model.opset_import, outputs, domain=domain
             )
 
             check_for_non_recursivity(node_indices, new_nodes, lf.input, lf.output)
@@ -1317,13 +1310,7 @@ def element_wise_op_cmp_types() -> Set[str]:
         from yobx.helpers.onnx_helper import element_wise_op_cmp_types
         pprint.pprint(element_wise_op_cmp_types())
     """
-    return {
-        "Equal",
-        "Greater",
-        "GreaterOrEqual",
-        "Less",
-        "LessOrEqual",
-    }
+    return {"Equal", "Greater", "GreaterOrEqual", "Less", "LessOrEqual"}
 
 
 def unary_like_op_types() -> Set[str]:
@@ -1579,16 +1566,7 @@ def get_onnx_signature(
     Tuple[
         str,
         int,
-        Union[
-            Tuple[Union[int, str], ...],
-            List[
-                Tuple[
-                    str,
-                    int,
-                    Tuple[Union[int, str], ...],
-                ],
-            ],
-        ],
+        Union[Tuple[Union[int, str], ...], List[Tuple[str, int, Tuple[Union[int, str], ...]],]],
     ],
     ...,
 ]:

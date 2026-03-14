@@ -181,10 +181,7 @@ class MatMulAddPattern(PatternOptimization):
         return MatchResult(self, [node, add_node], self.apply, insert_at=add_node)
 
     def _apply_matmmul(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        matmul_node: NodeProto,
-        add_node: NodeProto,
+        self, g: "GraphBuilder", matmul_node: NodeProto, add_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         bias2 = add_node.input[0 if add_node.input[1] == matmul_node.output[0] else 1]
         if g.get_rank(matmul_node.input[0]) > 2:
@@ -194,9 +191,7 @@ class MatMulAddPattern(PatternOptimization):
             sh2 = g.get_shape(matmul_node.input[1]) if g.has_shape(matmul_node.input[1]) else None
             k = sh1[-1] if sh1 is not None and isinstance(sh1[-1], int) else sh2[0]
             new_shape = g.make_initializer(
-                "",
-                np.array([-1, k], dtype=np.int64),
-                source="MatMulAddPattern.new_shape.1",
+                "", np.array([-1, k], dtype=np.int64), source="MatMulAddPattern.new_shape.1"
             )
             reshaped = g.unique_name(f"{self.__class__.__name__}--{matmul_node.input[0]}")
             reshape_node = g.make_node(
@@ -230,9 +225,7 @@ class MatMulAddPattern(PatternOptimization):
                         f"{self.__class__.__name__}--{matmul_node.input[0]}"
                     )
                     minus1 = g.make_initializer(
-                        "",
-                        g.MINUS_ONE,
-                        source="MatMulAddPattern.new_shape.7",
+                        "", g.MINUS_ONE, source="MatMulAddPattern.new_shape.7"
                     )
                     reshape_nodes.append(
                         g.make_node(
@@ -284,9 +277,7 @@ class MatMulAddPattern(PatternOptimization):
                 )
                 shape_back = g.unique_name(f"{self.__class__.__name__}--{matmul_node.input[0]}")
                 minus1 = g.make_initializer(
-                    "",
-                    g.MINUS_ONE,
-                    source="MatMulAddPattern.new_shape.3",
+                    "", g.MINUS_ONE, source="MatMulAddPattern.new_shape.3"
                 )
                 reshape_nodes.append(
                     g.make_node(
@@ -323,10 +314,7 @@ class MatMulAddPattern(PatternOptimization):
         return [new_node]
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        matmul_node: NodeProto,
-        add_node: NodeProto,
+        self, g: "GraphBuilder", matmul_node: NodeProto, add_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         if matmul_node.op_type == "MatMul" or len(matmul_node.input) == 2:
             return self._apply_matmmul(g, matmul_node, add_node)
@@ -446,11 +434,7 @@ class GemmTransposePattern(PatternOptimization):
                 return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         tr = g.unique_name(f"{self.__class__.__name__}--{node.input[1]}")
         return [
             g.make_node(
@@ -1011,11 +995,7 @@ class MulMulMatMulPattern(PatternOptimization):
         return MatchResult(self, [*node_before, node], self.apply)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        mul1: NodeProto,
-        mul2: NodeProto,
-        node: NodeProto,
+        self, g: "GraphBuilder", mul1: NodeProto, mul2: NodeProto, node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         cst = [i for i in [*mul1.input, *mul2.input] if g.is_constant(i)]
         not_cst = [i for i in [*mul1.input, *mul2.input] if i not in cst]
@@ -1029,10 +1009,7 @@ class MulMulMatMulPattern(PatternOptimization):
 
         return [
             g.make_node(
-                "MatMul",
-                not_cst,
-                [mul_name],
-                name=f"{self.__class__.__name__}--{node.name}-1",
+                "MatMul", not_cst, [mul_name], name=f"{self.__class__.__name__}--{node.name}-1"
             ),
             g.make_node(
                 "Mul",
@@ -1193,9 +1170,7 @@ class ReshapeMatMulReshapePattern(PatternOptimization):
             )
 
         return MatchResult(
-            self,
-            [node_before_left, node_before_right, node, next_node],
-            self.apply,
+            self, [node_before_left, node_before_right, node, next_node], self.apply
         )
 
     def apply(
@@ -1907,10 +1882,7 @@ class ShapeBasedMatMulToMulPattern(PatternOptimization):
         return MatchResult(self, [node, None], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        mm_node: NodeProto,
-        transpose: Optional[NodeProto],
+        self, g: "GraphBuilder", mm_node: NodeProto, transpose: Optional[NodeProto]  # noqa: F821
     ) -> List[NodeProto]:
         if transpose is None:
             return [

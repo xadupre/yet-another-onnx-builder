@@ -53,12 +53,7 @@ rng = np.random.default_rng(0)
 X_train = rng.standard_normal((80, 4)).astype(np.float32)
 y_train = (X_train[:, 0] + X_train[:, 1] > 0).astype(int)
 
-pipe = Pipeline(
-    [
-        ("scaler", StandardScaler()),
-        ("clf", LogisticRegression()),
-    ]
-)
+pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression())])
 pipe.fit(X_train, y_train)
 
 print("Binary pipeline steps:")
@@ -78,10 +73,7 @@ onx = to_onnx(pipe, (X_train[:1],), builder_cls=SpoxGraphBuilder)
 
 print(f"\nONNX opset  : {onx.opset_import[0].version}")
 print("Node types  :", [n.op_type for n in onx.graph.node])
-print(
-    "Graph input : ",
-    [(inp.name, inp.type.tensor_type.elem_type) for inp in onx.graph.input],
-)
+print("Graph input : ", [(inp.name, inp.type.tensor_type.elem_type) for inp in onx.graph.input])
 print("Graph outputs:", [out.name for out in onx.graph.output])
 
 # %%
@@ -117,12 +109,7 @@ print("\nBinary predictions match ✓")
 X_mc = rng.standard_normal((120, 4)).astype(np.float32)
 y_mc = rng.integers(0, 3, size=120)
 
-pipe_mc = Pipeline(
-    [
-        ("scaler", StandardScaler()),
-        ("clf", LogisticRegression(max_iter=500)),
-    ]
-)
+pipe_mc = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression(max_iter=500))])
 pipe_mc.fit(X_mc, y_mc)
 
 X_test_mc = rng.standard_normal((30, 4)).astype(np.float32)

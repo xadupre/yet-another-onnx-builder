@@ -1434,7 +1434,7 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
                     # q_num_heads=num_heads,
                     # kv_num_heads=kv_num_heads,
                     **attn_kwargs,
-                ),
+                )
             ]
         )
         for node in nodes:

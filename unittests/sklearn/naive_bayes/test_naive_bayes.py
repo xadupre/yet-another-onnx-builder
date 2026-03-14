@@ -194,8 +194,7 @@ class TestSklearnNaiveBayes(ExtTestCase):
     _y_cat_bin = np.array([0, 0, 1, 1, 1, 0])
 
     _X_cat_multi = np.array(
-        [[0, 1], [1, 0], [2, 1], [0, 0], [1, 1], [2, 0], [0, 1], [1, 1], [2, 0]],
-        dtype=np.int64,
+        [[0, 1], [1, 0], [2, 1], [0, 0], [1, 1], [2, 0], [0, 1], [1, 1], [2, 0]], dtype=np.int64
     )
     _y_cat_multi = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2])
 

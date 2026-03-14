@@ -3,11 +3,7 @@ import unittest
 import warnings
 from typing import Optional
 from onnx.reference import ReferenceEvaluator
-from yobx.ext_test_case import (
-    ExtTestCase,
-    ignore_warnings,
-    skipif_ci_windows,
-)
+from yobx.ext_test_case import ExtTestCase, ignore_warnings, skipif_ci_windows
 from yobx.xbuilder import OptimizationOptions
 from yobx.torch import ExportOptions
 from yobx.torch.interpreter import to_onnx

@@ -142,12 +142,7 @@ class TestMeanShift(ExtTestCase):
 
         rng = np.random.default_rng(4)
         X = rng.standard_normal((30, 4)).astype(np.float32)
-        pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("ms", MeanShift()),
-            ]
-        )
+        pipe = Pipeline([("scaler", StandardScaler()), ("ms", MeanShift())])
         pipe.fit(X)
 
         onx = to_onnx(pipe, (X,))

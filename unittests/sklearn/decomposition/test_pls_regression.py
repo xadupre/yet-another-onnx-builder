@@ -28,8 +28,7 @@ class TestPLSRegression(ExtTestCase):
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Sub", op_types)
         self.assertTrue(
-            "MatMul" in op_types or "Gemm" in op_types,
-            f"Expected MatMul or Gemm in {op_types}",
+            "MatMul" in op_types or "Gemm" in op_types, f"Expected MatMul or Gemm in {op_types}"
         )
 
         # Check numerical output.
@@ -123,12 +122,7 @@ class TestPLSRegression(ExtTestCase):
         X = rng.standard_normal((40, 6)).astype(np.float32)
         y = rng.standard_normal((40, 2)).astype(np.float32)
 
-        pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("pls", PLSRegression(n_components=3)),
-            ]
-        )
+        pipe = Pipeline([("scaler", StandardScaler()), ("pls", PLSRegression(n_components=3))])
         pipe.fit(X, y)
 
         onx = to_onnx(pipe, (X,))

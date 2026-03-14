@@ -124,9 +124,7 @@ def sklearn_one_vs_one_classifier(
         # Binary prediction: 1 if class j wins (conf >= 0.5), 0 if class i wins.
         pred_k = g.op.Cast(
             g.op.GreaterOrEqual(
-                conf_k,
-                np.array([[0.5]], dtype=dtype),
-                name=f"{sub_name}_pred_ge",
+                conf_k, np.array([[0.5]], dtype=dtype), name=f"{sub_name}_pred_ge"
             ),
             to=itype,
             name=f"{sub_name}_pred",
@@ -147,15 +145,10 @@ def sklearn_one_vs_one_classifier(
             if c == ci:
                 # vote contribution: (1 - pred_k)  →  1 if class i won
                 v_contrib = g.op.Sub(
-                    np.array([[1.0]], dtype=dtype),
-                    pair_preds[k],
-                    name=f"{name}__v_c{c}_k{k}",
+                    np.array([[1.0]], dtype=dtype), pair_preds[k], name=f"{name}__v_c{c}_k{k}"
                 )
                 # confidence contribution: -conf_k
-                c_contrib: str = g.op.Neg(
-                    pair_confs[k],
-                    name=f"{name}__c_c{c}_k{k}",
-                )
+                c_contrib: str = g.op.Neg(pair_confs[k], name=f"{name}__c_c{c}_k{k}")
             elif c == cj:
                 # vote contribution: pred_k  →  1 if class j won
                 v_contrib = pair_preds[k]
@@ -183,16 +176,8 @@ def sklearn_one_vs_one_classifier(
 
     # Monotonic tie-breaking transform: f(x) = x / (3 * (|x| + 1))
     abs_conf = g.op.Abs(sum_conf, name=f"{name}_abs_conf")
-    denom_inner = g.op.Add(
-        abs_conf,
-        np.array([1.0], dtype=dtype),
-        name=f"{name}_denom_inner",
-    )
-    denom = g.op.Mul(
-        np.array([3.0], dtype=dtype),
-        denom_inner,
-        name=f"{name}_denom",
-    )
+    denom_inner = g.op.Add(abs_conf, np.array([1.0], dtype=dtype), name=f"{name}_denom_inner")
+    denom = g.op.Mul(np.array([3.0], dtype=dtype), denom_inner, name=f"{name}_denom")
     transformed_conf = g.op.Div(sum_conf, denom, name=f"{name}_transformed_conf")
 
     # Final per-class scores.
@@ -207,11 +192,7 @@ def sklearn_one_vs_one_classifier(
     if np.issubdtype(classes.dtype, np.integer):
         classes_arr = classes.astype(np.int64)
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label",
-            outputs=outputs[:1],
+            classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:
@@ -219,11 +200,7 @@ def sklearn_one_vs_one_classifier(
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label_string",
-            outputs=outputs[:1],
+            classes_arr, label_idx, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:

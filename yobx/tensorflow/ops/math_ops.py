@@ -66,11 +66,7 @@ def convert_topk(
     """
     sorted_attr = int(op.get_attr("sorted"))
     k_i64 = g.op.Cast(op.inputs[1].name, to=TensorProto.INT64, name=f"{op.name}_k_cast")
-    k_1d = g.op.Reshape(
-        k_i64,
-        np.array([1], dtype=np.int64),
-        name=f"{op.name}_k_reshape",
-    )
+    k_1d = g.op.Reshape(k_i64, np.array([1], dtype=np.int64), name=f"{op.name}_k_reshape")
     return g.op.TopK(
         op.inputs[0].name,
         k_1d,

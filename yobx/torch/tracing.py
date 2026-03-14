@@ -123,12 +123,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
 
     @classmethod
     def cat(
-        cls,
-        tensors: List["CustomProxy"],
-        dim: int = 0,
-        *,
-        out=None,
-        axis: Optional[int] = None,
+        cls, tensors: List["CustomProxy"], dim: int = 0, *, out=None, axis: Optional[int] = None
     ) -> "CustomProxy":
         """Implements cat for tensors."""
         assert out is None, "Tracing is not implementing is out is not None."
@@ -286,14 +281,8 @@ def replace_problematic_function_before_tracing() -> Generator:
     Replaces function that cannot be traced with the default tracer
     such as :func:`torch.cat`.
     """
-    saved = {
-        "cat": torch.cat,
-        "cond": torch.cond,
-    }
-    newf = {
-        "cat": CustomProxy.cat,
-        "cond": CondCCOp(),
-    }
+    saved = {"cat": torch.cat, "cond": torch.cond}
+    newf = {"cat": CustomProxy.cat, "cond": CondCCOp()}
     for k, v in newf.items():
         if isinstance(k, tuple):
             setattr(k[0], k[1], v)
@@ -774,9 +763,7 @@ class CustomTracer(torch.fx.Tracer):
         :param verbose: verbosity level
         :return: number of impacted nodes
         """
-        replaces = {
-            CustomProxy.cat: torch.cat,
-        }
+        replaces = {CustomProxy.cat: torch.cat}
         n = 0
         for node in graph.nodes:
             if node.op == "call_function":
@@ -797,11 +784,7 @@ class CustomTracer(torch.fx.Tracer):
     def _get_aten_name(cls, node: torch.fx.Node) -> str:
         """Returns the aten name for the target as a string."""
         assert hasattr(node, "target"), f"Unable to return aten name for {node}"
-        known = {
-            operator.getitem: "getitem",
-            operator.le: "le",
-            operator.ge: "ge",
-        }
+        known = {operator.getitem: "getitem", operator.le: "le", operator.ge: "ge"}
         if node.target in known:
             return known[node.target]
         if isinstance(node.target, torch._ops.OpOverloadPacket):

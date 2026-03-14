@@ -32,10 +32,7 @@ class TestGraphBuilder(ExtTestCase):
             "LinearRegression",
             ["x", "a", "b"],
             ["y"],
-            [
-                oh.make_node("MatMul", ["x", "a"], ["xa"]),
-                oh.make_node("Add", ["xa", "b"], ["y"]),
-            ],
+            [oh.make_node("MatMul", ["x", "a"], ["xa"]), oh.make_node("Add", ["xa", "b"], ["y"])],
             [oh.make_opsetid("", 14)],
             [],
         )
@@ -81,9 +78,7 @@ class TestGraphBuilder(ExtTestCase):
         gr.inline_functions(verbose=1)
         function_proto = gr.to_onnx(
             function_options=FunctionOptions(
-                export_as_function=True,
-                name="lr",
-                domain="custom_domain",
+                export_as_function=True, name="lr", domain="custom_domain"
             ),
             inline=False,
         )
@@ -104,10 +99,7 @@ class TestGraphBuilder(ExtTestCase):
             "LinearRegression",
             ["x", "a", "b"],
             ["y"],
-            [
-                oh.make_node("MatMul", ["x", "a"], ["xa"]),
-                oh.make_node("Add", ["xa", "b"], ["y"]),
-            ],
+            [oh.make_node("MatMul", ["x", "a"], ["xa"]), oh.make_node("Add", ["xa", "b"], ["y"])],
             [oh.make_opsetid("", 14)],
             [],
         )
@@ -117,9 +109,7 @@ class TestGraphBuilder(ExtTestCase):
             "LinearAdd",
             ["x", "a"],
             ["y"],
-            [
-                oh.make_node("Add", ["x", "a"], ["y"]),
-            ],
+            [oh.make_node("Add", ["x", "a"], ["y"])],
             [oh.make_opsetid("", 14)],
             [],
         )
@@ -159,10 +149,7 @@ class TestGraphBuilder(ExtTestCase):
 
         gr.inline_functions()
         function_proto = gr.to_onnx(
-            function_options=FunctionOptions(
-                name="lr",
-                domain="custom_domain",
-            )
+            function_options=FunctionOptions(name="lr", domain="custom_domain")
         )
         self.assertNotEmpty(function_proto)
 
@@ -181,9 +168,7 @@ class TestGraphBuilder(ExtTestCase):
             "LinearAdd",
             ["x", "a"],
             ["y"],
-            [
-                oh.make_node("Add", ["x", "a"], ["y"]),
-            ],
+            [oh.make_node("Add", ["x", "a"], ["y"])],
             [oh.make_opsetid("", 14)],
             [],
         )
@@ -321,12 +306,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(
             nodes,
             [
-                (
-                    "custom",
-                    "Regression",
-                    ["X", "weights", "bias"],
-                    ["_onx_regression_X"],
-                ),
+                ("custom", "Regression", ["X", "weights", "bias"], ["_onx_regression_X"]),
                 ("", "Add", ["_onx_regression_X", "bias2"], ["Y"]),
             ],
         )
@@ -448,9 +428,7 @@ class TestGraphBuilder(ExtTestCase):
         fct = g.to_onnx(
             g2,
             function_options=FunctionOptions(
-                name="linear",
-                domain="mine",
-                return_initializer=True,
+                name="linear", domain="mine", return_initializer=True
             ),
             inline=False,
         )
@@ -470,19 +448,13 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIsInstance(fct["functions"], list)
         self.assertTrue(all(isinstance(p, FunctionProto) for p in fct["functions"]))
         self.assertIsInstance(fct["initializers_name"], list)
-        self.assertEqual(
-            fct["initializers_name"],
-            ["weights", "bias3", "bias2", "bias"],
-        )
+        self.assertEqual(fct["initializers_name"], ["weights", "bias3", "bias2", "bias"])
         self.assertIsInstance(fct["initializers_dict"], dict)
         self.assertTrue(all(isinstance(p, np.ndarray) for p in fct["initializers_dict"].values()))
         self.assertEqual(len(fct["initializers_name"]), len(fct["initializers_dict"]))
         proto = fct["proto"]
         self.assertEqual(proto.output, ["Y"])
-        self.assertEqual(
-            proto.input,
-            ["X", "weights", "bias3", "bias2", "bias"],
-        )
+        self.assertEqual(proto.input, ["X", "weights", "bias3", "bias2", "bias"])
         self.assertEqual(proto.domain, "mine")
         self.assertEqual(proto.name, "linear")
         self.assertEqual(2, len(fct["functions"]))
@@ -503,16 +475,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqualArray(np_bias, feeds["bias"])
         self.assertEqualArray(np_bias2, feeds["bias2"])
         self.assertEqualArray(np_bias3, feeds["bias3"])
-        self.assertEqual(
-            set(feeds),
-            {
-                "X",
-                "weights",
-                "bias",
-                "bias3",
-                "bias2",
-            },
-        )
+        self.assertEqual(set(feeds), {"X", "weights", "bias", "bias3", "bias2"})
         expected = feeds["X"] @ np_weights + np_bias + np_bias2 + np_bias3
 
         # Evaluation of a function
@@ -621,10 +584,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(len(fct["initializers_name"]), len(fct["initializers_dict"]))
         proto = fct["proto"]
         self.assertEqual(proto.output, ["Y"])
-        self.assertEqual(
-            proto.input,
-            ["X", "weights", "bias"],
-        )
+        self.assertEqual(proto.input, ["X", "weights", "bias"])
         self.assertEqual(proto.domain, "mine")
         self.assertEqual(proto.name, "linear")
         f1 = fct["functions"][0]
@@ -731,9 +691,7 @@ class TestGraphBuilder(ExtTestCase):
 
         fct = g.to_onnx(
             function_options=FunctionOptions(
-                name="linear",
-                domain="mine",
-                return_initializer=True,
+                name="linear", domain="mine", return_initializer=True
             ),
             inline=False,
         )
@@ -880,9 +838,7 @@ class TestGraphBuilder(ExtTestCase):
 
         fct = g.to_onnx(
             function_options=FunctionOptions(
-                name="linear",
-                domain="mine",
-                return_initializer=True,
+                name="linear", domain="mine", return_initializer=True
             ),
             inline=False,
         )
@@ -956,10 +912,7 @@ class TestGraphBuilder(ExtTestCase):
             "LinearRegression",
             ["x", "a", "b"],
             ["y"],
-            [
-                oh.make_node("MatMul", ["x", "a"], ["xa"]),
-                oh.make_node("Add", ["xa", "b"], ["y"]),
-            ],
+            [oh.make_node("MatMul", ["x", "a"], ["xa"]), oh.make_node("Add", ["xa", "b"], ["y"])],
             [oh.make_opsetid("", 14)],
             [],
         )
@@ -1083,18 +1036,10 @@ class TestGraphBuilder(ExtTestCase):
                     oh.make_node("Cast", ["w2"], ["w2f"], to=TFLOAT),
                     oh.make_node("Cast", ["neq1"], ["neq1f"], to=TFLOAT),
                     oh.make_node(
-                        "ReduceSum",
-                        ["w2f"],
-                        ["red1"],
-                        keepdims=0,
-                        noop_with_empty_axes=0,
+                        "ReduceSum", ["w2f"], ["red1"], keepdims=0, noop_with_empty_axes=0
                     ),
                     oh.make_node(
-                        "ReduceSum",
-                        ["neq1f"],
-                        ["red2"],
-                        keepdims=0,
-                        noop_with_empty_axes=0,
+                        "ReduceSum", ["neq1f"], ["red2"], keepdims=0, noop_with_empty_axes=0
                     ),
                     oh.make_node("Cast", ["red1"], ["red1_16"], to=TFLOAT16),
                     oh.make_node("Cast", ["red2"], ["red2_16"], to=TFLOAT16),
@@ -1206,9 +1151,7 @@ class TestGraphBuilder(ExtTestCase):
         gr.inline_functions(verbose=1)
         function_proto = gr.to_onnx(
             function_options=FunctionOptions(
-                export_as_function=True,
-                name="lr",
-                domain="custom_domain",
+                export_as_function=True, name="lr", domain="custom_domain"
             ),
             inline=False,
         )
@@ -1367,9 +1310,7 @@ class TestGraphBuilder(ExtTestCase):
         gr.inline_functions(verbose=1)
         function_proto = gr.to_onnx(
             function_options=FunctionOptions(
-                export_as_function=True,
-                name="lr",
-                domain="custom_domain",
+                export_as_function=True, name="lr", domain="custom_domain"
             ),
             inline=False,
         )
@@ -1547,19 +1488,14 @@ class TestGraphBuilder(ExtTestCase):
             "LinearRegression",
             ["x", "a", "b"],
             ["y"],
-            [
-                oh.make_node("MatMul", ["x", "a"], ["xa"]),
-                oh.make_node("Add", ["xa", "b"], ["y"]),
-            ],
+            [oh.make_node("MatMul", ["x", "a"], ["xa"]), oh.make_node("Add", ["xa", "b"], ["y"])],
             [oh.make_opsetid("", 18)],
             [],
         )
 
         # Build the then_branch: calls the custom function inside
         then_branch = oh.make_graph(
-            [
-                oh.make_node("LinearRegression", ["X", "A", "B"], ["Y_then"], domain=new_domain),
-            ],
+            [oh.make_node("LinearRegression", ["X", "A", "B"], ["Y_then"], domain=new_domain)],
             "then_branch",
             [],
             [oh.make_tensor_value_info("Y_then", TensorProto.FLOAT, None)],
@@ -1567,9 +1503,7 @@ class TestGraphBuilder(ExtTestCase):
 
         # Build the else_branch: returns Abs(X)
         else_branch = oh.make_graph(
-            [
-                oh.make_node("Abs", ["X"], ["Y_else"]),
-            ],
+            [oh.make_node("Abs", ["X"], ["Y_else"])],
             "else_branch",
             [],
             [oh.make_tensor_value_info("Y_else", TensorProto.FLOAT, None)],
@@ -1579,12 +1513,8 @@ class TestGraphBuilder(ExtTestCase):
             oh.make_graph(
                 [
                     oh.make_node(
-                        "If",
-                        ["Cond"],
-                        ["Y"],
-                        then_branch=then_branch,
-                        else_branch=else_branch,
-                    ),
+                        "If", ["Cond"], ["Y"], then_branch=then_branch, else_branch=else_branch
+                    )
                 ],
                 "main_graph",
                 [
@@ -1640,8 +1570,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIn("batch", g.dynamic_objects)
         self.assertIn("batch", g.dynamic_dimensions_source)
         self.assertEqual(
-            g.dynamic_dimensions_source["batch"],
-            [{"input_name": "args_0", "axis": 0}],
+            g.dynamic_dimensions_source["batch"], [{"input_name": "args_0", "axis": 0}]
         )
 
     @requires_torch("2.0")
@@ -1654,8 +1583,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIn("batch", g.dynamic_objects)
         self.assertIn("batch", g.dynamic_dimensions_source)
         self.assertEqual(
-            g.dynamic_dimensions_source["batch"],
-            [{"input_name": "args_0", "axis": 0}],
+            g.dynamic_dimensions_source["batch"], [{"input_name": "args_0", "axis": 0}]
         )
 
     @requires_torch("2.0")
@@ -1670,8 +1598,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIn("base", g.dynamic_objects)
         self.assertIn("2*base", g.dynamic_dimensions_source)
         self.assertEqual(
-            g.dynamic_dimensions_source["2*base"],
-            [{"input_name": "args_0", "axis": 0}],
+            g.dynamic_dimensions_source["2*base"], [{"input_name": "args_0", "axis": 0}]
         )
 
     @requires_torch("2.0")
@@ -1692,20 +1619,14 @@ class TestGraphBuilder(ExtTestCase):
     @requires_torch("2.0")
     def test_register_dynamic_object_from_dynamic_shapes_dict_multiple_axes(self):
         # Multiple axes for the same input
-        g = GraphBuilder(
-            18,
-            ir_version=9,
-            dynamic_shapes={"args_0": {0: "batch", 1: "seq"}},
-        )
+        g = GraphBuilder(18, ir_version=9, dynamic_shapes={"args_0": {0: "batch", 1: "seq"}})
         self.assertIn("batch", g.dynamic_objects)
         self.assertIn("seq", g.dynamic_objects)
         self.assertEqual(
-            g.dynamic_dimensions_source["batch"],
-            [{"input_name": "args_0", "axis": 0}],
+            g.dynamic_dimensions_source["batch"], [{"input_name": "args_0", "axis": 0}]
         )
         self.assertEqual(
-            g.dynamic_dimensions_source["seq"],
-            [{"input_name": "args_0", "axis": 1}],
+            g.dynamic_dimensions_source["seq"], [{"input_name": "args_0", "axis": 1}]
         )
 
     @requires_torch("2.0")
@@ -1841,8 +1762,7 @@ class TestGetInputDynamicShape(ExtTestCase):
     def test_check_two_shapes_are_compatible_value_mismatch(self):
         g = GraphBuilder(18)
         self.assertRaises(
-            AssertionError,
-            lambda: g._check_two_shapes_are_compatible((2, 3), (2, 5), name="x"),
+            AssertionError, lambda: g._check_two_shapes_are_compatible((2, 3), (2, 5), name="x")
         )
 
     def test_check_two_shapes_are_compatible_same_strings(self):
@@ -1893,13 +1813,7 @@ class TestGetInputDynamicShape(ExtTestCase):
         g = GraphBuilder(18)
         self.assertRaises(
             AssertionError,
-            lambda: g._check_op_type(
-                "If",
-                ["cond"],
-                ["result"],
-                domain="",
-                name="test_if",
-            ),
+            lambda: g._check_op_type("If", ["cond"], ["result"], domain="", name="test_if"),
         )
 
     def test_check_op_type_if_mismatched_outputs(self):
@@ -1914,10 +1828,7 @@ class TestGetInputDynamicShape(ExtTestCase):
             ],
         )
         else_graph = oh.make_graph(
-            [],
-            "else_branch",
-            [],
-            [oh.make_tensor_value_info("result", TensorProto.FLOAT, None)],
+            [], "else_branch", [], [oh.make_tensor_value_info("result", TensorProto.FLOAT, None)]
         )
         self.assertRaises(
             AssertionError,
@@ -1977,12 +1888,7 @@ class TestGetInputDynamicShape(ExtTestCase):
         )
         # Should not raise
         g._check_op_type(
-            "Loop",
-            ["max_iter", "cond", "v"],
-            ["v_final"],
-            domain="",
-            name="test_loop",
-            body=body,
+            "Loop", ["max_iter", "cond", "v"], ["v_final"], domain="", name="test_loop", body=body
         )
 
     @ignore_warnings(DeprecationWarning)
@@ -2033,9 +1939,7 @@ class TestGetInputDynamicShape(ExtTestCase):
             input_names=["X"],
             output_names=["output_0"],
             function_options=FunctionOptions(
-                name="LinearRegression",
-                domain="custom",
-                move_initializer_to_constant=True,
+                name="LinearRegression", domain="custom", move_initializer_to_constant=True
             ),
         )
         self.assertEqual(result, "output_0")
@@ -2140,10 +2044,7 @@ class TestGetInputDynamicShape(ExtTestCase):
             "LinearRegression",
             ["x", "a", "b"],
             ["y"],
-            [
-                oh.make_node("MatMul", ["x", "a"], ["xa"]),
-                oh.make_node("Add", ["xa", "b"], ["y"]),
-            ],
+            [oh.make_node("MatMul", ["x", "a"], ["xa"]), oh.make_node("Add", ["xa", "b"], ["y"])],
             [oh.make_opsetid("", 18)],
             [],
         )
@@ -2197,11 +2098,7 @@ class TestGetInputDynamicShape(ExtTestCase):
             [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
         )
         if_node = oh.make_node(
-            "If",
-            ["cond"],
-            ["y"],
-            then_branch=then_graph,
-            else_branch=else_graph,
+            "If", ["cond"], ["y"], then_branch=then_graph, else_branch=else_graph
         )
         func = oh.make_function(
             "custom",
@@ -2259,30 +2156,20 @@ class TestGetInputDynamicShape(ExtTestCase):
 
         # then_branch: Add(x, x) -> tmp; Identity(tmp) -> y
         then_graph = oh.make_graph(
-            [
-                oh.make_node("Add", ["x", "x"], ["tmp"]),
-                oh.make_node("Identity", ["tmp"], ["y"]),
-            ],
+            [oh.make_node("Add", ["x", "x"], ["tmp"]), oh.make_node("Identity", ["tmp"], ["y"])],
             "then_branch",
             [],
             [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
         )
         # else_branch: Abs(x) -> tmp; Identity(tmp) -> y
         else_graph = oh.make_graph(
-            [
-                oh.make_node("Abs", ["x"], ["tmp"]),
-                oh.make_node("Identity", ["tmp"], ["y"]),
-            ],
+            [oh.make_node("Abs", ["x"], ["tmp"]), oh.make_node("Identity", ["tmp"], ["y"])],
             "else_branch",
             [],
             [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
         )
         if_node = oh.make_node(
-            "If",
-            ["cond"],
-            ["y"],
-            then_branch=then_graph,
-            else_branch=else_graph,
+            "If", ["cond"], ["y"], then_branch=then_graph, else_branch=else_graph
         )
         graph = oh.make_graph(
             [if_node],
@@ -2293,11 +2180,7 @@ class TestGetInputDynamicShape(ExtTestCase):
             ],
             [oh.make_tensor_value_info("y", TensorProto.FLOAT, None)],
         )
-        model = oh.make_model(
-            graph,
-            opset_imports=[oh.make_opsetid("", 18)],
-            ir_version=9,
-        )
+        model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 18)], ir_version=9)
         gr = GraphBuilder(model, optimization_options=OptimizationOptions(recursive=True))
         node = gr.nodes[0]
         self.assertEqual(node.op_type, "If")
@@ -2364,10 +2247,7 @@ class TestGetInputDynamicShape(ExtTestCase):
         self.assertEqual(inp.type.sequence_type.elem_type.tensor_type.elem_type, TFLOAT)
 
         # Running the model should return the number of tensors in the sequence
-        tensors = [
-            np.ones((3, 4), dtype=np.float32),
-            np.zeros((3, 4), dtype=np.float32),
-        ]
+        tensors = [np.ones((3, 4), dtype=np.float32), np.zeros((3, 4), dtype=np.float32)]
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, {"seq": tensors})
         self.assertEqual(got[0], 2)

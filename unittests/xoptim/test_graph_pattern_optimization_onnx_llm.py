@@ -69,8 +69,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Shape", "Shape", "CausalMask", "Cast"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Shape", "Shape", "CausalMask", "Cast"], [n.op_type for n in opt_onx.graph.node]
         )
         ref = ExtendedReferenceEvaluator(opt_onx)
         zz = ref.run(None, feeds)[0]
@@ -360,10 +359,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["FunctionCosSinCache"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["CosSinCacheWithRange_to10"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["CosSinCacheWithRange_to10"], [n.op_type for n in opt_onx.graph.node])
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
@@ -400,10 +396,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["FunctionCosSinCache"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["CosSinCache_to10_p1"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["CosSinCache_to10_p1"], [n.op_type for n in opt_onx.graph.node])
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
@@ -445,10 +438,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["FunctionCosSinCache"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["CosSinCacheWithRange"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["CosSinCacheWithRange"], [n.op_type for n in opt_onx.graph.node])
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
@@ -495,8 +485,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         self.assertEqual((1, "seq", "a"), gr.get_shape("sin_cache"))
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["CosSinCacheWithRange", "Exp", "Exp"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["CosSinCacheWithRange", "Exp", "Exp"], [n.op_type for n in opt_onx.graph.node]
         )
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
@@ -756,14 +745,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
                 y = y[..., :-1]
                 return y
 
-            def group_query_attention_reference(
-                self,
-                query,
-                key,
-                value,
-                scale=None,
-                mask=None,
-            ):
+            def group_query_attention_reference(self, query, key, value, scale=None, mask=None):
                 if scale is None:
                     scale = 1.0 / (self.head_size**0.5)
 
@@ -983,14 +965,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
                 y = y[..., :-1]
                 return y
 
-            def group_query_attention_reference(
-                self,
-                query,
-                key,
-                value,
-                scale=None,
-                mask=None,
-            ):
+            def group_query_attention_reference(self, query, key, value, scale=None, mask=None):
                 if scale is None:
                     scale = 1.0 / (self.head_size**0.5)
 
@@ -1120,10 +1095,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
                     oh.make_node("Expand", ["value_u", "t11211"], ["value_ue"]),
                     oh.make_node("Squeeze", ["value_ue", "one"], ["value_ues"]),
                     oh.make_node(
-                        "Attention",
-                        ["query", "key_ues", "value_ues", "mask"],
-                        ["Y"],
-                        scale=0.11,
+                        "Attention", ["query", "key_ues", "value_ues", "mask"], ["Y"], scale=0.11
                     ),
                 ],
                 "test",
@@ -1200,10 +1172,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
                     oh.make_node("Expand", ["value_u", "t11211"], ["value_ue"]),
                     oh.make_node("Reshape", ["value_ue", "resh"], ["value_ues"]),
                     oh.make_node(
-                        "Attention",
-                        ["query", "key_ues", "value_ues", "mask"],
-                        ["Y"],
-                        scale=0.11,
+                        "Attention", ["query", "key_ues", "value_ues", "mask"], ["Y"], scale=0.11
                     ),
                 ],
                 "test",
@@ -1281,10 +1250,7 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
                     oh.make_node("Expand", ["value_u", "t11211"], ["value_ue"]),
                     oh.make_node("Squeeze", ["value_ue", "one"], ["value_ues"]),
                     oh.make_node(
-                        "Attention",
-                        ["query", "key_ues", "value_ues", "mask"],
-                        ["Y"],
-                        scale=0.11,
+                        "Attention", ["query", "key_ues", "value_ues", "mask"], ["Y"], scale=0.11
                     ),
                 ],
                 "test",

@@ -94,12 +94,7 @@ class TestEllipticEnvelope(ExtTestCase):
 
         rng = np.random.default_rng(4)
         X = rng.standard_normal((60, 4)).astype(np.float32)
-        pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("ee", EllipticEnvelope(random_state=4)),
-            ]
-        )
+        pipe = Pipeline([("scaler", StandardScaler()), ("ee", EllipticEnvelope(random_state=4))])
         pipe.fit(X)
         onx = to_onnx(pipe, (X,))
 

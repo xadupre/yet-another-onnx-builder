@@ -41,30 +41,32 @@ def _to_onnx(*args, exporter: str = "yobx", **kwargs):
         # Keys like "optimization" have no equivalent — skip them.
         # "filename" maps to the "f" positional-style param of older APIs; the
         # newer (2.x dynamo) API returns an ExportOutput that must be saved.
-        dynamo_kwargs: dict = {}
-        filename = None
+        dynamo_kwargs: dict = {"optimize": False, "dynamo": True}
         for k, v in kwargs.items():
             if k == "filename":
-                filename = v
+                dynamo_kwargs["f"] = v
             elif k == "optimization":
-                pass  # not supported by torch.onnx.export
+                dynamo_kwargs["optimize"] = v in (
+                    "default",
+                    "ir",
+                    "default+onnxruntime",
+                    "os_ort",
+                )
             elif k == "verbose":
-                pass  # not passed through
+                dynamo_kwargs["report"] = True
             else:
                 dynamo_kwargs[k] = v
 
         if exporter == "modelbuilder":
             dynamo_kwargs.setdefault("dynamo", True)
 
-        result = torch.onnx.export(*args, **dynamo_kwargs)
-        # Newer PyTorch (2.x+) returns an ExportOutput with .save()
-        if filename is not None and hasattr(result, "save"):
-            result.save(filename)
-        elif filename is not None and result is not None:
-            import onnx
+        epo = torch.onnx.export(*args, **dynamo_kwargs)
+        if kwargs.get("optimization", "") in ("os_ort", "default+onnxruntime"):
+            from onnxscript.rewriter.ort_fusions import optimize_for_ort
 
-            onnx.save(result, filename)
-        return result
+            optimize_for_ort(epo)  # type: ignore
+        # saving is part of the the export
+        return epo
     raise NotImplementedError(f"exporter={exporter!r} not implemented.")
 
 
@@ -111,12 +113,7 @@ def _load_config(
     return config
 
 
-def _load_tokenizer(
-    model_id: str,
-    verbose: int,
-    quiet: bool,
-    summary: Dict[str, Any],
-):
+def _load_tokenizer(model_id: str, verbose: int, quiet: bool, summary: Dict[str, Any]):
     """Load the tokenizer (local HF cache first, then network)."""
     from transformers import AutoTokenizer
 
@@ -220,9 +217,7 @@ def _capture_inputs(
             observer(model),
         ):
             generate_kwargs: Dict[str, Any] = dict(
-                input_ids=input_ids,
-                do_sample=False,
-                max_new_tokens=max_new_tokens,
+                input_ids=input_ids, do_sample=False, max_new_tokens=max_new_tokens
             )
             if attention_mask is not None:
                 generate_kwargs["attention_mask"] = attention_mask
@@ -234,10 +229,10 @@ def _capture_inputs(
         return None
 
     collected_data["observer"] = observer
-    summary["n_captured"] = len(observer.info)
+    summary["n_captured"] = len(observer.info or [])
 
     if verbose:
-        print(f"[validate_model] captured {len(observer.info)} input set(s)")
+        print(f"[validate_model] captured {len(observer.info or [])} input set(s)")
 
     return observer
 
@@ -478,8 +473,15 @@ def validate_model(
 
     # --------------------------------------------------------------- load model
     model = _load_model(
-        model_id, config, random_weights, torch_dtype, torch_device,
-        verbose, quiet, summary, collected_data,
+        model_id,
+        config,
+        random_weights,
+        torch_dtype,
+        torch_device,
+        verbose,
+        quiet,
+        summary,
+        collected_data,
     )
     if model is None:
         return summary, collected_data
@@ -488,7 +490,7 @@ def validate_model(
     if tokenized_inputs is not None:
         inputs = tokenized_inputs
     else:
-        inputs = tokenizer(prompt, return_tensors="pt")
+        inputs = tokenizer(prompt, return_tensors="pt")  # type: ignore
     input_ids = inputs["input_ids"].to(torch_device)
     attention_mask = inputs.get("attention_mask")
     if attention_mask is not None:
@@ -499,8 +501,16 @@ def validate_model(
 
     # ------------------------------------------------------- capture with observer
     observer = _capture_inputs(
-        model, input_ids, attention_mask, max_new_tokens, patch,
-        prompt, verbose, quiet, summary, collected_data,
+        model,
+        input_ids,
+        attention_mask,
+        max_new_tokens,
+        patch,
+        prompt,
+        verbose,
+        quiet,
+        summary,
+        collected_data,
     )
     if observer is None:
         return summary, collected_data
@@ -510,8 +520,19 @@ def validate_model(
 
     # ------------------------------------------------------------------- export
     ok = _export(
-        model, model_id, kwargs, dynamic_shapes, exporter, opset, optimization,
-        patch, dump_folder, verbose, quiet, summary, collected_data,
+        model,
+        model_id,
+        kwargs,
+        dynamic_shapes,
+        exporter,
+        opset,
+        optimization,
+        patch,
+        dump_folder,
+        verbose,
+        quiet,
+        summary,
+        collected_data,
     )
     if not ok:
         return summary, collected_data
@@ -519,7 +540,7 @@ def validate_model(
     # --------------------------------------------------------- check discrepancies
     if do_run:
         _check_discrepancies(
-            observer, collected_data["filename"], verbose, quiet, summary, collected_data,
+            observer, collected_data["filename"], verbose, quiet, summary, collected_data
         )
 
     return summary, collected_data

@@ -481,12 +481,7 @@ class _InferenceRuntime:
                 output = [
                     reshape_implementation_with_zero(feeds[v.input[0]], tuple(feeds[v.input[1]]))
                 ]
-            elif v.op_type in {
-                "Add",
-                "Div",
-                "Mul",
-                "Sub",
-            }:
+            elif v.op_type in {"Add", "Div", "Mul", "Sub"}:
                 # bypassing onnx.numpy_helper.from_array, too slow
                 output = self._apply_binary_op(v, feeds)
             elif (

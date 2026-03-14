@@ -3,12 +3,7 @@ import itertools
 import unittest
 import pandas
 import torch
-from yobx.ext_test_case import (
-    ExtTestCase,
-    requires_torch,
-    hide_stdout,
-    ignore_warnings,
-)
+from yobx.ext_test_case import ExtTestCase, requires_torch, hide_stdout, ignore_warnings
 from yobx.torch.input_observer import InputCandidate, InputObserver, _infer_dynamic_dimensions
 from yobx.torch import apply_patches_for_model, to_onnx
 
@@ -290,10 +285,7 @@ class TestInputObserver(ExtTestCase):
                 return r
 
         inputs = [
-            (
-                (torch.randn((5, 6)),),
-                dict(w=torch.randn((1, 6))),
-            ),
+            ((torch.randn((5, 6)),), dict(w=torch.randn((1, 6)))),
             (
                 (torch.randn((6, 7)), torch.randn((1, 7))),
                 dict(z=torch.randn((6, 7)), w=torch.randn((1, 7))),
@@ -572,10 +564,7 @@ class TestInputObserver(ExtTestCase):
         ]
 
         cst = torch.export.Dim.DYNAMIC
-        expected = (
-            {0: cst, 1: cst},
-            [{0: cst, 1: cst}, {1: cst}, {1: cst}, {0: cst, 1: cst}],
-        )
+        expected = ({0: cst, 1: cst}, [{0: cst, 1: cst}, {1: cst}, {1: cst}, {0: cst, 1: cst}])
         flat = torch.utils._pytree.tree_flatten(inputs[-1])[0]
         self.assertEqual(len(flat), 5)
 
@@ -952,11 +941,7 @@ class TestInputObserver(ExtTestCase):
     def test_infer_dynamic_shapes_missing_args(self):
         class Model(torch.nn.Module):
             def forward(
-                self,
-                input_ids=None,
-                pixel_values=None,
-                attention_mask=None,
-                past_key_values=None,
+                self, input_ids=None, pixel_values=None, attention_mask=None, past_key_values=None
             ):
                 return input_ids
 
@@ -1555,18 +1540,9 @@ class TestInputObserver(ExtTestCase):
                 return r
 
         inputs = [
-            (
-                (torch.randn((5, 6)), torch.randn((1, 6))),
-                dict(z=torch.randn((5, 6))),
-            ),
-            (
-                (torch.randn((6, 7)), torch.randn((1, 7))),
-                dict(z=torch.randn((6, 7))),
-            ),
-            (
-                (torch.randn((7, 8)), torch.randn((1, 8))),
-                dict(z=torch.randn((7, 8))),
-            ),
+            ((torch.randn((5, 6)), torch.randn((1, 6))), dict(z=torch.randn((5, 6)))),
+            ((torch.randn((6, 7)), torch.randn((1, 7))), dict(z=torch.randn((6, 7)))),
+            ((torch.randn((7, 8)), torch.randn((1, 8))), dict(z=torch.randn((7, 8)))),
         ]
 
         model = Model()
@@ -1634,14 +1610,8 @@ class TestInputObserver(ExtTestCase):
                 return torch.cat([input_ids, attention_mask.to(input_ids.dtype)], dim=1)
 
         inputs = [
-            (
-                torch.randint(0, 100, (2, 6), dtype=torch.long),
-                torch.ones(2, 7, dtype=torch.long),
-            ),
-            (
-                torch.randint(0, 100, (3, 8), dtype=torch.long),
-                torch.ones(3, 9, dtype=torch.long),
-            ),
+            (torch.randint(0, 100, (2, 6), dtype=torch.long), torch.ones(2, 7, dtype=torch.long)),
+            (torch.randint(0, 100, (3, 8), dtype=torch.long), torch.ones(3, 9, dtype=torch.long)),
         ]
 
         model = LLMModel()

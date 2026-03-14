@@ -101,10 +101,7 @@ class TestMakeFeeds(ExtTestCase):
     def test_make_feeds_assertion_too_few_names(self):
         """Fewer names than inputs raises AssertionError when using a plain list."""
         names = ["x"]
-        inputs = [
-            np.array([1.0], dtype=np.float32),
-            np.array([2.0], dtype=np.float32),
-        ]
+        inputs = [np.array([1.0], dtype=np.float32), np.array([2.0], dtype=np.float32)]
         with self.assertRaises(AssertionError):
             make_feeds(names, inputs)
 
@@ -241,10 +238,7 @@ class TestOnnxGenerate(ExtTestCase):
 
         nodes = [
             onnx.helper.make_node(
-                "Constant",
-                [],
-                ["logits"],
-                value=onnx.numpy_helper.from_array(fixed_logits),
+                "Constant", [], ["logits"], value=onnx.numpy_helper.from_array(fixed_logits)
             )
         ]
         for i in range(LAYERS):

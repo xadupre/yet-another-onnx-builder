@@ -129,16 +129,9 @@ def sklearn_isomap(
 
     # ── Step 3: Approximate geodesic distances G_X ─────────────────────────
     # Flatten indices → (N*k,), gather dist_matrix rows → (N*k, M)
-    nb_idx_flat = g.op.Reshape(
-        nb_idx,
-        np.array([-1], dtype=np.int64),
-        name=f"{name}_idx_flat",
-    )
+    nb_idx_flat = g.op.Reshape(nb_idx, np.array([-1], dtype=np.int64), name=f"{name}_idx_flat")
     dist_rows = g.op.Gather(
-        dist_matrix,
-        nb_idx_flat,
-        axis=0,
-        name=f"{name}_dist_rows",
+        dist_matrix, nb_idx_flat, axis=0, name=f"{name}_dist_rows"
     )  # (N*k, M)
 
     # Reshape to (N, k, M) using -1 so N is inferred dynamically
@@ -150,9 +143,7 @@ def sklearn_isomap(
 
     # Expand neighbour distances: (N, k) → (N, k, 1) for broadcasting
     nb_dists_3d = g.op.Unsqueeze(
-        nb_dists,
-        np.array([2], dtype=np.int64),
-        name=f"{name}_nb_dists_3d",
+        nb_dists, np.array([2], dtype=np.int64), name=f"{name}_nb_dists_3d"
     )  # (N, k, 1)
 
     # For each (i, nb, j): dist(X[i], X_train[nb]) + dist_matrix_[nb, j]
@@ -160,10 +151,7 @@ def sklearn_isomap(
 
     # Geodesic distance = minimum over neighbours
     G_X = g.op.ReduceMin(
-        extended,
-        np.array([1], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_G_X",
+        extended, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_G_X"
     )  # (N, M)
 
     # ── Step 4: Kernel values K = -0.5 * G_X ** 2 ──────────────────────────
@@ -175,10 +163,7 @@ def sklearn_isomap(
     # K_pred_cols = K.sum(axis=1, keepdims=True) / n_train
     n_train_arr = np.array([float(n_train)], dtype=dtype)
     K_row_sum = g.op.ReduceSum(
-        K,
-        np.array([1], dtype=np.int64),
-        keepdims=1,
-        name=f"{name}_row_sum",
+        K, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_row_sum"
     )  # (N, 1)
     K_pred_cols = g.op.Div(K_row_sum, n_train_arr, name=f"{name}_pred_cols")  # (N, 1)
 

@@ -96,10 +96,7 @@ def sklearn_classifier_chain(
 
             # Extract probability of class 1: Gather(sub_proba, [1], axis=1) → (N, 1)
             proba_col = g.op.Gather(
-                sub_proba,
-                np.array([1], dtype=np.int64),
-                axis=1,
-                name=f"{sub_name}_proba1",
+                sub_proba, np.array([1], dtype=np.int64), axis=1, name=f"{sub_name}_proba1"
             )
             chain_proba_cols.append(proba_col)
         else:
@@ -114,9 +111,7 @@ def sklearn_classifier_chain(
 
         # Reshape to (N, 1) for column-wise concatenation.
         pred_col = g.op.Reshape(
-            pred_float,
-            np.array([-1, 1], dtype=np.int64),
-            name=f"{sub_name}_pred_col",
+            pred_float, np.array([-1, 1], dtype=np.int64), name=f"{sub_name}_pred_col"
         )
         chain_pred_cols.append(pred_col)
 
@@ -135,11 +130,7 @@ def sklearn_classifier_chain(
         labels = g.op.Identity(chain_preds, name=f"{name}_label", outputs=outputs[:1])
     else:
         labels = g.op.Gather(
-            chain_preds,
-            inv_order,
-            axis=1,
-            name=f"{name}_label",
-            outputs=outputs[:1],
+            chain_preds, inv_order, axis=1, name=f"{name}_label", outputs=outputs[:1]
         )
 
     if not sts:
@@ -170,11 +161,7 @@ def sklearn_classifier_chain(
         probabilities = g.op.Identity(chain_probas, name=f"{name}_proba", outputs=outputs[1:])
     else:
         probabilities = g.op.Gather(
-            chain_probas,
-            inv_order,
-            axis=1,
-            name=f"{name}_proba",
-            outputs=outputs[1:],
+            chain_probas, inv_order, axis=1, name=f"{name}_proba", outputs=outputs[1:]
         )
 
     if not sts:

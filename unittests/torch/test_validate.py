@@ -1,9 +1,5 @@
 import unittest
-from yobx.ext_test_case import (
-    ExtTestCase,
-    requires_torch,
-    requires_transformers,
-)
+from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
 
 
 @requires_torch("2.0")

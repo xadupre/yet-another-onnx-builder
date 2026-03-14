@@ -16,8 +16,7 @@ from yobx.sklearn import to_onnx
 class TestSklearnRandomForest(ExtTestCase):
     def test_random_forest_classifier_binary(self):
         X = np.array(
-            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float32,
+            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float32
         )
         y = np.array([0, 0, 0, 0, 1, 1, 1, 1])
         rf = RandomForestClassifier(n_estimators=5, random_state=0)
@@ -100,8 +99,7 @@ class TestSklearnRandomForest(ExtTestCase):
 
     def test_pipeline_random_forest_classifier(self):
         X = np.array(
-            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float32,
+            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float32
         )
         y = np.array([0, 0, 0, 0, 1, 1, 1, 1])
         pipe = Pipeline(
@@ -139,8 +137,7 @@ class TestSklearnRandomForest(ExtTestCase):
     def test_random_forest_classifier_binary_v5(self):
         """TreeEnsemble (ai.onnx.ml opset 5) - binary classification."""
         X = np.array(
-            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float32,
+            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float32
         )
         y = np.array([0, 0, 0, 0, 1, 1, 1, 1])
         rf = RandomForestClassifier(n_estimators=5, random_state=0)
@@ -232,8 +229,7 @@ class TestSklearnRandomForest(ExtTestCase):
     def test_random_forest_legacy_opset_unchanged(self):
         """Passing an integer target_opset still emits legacy operators."""
         X = np.array(
-            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float32,
+            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float32
         )
         y_cls = np.array([0, 0, 0, 0, 1, 1, 1, 1])
         y_reg = np.array([1.5, 1.5, 1.5, 1.5, 4.5, 4.5, 4.5, 4.5], dtype=np.float32)
@@ -261,8 +257,7 @@ class TestSklearnRandomForest(ExtTestCase):
     def test_pipeline_random_forest_classifier_v5(self):
         """Pipeline with TreeEnsemble (ai.onnx.ml opset 5)."""
         X = np.array(
-            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float32,
+            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float32
         )
         y = np.array([0, 0, 0, 0, 1, 1, 1, 1])
         pipe = Pipeline(

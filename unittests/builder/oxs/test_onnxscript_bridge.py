@@ -296,8 +296,7 @@ class TestOnnxScriptBridge(ExtTestCase):
         for vi in list(proto.graph.input) + list(proto.graph.output):
             if vi.type.HasField("tensor_type"):
                 self.assertTrue(
-                    vi.type.tensor_type.HasField("shape"),
-                    f"shape field missing for {vi.name}",
+                    vi.type.tensor_type.HasField("shape"), f"shape field missing for {vi.name}"
                 )
 
     def test_to_onnx_custom_ir_version_at_construction(self):

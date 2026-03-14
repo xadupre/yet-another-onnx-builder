@@ -54,10 +54,7 @@ _TF_DTYPE_TO_ONNX = {
 
 @register_tf_op_converter("Reshape")
 def convert_reshape(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``Reshape`` → ONNX ``Reshape``.
@@ -101,10 +98,7 @@ def convert_reshape(
 
 @register_tf_op_converter("Squeeze")
 def convert_squeeze(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``Squeeze`` → ONNX ``Squeeze``.
@@ -122,10 +116,7 @@ def convert_squeeze(
 
 @register_tf_op_converter("Cast")
 def convert_cast(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``Cast`` → ONNX ``Cast``.
@@ -144,10 +135,7 @@ def convert_cast(
 
 @register_tf_op_converter("Shape")
 def convert_shape(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``Shape`` → ONNX ``Shape``.
@@ -163,10 +151,7 @@ def convert_shape(
 
 @register_tf_op_converter("StridedSlice")
 def convert_strided_slice(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``StridedSlice`` → ONNX ``Gather`` or ``Slice`` (+ optional
@@ -233,10 +218,7 @@ def convert_strided_slice(
 
 @register_tf_op_converter("Pack")
 def convert_pack(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``Pack`` (``tf.stack``) → ONNX ``Unsqueeze`` + ``Concat``.
@@ -265,10 +247,7 @@ def convert_pack(
 
 @register_tf_op_converter("ExpandDims")
 def convert_expand_dims(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``ExpandDims`` (``tf.expand_dims``) → ONNX ``Unsqueeze``.
@@ -284,10 +263,7 @@ def convert_expand_dims(
 
 @register_tf_op_converter("Transpose")
 def convert_transpose(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``Transpose`` → ONNX ``Transpose``.

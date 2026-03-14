@@ -19,11 +19,7 @@ def _build_label(
     if np.issubdtype(classes.dtype, np.integer):
         classes_arr = classes.astype(np.int64)
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label",
-            outputs=outputs[:1],
+            classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:
@@ -31,11 +27,7 @@ def _build_label(
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label_string",
-            outputs=outputs[:1],
+            classes_arr, label_idx, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:

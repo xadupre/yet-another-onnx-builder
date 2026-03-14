@@ -150,10 +150,7 @@ observer_llm = InputObserver()
 
 # The `register_flattening_functions` context manager must wrap *both* the
 # inference calls and the subsequent shape / argument inference.
-with (
-    register_flattening_functions(patch_transformers=True),
-    observer_llm(model_llm),
-):
+with register_flattening_functions(patch_transformers=True), observer_llm(model_llm):
     for kwargs in llm_inputs:
         model_llm(**kwargs)
 
@@ -192,13 +189,7 @@ print("Inferred kwargs:", string_type(kwargs_llm, with_shape=True))
 class MultimodalModel(torch.nn.Module):
     """Minimal stand-in for a vision-language model forward pass."""
 
-    def forward(
-        self,
-        input_ids,
-        pixel_values=None,
-        attention_mask=None,
-        past_key_values=None,
-    ):
+    def forward(self, input_ids, pixel_values=None, attention_mask=None, past_key_values=None):
         return input_ids, past_key_values
 
 
@@ -247,10 +238,7 @@ observer_mm = InputObserver(
     value_if_missing=dict(pixel_values=torch.empty((0, 3, image_h, image_w), dtype=torch.float32))
 )
 
-with (
-    register_flattening_functions(patch_transformers=True),
-    observer_mm(model_mm),
-):
+with register_flattening_functions(patch_transformers=True), observer_mm(model_mm):
     for kwargs in mm_inputs:
         model_mm(**kwargs)
 

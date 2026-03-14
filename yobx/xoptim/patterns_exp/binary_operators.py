@@ -196,10 +196,7 @@ class AddAddMulMulPattern(PatternOptimization, _common):
         else:
             new_node = g.make_node(
                 node.op_type * 2,
-                [
-                    *node_left.input,
-                    node.input[1],
-                ],
+                [*node_left.input, node.input[1]],
                 node.output,
                 domain="onnx_extended.ortops.optim.cuda",
                 name=f"{self.__class__.__name__}--{node.name}",
@@ -506,10 +503,7 @@ class MulSigmoidPattern(PatternOptimization):
         return MatchResult(self, [node, next_node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node_sigmoid: NodeProto,
-        node_mul: NodeProto,
+        self, g: "GraphBuilder", node_sigmoid: NodeProto, node_mul: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         new_node = g.make_node(
             "MulSigmoid",
@@ -641,11 +635,7 @@ class NegXplus1Pattern(PatternOptimization):
 
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         new_node = g.make_node(
             "NegXplus1",
             node.input[1:],
@@ -984,11 +974,7 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
 
         return self.none(node, inspect.currentframe().f_lineno)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        *nodes: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", *nodes: NodeProto) -> List[NodeProto]:  # noqa: F821
         assert len(nodes) == 2, f"not implemented for {len(nodes)} nodes"
         names = collections.Counter([*nodes[0].input, *nodes[1].input])
         assert len(names) == 3, f"Expects three distinct inputs not {names}"
@@ -1172,10 +1158,7 @@ class AddMulTransposePattern(PatternOptimization):
         return MatchResult(self, [node, next_node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-        transpose_node: NodeProto,
+        self, g: "GraphBuilder", node: NodeProto, transpose_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         att = g.get_attribute(node, "transposeMiddle", exc=False)
         if att is None or att.i == 0:

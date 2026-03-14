@@ -11,10 +11,7 @@ from ..helpers.mini_onnx_builder import proto_from_array
 from ..helpers.onnx_helper import dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
 from .build_stats import BuildStats
 
-STORAGE_TYPE = {
-    onnx.TensorProto.FLOAT16: np.int16,
-    onnx.TensorProto.BFLOAT16: np.int16,
-}
+STORAGE_TYPE = {onnx.TensorProto.FLOAT16: np.int16, onnx.TensorProto.BFLOAT16: np.int16}
 
 
 def _set_external_data(
@@ -93,11 +90,7 @@ class ExtendedModelContainer(ModelContainer):
             self._load_large_initializers(file_path)
         return self
 
-    def _save_external(
-        self,
-        file_path: str,
-        all_tensors_to_one_file: bool,
-    ) -> onnx.ModelProto:
+    def _save_external(self, file_path: str, all_tensors_to_one_file: bool) -> onnx.ModelProto:
         """Save the large model into a main onnx file and one file
         per tensor. Follows the same format as :func:`write_external_data_tensors
         <onnx.external_data_helper.write_external_data_tensors>`.
@@ -198,10 +191,7 @@ class ExtendedModelContainer(ModelContainer):
             begin = time.perf_counter()
             if all_tensors_to_one_file:
                 _set_external_data(
-                    tensor,
-                    location=file_weight,
-                    offset=offset,
-                    length=len(tensor_bytes),
+                    tensor, location=file_weight, offset=offset, length=len(tensor_bytes)
                 )
                 offset += len(tensor_bytes)
                 with open(full_file_weight, "ab") as f:

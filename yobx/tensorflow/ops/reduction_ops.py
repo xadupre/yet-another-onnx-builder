@@ -37,11 +37,7 @@ def _axes_i64(g: GraphBuilderExtendedProtocol, op: tf.Operation) -> str:
     ``Reshape(..., [-1])`` is applied after casting to int64.
     """
     axes_i64 = g.op.Cast(op.inputs[1].name, to=TensorProto.INT64, name=f"{op.name}_axes_cast")
-    return g.op.Reshape(
-        axes_i64,
-        np.array([-1], dtype=np.int64),
-        name=f"{op.name}_axes_reshape",
-    )
+    return g.op.Reshape(axes_i64, np.array([-1], dtype=np.int64), name=f"{op.name}_axes_reshape")
 
 
 # ---------------------------------------------------------------------------

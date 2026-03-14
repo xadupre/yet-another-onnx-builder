@@ -20,8 +20,7 @@ class TestSklearnKernelRidge(ExtTestCase):
     # ── shared fixtures ────────────────────────────────────────────────────────
 
     _X = np.array(
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [2.0, 3.0], [4.0, 5.0]],
-        dtype=np.float64,
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [2.0, 3.0], [4.0, 5.0]], dtype=np.float64
     )
     # positive values required by chi2 kernel
     _X_pos = np.abs(_X) + 0.1
@@ -84,9 +83,7 @@ class TestSklearnKernelRidge(ExtTestCase):
     def test_sigmoid_kernel(self):
         """Sigmoid kernel: K(x, y) = tanh(gamma * x·y + coef0)."""
         self._check(
-            KernelRidge(kernel="sigmoid", gamma=0.01, coef0=0.0, alpha=0.1),
-            self._X,
-            self._y,
+            KernelRidge(kernel="sigmoid", gamma=0.01, coef0=0.0, alpha=0.1), self._X, self._y
         )
 
     def test_cosine_kernel(self):
@@ -95,27 +92,15 @@ class TestSklearnKernelRidge(ExtTestCase):
 
     def test_laplacian_kernel(self):
         """Laplacian kernel: K(x, y) = exp(-gamma * ||x-y||_1)."""
-        self._check(
-            KernelRidge(kernel="laplacian", gamma=0.1, alpha=0.5),
-            self._X,
-            self._y,
-        )
+        self._check(KernelRidge(kernel="laplacian", gamma=0.1, alpha=0.5), self._X, self._y)
 
     def test_chi2_kernel(self):
         """Chi² kernel (requires non-negative features)."""
-        self._check(
-            KernelRidge(kernel="chi2", gamma=0.5, alpha=0.5),
-            self._X_pos,
-            self._y,
-        )
+        self._check(KernelRidge(kernel="chi2", gamma=0.5, alpha=0.5), self._X_pos, self._y)
 
     def test_multi_target(self):
         """Multi-target regression: dual_coef_ is (M, n_targets)."""
-        self._check(
-            KernelRidge(kernel="rbf", gamma=0.1, alpha=0.5),
-            self._X,
-            self._y_multi,
-        )
+        self._check(KernelRidge(kernel="rbf", gamma=0.1, alpha=0.5), self._X, self._y_multi)
 
     def test_rbf_float32_fit(self):
         """Ensure float32 conversion is numerically stable."""

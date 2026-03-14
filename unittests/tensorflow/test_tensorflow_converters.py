@@ -191,10 +191,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         handles were paired with the wrong tf.Variable values.
         """
         model = tf.keras.Sequential(
-            [
-                tf.keras.layers.Dense(4, input_shape=(3,)),
-                tf.keras.layers.Dense(2),
-            ]
+            [tf.keras.layers.Dense(4, input_shape=(3,)), tf.keras.layers.Dense(2)]
         )
         X = np.random.rand(5, 3).astype(np.float32)
         expected = model(X).numpy()

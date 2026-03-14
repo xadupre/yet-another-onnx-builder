@@ -7,11 +7,7 @@ from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 
 def _yeo_johnson_transform(
-    g: GraphBuilderExtendedProtocol,
-    X: str,
-    lambdas: np.ndarray,
-    name: str,
-    dtype,
+    g: GraphBuilderExtendedProtocol, X: str, lambdas: np.ndarray, name: str, dtype
 ) -> str:
     """
     Applies the Yeo-Johnson transformation column-wise using ONNX ops.
@@ -42,9 +38,7 @@ def _yeo_johnson_transform(
     x_p1 = g.op.Add(X, ones, name=f"{name}_xp1")
     pos_pow = g.op.Pow(x_p1, lam_safe_pos, name=f"{name}_pos_pow")
     pos_power_result = g.op.Div(
-        g.op.Sub(pos_pow, ones, name=f"{name}_pos_sub"),
-        lam_safe_pos,
-        name=f"{name}_pos_div",
+        g.op.Sub(pos_pow, ones, name=f"{name}_pos_sub"), lam_safe_pos, name=f"{name}_pos_div"
     )
     pos_log = g.op.Log(x_p1, name=f"{name}_pos_log")
     pos_transform = g.op.Where(lam_is_zero, pos_log, pos_power_result, name=f"{name}_pos_where")
@@ -55,9 +49,7 @@ def _yeo_johnson_transform(
     neg_pow = g.op.Pow(neg_x_p1, lam_safe_neg, name=f"{name}_neg_pow")
     neg_power_result = g.op.Neg(
         g.op.Div(
-            g.op.Sub(neg_pow, ones, name=f"{name}_neg_sub"),
-            lam_safe_neg,
-            name=f"{name}_neg_div",
+            g.op.Sub(neg_pow, ones, name=f"{name}_neg_sub"), lam_safe_neg, name=f"{name}_neg_div"
         ),
         name=f"{name}_neg_neg",
     )
@@ -70,11 +62,7 @@ def _yeo_johnson_transform(
 
 
 def _box_cox_transform(
-    g: GraphBuilderExtendedProtocol,
-    X: str,
-    lambdas: np.ndarray,
-    name: str,
-    dtype,
+    g: GraphBuilderExtendedProtocol, X: str, lambdas: np.ndarray, name: str, dtype
 ) -> str:
     """
     Applies the Box-Cox transformation column-wise using ONNX ops.
@@ -94,9 +82,7 @@ def _box_cox_transform(
 
     pow_result = g.op.Pow(X, lam_safe, name=f"{name}_pow")
     power_result = g.op.Div(
-        g.op.Sub(pow_result, ones, name=f"{name}_sub"),
-        lam_safe,
-        name=f"{name}_div",
+        g.op.Sub(pow_result, ones, name=f"{name}_sub"), lam_safe, name=f"{name}_div"
     )
     log_result = g.op.Log(X, name=f"{name}_log")
     return g.op.Where(lam_is_zero, log_result, power_result, name=f"{name}_where")

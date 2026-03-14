@@ -126,10 +126,7 @@ class TransposeTransposePattern(PatternOptimization):
         return MatchResult(self, [node, next_node], self.apply)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-        next_node: NodeProto,
+        self, g: "GraphBuilder", node: NodeProto, next_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         perms = [tuple(g.get_attribute(n, "perm").ints) for n in [node, next_node]]
         first = list(range(len(perms[0])))
@@ -564,9 +561,7 @@ class TransposeEqualReshapePattern(PatternOptimization):
         return new_shape
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        transpose_node: NodeProto,
+        self, g: "GraphBuilder", transpose_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         new_shape = self._make_new_shape(
             g.get_shape(transpose_node.input[0]),
@@ -688,10 +683,7 @@ class TransposeGatherPattern(PatternOptimization):
         return MatchResult(self, [tr_node, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        transpose_node: NodeProto,
-        gather_node: NodeProto,
+        self, g: "GraphBuilder", transpose_node: NodeProto, gather_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         perm = transpose_node.attribute[0].ints
         axis = gather_node.attribute[0].i if gather_node.attribute else 0

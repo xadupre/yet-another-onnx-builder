@@ -18,8 +18,7 @@ from yobx.sklearn import to_onnx
 @requires_sklearn("1.4")
 class TestSklearnVotingClassifier(ExtTestCase):
     _X = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [9, 10]],
-        dtype=np.float32,
+        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [9, 10]], dtype=np.float32
     )
     _y_bin = np.array([0, 0, 1, 1, 0, 1, 0, 1])
     _y_multi = np.array([0, 0, 1, 1, 2, 2, 0, 1])
@@ -131,8 +130,7 @@ class TestSklearnVotingClassifier(ExtTestCase):
 @requires_sklearn("1.4")
 class TestSklearnVotingRegressor(ExtTestCase):
     _X = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [9, 10]],
-        dtype=np.float32,
+        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [9, 10]], dtype=np.float32
     )
     _y = np.array([1.5, 2.5, 3.5, 4.5, 2.0, 3.0, 1.0, 5.0], dtype=np.float32)
 

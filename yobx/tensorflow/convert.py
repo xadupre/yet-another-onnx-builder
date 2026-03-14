@@ -119,12 +119,7 @@ def _shape_to_tuple(g: GraphBuilder, shape: tf.TensorShape) -> Tuple[Union[int, 
 
 
 def _convert_concrete_function(
-    cf,
-    g: GraphBuilder,
-    args,
-    input_specs,
-    verbose: int,
-    extra_converters: Dict[str, Callable],
+    cf, g: GraphBuilder, args, input_specs, verbose: int, extra_converters: Dict[str, Callable]
 ) -> None:
     """
     Walks the concrete-function graph and emits equivalent ONNX operations.

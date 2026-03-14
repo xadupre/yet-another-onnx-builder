@@ -110,10 +110,7 @@ class _InferenceSession:
                 if isinstance(sess, onnx.ModelProto):
                     debug_path = "_debug_InferenceSession_last_failure.onnx"
                     onnx.save(
-                        sess,
-                        debug_path,
-                        save_as_external_data=True,
-                        all_tensors_to_one_file=True,
+                        sess, debug_path, save_as_external_data=True, all_tensors_to_one_file=True
                     )
                 else:
                     debug_path = sess

@@ -75,8 +75,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         self.assertEqual(2, len(rt.constants))
 
         feeds = dict(
-            X=torch.rand((4, 5), dtype=torch.float32),
-            Y=torch.rand((4, 5), dtype=torch.float32),
+            X=torch.rand((4, 5), dtype=torch.float32), Y=torch.rand((4, 5), dtype=torch.float32)
         )
 
         expected = ExtendedReferenceEvaluator(model).run(
@@ -443,11 +442,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
             ir_version=9,
             opset_imports=[oh.make_opsetid("", 18)],
         )
-        self._finalize_test(
-            model,
-            torch.rand(3, 4, 5, dtype=torch.float32),
-            atol=1e-6,
-        )
+        self._finalize_test(model, torch.rand(3, 4, 5, dtype=torch.float32), atol=1e-6)
 
     def test_op_reduce_min_17(self):
         model = oh.make_model(
@@ -460,11 +455,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
             ir_version=9,
             opset_imports=[oh.make_opsetid("", 17)],
         )
-        self._finalize_test(
-            model,
-            torch.rand(3, 4, 5, dtype=torch.float32),
-            atol=1e-6,
-        )
+        self._finalize_test(model, torch.rand(3, 4, 5, dtype=torch.float32), atol=1e-6)
 
     def test_op_reduce_min_17_no_axes(self):
         model = oh.make_model(
@@ -477,11 +468,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
             ir_version=9,
             opset_imports=[oh.make_opsetid("", 17)],
         )
-        self._finalize_test(
-            model,
-            torch.rand(3, 4, 5, dtype=torch.float32),
-            atol=1e-6,
-        )
+        self._finalize_test(model, torch.rand(3, 4, 5, dtype=torch.float32), atol=1e-6)
 
     def test_op_reduce_sum(self):
         model = oh.make_model(
@@ -896,9 +883,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         )
         onnx.checker.check_model(model)
         self._finalize_test(
-            model,
-            torch.rand((6, 6), dtype=torch.float32),
-            torch.tensor([2], dtype=torch.int64),
+            model, torch.rand((6, 6), dtype=torch.float32), torch.tensor([2], dtype=torch.int64)
         )
 
     def test_local_function(self):
@@ -909,10 +894,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
             "LinearRegression",
             ["x", "a", "b"],
             ["y"],
-            [
-                oh.make_node("MatMul", ["x", "a"], ["xa"]),
-                oh.make_node("Add", ["xa", "b"], ["y"]),
-            ],
+            [oh.make_node("MatMul", ["x", "a"], ["xa"]), oh.make_node("Add", ["xa", "b"], ["y"])],
             [oh.make_opsetid("", 18)],
             [],
         )
@@ -1285,14 +1267,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
     def test_averagepool_1d(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node(
-                        "AveragePool",
-                        inputs=["x"],
-                        outputs=["y"],
-                        kernel_shape=[2],
-                    )
-                ],
+                [oh.make_node("AveragePool", inputs=["x"], outputs=["y"], kernel_shape=[2])],
                 "ut",
                 [oh.make_tensor_value_info("x", TFLOAT, [None, None, None])],
                 [oh.make_tensor_value_info("y", TFLOAT, [None, None, None])],
@@ -1442,9 +1417,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
 
         torch_sess = TorchReferenceEvaluator(model, verbose=0)
         torch_sess_custom = TorchReferenceEvaluator(
-            model,
-            verbose=0,
-            custom_kernels={("", "LayerNormalization"): LayerNormalizationOrt},
+            model, verbose=0, custom_kernels={("", "LayerNormalization"): LayerNormalizationOrt}
         )
         feeds = dict(
             zip(

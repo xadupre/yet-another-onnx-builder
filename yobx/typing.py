@@ -1,14 +1,4 @@
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Protocol,
-    Tuple,
-    Union,
-    runtime_checkable,
-)
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union, runtime_checkable
 
 
 @runtime_checkable
@@ -116,10 +106,7 @@ class GraphBuilderProtocol(Protocol):
         ...
 
     def set_shape(
-        self,
-        name: str,
-        shape: Tuple[Union[int, str], ...],
-        allow_zero: bool = False,
+        self, name: str, shape: Tuple[Union[int, str], ...], allow_zero: bool = False
     ) -> None:
         """Sets the shape for *name*.
 
@@ -167,11 +154,7 @@ class GraphBuilderProtocol(Protocol):
         """
         ...
 
-    def make_initializer(
-        self,
-        name: str,
-        value: Any,
-    ) -> str:
+    def make_initializer(self, name: str, value: Any) -> str:
         """Adds a constant initializer and returns its name.
 
         :param name: initializer name; may be empty to auto-generate a unique name
@@ -288,10 +271,7 @@ class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
         ...
 
     def set_type_shape_unary_op(
-        self,
-        name: str,
-        input_name: str,
-        itype: Optional[int] = None,
+        self, name: str, input_name: str, itype: Optional[int] = None
     ) -> bool:
         """Propagates type and shape from *input_name* to *name* for a unary op.
 

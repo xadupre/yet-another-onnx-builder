@@ -129,12 +129,7 @@ def sklearn_one_vs_rest_classifier(
         scores = g.op.Concat(*pos_probs, axis=1, name=f"{name}_scores")  # [n, n_classes]
 
     # Normalise rows so they sum to 1.
-    sum_ = g.op.ReduceSum(
-        scores,
-        np.array([1], dtype=np.int64),
-        keepdims=1,
-        name=f"{name}_sum",
-    )
+    sum_ = g.op.ReduceSum(scores, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_sum")
     proba_norm = g.op.Div(scores, sum_, name=f"{name}_normalize")
 
     # Argmax → label index → class label.
@@ -144,11 +139,7 @@ def sklearn_one_vs_rest_classifier(
     if np.issubdtype(classes.dtype, np.integer):
         classes_arr = classes.astype(np.int64)
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label",
-            outputs=outputs[:1],
+            classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:
@@ -156,11 +147,7 @@ def sklearn_one_vs_rest_classifier(
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label_string",
-            outputs=outputs[:1],
+            classes_arr, label_idx, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:

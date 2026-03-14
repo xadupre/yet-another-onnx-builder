@@ -69,12 +69,7 @@ class TestApplySliceToShape(ExtTestCase):
     def test_mixed_raises_runtime_error(self):
         # mixing int and slice indices is unsupported
         self.assertRaises(
-            RuntimeError,
-            self.b._apply_slice_to_shape,
-            (10, 4, 5),
-            [0, slice(1, 3)],
-            [0],
-            [],
+            RuntimeError, self.b._apply_slice_to_shape, (10, 4, 5), [0, slice(1, 3)], [0], []
         )
 
     def test_remaining_dims_appended(self):
@@ -558,12 +553,7 @@ class TestApplyBinaryOp(ExtTestCase):
         node = self._make_node("Xor")
         a = np.array([1.0], dtype=np.float32)
         b = np.array([1.0], dtype=np.float32)
-        self.assertRaises(
-            AssertionError,
-            self.b._apply_binary_op,
-            node,
-            {"a": a, "b": b},
-        )
+        self.assertRaises(AssertionError, self.b._apply_binary_op, node, {"a": a, "b": b})
 
 
 class TestApplySlice(ExtTestCase):
@@ -602,14 +592,7 @@ class TestApplySlice(ExtTestCase):
         axes = np.array([0], dtype=np.int64)
         steps = np.array([2], dtype=np.int64)
         result = self.b._apply_slice(
-            node,
-            {
-                "data": data,
-                "starts": starts,
-                "ends": ends,
-                "axes": axes,
-                "steps": steps,
-            },
+            node, {"data": data, "starts": starts, "ends": ends, "axes": axes, "steps": steps}
         )
         self.assertEqual(len(result), 1)
         self.assertEqual(tuple(result[0].shape), (3, 5))

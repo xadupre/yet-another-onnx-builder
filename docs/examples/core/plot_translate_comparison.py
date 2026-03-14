@@ -44,10 +44,7 @@ b = onh.from_array(np.random.randn(5).astype(np.float32), name="b")
 
 model = oh.make_model(
     oh.make_graph(
-        [
-            oh.make_node("Gemm", ["X", "W", "b"], ["T"]),
-            oh.make_node("Relu", ["T"], ["Z"]),
-        ],
+        [oh.make_node("Gemm", ["X", "W", "b"], ["T"]), oh.make_node("Relu", ["T"], ["Z"])],
         "gemm_relu",
         [oh.make_tensor_value_info("X", TFLOAT, [None, 8])],
         [oh.make_tensor_value_info("Z", TFLOAT, [None, 5])],

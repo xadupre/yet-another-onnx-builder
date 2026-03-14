@@ -87,10 +87,7 @@ class TestMiniOnnxBuilder(ExtTestCase):
             (
                 np.array([1, 2], dtype=np.int64),
                 torch.tensor([4, 5], dtype=torch.float32),
-                (
-                    np.array([-1, -2], dtype=np.int64),
-                    torch.tensor([-4, -5], dtype=torch.float32),
-                ),
+                (np.array([-1, -2], dtype=np.int64), torch.tensor([-4, -5], dtype=torch.float32)),
                 tuple(),
             ),
             {
@@ -135,10 +132,7 @@ class TestMiniOnnxBuilder(ExtTestCase):
             (
                 np.array([1, 2], dtype=np.int64),
                 torch.tensor([4, 5], dtype=torch.float32),
-                [
-                    np.array([-1, -2], dtype=np.int64),
-                    torch.tensor([-4, -5], dtype=torch.float32),
-                ],
+                [np.array([-1, -2], dtype=np.int64), torch.tensor([-4, -5], dtype=torch.float32)],
                 [],
             ),
             {
@@ -269,7 +263,7 @@ class TestMiniOnnxBuilder(ExtTestCase):
                     torch.rand((2, 2)).to(torch.int64),
                 ),
                 {},
-            ),
+            )
         }
         model = create_onnx_model_from_input_tensors(data)
         shapes = [

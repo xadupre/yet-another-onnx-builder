@@ -26,8 +26,7 @@ class TestSklearnBernoulliRBM(ExtTestCase):
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertTrue(
-            "MatMul" in op_types or "Gemm" in op_types,
-            f"Expected MatMul or Gemm in {op_types}",
+            "MatMul" in op_types or "Gemm" in op_types, f"Expected MatMul or Gemm in {op_types}"
         )
         self.assertIn("Sigmoid", op_types)
 

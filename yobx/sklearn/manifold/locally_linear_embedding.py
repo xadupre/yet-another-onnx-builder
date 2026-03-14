@@ -13,13 +13,7 @@ from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 _CG_EPS: float = 1e-10
 
 
-def _batched_cg_solve(
-    g: GraphBuilderExtendedProtocol,
-    C: str,
-    k: int,
-    dtype,
-    name: str,
-) -> str:
+def _batched_cg_solve(g: GraphBuilderExtendedProtocol, C: str, k: int, dtype, name: str) -> str:
     """
     Solve ``C @ w = ones`` for a batch of symmetric positive-definite matrices
     ``C`` of shape ``(N, k, k)`` using the Conjugate Gradient method, unrolled
@@ -39,10 +33,7 @@ def _batched_cg_solve(
     # This avoids any Shape/Expand ops while giving the correct dynamic shape.
     b_zeros = g.op.Mul(
         g.op.ReduceSum(
-            C,
-            np.array([2], dtype=np.int64),
-            keepdims=0,
-            name=f"{name}_cg_rowsum",
+            C, np.array([2], dtype=np.int64), keepdims=0, name=f"{name}_cg_rowsum"
         ),  # (N, k)
         np.array([0.0], dtype=dtype),
         name=f"{name}_cg_zeros",
@@ -78,28 +69,16 @@ def _batched_cg_solve(
         )
 
         # alpha = rr / (pCp + eps)  (N,)
-        alpha = g.op.Div(
-            rr,
-            g.op.Add(pCp, eps, name=f"{pfx}_pCp_safe"),
-            name=f"{pfx}_alpha",
-        )
+        alpha = g.op.Div(rr, g.op.Add(pCp, eps, name=f"{pfx}_pCp_safe"), name=f"{pfx}_alpha")
         alpha_2d = g.op.Unsqueeze(
             alpha, np.array([1], dtype=np.int64), name=f"{pfx}_alpha2d"
         )  # (N, 1)
 
         # x = x + alpha * p
-        x = g.op.Add(
-            x,
-            g.op.Mul(alpha_2d, p, name=f"{pfx}_ap"),
-            name=f"{pfx}_x",
-        )
+        x = g.op.Add(x, g.op.Mul(alpha_2d, p, name=f"{pfx}_ap"), name=f"{pfx}_x")
 
         # r_new = r - alpha * Cp
-        r_new = g.op.Sub(
-            r,
-            g.op.Mul(alpha_2d, Cp, name=f"{pfx}_aCp"),
-            name=f"{pfx}_r",
-        )
+        r_new = g.op.Sub(r, g.op.Mul(alpha_2d, Cp, name=f"{pfx}_aCp"), name=f"{pfx}_r")
 
         # rr_new = <r_new, r_new>  per sample  (N,)
         rr_new = g.op.ReduceSum(
@@ -110,21 +89,13 @@ def _batched_cg_solve(
         )
 
         # beta = rr_new / (rr + eps)  (N,)
-        beta = g.op.Div(
-            rr_new,
-            g.op.Add(rr, eps, name=f"{pfx}_rr_safe"),
-            name=f"{pfx}_beta",
-        )
+        beta = g.op.Div(rr_new, g.op.Add(rr, eps, name=f"{pfx}_rr_safe"), name=f"{pfx}_beta")
         beta_2d = g.op.Unsqueeze(
             beta, np.array([1], dtype=np.int64), name=f"{pfx}_beta2d"
         )  # (N, 1)
 
         # p = r_new + beta * p
-        p = g.op.Add(
-            r_new,
-            g.op.Mul(beta_2d, p, name=f"{pfx}_bp"),
-            name=f"{pfx}_p",
-        )
+        p = g.op.Add(r_new, g.op.Mul(beta_2d, p, name=f"{pfx}_bp"), name=f"{pfx}_p")
         r = r_new
 
     return x
@@ -233,30 +204,18 @@ def sklearn_locally_linear_embedding(
 
     # ── Step 2: k nearest neighbours (indices, no distances needed) ─────────
     _nb_dists, nb_idx = g.op.TopK(
-        dists,
-        np.array([k], dtype=np.int64),
-        axis=1,
-        largest=0,
-        sorted=1,
-        name=f"{name}_topk",
+        dists, np.array([k], dtype=np.int64), axis=1, largest=0, sorted=1, name=f"{name}_topk"
     )  # nb_idx: (N, k)
 
     # ── Step 3: Gather neighbour feature vectors ────────────────────────────
     nb_idx_flat = g.op.Reshape(
-        nb_idx,
-        np.array([-1], dtype=np.int64),
-        name=f"{name}_idx_flat",
+        nb_idx, np.array([-1], dtype=np.int64), name=f"{name}_idx_flat"
     )  # (N*k,)
     nb_feats_flat = g.op.Gather(
-        training_data,
-        nb_idx_flat,
-        axis=0,
-        name=f"{name}_nb_flat",
+        training_data, nb_idx_flat, axis=0, name=f"{name}_nb_flat"
     )  # (N*k, F)
     nb_feats = g.op.Reshape(
-        nb_feats_flat,
-        np.array([-1, k, n_features], dtype=np.int64),
-        name=f"{name}_nb",
+        nb_feats_flat, np.array([-1, k, n_features], dtype=np.int64), name=f"{name}_nb"
     )  # (N, k, F)
 
     # ── Step 4: Local displacement vectors v = X[:, None, :] - neighbours ──
@@ -291,9 +250,7 @@ def sklearn_locally_linear_embedding(
     eye_k = np.eye(k, dtype=dtype)  # (k, k)
     R_3d = g.op.Reshape(R, np.array([-1, 1, 1], dtype=np.int64), name=f"{name}_R_3d")  # (N,1,1)
     C_reg = g.op.Add(
-        C,
-        g.op.Mul(R_3d, eye_k, name=f"{name}_R_eye"),
-        name=f"{name}_C_reg",
+        C, g.op.Mul(R_3d, eye_k, name=f"{name}_R_eye"), name=f"{name}_C_reg"
     )  # (N, k, k)
 
     # ── Step 7: Solve C_reg @ w = ones via Conjugate Gradient ───────────────
@@ -308,15 +265,10 @@ def sklearn_locally_linear_embedding(
     # ── Step 9: Apply normalised weights to the training embedding ───────────
     # Gather embedding rows for all flattened neighbour indices (N*k,)
     emb_flat = g.op.Gather(
-        embedding,
-        nb_idx_flat,
-        axis=0,
-        name=f"{name}_emb_flat",
+        embedding, nb_idx_flat, axis=0, name=f"{name}_emb_flat"
     )  # (N*k, n_components)
     emb_nb = g.op.Reshape(
-        emb_flat,
-        np.array([-1, k, n_components], dtype=np.int64),
-        name=f"{name}_emb_nb",
+        emb_flat, np.array([-1, k, n_components], dtype=np.int64), name=f"{name}_emb_nb"
     )  # (N, k, n_components)
 
     # result[n] = w_norm[n] @ emb_nb[n]

@@ -66,12 +66,7 @@ class TestQuantileTransformer(ExtTestCase):
         qt.fit(X_train)
 
         # Include values outside the training range.
-        X_test = np.vstack(
-            [
-                X_train[:3],
-                np.array([[-100.0, 100.0]], dtype=np.float32),
-            ]
-        )
+        X_test = np.vstack([X_train[:3], np.array([[-100.0, 100.0]], dtype=np.float32)])
         onx = to_onnx(qt, (X_test,))
 
         sess = self.check_ort(onx)

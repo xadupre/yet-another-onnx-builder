@@ -7,13 +7,7 @@ import warnings
 
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier, GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import (
-    ConstantKernel,
-    DotProduct,
-    Matern,
-    RBF,
-    WhiteKernel,
-)
+from sklearn.gaussian_process.kernels import ConstantKernel, DotProduct, Matern, RBF, WhiteKernel
 
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
@@ -27,8 +21,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
     # ── shared fixtures ────────────────────────────────────────────────────────
 
     _X = np.array(
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [2.0, 3.0], [4.0, 5.0]],
-        dtype=np.float64,
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [2.0, 3.0], [4.0, 5.0]], dtype=np.float64
     )
     _y_reg = np.array([1.0, 2.0, 3.0, 4.0, 1.5, 2.5])
     _y_bin = np.array([0, 0, 1, 1, 0, 1])

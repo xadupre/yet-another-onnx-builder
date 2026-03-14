@@ -78,10 +78,7 @@ print("\nAll labels and distances match ✓")
 # KMeans also works as the final step of a :class:`~sklearn.pipeline.Pipeline`.
 
 pipe = Pipeline(
-    [
-        ("scaler", StandardScaler()),
-        ("km", KMeans(n_clusters=3, random_state=0, n_init=10)),
-    ]
+    [("scaler", StandardScaler()), ("km", KMeans(n_clusters=3, random_state=0, n_init=10))]
 )
 pipe.fit(X)
 

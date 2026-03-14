@@ -57,10 +57,7 @@ class BaseVar:
     # ------------------------------------------------------------------
 
     def vin(
-        self,
-        name: str,
-        elem_type: int = TensorProto.FLOAT,
-        shape: Optional[Any] = None,
+        self, name: str, elem_type: int = TensorProto.FLOAT, shape: Optional[Any] = None
     ) -> "Var":
         """
         Declares a new graph input.
@@ -161,11 +158,7 @@ class Var(BaseVar, OpsVar):
     def __repr__(self) -> str:
         return f"Var({self.name!r})"
 
-    def vout(
-        self,
-        elem_type: int = TensorProto.FLOAT,
-        shape: Optional[Any] = None,
-    ) -> "Var":
+    def vout(self, elem_type: int = TensorProto.FLOAT, shape: Optional[Any] = None) -> "Var":
         """
         Declares this variable as a graph output.
 
@@ -330,11 +323,7 @@ class Vars(BaseVar, OpsVars):
             var.rename(new_name)
         return self
 
-    def vout(
-        self,
-        elem_type: int = TensorProto.FLOAT,
-        shape: Optional[Any] = None,
-    ) -> "Vars":
+    def vout(self, elem_type: int = TensorProto.FLOAT, shape: Optional[Any] = None) -> "Vars":
         """
         Declares all variables as graph outputs.
 

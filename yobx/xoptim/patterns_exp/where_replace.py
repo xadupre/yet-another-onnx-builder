@@ -137,10 +137,7 @@ class ReplaceZeroPattern(PatternOptimization):
         return MatchResult(self, [cast_node, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        cast_node: NodeProto,
-        where_node: NodeProto,
+        self, g: "GraphBuilder", cast_node: NodeProto, where_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         cst = g.get_constant_scalar(where_node.input[1])
         new_node = g.make_node(

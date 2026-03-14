@@ -15,10 +15,7 @@ from ..tree.decision_tree import _LEAF, _NODE_MODE_LEQ
 
 
 def _extract_forest_attributes_legacy(
-    estimators: list,
-    n_classes: int,
-    is_classifier: bool,
-    n_estimators: int,
+    estimators: list, n_classes: int, is_classifier: bool, n_estimators: int
 ):
     """
     Extracts combined attributes for all trees in a forest for use with
@@ -161,11 +158,7 @@ def _append_leaf_entry_v5(
 
 
 def _extract_forest_attributes_v5(
-    estimators: list,
-    n_classes: int,
-    is_classifier: bool,
-    n_estimators: int,
-    itype: int,
+    estimators: list, n_classes: int, is_classifier: bool, n_estimators: int, itype: int
 ):
     """
     Extracts combined attributes for all trees in a forest for use with the
@@ -323,10 +316,7 @@ def _extract_forest_attributes_v5(
     # Pack tensor attributes required by the opset-5 operator.
     # nodes_splits and leaf_weights use the same float type as the input.
     nodes_splits_tensor = oh.make_tensor(
-        "nodes_splits",
-        itype,
-        (len(all_nodes_splits),),
-        np.array(all_nodes_splits, dtype=dtype),
+        "nodes_splits", itype, (len(all_nodes_splits),), np.array(all_nodes_splits, dtype=dtype)
     )
     nodes_modes_tensor = oh.make_tensor(
         "nodes_modes",
@@ -335,10 +325,7 @@ def _extract_forest_attributes_v5(
         np.array(all_nodes_modes, dtype=np.uint8),
     )
     leaf_weights_tensor = oh.make_tensor(
-        "leaf_weights",
-        itype,
-        (len(all_leaf_weights),),
-        np.array(all_leaf_weights, dtype=dtype),
+        "leaf_weights", itype, (len(all_leaf_weights),), np.array(all_leaf_weights, dtype=dtype)
     )
 
     return dict(
@@ -487,11 +474,7 @@ def _sklearn_random_forest_classifier_v5(
     if np.issubdtype(classes.dtype, np.integer):  # type: ignore
         classes_arr = classes.astype(np.int64)
         label = g.op.Gather(
-            classes_arr,
-            label_idx_cast,
-            axis=0,
-            name=f"{name}_label",
-            outputs=outputs[:1],
+            classes_arr, label_idx_cast, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:
@@ -499,11 +482,7 @@ def _sklearn_random_forest_classifier_v5(
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
-            classes_arr,
-            label_idx_cast,
-            axis=0,
-            name=f"{name}_label_string",
-            outputs=outputs[:1],
+            classes_arr, label_idx_cast, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:
@@ -548,15 +527,7 @@ def sklearn_random_forest_regressor(
 
     if ml_opset >= 5:
         return _sklearn_random_forest_regressor_v5(
-            g,
-            sts,
-            outputs,
-            estimator,
-            X,
-            name,
-            n_estimators,
-            estimators,
-            itype=g.get_type(X),
+            g, sts, outputs, estimator, X, name, n_estimators, estimators, itype=g.get_type(X)
         )
 
     # Detect float64 input so we can cast the output back to double after the
@@ -586,11 +557,7 @@ def sklearn_random_forest_regressor(
 
     # Cast float32 output back to float64 to match the input dtype.
     cast_result = g.make_node(
-        "Cast",
-        [tree_result],
-        outputs=outputs,
-        name=f"{name}_cast_f64",
-        to=itype,
+        "Cast", [tree_result], outputs=outputs, name=f"{name}_cast_f64", to=itype
     )
     return cast_result if isinstance(cast_result, str) else cast_result[0]
 
@@ -754,15 +721,7 @@ def sklearn_extra_trees_regressor(
 
     if ml_opset >= 5:
         return _sklearn_random_forest_regressor_v5(
-            g,
-            sts,
-            outputs,
-            estimator,
-            X,
-            name,
-            n_estimators,
-            estimators,
-            itype=g.get_type(X),
+            g, sts, outputs, estimator, X, name, n_estimators, estimators, itype=g.get_type(X)
         )
 
     # Detect float64 input so we can cast the output back to double after the
@@ -792,10 +751,6 @@ def sklearn_extra_trees_regressor(
 
     # Cast float32 output back to float64 to match the input dtype.
     cast_result = g.make_node(
-        "Cast",
-        [tree_result],
-        outputs=outputs,
-        name=f"{name}_cast_f64",
-        to=itype,
+        "Cast", [tree_result], outputs=outputs, name=f"{name}_cast_f64", to=itype
     )
     return cast_result if isinstance(cast_result, str) else cast_result[0]

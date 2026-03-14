@@ -1,9 +1,5 @@
 import unittest
-from yobx.ext_test_case import (
-    ExtTestCase,
-    requires_torch,
-    requires_transformers,
-)
+from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
 from yobx.torch import get_tiny_model, apply_patches_for_model
 from yobx.torch.torch_helper import torch_deepcopy
 

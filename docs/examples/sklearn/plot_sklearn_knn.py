@@ -134,12 +134,7 @@ print("Regressor predictions match sklearn ✓")
 # Both implementations work transparently inside a scikit-learn
 # :class:`~sklearn.pipeline.Pipeline`.
 
-pipe = Pipeline(
-    [
-        ("scaler", StandardScaler()),
-        ("clf", KNeighborsClassifier(n_neighbors=5)),
-    ]
-)
+pipe = Pipeline([("scaler", StandardScaler()), ("clf", KNeighborsClassifier(n_neighbors=5))])
 pipe.fit(X, y)
 
 onx_pipe = to_onnx(pipe, (X,))

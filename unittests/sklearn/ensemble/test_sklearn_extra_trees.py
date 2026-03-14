@@ -16,8 +16,7 @@ from yobx.sklearn import to_onnx
 class TestSklearnExtraTrees(ExtTestCase):
     def test_extra_trees_classifier_binary(self):
         X = np.array(
-            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float32,
+            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float32
         )
         y = np.array([0, 0, 0, 0, 1, 1, 1, 1])
         et = ExtraTreesClassifier(n_estimators=5, random_state=0)
@@ -101,8 +100,7 @@ class TestSklearnExtraTrees(ExtTestCase):
     def test_extra_trees_classifier_binary_v5(self):
         """TreeEnsemble (ai.onnx.ml opset 5) - binary classification."""
         X = np.array(
-            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float32,
+            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float32
         )
         y = np.array([0, 0, 0, 0, 1, 1, 1, 1])
         et = ExtraTreesClassifier(n_estimators=5, random_state=0)
@@ -244,8 +242,7 @@ class TestSklearnExtraTrees(ExtTestCase):
 
     def test_pipeline_extra_trees_classifier(self):
         X = np.array(
-            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float32,
+            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float32
         )
         y = np.array([0, 0, 0, 0, 1, 1, 1, 1])
         pipe = Pipeline(

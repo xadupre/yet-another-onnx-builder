@@ -125,12 +125,7 @@ def _rotate_half(g: GraphBuilderExtendedProtocol, x: T, head_dim: int, name: str
 
 
 def _apply_rope(
-    g: GraphBuilderExtendedProtocol,
-    states_4d: T,
-    cos_4d: T,
-    sin_4d: T,
-    head_dim: int,
-    name: str,
+    g: GraphBuilderExtendedProtocol, states_4d: T, cos_4d: T, sin_4d: T, head_dim: int, name: str
 ) -> T:
     """
     Applies Rotary Position Embedding to a 4-D tensor
@@ -175,16 +170,10 @@ def _repeat_kv(
     # Use Shape-based dynamic reshape because batch and seq are dynamic.
     kv_shape = g.op.Shape(kv, name=name)
     batch_val = g.op.Slice(
-        kv_shape,
-        np.array([0], dtype=np.int64),
-        np.array([1], dtype=np.int64),
-        name=name,
+        kv_shape, np.array([0], dtype=np.int64), np.array([1], dtype=np.int64), name=name
     )
     seq_val = g.op.Slice(
-        kv_shape,
-        np.array([2], dtype=np.int64),
-        np.array([3], dtype=np.int64),
-        name=name,
+        kv_shape, np.array([2], dtype=np.int64), np.array([3], dtype=np.int64), name=name
     )
     new_shape = g.op.Concat(
         batch_val,
@@ -280,14 +269,7 @@ def _attention_opset24(
     Uses the ONNX ``Attention`` operator (opset ≥ 24).
     Returns ``(batch, n_heads, seq, head_dim)``.
     """
-    return g.op.Attention(
-        query_4d,
-        key_4d,
-        value_4d,
-        attention_mask,
-        scale=scaling,
-        name=name,
-    )
+    return g.op.Attention(query_4d, key_4d, value_4d, attention_mask, scale=scaling, name=name)
 
 
 def _mha_com_microsoft(
@@ -314,11 +296,7 @@ def _mha_com_microsoft(
         inputs.append(attention_mask)
 
     out = g.op.MultiHeadAttention(
-        *inputs,
-        domain="com.microsoft",
-        num_heads=num_heads,
-        scale=scaling,
-        name=name,
+        *inputs, domain="com.microsoft", num_heads=num_heads, scale=scaling, name=name
     )
     # MultiHeadAttention returns (output [, present_key, present_value]); keep only output
     if isinstance(out, (list, tuple)):
@@ -492,16 +470,7 @@ def llama_attention_to_onnx(
             v_3d = _repeat_kv_3d(v_3d)
 
         # MHA: output is (batch, seq, num_heads * head_dim)
-        out_3d = _mha_com_microsoft(
-            g,
-            q_3d,
-            k_3d,
-            v_3d,
-            attention_mask,
-            num_heads,
-            scaling,
-            name,
-        )
+        out_3d = _mha_com_microsoft(g, q_3d, k_3d, v_3d, attention_mask, num_heads, scaling, name)
 
         # Apply output projection
         o_wt = g.make_initializer("w_o", o_w.T)

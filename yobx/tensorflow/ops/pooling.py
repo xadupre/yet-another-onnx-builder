@@ -27,10 +27,7 @@ def _decode(value) -> str:
 
 
 def _explicit_pads(
-    padding: str,
-    kernel_shape: List[int],
-    strides: List[int],
-    input_spatial: List[Optional[int]],
+    padding: str, kernel_shape: List[int], strides: List[int], input_spatial: List[Optional[int]]
 ) -> List[int]:
     """
     Returns ONNX-style explicit ``pads`` ``[h_beg, w_beg, h_end, w_end]``.
@@ -56,10 +53,7 @@ def _explicit_pads(
 
 
 def _set_pool_nchw_shape(
-    g: GraphBuilderExtendedProtocol,
-    op: "tf.Operation",
-    x_nchw: str,
-    pool_out: str,
+    g: GraphBuilderExtendedProtocol, op: "tf.Operation", x_nchw: str, pool_out: str
 ) -> None:
     """
     Manually register the NCHW output shape of a pooling node.
@@ -88,10 +82,7 @@ def _set_pool_nchw_shape(
 
 @register_tf_op_converter("MaxPool")
 def convert_max_pool(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``MaxPool`` (NHWC) → ONNX ``MaxPool`` (NCHW).
@@ -137,10 +128,7 @@ def convert_max_pool(
 
 @register_tf_op_converter("AvgPool")
 def convert_avg_pool(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``AvgPool`` (NHWC) → ONNX ``AveragePool`` (NCHW).

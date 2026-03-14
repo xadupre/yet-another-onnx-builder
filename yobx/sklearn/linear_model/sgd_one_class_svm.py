@@ -67,11 +67,7 @@ def sklearn_sgd_one_class_svm(
     decision_2d = g.op.Gemm(X, coef, neg_offset, transB=1, name=f"{name}_gemm")
 
     # Flatten (N, 1) → (N,)
-    decision = g.op.Reshape(
-        decision_2d,
-        np.array([-1], dtype=np.int64),
-        name=f"{name}_flatten",
-    )
+    decision = g.op.Reshape(decision_2d, np.array([-1], dtype=np.int64), name=f"{name}_flatten")
 
     # label = 1 if decision >= 0 else -1
     zero = np.zeros(1, dtype=dtype)

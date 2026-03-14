@@ -108,12 +108,7 @@ def _emit_pairwise_sq_dist(
 
 
 def _emit_kernel_matrix(
-    g: GraphBuilderExtendedProtocol,
-    kernel,
-    X: str,
-    X_ref: np.ndarray,
-    name: str,
-    dtype,
+    g: GraphBuilderExtendedProtocol, kernel, X: str, X_ref: np.ndarray, name: str, dtype
 ) -> str:
     """
     Emit ONNX operations computing the kernel matrix ``K(X, X_ref)``.
@@ -274,13 +269,7 @@ def _kernel_diag_const(kernel) -> Optional[float]:
     return None  # DotProduct or unknown kernel
 
 
-def _emit_kernel_diag(
-    g: GraphBuilderExtendedProtocol,
-    kernel,
-    X: str,
-    name: str,
-    dtype,
-) -> str:
+def _emit_kernel_diag(g: GraphBuilderExtendedProtocol, kernel, X: str, name: str, dtype) -> str:
     """
     Emit ONNX operations computing the kernel diagonal ``k(X[i], X[i])``
     for each row *i* of *X*.  Returns a tensor of shape ``(N,)``.
@@ -332,12 +321,7 @@ def _emit_kernel_diag(
 
 
 def _emit_gpc_binary_pi_star(
-    g: GraphBuilderExtendedProtocol,
-    kernel,
-    be,
-    name: str,
-    X: str,
-    dtype,
+    g: GraphBuilderExtendedProtocol, kernel, be, name: str, X: str, dtype
 ) -> str:
     """
     Emit ONNX operations for the binary GPC sigmoid probability ``π*``.
@@ -429,8 +413,7 @@ def _emit_gpc_binary_pi_star(
 
     # √(π / α)   → (1, N)
     sqrt_pi_over_alpha = g.op.Sqrt(
-        g.op.Div(np.array(np.pi, dtype=dtype), alpha_2d, name=f"{name}_pia"),
-        name=f"{name}_sqpia",
+        g.op.Div(np.array(np.pi, dtype=dtype), alpha_2d, name=f"{name}_pia"), name=f"{name}_sqpia"
     )
 
     # 2 · √(latent_var · 2π)  → (1, N)
@@ -500,11 +483,7 @@ def _emit_label_and_proba_from_scores(
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
-            classes_arr,
-            label_idx_cast,
-            axis=0,
-            name=f"{name}_label_str",
-            outputs=outputs[:1],
+            classes_arr, label_idx_cast, axis=0, name=f"{name}_label_str", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:

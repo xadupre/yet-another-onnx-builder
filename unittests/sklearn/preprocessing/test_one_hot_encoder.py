@@ -128,10 +128,7 @@ class TestOneHotEncoder(ExtTestCase):
         X = np.array([[0.0, 1.0], [1.0, 0.0], [0.0, 0.0], [1.0, 1.0]], dtype=np.float32)
         y = np.array([0, 1, 0, 1])
         pipe = Pipeline(
-            [
-                ("enc", OneHotEncoder(handle_unknown="ignore")),
-                ("clf", LogisticRegression()),
-            ]
+            [("enc", OneHotEncoder(handle_unknown="ignore")), ("clf", LogisticRegression())]
         )
         pipe.fit(X, y)
 

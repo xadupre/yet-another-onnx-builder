@@ -274,10 +274,7 @@ def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, itype
     # be ONNX tensors in the opset-5 encoding).
     # nodes_splits and leaf_weights use the same float type as the input.
     nodes_splits_tensor = oh.make_tensor(
-        "nodes_splits",
-        itype,
-        (len(nodes_splits_),),
-        np.array(nodes_splits_, dtype=dtype),
+        "nodes_splits", itype, (len(nodes_splits_),), np.array(nodes_splits_, dtype=dtype)
     )
     nodes_modes_tensor = oh.make_tensor(
         "nodes_modes",
@@ -286,10 +283,7 @@ def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, itype
         np.array(nodes_modes_, dtype=np.uint8),
     )
     leaf_weights_tensor = oh.make_tensor(
-        "leaf_weights",
-        itype,
-        (len(leaf_weights_),),
-        np.array(leaf_weights_, dtype=dtype),
+        "leaf_weights", itype, (len(leaf_weights_),), np.array(leaf_weights_, dtype=dtype)
     )
 
     return dict(
@@ -423,11 +417,7 @@ def _sklearn_decision_tree_classifier_v5(
     if np.issubdtype(classes.dtype, np.integer):  # type: ignore
         classes_arr = classes.astype(np.int64)
         label = g.op.Gather(
-            classes_arr,
-            label_idx_cast,
-            axis=0,
-            name=f"{name}_label",
-            outputs=outputs[:1],
+            classes_arr, label_idx_cast, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:
@@ -435,11 +425,7 @@ def _sklearn_decision_tree_classifier_v5(
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
-            classes_arr,
-            label_idx_cast,
-            axis=0,
-            name=f"{name}_label_string",
-            outputs=outputs[:1],
+            classes_arr, label_idx_cast, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:
@@ -513,10 +499,6 @@ def sklearn_decision_tree_regressor(
         **attrs,  # type: ignore
     )
     cast_result = g.make_node(
-        "Cast",
-        [tree_result],
-        outputs=outputs,
-        name=f"{name}_cast_f64",
-        to=g.get_type(X),
+        "Cast", [tree_result], outputs=outputs, name=f"{name}_cast_f64", to=g.get_type(X)
     )
     return cast_result

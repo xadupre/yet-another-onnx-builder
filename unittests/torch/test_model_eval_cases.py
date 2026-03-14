@@ -42,26 +42,17 @@ class TestModelEvalCases(ExtTestCase):
 
     def test_run_exporter_custom(self):
         evaluation(
-            cases="SignatureListFixedLength",
-            exporters="custom",
-            quiet=False,
-            dynamic=False,
+            cases="SignatureListFixedLength", exporters="custom", quiet=False, dynamic=False
         )
 
     def test_run_exporter_dynamo(self):
         evaluation(
-            cases="SignatureListFixedLength",
-            exporters="dynamo",
-            quiet=False,
-            dynamic=False,
+            cases="SignatureListFixedLength", exporters="dynamo", quiet=False, dynamic=False
         )
 
     def test_run_exporter_dynamo_ir(self):
         evaluation(
-            cases="SignatureListFixedLength",
-            exporters="dynamo-ir",
-            quiet=False,
-            dynamic=False,
+            cases="SignatureListFixedLength", exporters="dynamo-ir", quiet=False, dynamic=False
         )
 
     def test_run_exporter_nostrict(self):
@@ -84,12 +75,7 @@ class TestModelEvalCases(ExtTestCase):
         evaluation(cases=".*Aten.*", exporters="custom-strict", quiet=False, dynamic=False)
 
     def test_run_exporter_custom_nested_cond(self):
-        evaluation(
-            cases="ControlFlowNestCond",
-            exporters="custom",
-            quiet=False,
-            dynamic=False,
-        )
+        evaluation(cases="ControlFlowNestCond", exporters="custom", quiet=False, dynamic=False)
 
     def test_run_exporter_dimension0(self):
         evaluation(

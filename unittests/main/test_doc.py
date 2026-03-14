@@ -259,10 +259,7 @@ class TestDocPlotText(ExtTestCase):
         import matplotlib.axes
         from yobx.doc import plot_text
 
-        ax = plot_text(
-            "+added\n-removed\n neutral",
-            line_color_map={"+": "green", "-": "red"},
-        )
+        ax = plot_text("+added\n-removed\n neutral", line_color_map={"+": "green", "-": "red"})
         self.assertIsInstance(ax, matplotlib.axes.Axes)
         self.plt.close("all")
 

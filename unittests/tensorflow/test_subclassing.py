@@ -127,12 +127,7 @@ class VariationalAutoEncoder(tf.keras.Model):
     """Combines Encoder and Decoder into an end-to-end VAE."""
 
     def __init__(
-        self,
-        original_dim,
-        intermediate_dim=64,
-        latent_dim=32,
-        name="autoencoder",
-        **kwargs,
+        self, original_dim, intermediate_dim=64, latent_dim=32, name="autoencoder", **kwargs
     ):
         super().__init__(name=name, **kwargs)
         self.original_dim = original_dim

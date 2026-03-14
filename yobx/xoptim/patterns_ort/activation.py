@@ -534,11 +534,7 @@ class FastGeluPattern(PatternOptimization):
             return self.none()
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        gelu_node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", gelu_node: NodeProto) -> List[NodeProto]:  # noqa: F821
         return [
             g.make_node(
                 "FastGelu",
@@ -645,10 +641,7 @@ class BiasSoftmaxPattern(PatternOptimization):
         return MatchResult(self, [before, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        add_node: NodeProto,
-        softmax_node: NodeProto,
+        self, g: "GraphBuilder", add_node: NodeProto, softmax_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         return [
             g.make_node(
@@ -747,10 +740,7 @@ class QuickGeluPattern(PatternOptimization):
         return MatchResult(self, [node, mul_node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        sigmoid: NodeProto,
-        mul_node: NodeProto,
+        self, g: "GraphBuilder", sigmoid: NodeProto, mul_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         return [
             g.make_node(

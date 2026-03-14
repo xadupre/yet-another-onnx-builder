@@ -169,20 +169,14 @@ def run_runpython_blocks(
 
             # Write code to a temporary file and run it
             with tempfile.NamedTemporaryFile(
-                mode="w",
-                suffix=".py",
-                delete=False,
-                encoding="utf-8",
+                mode="w", suffix=".py", delete=False, encoding="utf-8"
             ) as tmp:
                 tmp.write(block["code"])
                 tmp_path = tmp.name
 
             try:
                 result = subprocess.run(
-                    [sys.executable, tmp_path],
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
+                    [sys.executable, tmp_path], capture_output=True, text=True, timeout=timeout
                 )
                 raised = result.returncode != 0
 

@@ -15,10 +15,7 @@ class TestOnnxExportDevice(ExtTestCase):
         x, y = torch.randn(2, 3), torch.randn(2, 3)
         Model()(x=x, y=y)
         ds = {
-            "kwargs": {
-                "x": {0: torch.export.Dim("batch")},
-                "y": {0: torch.export.Dim("batch")},
-            }
+            "kwargs": {"x": {0: torch.export.Dim("batch")}, "y": {0: torch.export.Dim("batch")}}
         }
         ep = torch.export.export(Model(), tuple(), kwargs={"x": x, "y": y}, dynamic_shapes=ds)
         self.assertNotEmpty(ep)

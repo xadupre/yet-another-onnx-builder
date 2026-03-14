@@ -274,11 +274,7 @@ def patched__maybe_broadcast(*args, preserve_cpu_scalar_tensors=True):
     )
 
     def should_expand(a: ShapeType, b: ShapeType) -> bool:
-        from torch.fx.experimental.symbolic_shapes import (
-            guard_or_false,
-            sym_and,
-            sym_or,
-        )
+        from torch.fx.experimental.symbolic_shapes import guard_or_false, sym_and, sym_or
 
         if len(a) != len(b):
             return True
@@ -330,10 +326,5 @@ def patched__maybe_broadcast(*args, preserve_cpu_scalar_tensors=True):
 
 
 PATCHES.append(
-    PatchInfo.make(
-        patched__maybe_broadcast,
-        torch._refs,
-        "_maybe_broadcast",
-        family="torch",
-    )
+    PatchInfo.make(patched__maybe_broadcast, torch._refs, "_maybe_broadcast", family="torch")
 )

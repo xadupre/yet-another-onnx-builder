@@ -145,10 +145,7 @@ def sklearn_radius_neighbors_classifier(
 
     # 6. Sum votes over the neighbours axis: (N, n_classes) float32
     vote_counts = g.op.ReduceSum(
-        votes_3d,
-        np.array([1], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_votes",
+        votes_3d, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_votes"
     )  # (N, n_classes)
     assert isinstance(vote_counts, str)
     g.set_type(vote_counts, onnx.TensorProto.FLOAT)
@@ -172,10 +169,7 @@ def sklearn_radius_neighbors_classifier(
         outlier_label_ = outlier_label_list[0]
         # Count neighbours per query point: (N,) float32
         neighbor_count = g.op.ReduceSum(
-            mask_f32,
-            np.array([1], dtype=np.int64),
-            keepdims=0,
-            name=f"{name}_count",
+            mask_f32, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_count"
         )
         # is_outlier: True where count < 0.5 (i.e. == 0 for integer counts)
         half = np.array([0.5], dtype=np.float32)
@@ -187,11 +181,7 @@ def sklearn_radius_neighbors_classifier(
             outlier_val = np.array([str(outlier_label_)])
 
         labels = g.op.Where(
-            is_outlier,
-            outlier_val,
-            predicted_label,
-            name=f"{name}_labels",
-            outputs=outputs[:1],
+            is_outlier, outlier_val, predicted_label, name=f"{name}_labels", outputs=outputs[:1]
         )
     else:
         labels = g.op.Identity(predicted_label, name=f"{name}_labels", outputs=outputs[:1])
@@ -209,18 +199,12 @@ def sklearn_radius_neighbors_classifier(
     if n_out >= 2:
         # Normalise vote counts → probabilities in [0, 1]
         total = g.op.ReduceSum(
-            vote_counts,
-            np.array([1], dtype=np.int64),
-            keepdims=1,
-            name=f"{name}_total",
+            vote_counts, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_total"
         )  # (N, 1) float32
         # Clamp denominator to 1 to avoid NaN for outlier points (total == 0)
         safe_total = g.op.Max(total, np.array([1.0], dtype=np.float32), name=f"{name}_safe_total")
         probabilities = g.op.Div(
-            vote_counts,
-            safe_total,
-            name=f"{name}_proba",
-            outputs=outputs[1:2],
+            vote_counts, safe_total, name=f"{name}_proba", outputs=outputs[1:2]
         )
         assert isinstance(probabilities, str)
         if not sts:
@@ -333,27 +317,16 @@ def sklearn_radius_neighbors_regressor(
 
     # 5. Sum targets within radius: (N,)
     sum_targets = g.op.ReduceSum(
-        masked_targets,
-        np.array([1], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_sum",
+        masked_targets, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_sum"
     )
 
     # 6. Count neighbours within radius: (N,)
     count = g.op.ReduceSum(
-        mask_float,
-        np.array([1], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_count",
+        mask_float, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_count"
     )
 
     # 7. Average: (N,) — NaN for outlier points (0 / 0 = NaN in float)
-    predictions = g.op.Div(
-        sum_targets,
-        count,
-        name=f"{name}_pred",
-        outputs=outputs[:1],
-    )
+    predictions = g.op.Div(sum_targets, count, name=f"{name}_pred", outputs=outputs[:1])
     assert isinstance(predictions, str)
     if not sts:
         g.set_type(predictions, itype)

@@ -239,10 +239,7 @@ class InplaceSetItemMask(torch.nn.Module):
 class AtenInterpolate(torch.nn.Module):
     def forward(self, x):
         y = torch.nn.functional.interpolate(
-            x,
-            scale_factor=2.0,
-            mode="bilinear",
-            recompute_scale_factor=False,
+            x, scale_factor=2.0, mode="bilinear", recompute_scale_factor=False
         )
         return y
 
@@ -435,11 +432,7 @@ class ControlFlowCondNonZero(torch.nn.Module):
             1025,
         ),
     ]
-    _dynamic = (
-        {0: DIM("batch")},
-        {0: DIM("batch"), 1: DIM("seq_length")},
-        None,
-    )
+    _dynamic = ({0: DIM("batch")}, {0: DIM("batch"), 1: DIM("seq_length")}, None)
 
 
 class ControlFlowCondIdentity_153832(torch.nn.Module):
@@ -456,10 +449,7 @@ class ControlFlowCondIdentity_153832(torch.nn.Module):
         x = torch.cond(x.sum() > 0, branch_cond_then_1, branch_cond_else_1, [x])
         return x + y
 
-    _inputs = [
-        (torch.rand((3, 4)), torch.rand((3, 4))),
-        (torch.rand((4, 5)), torch.rand((4, 5))),
-    ]
+    _inputs = [(torch.rand((3, 4)), torch.rand((3, 4))), (torch.rand((4, 5)), torch.rand((4, 5)))]
     _dynamic = {"x": {0: DYN, 1: DYN}, "y": {0: DYN, 1: DYN}}
 
 
@@ -573,14 +563,8 @@ class ControlFlowScanCDistXY(torch.nn.Module):
         )
         return out
 
-    _inputs = [
-        (torch.randn(3, 4), torch.randn(5, 4)),
-        (torch.randn(13, 14), torch.randn(15, 14)),
-    ]
-    _dynamic = {
-        "x": {0: DIM("x_rows"), 1: DIM("dim")},
-        "y": {0: DIM("y_rows"), 1: DIM("dim")},
-    }
+    _inputs = [(torch.randn(3, 4), torch.randn(5, 4)), (torch.randn(13, 14), torch.randn(15, 14))]
+    _dynamic = {"x": {0: DIM("x_rows"), 1: DIM("dim")}, "y": {0: DIM("y_rows"), 1: DIM("dim")}}
 
 
 class ControlFlowScanInplace_153705(torch.nn.Module):
@@ -601,10 +585,7 @@ class ControlFlowScanInplace_153705(torch.nn.Module):
         )
         return r[0]
 
-    _inputs = [
-        (torch.rand((3, 4)), torch.rand((5, 4))),
-        (torch.rand((4, 5)), torch.rand((6, 5))),
-    ]
+    _inputs = [(torch.rand((3, 4)), torch.rand((5, 4))), (torch.rand((4, 5)), torch.rand((6, 5)))]
     _dynamic = {"x": {0: DYN, 1: DYN}, "y": {0: DYN, 1: DYN}}
 
 
@@ -634,12 +615,7 @@ class ControlFlowScanDecomposition_151564(torch.nn.Module):
             row[: p.item()] = padded[: p.item()]
             return (row,)
 
-        return torch.ops.higher_order.scan(
-            pad_row,
-            [],
-            [padded, pos],
-            [],
-        )
+        return torch.ops.higher_order.scan(pad_row, [], [padded, pos], [])
 
     @classmethod
     def select_when_exporting(cls, f, f_scan):
@@ -724,10 +700,7 @@ class SignatureInt2(torch.nn.Module):
         return torch.sigmoid(self.linear(x)) - self.buff + x[:, i]
 
     _inputs = ((torch.arange(4 * 3) + 10).reshape((-1, 3)).to(torch.float32), 1)
-    _dynamic = {
-        "x": {0: DIM("batch")},
-        "i": None,  # DIM("ii", min=0, max=3)}
-    }
+    _dynamic = {"x": {0: DIM("batch")}, "i": None}  # DIM("ii", min=0, max=3)}
 
 
 class SignatureListFixedLength(torch.nn.Module):
@@ -755,10 +728,7 @@ class SignatureListFixedLength(torch.nn.Module):
             ],
         ),
     ]
-    _dynamic = {
-        "x": {0: DIM("batch")},
-        "lx": [{0: DIM("batch")}, {0: DIM("batch")}],
-    }
+    _dynamic = {"x": {0: DIM("batch")}, "lx": [{0: DIM("batch")}, {0: DIM("batch")}]}
 
 
 class SignatureListVariableLength(torch.nn.Module):
@@ -788,10 +758,7 @@ class SignatureListVariableLength(torch.nn.Module):
             ],
         ),
     ]
-    _dynamic = {
-        "x": {0: DIM("batch")},
-        "lx": [{0: DIM("batch")}, {0: DIM("batch")}],
-    }
+    _dynamic = {"x": {0: DIM("batch")}, "lx": [{0: DIM("batch")}, {0: DIM("batch")}]}
 
 
 class BuildInLen(torch.nn.Module):
@@ -823,10 +790,7 @@ class BuildInLen(torch.nn.Module):
             ],
         ),
     ]
-    _dynamic = {
-        "x": {0: DIM("batch")},
-        "lx": [{0: DIM("batch")}, {0: DIM("batch")}],
-    }
+    _dynamic = {"x": {0: DIM("batch")}, "lx": [{0: DIM("batch")}, {0: DIM("batch")}]}
 
 
 class BuildInIsInstance(torch.nn.Module):
@@ -857,10 +821,7 @@ class BuildInIsInstance(torch.nn.Module):
             ],
         ),
     ]
-    _dynamic = {
-        "x": {0: DIM("batch")},
-        "lx": [{0: DIM("batch")}, {0: DIM("batch")}],
-    }
+    _dynamic = {"x": {0: DIM("batch")}, "lx": [{0: DIM("batch")}, {0: DIM("batch")}]}
 
 
 class SignatureShapeAsIndex(torch.nn.Module):
@@ -879,10 +840,7 @@ class SignatureShapeAsIndex(torch.nn.Module):
     )
     _dynamic = {
         "x": {0: DIM("batch", min=0, max=1024)},
-        "y": {
-            0: DIM("batch", min=0, max=1024),
-            1: DIM("length", min=0, max=2),
-        },
+        "y": {0: DIM("batch", min=0, max=1024), 1: DIM("length", min=0, max=2)},
     }
 
 
@@ -901,23 +859,10 @@ class CropLastDimensionWithTensorShape(torch.nn.Module):
         return x[..., : y.shape[0]]
 
     _inputs = [
-        (
-            torch.rand(3, 4, 4).to(torch.float32),
-            torch.rand(
-                2,
-            ).to(torch.float32),
-        ),
-        (
-            torch.rand(6, 4, 4).to(torch.float32),
-            torch.rand(
-                3,
-            ).to(torch.float32),
-        ),
+        (torch.rand(3, 4, 4).to(torch.float32), torch.rand(2).to(torch.float32)),
+        (torch.rand(6, 4, 4).to(torch.float32), torch.rand(3).to(torch.float32)),
     ]
-    _dynamic = {
-        "x": {0: DIM("batch")},
-        "y": {0: DIM("crop", min=1, max=3)},
-    }
+    _dynamic = {"x": {0: DIM("batch")}, "y": {0: DIM("crop", min=1, max=3)}}
 
 
 class CropLastDimensionWithTensorContent(torch.nn.Module):
@@ -944,9 +889,7 @@ class SignatureListFixedWithNone(torch.nn.Module):
         ([torch.rand((4, 4)), torch.rand((4, 4)), None],),
         ([torch.rand((4, 4)), torch.rand((4, 4)), torch.rand((4, 4))],),
     ]
-    _dynamic = {
-        "lx": [{0: DIM("batch")}, {0: DIM("batch")}],
-    }
+    _dynamic = {"lx": [{0: DIM("batch")}, {0: DIM("batch")}]}
 
 
 class CreateFromShape(torch.nn.Module):

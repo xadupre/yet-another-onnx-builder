@@ -112,9 +112,7 @@ print("concrete shape of Z:", builder.evaluate_shape("Z", context))  # (2, 12)
 
 model_reshape = oh.make_model(
     oh.make_graph(
-        [
-            oh.make_node("Reshape", ["X", "shape"], ["Xr"]),
-        ],
+        [oh.make_node("Reshape", ["X", "shape"], ["Xr"])],
         "reshape_graph",
         [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
         [oh.make_tensor_value_info("Xr", TFLOAT, [None, None, None, None])],

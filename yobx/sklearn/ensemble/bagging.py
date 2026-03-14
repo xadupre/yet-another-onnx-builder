@@ -10,10 +10,7 @@ from ..sklearn_helper import get_n_expected_outputs
 
 
 def _select_features(
-    g: GraphBuilderExtendedProtocol,
-    X: str,
-    feature_indices: np.ndarray,
-    name: str,
+    g: GraphBuilderExtendedProtocol, X: str, feature_indices: np.ndarray, name: str
 ) -> str:
     """
     Selects a subset of columns from *X* using a :onnx:`Gather` node.
@@ -86,9 +83,7 @@ def sklearn_bagging_regressor(
 
         # Reshape (N,) → (N, 1) for concatenation.
         pred_2d = g.op.Reshape(
-            sub_out,
-            np.array([-1, 1], dtype=np.int64),
-            name=f"{sub_name}_reshape",
+            sub_out, np.array([-1, 1], dtype=np.int64), name=f"{sub_name}_reshape"
         )
         preds.append(pred_2d)
 
@@ -181,18 +176,13 @@ def sklearn_bagging_classifier(
 
         # Unsqueeze to (1, N, C) for stacking along axis 0.
         proba_3d = g.op.Unsqueeze(
-            sub_proba,
-            np.array([0], dtype=np.int64),
-            name=f"{sub_name}_unsqueeze",
+            sub_proba, np.array([0], dtype=np.int64), name=f"{sub_name}_unsqueeze"
         )
         probas.append(proba_3d)
 
     stacked = g.op.Concat(*probas, axis=0, name=f"{name}_stack")  # (E, N, C)
     avg_proba = g.op.ReduceMean(
-        stacked,
-        np.array([0], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_mean",
+        stacked, np.array([0], dtype=np.int64), keepdims=0, name=f"{name}_mean"
     )  # (N, C)
 
     label_idx_raw = g.op.ArgMax(avg_proba, axis=1, keepdims=0, name=f"{name}_argmax")
@@ -201,22 +191,14 @@ def sklearn_bagging_classifier(
     # Build the label output by gathering from classes_.
     if np.issubdtype(classes.dtype, np.integer):
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label",
-            outputs=outputs[:1],
+            classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not g.has_type(label):
             g.set_type(label, onnx.TensorProto.INT64)
     else:
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label_str",
-            outputs=outputs[:1],
+            classes_arr, label_idx, axis=0, name=f"{name}_label_str", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not g.has_type(label):

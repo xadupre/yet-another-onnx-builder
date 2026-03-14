@@ -109,10 +109,7 @@ class ClipClipPattern(PatternOptimization):
         return MatchResult(self, [before, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        before: NodeProto,
-        node: NodeProto,
+        self, g: "GraphBuilder", before: NodeProto, node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         # merges clips
         min1 = before.input[1] if len(before.input) > 1 else ""

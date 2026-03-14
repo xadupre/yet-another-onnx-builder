@@ -1899,9 +1899,7 @@ class Attention3DPattern(PatternOptimization):
         ]
         dtype = tensor_dtype_to_np_dtype(g.get_type(attention.input[0]))
         zero_bias = g.make_initializer(
-            "",
-            np.zeros(sum(sizes), dtype=dtype),
-            source=f"{self.__class__.__name__}.bias",
+            "", np.zeros(sum(sizes), dtype=dtype), source=f"{self.__class__.__name__}.bias"
         )
 
         where_node = None
@@ -1930,14 +1928,7 @@ class Attention3DPattern(PatternOptimization):
 
         attention_node = g.make_node(
             "Attention",
-            [
-                mm_q.input[0],
-                packed,
-                zero_bias,
-                "",
-                "",
-                mask,
-            ],
+            [mm_q.input[0], packed, zero_bias, "", "", mask],
             [reshape.output[0]],
             num_heads=num_heads,
             qkv_hidden_sizes=sizes,

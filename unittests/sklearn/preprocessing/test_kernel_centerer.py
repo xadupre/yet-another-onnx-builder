@@ -12,14 +12,8 @@ from yobx.reference import ExtendedReferenceEvaluator
 @requires_sklearn("1.4")
 class TestKernelCenterer(ExtTestCase):
     # ── shared fixtures ────────────────────────────────────────────────────
-    _X_train = np.array(
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]],
-        dtype=np.float64,
-    )
-    _X_test = np.array(
-        [[2.0, 3.0], [4.0, 5.0], [6.0, 7.0]],
-        dtype=np.float64,
-    )
+    _X_train = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]], dtype=np.float64)
+    _X_test = np.array([[2.0, 3.0], [4.0, 5.0], [6.0, 7.0]], dtype=np.float64)
 
     # ── helper ─────────────────────────────────────────────────────────────
 

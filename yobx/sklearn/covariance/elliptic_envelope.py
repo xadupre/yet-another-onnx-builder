@@ -95,10 +95,7 @@ def sklearn_elliptic_envelope(
     # Element-wise product, then sum over features → squared Mahalanobis dist
     x_prec_centered = g.op.Mul(x_prec, x_centered, name=f"{name}_ew_mul")  # (N, F)
     mahal_sq = g.op.ReduceSum(
-        x_prec_centered,
-        np.array([1], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_mahal_sq",
+        x_prec_centered, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_mahal_sq"
     )  # (N,)
 
     # score_samples = -mahal_sq

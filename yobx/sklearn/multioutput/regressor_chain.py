@@ -82,9 +82,7 @@ def sklearn_regressor_chain(
 
         # Reshape (N,) or (N, 1) → (N, 1) for feature augmentation
         reshaped = g.op.Reshape(
-            sub_output,
-            np.array([-1, 1], dtype=np.int64),
-            name=f"{sub_name}_reshape",
+            sub_output, np.array([-1, 1], dtype=np.int64), name=f"{sub_name}_reshape"
         )
         per_chain_preds.append(reshaped)
 
@@ -108,11 +106,7 @@ def sklearn_regressor_chain(
         predictions = g.op.Identity(chain_preds, name=f"{name}_pred", outputs=outputs[:1])
     else:
         predictions = g.op.Gather(
-            chain_preds,
-            inv_order,
-            axis=1,
-            name=f"{name}_reorder",
-            outputs=outputs[:1],
+            chain_preds, inv_order, axis=1, name=f"{name}_reorder", outputs=outputs[:1]
         )
 
     if not sts:

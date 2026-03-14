@@ -106,12 +106,7 @@ def sklearn_kneighbors_transformer(
 
     # 2. k nearest neighbour distances and indices: (N, k)
     topk_values, topk_indices = g.op.TopK(
-        dists,
-        np.array([k], dtype=np.int64),
-        axis=1,
-        largest=0,
-        sorted=1,
-        name=f"{name}_topk",
+        dists, np.array([k], dtype=np.int64), axis=1, largest=0, sorted=1, name=f"{name}_topk"
     )
 
     # 3. Build a zero matrix of shape (N, M).
@@ -136,14 +131,10 @@ def sklearn_kneighbors_transformer(
     if mode == "connectivity":
         # Scatter 1.0 at all k-NN positions.
         zeros_k = g.op.Mul(
-            topk_values,
-            np.array([0.0], dtype=dtype),
-            name=f"{name}_zeros_k",
+            topk_values, np.array([0.0], dtype=dtype), name=f"{name}_zeros_k"
         )  # (N, k) — all zeros, same shape as topk_values
         scatter_vals = g.op.Add(
-            zeros_k,
-            np.array([1.0], dtype=dtype),
-            name=f"{name}_ones_k",
+            zeros_k, np.array([1.0], dtype=dtype), name=f"{name}_ones_k"
         )  # (N, k) — all ones
     else:
         # mode == "distance": scatter the actual distances.
@@ -151,12 +142,7 @@ def sklearn_kneighbors_transformer(
 
     # 5. Scatter values into the zero matrix at the k-NN column indices.
     output = g.op.ScatterElements(
-        zeros,
-        topk_indices,
-        scatter_vals,
-        axis=1,
-        name=f"{name}_scatter",
-        outputs=outputs[:1],
+        zeros, topk_indices, scatter_vals, axis=1, name=f"{name}_scatter", outputs=outputs[:1]
     )
 
     assert isinstance(output, str)

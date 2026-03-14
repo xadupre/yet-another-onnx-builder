@@ -244,13 +244,7 @@ def to_onnx(
     if function_options and function_options.export_as_function and not is_container:
         # Wrap the single top-level estimator as a local function.
         _wrap_step_as_function(
-            g,
-            function_options,
-            estimator,
-            list(input_names),
-            output_names,
-            fct,
-            name="main",
+            g, function_options, estimator, list(input_names), output_names, fct, name="main"
         )
     elif is_container:
         fct(

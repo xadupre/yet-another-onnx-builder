@@ -42,10 +42,7 @@ TFLOAT = onnx.TensorProto.FLOAT
 
 model = oh.make_model(
     oh.make_graph(
-        [
-            oh.make_node("Add", ["X", "Y"], ["T"]),
-            oh.make_node("Tanh", ["T"], ["Z"]),
-        ],
+        [oh.make_node("Add", ["X", "Y"], ["T"]), oh.make_node("Tanh", ["T"], ["Z"])],
         "add_tanh",
         [
             oh.make_tensor_value_info("X", TFLOAT, [None, None]),

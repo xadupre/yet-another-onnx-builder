@@ -15,19 +15,12 @@ Tests cover:
 import unittest
 import numpy as np
 import torch
-from yobx.ext_test_case import (
-    ExtTestCase,
-    requires_onnxruntime,
-    requires_transformers,
-)
+from yobx.ext_test_case import ExtTestCase, requires_onnxruntime, requires_transformers
 from yobx.reference import ExtendedReferenceEvaluator
 
 
 def _make_llama_attention(
-    hidden_size=64,
-    num_attention_heads=4,
-    num_key_value_heads=2,
-    head_dim=16,
+    hidden_size=64, num_attention_heads=4, num_key_value_heads=2, head_dim=16
 ):
     """Creates a tiny LlamaAttention instance."""
     from transformers import LlamaConfig
@@ -105,11 +98,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
         model = _to_model(attn, hs, cos, sin, target_opset=22)
 
-        feeds = {
-            "hidden_states": hs.numpy(),
-            "cos": cos.numpy(),
-            "sin": sin.numpy(),
-        }
+        feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
 
         ref = ExtendedReferenceEvaluator(model)
         got = ref.run(None, feeds)[0]
@@ -133,11 +122,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
         model = _to_model(attn, hs, cos, sin, target_opset=22)
 
-        feeds = {
-            "hidden_states": hs.numpy(),
-            "cos": cos.numpy(),
-            "sin": sin.numpy(),
-        }
+        feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
         ref = ExtendedReferenceEvaluator(model)
         got = ref.run(None, feeds)[0].astype(np.float32)
         self.assertEqualArray(expected, got, atol=5e-3)
@@ -236,11 +221,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
         model = _to_model(attn, hs, cos, sin, target_opset=24)
 
-        feeds = {
-            "hidden_states": hs.numpy(),
-            "cos": cos.numpy(),
-            "sin": sin.numpy(),
-        }
+        feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
         ref = ExtendedReferenceEvaluator(model)
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-4)
@@ -267,11 +248,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
         model = _to_model(attn, hs, cos, sin, target_opset=24)
 
-        feeds = {
-            "hidden_states": hs.numpy(),
-            "cos": cos.numpy(),
-            "sin": sin.numpy(),
-        }
+        feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
         ref = ExtendedReferenceEvaluator(model)
         got = ref.run(None, feeds)[0].astype(np.float32)
         self.assertEqualArray(expected, got, atol=5e-3)
@@ -336,11 +313,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
         op_types = {n.op_type for n in model.graph.node}
         self.assertIn("MultiHeadAttention", op_types)
 
-        feeds = {
-            "hidden_states": hs.numpy(),
-            "cos": cos.numpy(),
-            "sin": sin.numpy(),
-        }
+        feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
         import onnxruntime as ort
 
         sess = ort.InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
@@ -359,11 +332,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
         op_types = {n.op_type for n in model.graph.node}
         self.assertIn("MultiHeadAttention", op_types)
 
-        feeds = {
-            "hidden_states": hs.numpy(),
-            "cos": cos.numpy(),
-            "sin": sin.numpy(),
-        }
+        feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
         import onnxruntime as ort
 
         sess = ort.InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
@@ -404,11 +373,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
         model = _to_model(attn, hs, cos, sin, target_opset={"": 22, "com.microsoft": 1})
 
-        feeds = {
-            "hidden_states": hs.numpy(),
-            "cos": cos.numpy(),
-            "sin": sin.numpy(),
-        }
+        feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
         import onnxruntime as ort
 
         sess = ort.InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])

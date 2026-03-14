@@ -116,25 +116,20 @@ def sklearn_nystroem(
         )
         neg_gamma = np.array([-gamma_val], dtype=dtype)
         K = g.op.Exp(
-            g.op.Mul(sq_dists, neg_gamma, name=f"{name}_neg_scaled"),
-            name=f"{name}_rbf_k",
+            g.op.Mul(sq_dists, neg_gamma, name=f"{name}_neg_scaled"), name=f"{name}_rbf_k"
         )
 
     elif kernel == "poly":
         dot = g.op.MatMul(X, components.T, name=f"{name}_dot")
         inner = g.op.Add(
-            g.op.Mul(dot, gamma, name=f"{name}_poly_scaled"),
-            coef0,
-            name=f"{name}_poly_inner",
+            g.op.Mul(dot, gamma, name=f"{name}_poly_scaled"), coef0, name=f"{name}_poly_inner"
         )
         K = g.op.Pow(inner, np.array([float(degree)], dtype=dtype), name=f"{name}_poly_k")
 
     elif kernel == "sigmoid":
         dot = g.op.MatMul(X, components.T, name=f"{name}_dot")
         inner = g.op.Add(
-            g.op.Mul(dot, gamma, name=f"{name}_sig_scaled"),
-            coef0,
-            name=f"{name}_sig_inner",
+            g.op.Mul(dot, gamma, name=f"{name}_sig_scaled"), coef0, name=f"{name}_sig_inner"
         )
         K = g.op.Tanh(inner, name=f"{name}_sig_k")
 

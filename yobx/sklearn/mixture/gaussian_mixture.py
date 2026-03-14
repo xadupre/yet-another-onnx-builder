@@ -170,9 +170,7 @@ def sklearn_gaussian_mixture(
         )
         term2 = g.op.MatMul(X, B.T, name=f"{name}_X_dot_BT")  # (N, K)
         log_p = g.op.Add(
-            g.op.Sub(term2, term1, name=f"{name}_sub"),
-            c,
-            name=f"{name}_log_p",
+            g.op.Sub(term2, term1, name=f"{name}_sub"), c, name=f"{name}_log_p"
         )  # (N, K)
 
     elif cov_type == "spherical":
@@ -192,15 +190,11 @@ def sklearn_gaussian_mixture(
         )  # (N, 1)
         cross = g.op.MatMul(X, means.T, name=f"{name}_cross")  # (N, K)
         xsq_term = g.op.Mul(
-            g.op.Mul(half, prec, name=f"{name}_half_prec"),
-            x_sq,
-            name=f"{name}_xsq_term",
+            g.op.Mul(half, prec, name=f"{name}_half_prec"), x_sq, name=f"{name}_xsq_term"
         )  # (N, K)
         cross_term = g.op.Mul(prec, cross, name=f"{name}_cross_term")  # (N, K)
         log_p = g.op.Add(
-            g.op.Sub(cross_term, xsq_term, name=f"{name}_before_c"),
-            c,
-            name=f"{name}_log_p",
+            g.op.Sub(cross_term, xsq_term, name=f"{name}_before_c"), c, name=f"{name}_log_p"
         )  # (N, K)
 
     else:

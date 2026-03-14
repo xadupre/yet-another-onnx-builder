@@ -195,10 +195,7 @@ class TreeEnsembleRegressorMulPattern(PatternOptimization):
         return MatchResult(self, [node, next_nodes[0]], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        tree_node: NodeProto,
-        mul_node: NodeProto,
+        self, g: "GraphBuilder", tree_node: NodeProto, mul_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         cst = g.get_constant_scalar(mul_node.input[1])
         names = {"target_weights", "target_weights_as_tensor"}

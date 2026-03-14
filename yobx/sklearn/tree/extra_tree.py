@@ -152,10 +152,6 @@ def sklearn_extra_tree_regressor(
         **attrs,  # type: ignore
     )
     cast_result = g.make_node(
-        "Cast",
-        [tree_result],
-        outputs=outputs,
-        name=f"{name}_cast_f64",
-        to=g.get_type(X),
+        "Cast", [tree_result], outputs=outputs, name=f"{name}_cast_f64", to=g.get_type(X)
     )
     return cast_result

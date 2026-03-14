@@ -11,11 +11,7 @@ from ..register import get_sklearn_converter, register_sklearn_converter
 
 
 def _apply_sigmoid_calibration(
-    g: GraphBuilderExtendedProtocol,
-    T: str,
-    calibrator,
-    dtype: np.dtype,
-    name: str,
+    g: GraphBuilderExtendedProtocol, T: str, calibrator, dtype: np.dtype, name: str
 ) -> str:
     """
     Apply sigmoid calibration: ``expit(-(a * T + b))``.
@@ -92,10 +88,7 @@ def _apply_isotonic_calibration(
     ge = g.op.GreaterOrEqual(T_2d, X_arr, name=f"{name}_ge")
     ge_int = g.op.Cast(ge, to=onnx.TensorProto.INT64, name=f"{name}_ge_int")
     bin_count = g.op.ReduceSum(
-        ge_int,
-        np.array([1], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_bincount",
+        ge_int, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_bincount"
     )  # (N,)
 
     # Lower-bound knot index: bin_count - 1, clipped to [0, K-2].
@@ -123,10 +116,7 @@ def _apply_isotonic_calibration(
     zero_f = np.array([0], dtype=dtype)
     eps = np.array([1e-7], dtype=dtype)
     dx_safe = g.op.Where(
-        g.op.Equal(dx, zero_f, name=f"{name}_dx_eq0"),
-        eps,
-        dx,
-        name=f"{name}_dx_safe",
+        g.op.Equal(dx, zero_f, name=f"{name}_dx_eq0"), eps, dx, name=f"{name}_dx_safe"
     )  # (N,)
     slope = g.op.Div(dy, dx_safe, name=f"{name}_slope")  # (N,)
     interp = g.op.Add(
@@ -143,11 +133,7 @@ def _apply_isotonic_calibration(
 
 
 def _apply_calibrator(
-    g: GraphBuilderExtendedProtocol,
-    T: str,
-    calibrator,
-    dtype: np.dtype,
-    name: str,
+    g: GraphBuilderExtendedProtocol, T: str, calibrator, dtype: np.dtype, name: str
 ) -> str:
     """
     Dispatch to the appropriate ONNX calibrator implementation.
@@ -226,9 +212,7 @@ def _get_base_predictions(
             # Binary: Gemm output is (N, 1) → squeeze to (N,)
             if is_binary:
                 decision = g.op.Reshape(
-                    decision,
-                    np.array([-1], dtype=np.int64),
-                    name=f"{name}_decision_sq",
+                    decision, np.array([-1], dtype=np.int64), name=f"{name}_decision_sq"
                 )
             return decision, is_binary
         else:
@@ -259,10 +243,7 @@ def _get_base_predictions(
         if is_binary:
             # sklearn uses only the positive-class column: predict_proba[:, 1]
             pos_prob = g.op.Gather(
-                sub_proba,
-                np.array(1, dtype=np.int64),
-                axis=1,
-                name=f"{name}_pos_prob",
+                sub_proba, np.array(1, dtype=np.int64), axis=1, name=f"{name}_pos_prob"
             )  # (N,)
             return pos_prob, is_binary
         else:
@@ -436,10 +417,7 @@ def sklearn_calibrated_classifier_cv(
     else:
         stacked = g.op.Concat(*fold_probas, axis=0, name=f"{name}_stack_folds")  # (K, N, C)
         avg_proba = g.op.ReduceMean(
-            stacked,
-            np.array([0], dtype=np.int64),
-            keepdims=0,
-            name=f"{name}_mean_folds",
+            stacked, np.array([0], dtype=np.int64), keepdims=0, name=f"{name}_mean_folds"
         )  # (N, C)
 
     # Derive predicted class labels from the averaged probabilities.
@@ -449,22 +427,14 @@ def sklearn_calibrated_classifier_cv(
     if np.issubdtype(classes.dtype, np.integer):
         classes_arr = classes.astype(np.int64)
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label",
-            outputs=outputs[:1],
+            classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         if not sts:
             g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label_str",
-            outputs=outputs[:1],
+            classes_arr, label_idx, axis=0, name=f"{name}_label_str", outputs=outputs[:1]
         )
         if not sts:
             g.set_type(label, onnx.TensorProto.STRING)

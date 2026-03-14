@@ -118,10 +118,7 @@ class FusedConvPattern(PatternOptimization):
         return MatchResult(self, [node, next_nodes[0]], self.apply, insert_at=next_nodes[0])
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-        node_act: NodeProto,
+        self, g: "GraphBuilder", node: NodeProto, node_act: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         fc = g.make_node(
             "FusedConv",

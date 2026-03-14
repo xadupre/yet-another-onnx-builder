@@ -109,11 +109,7 @@ class ExpandPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         new_node = g.make_node(
             "Identity",
             node.input,
@@ -254,10 +250,7 @@ class ExpandBroadcastPattern(PatternOptimization):
         return MatchResult(self, [node, next_node], self.apply, insert_at=next_node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-        next_node: NodeProto,
+        self, g: "GraphBuilder", node: NodeProto, next_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         if next_node.input[0] == node.output[0]:
             inputs = [node.input[0], next_node.input[1]]
@@ -534,10 +527,7 @@ class ExpandSwapPattern(PatternOptimization):
         return MatchResult(self, [node, next_node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-        next_node: NodeProto,
+        self, g: "GraphBuilder", node: NodeProto, next_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         # We need to create a new name for the intermediate results.
         # The optimizer cannot reuse an existing name if the new result
@@ -681,18 +671,12 @@ class ShapeBasedStaticExpandPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        reshape: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", reshape: NodeProto) -> List[NodeProto]:  # noqa: F821
         expand_shape = self._find_expand_shape(
             g.get_shape_renamed(reshape.input[0]), g.get_shape_renamed(reshape.output[0])
         )
         new_shape = g.make_initializer(
-            "",
-            np.array(expand_shape, dtype=np.int64),
-            source=f"{self.__class__.__name__}.m1",
+            "", np.array(expand_shape, dtype=np.int64), source=f"{self.__class__.__name__}.m1"
         )
         return [
             g.make_node(
@@ -988,7 +972,7 @@ class ShapeBasedExpandSwapPattern(PatternOptimization):
                 [new_name],
                 name=f"{self.__class__.__name__}--{binary_node.name}",
                 doc_string=binary_node.doc_string,
-            ),
+            )
         )
 
         # One or two expand, same rewriting as the expand argument is the same.
@@ -1260,11 +1244,7 @@ class ShapeBasedExpandCastWhereSwapPattern(PatternOptimization):
 
     @classmethod
     def _compatible_shapes(
-        cls,
-        cond: DYNAMIC_SHAPE,
-        cst: DYNAMIC_SHAPE,
-        output: DYNAMIC_SHAPE,
-        before: DYNAMIC_SHAPE,
+        cls, cond: DYNAMIC_SHAPE, cst: DYNAMIC_SHAPE, output: DYNAMIC_SHAPE, before: DYNAMIC_SHAPE
     ):
         if cond != output:
             return False
@@ -1493,10 +1473,7 @@ class ShapeBasedConcatExpandPattern(PatternOptimization):
         return MatchResult(self, [concat_node, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        concat_node: NodeProto,
-        expand_node: NodeProto,
+        self, g: "GraphBuilder", concat_node: NodeProto, expand_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         shape1 = g.get_shape_renamed(expand_node.input[0])
         shape2 = g.get_shape_renamed(expand_node.output[0])
@@ -1637,10 +1614,7 @@ class SwapExpandReshapePattern(PatternOptimization):
         return MatchResult(self, [expand_node, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        expand_node: NodeProto,
-        reshape_node: NodeProto,
+        self, g: "GraphBuilder", expand_node: NodeProto, reshape_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         new_name = g.unique_name(reshape_node.output[0])
         return [
