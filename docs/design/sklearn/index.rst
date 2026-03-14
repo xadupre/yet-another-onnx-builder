@@ -84,7 +84,7 @@ choose a different decision path and produce a very different output.
 
    expected_api
    sklearn_converter
-   lightgbm_converter
+   sklearn_like_converter
    supported_converters
    custom_converter
    contrib_ops

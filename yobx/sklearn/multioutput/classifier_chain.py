@@ -30,12 +30,12 @@ def sklearn_classifier_chain(
 
     .. code-block:: text
 
-        X ──[est 0 converter]──► label_0 ──Cast(float)──Reshape(N,1)──┐ pred_0_col
+        X ──[est 0 converter]──► label_0 ── Cast(float)──Reshape(N,1) ──┐ pred_0_col
         │                                                               │
         Concat(X, pred_0_col) ──[est 1 converter]──► label_1 ──Cast──Reshape──┐ pred_1_col
         │                                                                       │
-        ...                                                                    │
-                                                    Concat(axis=1) ────────────► labels (N, n_targets)
+        ...                         +-------------------------------------------+
+                Concat(axis=1) ─────+──────► labels (N, n_targets)
 
     When the chain ``order_`` is not the identity permutation, the concatenated
     predictions (in chain order) are reordered via ``Gather`` using the
@@ -74,7 +74,7 @@ def sklearn_classifier_chain(
     # If not needed we compute it lazily (only when actually non-identity).
     inv_order = np.argsort(order).astype(np.int64) if not is_identity_order else None
 
-    chain_pred_cols: List[str] = []   # (N, 1) float predictions in chain order
+    chain_pred_cols: List[str] = []  # (N, 1) float predictions in chain order
     chain_proba_cols: List[str] = []  # (N, 1) probabilities in chain order
 
     # X_aug grows with each step: starts as X, then Concat(X_aug, pred_col)
@@ -128,9 +128,7 @@ def sklearn_classifier_chain(
     if len(chain_pred_cols) == 1:
         chain_preds = g.op.Identity(chain_pred_cols[0], name=f"{name}_chain_preds")
     else:
-        chain_preds = g.op.Concat(
-            *chain_pred_cols, axis=1, name=f"{name}_chain_preds_concat"
-        )
+        chain_preds = g.op.Concat(*chain_pred_cols, axis=1, name=f"{name}_chain_preds_concat")
 
     # Reorder to original column order via Gather on axis 1.
     if is_identity_order:
@@ -165,15 +163,11 @@ def sklearn_classifier_chain(
     if len(chain_proba_cols) == 1:
         chain_probas = g.op.Identity(chain_proba_cols[0], name=f"{name}_chain_probas")
     else:
-        chain_probas = g.op.Concat(
-            *chain_proba_cols, axis=1, name=f"{name}_chain_probas_concat"
-        )
+        chain_probas = g.op.Concat(*chain_proba_cols, axis=1, name=f"{name}_chain_probas_concat")
 
     # Reorder to original column order.
     if is_identity_order:
-        probabilities = g.op.Identity(
-            chain_probas, name=f"{name}_proba", outputs=outputs[1:]
-        )
+        probabilities = g.op.Identity(chain_probas, name=f"{name}_proba", outputs=outputs[1:])
     else:
         probabilities = g.op.Gather(
             chain_probas,

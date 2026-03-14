@@ -13,7 +13,7 @@ from yobx.reference import ExtendedReferenceEvaluator
 @requires_category_encoders("2.6")
 class TestQuantileEncoder(ExtTestCase):
     def _make_data(self, dtype=np.float32):
-        rng = np.random.default_rng(0)
+        _rng = np.random.default_rng(0)
         X = pd.DataFrame(
             {
                 "cat1": np.tile([0, 1, 2, 0, 1, 0], 5).astype(float),
@@ -89,7 +89,11 @@ class TestQuantileEncoder(ExtTestCase):
 
         # Include an unknown category value (99)
         X_test_df = pd.DataFrame(
-            {"cat1": [0.0, 1.0, 2.0, 99.0], "cat2": [0.0, 1.0, 2.0, 0.0], "num": [0.0, 1.0, 2.0, 3.0]}
+            {
+                "cat1": [0.0, 1.0, 2.0, 99.0],
+                "cat2": [0.0, 1.0, 2.0, 0.0],
+                "num": [0.0, 1.0, 2.0, 3.0],
+            }
         )
         X_np = X_test_df.values.astype(dtype)
 
@@ -106,9 +110,7 @@ class TestQuantileEncoder(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         rng = np.random.default_rng(1)
-        X_df = pd.DataFrame(
-            {"a": rng.standard_normal(20), "b": rng.standard_normal(20)}
-        )
+        X_df = pd.DataFrame({"a": rng.standard_normal(20), "b": rng.standard_normal(20)})
         y = (X_df["a"] > 0).astype(int).values
         enc = QuantileEncoder(cols=[])
         enc.fit(X_df, y)
@@ -128,7 +130,7 @@ class TestQuantileEncoder(ExtTestCase):
         from sklearn.pipeline import Pipeline
         from yobx.sklearn import to_onnx
 
-        X_df, y, dtype = self._make_data(np.float32)
+        X_df, y, _dtype = self._make_data(np.float32)
         y_f = y.astype(np.float32)
         pipe = Pipeline(
             [

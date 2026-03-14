@@ -91,13 +91,13 @@ def sklearn_quadratic_discriminant_analysis(
     const_list = []
     for k in range(n_classes):
         R_k = estimator.rotations_[k].astype(dtype)  # (F, r_k)
-        S_k = estimator.scalings_[k].astype(dtype)   # (r_k,)
-        m_k = estimator.means_[k].astype(dtype)      # (F,)
+        S_k = estimator.scalings_[k].astype(dtype)  # (r_k,)
+        m_k = estimator.means_[k].astype(dtype)  # (F,)
 
         # Scaled rotation: W_k = R_k * S_k^(-0.5)  (each column scaled by 1/sqrt(eigenvalue))
-        W_k = R_k * (S_k ** (-0.5))                      # (F, r_k)
+        W_k = R_k * (S_k ** (-0.5))  # (F, r_k)
         # Bias correction: offset = mean @ W = mean @ (R * S^(-0.5))
-        offset_k = m_k @ W_k                         # (r_k,)
+        offset_k = m_k @ W_k  # (r_k,)
         # Scalar log-likelihood constant: -0.5 * log|Σ_k| + log(prior_k)
         # where log|Σ_k| = sum(log(eigenvalues)) = sum(log(S_k))
         log_det_k = float(np.sum(np.log(S_k)))
@@ -112,16 +112,16 @@ def sklearn_quadratic_discriminant_analysis(
     if all_equal_rank:
         r = ranks[0]
         # W_2d: (F, C*r) — columns of all W_k concatenated
-        W_2d = np.concatenate(W_list, axis=1).astype(dtype)     # (F, C*r)
+        W_2d = np.concatenate(W_list, axis=1).astype(dtype)  # (F, C*r)
         # b_flat: (1, C*r) — offsets concatenated
         b_flat = np.concatenate(offset_list).reshape(1, -1).astype(dtype)  # (1, C*r)
         # consts: (C,) — per-class scalar constants
-        consts = np.array(const_list, dtype=dtype)               # (C,)
+        consts = np.array(const_list, dtype=dtype)  # (C,)
 
         # (N, F) @ (F, C*r) → (N, C*r)
         XW = g.op.MatMul(X, W_2d, name=f"{name}_XW")
-        diff = g.op.Sub(XW, b_flat, name=f"{name}_diff")         # (N, C*r)
-        diff_sq = g.op.Mul(diff, diff, name=f"{name}_diff_sq")   # (N, C*r)
+        diff = g.op.Sub(XW, b_flat, name=f"{name}_diff")  # (N, C*r)
+        diff_sq = g.op.Mul(diff, diff, name=f"{name}_diff_sq")  # (N, C*r)
         # Reshape to (N, C, r) then sum over last axis
         diff_sq_3d = g.op.Reshape(
             diff_sq, np.array([-1, n_classes, r], dtype=np.int64), name=f"{name}_diff_sq_3d"
@@ -141,12 +141,14 @@ def sklearn_quadratic_discriminant_analysis(
         dec_parts = []
         for k in range(n_classes):
             W_k = W_list[k].astype(dtype)
-            b_k = (-offset_list[k]).astype(dtype)                # Gemm computes A @ B + C, so pass -offset to achieve X @ W_k - offset_k
+            b_k = (-offset_list[k]).astype(
+                dtype
+            )  # Gemm computes A @ B + C, so pass -offset to achieve X @ W_k - offset_k
             const_k = np.array([const_list[k]], dtype=dtype)
 
             # z_k = X @ W_k - offset_k  (Gemm: A @ B + C  with C = -offset)
             z_k = g.op.Gemm(X, W_k, b_k, name=f"{name}_z{k}")  # (N, r_k)
-            z_sq = g.op.Mul(z_k, z_k, name=f"{name}_zsq{k}")    # (N, r_k)
+            z_sq = g.op.Mul(z_k, z_k, name=f"{name}_zsq{k}")  # (N, r_k)
             norm2_k = g.op.ReduceSum(
                 z_sq, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_norm2_{k}"
             )  # (N,)
