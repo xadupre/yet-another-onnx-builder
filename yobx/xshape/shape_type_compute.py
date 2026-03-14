@@ -1282,10 +1282,7 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
 
         starts = _resolve_int_tuple_or_shape(self, node.input[1])
         ends = _resolve_int_tuple_or_shape(self, node.input[2])
-        if len(node.input) > 3 and self.is_constant(node.input[3]):
-            axes = self.get_constant(node.input[3])
-        else:
-            axes = None
+        axes = _resolve_int_tuple_or_shape(self, node.input[3]) if len(node.input) > 3 else None
 
         if starts is None or ends is None:
             if axes is None:
