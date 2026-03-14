@@ -1594,6 +1594,87 @@ class TestInputObserver(ExtTestCase):
             named_shapes,
         )
 
+    def test_dim_names_auto_basic(self):
+        """dim_names=True auto-assigns names; shared value sequences share a label."""
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        # x and y have the same dynamic dim-1 values → they share the same label.
+        # x dim-0 values differ from y dim-0 (y dim-0 is always 1 → static).
+        inputs = [
+            (torch.randn((5, 6)), torch.randn((1, 6))),
+            (torch.randn((7, 7)), torch.randn((1, 7))),
+            (torch.randn((7, 8)), torch.randn((1, 8))),
+        ]
+
+        model = Model()
+        observer = InputObserver()
+        with observer(model):
+            for args in inputs:
+                model(*args)
+
+        shapes = observer.infer_dynamic_shapes(dim_names=True)
+        # Result is a tuple (positional args).
+        self.assertIsInstance(shapes, tuple)
+        self.assertEqual(len(shapes), 2)
+        x_shape, y_shape = shapes
+
+        # All returned dim values must be strings (no Dim.DYNAMIC).
+        for dim_val in x_shape.values():
+            self.assertIsInstance(dim_val, str)
+        for dim_val in y_shape.values():
+            self.assertIsInstance(dim_val, str)
+
+        # x dim 1 and y dim 1 have identical observed sequences → same label.
+        # (Both take values (6, 7, 8) across the three observations.)
+        self.assertEqual(x_shape[1], y_shape[1])
+
+        # x dim 0 is distinct → different label from x dim 1.
+        self.assertNotEqual(x_shape[0], x_shape[1])
+
+    def test_dim_names_auto_known_llm_names(self):
+        """dim_names=True uses precise labels for well-known LLM parameter names."""
+
+        class LLMModel(torch.nn.Module):
+            def forward(self, input_ids, attention_mask):
+                return input_ids + attention_mask
+
+        inputs = [
+            (
+                torch.randint(0, 100, (2, 6), dtype=torch.long),
+                torch.ones(2, 6, dtype=torch.long),
+            ),
+            (
+                torch.randint(0, 100, (3, 8), dtype=torch.long),
+                torch.ones(3, 8, dtype=torch.long),
+            ),
+        ]
+
+        model = LLMModel()
+        observer = InputObserver()
+        with observer(model):
+            for args in inputs:
+                model(*args)
+
+        shapes = observer.infer_dynamic_shapes(set_batch_dimension_for=True, dim_names=True)
+        # Both are positional → tuple result.
+        self.assertIsInstance(shapes, tuple)
+        ids_shape, mask_shape = shapes
+
+        # input_ids: dim 0 → "batch_size", dim 1 → "sequence_length"
+        self.assertEqual(ids_shape[0], "batch_size")
+        self.assertEqual(ids_shape[1], "sequence_length")
+
+        # attention_mask: dim 0 → "batch_size" (shared with input_ids),
+        # dim 1 → "total_sequence_length" (from _KNOWN_DIM_NAMES)
+        self.assertEqual(mask_shape[0], "batch_size")
+        self.assertEqual(mask_shape[1], "total_sequence_length")
+
+        # Batch dimension is the same label for both.
+        self.assertEqual(ids_shape[0], mask_shape[0])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
