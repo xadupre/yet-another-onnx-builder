@@ -223,7 +223,7 @@ def sklearn_locally_linear_embedding(
     metric = estimator.nbrs_.effective_metric_
     metric_params = dict(estimator.nbrs_.effective_metric_params_)
 
-    n_train = int(training_data.shape[0])
+    _n_train = int(training_data.shape[0])
     n_features = int(training_data.shape[1])
 
     # ── Step 1: Pairwise distances X → training data (N, M) ────────────────
@@ -260,9 +260,7 @@ def sklearn_locally_linear_embedding(
     )  # (N, k, F)
 
     # ── Step 4: Local displacement vectors v = X[:, None, :] - neighbours ──
-    X_unsq = g.op.Unsqueeze(
-        X, np.array([1], dtype=np.int64), name=f"{name}_X_unsq"
-    )  # (N, 1, F)
+    X_unsq = g.op.Unsqueeze(X, np.array([1], dtype=np.int64), name=f"{name}_X_unsq")  # (N, 1, F)
     v = g.op.Sub(X_unsq, nb_feats, name=f"{name}_v")  # (N, k, F)
 
     # ── Step 5: Gram matrix C = v @ v.T ─────────────────────────────────────
@@ -324,9 +322,7 @@ def sklearn_locally_linear_embedding(
     # result[n] = w_norm[n] @ emb_nb[n]
     #   w_norm (N, k)  →  unsqueeze  →  (N, 1, k)
     #   (N, 1, k) @ (N, k, n_comp)  =  (N, 1, n_comp)  →  squeeze  →  (N, n_comp)
-    w_2d = g.op.Unsqueeze(
-        w_norm, np.array([1], dtype=np.int64), name=f"{name}_w_2d"
-    )  # (N, 1, k)
+    w_2d = g.op.Unsqueeze(w_norm, np.array([1], dtype=np.int64), name=f"{name}_w_2d")  # (N, 1, k)
     result_3d = g.op.MatMul(w_2d, emb_nb, name=f"{name}_mm")  # (N, 1, n_components)
     res = g.op.Squeeze(
         result_3d, np.array([1], dtype=np.int64), name=name, outputs=outputs
