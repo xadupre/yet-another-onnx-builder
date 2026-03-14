@@ -44,6 +44,8 @@ def register_sklearn_converters():
     from .dummy import register as register_dummy
     from .ensemble import register as register_ensemble
     from .gaussian_process import register as register_gaussian_process
+    from .impute import register as register_impute
+    from .isotonic import register as register_isotonic
     from .kernel_ridge import register as register_kernel_ridge
     from .lightgbm import register as register_lightgbm
     from .linear_model import register as register_linear_model
@@ -70,6 +72,8 @@ def register_sklearn_converters():
     register_dummy()
     register_ensemble()
     register_gaussian_process()
+    register_impute()
+    register_isotonic()
     register_kernel_ridge()
     register_linear_model()
     register_lightgbm()

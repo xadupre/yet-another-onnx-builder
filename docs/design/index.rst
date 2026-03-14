@@ -6,19 +6,10 @@ a toolkit for converting machine learning models from multiple frameworks to ONN
 It covers the conversion pipelines for scikit-learn, PyTorch, and TensorFlow models;
 the core ``GraphBuilder`` and graph-optimization infrastructure that powers all conversions;
 miscellaneous utilities; and the repository structure and CI workflows
-that maintain code quality across the project.
+that maintain code across the project.
 
 .. toctree::
    :maxdepth: 1
-   :caption: Libraries
-
-   sklearn/index
-   tensorflow/index
-   torch/index
-
-.. toctree::
-   :maxdepth: 1
-   :caption: GraphBuilder and other classes
 
    builder/index
    misc/index

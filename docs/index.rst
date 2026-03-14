@@ -57,7 +57,9 @@ Its unique API:
    :maxdepth: 2
    :caption: Contents
 
-   design/index
+   design/sklearn/index
+   design/tensorflow/index
+   design/torch/index
    cmds/index
 
 .. toctree::
