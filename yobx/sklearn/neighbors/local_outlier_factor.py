@@ -98,9 +98,9 @@ def sklearn_local_outlier_factor(
     :raises NotImplementedError: if the opset is below 18 (required for
         ``ReduceMean`` with axes as input) or the metric is unsupported
     """
-    assert isinstance(estimator, LocalOutlierFactor), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(
+        estimator, LocalOutlierFactor
+    ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     if not estimator.novelty:
@@ -148,9 +148,7 @@ def sklearn_local_outlier_factor(
 
     # 3. k-distances of the neighbours (from their own fit): (N, k)
     k_dists_init = g.make_initializer(f"{name}_k_distances_train", k_distances_train)
-    k_dists_nbrs = g.op.Gather(
-        k_dists_init, topk_idx, axis=0, name=f"{name}_k_dists_nbrs"
-    )
+    k_dists_nbrs = g.op.Gather(k_dists_init, topk_idx, axis=0, name=f"{name}_k_dists_nbrs")
 
     # 4. Reachability distances: max(dist(x, x_i), k_distance(x_i)): (N, k)
     reach_dists = g.op.Max(topk_dists, k_dists_nbrs, name=f"{name}_reach_dists")
@@ -206,9 +204,7 @@ def sklearn_local_outlier_factor(
 
     emit_scores = len(outputs) > 1
     if emit_scores:
-        scores_out = g.op.Identity(
-            decision, name=f"{name}_scores", outputs=outputs[1:]
-        )
+        scores_out = g.op.Identity(decision, name=f"{name}_scores", outputs=outputs[1:])
         assert isinstance(scores_out, str)
         return label, scores_out
 
