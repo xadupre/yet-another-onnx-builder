@@ -23,6 +23,8 @@ yobx.sklearn
     dummy/index
     ensemble/index
     gaussian_process/index
+    impute/index
+    isotonic/index
     lightgbm/index
     linear_model/index
     manifold/index

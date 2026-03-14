@@ -8,6 +8,7 @@ yobx.sklearn.decomposition
     factor_analysis
     gaussian_random_projection
     incremental_pca
+    kernel_pca
     latent_dirichlet_allocation
     pca
     pls_regression

@@ -1466,5 +1466,450 @@ class TestTensorflowNnOpConverters(ExtTestCase):
         self.assertIn("LogSoftmax", [n.op_type for n in onx.graph.node])
 
 
+@requires_tensorflow("2.18")
+class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
+    """Tests for Keras layer converters, inspired by tensorflow-onnx test_layers.py.
+
+    Reference:
+    https://github.com/onnx/tensorflow-onnx/blob/main/tests/keras2onnx_unit_tests/test_layers.py
+    """
+
+    # ------------------------------------------------------------------
+    # BatchNormalization
+    # ------------------------------------------------------------------
+
+    def test_keras_batch_normalization(self):
+        """Keras BatchNormalization (inference) → ONNX Mul + Add pattern."""
+        model = tf.keras.Sequential(
+            [tf.keras.layers.Dense(8), tf.keras.layers.BatchNormalization()]
+        )
+        X = np.random.rand(4, 3).astype(np.float32)
+        model(X, training=False)  # build the model
+
+        onx = to_onnx(model, (X,))
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
+        expected = model(X, training=False).numpy()
+        ort_result = _ort_run(onx, feeds)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
+    def test_keras_batch_normalization_conv(self):
+        """BatchNormalization after Conv2D — typical CNN pattern."""
+        model = tf.keras.Sequential(
+            [
+                tf.keras.layers.Conv2D(
+                    4, (3, 3), padding="same", use_bias=False, input_shape=(8, 8, 3)
+                ),
+                tf.keras.layers.BatchNormalization(),
+            ]
+        )
+        X = np.random.rand(2, 8, 8, 3).astype(np.float32)
+        model(X, training=False)
+
+        onx = to_onnx(model, (X,))
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
+        expected = model(X, training=False).numpy()
+        ort_result = _ort_run(onx, feeds)
+        self.assertEqualArray(expected, ort_result, atol=1e-4)
+
+    # ------------------------------------------------------------------
+    # Dropout (inference = identity)
+    # ------------------------------------------------------------------
+
+    def test_keras_dropout_inference(self):
+        """Dropout is a no-op at inference time → output equals input."""
+        model = tf.keras.Sequential([tf.keras.layers.Dense(8), tf.keras.layers.Dropout(0.5)])
+        X = np.random.rand(4, 4).astype(np.float32)
+        model(X, training=False)
+
+        onx = to_onnx(model, (X,))
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
+        expected = model(X, training=False).numpy()
+        ort_result = _ort_run(onx, feeds)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
+    # ------------------------------------------------------------------
+    # Flatten
+    # ------------------------------------------------------------------
+
+    def test_keras_flatten(self):
+        """Keras Flatten layer → ONNX Reshape (dynamic batch, static product)."""
+        model = tf.keras.Sequential([tf.keras.layers.Flatten(input_shape=(4, 4))])
+        X = np.random.rand(3, 4, 4).astype(np.float32)
+        model(X)
+
+        onx = to_onnx(model, (X,))
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
+        expected = model(X).numpy()
+        ort_result = _ort_run(onx, feeds)
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+        self.assertEqual(ort_result.shape, (3, 16))
+
+    def test_keras_conv2d_flatten_dense(self):
+        """Classic CNN pattern: Conv2D → Flatten → Dense."""
+        model = tf.keras.Sequential(
+            [
+                tf.keras.layers.Conv2D(
+                    4, (3, 3), activation="relu", padding="valid", input_shape=(8, 8, 3)
+                ),
+                tf.keras.layers.Flatten(),
+                tf.keras.layers.Dense(2),
+            ]
+        )
+        X = np.random.rand(2, 8, 8, 3).astype(np.float32)
+        model(X)
+
+        onx = to_onnx(model, (X,))
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
+        expected = model(X).numpy()
+        ort_result = _ort_run(onx, feeds)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
+    def test_keras_dense_flatten_dense(self):
+        """Dense → Flatten → Dense: verifies Flatten on 3-D output."""
+        model = tf.keras.Sequential(
+            [
+                tf.keras.layers.Dense(8, activation="relu", input_shape=(4, 4)),
+                tf.keras.layers.Flatten(),
+                tf.keras.layers.Dense(2),
+            ]
+        )
+        X = np.random.rand(3, 4, 4).astype(np.float32)
+        model(X)
+
+        onx = to_onnx(model, (X,))
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
+        expected = model(X).numpy()
+        ort_result = _ort_run(onx, feeds)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
+    # ------------------------------------------------------------------
+    # GlobalAveragePooling2D
+    # ------------------------------------------------------------------
+
+    def test_keras_global_average_pooling_2d(self):
+        """GlobalAveragePooling2D → ONNX ReduceMean."""
+        model = tf.keras.Sequential([tf.keras.layers.GlobalAveragePooling2D()])
+        X = np.random.rand(3, 8, 8, 4).astype(np.float32)
+        model(X)
+
+        onx = to_onnx(model, (X,))
+        self.assertIn("ReduceMean", [n.op_type for n in onx.graph.node])
+
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
+        expected = model(X).numpy()
+        ort_result = _ort_run(onx, feeds)
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+
+    def test_keras_conv2d_global_avg_pool_dense(self):
+        """Conv2D → GlobalAveragePooling2D → Dense (common feature-extractor head)."""
+        model = tf.keras.Sequential(
+            [
+                tf.keras.layers.Conv2D(
+                    4, (3, 3), activation="relu", padding="same", input_shape=(8, 8, 3)
+                ),
+                tf.keras.layers.GlobalAveragePooling2D(),
+                tf.keras.layers.Dense(2),
+            ]
+        )
+        X = np.random.rand(2, 8, 8, 3).astype(np.float32)
+        model(X)
+
+        onx = to_onnx(model, (X,))
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
+        expected = model(X).numpy()
+        ort_result = _ort_run(onx, feeds)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
+    # ------------------------------------------------------------------
+    # ConcatV2 (tf.concat)
+    # ------------------------------------------------------------------
+
+    def test_tf_concat_axis_last(self):
+        """tf.concat along the last axis → ONNX Concat."""
+
+        @tf.function
+        def fn(x, y):
+            return tf.concat([x, y], axis=-1)
+
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(3, 8).astype(np.float32)
+        onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
+        self.assertIn("Concat", [n.op_type for n in onx.graph.node])
+
+        expected = fn(a, b).numpy()
+        ort_result = _ort_run(onx, {"X:0": a, "Y:0": b})
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+
+    def test_tf_concat_axis_0(self):
+        """tf.concat along axis 0 (batch axis) → ONNX Concat."""
+
+        @tf.function
+        def fn(x, y):
+            return tf.concat([x, y], axis=0)
+
+        a = np.random.rand(2, 4).astype(np.float32)
+        b = np.random.rand(3, 4).astype(np.float32)
+        onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
+        self.assertIn("Concat", [n.op_type for n in onx.graph.node])
+
+        expected = fn(a, b).numpy()
+        ort_result = _ort_run(onx, {"X:0": a, "Y:0": b})
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+
+    def test_tf_concat_three_inputs(self):
+        """tf.concat with three inputs → ONNX Concat."""
+
+        @tf.function
+        def fn(x, y, z):
+            return tf.concat([x, y, z], axis=1)
+
+        a = np.random.rand(3, 2).astype(np.float32)
+        b = np.random.rand(3, 3).astype(np.float32)
+        c = np.random.rand(3, 4).astype(np.float32)
+        onx = to_onnx(fn, (a, b, c), input_names=["X", "Y", "Z"])
+        self.assertIn("Concat", [n.op_type for n in onx.graph.node])
+
+        expected = fn(a, b, c).numpy()
+        ort_result = _ort_run(onx, {"X:0": a, "Y:0": b, "Z:0": c})
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+
+    # ------------------------------------------------------------------
+    # GatherV2 (tf.gather)
+    # ------------------------------------------------------------------
+
+    def test_tf_gather_axis0(self):
+        """tf.gather along axis 0 → ONNX Gather."""
+
+        @tf.function
+        def fn(params, indices):
+            return tf.gather(params, indices, axis=0)
+
+        params = np.random.rand(5, 4).astype(np.float32)
+        indices = np.array([1, 3, 2, 0], dtype=np.int32)
+        onx = to_onnx(fn, (params, indices), input_names=["params", "indices"])
+        self.assertIn("Gather", [n.op_type for n in onx.graph.node])
+
+        inp_names = [i.name for i in onx.graph.input]
+        expected = fn(params, indices).numpy()
+        ort_result = _ort_run(onx, {inp_names[0]: params, inp_names[1]: indices})
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+
+    def test_tf_gather_axis1(self):
+        """tf.gather along axis 1 → ONNX Gather(axis=1)."""
+
+        @tf.function
+        def fn(params, indices):
+            return tf.gather(params, indices, axis=1)
+
+        params = np.random.rand(3, 5).astype(np.float32)
+        indices = np.array([0, 2, 4], dtype=np.int32)
+        onx = to_onnx(fn, (params, indices), input_names=["params", "indices"])
+        self.assertIn("Gather", [n.op_type for n in onx.graph.node])
+
+        inp_names = [i.name for i in onx.graph.input]
+        expected = fn(params, indices).numpy()
+        ort_result = _ort_run(onx, {inp_names[0]: params, inp_names[1]: indices})
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+
+    # ------------------------------------------------------------------
+    # ExpandDims (tf.expand_dims)
+    # ------------------------------------------------------------------
+
+    def test_tf_expand_dims_axis1(self):
+        """tf.expand_dims along axis 1 → ONNX Unsqueeze."""
+
+        @tf.function
+        def fn(x):
+            return tf.expand_dims(x, axis=1)
+
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = to_onnx(fn, (x,))
+        self.assertIn("Unsqueeze", [n.op_type for n in onx.graph.node])
+
+        expected = fn(x).numpy()
+        ort_result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+        self.assertEqual(ort_result.shape, (3, 1, 4))
+
+    def test_tf_expand_dims_axis0(self):
+        """tf.expand_dims along axis 0 → ONNX Unsqueeze."""
+
+        @tf.function
+        def fn(x):
+            return tf.expand_dims(x, axis=0)
+
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = to_onnx(fn, (x,))
+
+        expected = fn(x).numpy()
+        ort_result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+
+    def test_tf_expand_dims_negative_axis(self):
+        """tf.expand_dims with a negative axis → ONNX Unsqueeze."""
+
+        @tf.function
+        def fn(x):
+            return tf.expand_dims(x, axis=-1)
+
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = to_onnx(fn, (x,))
+
+        expected = fn(x).numpy()
+        ort_result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+        self.assertEqual(ort_result.shape, (3, 4, 1))
+
+    # ------------------------------------------------------------------
+    # Cast (tf.cast)
+    # ------------------------------------------------------------------
+
+    def test_tf_cast_float_to_double(self):
+        """tf.cast float32 → float64 → ONNX Cast."""
+
+        @tf.function
+        def fn(x):
+            return tf.cast(x, tf.float64)
+
+        x = np.random.rand(3, 4).astype(np.float32)
+        onx = to_onnx(fn, (x,))
+        self.assertIn("Cast", [n.op_type for n in onx.graph.node])
+
+        expected = fn(x).numpy()
+        ort_result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+        self.assertEqual(ort_result.dtype, np.float64)
+
+    def test_tf_cast_float_to_int32(self):
+        """tf.cast float32 → int32 → ONNX Cast."""
+
+        @tf.function
+        def fn(x):
+            return tf.cast(x, tf.int32)
+
+        x = np.array([[1.7, 2.3, 3.9], [4.0, 5.1, 6.8]], dtype=np.float32)
+        onx = to_onnx(fn, (x,))
+        self.assertIn("Cast", [n.op_type for n in onx.graph.node])
+
+        expected = fn(x).numpy()
+        ort_result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, ort_result)
+
+    # ------------------------------------------------------------------
+    # Dense with additional activations
+    # ------------------------------------------------------------------
+
+    def test_keras_dense_tanh(self):
+        """Dense layer with tanh activation → ONNX MatMul + Tanh."""
+        model = tf.keras.Sequential(
+            [tf.keras.layers.Dense(4, activation="tanh", input_shape=(3,))]
+        )
+        X = np.random.rand(5, 3).astype(np.float32)
+        model(X)
+
+        onx = to_onnx(model, (X,))
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("MatMul", op_types)
+        self.assertIn("Tanh", op_types)
+
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
+        expected = model(X).numpy()
+        ort_result = _ort_run(onx, feeds)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
+    def test_keras_dense_softmax(self):
+        """Dense layer with softmax activation → ONNX MatMul + Softmax."""
+        model = tf.keras.Sequential(
+            [tf.keras.layers.Dense(4, activation="softmax", input_shape=(3,))]
+        )
+        X = np.random.rand(5, 3).astype(np.float32)
+        model(X)
+
+        onx = to_onnx(model, (X,))
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Softmax", op_types)
+
+        input_name = onx.graph.input[0].name
+        feeds = {input_name: X}
+
+        expected = model(X).numpy()
+        ort_result = _ort_run(onx, feeds)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
+    # ------------------------------------------------------------------
+    # tf.nn.bias_add
+    # ------------------------------------------------------------------
+
+    def test_tf_bias_add(self):
+        """tf.nn.bias_add → ONNX Add (via BiasAdd converter)."""
+
+        @tf.function
+        def fn(x, b):
+            return tf.nn.bias_add(x, b)
+
+        x = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(4).astype(np.float32)
+        onx = to_onnx(fn, (x, b), input_names=["X", "B"])
+        self.assertIn("Add", [n.op_type for n in onx.graph.node])
+
+        expected = fn(x, b).numpy()
+        ort_result = _ort_run(onx, {"X:0": x, "B:0": b})
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+
+    # ------------------------------------------------------------------
+    # tf.clip_by_value (Relu6-like)
+    # ------------------------------------------------------------------
+
+    def test_tf_clip_by_value(self):
+        """tf.clip_by_value → ONNX Clip."""
+
+        @tf.function
+        def fn(x):
+            return tf.clip_by_value(x, 0.0, 1.0)
+
+        x = np.random.rand(3, 4).astype(np.float32) * 2 - 0.5
+        onx = to_onnx(fn, (x,))
+
+        expected = fn(x).numpy()
+        ort_result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+
+    # ------------------------------------------------------------------
+    # tf.math.reduce_std / reduce_variance
+    # ------------------------------------------------------------------
+
+    def test_tf_reduce_std(self):
+        """tf.math.reduce_std → combination of ReduceMean and Sqrt ops."""
+
+        @tf.function
+        def fn(x):
+            return tf.math.reduce_std(x, axis=1)
+
+        x = np.random.rand(3, 8).astype(np.float32)
+        onx = to_onnx(fn, (x,))
+
+        expected = fn(x).numpy()
+        ort_result = _ort_run(onx, {"X:0": x})
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
