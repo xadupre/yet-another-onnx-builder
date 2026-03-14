@@ -186,6 +186,7 @@ module = [
     "yobx.sklearn.neighbors.*",
     "yobx.sklearn.neural_network.*",
     "yobx.sklearn.preprocessing.*",
+    "yobx.sklearn.svm.*",
     "yobx.sklearn.tree.*",
     "yobx.sklearn.xgboost.*",
     "yobx.reference.torch_ops.*",
