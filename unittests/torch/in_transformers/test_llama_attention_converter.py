@@ -76,7 +76,7 @@ def _to_model(attn, hs, cos, sin, mask=None, target_opset=22):
     return g.to_onnx(optimize=False)
 
 
-@requires_transformers("4.50")
+@requires_transformers("4.57")
 class TestLlamaAttentionConverter(ExtTestCase):
     """Unit tests for :func:`llama_attention_to_onnx`."""
 
