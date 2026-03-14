@@ -60,6 +60,7 @@ Its unique API:
    design/sklearn/index
    design/tensorflow/index
    design/torch/index
+   design/index
    cmds/index
 
 .. toctree::

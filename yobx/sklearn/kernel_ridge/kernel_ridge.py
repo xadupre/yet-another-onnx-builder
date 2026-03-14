@@ -1,4 +1,4 @@
-from typing import Dict, List, Union, Tuple
+from typing import Dict, List
 
 import numpy as np
 from sklearn.kernel_ridge import KernelRidge
@@ -132,9 +132,7 @@ def _emit_kernel_ridge_matrix(
         diff = g.op.Sub(X_exp, X_fit_3d, name=f"{name}_diff")  # (N, M, F)
         diff_sq = g.op.Mul(diff, diff, name=f"{name}_diffsq")  # (N, M, F)
         denom = g.op.Add(X_exp, X_fit_3d, name=f"{name}_denom")  # (N, M, F)
-        denom_safe = g.op.Max(
-            denom, np.array(1e-30, dtype=dtype), name=f"{name}_denom_safe"
-        )
+        denom_safe = g.op.Max(denom, np.array(1e-30, dtype=dtype), name=f"{name}_denom_safe")
         ratio = g.op.Div(diff_sq, denom_safe, name=f"{name}_ratio")  # (N, M, F)
         chi2_sum = g.op.ReduceSum(
             ratio, np.array([2], dtype=np.int64), keepdims=0, name=f"{name}_chi2sum"
@@ -192,9 +190,7 @@ def sklearn_kernel_ridge(
     :param name: prefix for added node names
     :return: output tensor name (predictions)
     """
-    assert isinstance(
-        estimator, KernelRidge
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, KernelRidge), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     kernel = estimator.kernel
@@ -213,9 +209,7 @@ def sklearn_kernel_ridge(
 
     # Resolve effective gamma (sklearn default: 1 / n_features when gamma=None)
     gamma = (
-        float(estimator.gamma)
-        if estimator.gamma is not None
-        else 1.0 / estimator.X_fit_.shape[1]
+        float(estimator.gamma) if estimator.gamma is not None else 1.0 / estimator.X_fit_.shape[1]
     )
     degree = int(estimator.degree)
     coef0 = float(estimator.coef0)
