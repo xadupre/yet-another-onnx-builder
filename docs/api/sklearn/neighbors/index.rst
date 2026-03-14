@@ -7,5 +7,6 @@ yobx.sklearn.neighbors
 
     kneighbors
     kneighbors_transformer
+    kernel_density
     local_outlier_factor
     radiusneighbors

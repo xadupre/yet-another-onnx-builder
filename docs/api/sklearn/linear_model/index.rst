@@ -9,3 +9,4 @@ yobx.sklearn.linear_model
     linear_classifier
     linear_regressor
     logistic_regression
+    sgd_one_class_svm
