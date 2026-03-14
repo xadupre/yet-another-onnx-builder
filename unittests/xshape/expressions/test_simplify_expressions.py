@@ -83,6 +83,11 @@ class TestSimplifyExpressions(ExtTestCase):
         self.assertEqual("a+b", simplify_expression("1024*(a+b)//1024"))
         self.assertEqual("2*a+2*b", simplify_expression("1024*(a+b)//1024*2"))
 
+    def test_simplify_expression_negation(self):
+        self.assertEqual("length", simplify_expression("-1+1+length"))
+        self.assertEqual("x-1", simplify_expression("-1+x"))
+        self.assertEqual("x", simplify_expression("-x+2*x"))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

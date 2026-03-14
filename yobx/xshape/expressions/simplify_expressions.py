@@ -209,6 +209,20 @@ class ExpressionSimplifierAddVisitor(CommonVisitor):
         else:
             self.generic_visit(node)
 
+    def visit_UnaryOp(self, node):
+        if isinstance(node.op, ast.USub):
+            neg = ExpressionSimplifierAddVisitor()
+            neg.visit(node.operand)
+            for v, c in neg.coeffs.items():
+                if v not in self.coeffs:
+                    self.coeffs[v] = 0
+                self.coeffs[v] -= c
+            self.const -= neg.const
+        elif isinstance(node.op, ast.UAdd):
+            self.visit(node.operand)
+        else:
+            self.generic_visit(node)
+
     def visit_Constant(self, node):
         self.const += node.value
 
