@@ -26,6 +26,11 @@ class TestSimplifyExpressions(ExtTestCase):
         self.assertEqual(simplify_expression("x - 1"), "x-1")
         self.assertEqual(simplify_expression("1 - x"), "-x+1")
 
+    def test_simplify_expression4(self):
+        self.assertEqual(simplify_expression("-1+1+length"), "length")
+        self.assertEqual(simplify_expression("1+length-1"), "length")
+        self.assertEqual(simplify_expression("-1+length+1"), "length")
+
     def test_simplify_two_expressions(self):
         self.assertEqual(
             simplify_two_expressions("s52+seq_length", "s52+s70"), {"s70": -1, "seq_length": 1}
