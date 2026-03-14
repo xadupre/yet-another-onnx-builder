@@ -3,7 +3,6 @@ import numpy as np
 import torch
 from yobx.ext_test_case import (
     ExtTestCase,
-    has_onnxruntime,
     requires_onnxruntime,
     requires_transformers,
 )
@@ -44,22 +43,12 @@ class TestLlamaAttentionConverter(ExtTestCase):
             out, _ = attn(hs, position_embeddings=(cos, sin))
         return out.float().numpy()
 
-    def _run_ort(self, model, feeds):
-        try:
-            import onnxruntime as ort
-        except ImportError:
-            return None
-        sess = ort.InferenceSession(
-            model.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
-        return sess.run(None, feeds)[0]
-
     # ------------------------------------------------------------------ #
     # float32 tests                                                        #
     # ------------------------------------------------------------------ #
 
     def test_opset22_float32(self):
-        """Standard ONNX ops path, float32."""
+        """Standard ONNX ops path, float32 — ref evaluator and OnnxRuntime."""
         from yobx.torch.in_transformers.models import llama_attention_to_onnx
 
         attn = _make_llama_attention().eval()
@@ -78,32 +67,20 @@ class TestLlamaAttentionConverter(ExtTestCase):
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-4)
 
-    @requires_onnxruntime("1.0")
-    def test_opset22_float32_ort(self):
-        """Standard ONNX ops path, float32, validated with OnnxRuntime."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
+        import onnxruntime as ort
 
-        attn = _make_llama_attention().eval()
-        hs, cos, sin = self._get_inputs()
-        expected = self._torch_expected(attn, hs, cos, sin)
-
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=22)
-
-        feeds = {
-            "hidden_states": hs.numpy(),
-            "cos": cos.numpy(),
-            "sin": sin.numpy(),
-        }
-        got = self._run_ort(model, feeds)
-        if got is not None:
-            self.assertEqualArray(expected, got, atol=1e-4)
+        sess = ort.InferenceSession(
+            model.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got_ort = sess.run(None, feeds)[0]
+        self.assertEqualArray(expected, got_ort, atol=1e-4)
 
     # ------------------------------------------------------------------ #
     # float16 tests                                                        #
     # ------------------------------------------------------------------ #
 
     def test_opset22_float16(self):
-        """Standard ONNX ops path, float16."""
+        """Standard ONNX ops path, float16 — ref evaluator and OnnxRuntime."""
         from yobx.torch.in_transformers.models import llama_attention_to_onnx
 
         attn = _make_llama_attention().to(torch.float16).eval()
@@ -121,25 +98,13 @@ class TestLlamaAttentionConverter(ExtTestCase):
         got = ref.run(None, feeds)[0].astype(np.float32)
         self.assertEqualArray(expected, got, atol=5e-3)
 
-    @requires_onnxruntime("1.0")
-    def test_opset22_float16_ort(self):
-        """Standard ONNX ops path, float16, validated with OnnxRuntime."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
+        import onnxruntime as ort
 
-        attn = _make_llama_attention().to(torch.float16).eval()
-        hs, cos, sin = self._get_inputs(torch_dtype=torch.float16)
-        expected = self._torch_expected(attn, hs, cos, sin)
-
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=22)
-
-        feeds = {
-            "hidden_states": hs.numpy(),
-            "cos": cos.numpy(),
-            "sin": sin.numpy(),
-        }
-        got = self._run_ort(model, feeds)
-        if got is not None:
-            self.assertEqualArray(expected, got.astype(np.float32), atol=5e-3)
+        sess = ort.InferenceSession(
+            model.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got_ort = sess.run(None, feeds)[0].astype(np.float32)
+        self.assertEqualArray(expected, got_ort, atol=5e-3)
 
     # ------------------------------------------------------------------ #
     # opset 24 (ONNX Attention op)                                         #
@@ -316,7 +281,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
     # ------------------------------------------------------------------ #
 
     def test_opset22_with_attention_mask(self):
-        """Standard ONNX ops path with an attention_mask input."""
+        """Standard ONNX ops path with an attention_mask input — ref evaluator and OnnxRuntime."""
         from yobx.torch.in_transformers.models import llama_attention_to_onnx
 
         attn = _make_llama_attention().eval()
@@ -344,6 +309,14 @@ class TestLlamaAttentionConverter(ExtTestCase):
         ref = ExtendedReferenceEvaluator(model)
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-4)
+
+        import onnxruntime as ort
+
+        sess = ort.InferenceSession(
+            model.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got_ort = sess.run(None, feeds)[0]
+        self.assertEqualArray(expected, got_ort, atol=1e-4)
 
     # ------------------------------------------------------------------ #
     # Model structure tests                                                 #
