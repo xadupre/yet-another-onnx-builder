@@ -129,12 +129,19 @@ def validate_model(
         print(f"[validate_model] loading config for {model_id!r}")
 
     try:
-        try:
-            config = AutoConfig.from_pretrained(model_id, local_files_only=True)
-            summary["config_from_cache"] = True
-        except OSError:
-            config = AutoConfig.from_pretrained(model_id)
-            summary["config_from_cache"] = False
+        from .in_transformers.models import get_cached_configuration
+
+        _cached = get_cached_configuration(model_id)
+        if _cached is not None:
+            config = _cached
+            summary["config_from_cache"] = "bundled"
+        else:
+            try:
+                config = AutoConfig.from_pretrained(model_id, local_files_only=True)
+                summary["config_from_cache"] = "local"
+            except OSError:
+                config = AutoConfig.from_pretrained(model_id)
+                summary["config_from_cache"] = False
     except Exception as exc:
         summary["error_config"] = str(exc)
         if not quiet:
