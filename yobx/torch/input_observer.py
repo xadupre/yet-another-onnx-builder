@@ -645,8 +645,12 @@ class InputObserverInfo:
 
         flat_dynamic_shapes = [
             {
-                dim: self._resolve_dim_label(
-                    self._best_candidate._position_to_args_kwargs[flat_idx], dim, dim_names
+                dim: (
+                    self._resolve_dim_label(
+                        self._best_candidate._position_to_args_kwargs[flat_idx], dim, dim_names
+                    )
+                    if dim_names
+                    else torch.export.Dim.DYNAMIC
                 )
                 for dim in dims
             }
@@ -941,14 +945,19 @@ class InputObserverInfo:
         self,
         arg_or_kwarg: int | str,
         dim: int,
-        dim_names: dict[str | int, dict[int, str]] | None,
-    ) -> Any:
-        """Returns the string label or ``torch.export.Dim.DYNAMIC`` for a dynamic dimension.
+        dim_names: dict[str | int, dict[int, str]],
+    ) -> str:
+        """Returns the string label for a dynamic dimension.
 
-        Used directly when constructing ``flat_dynamic_shapes`` in
-        :meth:`infer_dynamic_shapes` so that string labels are embedded into the
-        per-tensor shape dicts as soon as they are built, rather than as a
-        post-processing step.
+        Always returns a string — never ``torch.export.Dim.DYNAMIC``.  When
+        *dim_names* provides an explicit label for this input and dimension it is
+        returned directly.  Otherwise a unique fallback label
+        ``<input_name>_dim_<n>`` is generated so that every dynamic axis carries a
+        distinct, human-readable name.
+
+        The caller is responsible for the ``if not dim_names`` guard (treating both
+        ``None`` and an empty dict as "no naming requested") and should use
+        ``torch.export.Dim.DYNAMIC`` directly when no naming is requested.
 
         Args:
             arg_or_kwarg: The positional index (``int``) or keyword name (``str``)
@@ -956,27 +965,31 @@ class InputObserverInfo:
                 ``InputCandidate._position_to_args_kwargs``.
             dim: Dimension index within the tensor.
             dim_names: Mapping from input identifier to per-dimension string labels,
-                as passed to :meth:`infer_dynamic_shapes`.  ``None`` or empty
-                → always returns ``torch.export.Dim.DYNAMIC``.
+                as passed to :meth:`infer_dynamic_shapes`.
 
         Returns:
-            A string label when *dim_names* provides one for this input and dimension,
-            otherwise ``torch.export.Dim.DYNAMIC``.
+            A string label — the one from *dim_names* when available, otherwise an
+            auto-generated ``<input_name>_dim_<n>`` label.
         """
-        if not dim_names:
-            return torch.export.Dim.DYNAMIC
-        per_input = dim_names.get(arg_or_kwarg)
-        if per_input is None and isinstance(arg_or_kwarg, int):
-            sig_name = (
+        # Resolve the human-readable input name for the fallback label.
+        if isinstance(arg_or_kwarg, str):
+            input_name: str = arg_or_kwarg
+        else:
+            input_name = (
                 self.signature_names[arg_or_kwarg]
                 if arg_or_kwarg < len(self.signature_names)
-                else None
+                else f"arg{arg_or_kwarg}"
             )
-            if sig_name is not None:
-                per_input = dim_names.get(sig_name)
-        if per_input is None or dim not in per_input:
-            return torch.export.Dim.DYNAMIC
-        return per_input[dim]
+
+        # Look up an explicit label from dim_names (try str key then int key).
+        per_input = dim_names.get(arg_or_kwarg)
+        if per_input is None and isinstance(arg_or_kwarg, int):
+            per_input = dim_names.get(input_name)
+        if per_input is not None and dim in per_input:
+            return per_input[dim]
+
+        # No explicit label — return a unique fallback string.
+        return f"{input_name}_dim_{dim}"
 
     def _build_auto_dim_names(
         self,
