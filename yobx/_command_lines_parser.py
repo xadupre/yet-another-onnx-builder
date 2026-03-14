@@ -799,9 +799,9 @@ def get_parser_validate() -> ArgumentParser:
     )
     parser.add_argument(
         "--opset",
-        default=18,
+        default=22,
         type=int,
-        help="ONNX opset version to target (default: 18).",
+        help="ONNX opset version to target (default: 22).",
     )
     parser.add_argument(
         "--dtype",

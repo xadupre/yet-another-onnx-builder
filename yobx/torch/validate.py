@@ -23,7 +23,7 @@ def validate_model(
     optimization: Optional[str] = "default",
     verbose: int = 0,
     dump_folder: Optional[str] = None,
-    opset: int = 18,
+    opset: int = 22,
     dtype: Optional[str] = None,
     device: Optional[str] = None,
     max_new_tokens: int = 10,
@@ -51,14 +51,14 @@ def validate_model(
     :param prompt: Text prompt used to drive the generation step.
         Defaults to :data:`DEFAULT_PROMPT`.
     :param exporter: ONNX exporter to use, e.g. ``"yobx"`` (default),
-        ``"onnx-dynamo"``, or ``"modelbuilder"``.
+        ``"modelbuilder"``, or ``"onnx-dynamo"``.
     :param optimization: Optimisation level applied after export.
         Passed directly to :func:`yobx.torch.to_onnx`.  ``None`` means no
         optimisation; ``"default"`` applies the default set.
     :param verbose: Verbosity level (0 = silent).
     :param dump_folder: When given, all artefacts (ONNX file, export logs …)
         are saved under this directory.
-    :param opset: ONNX opset version to target (default 18).
+    :param opset: ONNX opset version to target (default 22).
     :param dtype: Cast the model (and inputs) to this dtype before exporting,
         e.g. ``"float16"``.  ``None`` keeps the default (``float32``).
     :param device: Run on this device, e.g. ``"cpu"`` or ``"cuda"``.
