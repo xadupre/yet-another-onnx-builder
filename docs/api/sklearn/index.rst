@@ -15,6 +15,7 @@ yobx.sklearn
     :caption: converters
 
     calibration/index
+    category_encoders/index
     cluster/index
     compose/index
     covariance/index
