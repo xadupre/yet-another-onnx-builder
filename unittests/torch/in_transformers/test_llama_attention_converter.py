@@ -1,3 +1,16 @@
+"""
+Unit tests for :func:`yobx.torch.in_transformers.models.llama_attention_to_onnx`.
+
+Tests cover:
+
+* All three ONNX backends: opset 22 (plain ops), opset 24 (ONNX Attention op),
+  and ``com.microsoft`` (OnnxRuntime MultiHeadAttention contrib op).
+* All supported dtypes: ``float32``, ``float16``, and ``bfloat16``.
+* Both with and without an ``attention_mask`` input.
+* GQA (grouped-query attention) and equal-heads configurations.
+* Validation with both :class:`~yobx.reference.ExtendedReferenceEvaluator`
+  and :mod:`onnxruntime`.
+"""
 import unittest
 import numpy as np
 import torch
