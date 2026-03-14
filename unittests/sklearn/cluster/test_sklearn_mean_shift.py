@@ -131,6 +131,65 @@ class TestMeanShift(ExtTestCase):
         ort_results = sess.run(None, {"X": X})
         self.assertEqualArray(expected_labels, ort_results[0])
 
+    # ------------------------------------------------------------------
+    # CDist path (com.microsoft opset)
+    # ------------------------------------------------------------------
+
+    def test_mean_shift_cdist_float32(self):
+        """Distances computed via com.microsoft.CDist (float32)."""
+        from sklearn.cluster import MeanShift
+        from sklearn.metrics import pairwise_distances
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(5)
+        X = rng.standard_normal((30, 4)).astype(np.float32)
+        ms = MeanShift()
+        ms.fit(X)
+
+        onx = to_onnx(ms, (X,), target_opset={"": 18, "com.microsoft": 1})
+
+        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        self.assertIn(("CDist", "com.microsoft"), op_types)
+
+        domains = {oi.domain for oi in onx.opset_import}
+        self.assertIn("com.microsoft", domains)
+
+        expected_labels = ms.predict(X).astype(np.int64)
+        expected_distances = pairwise_distances(
+            X, ms.cluster_centers_.astype(np.float32)
+        ).astype(np.float32)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_labels, ort_results[0])
+        self.assertEqualArray(expected_distances, ort_results[1], atol=1e-4)
+
+    def test_mean_shift_cdist_float64(self):
+        """Distances computed via com.microsoft.CDist (float64)."""
+        from sklearn.cluster import MeanShift
+        from sklearn.metrics import pairwise_distances
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(5)
+        X = rng.standard_normal((30, 4)).astype(np.float64)
+        ms = MeanShift()
+        ms.fit(X)
+
+        onx = to_onnx(ms, (X,), target_opset={"": 18, "com.microsoft": 1})
+
+        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        self.assertIn(("CDist", "com.microsoft"), op_types)
+
+        expected_labels = ms.predict(X).astype(np.int64)
+        expected_distances = pairwise_distances(
+            X, ms.cluster_centers_.astype(np.float64)
+        ).astype(np.float64)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_labels, ort_results[0])
+        self.assertEqualArray(expected_distances, ort_results[1], atol=1e-6)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
