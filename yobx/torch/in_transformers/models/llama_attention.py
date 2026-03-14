@@ -9,7 +9,9 @@ Three computation backends are supported, selected automatically based on
 the requested target opset:
 
 * **com.microsoft** (``"com.microsoft" in target_opset``):
-  Uses the ``com.microsoft.GroupQueryAttention`` contrib op from *onnxruntime*.
+  Uses the ``com.microsoft.MultiHeadAttention`` contrib op from *onnxruntime*.
+  GQA key/value heads are expanded (via repeat-interleave) to match the query
+  head count before being passed to the op.
   The model runs efficiently on CPU and CUDA with OnnxRuntime.
 * **opset ≥ 24** (``main_opset >= 24``):
   Uses the standard ONNX ``Attention`` operator introduced in opset 23
@@ -39,6 +41,9 @@ from ....xbuilder import GraphBuilder
 
 T = str
 
+# Upper bound for open-ended ONNX Slice (INT64_MAX would work but 2^30 is safe and smaller)
+_MAX_SLICE_END = 2**30
+
 
 def _np_dtype_for_onnx(onnx_dtype: int) -> np.dtype:
     return tensor_dtype_to_np_dtype(onnx_dtype)
@@ -64,7 +69,7 @@ def _rotate_half(g: GraphBuilder, x: T, head_dim: int, name: str) -> T:
     x2 = g.op.Slice(
         x,
         np.array([half], dtype=np.int64),
-        np.array([2**30], dtype=np.int64),
+        np.array([_MAX_SLICE_END], dtype=np.int64),
         np.array([-1], dtype=np.int64),
         name=name,
     )
