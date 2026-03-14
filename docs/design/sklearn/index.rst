@@ -68,7 +68,7 @@ if ``target_opsets={'': 18, 'com.microsoft': 1}`` (see :ref:`l-design-sklearn-co
 
 **Discrepancies**
 
-:epkg:`scikit-learn==1.8` is more strict with computation types and
+`scikit-learn==1.8` is more strict with computation types and
 the number of discrepancies is reduced. Switch to float32 in a matrix
 multiplication when the order of magnitude of the coefficient is quite
 large usually introduces discrepancies. That is often the case when

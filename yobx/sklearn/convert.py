@@ -172,20 +172,23 @@ def to_onnx(
 
     .. note::
 
-        :epkg:`scikit-learn==1.8` is more strict with computation types and
+        `scikit-learn==1.8` is more strict with computation types and
         the number of discrepancies is reduced. Switch to float32 in a matrix
         multiplication when the order of magnitude of the coefficient is quite
         large usually introduces discrepancies. That is often the case when
         a matrix is the inverse of another one.
         See :ref:`l-plot-sklearn-pls-float32`.
     """
+    _fitted_check_target = (
+        estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
+    )
     check_is_fitted(
-        estimator,
-        attributes=["transform", "predict"],
+        _fitted_check_target,
+        attributes=["transform", "predict", "mahalanobis"],
         all_or_any=any,
         msg=(
-            "This %(name)s instance has neither a 'transform' nor a 'predict' method "
-            "and cannot be converted to ONNX."
+            "This %(name)s instance has neither a 'transform', 'predict', nor "
+            "'mahalanobis' method and cannot be converted to ONNX."
         ),
     )
     if isinstance(target_opset, int):
