@@ -2390,25 +2390,25 @@ def set_type_shape_multi_head_attention(self: ShapeBuilder, node: NodeProto):
             if len(node.input) > 6 and node.input[6] and self.has_shape(node.input[6])
             else None
         )
-        up = []
-        self.set_shape(node.output[0], q_shape)
-        up.append(q_shape)
-        d1, d2 = q_shape[1], pk_shape[2]
-        if isinstance(d1, int) and isinstance(d2, int):
-            d = d1 + d2
-        else:
-            d = simplify_expression(f"({d1})+({d2})")
-        shape = (*pk_shape[:2], d, pk_shape[-1])
-        for o in node.output[1:]:
-            if o:
-                self.set_shape(o, shape)
-                up.append(shape)
-        return up
-    else:
-        self.set_rank(node.output[0], 3)
-        for o in node.output[1:]:
-            if o:
-                self.set_rank(o, 4)
+        if pk_shape is not None:
+            up = []
+            self.set_shape(node.output[0], q_shape)
+            up.append(q_shape)
+            d1, d2 = q_shape[1], pk_shape[2]
+            if isinstance(d1, int) and isinstance(d2, int):
+                d = d1 + d2
+            else:
+                d = simplify_expression(f"({d1})+({d2})")
+            shape = (*pk_shape[:2], d, pk_shape[-1])
+            for o in node.output[1:]:
+                if o:
+                    self.set_shape(o, shape)
+                    up.append(shape)
+            return up
+    self.set_rank(node.output[0], 3)
+    for o in node.output[1:]:
+        if o:
+            self.set_rank(o, 4)
 
 
 _set_shape_type_op_any_custom = {

@@ -10,3 +10,4 @@ yobx.torch.in_transformers
     flatten_class
     patches
     models/index
+    classes/index
