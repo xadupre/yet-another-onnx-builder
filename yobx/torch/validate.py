@@ -176,11 +176,13 @@ def validate_model(
     # --------------------------------------------------------------- load model
     if verbose:
         if random_weights:
-            print(f"[validate_model] creating model from config (random weights) for {model_id!r}")
+            print(
+                f"[validate_model] creating model from config (random weights) for {model_id!r}"
+            )
         else:
             print(f"[validate_model] loading model for {model_id!r}")
 
-    dtype_kwargs: Dict[str, Any] = ({"torch_dtype": torch_dtype} if torch_dtype is not None else {})
+    dtype_kwargs: Dict[str, Any] = {"torch_dtype": torch_dtype} if torch_dtype is not None else {}
     try:
         if random_weights:
             model: torch.nn.Module = AutoModelForCausalLM.from_config(config, **dtype_kwargs)
@@ -227,7 +229,11 @@ def validate_model(
     try:
         with (
             register_flattening_functions(patch_transformers=patch),
-            apply_patches_for_model(patch_transformers=patch, model=model) if patch else contextlib.nullcontext(),
+            (
+                apply_patches_for_model(patch_transformers=patch, model=model)
+                if patch
+                else contextlib.nullcontext()
+            ),
             observer(model),
         ):
             generate_kwargs: Dict[str, Any] = dict(
@@ -288,9 +294,11 @@ def validate_model(
 
         with (
             register_flattening_functions(patch_transformers=patch),
-            apply_patches_for_model(
-                patch_torch=patch, patch_transformers=patch, model=model
-            ) if patch else contextlib.nullcontext(),
+            (
+                apply_patches_for_model(patch_torch=patch, patch_transformers=patch, model=model)
+                if patch
+                else contextlib.nullcontext()
+            ),
         ):
             to_onnx(
                 model,

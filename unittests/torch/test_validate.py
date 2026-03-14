@@ -100,7 +100,7 @@ class TestValidateModel(ExtTestCase):
             "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
             "attention_mask": torch.ones(1, 5, dtype=torch.int64),
         }
-        summary, data = validate_model(
+        _summary, data = validate_model(
             "arnir0/Tiny-LLM",
             tokenized_inputs=tokenized,
             random_weights=True,
