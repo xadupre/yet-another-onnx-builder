@@ -1,4 +1,4 @@
-from typing import Tuple, Dict, List, Union
+from typing import Dict, List, Union
 
 import numpy as np
 import onnx

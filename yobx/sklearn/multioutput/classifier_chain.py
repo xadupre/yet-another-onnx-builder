@@ -30,12 +30,12 @@ def sklearn_classifier_chain(
 
     .. code-block:: text
 
-        X ──[est 0 converter]──► label_0 ──Cast(float)──Reshape(N,1)──┐ pred_0_col
+        X ──[est 0 converter]──► label_0 ── Cast(float)──Reshape(N,1) ──┐ pred_0_col
         │                                                               │
         Concat(X, pred_0_col) ──[est 1 converter]──► label_1 ──Cast──Reshape──┐ pred_1_col
         │                                                                       │
-        ...                                                                    │
-                                                    Concat(axis=1) ────────────► labels (N, n_targets)
+        ...                         +-------------------------------------------+
+                Concat(axis=1) ─────+──────► labels (N, n_targets)
 
     When the chain ``order_`` is not the identity permutation, the concatenated
     predictions (in chain order) are reordered via ``Gather`` using the
