@@ -7,6 +7,7 @@ yobx.sklearn.preprocessing
 
     binarizer
     kbins_discretizer
+    kernel_centerer
     max_abs_scaler
     min_max_scaler
     one_hot_encoder
