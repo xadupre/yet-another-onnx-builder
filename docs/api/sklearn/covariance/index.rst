@@ -6,3 +6,4 @@ yobx.sklearn.covariance
     :caption: modules
 
     elliptic_envelope
+    ledoit_wolf
