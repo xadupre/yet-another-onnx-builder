@@ -1,4 +1,4 @@
-name: ci-3
+name: ci-3-tensorflow
 
 on:
   push:
