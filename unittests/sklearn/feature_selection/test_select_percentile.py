@@ -98,10 +98,12 @@ class TestSelectPercentile(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         X, y = self._make_data(np.float32)
-        pipe = Pipeline([
-            ("sel", SelectPercentile(score_func=f_classif, percentile=50)),
-            ("clf", LogisticRegression()),
-        ])
+        pipe = Pipeline(
+            [
+                ("sel", SelectPercentile(score_func=f_classif, percentile=50)),
+                ("clf", LogisticRegression()),
+            ]
+        )
         pipe.fit(X, y)
 
         onx = to_onnx(pipe, (X,))
@@ -130,10 +132,12 @@ class TestSelectPercentile(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         X, y = self._make_data(np.float64)
-        pipe = Pipeline([
-            ("sel", SelectPercentile(score_func=f_classif, percentile=50)),
-            ("clf", LogisticRegression()),
-        ])
+        pipe = Pipeline(
+            [
+                ("sel", SelectPercentile(score_func=f_classif, percentile=50)),
+                ("clf", LogisticRegression()),
+            ]
+        )
         pipe.fit(X, y)
 
         onx = to_onnx(pipe, (X,))

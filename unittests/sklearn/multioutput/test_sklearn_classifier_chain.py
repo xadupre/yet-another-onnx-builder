@@ -102,9 +102,7 @@ class TestSklearnClassifierChain(ExtTestCase):
 
     def test_random_order(self):
         """ClassifierChain with float32 input and random chain order."""
-        cc = ClassifierChain(
-            LogisticRegression(max_iter=200), order="random", random_state=42
-        )
+        cc = ClassifierChain(LogisticRegression(max_iter=200), order="random", random_state=42)
         cc.fit(self._X, self._y)
 
         onx = to_onnx(cc, (self._X,))

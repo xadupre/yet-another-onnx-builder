@@ -40,7 +40,9 @@ class TestSklearnSGDOneClassSVM(ExtTestCase):
         onx = to_onnx(clf, (X,))
 
         output_names = [o.name for o in onx.graph.output]
-        self.assertEqual(len(output_names), 2, f"Expected 2 outputs (label, scores), got {output_names}")
+        self.assertEqual(
+            len(output_names), 2, f"Expected 2 outputs (label, scores), got {output_names}"
+        )
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": X})

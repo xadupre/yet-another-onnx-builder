@@ -70,9 +70,7 @@ def sklearn_one_class_svm(
     :param name: prefix for added node names
     :return: label tensor name, or tuple ``(label, scores)``
     """
-    assert isinstance(
-        estimator, OneClassSVM
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, OneClassSVM), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)

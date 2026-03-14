@@ -81,9 +81,9 @@ def sklearn_one_vs_one_classifier(
     # Build the ordered pair list: (i, j) for 0 <= i < j < K.
     # sklearn iterates in the same order to build estimators_.
     pairs = [(i, j) for i in range(K) for j in range(i + 1, K)]
-    assert len(pairs) == len(estimator.estimators_), (
-        f"Expected {len(pairs)} estimators, got {len(estimator.estimators_)}"
-    )
+    assert len(pairs) == len(
+        estimator.estimators_
+    ), f"Expected {len(pairs)} estimators, got {len(estimator.estimators_)}"
 
     # ------------------------------------------------------------------
     # Step 1: obtain per-pair confidence (proba[:, 1]) and binary prediction
@@ -201,12 +201,8 @@ def sklearn_one_vs_one_classifier(
     # ------------------------------------------------------------------
     # Step 4: argmax → class label
     # ------------------------------------------------------------------
-    label_idx_raw = g.op.ArgMax(
-        final_scores, axis=1, keepdims=0, name=f"{name}_argmax"
-    )
-    label_idx = g.op.Cast(
-        label_idx_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast"
-    )
+    label_idx_raw = g.op.ArgMax(final_scores, axis=1, keepdims=0, name=f"{name}_argmax")
+    label_idx = g.op.Cast(label_idx_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast")
 
     if np.issubdtype(classes.dtype, np.integer):
         classes_arr = classes.astype(np.int64)

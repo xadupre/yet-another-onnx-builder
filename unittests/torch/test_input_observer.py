@@ -1482,16 +1482,12 @@ class TestInputObserver(ExtTestCase):
 
         # With dim_names by input name: dimension 0 of x → "batch", dim 1 → "seq"
         # y is not in dim_names → auto-generated fallback "y_dim_1"
-        named_shapes = observer.infer_dynamic_shapes(
-            dim_names={"x": {0: "batch", 1: "seq"}}
-        )
+        named_shapes = observer.infer_dynamic_shapes(dim_names={"x": {0: "batch", 1: "seq"}})
         self.assertEqual(({0: "batch", 1: "seq"}, {1: "y_dim_1"}), named_shapes)
 
         # With dim_names by position index 0 → x
         # y is not in dim_names → auto-generated fallback "y_dim_1"
-        named_shapes_by_pos = observer.infer_dynamic_shapes(
-            dim_names={0: {0: "batch", 1: "seq"}}
-        )
+        named_shapes_by_pos = observer.infer_dynamic_shapes(dim_names={0: {0: "batch", 1: "seq"}})
         self.assertEqual(({0: "batch", 1: "seq"}, {1: "y_dim_1"}), named_shapes_by_pos)
 
     def test_dim_names_kwargs(self):
@@ -1522,9 +1518,7 @@ class TestInputObserver(ExtTestCase):
         named_shapes = observer.infer_dynamic_shapes(
             dim_names={"x": {0: "batch", 1: "seq"}, "y": {1: "seq"}}
         )
-        self.assertEqual(
-            dict(x={0: "batch", 1: "seq"}, y={1: "seq"}), named_shapes
-        )
+        self.assertEqual(dict(x={0: "batch", 1: "seq"}, y={1: "seq"}), named_shapes)
 
     def test_dim_names_partial(self):
         """Test that dim_names generates unique fallback strings for unspecified inputs/dims."""
@@ -1546,9 +1540,7 @@ class TestInputObserver(ExtTestCase):
                 model(*args)
 
         # Name only dimension 0 of x; unspecified dims get unique auto-generated strings.
-        named_shapes = observer.infer_dynamic_shapes(
-            dim_names={"x": {0: "batch"}}
-        )
+        named_shapes = observer.infer_dynamic_shapes(dim_names={"x": {0: "batch"}})
         # x dim 0 → "batch" (explicit), x dim 1 → "x_dim_1" (auto), y both dims → auto
         self.assertEqual(({0: "batch", 1: "x_dim_1"}, {0: "y_dim_0", 1: "y_dim_1"}), named_shapes)
 
@@ -1639,16 +1631,16 @@ class TestInputObserver(ExtTestCase):
 
         class LLMModel(torch.nn.Module):
             def forward(self, input_ids, attention_mask):
-                return input_ids + attention_mask
+                return torch.cat([input_ids, attention_mask.to(input_ids.dtype)], dim=1)
 
         inputs = [
             (
                 torch.randint(0, 100, (2, 6), dtype=torch.long),
-                torch.ones(2, 6, dtype=torch.long),
+                torch.ones(2, 7, dtype=torch.long),
             ),
             (
                 torch.randint(0, 100, (3, 8), dtype=torch.long),
-                torch.ones(3, 8, dtype=torch.long),
+                torch.ones(3, 9, dtype=torch.long),
             ),
         ]
 

@@ -21,9 +21,7 @@ class TestSklearnOneVsOneClassifier(ExtTestCase):
     _X_bin = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
     _y_bin = np.array([0, 0, 1, 1])
 
-    _X_multi = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32
-    )
+    _X_multi = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
     _y_multi = np.array([0, 0, 1, 1, 2, 2])
 
     def test_binary_logistic_regression_float32(self):
