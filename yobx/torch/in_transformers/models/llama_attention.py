@@ -74,6 +74,7 @@ import onnx
 from onnx import ModelProto, TensorProto
 
 from ....helpers.onnx_helper import np_dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
+from ....typing import GraphBuilderExtendedProtocol
 from ....xbuilder import GraphBuilder
 from ...torch_helper import to_numpy, torch_dtype_to_onnx_dtype
 
@@ -87,7 +88,7 @@ def _np_dtype_for_onnx(onnx_dtype: int) -> np.dtype:
     return tensor_dtype_to_np_dtype(onnx_dtype)
 
 
-def _rotate_half(g: GraphBuilder, x: T, head_dim: int, name: str) -> T:
+def _rotate_half(g: GraphBuilderExtendedProtocol, x: T, head_dim: int, name: str) -> T:
     """
     Implements ``rotate_half(x)``:
     split the last dimension into two halves, negate the second, then concatenate::
@@ -116,7 +117,7 @@ def _rotate_half(g: GraphBuilder, x: T, head_dim: int, name: str) -> T:
 
 
 def _apply_rope(
-    g: GraphBuilder,
+    g: GraphBuilderExtendedProtocol,
     states_4d: T,
     cos_4d: T,
     sin_4d: T,
@@ -138,7 +139,7 @@ def _apply_rope(
 
 
 def _repeat_kv(
-    g: GraphBuilder,
+    g: GraphBuilderExtendedProtocol,
     kv: T,
     n_rep: int,
     num_kv_heads: int,
@@ -189,7 +190,7 @@ def _repeat_kv(
 
 
 def _project_and_split(
-    g: GraphBuilder,
+    g: GraphBuilderExtendedProtocol,
     hidden_states: T,
     weight: np.ndarray,
     bias: Optional[np.ndarray],
@@ -218,7 +219,7 @@ def _project_and_split(
 
 
 def _standard_attention(
-    g: GraphBuilder,
+    g: GraphBuilderExtendedProtocol,
     query_4d: T,
     key_4d: T,
     value_4d: T,
@@ -259,7 +260,7 @@ def _standard_attention(
 
 
 def _attention_opset24(
-    g: GraphBuilder,
+    g: GraphBuilderExtendedProtocol,
     query_4d: T,
     key_4d: T,
     value_4d: T,
@@ -282,7 +283,7 @@ def _attention_opset24(
 
 
 def _mha_com_microsoft(
-    g: GraphBuilder,
+    g: GraphBuilderExtendedProtocol,
     query_3d: T,
     key_3d: T,
     value_3d: T,
