@@ -180,9 +180,7 @@ def to_onnx(
         See :ref:`l-plot-sklearn-pls-float32`.
     """
     _fitted_check_target = (
-        estimator.steps[-1][1]
-        if isinstance(estimator, Pipeline)
-        else estimator
+        estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
     )
     check_is_fitted(
         _fitted_check_target,
