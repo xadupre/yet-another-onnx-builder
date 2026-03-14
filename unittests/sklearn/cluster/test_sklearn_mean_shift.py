@@ -82,9 +82,9 @@ class TestMeanShift(ExtTestCase):
         results = ref.run(None, {"X": X})
         _labels, distances = results[0], results[1]
 
-        expected_distances = pairwise_distances(
-            X, ms.cluster_centers_.astype(np.float32)
-        ).astype(np.float32)
+        expected_distances = pairwise_distances(X, ms.cluster_centers_.astype(np.float32)).astype(
+            np.float32
+        )
         self.assertEqualArray(expected_distances, distances, atol=1e-3)
 
         sess = self.check_ort(onx)
@@ -107,9 +107,9 @@ class TestMeanShift(ExtTestCase):
         results = ref.run(None, {"X": X})
         _labels, distances = results[0], results[1]
 
-        expected_distances = pairwise_distances(
-            X, ms.cluster_centers_.astype(np.float64)
-        ).astype(np.float64)
+        expected_distances = pairwise_distances(X, ms.cluster_centers_.astype(np.float64)).astype(
+            np.float64
+        )
         self.assertEqualArray(expected_distances, distances, atol=1e-6)
 
         sess = self.check_ort(onx)
@@ -187,9 +187,9 @@ class TestMeanShift(ExtTestCase):
         self.assertIn("com.microsoft", domains)
 
         expected_labels = ms.predict(X).astype(np.int64)
-        expected_distances = pairwise_distances(
-            X, ms.cluster_centers_.astype(np.float32)
-        ).astype(np.float32)
+        expected_distances = pairwise_distances(X, ms.cluster_centers_.astype(np.float32)).astype(
+            np.float32
+        )
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": X})
@@ -213,9 +213,9 @@ class TestMeanShift(ExtTestCase):
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
         expected_labels = ms.predict(X).astype(np.int64)
-        expected_distances = pairwise_distances(
-            X, ms.cluster_centers_.astype(np.float64)
-        ).astype(np.float64)
+        expected_distances = pairwise_distances(X, ms.cluster_centers_.astype(np.float64)).astype(
+            np.float64
+        )
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": X})
