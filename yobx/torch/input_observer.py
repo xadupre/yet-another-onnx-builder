@@ -638,7 +638,7 @@ class InputObserverInfo:
 
         # Convert dim_names=True to an auto-generated dict.
         if dim_names is True:
-            dim_names = self._build_auto_dim_names(shape_lists, dynamic_shapes)
+            dim_names = self._build_auto_dim_names(shape_lists, dynamic_shapes)  # type: ignore
 
         # Ensure _position_to_args_kwargs is built before using it below.
         self._best_candidate.build_mappings()
@@ -647,7 +647,7 @@ class InputObserverInfo:
             {
                 dim: (
                     self._resolve_dim_label(
-                        self._best_candidate._position_to_args_kwargs[flat_idx], dim, dim_names
+                        self._best_candidate._position_to_args_kwargs[flat_idx], dim, dim_names  # type: ignore
                     )
                     if dim_names
                     else torch.export.Dim.DYNAMIC
@@ -1034,7 +1034,7 @@ class InputObserverInfo:
                 input_name = str(arg_or_kwarg)
             for dim in dims:
                 values = tuple(
-                    shapes[flat_idx][dim]
+                    shapes[flat_idx][dim]  # type: ignore
                     for shapes in shape_lists
                     if shapes[flat_idx] is not None
                 )
