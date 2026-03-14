@@ -7,6 +7,7 @@ from yobx.ext_test_case import ExtTestCase
 from yobx.xshape import ShapeBuilder, BasicShapeBuilder
 from yobx.xshape.shape_type_compute import (
     broadcast_shape,
+    _compute_reshape_shape,
     set_type_shape_binary_op,
     set_type_shape_fused_matmul,
     set_type_shape_gemm,
@@ -1097,7 +1098,175 @@ class TestShapeTypeCompute(ExtTestCase):
         b = BasicShapeBuilder()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
-        self.assertEqual(b.get_rank("Y"), 2)
+        self.assertEqual(b.get_shape("Y"), (3, 6))
+
+    def test_op_slice_no_axes(self):
+        # No axes input: default axis order applied
+        model = _make_model(
+            [oh.make_node("Slice", ["X", "starts", "ends"], ["Y"])],
+            [_mkv_("X", TFLOAT, [10, 8])],
+            [_mkv_("Y", TFLOAT, [None, None])],
+            [
+                onh.from_array(np.array([2, 1], dtype=np.int64), name="starts"),
+                onh.from_array(np.array([7, 5], dtype=np.int64), name="ends"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_shape("Y"), (5, 4))
+
+    def test_op_slice_with_step(self):
+        # step=2 on axis 0
+        model = _make_model(
+            [oh.make_node("Slice", ["X", "starts", "ends", "axes", "steps"], ["Y"])],
+            [_mkv_("X", TFLOAT, [10, 4])],
+            [_mkv_("Y", TFLOAT, [None, None])],
+            [
+                onh.from_array(np.array([0], dtype=np.int64), name="starts"),
+                onh.from_array(np.array([10], dtype=np.int64), name="ends"),
+                onh.from_array(np.array([0], dtype=np.int64), name="axes"),
+                onh.from_array(np.array([2], dtype=np.int64), name="steps"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_shape("Y"), (5, 4))
+
+    def test_op_slice_int64max_end(self):
+        # INT64_MAX as end means "slice to the end of the dimension"
+        model = _make_model(
+            [oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])],
+            [_mkv_("X", TFLOAT, [5, 6])],
+            [_mkv_("Y", TFLOAT, [None, None])],
+            [
+                onh.from_array(np.array([0], dtype=np.int64), name="starts"),
+                onh.from_array(np.array([9223372036854775807], dtype=np.int64), name="ends"),
+                onh.from_array(np.array([0], dtype=np.int64), name="axes"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_shape("Y"), (5, 6))
+
+    def test_op_slice_negative_start(self):
+        # negative start wraps around: start=-2 on dim=5 → start=3
+        model = _make_model(
+            [oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])],
+            [_mkv_("X", TFLOAT, [5, 6])],
+            [_mkv_("Y", TFLOAT, [None, None])],
+            [
+                onh.from_array(np.array([-2], dtype=np.int64), name="starts"),
+                onh.from_array(np.array([9223372036854775807], dtype=np.int64), name="ends"),
+                onh.from_array(np.array([0], dtype=np.int64), name="axes"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_shape("Y"), (2, 6))
+
+    def test_op_slice_symbolic_dim_preserved(self):
+        # When the sliced dimension is symbolic, it cannot be computed; keep as-is
+        model = _make_model(
+            [oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])],
+            [_mkv_("X", TFLOAT, ["batch", 6])],
+            [_mkv_("Y", TFLOAT, [None, None])],
+            [
+                onh.from_array(np.array([0], dtype=np.int64), name="starts"),
+                onh.from_array(np.array([3], dtype=np.int64), name="ends"),
+                onh.from_array(np.array([1], dtype=np.int64), name="axes"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        # axis 1 (integer 6) is sliced: output[1] = 3; axis 0 is "batch" (symbolic)
+        self.assertEqual(b.get_shape("Y"), ("batch", 3))
+
+    def test_op_slice_symbolic_dim_gets_newdim(self):
+        # When the sliced axis itself is symbolic, a fresh NEWDIM_slice dim is created.
+        model = _make_model(
+            [oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])],
+            [_mkv_("X", TFLOAT, ["batch", 6])],
+            [_mkv_("Y", TFLOAT, [None, None])],
+            [
+                onh.from_array(np.array([0], dtype=np.int64), name="starts"),
+                onh.from_array(np.array([3], dtype=np.int64), name="ends"),
+                onh.from_array(np.array([0], dtype=np.int64), name="axes"),
+            ],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        result_shape = b.get_shape("Y")
+        # axis 0 ("batch") is sliced → fresh symbolic NEWDIM_slice; axis 1 stays 6
+        self.assertEqual(len(result_shape), 2)
+        self.assertEqual(result_shape[0], 3)
+        self.assertEqual(result_shape[1], 6)
+
+    def test_op_split_value_as_shape(self):
+        # splits tensor is NOT a constant but is tracked via value_as_shape
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_split
+
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (6, 4))
+        # splits tracked as shape value, not a constant
+        b.set_value_shape("sp", (3, 3))
+        node = oh.make_node("Split", ["X", "sp"], ["A", "B"], axis=0)
+        _set_shape_type_op_any_split(b, node)
+        self.assertEqual(b.get_type("A"), TFLOAT)
+        self.assertEqual(b.get_shape("A"), (3, 4))
+        self.assertEqual(b.get_shape("B"), (3, 4))
+
+    def test_op_slice_value_as_shape_starts_ends(self):
+        # starts/ends are NOT constants but their values are tracked via value_as_shape
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_slice
+
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (10, 8))
+        # register dynamic starts/ends as shape values (not constants)
+        b.set_value_shape("starts", (2,))
+        b.set_value_shape("ends", (7,))
+        # no axes input: axis 0 is used by default (len(starts)=1)
+        node = oh.make_node("Slice", ["X", "starts", "ends"], ["Y"])
+        _set_shape_type_op_any_slice(b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        # axis 0: slice [2:7] on dim 10 → length 5; axis 1 unchanged = 8
+        self.assertEqual(b.get_shape("Y"), (5, 8))
+
+    def test_op_slice_value_as_shape_with_dynamic_axes(self):
+        # starts/ends/axes are all tracked via value_as_shape (no constants)
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_slice
+
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (10, 8))
+        b.set_value_shape("starts", (1,))
+        b.set_value_shape("ends", (6,))
+        b.set_value_shape("axes", (1,))  # slice along axis 1
+        node = oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])
+        _set_shape_type_op_any_slice(b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        # axis 1: slice [1:6] on dim 8 → length 5; axis 0 unchanged = 10
+        self.assertEqual(b.get_shape("Y"), (10, 5))
+
+    def test_op_slice_dynamic_starts_ends_known_axes(self):
+        # starts/ends fully dynamic (not constants, not value_as_shape),
+        # but axes is a constant → sliced axis gets a fresh dynamic dimension.
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_slice
+
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", (10, 8))
+        # axes is a constant initializer; starts/ends are completely unknown
+        b.constants_["axes"] = onh.from_array(np.array([0], dtype=np.int64), name="axes")
+        node = oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])
+        _set_shape_type_op_any_slice(b, node)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        # axis 1 is unchanged (=8); axis 0 becomes a new dynamic dimension
+        result_shape = b.get_shape("Y")
+        self.assertEqual(len(result_shape), 2)
+        self.assertIsInstance(result_shape[0], str)  # new symbolic dim
+        self.assertEqual(result_shape[1], 8)  # unchanged
 
     def test_op_split(self):
         model = _make_model(
@@ -2497,6 +2666,101 @@ class TestDevicePropagation(ExtTestCase):
         b.set_type("Y2", TFLOAT)
         _set_shape_type_op_any_reduce(b, node)
         self.assertEqual(b.get_device("Y2"), -1)
+
+
+class TestComputeReshapeShape(ExtTestCase):
+    """Unit tests for the _compute_reshape_shape helper."""
+
+    # ------------------------------------------------------------------
+    # Early-exit: no -1 in shape2
+    # ------------------------------------------------------------------
+
+    def test_no_neg1_returns_shape2_unchanged(self):
+        # When shape2 has no -1, the function returns shape2 as-is regardless of shape1.
+        result = _compute_reshape_shape((3, 4), (12,))
+        self.assertEqual(result, (12,))
+
+    def test_no_neg1_with_mixed_shapes(self):
+        result = _compute_reshape_shape((3, 4), (2, 6))
+        self.assertEqual(result, (2, 6))
+
+    # ------------------------------------------------------------------
+    # All-integer shapes with a single -1
+    # ------------------------------------------------------------------
+
+    def test_all_int_clean_division(self):
+        # 3*4=12, new shape (2,-1): 12/2=6 → (2, 6)
+        result = _compute_reshape_shape((3, 4), (2, -1))
+        self.assertEqual(result, (2, 6))
+
+    def test_all_int_clean_division_to_1(self):
+        # total_int1 == total_int2 (12==12): strict-greater condition fails,
+        # so the function falls back to a symbolic "12//12" expression.
+        result = _compute_reshape_shape((3, 4), (12, -1))
+        self.assertEqual((12, 1), result)
+
+    def test_all_int_flatten(self):
+        # 2*3*4=24, new shape (-1,): 24 → (24,)
+        result = _compute_reshape_shape((2, 3, 4), (-1,))
+        self.assertEqual(result, (24,))
+
+    def test_all_int_non_divisible_returns_symbolic(self):
+        # 3*5=15 is not divisible by 2 → symbolic expression "15//2"
+        result = _compute_reshape_shape((3, 5), (2, -1))
+        self.assertEqual(result[0], 2)
+        self.assertIn("15", result[1])
+        self.assertIn("2", result[1])
+
+    # ------------------------------------------------------------------
+    # Zero dimension in shape1
+    # ------------------------------------------------------------------
+
+    def test_zero_in_shape1_yields_zero_for_neg1(self):
+        # total_int1 = 0*4 = 0 → -1 becomes 0
+        result = _compute_reshape_shape((0, 4), (3, -1))
+        self.assertEqual(result, (3, 0))
+
+    def test_zero_only_in_shape1(self):
+        result = _compute_reshape_shape((0,), (-1, 2))
+        self.assertEqual(result, (0, 2))
+
+    # ------------------------------------------------------------------
+    # Symbolic dimensions
+    # ------------------------------------------------------------------
+
+    def test_symbolic_common_dim_with_int_factor(self):
+        # shape1=("batch", 4), shape2=("batch", -1)
+        # total_int1=4, total_int2=1 (no ints besides -1 in shape2)
+        # intpart=4, left1={}, left2={} → ok=4 → ("batch", 4)
+        result = _compute_reshape_shape(("batch", 4), ("batch", -1))
+        self.assertEqual(result, ("batch", 4))
+
+    def test_symbolic_left_in_shape1_only(self):
+        # shape1=("batch", "h", 4), shape2=("batch", -1)
+        # total_int1=4, total_int2=1, intpart=4
+        # left1={"h"}, left2={} → ok="(h)" then "*4" → ("batch", "(h)*4")
+        result = _compute_reshape_shape(("batch", "h", 4), ("batch", -1))
+        self.assertEqual(result[0], "batch")
+        self.assertIn("h", result[1])
+        self.assertIn("4", result[1])
+
+    def test_symbolic_left_in_shape2_only(self):
+        # shape1=(12,), shape2=("d", -1)
+        # total_int1=12, total_int2=1, intpart=12
+        # left1={}, left2={"d"} → ok="1//(d)" then "*12" → ("d", "1//(d)*12")
+        result = _compute_reshape_shape((12,), ("d", -1))
+        self.assertEqual(result[0], "d")
+        self.assertIn("d", result[1])
+        self.assertIn("12", result[1])
+
+    def test_symbolic_left_in_both(self):
+        # shape1=("a", 4), shape2=("b", -1)
+        # total_int1=4, total_int2=1, intpart=4
+        # left1={"a"}, left2={"b"} → ok="(a)//((b))"  then "*4"
+        result = _compute_reshape_shape(("a", 4), ("b", -1))
+        self.assertEqual(result[0], "b")
+        self.assertIn("a", result[1])
+        self.assertIn("b", result[1])
 
 
 if __name__ == "__main__":

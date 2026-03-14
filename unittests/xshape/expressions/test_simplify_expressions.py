@@ -17,6 +17,7 @@ class TestSimplifyExpressions(ExtTestCase):
         self.assertEqual(simplify_expression("5 + x - 2 + 3"), "x+6")
         self.assertEqual(simplify_expression("x - x"), "0")
         self.assertEqual(simplify_expression("Max(x,y)"), "x^y")
+        self.assertEqual(simplify_expression("2*batch//batch"), "2")
 
     def test_simplify_expression2(self):
         self.assertEqual(simplify_expression("5 + x - (2 + 3)"), "x")
@@ -43,6 +44,10 @@ class TestSimplifyExpressions(ExtTestCase):
         self.assertEqual("x", simplify_expression("(x*y)//y"))
         self.assertEqual("x", simplify_expression("(x*(y+1))//(y+1)"))
         self.assertEqual("c//2", simplify_expression("((c)//(2))"))
+
+    def test_simplify_expression_bracket_max(self):
+        self.assertEqual("x^1+y", simplify_expression("(x)^(y+1)"))
+        self.assertEqual("1+x^y", simplify_expression("(x+1)^(y)"))
 
     def test_simplify_add_sub(self):
         self.assertEqual("b+c", simplify_expression("b+c-CeilToInt(b+c,2)+CeilToInt(b+c,2)"))

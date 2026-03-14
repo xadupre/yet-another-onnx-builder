@@ -22,9 +22,11 @@ yobx.sklearn
     discriminant_analysis/index
     dummy/index
     ensemble/index
+    feature_selection/index
     gaussian_process/index
     impute/index
     isotonic/index
+    kernel_approximation/index
     kernel_ridge/index
     lightgbm/index
     linear_model/index

@@ -17,5 +17,6 @@ yobx.tensorflow.ops
     matmul
     padding
     pooling
+    random_ops
     reduction_ops
     shape_ops

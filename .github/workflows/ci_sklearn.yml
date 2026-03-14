@@ -1,4 +1,4 @@
-name: ci-2
+name: ci-2-scikit-learn
 
 on:
   push:
@@ -66,16 +66,15 @@ jobs:
       - name: Run unittest files with coverage, not pytest
         if: matrix.sklearn-version == '1.8'
         run: |
-          python -m coverage run --append unittests/sklearn/decomposition/test_latent_dirichlet_allocation.py
-          python -m coverage run --append unittests/sklearn/ensemble/test_sklearn_gradient_boosting.py
-          python -m coverage run --append unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
-          python -m coverage run --append unittests/sklearn/preprocessing/test_power_transformer.py
-          coverage xml
+          python -m coverage run --source=yobx --append unittests/sklearn/decomposition/test_latent_dirichlet_allocation.py
+          python -m coverage run --source=yobx --append unittests/sklearn/ensemble/test_sklearn_gradient_boosting.py
+          python -m coverage run --source=yobx --append unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
+          python -m coverage run --source=yobx --append unittests/sklearn/preprocessing/test_power_transformer.py
 
       - name: Run sklearn tests with coverage
         if: matrix.sklearn-version == '1.8'
         run: |
-            pytest --cov=yobx --cov-report=xml --durations=10 \
+            pytest --cov=yobx --cov-append --cov-report=xml --durations=10 \
               --ignore=unittests/builder/oxs \
               --ignore=unittests/reference/test__inference_session_torch.py \
               --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \

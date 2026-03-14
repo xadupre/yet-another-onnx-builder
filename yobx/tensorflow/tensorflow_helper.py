@@ -31,6 +31,10 @@ def tf_dtype_to_np_dtype(tf_dtype):
         "bool": np.bool_,
     }
     name = tf_dtype.name if hasattr(tf_dtype, "name") else str(tf_dtype)
+    if name == "bfloat16":
+        import ml_dtypes
+
+        return ml_dtypes.bfloat16
     if name not in mapping:
         raise ValueError(f"Unsupported TensorFlow dtype: {tf_dtype!r}")
     return mapping[name]

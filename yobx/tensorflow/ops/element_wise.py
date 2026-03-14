@@ -1,5 +1,6 @@
 """
-Converters for element-wise TF ops: ``AddV2``, ``BiasAdd``, ``ConcatV2``.
+Converters for element-wise TF ops: ``AddV2``, ``BiasAdd``, ``ConcatV2``,
+``SelectV2``.
 
 Addition / bias
 ---------------
@@ -8,6 +9,10 @@ Addition / bias
 Concatenation
 -------------
 ``ConcatV2``
+
+Conditional selection
+---------------------
+``SelectV2``
 """
 
 from typing import Any, Dict, List
@@ -46,3 +51,19 @@ def convert_concat_v2(
     axis = int(tf.make_ndarray(axis_op.get_attr("value")))
     tensor_inputs = [inp.name for inp in op.inputs[:-1]]
     return g.op.Concat(*tensor_inputs, axis=axis, outputs=outputs[:1], name=op.name)
+
+
+@register_tf_op_converter("SelectV2")
+def convert_select_v2(
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
+) -> str:
+    """
+    Converts TF ``SelectV2`` (``tf.where(condition, x, y)``) → ONNX ``Where``.
+
+    ``SelectV2`` selects elements from *x* where *condition* is ``True`` and
+    from *y* otherwise.  Broadcasting semantics match ONNX ``Where``.
+    """
+    cond = op.inputs[0].name
+    x = op.inputs[1].name
+    y = op.inputs[2].name
+    return g.op.Where(cond, x, y, outputs=outputs[:1], name=op.name)

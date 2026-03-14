@@ -6,4 +6,5 @@ yobx.sklearn.svm
     :caption: modules
 
     linear_svm
+    one_class_svm
     svm

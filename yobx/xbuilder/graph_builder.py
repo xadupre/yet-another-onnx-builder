@@ -381,7 +381,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._debug_node_output = os.environ.get("ONNXSTOPOUTPUT", "")
         self._debug_node_type = os.environ.get("ONNXNODETYPE", "")
         self._debug_quiet = int(os.environ.get("ONNXQUIET", "0"))
-        self._debug_shape_missing = int(os.environ.get("ONNXSHAPECOMPUTE", "0"))
+        self._debug_shape_missing = (
+            not self.as_function and int(os.environ.get("ONNXSHAPECOMPUTE", "0")) == 1
+        )
         self._debug_constant_folding = int(os.environ.get("ONNXCONSTANTFOLD", "0"))
         self._debug_foldnot = int(os.environ.get("ONNXFOLDNOT", "0"))
         self._debug_dyn_dim = set(os.environ.get("ONNXDYNDIM", "").split(","))
@@ -2271,7 +2273,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             f"Unexpected value for shape {name!r}, value={value!r}, "
             f"types={string_type(value)}{self.get_debug_msg()}"
         )
-        if not self.has_rank(name):
+        if not self.has_shape(name):
             self.set_shape(name, (len(value),) if isinstance(value, tuple) else tuple())
         assert self.has_rank(name), (
             f"name={name!r}, has no rank, but it should, value={value!r}"
@@ -2336,7 +2338,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 self._set_known_value_shape(n, new_value)
 
     def _set_known_value_shape(self, name: str, value: DYNAMIC_SHAPE):
-        self._known_value_shape[name] = value
+        self._known_value_shape[name] = (
+            tuple(simplify_expression(s) for s in value)  # type: ignore
+            if isinstance(value, tuple)
+            else simplify_expression(value)
+        )
 
     def unique_function_name(self, prefix: str) -> str:
         """Returns a function which does not exist yet."""
@@ -2357,6 +2363,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         the builder may be confused as a dynamic dimension can take part
         of a known value for a shape.
         """
+        assert ":" not in prefix, f"':' not allowed in a dimension {prefix!r}"
         existing = set(self.dynamic_objects) | set(self._unique_names)
         for shape in self._known_shapes:
             existing |= set(shape)
@@ -4325,10 +4332,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             # No need.
             return output_names[0]
         if op_type == "Concat":
-            types = [self.get_rank(t) for t in inputs if self.has_rank(t)]
-            assert not types or len(set(types)) == 1, (
+            ranks = [self.get_rank(t) for t in inputs if self.has_rank(t)]
+            assert not ranks or len(set(ranks)) == 1, (
                 f"All inputs must have the same rank for Concat, "
-                f"types={types}, inputs={inputs}{self.get_debug_msg()}"
+                f"types={ranks}, inputs={inputs}{self.get_debug_msg()}"
             )
 
         if check is not False:
@@ -4476,6 +4483,18 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         node.doc_string += ".\n" + self._info_shape_type(node.output) + "\n"
 
+        assert not self._debug_shape_missing or all(
+            self.has_shape(o) for o in node.output if o
+        ), (
+            f"One output among {node.output} shape is missing in "
+            f"{[(self.get_shape(o) if self.has_shape(o) else '?') for o in node.output if o]}, "
+            f"({shape_set=})"
+            f"\ninput shapes are "
+            f"{[(self.get_shape(i) if self.has_shape(i) else '?') for i in node.input if i]}"
+            f"\nvalue shapes are "
+            f"{[self.value_as_shape(i) for i in node.input if i]}"
+            f"\nnode is {self.pretty_node(node)}{self.get_debug_msg()}"
+        )
         if len(output_names) == 1:
             return output_names[0]
         return tuple(output_names)
@@ -6368,9 +6387,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         update[n2].add(n1)
                     k2 = rename_expression(k, {n1: n2})
                     vv2 = rename_expression(vv, {n2: n1})
-                    assert (
-                        k != k2 or vv != vv2
-                    ), f"{k=}, {k2=}, {vv=}, {vv2=}, {n1=}, {n2=}, {v=}, {self.constraints_=}"
+                    assert k != k2 or vv != vv2, (
+                        f"{k=}, {k2=}, {vv=}, {vv2=}, {n1=}, {n2=}, {v=}, "
+                        f"{self.constraints_=}{self.get_debug_msg()}"
+                    )
                     eq = {k, k2, vv, vv2}
                     for e in eq:
                         if e not in update:
@@ -10130,8 +10150,18 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         First supported expression:
 
-        * ``f("dim", "d1", "+", "d2")  ->  dimension == args[0] + args[2]``
+        * ``f("dim", "d1") -> dim == d2``
+        * ``f("dim", "d1", "+", "d2")  ->  dim == args[0] + args[2]``
         """
+        if len(args) == 1:
+            dim2 = args[0]
+            if dim2 == dimension:
+                return True
+            if dim2 in self.constraints_ and dimension in self.constraints_[dim2]:
+                return True
+            if dimension in self.constraints_ and dim2 in self.constraints_[dimension]:  # type: ignore
+                return True
+            return False
         if len(args) == 3:
             if args[1] == "+":
                 d1, d2 = args[0], args[2]
