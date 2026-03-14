@@ -1306,8 +1306,8 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
         steps = _resolve_int_tuple_or_shape(self, node.input[4]) if len(node.input) > 4 else None
 
         output_shape = list(input_shape)
-        for s, e, a in zip(starts, ends, axes):
-            st = steps[a] if steps is not None and a < len(steps) else 1
+        for idx, (s, e, a) in enumerate(zip(starts, ends, axes)):
+            st = steps[idx] if steps is not None and idx < len(steps) else 1
             if isinstance(e, int) and e >= 922337203685477580:
                 e = input_shape[a]
             if isinstance(s, int) and isinstance(e, int):
