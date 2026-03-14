@@ -6,3 +6,4 @@ yobx.sklearn.multioutput
     :caption: modules
 
     multioutput
+    regressor_chain
