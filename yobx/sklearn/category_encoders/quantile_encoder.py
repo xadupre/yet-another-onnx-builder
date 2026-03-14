@@ -99,6 +99,9 @@ def category_encoders_quantile_encoder(
         estimator, QuantileEncoder
     ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
+    assert (
+        estimator.mapping is not None
+    ), f"estimator {estimator} is not fitted{g.get_debug_msg()}"
 
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)

@@ -9,19 +9,24 @@ from :epkg:`xgboost`, :epkg:`lightgbm`, :epkg:`category_encoders`
 using the same registry-based architecture as the other
 :mod:`yobx.sklearn` converters.
 
++--------------------------------+-------------------------------------------+
+| Package                        | Module                                    |
++================================+===========================================+
+| :epkg:`category_encoders`      | :mod:`yobx.sklearn.category_encoders`     |
++--------------------------------+-------------------------------------------+
+| :epkg:`xgboost`                | :mod:`yobx.sklearn.xgboost`               |
++--------------------------------+-------------------------------------------+
+| :epkg:`lightgm`                | :mod:`yobx.sklearn.lightgbm`              |
++--------------------------------+-------------------------------------------+
+
+Comparison: XGBoost vs LightGBM
+================================
+
 Both :epkg:`XGBoost` and :epkg:`LightGBM` are gradient-boosted tree
 libraries — their fitted models consist of an ensemble of binary decision
 trees.  The converters map these trees to ONNX ``TreeEnsemble*`` operators
 and share the same high-level structure, differing only in how split
 conditions are expressed and how the raw margin is post-processed.
-
-* :mod:`yobx.sklearn.category_encoders` — category_encoders converters
-* :mod:`yobx.sklearn.xgboost` — XGBoost converters
-* :mod:`yobx.sklearn.lightgbm` — LightGBM converters
-
-Comparison: XGBoost vs LightGBM
-================================
-
 The table below summarises the key differences between the converters
 for xgboost and lightgbm.
 

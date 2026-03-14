@@ -86,6 +86,8 @@ _linkcode_resolve = make_linkcode_resolve(
 intersphinx_mapping = {
     # Not a sphinx documentation
     # "diffusers": ("https://huggingface.co/docs/diffusers/index", None),
+    "category_encoders": ("https://contrib.scikit-learn.org/category_encoders/", None),
+    "imblearn": ("https://imbalanced-learn.org/stable/", None),
     "matplotlib": ("https://matplotlib.org/stable/", None),
     "numpy": ("https://numpy.org/doc/stable", None),
     "onnx": ("https://onnx.ai/onnx/", None),
@@ -144,6 +146,7 @@ epkg_dictionary = {
     "aten functions": "https://pytorch.org/cppdocs/api/namespace_at.html#functions",
     "azure pipeline": "https://azure.microsoft.com/en-us/products/devops/pipelines",
     "black": "https://github.com/psf/black",
+    "category_encoders": "https://contrib.scikit-learn.org/category_encoders/",
     "Custom Backends": "https://docs.pytorch.org/docs/stable/torch.compiler_custom_backends.html",
     "diffusers": "https://github.com/huggingface/diffusers",
     "DOT": "https://graphviz.org/doc/info/lang.html",
@@ -158,6 +161,7 @@ epkg_dictionary = {
     "GraphModule": "https://docs.pytorch.org/docs/stable/fx.html#torch.fx.GraphModule",
     "HuggingFace": "https://huggingface.co/docs/hub/en/index",
     "huggingface_hub": "https://github.com/huggingface/huggingface_hub",
+    "imbalanced-learn": "https://imbalanced-learn.org/stable/",
     "ir-py": "https://onnx.ai/ir-py/",
     "lightgbm": "https://lightgbm.readthedocs.io/en/latest/",
     "LightGBM": "https://lightgbm.readthedocs.io/en/latest/",
