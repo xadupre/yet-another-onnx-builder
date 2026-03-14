@@ -4,7 +4,7 @@ import re
 import sys
 import textwrap
 import onnx
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from argparse import ArgumentParser, RawTextHelpFormatter, BooleanOptionalAction
 
 
@@ -836,14 +836,43 @@ def get_parser_validate() -> ArgumentParser:
         type=int,
         help="Verbosity level (default: 0).",
     )
+    parser.add_argument(
+        "--random-weights",
+        default=False,
+        action="store_true",
+        help="Instantiate the model from config with random weights instead of "
+        "downloading pretrained weights (useful for fast CI tests).",
+    )
+    parser.add_argument(
+        "--config-override",
+        default=None,
+        action="append",
+        metavar="KEY=VALUE",
+        dest="config_override",
+        help="Override a config attribute before creating the model, "
+        "e.g. --config-override num_hidden_layers=2. "
+        "Can be repeated for multiple overrides.",
+    )
     return parser
 
 
 def _cmd_validate(argv: List[Any]):
+    import ast
+
     from .torch.validate import validate_model
 
     parser = get_parser_validate()
     args = parser.parse_args(argv[1:])
+
+    config_overrides: Optional[Dict[str, Any]] = None
+    if args.config_override:
+        config_overrides = {}
+        for item in args.config_override:
+            k, _, v = item.partition("=")
+            try:
+                config_overrides[k.strip()] = ast.literal_eval(v.strip())
+            except Exception:
+                config_overrides[k.strip()] = v.strip()
 
     summary, _data = validate_model(
         model_id=args.mid,
@@ -859,6 +888,8 @@ def _cmd_validate(argv: List[Any]):
         do_run=args.run,
         patch=args.patch,
         quiet=args.quiet,
+        config_overrides=config_overrides,
+        random_weights=args.random_weights,
     )
 
     print("")

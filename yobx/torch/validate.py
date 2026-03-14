@@ -31,6 +31,8 @@ def validate_model(
     patch: bool = True,
     quiet: bool = False,
     tokenized_inputs: Optional[Dict[str, Any]] = None,
+    config_overrides: Optional[Dict[str, Any]] = None,
+    random_weights: bool = False,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
     Validates an ONNX export for any HuggingFace ``model_id`` by capturing real
@@ -39,13 +41,18 @@ def validate_model(
 
     The function:
 
-    1. Loads the pretrained model and tokeniser for *model_id* from HuggingFace.
-    2. Runs :meth:`model.generate` with *prompt* inside an
+    1. Loads the model config for *model_id* (cached copy preferred).
+    2. Optionally applies *config_overrides* to tweak the architecture
+       (e.g. reduce ``num_hidden_layers`` for a faster test).
+    3. Loads the tokeniser and the pretrained model weights — or, when
+       *random_weights* is ``True``, instantiates the model directly from the
+       (potentially modified) config without downloading any weights.
+    4. Runs :meth:`model.generate` with *prompt* inside an
        :class:`InputObserver <yobx.torch.InputObserver>` context to collect
        real input/output tensors.
-    3. Exports the model to ONNX using the observed inputs and the inferred
+    5. Exports the model to ONNX using the observed inputs and the inferred
        dynamic shapes.
-    4. Computes discrepancies between the original PyTorch outputs and the
+    6. Computes discrepancies between the original PyTorch outputs and the
        ONNX runtime outputs for every captured input set.
 
     :param model_id: HuggingFace model id, e.g. ``"arnir0/Tiny-LLM"``
@@ -78,6 +85,14 @@ def validate_model(
         ``"input_ids"`` and optionally ``"attention_mask"`` (mirrors the output
         of a HuggingFace tokenizer).  When provided the tokenizer is not loaded
         and *prompt* is only stored in the summary for reference.
+    :param config_overrides: Optional mapping of config attribute names to new
+        values applied to the model config before the model is instantiated,
+        e.g. ``{"num_hidden_layers": 2}``.  Useful to create a smaller model
+        for testing without changing the architecture definition on disk.
+    :param random_weights: When ``True``, instantiate the model from the
+        (possibly modified) config with random weights instead of downloading
+        the pretrained weights.  This avoids any network access for the model
+        itself, which is useful for fast unit-testing or CI validation.
     :return: A 2-tuple ``(summary, data)`` where *summary* is a flat
         ``{str: value}`` dictionary suitable for display or logging, and
         *data* collects all intermediate artefacts.
@@ -91,7 +106,7 @@ def validate_model(
             print(f":{k},{v};")
     """
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
     from .flatten import register_flattening_functions
     from .input_observer import InputObserver
@@ -109,13 +124,40 @@ def validate_model(
     if dtype is not None:
         torch_dtype = getattr(torch, dtype)
 
-    # --------------------------------------------------------------- load model
+    # ----------------------------------------------------------------- config
+    if verbose:
+        print(f"[validate_model] loading config for {model_id!r}")
+
+    try:
+        try:
+            config = AutoConfig.from_pretrained(model_id, local_files_only=True)
+            summary["config_from_cache"] = True
+        except OSError:
+            config = AutoConfig.from_pretrained(model_id)
+            summary["config_from_cache"] = False
+    except Exception as exc:
+        summary["error_config"] = str(exc)
+        if not quiet:
+            raise
+        return summary, collected_data
+
+    if config_overrides:
+        for k, v in config_overrides.items():
+            setattr(config, k, v)
+        summary["config_overrides"] = str(config_overrides)
+
+    collected_data["config"] = config
+
+    # --------------------------------------------------------------- tokenizer
     if verbose:
         print(f"[validate_model] loading tokenizer for {model_id!r}")
 
     if tokenized_inputs is None:
         try:
-            tokenizer = AutoTokenizer.from_pretrained(model_id)
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
+            except OSError:
+                tokenizer = AutoTokenizer.from_pretrained(model_id)
         except Exception as exc:
             summary["error_tokenizer"] = str(exc)
             if not quiet:
@@ -124,14 +166,28 @@ def validate_model(
     else:
         tokenizer = None
 
+    # --------------------------------------------------------------- load model
     if verbose:
-        print(f"[validate_model] loading model for {model_id!r}")
+        if random_weights:
+            print(f"[validate_model] creating model from config (random weights) for {model_id!r}")
+        else:
+            print(f"[validate_model] loading model for {model_id!r}")
 
+    dtype_kwargs: Dict[str, Any] = ({"torch_dtype": torch_dtype} if torch_dtype is not None else {})
     try:
-        model: torch.nn.Module = AutoModelForCausalLM.from_pretrained(
-            model_id,
-            **({"torch_dtype": torch_dtype} if torch_dtype is not None else {}),
-        )
+        if random_weights:
+            model: torch.nn.Module = AutoModelForCausalLM.from_config(config, **dtype_kwargs)
+        else:
+            try:
+                model = AutoModelForCausalLM.from_pretrained(
+                    model_id, config=config, local_files_only=True, **dtype_kwargs
+                )
+                summary["model_from_cache"] = True
+            except OSError:
+                model = AutoModelForCausalLM.from_pretrained(
+                    model_id, config=config, **dtype_kwargs
+                )
+                summary["model_from_cache"] = False
         model = model.to(torch_device)
         model.eval()
     except Exception as exc:

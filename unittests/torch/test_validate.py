@@ -30,6 +30,26 @@ class TestValidateModel(ExtTestCase):
         p = sig.parameters["tokenized_inputs"]
         self.assertIsNone(p.default)
 
+    def test_validate_model_config_overrides_param(self):
+        """validate_model has config_overrides and random_weights parameters."""
+        import inspect
+        from yobx.torch.validate import validate_model
+
+        sig = inspect.signature(validate_model)
+        self.assertIn("config_overrides", sig.parameters)
+        self.assertIsNone(sig.parameters["config_overrides"].default)
+        self.assertIn("random_weights", sig.parameters)
+        self.assertFalse(sig.parameters["random_weights"].default)
+
+    def test_cmd_validate_has_random_weights(self):
+        """CLI parser exposes --random-weights and --config-override flags."""
+        from yobx._command_lines_parser import get_parser_validate
+
+        parser = get_parser_validate()
+        dest_names = {a.dest for a in parser._actions}
+        self.assertIn("random_weights", dest_names)
+        self.assertIn("config_override", dest_names)
+
     def test_default_prompt(self):
         from yobx.torch.validate import DEFAULT_PROMPT
 
