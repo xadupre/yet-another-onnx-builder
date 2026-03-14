@@ -38,6 +38,7 @@ _TF_DTYPE_TO_ONNX = {
     tf.float16.as_datatype_enum: TensorProto.FLOAT16,
     tf.float32.as_datatype_enum: TensorProto.FLOAT,
     tf.float64.as_datatype_enum: TensorProto.DOUBLE,
+    tf.bfloat16.as_datatype_enum: TensorProto.BFLOAT16,
     tf.int8.as_datatype_enum: TensorProto.INT8,
     tf.int16.as_datatype_enum: TensorProto.INT16,
     tf.int32.as_datatype_enum: TensorProto.INT32,

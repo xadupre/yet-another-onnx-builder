@@ -1,4 +1,4 @@
-name: ci-6
+name: ci-6-transformers
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   transformers_dev:
-    name: transformers-dev (ubuntu-latest, py3.13, transformers-dev, torch-nightly)
+    name: tr-dev (ubuntu-latest, py3.13, transformers-dev, torch-nightly)
     runs-on: ubuntu-latest
     permissions:
       contents: read
