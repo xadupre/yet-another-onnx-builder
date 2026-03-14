@@ -1308,15 +1308,15 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
             if isinstance(e, int) and e >= 922337203685477580:
                 e = input_shape[a]
             if isinstance(s, int) and isinstance(e, int):
-                assert not isinstance(st, int) or st > 0, (
-                    f"Negative steps are not handled start={s}, end={e}, step={st}"
-                    f"{self.get_debug_msg()}"
-                )
                 if e >= s >= 0:
+                    assert not isinstance(st, int) or st > 0 or (e - s) % (-s) == 0, (
+                        f"Negative steps are not handled start={s}, end={e}, step={st}"
+                        f"{self.get_debug_msg()}"
+                    )
                     output_shape[a] = (
                         (e - s) // st
                         if isinstance(st, int)
-                        else simplify_expression(f"({e-s})//({st})")
+                        else simplify_expression(f"{e-s}//({st})")
                     )
                     continue
                 if isinstance(input_shape[a], int):
@@ -1325,6 +1325,10 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
                         s += d
                     if e < 0:
                         e += d
+                    assert not isinstance(st, int) or st > 0 or (e - s) % (-s) == 0, (
+                        f"Negative steps are not handled start={s}, end={e}, step={st}"
+                        f"{self.get_debug_msg()}"
+                    )
                     output_shape[a] = (
                         (e - s) // st
                         if isinstance(st, int)
