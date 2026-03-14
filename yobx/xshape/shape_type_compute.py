@@ -1137,13 +1137,13 @@ def _compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
     left1 = exist1 - common
     left2 = exist2 - common
     if left1 and left2:
-        resp = "*".join(f"({s})" for s in left1)
-        resm = "*".join(f"({s})" for s in left2)
+        resp = "*".join(f"({s})" for s in sorted(left1))
+        resm = "*".join(f"({s})" for s in sorted(left2))
         ok = simplify_expression(f"({resp})//({resm})")
     elif left1:
-        ok = "*".join(f"({s})" for s in left1)
+        ok = "*".join(f"({s})" for s in sorted(left1))
     elif left2:
-        resm = "*".join(f"({s})" for s in left2)
+        resm = "*".join(f"({s})" for s in sorted(left2))
         ok = simplify_expression(f"1//({resm})")
     else:
         ok = ""
