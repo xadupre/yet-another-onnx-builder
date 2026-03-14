@@ -91,6 +91,28 @@ class TestLatentDirichletAllocation(ExtTestCase):
         )
         self._check_lda(lda, X_train, X_test)
 
+    def test_lda_float32(self):
+        """Conversion with explicit float32 input."""
+        from sklearn.decomposition import LatentDirichletAllocation
+
+        rng = np.random.default_rng(9)
+        X_train = rng.poisson(10, size=(50, 15)).astype(np.float32)
+        X_test = rng.poisson(10, size=(8, 15)).astype(np.float32)
+
+        lda = LatentDirichletAllocation(
+            n_components=5,
+            max_iter=5,
+            max_doc_update_iter=20,
+            random_state=5,
+        )
+        onx = self._check_lda(lda, X_train, X_test, atol=1e-4)
+
+        # Verify that the ONNX graph operates in float32.
+        import onnx
+
+        input_type = onx.graph.input[0].type.tensor_type.elem_type
+        self.assertEqual(input_type, onnx.TensorProto.FLOAT)
+
     def test_lda_float64(self):
         """Conversion with float64 input."""
         from sklearn.decomposition import LatentDirichletAllocation
@@ -105,7 +127,13 @@ class TestLatentDirichletAllocation(ExtTestCase):
             max_doc_update_iter=15,
             random_state=3,
         )
-        self._check_lda(lda, X_train, X_test, atol=1e-6)
+        onx = self._check_lda(lda, X_train, X_test, atol=1e-6)
+
+        # Verify that the ONNX graph operates in float64.
+        import onnx
+
+        input_type = onx.graph.input[0].type.tensor_type.elem_type
+        self.assertEqual(input_type, onnx.TensorProto.DOUBLE)
 
     def test_lda_output_shape(self):
         """Check the output has the expected shape (N, n_components)."""
