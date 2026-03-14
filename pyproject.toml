@@ -170,6 +170,7 @@ module = [
     "yobx.sklearn.gaussian_process.*",
     "yobx.sklearn.impute.*",
     "yobx.sklearn.isotonic.*",
+    "yobx.sklearn.kernel_ridge.*",
     "yobx.sklearn.linear_model.*",
     "yobx.sklearn.lightgbm.*",
     "yobx.sklearn.manifold.*",

@@ -25,6 +25,7 @@ yobx.sklearn
     gaussian_process/index
     impute/index
     isotonic/index
+    kernel_ridge/index
     lightgbm/index
     linear_model/index
     manifold/index
