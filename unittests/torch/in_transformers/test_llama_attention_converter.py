@@ -11,6 +11,7 @@ Tests cover:
 * Validation with both :class:`~yobx.reference.ExtendedReferenceEvaluator`
   and :mod:`onnxruntime`.
 """
+
 import unittest
 import numpy as np
 import torch
@@ -47,7 +48,6 @@ def _to_model(attn, hs, cos, sin, mask=None, target_opset=22):
     declares graph inputs, calls :func:`llama_attention_to_onnx`, declares
     the graph output, and returns the resulting :class:`onnx.ModelProto`.
     """
-    from onnx import TensorProto
     from yobx.xbuilder import GraphBuilder
     from yobx.torch.in_transformers.models import llama_attention_to_onnx
     from yobx.torch.torch_helper import torch_dtype_to_onnx_dtype
@@ -80,7 +80,9 @@ def _to_model(attn, hs, cos, sin, mask=None, target_opset=22):
 class TestLlamaAttentionConverter(ExtTestCase):
     """Unit tests for :func:`llama_attention_to_onnx`."""
 
-    def _get_inputs(self, batch=2, seq=10, hidden_size=64, head_dim=16, torch_dtype=torch.float32):
+    def _get_inputs(
+        self, batch=2, seq=10, hidden_size=64, head_dim=16, torch_dtype=torch.float32
+    ):
         hs = torch.randn(batch, seq, hidden_size, dtype=torch_dtype)
         cos = torch.randn(batch, seq, head_dim, dtype=torch_dtype)
         sin = torch.randn(batch, seq, head_dim, dtype=torch_dtype)
@@ -115,9 +117,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
         import onnxruntime as ort
 
-        sess = ort.InferenceSession(
-            model.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = ort.InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
         got_ort = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got_ort, atol=1e-4)
 
@@ -144,9 +144,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
         import onnxruntime as ort
 
-        sess = ort.InferenceSession(
-            model.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = ort.InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
         got_ort = sess.run(None, feeds)[0].astype(np.float32)
         self.assertEqualArray(expected, got_ort, atol=5e-3)
 
@@ -293,7 +291,8 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
     @requires_onnxruntime("1.23")
     def test_opset24_bfloat16(self):
-        """ONNX Attention op path (opset 24), bfloat16 — model dtype check + ref/ORT validation."""
+        """ONNX Attention op path (opset 24), bfloat16 —
+        model dtype check + ref/ORT validation."""
         import onnx as _onnx
 
         attn = _make_llama_attention().to(torch.bfloat16).eval()
@@ -344,9 +343,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
         }
         import onnxruntime as ort
 
-        sess = ort.InferenceSession(
-            model.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = ort.InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-4)
 
@@ -369,15 +366,14 @@ class TestLlamaAttentionConverter(ExtTestCase):
         }
         import onnxruntime as ort
 
-        sess = ort.InferenceSession(
-            model.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = ort.InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
         got = sess.run(None, feeds)[0].astype(np.float32)
         self.assertEqualArray(expected, got, atol=5e-3)
 
     @requires_onnxruntime("1.0")
     def test_com_microsoft_bfloat16(self):
-        """com.microsoft.MultiHeadAttention path, bfloat16 — model dtype check + ORT validation."""
+        """com.microsoft.MultiHeadAttention path, bfloat16 —
+        model dtype check + ORT validation."""
         import onnx as _onnx
 
         attn = _make_llama_attention().to(torch.bfloat16).eval()
@@ -415,9 +411,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
         }
         import onnxruntime as ort
 
-        sess = ort.InferenceSession(
-            model.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = ort.InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-4)
 
@@ -442,6 +436,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
         expected = expected.float().numpy()
 
         model = _to_model(attn, hs, cos, sin, mask=mask, target_opset=22)
+        # self.dump_onnx("test_opset22_with_attention_mask.onnx", model)
 
         feeds = {
             "hidden_states": hs.numpy(),
@@ -455,9 +450,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
         import onnxruntime as ort
 
-        sess = ort.InferenceSession(
-            model.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = ort.InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
         got_ort = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got_ort, atol=1e-4)
 

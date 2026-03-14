@@ -89,7 +89,7 @@ from ...torch_helper import to_numpy
 T = str
 
 # Upper bound for open-ended ONNX Slice (INT64_MAX would work but 2^30 is safe and smaller)
-_MAX_SLICE_END = 2**30
+_MAX_SLICE_END = 922337203685477580
 
 
 def _np_dtype_for_onnx(onnx_dtype: int) -> np.dtype:
@@ -386,9 +386,7 @@ def llama_attention_to_onnx(
         g.make_tensor_output(out, TensorProto.FLOAT, ("batch", "seq", 64))
         model = g.to_onnx()
     """
-    assert g.has_type(hidden_states), (
-        f"Missing type for {hidden_states!r}{g.get_debug_msg()}"
-    )
+    assert g.has_type(hidden_states), f"Missing type for {hidden_states!r}{g.get_debug_msg()}"
 
     main_opset = g.main_opset
     has_ms = bool(g.has_opset("com.microsoft"))
@@ -457,6 +455,7 @@ def llama_attention_to_onnx(
         # Use Unsqueeze + Expand (not Tile) to get the same interleaved ordering
         # as torch.repeat_interleave: [h0, h0, h1, h1] not [h0, h1, h0, h1].
         if n_rep > 1:
+
             def _repeat_kv_3d(x_3d: T) -> T:
                 # (batch, seq, kv * head_dim)
                 sp_4d = np.array([0, 0, num_kv_heads, head_dim], dtype=np.int64)
@@ -466,15 +465,23 @@ def llama_attention_to_onnx(
                 # Compute dynamic shape (batch, seq, kv, n_rep, head_dim)
                 x_shape = g.op.Shape(x_3d, name=name)
                 batch_v = g.op.Slice(
-                    x_shape, np.array([0], dtype=np.int64), np.array([1], dtype=np.int64), name=name
+                    x_shape,
+                    np.array([0], dtype=np.int64),
+                    np.array([1], dtype=np.int64),
+                    name=name,
                 )
                 seq_v = g.op.Slice(
-                    x_shape, np.array([1], dtype=np.int64), np.array([2], dtype=np.int64), name=name
+                    x_shape,
+                    np.array([1], dtype=np.int64),
+                    np.array([2], dtype=np.int64),
+                    name=name,
                 )
                 tgt = g.op.Concat(
-                    batch_v, seq_v,
+                    batch_v,
+                    seq_v,
                     np.array([num_kv_heads, n_rep, head_dim], dtype=np.int64),
-                    axis=0, name=name,
+                    axis=0,
+                    name=name,
                 )
                 x5d = g.op.Expand(x5d, tgt, name=name)
                 # Reshape → (batch, seq, kv * n_rep * head_dim) with interleaved heads
@@ -486,8 +493,14 @@ def llama_attention_to_onnx(
 
         # MHA: output is (batch, seq, num_heads * head_dim)
         out_3d = _mha_com_microsoft(
-            g, q_3d, k_3d, v_3d, attention_mask,
-            num_heads, scaling, name,
+            g,
+            q_3d,
+            k_3d,
+            v_3d,
+            attention_mask,
+            num_heads,
+            scaling,
+            name,
         )
 
         # Apply output projection
