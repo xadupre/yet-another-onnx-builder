@@ -28,6 +28,41 @@ def _make_llama_attention(
     return LlamaAttention(config, layer_idx=0)
 
 
+def _to_model(attn, hs, cos, sin, mask=None, target_opset=22):
+    """
+    Convenience wrapper: creates a :class:`~yobx.xbuilder.GraphBuilder`,
+    declares graph inputs, calls :func:`llama_attention_to_onnx`, declares
+    the graph output, and returns the resulting :class:`onnx.ModelProto`.
+    """
+    from onnx import TensorProto
+    from yobx.xbuilder import GraphBuilder
+    from yobx.torch.in_transformers.models import llama_attention_to_onnx
+    from yobx.torch.torch_helper import torch_dtype_to_onnx_dtype
+
+    if isinstance(target_opset, int):
+        dict_opset = {"": target_opset}
+    else:
+        dict_opset = dict(target_opset)
+
+    onnx_dtype = torch_dtype_to_onnx_dtype(hs.dtype)
+    head_dim = cos.shape[-1]
+    hidden_size = hs.shape[-1]
+
+    g = GraphBuilder(dict_opset, verbose=0)
+    g.make_tensor_input("hidden_states", onnx_dtype, ("batch", "seq", hidden_size))
+    g.make_tensor_input("cos", onnx_dtype, ("batch", "seq", head_dim))
+    g.make_tensor_input("sin", onnx_dtype, ("batch", "seq", head_dim))
+
+    mask_name = None
+    if mask is not None:
+        g.make_tensor_input("attention_mask", onnx_dtype, ("batch", 1, "seq_q", "total_seq"))
+        mask_name = "attention_mask"
+
+    out = llama_attention_to_onnx(g, attn, "hidden_states", "cos", "sin", mask_name)
+    g.make_tensor_output(out, onnx_dtype, ("batch", "seq", hidden_size))
+    return g.to_onnx(optimize=False)
+
+
 @requires_transformers("4.40")
 class TestLlamaAttentionConverter(ExtTestCase):
     """Unit tests for :func:`llama_attention_to_onnx`."""
@@ -49,13 +84,11 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
     def test_opset22_float32(self):
         """Standard ONNX ops path, float32 — ref evaluator and OnnxRuntime."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
-
         attn = _make_llama_attention().eval()
         hs, cos, sin = self._get_inputs()
         expected = self._torch_expected(attn, hs, cos, sin)
 
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=22)
+        model = _to_model(attn, hs, cos, sin, target_opset=22)
 
         feeds = {
             "hidden_states": hs.numpy(),
@@ -81,13 +114,11 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
     def test_opset22_float16(self):
         """Standard ONNX ops path, float16 — ref evaluator and OnnxRuntime."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
-
         attn = _make_llama_attention().to(torch.float16).eval()
         hs, cos, sin = self._get_inputs(torch_dtype=torch.float16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=22)
+        model = _to_model(attn, hs, cos, sin, target_opset=22)
 
         feeds = {
             "hidden_states": hs.numpy(),
@@ -150,13 +181,12 @@ class TestLlamaAttentionConverter(ExtTestCase):
     def test_opset22_bfloat16(self):
         """Standard ONNX ops path, bfloat16 — model dtype check + ref/ORT validation."""
         import onnx as _onnx
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
 
         attn = _make_llama_attention().to(torch.bfloat16).eval()
         hs, cos, sin = self._get_inputs(torch_dtype=torch.bfloat16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=22)
+        model = _to_model(attn, hs, cos, sin, target_opset=22)
 
         # The produced model must use bfloat16 for all graph inputs.
         self.assertIsInstance(model, _onnx.ModelProto)
@@ -189,13 +219,11 @@ class TestLlamaAttentionConverter(ExtTestCase):
     @requires_onnxruntime("1.23")
     def test_opset24_float32(self):
         """ONNX Attention op path (opset 24), float32."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
-
         attn = _make_llama_attention().eval()
         hs, cos, sin = self._get_inputs()
         expected = self._torch_expected(attn, hs, cos, sin)
 
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=24)
+        model = _to_model(attn, hs, cos, sin, target_opset=24)
 
         feeds = {
             "hidden_states": hs.numpy(),
@@ -222,13 +250,11 @@ class TestLlamaAttentionConverter(ExtTestCase):
     @requires_onnxruntime("1.23")
     def test_opset24_float16(self):
         """ONNX Attention op path (opset 24), float16."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
-
         attn = _make_llama_attention().to(torch.float16).eval()
         hs, cos, sin = self._get_inputs(torch_dtype=torch.float16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=24)
+        model = _to_model(attn, hs, cos, sin, target_opset=24)
 
         feeds = {
             "hidden_states": hs.numpy(),
@@ -256,13 +282,12 @@ class TestLlamaAttentionConverter(ExtTestCase):
     def test_opset24_bfloat16(self):
         """ONNX Attention op path (opset 24), bfloat16 — model dtype check + ref/ORT validation."""
         import onnx as _onnx
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
 
         attn = _make_llama_attention().to(torch.bfloat16).eval()
         hs, cos, sin = self._get_inputs(torch_dtype=torch.bfloat16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=24)
+        model = _to_model(attn, hs, cos, sin, target_opset=24)
 
         # Verify bfloat16 dtype on graph inputs.
         for inp in model.graph.input:
@@ -289,17 +314,11 @@ class TestLlamaAttentionConverter(ExtTestCase):
     @requires_onnxruntime("1.0")
     def test_com_microsoft_float32(self):
         """com.microsoft.MultiHeadAttention path, float32."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
-
         attn = _make_llama_attention().eval()
         hs, cos, sin = self._get_inputs()
         expected = self._torch_expected(attn, hs, cos, sin)
 
-        model = llama_attention_to_onnx(
-            attn,
-            (hs, cos, sin),
-            target_opset={"": 22, "com.microsoft": 1},
-        )
+        model = _to_model(attn, hs, cos, sin, target_opset={"": 22, "com.microsoft": 1})
 
         # Verify that the model contains the MultiHeadAttention contrib op
         op_types = {n.op_type for n in model.graph.node}
@@ -321,17 +340,11 @@ class TestLlamaAttentionConverter(ExtTestCase):
     @requires_onnxruntime("1.0")
     def test_com_microsoft_float16(self):
         """com.microsoft.MultiHeadAttention path, float16."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
-
         attn = _make_llama_attention().to(torch.float16).eval()
         hs, cos, sin = self._get_inputs(torch_dtype=torch.float16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
-        model = llama_attention_to_onnx(
-            attn,
-            (hs, cos, sin),
-            target_opset={"": 22, "com.microsoft": 1},
-        )
+        model = _to_model(attn, hs, cos, sin, target_opset={"": 22, "com.microsoft": 1})
 
         op_types = {n.op_type for n in model.graph.node}
         self.assertIn("MultiHeadAttention", op_types)
@@ -353,17 +366,12 @@ class TestLlamaAttentionConverter(ExtTestCase):
     def test_com_microsoft_bfloat16(self):
         """com.microsoft.MultiHeadAttention path, bfloat16 — model dtype check + ORT validation."""
         import onnx as _onnx
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
 
         attn = _make_llama_attention().to(torch.bfloat16).eval()
         hs, cos, sin = self._get_inputs(torch_dtype=torch.bfloat16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
-        model = llama_attention_to_onnx(
-            attn,
-            (hs, cos, sin),
-            target_opset={"": 22, "com.microsoft": 1},
-        )
+        model = _to_model(attn, hs, cos, sin, target_opset={"": 22, "com.microsoft": 1})
 
         op_types = {n.op_type for n in model.graph.node}
         self.assertIn("MultiHeadAttention", op_types)
@@ -380,18 +388,12 @@ class TestLlamaAttentionConverter(ExtTestCase):
     @requires_onnxruntime("1.0")
     def test_com_microsoft_no_gqa_float32(self):
         """com.microsoft path when num_kv_heads == num_attention_heads."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
-
         # No GQA: kv_heads == query heads
         attn = _make_llama_attention(num_attention_heads=4, num_key_value_heads=4).eval()
         hs, cos, sin = self._get_inputs()
         expected = self._torch_expected(attn, hs, cos, sin)
 
-        model = llama_attention_to_onnx(
-            attn,
-            (hs, cos, sin),
-            target_opset={"": 22, "com.microsoft": 1},
-        )
+        model = _to_model(attn, hs, cos, sin, target_opset={"": 22, "com.microsoft": 1})
 
         feeds = {
             "hidden_states": hs.numpy(),
@@ -412,8 +414,6 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
     def test_opset22_with_attention_mask(self):
         """Standard ONNX ops path with an attention_mask input — ref evaluator and OnnxRuntime."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
-
         attn = _make_llama_attention().eval()
         batch, seq = 2, 10
         hs, cos, sin = self._get_inputs(batch=batch, seq=seq)
@@ -428,7 +428,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
             expected, _ = attn(hs, position_embeddings=(cos, sin), attention_mask=mask)
         expected = expected.float().numpy()
 
-        model = llama_attention_to_onnx(attn, (hs, cos, sin, mask), target_opset=22)
+        model = _to_model(attn, hs, cos, sin, mask=mask, target_opset=22)
 
         feeds = {
             "hidden_states": hs.numpy(),
@@ -456,11 +456,9 @@ class TestLlamaAttentionConverter(ExtTestCase):
         """Converter returns a valid ModelProto."""
         import onnx
 
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
-
         attn = _make_llama_attention().eval()
         hs, cos, sin = self._get_inputs()
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=22)
+        model = _to_model(attn, hs, cos, sin, target_opset=22)
 
         self.assertIsInstance(model, onnx.ModelProto)
         # Inputs
@@ -472,21 +470,17 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
     def test_opset22_no_attention_op(self):
         """Opset 22 path does not use the Attention op."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
-
         attn = _make_llama_attention().eval()
         hs, cos, sin = self._get_inputs()
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=22)
+        model = _to_model(attn, hs, cos, sin, target_opset=22)
         op_types = {n.op_type for n in model.graph.node}
         self.assertNotIn("Attention", op_types)
 
     def test_opset24_uses_attention_op(self):
         """Opset 24 path uses the ONNX Attention op."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
-
         attn = _make_llama_attention().eval()
         hs, cos, sin = self._get_inputs()
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=24)
+        model = _to_model(attn, hs, cos, sin, target_opset=24)
         op_types = {n.op_type for n in model.graph.node}
         self.assertIn("Attention", op_types)
 

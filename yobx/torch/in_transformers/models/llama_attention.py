@@ -1,19 +1,19 @@
 """
 Direct ONNX converter for :class:`transformers.models.llama.modeling_llama.LlamaAttention`.
 
-This converter builds a complete ONNX graph from a fitted
-:class:`transformers.models.llama.modeling_llama.LlamaAttention` module without
-going through :func:`torch.export.export`.
+This converter appends ONNX nodes to an existing :class:`~yobx.xbuilder.GraphBuilder`
+from a fitted :class:`transformers.models.llama.modeling_llama.LlamaAttention` module,
+without going through :func:`torch.export.export`.
 
 Three computation backends are supported, selected automatically based on
-the requested target opset:
+the opsets registered in the graph builder:
 
-* **com.microsoft** (``"com.microsoft" in target_opset``):
+* **com.microsoft** (``"com.microsoft"`` domain registered in the builder):
   Uses the ``com.microsoft.MultiHeadAttention`` contrib op from *onnxruntime*.
   GQA key/value heads are expanded (via repeat-interleave) to match the query
   head count before being passed to the op.
   The model runs efficiently on CPU and CUDA with OnnxRuntime.
-* **opset ≥ 24** (``main_opset >= 24``):
+* **opset ≥ 24** (main opset ≥ 24):
   Uses the standard ONNX ``Attention`` operator introduced in opset 23
   (revision 24 fixes a correctness bug; this converter therefore requires 24).
 * **opset ≤ 22** (default fallback):
@@ -21,62 +21,70 @@ the requested target opset:
 
 Supported dtypes:
     ``float32``, ``float16``, and ``bfloat16`` are all supported.
-    The dtype is inferred automatically from the first element of *args*.
+    The output dtype is inferred from the registered type of *hidden_states*
+    in the graph builder.
 
-Inputs to the produced ONNX model:
+Expected graph inputs (must be declared in the builder before calling the converter):
 
 * ``hidden_states``: ``(batch, seq, hidden_size)``
 * ``cos``: ``(batch, seq, head_dim)``
 * ``sin``: ``(batch, seq, head_dim)``
 * ``attention_mask`` *(optional)*: ``(batch, 1, seq_q, total_seq)``
 
-Output:
+Output returned by the converter:
 
-* ``attn_output``: ``(batch, seq, hidden_size)``
+* tensor name ``(batch, seq, hidden_size)`` — the caller must register it as
+  a graph output via ``g.make_tensor_output``
 
 Example::
 
     import torch
+    from onnx import TensorProto
     from transformers import LlamaConfig
     from transformers.models.llama.modeling_llama import LlamaAttention
+    from yobx.xbuilder import GraphBuilder
     from yobx.torch.in_transformers.models import llama_attention_to_onnx
 
     config = LlamaConfig(
         hidden_size=64, num_attention_heads=4, num_key_value_heads=2, head_dim=16
     )
     attn = LlamaAttention(config, layer_idx=0).eval()
-    hs  = torch.randn(2, 10, 64, dtype=torch.float32)
-    cos = torch.randn(2, 10, 16, dtype=torch.float32)
-    sin = torch.randn(2, 10, 16, dtype=torch.float32)
 
     # opset 22 — plain ONNX ops (MatMul, Softmax, …)
-    model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=22)
+    g = GraphBuilder({"": 22}, verbose=0)
+    g.make_tensor_input("hidden_states", TensorProto.FLOAT, ("batch", "seq", 64))
+    g.make_tensor_input("cos", TensorProto.FLOAT, ("batch", "seq", 16))
+    g.make_tensor_input("sin", TensorProto.FLOAT, ("batch", "seq", 16))
+    out = llama_attention_to_onnx(g, attn, "hidden_states", "cos", "sin")
+    g.make_tensor_output(out, TensorProto.FLOAT, ("batch", "seq", 64))
+    model = g.to_onnx()
 
-    # opset 24 — ONNX Attention op (opset ≥ 24)
-    model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=24)
+    # opset 24 — ONNX Attention op
+    g = GraphBuilder({"": 24}, verbose=0)
+    g.make_tensor_input("hidden_states", TensorProto.FLOAT, ("batch", "seq", 64))
+    g.make_tensor_input("cos", TensorProto.FLOAT, ("batch", "seq", 16))
+    g.make_tensor_input("sin", TensorProto.FLOAT, ("batch", "seq", 16))
+    out = llama_attention_to_onnx(g, attn, "hidden_states", "cos", "sin")
+    g.make_tensor_output(out, TensorProto.FLOAT, ("batch", "seq", 64))
+    model = g.to_onnx()
 
     # OnnxRuntime contrib ops
-    model = llama_attention_to_onnx(
-        attn, (hs, cos, sin), target_opset={"": 22, "com.microsoft": 1}
-    )
-
-    # bfloat16
-    attn_bf16 = LlamaAttention(config, layer_idx=0).to(torch.bfloat16).eval()
-    hs_bf16, cos_bf16, sin_bf16 = hs.bfloat16(), cos.bfloat16(), sin.bfloat16()
-    model_bf16 = llama_attention_to_onnx(
-        attn_bf16, (hs_bf16, cos_bf16, sin_bf16), target_opset=22
-    )
+    g = GraphBuilder({"": 22, "com.microsoft": 1}, verbose=0)
+    g.make_tensor_input("hidden_states", TensorProto.FLOAT, ("batch", "seq", 64))
+    g.make_tensor_input("cos", TensorProto.FLOAT, ("batch", "seq", 16))
+    g.make_tensor_input("sin", TensorProto.FLOAT, ("batch", "seq", 16))
+    out = llama_attention_to_onnx(g, attn, "hidden_states", "cos", "sin")
+    g.make_tensor_output(out, TensorProto.FLOAT, ("batch", "seq", 64))
+    model = g.to_onnx()
 """
 
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Optional
 import numpy as np
-import onnx
-from onnx import ModelProto, TensorProto
+from onnx import TensorProto
 
-from ....helpers.onnx_helper import np_dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
+from ....helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ....typing import GraphBuilderExtendedProtocol
-from ....xbuilder import GraphBuilder
-from ...torch_helper import to_numpy, torch_dtype_to_onnx_dtype
+from ...torch_helper import to_numpy
 
 T = str
 
@@ -319,106 +327,87 @@ def _mha_com_microsoft(
 
 
 def llama_attention_to_onnx(
+    g: GraphBuilderExtendedProtocol,
     attn: "LlamaAttention",  # noqa: F821
-    args: Tuple[Any, ...],
-    target_opset: Union[int, Dict[str, int]] = 22,
-    with_mask: bool = False,
-    input_names: Optional[Tuple[str, ...]] = None,
-) -> ModelProto:
+    hidden_states: str,
+    cos: str,
+    sin: str,
+    attention_mask: Optional[str] = None,
+    name: str = "llama_attention",
+) -> str:
     """
-    Converts a :class:`transformers.models.llama.modeling_llama.LlamaAttention`
-    module into an ONNX model.
+    Appends ONNX nodes implementing
+    :class:`transformers.models.llama.modeling_llama.LlamaAttention` to *g*.
 
     The output dtype (``float32``, ``float16``, or ``bfloat16``) is inferred
-    automatically from the first element of *args*.  Model weights are cast to
-    match.
+    from the registered type of *hidden_states* in *g*.  Model weights are cast
+    to match.
 
-    Three backends are available, controlled by *target_opset*:
+    The backend is chosen from the opsets registered in *g*:
 
     * **com.microsoft** — ``MultiHeadAttention`` contrib op (OnnxRuntime).
-      Pass ``{"": 22, "com.microsoft": 1}`` to select this path.
+      The ``"com.microsoft"`` domain must be registered in *g*.
       GQA KV heads are expanded to match the query head count before the op.
-    * **opset ≥ 24** — standard ONNX ``Attention`` op.  Pass an integer ≥ 24
-      or ``{"": 24}``.
+    * **opset ≥ 24** — standard ONNX ``Attention`` op.
     * **opset ≤ 22** — plain ONNX ops (``MatMul``, ``Softmax``,
       ``Transpose``, …).  This is the default path.
 
+    :param g: an existing graph builder — inputs must already be declared with
+        their types; the function appends nodes without creating new graph inputs
+        or outputs
     :param attn: a fitted ``LlamaAttention`` module (weights must be
         initialised; the module may be in any of ``float32``, ``float16``, or
         ``bfloat16``)
-    :param args: example inputs used to determine shapes and dtype; a tuple of
-        ``(hidden_states, cos, sin)`` or
-        ``(hidden_states, cos, sin, attention_mask)``.
-        Elements may be :class:`torch.Tensor` or :class:`numpy.ndarray`.
-    :param target_opset: target opset — either an integer for the default
-        domain (``""``), or a mapping from domain names to opset versions,
-        e.g. ``{"": 22}`` (plain ops), ``{"": 22, "com.microsoft": 1}`` (ORT
-        contrib), or ``{"": 24}`` (ONNX Attention op).  Defaults to ``22``.
-    :param with_mask: if ``True``, add an ``attention_mask`` input even when
-        *args* contains only three elements
-    :param input_names: optional names for the ONNX graph inputs; defaults to
-        ``("hidden_states", "cos", "sin")`` or
-        ``("hidden_states", "cos", "sin", "attention_mask")``
-    :return: :class:`onnx.ModelProto` — the converted ONNX model
+    :param hidden_states: name of the ``(batch, seq, hidden_size)`` input tensor
+        already declared in *g*
+    :param cos: name of the ``(batch, seq, head_dim)`` cosine embedding tensor
+        already declared in *g*
+    :param sin: name of the ``(batch, seq, head_dim)`` sine embedding tensor
+        already declared in *g*
+    :param attention_mask: optional name of the ``(batch, 1, seq_q, total_seq)``
+        attention mask tensor already declared in *g*; pass ``None`` (default)
+        when no mask is needed
+    :param name: prefix used for all node names added to *g*
+    :return: name of the output tensor ``(batch, seq, hidden_size)``; the
+        caller is responsible for registering it as a graph output via
+        ``g.make_tensor_output``
 
     Example::
 
-        import torch
-        from transformers import LlamaConfig
-        from transformers.models.llama.modeling_llama import LlamaAttention
+        from onnx import TensorProto
+        from yobx.xbuilder import GraphBuilder
         from yobx.torch.in_transformers.models import llama_attention_to_onnx
 
-        config = LlamaConfig(
-            hidden_size=64, num_attention_heads=4,
-            num_key_value_heads=2, head_dim=16,
-        )
-        attn = LlamaAttention(config, layer_idx=0).eval()
-        hs  = torch.randn(2, 10, 64, dtype=torch.float32)
-        cos = torch.randn(2, 10, 16, dtype=torch.float32)
-        sin = torch.randn(2, 10, 16, dtype=torch.float32)
-
-        # opset 22 — plain ONNX ops
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=22)
-
-        # opset 24 — ONNX Attention op
-        model = llama_attention_to_onnx(attn, (hs, cos, sin), target_opset=24)
-
-        # OnnxRuntime MultiHeadAttention contrib op
-        model = llama_attention_to_onnx(
-            attn, (hs, cos, sin),
-            target_opset={"": 22, "com.microsoft": 1},
-        )
-
-        # bfloat16
-        attn_bf16 = LlamaAttention(config, layer_idx=0).to(torch.bfloat16).eval()
-        hs_bf16 = hs.bfloat16()
-        model_bf16 = llama_attention_to_onnx(
-            attn_bf16, (hs_bf16, cos.bfloat16(), sin.bfloat16()), target_opset=22
-        )
+        g = GraphBuilder({"": 22}, verbose=0)
+        g.make_tensor_input("hidden_states", TensorProto.FLOAT, ("batch", "seq", 64))
+        g.make_tensor_input("cos", TensorProto.FLOAT, ("batch", "seq", 16))
+        g.make_tensor_input("sin", TensorProto.FLOAT, ("batch", "seq", 16))
+        out = llama_attention_to_onnx(g, attn, "hidden_states", "cos", "sin")
+        g.make_tensor_output(out, TensorProto.FLOAT, ("batch", "seq", 64))
+        model = g.to_onnx()
     """
-    import torch
+    assert g.has_type(hidden_states), (
+        f"Missing type for {hidden_states!r}{g.get_debug_msg()}"
+    )
 
-    if isinstance(target_opset, int):
-        dict_opset: Dict[str, int] = {"": target_opset}
-    else:
-        dict_opset = dict(target_opset)
-
-    main_opset = dict_opset.get("", 22)
-    has_ms = "com.microsoft" in dict_opset
+    main_opset = g.main_opset
+    has_ms = bool(g.has_opset("com.microsoft"))
+    onnx_dtype: int = g.get_type(hidden_states)
+    np_dtype = _np_dtype_for_onnx(onnx_dtype)
 
     # ------------------------------------------------------------------ #
     # Inspect module weights                                               #
     # Use to_numpy() so that bfloat16 weights are handled correctly.      #
     # ------------------------------------------------------------------ #
-    q_w = to_numpy(attn.q_proj.weight)  # (num_heads*head_dim, hidden)
-    k_w = to_numpy(attn.k_proj.weight)  # (num_kv_heads*head_dim, hidden)
-    v_w = to_numpy(attn.v_proj.weight)  # (num_kv_heads*head_dim, hidden)
-    o_w = to_numpy(attn.o_proj.weight)  # (hidden, num_heads*head_dim)
+    q_w = to_numpy(attn.q_proj.weight).astype(np_dtype)  # (num_heads*head_dim, hidden)
+    k_w = to_numpy(attn.k_proj.weight).astype(np_dtype)  # (num_kv_heads*head_dim, hidden)
+    v_w = to_numpy(attn.v_proj.weight).astype(np_dtype)  # (num_kv_heads*head_dim, hidden)
+    o_w = to_numpy(attn.o_proj.weight).astype(np_dtype)  # (hidden, num_heads*head_dim)
 
-    q_b = to_numpy(attn.q_proj.bias) if attn.q_proj.bias is not None else None
-    k_b = to_numpy(attn.k_proj.bias) if attn.k_proj.bias is not None else None
-    v_b = to_numpy(attn.v_proj.bias) if attn.v_proj.bias is not None else None
-    o_b = to_numpy(attn.o_proj.bias) if attn.o_proj.bias is not None else None
+    q_b = to_numpy(attn.q_proj.bias).astype(np_dtype) if attn.q_proj.bias is not None else None
+    k_b = to_numpy(attn.k_proj.bias).astype(np_dtype) if attn.k_proj.bias is not None else None
+    v_b = to_numpy(attn.v_proj.bias).astype(np_dtype) if attn.v_proj.bias is not None else None
+    o_b = to_numpy(attn.o_proj.bias).astype(np_dtype) if attn.o_proj.bias is not None else None
 
     num_heads: int = attn.config.num_attention_heads
     num_kv_heads: int = attn.config.num_key_value_heads
@@ -426,85 +415,6 @@ def llama_attention_to_onnx(
     n_rep: int = attn.num_key_value_groups
     scaling: float = attn.scaling
     hidden_size: int = attn.config.hidden_size
-
-    # ------------------------------------------------------------------ #
-    # Determine ONNX dtype from example inputs                            #
-    # Use torch_dtype_to_onnx_dtype for torch.Tensor to handle bfloat16  #
-    # (numpy does not have a native bfloat16 dtype).                      #
-    # ------------------------------------------------------------------ #
-    if isinstance(args[0], torch.Tensor):
-        onnx_dtype = torch_dtype_to_onnx_dtype(args[0].dtype)
-    elif isinstance(args[0], np.ndarray):
-        onnx_dtype = np_dtype_to_tensor_dtype(args[0].dtype)
-    else:
-        onnx_dtype = TensorProto.FLOAT
-
-    np_dtype = _np_dtype_for_onnx(onnx_dtype)
-
-    # Cast weights to the target dtype
-    q_w = q_w.astype(np_dtype)
-    k_w = k_w.astype(np_dtype)
-    v_w = v_w.astype(np_dtype)
-    o_w = o_w.astype(np_dtype)
-    if q_b is not None:
-        q_b = q_b.astype(np_dtype)
-    if k_b is not None:
-        k_b = k_b.astype(np_dtype)
-    if v_b is not None:
-        v_b = v_b.astype(np_dtype)
-    if o_b is not None:
-        o_b = o_b.astype(np_dtype)
-
-    # ------------------------------------------------------------------ #
-    # Derive input shapes from examples                                   #
-    # ------------------------------------------------------------------ #
-    def _get_shape(x: Any):
-        if isinstance(x, torch.Tensor):
-            return tuple(x.shape)
-        if isinstance(x, np.ndarray):
-            return tuple(x.shape)
-        return None
-
-    hs_shape = _get_shape(args[0])
-    has_mask_input = (len(args) > 3 and args[3] is not None) or with_mask
-    mask_shape = _get_shape(args[3]) if len(args) > 3 and args[3] is not None else None
-
-    # Build dynamic shape specs
-    dyn_hs = ("batch", "seq", hidden_size) if hs_shape is None else (
-        "batch", "seq", hs_shape[2]
-    )
-    dyn_cos = ("batch", "seq", head_dim)
-    dyn_sin = ("batch", "seq", head_dim)
-    if has_mask_input:
-        dyn_mask = ("batch", 1, "seq_q", "total_seq") if mask_shape is None else (
-            "batch", 1, mask_shape[2], mask_shape[3]
-        )
-
-    # ------------------------------------------------------------------ #
-    # Build graph                                                         #
-    # ------------------------------------------------------------------ #
-    g = GraphBuilder(dict_opset, verbose=0)
-
-    default_names = ("hidden_states", "cos", "sin", "attention_mask")
-    if input_names is None:
-        input_names = default_names[: 4 if has_mask_input else 3]
-
-    # Declare inputs
-    hs_name = input_names[0]
-    cos_name = input_names[1] if len(input_names) > 1 else "cos"
-    sin_name = input_names[2] if len(input_names) > 2 else "sin"
-    mask_name = input_names[3] if len(input_names) > 3 else "attention_mask"
-
-    g.make_tensor_input(hs_name, onnx_dtype, dyn_hs)
-    g.make_tensor_input(cos_name, onnx_dtype, dyn_cos)
-    g.make_tensor_input(sin_name, onnx_dtype, dyn_sin)
-    if has_mask_input:
-        g.make_tensor_input(mask_name, onnx_dtype, dyn_mask)
-        mask_input: Optional[T] = mask_name
-    else:
-        mask_input = None
-
-    name = "llama_attention"
 
     # -------------------------------------------------------------- #
     # Branch: com.microsoft MultiHeadAttention                        #
@@ -519,9 +429,9 @@ def llama_attention_to_onnx(
                 res = g.op.Add(res, bv, name=name)
             return res
 
-        q_3d = _proj_3d(hs_name, q_w, q_b, "w_q")  # (batch, seq, num_heads * head_dim)
-        k_3d = _proj_3d(hs_name, k_w, k_b, "w_k")  # (batch, seq, num_kv_heads * head_dim)
-        v_3d = _proj_3d(hs_name, v_w, v_b, "w_v")  # (batch, seq, num_kv_heads * head_dim)
+        q_3d = _proj_3d(hidden_states, q_w, q_b, "w_q")  # (batch, seq, num_heads * head_dim)
+        k_3d = _proj_3d(hidden_states, k_w, k_b, "w_k")  # (batch, seq, num_kv_heads * head_dim)
+        v_3d = _proj_3d(hidden_states, v_w, v_b, "w_v")  # (batch, seq, num_kv_heads * head_dim)
 
         # Apply RoPE: reshape to 4D, apply, reshape back to 3D
         def _apply_rope_3d(x_3d: T, n_h: int, cos_n: T, sin_n: T) -> T:
@@ -540,8 +450,8 @@ def llama_attention_to_onnx(
             sp3 = np.array([0, 0, -1], dtype=np.int64)
             return g.op.Reshape(x4d, sp3, name=name)
 
-        q_3d = _apply_rope_3d(q_3d, num_heads, cos_name, sin_name)
-        k_3d = _apply_rope_3d(k_3d, num_kv_heads, cos_name, sin_name)
+        q_3d = _apply_rope_3d(q_3d, num_heads, cos, sin)
+        k_3d = _apply_rope_3d(k_3d, num_kv_heads, cos, sin)
 
         # Repeat KV for GQA so k/v have same head count as q.
         # Use Unsqueeze + Expand (not Tile) to get the same interleaved ordering
@@ -576,7 +486,7 @@ def llama_attention_to_onnx(
 
         # MHA: output is (batch, seq, num_heads * head_dim)
         out_3d = _mha_com_microsoft(
-            g, q_3d, k_3d, v_3d, mask_input,
+            g, q_3d, k_3d, v_3d, attention_mask,
             num_heads, scaling, name,
         )
 
@@ -592,13 +502,13 @@ def llama_attention_to_onnx(
     # -------------------------------------------------------------- #
     elif main_opset >= 24:
         # Project to 4D
-        q_4d = _project_and_split(g, hs_name, q_w, q_b, num_heads, head_dim, name, "w_q")
-        k_4d = _project_and_split(g, hs_name, k_w, k_b, num_kv_heads, head_dim, name, "w_k")
-        v_4d = _project_and_split(g, hs_name, v_w, v_b, num_kv_heads, head_dim, name, "w_v")
+        q_4d = _project_and_split(g, hidden_states, q_w, q_b, num_heads, head_dim, name, "w_q")
+        k_4d = _project_and_split(g, hidden_states, k_w, k_b, num_kv_heads, head_dim, name, "w_k")
+        v_4d = _project_and_split(g, hidden_states, v_w, v_b, num_kv_heads, head_dim, name, "w_v")
 
         # Apply RoPE
-        cos4d = g.op.Unsqueeze(cos_name, np.array([1], dtype=np.int64), name=name)
-        sin4d = g.op.Unsqueeze(sin_name, np.array([1], dtype=np.int64), name=name)
+        cos4d = g.op.Unsqueeze(cos, np.array([1], dtype=np.int64), name=name)
+        sin4d = g.op.Unsqueeze(sin, np.array([1], dtype=np.int64), name=name)
         q_4d = _apply_rope(g, q_4d, cos4d, sin4d, head_dim, name)
         k_4d = _apply_rope(g, k_4d, cos4d, sin4d, head_dim, name)
 
@@ -608,7 +518,7 @@ def llama_attention_to_onnx(
             v_4d = _repeat_kv(g, v_4d, n_rep, num_kv_heads, head_dim, name)
 
         # ONNX Attention op
-        out_4d = _attention_opset24(g, q_4d, k_4d, v_4d, mask_input, scaling, name)
+        out_4d = _attention_opset24(g, q_4d, k_4d, v_4d, attention_mask, scaling, name)
 
         # (batch, n_heads, seq, head_dim) -> (batch, seq, hidden_size)
         transposed = g.op.Transpose(out_4d, perm=[0, 2, 1, 3], name=name)
@@ -627,13 +537,13 @@ def llama_attention_to_onnx(
     # -------------------------------------------------------------- #
     else:
         # Project to 4D
-        q_4d = _project_and_split(g, hs_name, q_w, q_b, num_heads, head_dim, name, "w_q")
-        k_4d = _project_and_split(g, hs_name, k_w, k_b, num_kv_heads, head_dim, name, "w_k")
-        v_4d = _project_and_split(g, hs_name, v_w, v_b, num_kv_heads, head_dim, name, "w_v")
+        q_4d = _project_and_split(g, hidden_states, q_w, q_b, num_heads, head_dim, name, "w_q")
+        k_4d = _project_and_split(g, hidden_states, k_w, k_b, num_kv_heads, head_dim, name, "w_k")
+        v_4d = _project_and_split(g, hidden_states, v_w, v_b, num_kv_heads, head_dim, name, "w_v")
 
         # Apply RoPE
-        cos4d = g.op.Unsqueeze(cos_name, np.array([1], dtype=np.int64), name=name)
-        sin4d = g.op.Unsqueeze(sin_name, np.array([1], dtype=np.int64), name=name)
+        cos4d = g.op.Unsqueeze(cos, np.array([1], dtype=np.int64), name=name)
+        sin4d = g.op.Unsqueeze(sin, np.array([1], dtype=np.int64), name=name)
         q_4d = _apply_rope(g, q_4d, cos4d, sin4d, head_dim, name)
         k_4d = _apply_rope(g, k_4d, cos4d, sin4d, head_dim, name)
 
@@ -644,7 +554,7 @@ def llama_attention_to_onnx(
 
         # Standard attention
         out_4d = _standard_attention(
-            g, q_4d, k_4d, v_4d, mask_input, scaling, onnx_dtype, name
+            g, q_4d, k_4d, v_4d, attention_mask, scaling, onnx_dtype, name
         )
 
         # (batch, n_heads, seq, head_dim) -> (batch, seq, hidden_size)
@@ -659,7 +569,4 @@ def llama_attention_to_onnx(
             o_bv = g.make_initializer("w_o_bias", o_b)
             attn_out = g.op.Add(attn_out, o_bv, name=name)
 
-    # Declare output
-    g.make_tensor_output(attn_out, onnx_dtype, ("batch", "seq", hidden_size))
-
-    return g.to_onnx(optimize=False)
+    return attn_out
