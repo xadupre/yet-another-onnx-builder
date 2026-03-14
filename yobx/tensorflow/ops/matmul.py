@@ -70,9 +70,7 @@ def _transpose_last_two(
     """
     rank = len(inp.shape)
     if rank < 2:
-        raise ValueError(
-            f"Cannot transpose last two dims of a tensor with rank {rank}."
-        )
+        raise ValueError(f"Cannot transpose last two dims of a tensor with rank {rank}.")
     perm = list(range(rank))
     perm[-2], perm[-1] = perm[-1], perm[-2]
     return g.op.Transpose(inp.name, perm=perm, name=f"{name}_{tag}")

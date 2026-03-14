@@ -55,9 +55,7 @@ def sklearn_ledoit_wolf(
     :param name: prefix for added node names
     :return: output tensor name
     """
-    assert isinstance(
-        estimator, LedoitWolf
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, LedoitWolf), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)

@@ -8,7 +8,6 @@ Random normal
 
 from typing import Any, Dict, List
 
-import numpy as np
 from onnx import TensorProto
 import onnx.helper as onh
 import tensorflow as tf
@@ -69,11 +68,8 @@ def convert_random_standard_normal(
         tf_dims = op.outputs[0].shape.as_list()
         if tf_dims is not None:
             # Replace None (dynamic) dims with symbolic names.
-            onnx_shape = tuple(
-                d if d is not None else f"d{i}" for i, d in enumerate(tf_dims)
-            )
+            onnx_shape = tuple(d if d is not None else f"d{i}" for i, d in enumerate(tf_dims))
             g.set_shape(outputs[0], onnx_shape)
             g.set_type(outputs[0], onnx_dtype)
 
     return result
-

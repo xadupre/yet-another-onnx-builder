@@ -37,13 +37,9 @@ class LeNet(tf.keras.Model):
 
     def __init__(self):
         super().__init__()
-        self.conv2d_1 = layers.Conv2D(
-            filters=6, kernel_size=(3, 3), activation="relu"
-        )
+        self.conv2d_1 = layers.Conv2D(filters=6, kernel_size=(3, 3), activation="relu")
         self.average_pool = layers.AveragePooling2D(pool_size=(2, 2))
-        self.conv2d_2 = layers.Conv2D(
-            filters=16, kernel_size=(3, 3), activation="relu"
-        )
+        self.conv2d_2 = layers.Conv2D(filters=16, kernel_size=(3, 3), activation="relu")
         self.flatten = layers.Flatten()
         self.fc_1 = layers.Dense(120, activation="relu")
         self.fc_2 = layers.Dense(84, activation="relu")
@@ -140,17 +136,13 @@ class VariationalAutoEncoder(tf.keras.Model):
     ):
         super().__init__(name=name, **kwargs)
         self.original_dim = original_dim
-        self.encoder = Encoder(
-            latent_dim=latent_dim, intermediate_dim=intermediate_dim
-        )
+        self.encoder = Encoder(latent_dim=latent_dim, intermediate_dim=intermediate_dim)
         self.decoder = Decoder(original_dim, intermediate_dim=intermediate_dim)
 
     def call(self, inputs):
         z_mean, z_log_var, z = self.encoder(inputs)
         reconstructed = self.decoder(z)
-        kl_loss = -0.5 * tf.reduce_mean(
-            z_log_var - tf.square(z_mean) - tf.exp(z_log_var) + 1
-        )
+        kl_loss = -0.5 * tf.reduce_mean(z_log_var - tf.square(z_mean) - tf.exp(z_log_var) + 1)
         self.add_loss(kl_loss)
         return reconstructed
 
@@ -279,9 +271,7 @@ class TestSubclassingModels(ExtTestCase):
             b = tf.where(
                 tf.constant([True]),
                 tf.expand_dims(input_0, axis=0),
-                tf.expand_dims(
-                    tf.constant([0, 1, 2, 5, 7], dtype=tf.int32), axis=0
-                ),
+                tf.expand_dims(tf.constant([0, 1, 2, 5, 7], dtype=tf.int32), axis=0),
             )
             c = tf.logical_or(tf.cast(a, tf.bool), tf.cast(b, tf.bool))
             return c
