@@ -62,10 +62,10 @@ class ShapedBasedReshapePattern(ReshapePattern):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c'])
             C[Constant <br/> value: 0, 0, -1]
@@ -89,10 +89,10 @@ class ShapedBasedReshapePattern(ReshapePattern):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             X[Input: X] --> ID[Identity]
             S[Input: shape2] -.->|Invalid?| ID
             ID --> xrr[Output: xrr]
@@ -135,10 +135,10 @@ class ReduceReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 3, 2])
             C[Constant <br/> value: 3]
@@ -167,10 +167,10 @@ class ReduceReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 3, 2])
             RS[[ReduceSum <br/> axes=1, keepdims=0]]
@@ -279,10 +279,10 @@ class ReshapeReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 128])
             C1[Constant <br/> value: 4096, 7, 7, 128]
@@ -314,10 +314,10 @@ class ReshapeReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 128])
             C2[Constant <br/> value: 4096, 49, 128]
@@ -590,10 +590,10 @@ class Reshape2Of3Pattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 4])
             Y([Input: Y <br/> float, 2, 3, 4])
@@ -644,10 +644,10 @@ class Reshape2Of3Pattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 4])
             Y([Input: Y <br/> float, 2, 3, 4])
@@ -869,10 +869,10 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 4])
             Y([Input: Y <br/> float, 'a', 4])
@@ -912,10 +912,10 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 4])
             Y([Input: Y <br/> float, 'a', 4])
@@ -1016,10 +1016,10 @@ class ConcatReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c', 'd'])
             I1([Input: I1 <br/> int64, 1])
@@ -1063,10 +1063,10 @@ class ConcatReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c', 'd'])
             I1([Input: I1 <br/> int64, 1])
@@ -1216,10 +1216,10 @@ class StaticConcatReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             I1([Input: I1 <br/> int64, 1])
@@ -1254,10 +1254,10 @@ class StaticConcatReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             I1([Input: I1 <br/> int64, 1])
@@ -1387,10 +1387,10 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             I1[Initializer <br/> value: -1]
@@ -1425,10 +1425,10 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             C[Constant <br/> value: 6, -1]
@@ -1623,10 +1623,10 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             one[Initializer <br/> value: 1]
@@ -1662,10 +1662,10 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             C[Constant <br/> value: 0, 4]
@@ -1785,10 +1785,10 @@ class UnsqueezeReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c'])
             C1[Constant <br/> value: 2]
@@ -1820,10 +1820,10 @@ class UnsqueezeReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c'])
             C[Constant <br/> value: 1]
@@ -1918,10 +1918,10 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 8, 16])
             S3([Input: shape3 <br/> int64, 2])
@@ -1953,10 +1953,10 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
 
         graph TD
 
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px
-            classDef ioNode fill:#dfd,stroke:#333
-            classDef interNode fill:#eee,stroke:#999
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 8, 16])
             S3([Input: shape3 <br/> int64, 2])

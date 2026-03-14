@@ -32,6 +32,12 @@ img.logo {
     font-family: "Courier New", Courier, monospace;
 }
 
+/* Mermaid node text colour: force dark text on light-theme node fills.
+   The dark-mode overrides below are more specific and will still win. */
+.mermaid text {
+    fill: #333 !important;
+}
+
 /* Mermaid dark-mode node colours.
    These classes are defined via classDef in each diagram and need to be
    overridden here rather than via inline styles so that theme switching works.
