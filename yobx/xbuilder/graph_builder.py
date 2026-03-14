@@ -2339,7 +2339,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def _set_known_value_shape(self, name: str, value: DYNAMIC_SHAPE):
         self._known_value_shape[name] = (
-            tuple(simplify_expression(s) for s in value)
+            tuple(simplify_expression(s) for s in value)  # type: ignore
             if isinstance(value, tuple)
             else simplify_expression(value)
         )
@@ -10159,7 +10159,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 return True
             if dim2 in self.constraints_ and dimension in self.constraints_[dim2]:
                 return True
-            if dimension in self.constraints_ and dim2 in self.constraints_[dimension]:
+            if dimension in self.constraints_ and dim2 in self.constraints_[dimension]:  # type: ignore
                 return True
             return False
         if len(args) == 3:
