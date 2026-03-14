@@ -614,41 +614,8 @@ class InputObserverInfo:
             for index in range(n_tensors)
         ]
 
-        def _get_dim_value(flat_index: int, dim: int) -> Any:
-            """Returns the value for a single dynamic dimension entry.
-            Uses a string name from *dim_names* when available, otherwise
-            falls back to ``torch.export.Dim.DYNAMIC``.
-
-            Args:
-                flat_index: Position of the tensor in the flat list of inputs.
-                dim: Dimension index within the tensor.
-
-            Returns:
-                A string label from *dim_names* if one is registered for this
-                input and dimension, otherwise ``torch.export.Dim.DYNAMIC``.
-            """
-            if not dim_names:
-                return torch.export.Dim.DYNAMIC
-            # type checking
-            assert self._best_candidate is not None
-            arg_or_kwarg = self._best_candidate.position_to_args_kwargs[flat_index]
-            # Look up by the raw key (int position or str name).
-            per_input_names = dim_names.get(arg_or_kwarg)
-            # If not found and key is an int, also try the signature name.
-            if per_input_names is None and isinstance(arg_or_kwarg, int):
-                sig_name = (
-                    self.signature_names[arg_or_kwarg]
-                    if arg_or_kwarg < len(self.signature_names)
-                    else None
-                )
-                if sig_name is not None:
-                    per_input_names = dim_names.get(sig_name)
-            if per_input_names is not None and dim in per_input_names:
-                return per_input_names[dim]
-            return torch.export.Dim.DYNAMIC
-
         flat_dynamic_shapes = [
-            {dim: _get_dim_value(flat_idx, dim) for dim in dims}
+            {dim: self._get_dim_value(flat_idx, dim, dim_names) for dim in dims}
             for flat_idx, dims in enumerate(dynamic_shapes)
         ]
         if return_flat:
@@ -935,6 +902,45 @@ class InputObserverInfo:
                 "Passing a keyword argument with this name is not supported."
             )
         return {**new_kwargs, self.kwargs_name: keywords}
+
+    def _get_dim_value(
+        self,
+        flat_index: int,
+        dim: int,
+        dim_names: dict[str | int, dict[int, str]] | None,
+    ) -> Any:
+        """Returns the value for a single dynamic dimension entry.
+        Uses a string name from *dim_names* when available, otherwise
+        falls back to ``torch.export.Dim.DYNAMIC``.
+
+        Args:
+            flat_index: Position of the tensor in the flat list of inputs.
+            dim: Dimension index within the tensor.
+            dim_names: Optional mapping from input identifiers to per-dimension
+                string labels, as passed to :meth:`infer_dynamic_shapes`.
+
+        Returns:
+            A string label from *dim_names* if one is registered for this
+            input and dimension, otherwise ``torch.export.Dim.DYNAMIC``.
+        """
+        if not dim_names:
+            return torch.export.Dim.DYNAMIC
+        assert self._best_candidate is not None
+        arg_or_kwarg = self._best_candidate.position_to_args_kwargs[flat_index]
+        # Look up by the raw key (int position or str name).
+        per_input_names = dim_names.get(arg_or_kwarg)
+        # If not found and key is an int, also try the signature name.
+        if per_input_names is None and isinstance(arg_or_kwarg, int):
+            sig_name = (
+                self.signature_names[arg_or_kwarg]
+                if arg_or_kwarg < len(self.signature_names)
+                else None
+            )
+            if sig_name is not None:
+                per_input_names = dim_names.get(sig_name)
+        if per_input_names is not None and dim in per_input_names:
+            return per_input_names[dim]
+        return torch.export.Dim.DYNAMIC
 
     def remove_inputs(self, input_names: Sequence[str | int]) -> int:
         """Lets the users drops inputs. Returns the number of removals."""
