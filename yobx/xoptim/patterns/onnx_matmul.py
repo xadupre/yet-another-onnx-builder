@@ -152,7 +152,7 @@ class MatMulAddPattern(PatternOptimization):
         shape_2 = g.get_shape(node.input[1])
         last_dim = shape_2[-1 - transB]
         shape_bias = g.get_shape(bias2)
-        if last_dim != shape_bias[-1]:
+        if not shape_bias or last_dim != shape_bias[-1]:
             return self.none(node, inspect.currentframe().f_lineno)
         if len(shape_bias) > 1:
             shape_node_out = g.get_shape(node.output[0]) if g.has_shape(node.output[0]) else None

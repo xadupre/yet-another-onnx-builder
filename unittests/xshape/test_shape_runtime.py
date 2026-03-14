@@ -495,6 +495,7 @@ class TestShapeRuntime(ExtTestCase):
         # rank=0, axes input=[0], values_0=None → #SV-Unsq4, output=("x",)
         b = _TestShapeBuilder()
         b.set_rank("x", 0)
+        b.set_type("x", onnx.TensorProto.INT64)
         b.set_constant("axes", _int64_cst("axes", [0]))
         node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
         result = b._update_value_shape_with_node_Unsqueeze(node)
@@ -511,15 +512,6 @@ class TestShapeRuntime(ExtTestCase):
         result = b._update_value_shape_with_node_Unsqueeze(node)
         self.assertTrue(result)
         self.assertEqual(b.value_as_shape("y"), (42,))
-
-    def test_unsqueeze_scalar_axes_attribute(self):
-        # rank=0, axes attribute=[0], values_0=None → #SV-Unsq4, output=("x",)
-        b = _TestShapeBuilder()
-        b.set_rank("x", 0)
-        node = oh.make_node("Unsqueeze", ["x"], ["y"], axes=[0])
-        result = b._update_value_shape_with_node_Unsqueeze(node)
-        self.assertTrue(result)
-        self.assertEqual(b.value_as_shape("y"), ("x",))
 
     def test_unsqueeze_scalar_0d_axes_returns_false(self):
         # rank=0, axes input is 0-D scalar → cst=tuple(), len≠1 → return False

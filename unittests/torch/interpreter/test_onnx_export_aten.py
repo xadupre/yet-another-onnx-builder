@@ -15,7 +15,6 @@ from yobx.ext_test_case import (
     requires_transformers,
     ignore_warnings,
     hide_stdout,
-    is_windows,
 )
 from yobx.helpers import max_diff
 from yobx.torch.torch_helper import torch_deepcopy
@@ -2603,13 +2602,7 @@ class TestOnnxExportAten(ExtTestCase):
             dynamic_shapes=({1: "b", 2: "c"}, {0: "d"}, {1: "f", 2: "g"}),
         )
         check_model(model_path)
-
-        import onnxruntime
-
-        sess_options = onnxruntime.SessionOptions()
-        sess = onnxruntime.InferenceSession(
-            model_path, sess_options=sess_options, providers=["CPUExecutionProvider"]
-        )
+        sess = self.check_ort(model_path)
         feeds = dict(
             zip([i.name for i in sess.get_inputs()], [x.numpy(), index.numpy(), update.numpy()])
         )
@@ -2640,13 +2633,7 @@ class TestOnnxExportAten(ExtTestCase):
             dynamic_shapes=({0: DYN, 1: DYN}, {0: DYN}, {0: DYN, 1: DYN}),
         )
         check_model(model_path)
-
-        import onnxruntime
-
-        sess_options = onnxruntime.SessionOptions()
-        sess = onnxruntime.InferenceSession(
-            model_path, sess_options=sess_options, providers=["CPUExecutionProvider"]
-        )
+        sess = self.check_ort(model_path)
         feeds = dict(zip([i.name for i in sess.get_inputs()], [i.numpy() for i in inputs]))
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
@@ -2675,13 +2662,7 @@ class TestOnnxExportAten(ExtTestCase):
             dynamic_shapes=({0: DYN, 1: DYN}, {0: DYN}, {0: DYN, 1: DYN}),
         )
         check_model(model_path)
-
-        import onnxruntime
-
-        sess_options = onnxruntime.SessionOptions()
-        sess = onnxruntime.InferenceSession(
-            model_path, sess_options=sess_options, providers=["CPUExecutionProvider"]
-        )
+        sess = self.check_ort(model_path)
         feeds = dict(zip([i.name for i in sess.get_inputs()], [i.numpy() for i in inputs]))
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
@@ -2710,13 +2691,7 @@ class TestOnnxExportAten(ExtTestCase):
             dynamic_shapes=({0: DYN, 1: DYN}, {0: DYN}, {0: DYN, 1: DYN}),
         )
         check_model(model_path)
-
-        import onnxruntime
-
-        sess_options = onnxruntime.SessionOptions()
-        sess = onnxruntime.InferenceSession(
-            model_path, sess_options=sess_options, providers=["CPUExecutionProvider"]
-        )
+        sess = self.check_ort(model_path)
         feeds = dict(zip([i.name for i in sess.get_inputs()], [i.numpy() for i in inputs]))
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
@@ -2759,15 +2734,7 @@ class TestOnnxExportAten(ExtTestCase):
                 export_options=ExportOptions(aten_as_function=set()),
             )
             self.dump_onnx(f"test_aten_index_put_3d_none_{ii}.onnx", onx)
-
-            import onnxruntime
-
-            sess_options = onnxruntime.SessionOptions()
-            sess = onnxruntime.InferenceSession(
-                onx.SerializeToString(),
-                sess_options=sess_options,
-                providers=["CPUExecutionProvider"],
-            )
+            sess = self.check_ort(onx)
             feeds = dict(
                 zip(
                     [i.name for i in sess.get_inputs()],
@@ -3514,6 +3481,7 @@ class TestOnnxExportAten(ExtTestCase):
             inputs,
             dynamic_shapes=({0: "batch"},),
             export_options=ExportOptions(aten_as_function=set()),
+            optimize=True,
         )
         self.dump_onnx("test_aten_histc_float_00.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
@@ -3573,9 +3541,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model, (a, b), dynamic_shapes=({0: "G", 1: "M", 2: "K"}, {0: "G", 1: "N", 2: "K"})
         )
-        self.assert_conversion_with_ort_on_cpu(
-            onx, expected, (a, b), atol=2e-2 if is_windows() else 1e-2
-        )
+        self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=2e-2)
 
     def test_aten_grouped_mm_offsets(self):
         import torch

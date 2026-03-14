@@ -1,5 +1,6 @@
 import collections
 import unittest
+import onnx
 import torch
 from yobx.helpers import max_diff
 from yobx.helpers.rt_helper import make_feeds
@@ -7,11 +8,39 @@ from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
 from yobx.torch.tiny_models import get_tiny_model
 from yobx.torch import register_flattening_functions, apply_patches_for_model, to_onnx
 from yobx.torch.torch_helper import torch_deepcopy
-from yobx.ext_test_case import ExtTestCase, hide_stdout
+from yobx.ext_test_case import (
+    ExtTestCase,
+    hide_stdout,
+    ignore_warnings,
+    requires_torch,
+    requires_transformers,
+    skipif_ci_windows,
+)
 from yobx.xbuilder import OptimizationOptions
 
 
 class TestOptimizationUntrainedTorchModel(ExtTestCase):
+    @staticmethod
+    def _get_missing_shapes(model_proto):
+        """
+        Returns a list of ``(op_type, output_name)`` tuples for every node output
+        in the main graph that has no type/shape entry in ``graph.value_info``.
+
+        Inputs, graph outputs, and initializers already carry their own type
+        information and are therefore excluded from the check.
+        """
+        known = set()
+        known.update(v.name for v in model_proto.graph.input)
+        known.update(v.name for v in model_proto.graph.output)
+        known.update(v.name for v in model_proto.graph.value_info)
+        known.update(v.name for v in model_proto.graph.initializer)
+        missing = []
+        for node in model_proto.graph.node:
+            for out in node.output:
+                if out and out not in known:
+                    missing.append((node.op_type, out))
+        return missing
+
     @hide_stdout()
     @unittest.skip("missing patches")
     def test_tiny_llm_to_onnx_24(self):
@@ -175,6 +204,143 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         got = sess.run(None, feeds)
         diff = max_diff(expected, got)
         assert diff["abs"] <= 1e-5, f"diff={diff}"
+
+    def _export_tiny_llm(self, opset: int, patterns: str, return_builder: bool = False):
+        """
+        Export ``arnir0/Tiny-LLM`` and return the main ``ModelProto``.
+
+        Inputs ``position_ids`` and their dynamic-shape entry are removed
+        so that the export matches the form used in the rest of the test suite.
+        """
+        data = get_tiny_model("arnir0/Tiny-LLM")
+        model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
+        del inputs["position_ids"]
+        del ds["position_ids"]
+
+        with (
+            register_flattening_functions(patch_transformers=True),
+            apply_patches_for_model(patch_transformers=True, patch_torch=True, model=model),
+        ):
+            onx = to_onnx(
+                model,
+                kwargs=inputs,
+                dynamic_shapes=ds,
+                verbose=0,
+                options=OptimizationOptions(patterns=patterns),
+                target_opset=opset,
+                return_builder=return_builder,
+            )
+        # to_onnx returns ModelProto when large_model=False (the default)
+        return onx
+
+    @hide_stdout()
+    @skipif_ci_windows("not available on windows")
+    @requires_torch("2.6", "dynamic shapes support")
+    @requires_transformers("4.57", "transformers patches support")
+    @ignore_warnings(FutureWarning)
+    def test_tiny_llm_shape_default_opset_22(self):
+        """
+        Checks that ``arnir0/Tiny-LLM`` is exported at opset 22 with type/shape
+        information on every node output, and that ``patterns="default"``
+        produces at least one local function (e.g. a fused attention function).
+        """
+        proto, builder = self._export_tiny_llm(opset=22, patterns="default", return_builder=True)
+        if builder.has_name("_onx_concat_sym_size_int_19::UnSq02"):
+            self.assertTrue(builder.has_shape("_onx_concat_sym_size_int_19::UnSq02"))
+            self.assertEqual((4,), builder.get_shape("_onx_concat_sym_size_int_19::UnSq02"))
+            self.assertEqual(
+                onnx.TensorProto.INT64, builder.get_type("_onx_concat_sym_size_int_19::UnSq02")
+            )
+        self.dump_onnx("test_tiny_llm_shape_default_opset_22.onnx", proto)
+        missing = self._get_missing_shapes(proto)
+        self.assertEqual(
+            [],
+            missing,
+            f"Some node outputs are missing shape info at opset 22 / default: {missing}",
+        )
+        self.assertGreater(
+            len(proto.functions),
+            0,
+            "default optimization should produce at least one local function at opset 22",
+        )
+
+    @hide_stdout()
+    @skipif_ci_windows("not available on windows")
+    @requires_torch("2.6", "dynamic shapes support")
+    @requires_transformers("4.57", "transformers patches support")
+    @ignore_warnings(FutureWarning)
+    def test_tiny_llm_shape_default_opset_24(self):
+        """
+        Checks that ``arnir0/Tiny-LLM`` is exported at opset 24 with type/shape
+        information on every node output, and that ``patterns="default"``
+        produces at least one local function (e.g. a fused attention function).
+        """
+        proto = self._export_tiny_llm(opset=24, patterns="default")
+        missing = self._get_missing_shapes(proto)
+        self.assertEqual(
+            [],
+            missing,
+            f"Some node outputs are missing shape info at opset 24 / default: {missing}",
+        )
+        self.assertGreater(
+            len(proto.functions),
+            0,
+            "default optimization should produce at least one local function at opset 24",
+        )
+
+    @hide_stdout()
+    @skipif_ci_windows("not available on windows")
+    @requires_torch("2.6", "dynamic shapes support")
+    @requires_transformers("4.57", "transformers patches support")
+    @ignore_warnings(FutureWarning)
+    def test_tiny_llm_shape_ort_opset_22(self):
+        """
+        Checks that ``arnir0/Tiny-LLM`` is exported at opset 22 with type/shape
+        information on every node output, and that ``patterns="default+onnxruntime"``
+        folds the local attention function into an ORT Attention operator
+        (``Attention`` or ``GroupQueryAttention``).
+        """
+        proto = self._export_tiny_llm(opset=22, patterns="default+onnxruntime")
+        missing = self._get_missing_shapes(proto)
+        self.assertEqual(
+            [],
+            missing,
+            f"Some node outputs are missing shape info at opset 22 / default+onnxruntime:"
+            f" {missing}",
+        )
+        unique_ops = {n.op_type for n in proto.graph.node}
+        self.assertInOr(
+            ("Attention", "GroupQueryAttention"),
+            unique_ops,
+            "default+onnxruntime should produce an Attention op at opset 22",
+        )
+
+    @hide_stdout()
+    @skipif_ci_windows("not available on windows")
+    @requires_torch("2.6", "dynamic shapes support")
+    @requires_transformers("4.57", "transformers patches support")
+    @ignore_warnings(FutureWarning)
+    def test_tiny_llm_shape_ort_opset_24(self):
+        """
+        Checks that ``arnir0/Tiny-LLM`` is exported at opset 24 with type/shape
+        information on every node output, and that ``patterns="default+onnxruntime"``
+        folds the local attention function into an ORT Attention operator
+        (``Attention`` or ``GroupQueryAttention``).
+        """
+        proto = self._export_tiny_llm(opset=24, patterns="default+onnxruntime")
+        missing = self._get_missing_shapes(proto)
+        self.assertEqual(
+            [],
+            missing,
+            f"Some node outputs are missing shape info at opset 24 / default+onnxruntime:"
+            f" {missing}",
+        )
+        unique_ops = {n.op_type for n in proto.graph.node}
+        self.assertInOr(
+            ("Attention", "GroupQueryAttention"),
+            unique_ops,
+            "default+onnxruntime should produce an Attention op at opset 24",
+        )
 
 
 if __name__ == "__main__":

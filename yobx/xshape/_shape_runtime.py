@@ -2,6 +2,7 @@ from typing import Any, List
 import numpy as np
 import onnx
 from ._shape_helper import all_int
+from .simplify_expressions import simplify_expression
 
 
 class _ShapeRuntime:
@@ -27,6 +28,7 @@ class _ShapeRuntime:
             "Range",
             "Scatter",
             "Shape",
+            "Size",
             "Slice",
             "Squeeze",
             "Sub",
@@ -97,6 +99,7 @@ class _ShapeRuntime:
                 self.set_value_shape(node.output[0], f"{y}[{i}]")
                 node.doc_string += "#SV-Ga3"
                 self.set_shape(node.output[0], tuple())
+                self.set_type(node.output[0], self.get_type(node.input[0]))
                 return True
             if (
                 isinstance(y, str)
@@ -108,15 +111,18 @@ class _ShapeRuntime:
                 self.set_value_shape(node.output[0], f"{y}[{ii}]")
                 node.doc_string += "#SV-Ga4"
                 self.set_shape(node.output[0], (1,) if i.shape == (1,) else tuple())
+                self.set_type(node.output[0], self.get_type(node.input[0]))
                 return True
             if isinstance(y, tuple) and isinstance(i, int):
                 self.set_value_shape(node.output[0], y[i])
                 node.doc_string += "#SV-Ga5"
                 self.set_shape(node.output[0], tuple())
+                self.set_type(node.output[0], self.get_type(node.input[0]))
                 return True
             if isinstance(y, tuple) and isinstance(i, tuple) and all_int(i):
                 self.set_value_shape(node.output[0], tuple(y[_] for _ in i))
                 self.set_shape(node.output[0], (len(i),))
+                self.set_type(node.output[0], self.get_type(node.input[0]))
                 node.doc_string += "#SV-Ga6"
                 return True
             if (
@@ -139,6 +145,7 @@ class _ShapeRuntime:
                 )
                 self.set_value_shape(node.output[0], (y[ii],) if i.shape == (1,) else y[ii])
                 self.set_shape(node.output[0], (1,) if i.shape == (1,) else tuple())
+                self.set_type(node.output[0], self.get_type(node.input[0]))
                 node.doc_string += "#SV-Ga7"
                 return True
             raise RuntimeError(
@@ -162,6 +169,7 @@ class _ShapeRuntime:
                 ),
                 equal_to=(node.input[0], node.output[0]),
             )
+            self.set_type(node.output[0], self.get_type(node.input[0]))
             return True
         node.doc_string += "#SV-Id/2"
         return False
@@ -270,16 +278,19 @@ class _ShapeRuntime:
         if isinstance(y, str):
             node.doc_string += "#SV-Sq1"
             self.set_value_shape(node.output[0], f"squeeze({y})")
+            self.set_type(node.output[0], self.get_type(node.input[0]))
             return True
         if isinstance(y, int):
             node.doc_string += "#SV-Sq2"
             self.set_value_shape(node.output[0], y)
+            self.set_type(node.output[0], self.get_type(node.input[0]))
             return True
         assert isinstance(
             y, tuple
         ), f"Unexpected type {type(y)} for y={y} and i={i}{self.get_debug_msg()}"
         node.doc_string += "#SV-Sq3"
         self.set_value_shape(node.output[0], y[0])
+        self.set_type(node.output[0], self.get_type(node.input[0]))
         return True
 
     def _update_value_shape_with_node_Unsqueeze(self, node: onnx.NodeProto) -> bool:
@@ -305,12 +316,29 @@ class _ShapeRuntime:
         else:
             cst = tuple(self.get_attribute(node, "axes").ints)
             assert cst, f"Value={cst!r} is wrong for {node.input[0]}{self.get_debug_msg()}"
-        if cst is not None and len(cst) == 1 and self.get_rank(node.input[0]) == 0:
-            node.doc_string += "#SV-Unsq4"
-            self.set_value_shape(
-                node.output[0], (node.input[0],) if values_0 is None else (values_0,)
-            )
-            return True
+        if cst is not None and len(cst) == 1:
+            if values_0 is not None:
+                node.doc_string += "#SV-Unsq4"
+                if isinstance(values_0, (str, int)):
+                    self.set_value_shape(node.output[0], (values_0,))
+                else:
+                    values_0 = list(values_0)
+                    values_0.insert(cst[0], 1)
+                    self.set_value_shape(node.output[0], tuple(values_0))
+                if self.has_type(node.input[0]):
+                    self.set_type(node.output[0], self.get_type(node.input[0]))
+                return True
+            if (
+                self.has_rank(node.input[0])
+                and self.get_rank(node.input[0]) == 0
+                and self.has_type(node.input[0])
+                and self.get_type(node.input[0]) == onnx.TensorProto.INT64
+                and "::" not in node.input[0]
+            ):
+                self.set_value_shape(node.output[0], (node.input[0],))
+                if self.has_type(node.input[0]):
+                    self.set_type(node.output[0], self.get_type(node.input[0]))
+                return True
         return False
 
     def _update_value_shape_with_values_Concat(
@@ -321,6 +349,9 @@ class _ShapeRuntime:
         for v in values:
             concatenated.extend(v if isinstance(v, tuple) else (v,))
         self.set_value_shape(node.output[0], tuple(concatenated))
+        self.set_shape(node.output[0], (len(concatenated),))
+        if self.has_type(node.input[0]):
+            self.set_type(node.output[0], self.get_type(node.input[0]))
         return True
 
     def _update_value_shape_with_values_Range(
@@ -349,6 +380,8 @@ class _ShapeRuntime:
             return False
         node.doc_string += "#SV-Ra"
         self.set_value_shape(node.output[0], tuple(range(*args)))
+        if self.has_type(node.input[0]):
+            self.set_type(node.output[0], self.get_type(node.input[0]))
         return True
 
     def _update_value_shape_with_values_Add(
@@ -391,10 +424,18 @@ class _ShapeRuntime:
         if isinstance(m1, int) and isinstance(m2, int):
             node.doc_string += f"#SV-{node.op_type}1"
             self.set_value_shape(node.output[0], fct(m1, m2))
+            if self.has_type(node.input[0]):
+                self.set_type(node.output[0], self.get_type(node.input[0]))
+            elif self.has_type(node.input[1]):
+                self.set_type(node.output[0], self.get_type(node.input[1]))
             return True
         if isinstance(m1, (int, str)) and isinstance(m2, (int, str)):
             node.doc_string += f"#SV-{node.op_type}2"
-            self.set_value_shape(node.output[0], f"{m1}{symbol}{m2}")
+            self.set_value_shape(node.output[0], simplify_expression(f"({m1}){symbol}({m2})"))
+            if self.has_type(node.input[0]):
+                self.set_type(node.output[0], self.get_type(node.input[0]))
+            elif self.has_type(node.input[1]):
+                self.set_type(node.output[0], self.get_type(node.input[1]))
             return True
 
         # One of them is a tuple.
@@ -408,10 +449,14 @@ class _ShapeRuntime:
                 res.append(
                     fct(s1, s2)
                     if isinstance(s1, int) and isinstance(s2, int)
-                    else f"{s1}{symbol}{s2}"
+                    else simplify_expression(f"({s1}){symbol}({s2})")
                 )
             self.set_value_shape(node.output[0], tuple(res))
             node.doc_string += f"#SV-{node.op_type}3"
+            if self.has_type(node.input[0]):
+                self.set_type(node.output[0], self.get_type(node.input[0]))
+            elif self.has_type(node.input[1]):
+                self.set_type(node.output[0], self.get_type(node.input[1]))
             return True
 
         if len(m1) == 1:
@@ -420,9 +465,13 @@ class _ShapeRuntime:
                 res.append(
                     fct(m1[0], s2)
                     if isinstance(m1[0], int) and isinstance(s2, int)
-                    else f"{m1[0]}{symbol}{s2}"
+                    else simplify_expression(f"({m1[0]}){symbol}({s2})")
                 )
             self.set_value_shape(node.output[0], tuple(res))
+            if self.has_type(node.input[0]):
+                self.set_type(node.output[0], self.get_type(node.input[0]))
+            elif self.has_type(node.input[1]):
+                self.set_type(node.output[0], self.get_type(node.input[1]))
             node.doc_string += f"#SV-{node.op_type}4"
             return True
         if len(m2) == 1:
@@ -431,9 +480,13 @@ class _ShapeRuntime:
                 res.append(
                     fct(s1, m2[0])
                     if isinstance(s1, int) and isinstance(m2[0], int)
-                    else f"{s1}{symbol}{m2[0]}"
+                    else simplify_expression(f"({s1}){symbol}({m2[0]})")
                 )
             self.set_value_shape(node.output[0], tuple(res))
+            if self.has_type(node.input[0]):
+                self.set_type(node.output[0], self.get_type(node.input[0]))
+            elif self.has_type(node.input[1]):
+                self.set_type(node.output[0], self.get_type(node.input[1]))
             node.doc_string += f"#SV-{node.op_type}4"
             return True
 
@@ -452,6 +505,8 @@ class _ShapeRuntime:
                 f"{self.get_debug_msg()}"
             )
             self.set_value_shape(node.output[0], tuple(shape[i] for i in values[1]))
+            if self.has_type(node.input[0]):
+                self.set_type(node.output[0], self.get_type(node.input[0]))
             return True
         return False
 
@@ -473,6 +528,8 @@ class _ShapeRuntime:
             )
             node.doc_string += "#SV-Sl3"
             self.set_value_shape(node.output[0], values[0][values[1][0] : values[2][0]])
+            if self.has_type(node.input[0]):
+                self.set_type(node.output[0], self.get_type(node.input[0]))
             return True
         if (
             len(values) == 4
@@ -492,6 +549,8 @@ class _ShapeRuntime:
             )
             res = values[0][begin:end:step]
             self.set_value_shape(node.output[0], res)
+            if self.has_type(node.input[0]):
+                self.set_type(node.output[0], self.get_type(node.input[0]))
             node.doc_string += "#SV-Sl4"
             return True
         return False
