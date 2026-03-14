@@ -618,6 +618,14 @@ class InputObserverInfo:
             """Returns the value for a single dynamic dimension entry.
             Uses a string name from *dim_names* when available, otherwise
             falls back to ``torch.export.Dim.DYNAMIC``.
+
+            Args:
+                flat_index: Position of the tensor in the flat list of inputs.
+                dim: Dimension index within the tensor.
+
+            Returns:
+                A string label from *dim_names* if one is registered for this
+                input and dimension, otherwise ``torch.export.Dim.DYNAMIC``.
             """
             if not dim_names:
                 return torch.export.Dim.DYNAMIC
