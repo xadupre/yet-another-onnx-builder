@@ -521,6 +521,15 @@ def _set_shape_type_op_any_concat(self: ShapeBuilder, node: NodeProto):
             self.set_device(node.output[0], devs.pop())
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
+    if all(self.value_as_shape(s) is not None for s in node.input):
+        axis = self.get_attribute(node, "axis").i
+        assert (
+            axis == 0
+        ), f"Unexpected value for axis={axis} in {self.pretty_node(node)}{self.get_debug_msg()}"
+        shape = []
+        for s in node.input:
+            shape.extend(self.value_as_shape(s))
+        self.set_value_shape(node.output[0], tuple(shape))
     if all(self.has_shape(s) for s in node.input):
         axis = self.get_attribute(node, "axis").i
         shapes = [self.get_shape(i) for i in node.input]
@@ -538,18 +547,18 @@ def _set_shape_type_op_any_concat(self: ShapeBuilder, node: NodeProto):
         new_shape = tuple(new_shape)
         self.set_shape(node.output[0], new_shape)
         return new_shape
-    elif all(map(self.has_rank, node.input)):
+
+    if all(map(self.has_rank, node.input)):
         ranks = [self.get_rank(i) for i in node.input]
         assert (
             len(set(ranks)) == 1
         ), f"Unexpected ranks={ranks} for node {node.op_type!r}{self.get_debug_msg()}"
         self.set_rank(node.output[0], ranks[0])
         return True
-    else:
-        assert not self._debug_shape_missing, (
-            f"Unable to compute shape for node: "
-            f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
-        )
+    assert not self._debug_shape_missing, (
+        f"Unable to compute shape for node: "
+        f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+    )
 
 
 def _set_shape_type_op_any_conv_max_pool(self: ShapeBuilder, node: NodeProto):
@@ -1100,6 +1109,52 @@ def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
     )
 
 
+def _compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
+    if 0 in shape2:
+        # 0 means keeping the dimension coming from shape1
+        new_shape2 = []
+        for s1, s2 in zip(shape1, shape2):
+            new_shape2.append(s1 if s2 == 0 else s2)
+        new_shape2.extend(shape2[len(new_shape2) :])
+        shape2 = tuple(new_shape2)
+
+    if -1 not in shape2:
+        return shape2
+
+    total_int1 = int(np.prod([i for i in shape1 if isinstance(i, int)]))
+    if total_int1 == 0:
+        return tuple(s if s != -1 else 0 for s in shape2)
+
+    total_int2 = int(np.prod([i for i in shape2 if isinstance(i, int) and i != -1]))
+    if total_int1 >= total_int2 and total_int1 % total_int2 == 0:
+        intpart = total_int1 // total_int2
+    else:
+        intpart = simplify_expression(f"({total_int1})//({total_int2})")
+
+    exist1 = {s for s in shape1 if isinstance(s, str)}
+    exist2 = {s for s in shape2 if isinstance(s, str)}
+    common = exist1 & exist2
+    left1 = exist1 - common
+    left2 = exist2 - common
+    if left1 and left2:
+        resp = "*".join(f"({s})" for s in sorted(left1))
+        resm = "*".join(f"({s})" for s in sorted(left2))
+        ok = simplify_expression(f"({resp})//({resm})")
+    elif left1:
+        ok = "*".join(f"({s})" for s in sorted(left1))
+    elif left2:
+        resm = "*".join(f"({s})" for s in sorted(left2))
+        ok = simplify_expression(f"1//({resm})")
+    else:
+        ok = ""
+    if not ok and isinstance(intpart, int):
+        return tuple(s if s != -1 else intpart for s in shape2)
+    if intpart != 1:
+        ok = simplify_expression(f"({ok})*({intpart})") if ok else intpart
+    assert ok, f"Unable to compute a shape with {shape1=} and {shape2=}."
+    return tuple(s if s != -1 else ok for s in shape2)
+
+
 def _set_shape_type_op_any_reshape(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Reshape."
     if self.has_device(node.input[0]):
@@ -1124,6 +1179,11 @@ def _set_shape_type_op_any_reshape(self: ShapeBuilder, node: NodeProto):
                 if new_shape is not None:
                     self.set_shape(k, new_shape, allow_zero=0 in sh)
                     return new_shape
+        if self.has_shape(node.input[0]):
+            combined_shape = _compute_reshape_shape(self.get_shape(node.input[0]), value)
+            if combined_shape is not None:
+                self.set_shape(node.output[0], combined_shape, allow_zero=0 in combined_shape)
+                return combined_shape
 
     if self.has_shape(node.input[1]):
         rk = self.get_shape(node.input[1])
@@ -1183,7 +1243,30 @@ def _set_shape_type_op_any_size(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Sign."
     self.set_type(node.output[0], TensorProto.INT64)
     self.set_shape(node.output[0], tuple())
+    if self.has_shape(node.input[0]):
+        shape = self.get_shape(node.input[0])
+        if all(isinstance(s, int) for s in shape):
+            self.set_value_shape(node.output[0], int(np.prod(shape)))
+        else:
+            int_part = [i for i in shape if isinstance(i, int)]
+            s_part = [i for i in shape if isinstance(i, str)]
+            t = "*".join(f"({s})" for s in s_part)
+            self.set_value_shape(
+                node.output[0],
+                simplify_expression(f"{int(np.prod(int_part))}*{t}" if int_part else t),
+            )
     return True
+
+
+def _resolve_int_tuple_or_shape(self: ShapeBuilder, name: str):
+    if self.is_constant(name):
+        cst = self.get_constant(name, exc=False, computed_value=True)
+        if cst is not None:
+            return tuple(int(v) for v in cst)
+    sv = self.value_as_shape(name)
+    if isinstance(sv, tuple) and all(isinstance(x, (str, int)) for x in sv):
+        return sv
+    return None
 
 
 def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
@@ -1192,6 +1275,78 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
         self.set_device(node.output[0], self.get_device(node.input[0]))
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
+
+    if self.has_shape(node.input[0]):
+        input_shape = self.get_shape(node.input[0])
+        rank = len(input_shape)
+
+        starts = _resolve_int_tuple_or_shape(self, node.input[1])
+        ends = _resolve_int_tuple_or_shape(self, node.input[2])
+        axes = _resolve_int_tuple_or_shape(self, node.input[3]) if len(node.input) > 3 else None
+
+        if starts is None or ends is None:
+            if axes is None:
+                self.set_rank(node.output[0], rank)
+                return True
+            output_shape = list(input_shape)
+            for a in axes:
+                output_shape[a] = self.unique_dimension_name("NEWDIM_slice")
+            new_shape = tuple(output_shape)
+            self.set_shape(node.output[0], new_shape, allow_zero=0 in new_shape)
+            return new_shape
+
+        axes = (
+            _resolve_int_tuple_or_shape(self, node.input[3])
+            if len(node.input) > 3
+            else np.arange(len(starts))
+        )
+        steps = _resolve_int_tuple_or_shape(self, node.input[4]) if len(node.input) > 4 else None
+
+        output_shape = list(input_shape)
+        for idx, (s, e, a) in enumerate(zip(starts, ends, axes)):
+            st = steps[idx] if steps is not None and idx < len(steps) else 1
+            if isinstance(e, int) and e >= 922337203685477580:
+                e = input_shape[a]
+            if isinstance(s, int) and isinstance(e, int):
+                if e >= s >= 0:
+                    assert not isinstance(st, int) or st > 0 or (e - s) % (-s) == 0, (
+                        f"Negative steps are not handled start={s}, end={e}, step={st}"
+                        f"{self.get_debug_msg()}"
+                    )
+                    output_shape[a] = (
+                        (e - s) // st
+                        if isinstance(st, int)
+                        else simplify_expression(f"{e-s}//({st})")
+                    )
+                    continue
+                if isinstance(input_shape[a], int):
+                    d = input_shape[a]
+                    if s < 0:
+                        s += d
+                    if e < 0:
+                        e += d
+                    assert not isinstance(st, int) or st > 0 or (e - s) % (-s) == 0, (
+                        f"Negative steps are not handled start={s}, end={e}, step={st}"
+                        f"{self.get_debug_msg()}"
+                    )
+                    output_shape[a] = (
+                        (e - s) // st
+                        if isinstance(st, int)
+                        else simplify_expression(f"({e-s})//({st})")
+                    )
+                    continue
+            d = input_shape[a]
+            if isinstance(s, int) and s < 0:
+                s = f"(({d}){e})"
+            if isinstance(e, int) and e < 0:
+                e = f"(({d}){e})"
+            output_shape[a] = simplify_expression(f"{e}-{s}" if st == 1 else f"({e}-{s})//({st})")
+            continue
+
+        new_shape = tuple(output_shape)
+        self.set_shape(node.output[0], new_shape, allow_zero=0 in new_shape)
+        return new_shape
+
     if self.has_rank(node.input[0]):
         self.set_rank(node.output[0], self.get_rank(node.input[0]))
         return True
@@ -1225,16 +1380,24 @@ def _set_shape_type_op_any_split(self: ShapeBuilder, node: NodeProto):
             self.set_device(o, device)
     att = self.get_attribute(node, "axis", exc=False)
     axis = 0 if att is None else att.i
-    if self.has_shape(node.input[0]) and len(node.input) > 1 and self.is_constant(node.input[1]):
-        splits = list(self.get_constant(node.input[1]))
-        assert len(splits) == len(
-            node.output
-        ), f"Unexpected number of outputs, output={node.output} splits={splits}"
-        sh = list(self.get_shape(node.input[0]))
-        for i, o in enumerate(node.output):
-            sh[axis] = int(splits[i])
-            self.set_shape(o, tuple(sh), allow_zero=True)
-        return [self.get_shape(o) for o in node.output]
+    if self.has_shape(node.input[0]) and len(node.input) > 1:
+        _splits_cst = None
+        if self.is_constant(node.input[1]):
+            _splits_cst = list(self.get_constant(node.input[1]))
+        else:
+            sv = self.value_as_shape(node.input[1])
+            if isinstance(sv, tuple) and all(isinstance(x, int) for x in sv):
+                _splits_cst = list(sv)
+        if _splits_cst is not None:
+            splits = _splits_cst
+            assert len(splits) == len(
+                node.output
+            ), f"Unexpected number of outputs, output={node.output} splits={splits}"
+            sh = list(self.get_shape(node.input[0]))
+            for i, o in enumerate(node.output):
+                sh[axis] = int(splits[i])
+                self.set_shape(o, tuple(sh), allow_zero=True)
+            return [self.get_shape(o) for o in node.output]
     num_outputs = self.get_attribute(node, "num_outputs", exc=False)
     if num_outputs is not None:
         no = num_outputs.i
@@ -1750,9 +1913,10 @@ def _set_shape_type_op_any_depth_to_space(self: ShapeBuilder, node: NodeProto):
         n, c = shape[0], shape[1]
         spatial = shape[2:]
         b_pow = blocksize ** len(spatial)
-        new_c = (c // b_pow) if isinstance(c, int) else f"{c}//{b_pow}"
+        new_c = (c // b_pow) if isinstance(c, int) else simplify_expression(f"({c})//({b_pow})")
         new_spatial = tuple(
-            (s * blocksize if isinstance(s, int) else f"{s}*{blocksize}") for s in spatial
+            (s * blocksize if isinstance(s, int) else simplify_expression(f"({s})*({blocksize})"))
+            for s in spatial
         )
         new_shape = (n, new_c, *new_spatial)
         self.set_shape(node.output[0], new_shape)
@@ -1800,9 +1964,14 @@ def _set_shape_type_op_any_space_to_depth(self: ShapeBuilder, node: NodeProto):
         n, c = shape[0], shape[1]
         spatial = shape[2:]
         b_pow = blocksize ** len(spatial)
-        new_c = (c * b_pow) if isinstance(c, int) else f"{c}*{b_pow}"
+        new_c = (c * b_pow) if isinstance(c, int) else simplify_expression(f"({c})*({b_pow})")
         new_spatial = tuple(
-            (s // blocksize if isinstance(s, int) else f"{s}//{blocksize}") for s in spatial
+            (
+                s // blocksize
+                if isinstance(s, int)
+                else simplify_expression(f"({s})//({blocksize})")
+            )
+            for s in spatial
         )
         new_shape = (n, new_c, *new_spatial)
         self.set_shape(node.output[0], new_shape)
@@ -1860,7 +2029,11 @@ def _set_shape_type_op_any_resize(self: ShapeBuilder, node: NodeProto):
         if scales is not None and scales.size > 0:
             shape = self.get_shape(node.input[0])
             new_shape = tuple(
-                int(np.floor(d * s)) if isinstance(d, int) else f"int(floor({d}*{s}))"
+                (
+                    int(np.floor(d * s))
+                    if isinstance(d, int)
+                    else f"int(floor({simplify_expression(f'({d})*({s})')}))"
+                )
                 for d, s in zip(shape, scales.tolist())
             )
             self.set_shape(node.output[0], new_shape)
@@ -1915,9 +2088,11 @@ _set_shape_type_op_any_known = {
     "Reshape": _set_shape_type_op_any_reshape,
     "Resize": _set_shape_type_op_any_resize,
     "RotaryEmbedding": _set_shape_type_op_any_rotary_embedding,
+    "RMSNormalization": _set_shape_type_op_any_layer_normalization,
     "ScatterND": _set_shape_type_op_any_scatternd,
     "SequenceEmpty": _set_shape_type_op_any_sequence_empty,
     "Sign": _set_shape_type_op_any_sign,
+    "SimplifiedLayerNormalization": _set_shape_type_op_any_layer_normalization,
     "Size": _set_shape_type_op_any_size,
     "Slice": _set_shape_type_op_any_slice,
     "Softmax": _set_shape_type_op_any_unary,
@@ -1948,8 +2123,12 @@ def set_shape_type_op_any(self: ShapeBuilder, node: NodeProto, exc: bool = False
     if node.op_type in self._op_type_element_wise_types:
         r = set_type_shape_binary_op(self, node.output[0], *node.input)
         assert r is not None or not self._debug_shape_missing, (
-            f"No function to compute shape for node: "
-            f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
+            f"No function to compute shape for node {node.op_type!r}"
+            f"\ninput shapes are "
+            f"{[(self.get_shape(i) if self.has_shape(i) else '?') for i in node.input if i]}"
+            f"\nvalue shapes are "
+            f"{[self.value_as_shape(i) for i in node.input if i]}"
+            f"\nnode is {self.pretty_node(node)}{self.get_debug_msg()}"
         )
         return r
     if node.op_type in {"DequantizeLinear", "DynamicQuantizeLinear"}:

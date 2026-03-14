@@ -9,3 +9,4 @@ yobx.sklearn.cluster
     birch
     bisecting_kmeans
     kmeans
+    mean_shift

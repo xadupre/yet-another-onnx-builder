@@ -168,10 +168,6 @@ class _BuilderRuntime:
             )
             rest = muli // divi
         else:
-
-            def _(s):
-                return f"({s})" if set(s) & set("+/-*%()") else s
-
             if muli != 1:
                 mul.append(str(muli))
             if divi != 1:
@@ -179,19 +175,22 @@ class _BuilderRuntime:
             if not mul:
                 mul = ["1"]
             if not div:
-                rest = mul[0] if len(mul) == 1 else f"{'*'.join(f'{_(s)}' for s in mul)}"
-            elif not mul:
                 rest = (
-                    f"1//{_(div[0])}"
+                    mul[0]
+                    if len(mul) == 1
+                    else simplify_expression(f"{'*'.join(f'({s})' for s in mul)}")
+                )
+            elif not mul:
+                rest = simplify_expression(
+                    f"1//({div[0]})"
                     if len(div) == 1
-                    else f"1//({'*'.join(f'{_(s)}' for s in div)})"
+                    else f"1//({'*'.join(f'({s})' for s in div)})"
                 )
             else:
-                rest = (
-                    f"(({'*'.join(f'{_(s)}' for s in mul)})"
-                    f"//({'*'.join(f'{_(s)}' for s in div)}))"
+                rest = simplify_expression(
+                    f"(({'*'.join(f'({s})' for s in mul)})"
+                    f"//({'*'.join(f'({s})' for s in div)}))"
                 )
-            rest = simplify_expression(rest)
         return tuple(s if s != -1 else rest for s in new_shape)
 
     def _apply_expand_to_shape(
@@ -226,7 +225,11 @@ class _BuilderRuntime:
                 continue
             if i < len(input_shape):
                 if isinstance(s, str) and isinstance(input_shape[i], str):
-                    if s != input_shape[i]:
+                    if s != input_shape[
+                        i
+                    ] and not self.evaluate_dimension_equality_with_constraints(
+                        s, input_shape[i]
+                    ):
                         return None
                     nsh.append(s)
                     continue

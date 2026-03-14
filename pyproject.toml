@@ -50,6 +50,10 @@ docs = [
     "tqdm",
     "xlsxwriter",
 ]
+category_encoders = [
+    "scikit-learn>=1.4",
+    "category-encoders>=2.6",
+]
 lightgbm = [
     "scikit-learn>=1.4",
     "lightgbm>=3.0",
@@ -163,9 +167,11 @@ module = [
     "yobx.helpers.helper",
     "yobx.reference.ops.*",
     "yobx.sklearn.calibration.*",
+    "yobx.sklearn.category_encoders.*",
     "yobx.sklearn.cluster.*",
     "yobx.sklearn.coveriance.*",
     "yobx.sklearn.decomposition.*",
+    "yobx.sklearn.discriminant_analysis.*",
     "yobx.sklearn.ensemble.*",
     "yobx.sklearn.gaussian_process.*",
     "yobx.sklearn.impute.*",
@@ -180,6 +186,7 @@ module = [
     "yobx.sklearn.neighbors.*",
     "yobx.sklearn.neural_network.*",
     "yobx.sklearn.preprocessing.*",
+    "yobx.sklearn.svm.*",
     "yobx.sklearn.tree.*",
     "yobx.sklearn.xgboost.*",
     "yobx.reference.torch_ops.*",

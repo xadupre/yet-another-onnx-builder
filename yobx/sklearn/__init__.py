@@ -36,6 +36,7 @@ def register_sklearn_converters():
         # already done
         return
     from .calibration import register as register_calibration
+    from .category_encoders import register as register_category_encoders
     from .cluster import register as register_cluster
     from .compose import register as register_compose
     from .covariance import register as register_covariance
@@ -43,9 +44,11 @@ def register_sklearn_converters():
     from .discriminant_analysis import register as register_discriminant_analysis
     from .dummy import register as register_dummy
     from .ensemble import register as register_ensemble
+    from .feature_selection import register as register_feature_selection
     from .gaussian_process import register as register_gaussian_process
     from .impute import register as register_impute
     from .isotonic import register as register_isotonic
+    from .kernel_approximation import register as register_kernel_approximation
     from .kernel_ridge import register as register_kernel_ridge
     from .lightgbm import register as register_lightgbm
     from .linear_model import register as register_linear_model
@@ -64,6 +67,7 @@ def register_sklearn_converters():
     from .xgboost import register as register_xgboost
 
     register_calibration()
+    register_category_encoders()
     register_cluster()
     register_compose()
     register_covariance()
@@ -71,9 +75,11 @@ def register_sklearn_converters():
     register_discriminant_analysis()
     register_dummy()
     register_ensemble()
+    register_feature_selection()
     register_gaussian_process()
     register_impute()
     register_isotonic()
+    register_kernel_approximation()
     register_kernel_ridge()
     register_linear_model()
     register_lightgbm()

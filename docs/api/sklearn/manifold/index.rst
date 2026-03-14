@@ -6,3 +6,4 @@ yobx.sklearn.manifold
     :caption: modules
 
     isomap
+    locally_linear_embedding
