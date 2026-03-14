@@ -1456,6 +1456,143 @@ class TestInputObserver(ExtTestCase):
             )
             torch.export.export(model, args, kwargs=kwargs, dynamic_shapes=ds)
 
+    def test_dim_names_positional_args(self):
+        """Test that dim_names produces string labels for dynamic dimensions (positional args)."""
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        inputs = [
+            (torch.randn((5, 6)), torch.randn((1, 6))),
+            (torch.randn((7, 7)), torch.randn((1, 7))),
+            (torch.randn((7, 8)), torch.randn((1, 8))),
+        ]
+
+        model = Model()
+        observer = InputObserver()
+        with observer(model):
+            for args in inputs:
+                model(*args)
+
+        cst = torch.export.Dim.DYNAMIC
+        # Without dim_names: default behaviour, all DYNAMIC
+        default_shapes = observer.infer_dynamic_shapes()
+        self.assertEqual(({0: cst, 1: cst}, {1: cst}), default_shapes)
+
+        # With dim_names by input name: dimension 0 of x → "batch", dim 1 → "seq"
+        named_shapes = observer.infer_dynamic_shapes(
+            dim_names={"x": {0: "batch", 1: "seq"}}
+        )
+        self.assertEqual(({0: "batch", 1: "seq"}, {1: cst}), named_shapes)
+
+        # With dim_names by position index 0 → x
+        named_shapes_by_pos = observer.infer_dynamic_shapes(
+            dim_names={0: {0: "batch", 1: "seq"}}
+        )
+        self.assertEqual(({0: "batch", 1: "seq"}, {1: cst}), named_shapes_by_pos)
+
+    def test_dim_names_kwargs(self):
+        """Test that dim_names produces string labels for dynamic dimensions (keyword args)."""
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        inputs = [
+            dict(x=torch.randn((5, 6)), y=torch.randn((1, 6))),
+            dict(x=torch.randn((7, 7)), y=torch.randn((1, 7))),
+            dict(x=torch.randn((7, 8)), y=torch.randn((1, 8))),
+        ]
+
+        model = Model()
+        observer = InputObserver()
+        with observer(model):
+            for kwargs in inputs:
+                model(**kwargs)
+
+        cst = torch.export.Dim.DYNAMIC
+        # Without dim_names: default behaviour
+        default_shapes = observer.infer_dynamic_shapes()
+        self.assertEqual(dict(x={0: cst, 1: cst}, y={1: cst}), default_shapes)
+
+        # With dim_names specifying names for both x and y
+        named_shapes = observer.infer_dynamic_shapes(
+            dim_names={"x": {0: "batch", 1: "seq"}, "y": {1: "seq"}}
+        )
+        self.assertEqual(
+            dict(x={0: "batch", 1: "seq"}, y={1: "seq"}), named_shapes
+        )
+
+    def test_dim_names_partial(self):
+        """Test that dim_names falls back to DYNAMIC for unspecified inputs/dims."""
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        inputs = [
+            (torch.randn((5, 6)), torch.randn((5, 6))),
+            (torch.randn((7, 7)), torch.randn((7, 7))),
+            (torch.randn((8, 8)), torch.randn((8, 8))),
+        ]
+
+        model = Model()
+        observer = InputObserver()
+        with observer(model):
+            for args in inputs:
+                model(*args)
+
+        cst = torch.export.Dim.DYNAMIC
+        # Name only dimension 0 of x; everything else falls back to DYNAMIC.
+        named_shapes = observer.infer_dynamic_shapes(
+            dim_names={"x": {0: "batch"}}
+        )
+        # x dim 0 → "batch", x dim 1 → DYNAMIC, y both dims → DYNAMIC
+        self.assertEqual(({0: "batch", 1: cst}, {0: cst, 1: cst}), named_shapes)
+
+    def test_dim_names_mixed_args_kwargs(self):
+        """Test dim_names with a mix of positional and keyword arguments."""
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y, z=None):
+                r = x + y
+                if z is not None:
+                    r += z
+                return r
+
+        inputs = [
+            (
+                (torch.randn((5, 6)), torch.randn((1, 6))),
+                dict(z=torch.randn((5, 6))),
+            ),
+            (
+                (torch.randn((6, 7)), torch.randn((1, 7))),
+                dict(z=torch.randn((6, 7))),
+            ),
+            (
+                (torch.randn((7, 8)), torch.randn((1, 8))),
+                dict(z=torch.randn((7, 8))),
+            ),
+        ]
+
+        model = Model()
+        observer = InputObserver()
+        with observer(model):
+            for args, kwargs in inputs:
+                model(*args, **kwargs)
+
+        cst = torch.export.Dim.DYNAMIC
+        named_shapes = observer.infer_dynamic_shapes(
+            dim_names={"x": {0: "batch"}, "z": {0: "batch", 1: "seq"}}
+        )
+        # x dim 0 → "batch", x dim 1 → DYNAMIC (not named)
+        # y dim 1 → DYNAMIC (y not in dim_names)
+        # z dim 0 → "batch", z dim 1 → "seq"
+        self.assertEqual(
+            dict(x={0: "batch", 1: cst}, y={1: cst}, z={0: "batch", 1: "seq"}),
+            named_shapes,
+        )
+
+
+

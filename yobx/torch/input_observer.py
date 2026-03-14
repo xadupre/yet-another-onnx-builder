@@ -528,6 +528,7 @@ class InputObserverInfo:
         self,
         set_batch_dimension_for: set[int | str] | bool | None = None,
         return_flat: bool = False,
+        dim_names: dict[str | int, dict[int, str]] | None = None,
     ) -> tuple[dict[int, Any] | None, ...] | dict[str, dict[int, Any] | None]:
         """Infers dynamic shapes based on the collected tensors.
         Most of the time, models do support a batch dimension
@@ -543,6 +544,13 @@ class InputObserverInfo:
                 no additional batch dimensions are marked as dynamic.
             return_flat: Tells the function to return a flat tuple instead of
                 nested structured. This option is used internally to infer arguments.
+            dim_names (dict[str | int, dict[int, str]] | None): Optional mapping from
+                input identifiers (by name as ``str`` or position as ``int``) to a dict
+                that maps dimension indices (``int``) to string labels.  When provided,
+                the matching dynamic dimensions will carry the given string instead of
+                ``torch.export.Dim.DYNAMIC``.  Unspecified inputs or dimensions fall
+                back to ``torch.export.Dim.DYNAMIC``.  Inputs can be referred to
+                either by their argument name or by their position index.
         """
         self.align_inputs_none_values()
         # type checking
@@ -605,8 +613,36 @@ class InputObserverInfo:
             )
             for index in range(n_tensors)
         ]
-        cst = torch.export.Dim.DYNAMIC
-        flat_dynamic_shapes = [dict.fromkeys(dims, cst) for dims in dynamic_shapes]
+
+        def _get_dim_value(flat_index: int, dim: int) -> Any:
+            """Returns the value for a single dynamic dimension entry.
+            Uses a string name from *dim_names* when available, otherwise
+            falls back to ``torch.export.Dim.DYNAMIC``.
+            """
+            if not dim_names:
+                return torch.export.Dim.DYNAMIC
+            # type checking
+            assert self._best_candidate is not None
+            arg_or_kwarg = self._best_candidate.position_to_args_kwargs[flat_index]
+            # Look up by the raw key (int position or str name).
+            per_input_names = dim_names.get(arg_or_kwarg)
+            # If not found and key is an int, also try the signature name.
+            if per_input_names is None and isinstance(arg_or_kwarg, int):
+                sig_name = (
+                    self.signature_names[arg_or_kwarg]
+                    if arg_or_kwarg < len(self.signature_names)
+                    else None
+                )
+                if sig_name is not None:
+                    per_input_names = dim_names.get(sig_name)
+            if per_input_names is not None and dim in per_input_names:
+                return per_input_names[dim]
+            return torch.export.Dim.DYNAMIC
+
+        flat_dynamic_shapes = [
+            {dim: _get_dim_value(flat_idx, dim) for dim in dims}
+            for flat_idx, dims in enumerate(dynamic_shapes)
+        ]
         if return_flat:
             return tuple(flat_dynamic_shapes)
 
@@ -1118,7 +1154,9 @@ class InputObserver:
             raise RuntimeError("No inputs were captured.")
 
     def infer_dynamic_shapes(
-        self, set_batch_dimension_for: set[int | str] | bool | None = None
+        self,
+        set_batch_dimension_for: set[int | str] | bool | None = None,
+        dim_names: dict[str | int, dict[int, str]] | None = None,
     ) -> tuple[dict[int, Any] | None, ...] | dict[str, dict[int, Any] | None]:
         """
         Infers dynamic shapes. Most of the time, models do support a batch dimension
@@ -1133,10 +1171,20 @@ class InputObserver:
                 which the first dimension should be treated as a dynamic batch
                 dimension. If ``None``, no dimensions are explicitly marked as
                 dynamic.
+            dim_names (dict[str | int, dict[int, str]] | None): Optional mapping from
+                input identifiers (by name as ``str`` or position as ``int``) to a dict
+                that maps dimension indices (``int``) to string labels.  When provided,
+                the matching dynamic dimensions will carry the given string instead of
+                ``torch.export.Dim.DYNAMIC``.  Unspecified inputs or dimensions fall
+                back to ``torch.export.Dim.DYNAMIC``.  Inputs can be referred to
+                either by their argument name or by their position index.
         """
         self._check_captured()
         assert self.info is not None  # missed by type checking
-        return self.info.infer_dynamic_shapes(set_batch_dimension_for=set_batch_dimension_for)
+        return self.info.infer_dynamic_shapes(
+            set_batch_dimension_for=set_batch_dimension_for,
+            dim_names=dim_names,
+        )
 
     def infer_arguments(
         self,
