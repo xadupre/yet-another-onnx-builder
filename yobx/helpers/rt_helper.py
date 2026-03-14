@@ -362,10 +362,7 @@ def onnx_generate(
             else 0
         )
         feeds["cache_position"] = torch.arange(
-            past_len,
-            input_ids.shape[1] + past_len,
-            dtype=torch.int64,
-            device=device,
+            past_len, input_ids.shape[1] + past_len, dtype=torch.int64, device=device
         )
 
     outputs = session.run(None, feeds)
@@ -427,18 +424,12 @@ def onnx_generate(
 
         if has_position_ids:
             feeds["position_ids"] = torch.full(
-                (batch_size, 1),
-                last_position,
-                dtype=torch.int64,
-                device=device,
+                (batch_size, 1), last_position, dtype=torch.int64, device=device
             )
 
         if has_cache_position:
             feeds["cache_position"] = torch.arange(
-                last_position,
-                last_position + 1,
-                dtype=torch.int64,
-                device=device,
+                last_position, last_position + 1, dtype=torch.int64, device=device
             )
 
         outputs = session.run(None, feeds)

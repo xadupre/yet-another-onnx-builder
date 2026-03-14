@@ -55,12 +55,7 @@ model = oh.make_model(
             oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq", 4]),
         ],
         [oh.make_tensor_value_info("Z", TFLOAT, ["batch", "seq", 2])],
-        [
-            onh.from_array(
-                np.random.randn(4, 2).astype(np.float32),
-                name="W",
-            )
-        ],
+        [onh.from_array(np.random.randn(4, 2).astype(np.float32), name="W")],
     ),
     opset_imports=[oh.make_opsetid("", 18)],
     ir_version=10,

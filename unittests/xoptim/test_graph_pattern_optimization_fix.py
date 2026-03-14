@@ -63,8 +63,7 @@ class TestGraphPatternOptimizationFix(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["ConstantOfShape", "ScatterND"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["ConstantOfShape", "ScatterND"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(1, len(opt_onx.graph.initializer))
 

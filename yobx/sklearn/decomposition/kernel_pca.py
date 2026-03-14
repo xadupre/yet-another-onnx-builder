@@ -15,22 +15,14 @@ _DIST_KERNELS = frozenset({"rbf"})
 
 
 def _compute_dot_product(
-    g: GraphBuilderExtendedProtocol,
-    X: str,
-    X_fit: np.ndarray,
-    name: str,
+    g: GraphBuilderExtendedProtocol, X: str, X_fit: np.ndarray, name: str
 ) -> str:
     """Return the ONNX node computing ``X @ X_fit_.T`` (shape ``(N, M)``)."""
     return g.op.MatMul(X, X_fit.T, name=name)
 
 
 def _compute_sq_euclidean(
-    g: GraphBuilderExtendedProtocol,
-    X: str,
-    X_fit: np.ndarray,
-    dtype,
-    itype: int,
-    name: str,
+    g: GraphBuilderExtendedProtocol, X: str, X_fit: np.ndarray, dtype, itype: int, name: str
 ) -> str:
     """Return the ONNX node computing pairwise squared-Euclidean distances
     ``||X[i] - X_fit[j]||^2`` (shape ``(N, M)``).
@@ -55,9 +47,7 @@ def _compute_sq_euclidean(
 
     # ||X[i]||^2 + ||X_fit[j]||^2 - 2 x·y
     sq_dists = g.op.Add(
-        g.op.Add(X_sq, Xfit_sq, name=f"{name}_sq_sum"),
-        neg_two_cross,
-        name=f"{name}_sqdist",
+        g.op.Add(X_sq, Xfit_sq, name=f"{name}_sq_sum"), neg_two_cross, name=f"{name}_sqdist"
     )
     # Clamp to 0 to avoid tiny negative values due to floating-point rounding
     zero = np.array([0.0], dtype=dtype)
@@ -184,8 +174,7 @@ def sklearn_kernel_pca(
         sq_dists = _compute_sq_euclidean(g, X, X_fit, dtype, itype, f"{name}_rbf")
         neg_gamma_arr = np.array([-gamma], dtype=dtype)
         K = g.op.Exp(
-            g.op.Mul(sq_dists, neg_gamma_arr, name=f"{name}_rbf_neg_scaled"),
-            name=f"{name}_rbf_k",
+            g.op.Mul(sq_dists, neg_gamma_arr, name=f"{name}_rbf_neg_scaled"), name=f"{name}_rbf_k"
         )
 
     elif kernel == "poly":
@@ -221,8 +210,7 @@ def sklearn_kernel_pca(
         )  # (N, 1)
         eps_arr = np.array([np.finfo(dtype).tiny], dtype=dtype)
         X_norm_denom = g.op.Sqrt(
-            g.op.Max(X_sq_sum, eps_arr, name=f"{name}_cos_xsq_clamp"),
-            name=f"{name}_cos_xnorm",
+            g.op.Max(X_sq_sum, eps_arr, name=f"{name}_cos_xsq_clamp"), name=f"{name}_cos_xnorm"
         )
         X_normed = g.op.Div(X, X_norm_denom, name=f"{name}_cos_xnormed")
 
@@ -243,10 +231,7 @@ def sklearn_kernel_pca(
     # K_pred_cols = K.sum(axis=1, keepdims=True) / n_train   → (N, 1)
     n_train_arr = np.array([float(n_train)], dtype=dtype)
     K_row_sum = g.op.ReduceSum(
-        K,
-        np.array([1], dtype=np.int64),
-        keepdims=1,
-        name=f"{name}_rowsum",
+        K, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_rowsum"
     )  # (N, 1)
     K_pred_cols = g.op.Div(K_row_sum, n_train_arr, name=f"{name}_pred_cols")
 

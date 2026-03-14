@@ -100,10 +100,7 @@ def sklearn_kbins_discretizer(
     # Sum True values along the threshold axis → bin_indices (N, F) int64
     cmp_int = g.op.Cast(cmp, to=onnx.TensorProto.INT64, name=f"{name}_cast_cmp")
     bin_indices = g.op.ReduceSum(
-        cmp_int,
-        np.array([2], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_sum",
+        cmp_int, np.array([2], dtype=np.int64), keepdims=0, name=f"{name}_sum"
     )  # (N, F)
 
     # Clip each feature to [0, n_bins_[j] - 1].
@@ -131,18 +128,11 @@ def sklearn_kbins_discretizer(
     for j in range(n_features):
         # Extract column j: (N, F) → (N,) then (N, 1) for later concat
         col_j = g.op.Gather(
-            bin_indices,
-            np.array(j, dtype=np.int64),
-            axis=1,
-            name=f"{name}_gather_{j}",
+            bin_indices, np.array(j, dtype=np.int64), axis=1, name=f"{name}_gather_{j}"
         )  # (N,)
         depth_j = np.array(int(n_bins[j]), dtype=np.int64)
         oh_j = g.op.OneHot(
-            col_j,
-            depth_j,
-            one_hot_values,
-            axis=-1,
-            name=f"{name}_onehot_{j}",
+            col_j, depth_j, one_hot_values, axis=-1, name=f"{name}_onehot_{j}"
         )  # (N, n_bins[j])
         one_hot_cols.append(oh_j)
 

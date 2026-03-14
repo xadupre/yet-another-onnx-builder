@@ -101,10 +101,7 @@ def sklearn_mean_shift(
         # ||x||² - sum of squares over the feature axis for every sample → (N, 1)
         x_sq = g.op.Mul(X, X, name=f"{name}_x_sq")
         x_sq_sum = g.op.ReduceSum(
-            x_sq,
-            np.array([1], dtype=np.int64),
-            keepdims=1,
-            name=f"{name}_x_sq_sum",
+            x_sq, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_x_sq_sum"
         )  # (N, 1)
 
         # ||c||² - precomputed constant for each centre → (1, K)
@@ -127,11 +124,7 @@ def sklearn_mean_shift(
 
     # Distances output (optional second output).
     if n_outputs >= 2:
-        distances = g.op.Identity(
-            eucl_dists,
-            name=f"{name}_distances",
-            outputs=outputs[1:2],
-        )
+        distances = g.op.Identity(eucl_dists, name=f"{name}_distances", outputs=outputs[1:2])
         assert isinstance(distances, str)
         if not sts:
             g.set_type(distances, itype)
@@ -140,17 +133,9 @@ def sklearn_mean_shift(
         assert isinstance(distances, str)
 
     # Labels: nearest centre index → (N,)
-    label_idx = g.op.ArgMin(
-        eucl_dists,
-        axis=1,
-        keepdims=0,
-        name=f"{name}_argmin",
-    )
+    label_idx = g.op.ArgMin(eucl_dists, axis=1, keepdims=0, name=f"{name}_argmin")
     labels = g.op.Cast(
-        label_idx,
-        to=onnx.TensorProto.INT64,
-        name=f"{name}_cast",
-        outputs=outputs[:1],
+        label_idx, to=onnx.TensorProto.INT64, name=f"{name}_cast", outputs=outputs[:1]
     )
     assert isinstance(labels, str)
     if not sts:

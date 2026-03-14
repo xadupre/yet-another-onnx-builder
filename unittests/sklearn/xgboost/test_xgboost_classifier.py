@@ -57,12 +57,7 @@ class TestXGBoostClassifier(ExtTestCase):
         from xgboost import XGBClassifier
 
         X, y = self._make_multiclass_data()
-        clf = XGBClassifier(
-            n_estimators=5,
-            max_depth=3,
-            random_state=0,
-            eval_metric="mlogloss",
-        )
+        clf = XGBClassifier(n_estimators=5, max_depth=3, random_state=0, eval_metric="mlogloss")
         clf.fit(X, y)
 
         onx = to_onnx(clf, (X,))
@@ -166,10 +161,7 @@ class TestXGBoostClassifier(ExtTestCase):
 
         X, y = self._make_binary_data()
         pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("clf", XGBClassifier(n_estimators=3, random_state=0)),
-            ]
+            [("scaler", StandardScaler()), ("clf", XGBClassifier(n_estimators=3, random_state=0))]
         )
         pipe.fit(X, y)
 

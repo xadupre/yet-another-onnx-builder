@@ -421,8 +421,7 @@ class CubeLogs:
         recent: bool = False,
         formulas: Optional[
             Union[
-                Sequence[str],
-                Dict[str, Union[str, Callable[[pandas.DataFrame], pandas.Series]]],
+                Sequence[str], Dict[str, Union[str, Callable[[pandas.DataFrame], pandas.Series]]]
             ]
         ] = None,
         fill_missing: Optional[Sequence[Tuple[str, Any]]] = None,
@@ -729,10 +728,7 @@ class CubeLogs:
         return CubeViewDef(key_index=keys[:index], values=[name], name=name)
 
     def view(
-        self,
-        view_def: Union[str, CubeViewDef],
-        return_view_def: bool = False,
-        verbose: int = 0,
+        self, view_def: Union[str, CubeViewDef], return_view_def: bool = False, verbose: int = 0
     ) -> Union[pandas.DataFrame, Tuple[pandas.DataFrame, CubeViewDef]]:
         """
         Returns a dataframe, a pivot view.
@@ -778,8 +774,7 @@ class CubeLogs:
         ):
             # before aggregation, let's fix some keys whose values changed over time
             data_to_process = self._fix_aggregation_change(
-                self.data,
-                list(set(view_def.fix_aggregation_change) & set(self.keys_no_time)),
+                self.data, list(set(view_def.fix_aggregation_change) & set(self.keys_no_time))
             )
         else:
             data_to_process = self.data
@@ -965,10 +960,7 @@ class CubeLogs:
             if corder:
                 # reorder the levels for the columns with the view definition
                 new_corder = [c for c in corder if c in piv.columns.names]
-                new_names = [
-                    *[c for c in piv.columns.names if c not in new_corder],
-                    *new_corder,
-                ]
+                new_names = [*[c for c in piv.columns.names if c not in new_corder], *new_corder]
                 piv.columns = piv.columns.reorder_levels(new_names)
             elif self.time in piv.columns.names:
                 # put time at the end
@@ -1040,8 +1032,7 @@ class CubeLogs:
         select = data[self.keys_no_time]
         # pyrefly: ignore[no-matching-overload]
         select_agg = select.groupby(list(keys), as_index=True).apply(
-            lambda x: "-".join(sorted(set(x[columns_to_fix].dropna()))),
-            include_groups=False,
+            lambda x: "-".join(sorted(set(x[columns_to_fix].dropna()))), include_groups=False
         )
         select_agg = select_agg.to_frame(name=columns_to_fix)
         res = pandas.merge(
@@ -1168,11 +1159,7 @@ class CubeLogs:
                 elif obs["kind"] == "time":
                     unique = set(nonan)
                     obs["n_values"] = len(unique)
-                    o = dict(
-                        min=str(nonan.min()),
-                        max=str(nonan.max()),
-                        n_values=len(set(nonan)),
-                    )
+                    o = dict(min=str(nonan.min()), max=str(nonan.max()), n_values=len(set(nonan)))
                     o["values"] = f"{o['min']} - {o['max']}"
                     obs.update(o)
                 else:
@@ -1345,26 +1332,17 @@ class CubeLogs:
                 sbs_raw.to_excel(
                     writer,
                     sheet_name=name,
-                    freeze_panes=(
-                        sbs_raw.columns.nlevels + 1,
-                        sbs_raw.index.nlevels,
-                    ),
+                    freeze_panes=(sbs_raw.columns.nlevels + 1, sbs_raw.index.nlevels),
                 )
                 sbs_agg.to_excel(
                     writer,
                     sheet_name=f"{name}-AGG",
-                    freeze_panes=(
-                        sbs_agg.columns.nlevels + 1,
-                        sbs_agg.index.nlevels,
-                    ),
+                    freeze_panes=(sbs_agg.columns.nlevels + 1, sbs_agg.index.nlevels),
                 )
                 sbs_col.to_excel(
                     writer,
                     sheet_name=f"{name}-COL",
-                    freeze_panes=(
-                        sbs_col.columns.nlevels + 1,
-                        sbs_col.index.nlevels,
-                    ),
+                    freeze_panes=(sbs_col.columns.nlevels + 1, sbs_col.index.nlevels),
                 )
 
             if plots:
@@ -1493,10 +1471,7 @@ class CubeLogs:
         excluded_keys = set(columns_index) | {column_name}  # type: ignore[arg-type]
         key_index = [k for k in self.keys_time if k not in excluded_keys]
         view = CubeViewDef(
-            key_index=key_index,
-            name="sbs",
-            values=cube.values,
-            keep_columns_in_index=[self.time],
+            key_index=key_index, name="sbs", values=cube.values, keep_columns_in_index=[self.time]
         )
         view_res = cube.view(view)
         assert isinstance(view_res, pandas.DataFrame), "not needed but mypy complains"
@@ -1631,8 +1606,7 @@ class CubeLogsPerformance(CubeLogs):
         recent: bool = True,
         formulas: Optional[
             Union[
-                Sequence[str],
-                Dict[str, Union[str, Callable[[pandas.DataFrame], pandas.Series]]],
+                Sequence[str], Dict[str, Union[str, Callable[[pandas.DataFrame], pandas.Series]]]
             ]
         ] = (
             "speedup",
@@ -1805,9 +1779,7 @@ class CubeLogsPerformance(CubeLogs):
                     df, "discrepancies_abs", gdf(df, "discrepancies_abs") <= 0.01
                 ),
                 n_model_dynamic=lambda df: gpreserve(
-                    df,
-                    "discrepancies_dynamic_abs",
-                    (gdf(df, "discrepancies_dynamic_abs") <= 0.1),
+                    df, "discrepancies_dynamic_abs", (gdf(df, "discrepancies_dynamic_abs") <= 0.1)
                 ),
                 n_model_pass=lambda df: gpreserve(
                     df,
@@ -1936,9 +1908,7 @@ class CubeLogsPerformance(CubeLogs):
                     df, "time_latency_eager", gdf(df, "op_onnx__Expand")
                 ),
                 n_node_causal_mask=lambda df: gpreserve(
-                    df,
-                    "time_latency_eager",
-                    gdf(df, "op_onnx__CausalMask", 0),
+                    df, "time_latency_eager", gdf(df, "op_onnx__CausalMask", 0)
                 ),
                 n_node_sequence=lambda df: gpreserve(
                     df,

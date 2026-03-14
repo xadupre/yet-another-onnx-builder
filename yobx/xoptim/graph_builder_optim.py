@@ -402,10 +402,7 @@ class GraphBuilderPatternOptimization:
             }:
                 with self.builder.maybe_disable_fake_tensor_mode():
                     return float(value)
-            if value.dtype in {
-                self.builder.torch.complex64,
-                self.builder.torch.complex128,
-            }:
+            if value.dtype in {self.builder.torch.complex64, self.builder.torch.complex128}:
                 with self.builder.maybe_disable_fake_tensor_mode():
                     return complex(value)
 
@@ -479,11 +476,7 @@ class GraphBuilderPatternOptimization:
         return att.i
 
     def get_constant_or_attribute(
-        self,
-        node: NodeProto,
-        attribute: str,
-        input_index: int,
-        cvt: Optional[Callable] = None,
+        self, node: NodeProto, attribute: str, input_index: int, cvt: Optional[Callable] = None
     ) -> Any:
         """
         Returns an input or the value of an attribute.
@@ -789,14 +782,7 @@ class GraphBuilderPatternOptimization:
             f"No output in node {op_type!r}, domain={domain!r}, inputs={inputs}, "
             f"outputs={outputs}, attributes={attributes}"
         )
-        proto = oh.make_node(
-            op_type,
-            inputs,
-            outputs,
-            domain=domain,
-            name=name,
-            **kwargs,
-        )
+        proto = oh.make_node(op_type, inputs, outputs, domain=domain, name=name, **kwargs)
 
         if all(self.is_constant(i) for i in inputs):
             for o in outputs:
@@ -1528,13 +1514,7 @@ class GraphBuilderPatternOptimization:
             n_added += add
             n_removed += rem
             applied_patterns.append(pattern)
-        self._check_graph(
-            statistics,
-            "_optimize_apply_step",
-            it,
-            "A2",
-            verifies=self.verifies,
-        )
+        self._check_graph(statistics, "_optimize_apply_step", it, "A2", verifies=self.verifies)
         return applied_patterns, added_types, n_added, n_removed, all_added_nodes
 
     def optimize(
@@ -2052,8 +2032,7 @@ class GraphBuilderPatternOptimization:
                 self.builder.initializers_dict[k] = v
                 self.builder.initializers_dict_sources[k] = g.initializers_dict_sources[k]
                 self.builder.set_name(
-                    k,
-                    marker=g._events.get((k, "set_event"), "optimize_node_subgraphs_inplace"),
+                    k, marker=g._events.get((k, "set_event"), "optimize_node_subgraphs_inplace")
                 )
                 self.builder.set_type(k, g.get_type(k))
                 if g.has_device(k):

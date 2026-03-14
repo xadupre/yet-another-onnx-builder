@@ -30,20 +30,13 @@ def _reorder_paddings(g: GraphBuilderExtendedProtocol, paddings_name: str, op_na
     * Cast to int64 (ONNX ``Pad`` requires int64 pads)
     """
     pads_t = g.op.Transpose(paddings_name, perm=[1, 0], name=f"{op_name}_pads_t")
-    pads_flat = g.op.Reshape(
-        pads_t,
-        np.array([-1], dtype=np.int64),
-        name=f"{op_name}_pads_flat",
-    )
+    pads_flat = g.op.Reshape(pads_t, np.array([-1], dtype=np.int64), name=f"{op_name}_pads_flat")
     return g.op.Cast(pads_flat, to=TensorProto.INT64, name=f"{op_name}_pads_i64")
 
 
 @register_tf_op_converter(("Pad", "PadV2"))
 def convert_pad(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``Pad`` / ``PadV2`` → ONNX ``Pad``.
@@ -63,10 +56,7 @@ def convert_pad(
 
 @register_tf_op_converter("MirrorPad")
 def convert_mirror_pad(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``MirrorPad`` → ONNX ``Pad`` with ``mode`` attribute.

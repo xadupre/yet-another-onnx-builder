@@ -83,8 +83,7 @@ def scatter_elements(data, indices, updates, axis=0, reduction=None):  # type: i
                     for j in range(indices.shape[2]):
                         for k in range(indices.shape[3]):
                             scattered[a, i, j, indices[a, i, j, k]] = f(
-                                scattered[a, i, j, indices[a, i, j, k]],
-                                updates[a, i, j, k],
+                                scattered[a, i, j, indices[a, i, j, k]], updates[a, i, j, k]
                             )
             return scattered
         if axis == 0:
@@ -93,8 +92,7 @@ def scatter_elements(data, indices, updates, axis=0, reduction=None):  # type: i
                     for j in range(indices.shape[2]):
                         for k in range(indices.shape[3]):
                             scattered[indices[a, i, j, k], i, j, k] = f(
-                                scattered[indices[a, i, j, k], i, j, k],
-                                updates[a, i, j, k],
+                                scattered[indices[a, i, j, k], i, j, k], updates[a, i, j, k]
                             )
             return scattered
 

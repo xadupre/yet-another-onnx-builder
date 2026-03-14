@@ -118,10 +118,7 @@ class FusedMatMulDivPattern(PatternOptimization):
         return MatchResult(self, [node, next_nodes[0]], self.apply, insert_at=next_nodes[0])
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-        node_div: NodeProto,
+        self, g: "GraphBuilder", node: NodeProto, node_div: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         alpha = 1.0
         atts = []
@@ -354,10 +351,7 @@ class FusedMatMulPattern(PatternOptimization):
                 )
 
         kwargs = dict(
-            transA=transA,
-            transB=transB,
-            transBatchA=transBatchA,
-            transBatchB=transBatchB,
+            transA=transA, transB=transB, transBatchA=transBatchA, transBatchB=transBatchB
         )
 
         if scale is not None:
@@ -695,10 +689,7 @@ class FusedMatMulTransposePattern(PatternOptimization):
         return MatchResult(self, [node, transpose_node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-        transpose_node: NodeProto,
+        self, g: "GraphBuilder", node: NodeProto, transpose_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         default_values = dict(transA=0, transB=0, transBatchA=0, transBatchB=0, alpha=1.0)
         kwargs = g.get_attributes_with_default(node, **default_values)
@@ -837,10 +828,7 @@ class ReshapeGemmPattern(PatternOptimization):
         return MatchResult(self, [node_before, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        reshape_node: NodeProto,
-        gemm_node: NodeProto,
+        self, g: "GraphBuilder", reshape_node: NodeProto, gemm_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         kwargs = {}
         transB = g.get_attributes_with_default(gemm_node, transB=0)["transB"]
@@ -1140,10 +1128,7 @@ class TransposeFusedMatMulBPattern(PatternOptimization):
         return MatchResult(self, [transpose_node, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        transpose_node: NodeProto,
-        node: NodeProto,
+        self, g: "GraphBuilder", transpose_node: NodeProto, node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         tout = g.unique_name(f"{self.__class__.__name__}--{node.input[1]}")
         nodes = [

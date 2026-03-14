@@ -7,10 +7,7 @@ import onnx.helper as oh
 import onnx.numpy_helper as onh
 import numpy as np
 from yobx.ext_test_case import ExtTestCase
-from yobx.translate.reverse_graph_builder import (
-    to_graph_builder_code,
-    to_graph_pattern_matching,
-)
+from yobx.translate.reverse_graph_builder import to_graph_builder_code, to_graph_pattern_matching
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder import GraphBuilder, FunctionOptions, OptimizationOptions
 
@@ -33,10 +30,7 @@ class TestReverseGraphBuilder(ExtTestCase):
                         value=onh.from_array(np.array([0], dtype=np.float32)),
                     ),
                     oh.make_node(
-                        "ScatterND",
-                        ["cst", "indices", "updates"],
-                        ["Z"],
-                        reduction="add",
+                        "ScatterND", ["cst", "indices", "updates"], ["Z"], reduction="add"
                     ),
                 ],
                 "create_graph",
@@ -47,9 +41,7 @@ class TestReverseGraphBuilder(ExtTestCase):
                 ],
                 [oh.make_tensor_value_info("Z", TFLOAT, [None, None, None])],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-            ],
+            opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
         code = to_graph_builder_code(model)
@@ -118,9 +110,7 @@ class TestReverseGraphBuilder(ExtTestCase):
                 ],
                 [oh.make_tensor_value_info("Z", TFLOAT, [None, None, None])],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-            ],
+            opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
         code = to_graph_builder_code(model)
@@ -176,10 +166,7 @@ class TestReverseGraphBuilder(ExtTestCase):
             "LinearRegression",
             ["x", "a", "b"],
             ["y"],
-            [
-                oh.make_node("MatMul", ["x", "a"], ["xa"]),
-                oh.make_node("Add", ["xa", "b"], ["y"]),
-            ],
+            [oh.make_node("MatMul", ["x", "a"], ["xa"]), oh.make_node("Add", ["xa", "b"], ["y"])],
             [oh.make_opsetid("", 14)],
             [],
         )
@@ -302,11 +289,7 @@ class TestReverseGraphBuilder(ExtTestCase):
         ref = ExtendedReferenceEvaluator(model)
         ref.run(
             None,
-            {
-                "X": np.random.randn(3, 3),
-                "A": np.random.randn(3, 3),
-                "B": np.random.randn(1, 3),
-            },
+            {"X": np.random.randn(3, 3), "A": np.random.randn(3, 3), "B": np.random.randn(1, 3)},
         )
 
     def test_to_graph_pattern_matching(self):
@@ -320,10 +303,7 @@ class TestReverseGraphBuilder(ExtTestCase):
                         value=onh.from_array(np.array([0], dtype=np.float32)),
                     ),
                     oh.make_node(
-                        "ScatterND",
-                        ["cst", "indices", "updates"],
-                        ["Z"],
-                        reduction="add",
+                        "ScatterND", ["cst", "indices", "updates"], ["Z"], reduction="add"
                     ),
                 ],
                 "create_graph",
@@ -334,9 +314,7 @@ class TestReverseGraphBuilder(ExtTestCase):
                 ],
                 [oh.make_tensor_value_info("Z", TFLOAT, [None, None, None])],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-            ],
+            opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
         code = to_graph_pattern_matching(model)
@@ -456,9 +434,7 @@ class TestReverseGraphBuilder(ExtTestCase):
                 return MatchResult(self, nodes, self.apply)
 
             def apply(
-                self,
-                g: "GraphBuilder",  # noqa: F821
-                *nodes: onnx.NodeProto,
+                self, g: "GraphBuilder", *nodes: onnx.NodeProto  # noqa: F821
             ) -> List[onnx.NodeProto]:
                 new_node = g.make_node(
                     "Dummy",

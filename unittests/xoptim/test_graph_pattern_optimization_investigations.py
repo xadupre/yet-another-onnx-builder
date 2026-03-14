@@ -54,9 +54,7 @@ class TestGraphPatternOptimizationInvestigation(ExtTestCase):
                 model,
                 infer_shapes_options=True,
                 optimization_options=OptimizationOptions(
-                    patterns=["Reshape"],
-                    dump_applied_patterns=tmpdir,
-                    verbose=0,
+                    patterns=["Reshape"], dump_applied_patterns=tmpdir, verbose=0
                 ),
             )
             opt_onx = gr.to_onnx(optimize=True)
@@ -109,9 +107,7 @@ class TestGraphPatternOptimizationInvestigation(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["FunctionPackedMatMul"],
-                verbose=0,
-                constant_folding=True,
+                patterns=["FunctionPackedMatMul"], verbose=0, constant_folding=True
             ),
             verbose=0,
         )
@@ -162,9 +158,7 @@ class TestGraphPatternOptimizationInvestigation(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["FunctionSplitRotaryMul"],
-                verbose=0,
-                constant_folding=True,
+                patterns=["FunctionSplitRotaryMul"], verbose=0, constant_folding=True
             ),
             verbose=0,
         )
@@ -222,9 +216,7 @@ class TestGraphPatternOptimizationInvestigation(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["FunctionSplitRotaryMul"],
-                verbose=0,
-                constant_folding=True,
+                patterns=["FunctionSplitRotaryMul"], verbose=0, constant_folding=True
             ),
             verbose=0,
         )
@@ -279,9 +271,7 @@ class TestGraphPatternOptimizationInvestigation(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["FunctionPowTanh"],
-                verbose=0,
-                constant_folding=True,
+                patterns=["FunctionPowTanh"], verbose=0, constant_folding=True
             ),
             verbose=0,
         )

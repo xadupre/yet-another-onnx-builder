@@ -123,10 +123,7 @@ class TestFilterOps(ExtTestCase):
         # Build a minimal model with opset version 1 for the domain
         model = oh.make_model(
             oh.make_graph([], "g", [], []),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("test.domain", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("test.domain", 1)],
         )
 
         # With domain opset=1, MyOp_2 (version 2) should be excluded

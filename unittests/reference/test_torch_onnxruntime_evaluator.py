@@ -117,10 +117,7 @@ class TestTorchOnnxruntimeEvaluator(ExtTestCase):
 
     def test_constant_bool(self):
         node = oh.make_node(
-            "Constant",
-            [],
-            ["cbool"],
-            value=onh.from_array(np.array(True, dtype=np.bool_)),
+            "Constant", [], ["cbool"], value=onh.from_array(np.array(True, dtype=np.bool_))
         )
         ref = ExtendedReferenceEvaluator(node)
         got = ref.run(None, {})[0]
@@ -140,10 +137,7 @@ class TestTorchOnnxruntimeEvaluator(ExtTestCase):
 
     def test_constant_bool_array(self):
         node = oh.make_node(
-            "Constant",
-            [],
-            ["cbool"],
-            value=onh.from_array(np.array([True], dtype=np.bool_)),
+            "Constant", [], ["cbool"], value=onh.from_array(np.array([True], dtype=np.bool_))
         )
         ref = ExtendedReferenceEvaluator(node)
         got = ref.run(None, {})[0]
@@ -554,10 +548,7 @@ class TestTorchOnnxruntimeEvaluator(ExtTestCase):
             "LinearRegression",
             ["x", "a", "b"],
             ["y"],
-            [
-                oh.make_node("MatMul", ["x", "a"], ["xa"]),
-                oh.make_node("Add", ["xa", "b"], ["y"]),
-            ],
+            [oh.make_node("MatMul", ["x", "a"], ["xa"]), oh.make_node("Add", ["xa", "b"], ["y"])],
             [oh.make_opsetid("", 14)],
             [],
         )

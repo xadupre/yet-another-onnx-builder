@@ -56,14 +56,7 @@ def get_parser_dot() -> ArgumentParser:
         required=False,
         help="dot model to output or empty to print out the result",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        type=int,
-        default=0,
-        required=False,
-        help="verbosity",
-    )
+    parser.add_argument("-v", "--verbose", type=int, default=0, required=False, help="verbosity")
     parser.add_argument(
         "-r",
         "--run",
@@ -120,13 +113,7 @@ def get_parser_find() -> ArgumentParser:
             """),
         epilog="Enables some quick validation.",
     )
-    parser.add_argument(
-        "-i",
-        "--input",
-        type=str,
-        required=True,
-        help="onnx model to search",
-    )
+    parser.add_argument("-i", "--input", type=str, required=True, help="onnx model to search")
     parser.add_argument(
         "-n",
         "--names",
@@ -135,14 +122,7 @@ def get_parser_find() -> ArgumentParser:
         help="Names to look at comma separated values, if 'SHADOW', "
         "search for shadowing names.",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        default=0,
-        type=int,
-        required=False,
-        help="verbosity",
-    )
+    parser.add_argument("-v", "--verbose", default=0, type=int, required=False, help="verbosity")
     parser.add_argument(
         "--v2",
         default=False,
@@ -222,10 +202,7 @@ def get_parser_agg() -> ArgumentParser:
         "--recent should be added.",
     )
     parser.add_argument(
-        "--raw",
-        default=True,
-        action=BooleanOptionalAction,
-        help="Keeps the raw data in a sheet.",
+        "--raw", default=True, action=BooleanOptionalAction, help="Keeps the raw data in a sheet."
     )
     parser.add_argument("-t", "--time", default="DATE", help="Date or time column")
     parser.add_argument(
@@ -281,11 +258,7 @@ def get_parser_agg() -> ArgumentParser:
             Their definition is part of class CubeLogsPerformance.
             """),
     )
-    parser.add_argument(
-        "--csv",
-        default="raw-short",
-        help="Views to dump as csv files.",
-    )
+    parser.add_argument("--csv", default="raw-short", help="Views to dump as csv files.")
     parser.add_argument("-v", "--verbose", type=int, default=0, help="verbosity")
     parser.add_argument(
         "--filter-in",
@@ -416,14 +389,7 @@ def get_parser_partition() -> ArgumentParser:
         default="namespace,source[",
         help="allowed prefixes for keys in the metadata",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        default=0,
-        required=False,
-        type=int,
-        help="verbosity",
-    )
+    parser.add_argument("-v", "--verbose", default=0, required=False, type=int, help="verbosity")
     return parser
 
 
@@ -610,10 +576,7 @@ def _cmd_run_doc_examples(argv: List[Any]):
         print(f"[run-doc-examples] scanning {len(files)} file(s) ...")
 
     _, n_failed = run_runpython_blocks(
-        files,
-        verbose=args.verbose,
-        raise_on_error=False,
-        timeout=args.timeout,
+        files, verbose=args.verbose, raise_on_error=False, timeout=args.timeout
     )
 
     if n_failed:
@@ -680,14 +643,7 @@ def get_parser_copilot_draft() -> ArgumentParser:
         action="store_true",
         help="Print the generated code without writing any file.",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        type=int,
-        default=0,
-        required=False,
-        help="verbosity",
-    )
+    parser.add_argument("-v", "--verbose", type=int, default=0, required=False, help="verbosity")
     return parser
 
 
@@ -747,15 +703,7 @@ def get_main_parser() -> ArgumentParser:
     )
     parser.add_argument(
         "cmd",
-        choices=[
-            "agg",
-            "copilot-draft",
-            "dot",
-            "find",
-            "partition",
-            "print",
-            "run-doc-examples",
-        ],
+        choices=["agg", "copilot-draft", "dot", "find", "partition", "print", "run-doc-examples"],
         help="Selects a command.",
     )
     return parser

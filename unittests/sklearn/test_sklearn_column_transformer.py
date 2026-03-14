@@ -17,8 +17,7 @@ from yobx.sklearn import to_onnx
 class TestSklearnColumnTransformer(ExtTestCase):
     def test_column_transformer_scaler_and_passthrough(self):
         X = np.array(
-            [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
-            dtype=np.float32,
+            [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]], dtype=np.float32
         )
         ct = ColumnTransformer(
             [("scaler", StandardScaler(), [0, 1]), ("passthrough", "passthrough", [2, 3])]
@@ -43,8 +42,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
 
     def test_column_transformer_two_scalers(self):
         X = np.array(
-            [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
-            dtype=np.float32,
+            [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]], dtype=np.float32
         )
         ct = ColumnTransformer(
             [("std", StandardScaler(), [0, 1]), ("mm", MinMaxScaler(), [2, 3])]
@@ -64,8 +62,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
 
     def test_column_transformer_drop(self):
         X = np.array(
-            [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
-            dtype=np.float32,
+            [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]], dtype=np.float32
         )
         ct = ColumnTransformer(
             [("scaler", StandardScaler(), [0, 1]), ("drop_cols", "drop", [2, 3])]
@@ -86,8 +83,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
 
     def test_column_transformer_remainder_passthrough(self):
         X = np.array(
-            [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
-            dtype=np.float32,
+            [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]], dtype=np.float32
         )
         ct = ColumnTransformer([("scaler", StandardScaler(), [0, 1])], remainder="passthrough")
         ct.fit(X)
@@ -107,8 +103,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
 
     def test_column_transformer_slice_columns(self):
         X = np.array(
-            [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]],
-            dtype=np.float32,
+            [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]], dtype=np.float32
         )
         ct = ColumnTransformer(
             [("std", StandardScaler(), slice(0, 2)), ("mm", MinMaxScaler(), slice(2, 4))]

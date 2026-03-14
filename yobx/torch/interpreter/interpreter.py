@@ -90,15 +90,7 @@ class DynamoInterpreter:
                 t is None
                 or isinstance(
                     t,
-                    (
-                        torch.SymInt,
-                        torch.SymFloat,
-                        torch.Tensor,
-                        list,
-                        int,
-                        float,
-                        VirtualTensor,
-                    ),
+                    (torch.SymInt, torch.SymFloat, torch.Tensor, list, int, float, VirtualTensor),
                 )
                 or t.__class__.__name__
                 in {"DynamicCache", "MambaCache", "EncoderDecoderCache", "BaseModelOutput"}
@@ -584,10 +576,7 @@ class DynamoInterpreter:
         elem_type = _get_type(example_value[0].dtype)
         self.current_input_ += 1
         return self.builder.make_tensor_sequence_input(
-            name,
-            elem_type,
-            shape[0],
-            marker="DynamoInterpreter._make_list_input",
+            name, elem_type, shape[0], marker="DynamoInterpreter._make_list_input"
         )
 
     def placeholder(self, node: "torch.fx.Node"):  # noqa: F821
@@ -994,8 +983,7 @@ class DynamoInterpreter:
         raise TypeError(f"Unexpected output type {type(val)}.")
 
     def _fill_in_default_kwargs(
-        self,
-        node: "torch.fx.Node",  # noqa: F821
+        self, node: "torch.fx.Node"  # noqa: F821
     ) -> Tuple[List[Any], Dict[str, Any]]:
         node_schema = node.target._schema if hasattr(node.target, "_schema") else None
         complete_args = []
@@ -1364,10 +1352,7 @@ class DynamoInterpreter:
                     "", np.array(index, dtype=np.int64), source="DynamoInterpreter.getitem.1"
                 )
                 res = self.builder.make_node(
-                    "SequenceAt",
-                    [result_name, tpos],
-                    [node.name],
-                    name="getitemB_tuple",
+                    "SequenceAt", [result_name, tpos], [node.name], name="getitemB_tuple"
                 )
                 if not sts:
                     info = self.builder.get_sequence(result_name)
@@ -1391,9 +1376,7 @@ class DynamoInterpreter:
                 # A tensor.
                 res = self.builder.op.SqueezeAnyOpset(
                     self.builder.op.Gather(
-                        result_name,
-                        np.array([index], dtype=np.int64),
-                        name="getitemB_index",
+                        result_name, np.array([index], dtype=np.int64), name="getitemB_index"
                     ),
                     np.array([0], dtype=np.int64),
                     name="getitemB_index",
@@ -1769,13 +1752,7 @@ class DynamoInterpreter:
 
         if self.export_options.export_as_aten_function(method_name):
             res = self.add_aten_as_function(
-                name_fct,
-                fct,
-                can_set,
-                output_names,
-                args,
-                kwargs,
-                metadata_props={"inline": "0"},
+                name_fct, fct, can_set, output_names, args, kwargs, metadata_props={"inline": "0"}
             )
         else:
             res = fct(self.builder, can_set, output_names, *args, **kwargs)
@@ -1986,8 +1963,7 @@ class DynamoInterpreter:
         return None
 
     def _get_node_output_type(
-        self,
-        node: "torch.fx.Node",  # noqa: F821
+        self, node: "torch.fx.Node"  # noqa: F821
     ) -> Optional[Union["torch.dtype", Tuple["torch.dtype", ...]]]:  # noqa: F821
         val = node.meta.get("val", None)
         if val is not None:
@@ -2198,8 +2174,7 @@ class DynamoInterpreter:
                                 if not any(
                                     i == 0 for i in shape if isinstance(i, int)
                                 ) and self.builder.is_dynamic_shape(
-                                    shape,
-                                    allow_new_dynamic_dimension=allow_new_dynamic_dimension,
+                                    shape, allow_new_dynamic_dimension=allow_new_dynamic_dimension
                                 ):
                                     self.builder.set_shape(r_, shape, set_if_more_precise=False)
                                 elif self.builder.has_rank(r_):
@@ -2462,15 +2437,11 @@ class DynamoInterpreter:
                         builder.set_device(name, val[i].get_device())
                 elif isinstance(val[i], (self.builder.torch.SymInt)):
                     self.builder.set_shapes_types(
-                        source_node.name,
-                        "call_module",
-                        (self.builder.torch.SymInt, tuple()),
+                        source_node.name, "call_module", (self.builder.torch.SymInt, tuple())
                     )
                 elif isinstance(val[i], (self.builder.torch.SymFloat)):
                     self.builder.set_shapes_types(
-                        source_node.name,
-                        "call_module",
-                        (self.builder.torch.SymFloat, tuple()),
+                        source_node.name, "call_module", (self.builder.torch.SymFloat, tuple())
                     )
         return builder, args, kwargs, output_names
 

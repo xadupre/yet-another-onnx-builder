@@ -47,10 +47,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         X_test = self._make_data(n_samples=10, n_features=15, seed=1)
 
         lda = LatentDirichletAllocation(
-            n_components=5,
-            max_iter=5,
-            max_doc_update_iter=20,
-            random_state=0,
+            n_components=5, max_iter=5, max_doc_update_iter=20, random_state=0
         )
         onx = self._check_lda(lda, X_train, X_test)
 
@@ -69,10 +66,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         X_test = self._make_data(n_samples=5, n_features=10, seed=3)
 
         lda = LatentDirichletAllocation(
-            n_components=1,
-            max_iter=3,
-            max_doc_update_iter=10,
-            random_state=1,
+            n_components=1, max_iter=3, max_doc_update_iter=10, random_state=1
         )
         self._check_lda(lda, X_train, X_test)
 
@@ -84,10 +78,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         X_test = self._make_data(n_samples=8, n_features=20, seed=5)
 
         lda = LatentDirichletAllocation(
-            n_components=10,
-            max_iter=5,
-            max_doc_update_iter=15,
-            random_state=2,
+            n_components=10, max_iter=5, max_doc_update_iter=15, random_state=2
         )
         self._check_lda(lda, X_train, X_test)
 
@@ -100,10 +91,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         X_test = rng.poisson(10, size=(8, 15)).astype(np.float32)
 
         lda = LatentDirichletAllocation(
-            n_components=5,
-            max_iter=5,
-            max_doc_update_iter=20,
-            random_state=5,
+            n_components=5, max_iter=5, max_doc_update_iter=20, random_state=5
         )
         onx = self._check_lda(lda, X_train, X_test, atol=1e-4)
 
@@ -122,10 +110,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         X_test = rng.poisson(8, size=(6, 12)).astype(np.float64)
 
         lda = LatentDirichletAllocation(
-            n_components=4,
-            max_iter=5,
-            max_doc_update_iter=15,
-            random_state=3,
+            n_components=4, max_iter=5, max_doc_update_iter=15, random_state=3
         )
         onx = self._check_lda(lda, X_train, X_test, atol=1e-6)
 
@@ -145,10 +130,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         X_test = self._make_data(n_samples=n_samples, n_features=n_features, seed=8)
 
         lda = LatentDirichletAllocation(
-            n_components=n_topics,
-            max_iter=3,
-            max_doc_update_iter=10,
-            random_state=4,
+            n_components=n_topics, max_iter=3, max_doc_update_iter=10, random_state=4
         )
         lda.fit(X_train)
         onx = to_onnx(lda, (X_test,))

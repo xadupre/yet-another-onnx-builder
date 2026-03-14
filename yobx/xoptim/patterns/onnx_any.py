@@ -282,11 +282,7 @@ class SameChildrenPattern(PatternOptimization):
         )
         return MatchResult(self, nodes, self.apply)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        *nodes: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", *nodes: NodeProto) -> List[NodeProto]:  # noqa: F821
         """
         The function receives pairs of nodes. We replace every odd node
         by an identity node.
@@ -512,11 +508,7 @@ class ShapeBasedSameChildrenPattern(PatternOptimization):
                     return MatchResult(self, selected, self.apply)
         return self.none(node, inspect.currentframe().f_lineno)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        *nodes: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", *nodes: NodeProto) -> List[NodeProto]:  # noqa: F821
         """
         The function receives multiple nodes of the same type.
         We keep one and replace the other by an Identity node.
@@ -785,11 +777,7 @@ class IdentityPattern(PatternOptimization):
 
         return self.none(node, inspect.currentframe().f_lineno)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         name = node.input[
             (
                 1
@@ -907,11 +895,7 @@ class ShapeBasedIdentityPattern(PatternOptimization):
 
         return self.none(node, inspect.currentframe().f_lineno)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         return [
             g.make_node(
                 "Identity",

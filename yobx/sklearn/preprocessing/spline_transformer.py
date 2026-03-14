@@ -173,10 +173,7 @@ def sklearn_spline_transformer(
         le = g.op.LessOrEqual(bp, x_unsq, name=f"{feat_name}_le")  # (N, n_bp)
         le_int = g.op.Cast(le, to=7, name=f"{feat_name}_le_int")  # INT64=7
         count = g.op.ReduceSum(
-            le_int,
-            np.array([1], dtype=np.int64),
-            keepdims=0,
-            name=f"{feat_name}_count",
+            le_int, np.array([1], dtype=np.int64), keepdims=0, name=f"{feat_name}_count"
         )  # (N,)
         one = np.array(1, dtype=np.int64)
         seg_raw = g.op.Sub(count, one, name=f"{feat_name}_seg_raw")  # (N,)
@@ -234,8 +231,7 @@ def sklearn_spline_transformer(
     if not estimator.include_bias:
         # The last column of each feature's n_splines block is removed.
         keep_cols = np.array(
-            [i for i in range(n_features * n_splines) if (i + 1) % n_splines != 0],
-            dtype=np.int64,
+            [i for i in range(n_features * n_splines) if (i + 1) % n_splines != 0], dtype=np.int64
         )
         res = g.op.Gather(full_dm, keep_cols, axis=1, name=name, outputs=outputs)
     else:

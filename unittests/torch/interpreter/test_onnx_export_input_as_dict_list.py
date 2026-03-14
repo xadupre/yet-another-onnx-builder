@@ -1,9 +1,5 @@
 import unittest
-from yobx.ext_test_case import (
-    ExtTestCase,
-    requires_torch,
-    skipif_ci_windows,
-)
+from yobx.ext_test_case import ExtTestCase, requires_torch, skipif_ci_windows
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch import ExportOptions
 from yobx.torch.interpreter import to_onnx
@@ -235,10 +231,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
 
         batch = torch.export.Dim("batch", min=1, max=2048)
         onx = to_onnx(
-            model,
-            (x,),
-            dynamic_shapes=({0: batch},),
-            export_options=ExportOptions(tracing=True),
+            model, (x,), dynamic_shapes=({0: batch},), export_options=ExportOptions(tracing=True)
         )
         import onnx
 

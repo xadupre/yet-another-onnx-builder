@@ -51,8 +51,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         self.assertEqual(choose_consistent_domain_opset("com.microsoft", {"": 18}), 1)
         self.assertIsInstance(choose_consistent_domain_opset("", {"com.microsoft": 1}), int)
         self.assertRaise(
-            lambda: choose_consistent_domain_opset("", {"ai.onnx.ml": 10}),
-            AssertionError,
+            lambda: choose_consistent_domain_opset("", {"ai.onnx.ml": 10}), AssertionError
         )
 
     @skipif_ci_windows("get_all_schemas_with_history returns wrong values")
@@ -80,36 +79,25 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 [
                     oh.make_node("Transpose", ["X"], ["xm1"], perm=[0, 1, 3, 2]),
                     oh.make_node(
-                        "MatMul",
-                        ["xm1", "Y"] if side == "left" else ["Y", "xm1"],
-                        ["Z"],
+                        "MatMul", ["xm1", "Y"] if side == "left" else ["Y", "xm1"], ["Z"]
                     ),
                 ],
                 "dummy",
                 [
                     oh.make_tensor_value_info(
-                        "X",
-                        TFLOAT,
-                        [2, 2, 128, 32] if side == "left" else [2, 2, 32, 128],
+                        "X", TFLOAT, [2, 2, 128, 32] if side == "left" else [2, 2, 32, 128]
                     ),
                     oh.make_tensor_value_info(
-                        "Y",
-                        TFLOAT,
-                        [2, 2, 128, 64] if side == "left" else [2, 2, 64, 128],
+                        "Y", TFLOAT, [2, 2, 128, 64] if side == "left" else [2, 2, 64, 128]
                     ),
                 ],
                 [
                     oh.make_tensor_value_info(
-                        "Z",
-                        TFLOAT,
-                        [2, 2, 32, 64] if side == "left" else [2, 2, 64, 32],
-                    ),
+                        "Z", TFLOAT, [2, 2, 32, 64] if side == "left" else [2, 2, 64, 32]
+                    )
                 ],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         check_model(model)
@@ -131,10 +119,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["FusedMatMul"]),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["FusedMatMul"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["FusedMatMul"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -170,10 +155,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                     oh.make_tensor_value_info("ym1", TFLOAT, [2, 2, 128, 64]),
                 ],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         check_model(model)
@@ -189,8 +171,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Transpose", "Transpose", "FusedMatMul"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Transpose", "Transpose", "FusedMatMul"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
@@ -227,10 +208,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 [oh.make_tensor_value_info("Z", TFLOAT, [2, 2, 32, 64])],
                 [onh.from_array(np.array([2], dtype=np.float32), name="deux")],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         check_model(model)
@@ -245,10 +223,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["FusedMatMul"]),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Transpose", "FusedMatMul"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Transpose", "FusedMatMul"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -274,11 +249,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             oh.make_graph(
                 [
                     oh.make_node(
-                        "FusedMatMul",
-                        ["X", "Y"],
-                        ["zd"],
-                        domain="com.microsoft",
-                        alpha=1.3,
+                        "FusedMatMul", ["X", "Y"], ["zd"], domain="com.microsoft", alpha=1.3
                     ),
                     oh.make_node("Div", ["zd", "deux"], ["Z"]),
                 ],
@@ -290,10 +261,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 [oh.make_tensor_value_info("Z", TFLOAT, [2, 2, 32, 64])],
                 [onh.from_array(np.array([2], dtype=np.float32), name="deux")],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         check_model(model)
@@ -308,10 +276,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["FusedMatMulDiv"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["FusedMatMul"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["FusedMatMul"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -377,12 +342,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 opt_onx = gr.to_onnx(optimize=True)
                 self.assertEqual(
                     (
-                        [
-                            "Shape",
-                            "Gather",
-                            "ConstantOfShape",
-                            "SimplifiedLayerNormalization",
-                        ]
+                        ["Shape", "Gather", "ConstantOfShape", "SimplifiedLayerNormalization"]
                         if dyn
                         else ["SimplifiedLayerNormalization"]
                     ),
@@ -393,12 +353,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 ref1 = ExtendedReferenceEvaluator(model)
                 expected = ref1.run(None, feeds)
 
-                ninits = {
-                    (False, False): 1,
-                    (False, True): 1,
-                    (True, False): 1,
-                    (True, True): 1,
-                }
+                ninits = {(False, False): 1, (False, True): 1, (True, False): 1, (True, True): 1}
                 self.assertEqual(ninits[div, dyn], len(opt_onx.graph.initializer))
 
                 ref2 = ExtendedReferenceEvaluator(opt_onx)
@@ -464,12 +419,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 opt_onx = gr.to_onnx(optimize=True)
                 self.assertEqual(
                     (
-                        [
-                            "Shape",
-                            "Gather",
-                            "ConstantOfShape",
-                            "SimplifiedLayerNormalization",
-                        ]
+                        ["Shape", "Gather", "ConstantOfShape", "SimplifiedLayerNormalization"]
                         if dyn
                         else ["SimplifiedLayerNormalization"]
                     ),
@@ -480,12 +430,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 ref1 = ExtendedReferenceEvaluator(model)
                 expected = ref1.run(None, feeds)
 
-                ninits = {
-                    (False, False): 1,
-                    (False, True): 1,
-                    (True, False): 1,
-                    (True, True): 1,
-                }
+                ninits = {(False, False): 1, (False, True): 1, (True, False): 1, (True, True): 1}
                 self.assertEqual(ninits[div, dyn], len(opt_onx.graph.initializer))
 
                 ref2 = ExtendedReferenceEvaluator(opt_onx)
@@ -536,10 +481,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 [oh.make_tensor_value_info("Z", TFLOAT, [2, 2, 32, 64])],
                 [onh.from_array(np.array([2], dtype=np.float32), name="deux")],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         feeds = {"X": self._range(2, 2, 4, 4), "Y": self._range(2, 2, 4, 4)}
@@ -553,8 +495,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["FusedMatMul", "FusedMatMul", "Add"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["FusedMatMul", "FusedMatMul", "Add"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
@@ -589,10 +530,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 [oh.make_tensor_value_info("Z", TFLOAT, [2, 2, None, None])],
                 [onh.from_array(np.array([2], dtype=np.float32), name="deux")],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         feeds = {"X": self._range(2, 2, 6, 3), "Y": self._range(2, 2, 5, 6)}
@@ -607,10 +545,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["FusedMatMul"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["FusedMatMul"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -688,10 +623,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                     ),
                 ],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         check_model(model)
@@ -705,10 +637,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["BiasGelu"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["BiasGelu"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["BiasGelu"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(1, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -745,10 +674,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                     ),
                 ],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         check_model(model)
@@ -760,15 +686,11 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["AddAddMulMul", "AddAddMulMulBroadcast", "BiasGelu"],
-                verbose=0,
+                patterns=["AddAddMulMul", "AddAddMulMulBroadcast", "BiasGelu"], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["BiasGelu"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["BiasGelu"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(1, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -800,10 +722,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                     onh.from_array(np.array([0.5], dtype=np.float32), name="half"),
                 ],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         check_model(model)
@@ -815,15 +734,11 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=[GeluErfPattern(verbose=0)],
-                verbose=0,
+                patterns=[GeluErfPattern(verbose=0)], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Gelu"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Gelu"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -851,10 +766,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 ],
                 [oh.make_tensor_value_info("Z", TFLOAT, [16, 8, 4, 8])],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         check_model(model)
@@ -870,10 +782,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["BiasSoftmax"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["BiasSoftmax"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -910,11 +819,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
-        feeds = {
-            "X": self._range(1, 8, 6, 6),
-            "W": self._range(8, 8, 3, 3),
-            "B": self._range(8),
-        }
+        feeds = {"X": self._range(1, 8, 6, 6), "W": self._range(8, 8, 3, 3), "B": self._range(8)}
         ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
         expected = ref.run(None, feeds)
 
@@ -924,10 +829,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["FusedConv"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["FusedConv"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["FusedConv"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -941,10 +843,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
 
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("Sigmoid", ["X"], ["S"]),
-                    oh.make_node("Mul", ["X", "S"], ["Y"]),
-                ],
+                [oh.make_node("Sigmoid", ["X"], ["S"]), oh.make_node("Mul", ["X", "S"], ["Y"])],
                 "dummy",
                 [oh.make_tensor_value_info("X", TFLOAT, [1, 8, 6, 6])],
                 [oh.make_tensor_value_info("Y", TFLOAT, [1, 8, 6, 6])],
@@ -980,10 +879,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                     [
                         oh.make_node("Add", ["X1", "X2"], ["add"]),
                         oh.make_node(
-                            "LayerNormalization",
-                            ["add", "scale", "bias"],
-                            ["Y"],
-                            axis=-1,
+                            "LayerNormalization", ["add", "scale", "bias"], ["Y"], axis=-1
                         ),
                     ],
                     "dummy",
@@ -1033,12 +929,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             oh.make_graph(
                 [
                     oh.make_node("Add", ["X1", "X2"], ["add"]),
-                    oh.make_node(
-                        "LayerNormalization",
-                        ["add", "scale", "bias"],
-                        ["Y"],
-                        axis=-1,
-                    ),
+                    oh.make_node("LayerNormalization", ["add", "scale", "bias"], ["Y"], axis=-1),
                 ],
                 "dummy",
                 [
@@ -1180,10 +1071,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
-        feeds = {
-            "A": self._range(2, 3, 8, 7),
-            "B": self._range(2, 8, 3, 7),
-        }
+        feeds = {"A": self._range(2, 3, 8, 7), "B": self._range(2, 8, 3, 7)}
         ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
         expected = ref.run(None, feeds)
 
@@ -1230,10 +1118,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 ],
                 [onh.from_array(np.ones(192, dtype=np.float32), name="scale")],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         feeds = {"X": self._range(2, 128, 192), "skip": self._range(2, 128, 192)}
@@ -1288,10 +1173,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                     onh.from_array(self._range(192, bias=1000), name="weights"),
                 ],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         gr = GraphBuilder(
@@ -1367,10 +1249,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                     onh.from_array(self._range(192, bias=1000), name="weights"),
                 ],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         feeds = {"X": self._range(2, 128, 192, bias=0.001), "skip": self._range(2, 128, 192)}
@@ -1381,8 +1260,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["SimplifiedLayerNormalizationMul"],
-                verbose=0,
+                patterns=["SimplifiedLayerNormalizationMul"], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
@@ -2172,14 +2050,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                 y = y[..., :-1]
                 return y
 
-            def group_query_attention_reference(
-                self,
-                query,
-                key,
-                value,
-                scale=None,
-                mask=None,
-            ):
+            def group_query_attention_reference(self, query, key, value, scale=None, mask=None):
                 if scale is None:
                     scale = 1.0 / (self.head_size**0.5)
 

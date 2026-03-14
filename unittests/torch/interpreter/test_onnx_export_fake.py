@@ -1,9 +1,5 @@
 import unittest
-from yobx.ext_test_case import (
-    ExtTestCase,
-    requires_torch,
-    skipif_ci_windows,
-)
+from yobx.ext_test_case import ExtTestCase, requires_torch, skipif_ci_windows
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch.interpreter import to_onnx, match_input_parameters
 from yobx.torch import ExportOptions

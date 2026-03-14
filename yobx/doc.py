@@ -135,12 +135,7 @@ def _run_subprocess(args: List[str], cwd: Optional[str] = None):
     assert not isinstance(args, str), "args should be a sequence of strings, not a string."
 
     p = subprocess.Popen(
-        args,
-        cwd=cwd,
-        shell=False,
-        env=os.environ,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        args, cwd=cwd, shell=False, env=os.environ, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
     # Use communicate() to read stdout and stderr concurrently, avoiding the
     # deadlock that occurs when the subprocess fills its stderr pipe buffer
@@ -150,13 +145,7 @@ def _run_subprocess(args: List[str], cwd: Optional[str] = None):
     error = stderr_data.decode(errors="ignore")
     raise_exception = any(
         phrase in stdout_output
-        for phrase in (
-            "fatal error",
-            "CMake Error",
-            "gmake: ***",
-            "): error C",
-            ": error: ",
-        )
+        for phrase in ("fatal error", "CMake Error", "gmake: ***", "): error C", ": error: ")
     )
     if error and raise_exception:
         raise RuntimeError(

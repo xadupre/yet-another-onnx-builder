@@ -45,17 +45,11 @@ def prims_amax(
         res = g.op.ReduceMaxAnyOpset(x, keepdims=1 if keepdim else 0, outputs=outputs)
     elif isinstance(dim, int):
         res = g.op.ReduceMaxAnyOpset(
-            x,
-            np.array([dim], dtype=np.int64),
-            keepdims=1 if keepdim else 0,
-            outputs=outputs,
+            x, np.array([dim], dtype=np.int64), keepdims=1 if keepdim else 0, outputs=outputs
         )
     elif isinstance(dim, list) and all_int(dim):
         res = g.op.ReduceMaxAnyOpset(
-            x,
-            np.array(dim, dtype=np.int64),
-            keepdims=1 if keepdim else 0,
-            outputs=outputs,
+            x, np.array(dim, dtype=np.int64), keepdims=1 if keepdim else 0, outputs=outputs
         )
     else:
         raise RuntimeError(f"Unexpected type {type(dim)} for dim")
@@ -107,10 +101,7 @@ def prims_broadcast_in_dim(
         else a
     )
     res = g.op.Expand(
-        unsqueezed,
-        np.array(shape, dtype=np.int64),
-        name="broadcast_in_dim",
-        outputs=outputs,
+        unsqueezed, np.array(shape, dtype=np.int64), name="broadcast_in_dim", outputs=outputs
     )
 
     if not sts:
@@ -371,11 +362,7 @@ def prims_mul(
 
 
 def prims_neg(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    name="prims_neg",
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name="prims_neg"
 ) -> T:
     "neg"
     from ._aten_functions import aten_neg

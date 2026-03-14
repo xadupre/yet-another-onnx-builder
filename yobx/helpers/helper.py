@@ -578,8 +578,7 @@ def string_type(
             return f"{obj.__class__.__name__}({obj})"
 
         if isinstance(  # TreeSpec, MappingKey, SequenceKey
-            obj,
-            (pytree.TreeSpec, pytree.MappingKey, pytree.SequenceKey),
+            obj, (pytree.TreeSpec, pytree.MappingKey, pytree.SequenceKey)
         ):
             return repr(obj).replace(" ", "").replace("\n", " ")
 
@@ -749,10 +748,7 @@ def flatten_object(x: Any, drop_keys: bool = False) -> Any:
         return CacheKeyValue(x).aslist()
 
     if x.__class__.__name__ == "EncoderDecoderCache":
-        res = [
-            *flatten_object(x.self_attention_cache),
-            *flatten_object(x.cross_attention_cache),
-        ]
+        res = [*flatten_object(x.self_attention_cache), *flatten_object(x.cross_attention_cache)]
         return tuple(res)
     if hasattr(x, "to_tuple"):
         return flatten_object(x.to_tuple(), drop_keys=drop_keys)
@@ -814,12 +810,7 @@ def max_diff(
         return dict(abs=0, rel=0, sum=0, n=0, dnan=0)
 
     _dkws_ = dict(
-        level=level + 1,
-        begin=begin,
-        end=end,
-        _index=_index,
-        hist=hist,
-        skip_none=skip_none,
+        level=level + 1, begin=begin, end=end, _index=_index, hist=hist, skip_none=skip_none
     )
     _dkws = {**_dkws_, "flatten": flatten}
     _dkwsf = {**_dkws_, "flatten": False}
@@ -1103,13 +1094,7 @@ def max_diff(
             argm = None
 
         res: Dict[str, float] = dict(  # type: ignore
-            abs=abs_diff,
-            rel=rel_diff,
-            sum=sum_diff,
-            n=n_diff,
-            dnan=nan_diff,
-            argm=argm,
-            dev=dev,
+            abs=abs_diff, rel=rel_diff, sum=sum_diff, n=n_diff, dnan=nan_diff, argm=argm, dev=dev
         )
         if hist:
             if isinstance(hist, bool):
@@ -1121,12 +1106,7 @@ def max_diff(
         # a size
         if got.shape != tuple():
             return dict(  # type: ignore
-                abs=np.inf,
-                rel=np.inf,
-                sum=np.inf,
-                n=np.inf,
-                dnan=np.inf,
-                argm=np.inf,
+                abs=np.inf, rel=np.inf, sum=np.inf, n=np.inf, dnan=np.inf, argm=np.inf
             )
         return dict(  # type: ignore
             abs=abs(expected - got.item()),
@@ -1188,9 +1168,7 @@ def max_diff(
             cae = CacheKeyValue(expected)
             cag = CacheKeyValue(got)
             return max_diff(
-                [cae.key_cache, cae.value_cache],
-                [cag.key_cache, cag.value_cache],
-                hist=hist,
+                [cae.key_cache, cae.value_cache], [cag.key_cache, cag.value_cache], hist=hist
             )
         if isinstance(got, tuple) and len(got) == 2:
             from ..torch.in_transformers.cache_helper import CacheKeyValue
@@ -1259,10 +1237,7 @@ def max_diff(
         if got.cache_type != expected.cache_type:
             return dict(abs=np.inf, rel=np.inf, sum=np.inf, n=np.inf, dnan=np.inf)
         return max_diff(
-            list(expected),
-            list(got),
-            debug_info=_debug(expected.__class__.__name__),
-            **_dkws,
+            list(expected), list(got), debug_info=_debug(expected.__class__.__name__), **_dkws
         )
 
     if skip_none and (expected is None or got is None):

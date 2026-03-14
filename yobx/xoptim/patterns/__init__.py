@@ -53,10 +53,7 @@ from .onnx_layer_normalization import (
     RMSNormalizationPattern,
     RMSNormalizationMulPattern,
 )
-from .onnx_mul import (
-    MulMulMulScalarPattern,
-    SwitchOrderBinaryPattern,
-)
+from .onnx_mul import MulMulMulScalarPattern, SwitchOrderBinaryPattern
 from .onnx_matmul import (
     GemmTransposePattern,
     MatMulAddPattern,
@@ -133,17 +130,10 @@ class AlmostDoNothingPattern(PatternOptimization):
         self.n_count += 1
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         return [
             g.make_node(
-                node.op_type,
-                node.input,
-                node.output,
-                name=f"AlmostDoNothing--{node.name}",
+                node.op_type, node.input, node.output, name=f"AlmostDoNothing--{node.name}"
             )
         ]
 

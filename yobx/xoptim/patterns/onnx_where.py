@@ -88,10 +88,7 @@ class NotWherePattern(PatternOptimization):
         return MatchResult(self, [node, where], self.apply, insert_at=where)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        not_node: NodeProto,
-        where_node: NodeProto,
+        self, g: "GraphBuilder", not_node: NodeProto, where_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         return [
             g.make_node(
@@ -209,10 +206,7 @@ class WhereAddPattern(PatternOptimization):
         return MatchResult(self, [node, add_nodes[0]], self.apply, insert_at=add_nodes[0])
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        where_node: NodeProto,
-        add_node: NodeProto,
+        self, g: "GraphBuilder", where_node: NodeProto, add_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         where_input1 = add_node.input[1 if add_node.input[0] == where_node.output[0] else 0]
         return [

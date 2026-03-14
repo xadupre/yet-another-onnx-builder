@@ -84,11 +84,7 @@ def sklearn_polynomial_features(
 
     # 4. Multiply over the feature axis to get (N, K).
     res = g.op.ReduceProdAnyOpset(
-        powered,
-        np.array([-1], dtype=np.int64),
-        keepdims=0,
-        name=name,
-        outputs=outputs,
+        powered, np.array([-1], dtype=np.int64), keepdims=0, name=name, outputs=outputs
     )
 
     assert isinstance(res, str)  # type happiness

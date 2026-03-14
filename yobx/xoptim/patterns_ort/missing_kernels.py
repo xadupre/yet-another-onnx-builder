@@ -23,11 +23,7 @@ class MissingRangePattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         to = g.get_type(node.input[0])
         other_to = (
             TensorProto.FLOAT
@@ -81,11 +77,7 @@ class MissingCosSinPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         to = g.get_type(node.input[0])
         other_to = TensorProto.FLOAT
         n1 = g.unique_name(f"{self.__class__.__name__}--{node.input[0]}")
@@ -106,11 +98,7 @@ class MissingCosSinPattern(PatternOptimization):
                 name=f"{self.__class__.__name__}--{node.name}",
             ),
             g.make_node(
-                "Cast",
-                [n2],
-                [node.output[0]],
-                to=to,
-                name=f"{self.__class__.__name__}--Cast2",
+                "Cast", [n2], [node.output[0]], to=to, name=f"{self.__class__.__name__}--Cast2"
             ),
         ]
 
@@ -132,11 +120,7 @@ class MissingReduceMaxPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         to = g.get_type(node.input[0])
         other_to = TensorProto.FLOAT
         nodes = []
@@ -185,11 +169,7 @@ class MissingTopKPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         to = g.get_type(node.input[0])
         other_to = TensorProto.FLOAT
         nodes = []

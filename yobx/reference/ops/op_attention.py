@@ -12,16 +12,7 @@ class Attention(OpRun):
         self._schema = None
         self.attributes_names_ = ["num_heads"]
 
-    def _run(
-        self,
-        x,
-        weights,
-        bias,
-        mask_index,
-        past,
-        attention_bias,
-        num_heads=None,
-    ):
+    def _run(self, x, weights, bias, mask_index, past, attention_bias, num_heads=None):
         assert past is None, f"Attention not implemented if past == {past!r}"
         assert (
             num_heads == attention_bias.shape[1]

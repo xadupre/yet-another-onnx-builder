@@ -111,12 +111,7 @@ class TestLedoitWolf(ExtTestCase):
 
         rng = np.random.default_rng(4)
         X = rng.standard_normal((60, 4)).astype(np.float32)
-        pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("lw", LedoitWolf()),
-            ]
-        )
+        pipe = Pipeline([("scaler", StandardScaler()), ("lw", LedoitWolf())])
         pipe.fit(X)
         onx = to_onnx(pipe, (X,))
 

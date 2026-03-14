@@ -191,10 +191,7 @@ class TestOnnxExportAten(ExtTestCase):
 
             def forward(self, x):
                 y = torch.nn.functional.interpolate(
-                    x,
-                    scale_factor=2.0,
-                    mode="bilinear",
-                    recompute_scale_factor=False,
+                    x, scale_factor=2.0, mode="bilinear", recompute_scale_factor=False
                 )
                 return y
 
@@ -1683,10 +1680,7 @@ class TestOnnxExportAten(ExtTestCase):
         expected = model(*inputs)
 
         onx = to_onnx(
-            model,
-            inputs,
-            dynamic_shapes=({2: "M1", 3: "M1"}, {2: "N1", 3: "N2"}),
-            verbose=0,
+            model, inputs, dynamic_shapes=({2: "M1", 3: "M1"}, {2: "N1", 3: "N2"}), verbose=0
         )
         self.dump_onnx("test_getitem_index_put3.onnx", onx)
         feeds = dict(zip(["x", "value"], [x.detach().cpu().numpy() for x in inputs]))
@@ -1889,12 +1883,7 @@ class TestOnnxExportAten(ExtTestCase):
             def __init__(self):
                 super().__init__()
                 self.conv = torch.nn.Conv2d(
-                    in_channels=1,
-                    out_channels=1,
-                    kernel_size=3,
-                    stride=1,
-                    padding=0,
-                    bias=False,
+                    in_channels=1, out_channels=1, kernel_size=3, stride=1, padding=0, bias=False
                 )
 
             def forward(self, x):
@@ -1920,10 +1909,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.float32)
 
         onx = to_onnx(
-            model,
-            inputs,
-            verbose=0,
-            options=OptimizationOptions(patterns="default", verbose=0),
+            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
         )
         self.dump_onnx("test_convolution_valid.onnx", onx)
         op_types = [n.op_type for n in onx.graph.node]
@@ -2297,10 +2283,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.float32)
 
         onx = to_onnx(
-            model,
-            inputs,
-            verbose=0,
-            options=OptimizationOptions(patterns="default", verbose=0),
+            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
         )
         self.dump_onnx("test_index_copy.onnx", onx)
         feeds = dict(
@@ -2339,10 +2322,7 @@ class TestOnnxExportAten(ExtTestCase):
             )
             self.dump_onnx(f"test_index_add_{alpha}.onnx", onx)
             feeds = dict(
-                zip(
-                    [i.name for i in onx.graph.input],
-                    [x.detach().cpu().numpy() for x in inputs],
-                )
+                zip([i.name for i in onx.graph.input], [x.detach().cpu().numpy() for x in inputs])
             )
             ref = ExtendedReferenceEvaluator(onx, verbose=0)
             got = ref.run(None, feeds)[0]
@@ -2369,10 +2349,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.float32)
 
         onx = to_onnx(
-            model,
-            inputs,
-            verbose=0,
-            options=OptimizationOptions(patterns="default", verbose=0),
+            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
         )
         self.dump_onnx("test_index_add_d1.onnx", onx)
         feeds = dict(
@@ -2400,10 +2377,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.int64)
 
         onx = to_onnx(
-            model,
-            inputs,
-            verbose=0,
-            options=OptimizationOptions(patterns="default", verbose=0),
+            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
         )
         self.dump_onnx("test_onx_hot_d1.onnx", onx)
         feeds = dict(
@@ -2426,10 +2400,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.int64)
 
         onx = to_onnx(
-            model,
-            inputs,
-            verbose=0,
-            options=OptimizationOptions(patterns="default", verbose=0),
+            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
         )
         self.dump_onnx("test_onx_hot_d2.onnx", onx)
         feeds = dict(
@@ -2452,10 +2423,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.int64)
 
         onx = to_onnx(
-            model,
-            inputs,
-            verbose=0,
-            options=OptimizationOptions(patterns="default", verbose=0),
+            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
         )
         self.dump_onnx("test_expand.onnx", onx)
         feeds = dict(
@@ -2486,10 +2454,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.int64)
 
         onx = to_onnx(
-            model,
-            inputs,
-            verbose=0,
-            options=OptimizationOptions(patterns="default", verbose=0),
+            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
         )
         self.dump_onnx("test_diff.onnx", onx)
         feeds = dict(
@@ -2523,10 +2488,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.int64)
 
         onx = to_onnx(
-            model,
-            inputs,
-            verbose=0,
-            options=OptimizationOptions(patterns="default", verbose=0),
+            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
         )
         self.dump_onnx("test_diff_prepend.onnx", onx)
         feeds = dict(

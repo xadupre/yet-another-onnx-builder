@@ -68,7 +68,7 @@ class TestGraphPatternRepeated(ExtTestCase):
                 "test",
                 [],
                 [],
-            ),
+            )
         )
         h = node_type_frequency(onx)
         self.assertEqual(({("", "Add"): 4, ("", "Neg"): 2}, {4: 1, 2: 3}, 2, [("", "Neg")]), h)
@@ -95,7 +95,7 @@ class TestGraphPatternRepeated(ExtTestCase):
                     onh.from_array(np.array([1], dtype=np.float32), name="un"),
                     onh.from_array(np.array([2], dtype=np.float32), name="de"),
                 ],
-            ),
+            )
         )
         for i, n in enumerate(onx.graph.node):
             n.name = f"i{i}"
@@ -133,7 +133,7 @@ class TestGraphPatternRepeated(ExtTestCase):
                 "test",
                 [],
                 [],
-            ),
+            )
         )
         h = node_type_frequency(onx)
         self.assertEqual(
@@ -166,7 +166,7 @@ class TestGraphPatternRepeated(ExtTestCase):
                 "test",
                 [],
                 [],
-            ),
+            )
         )
         h = node_type_frequency(onx)
         self.assertEqual(

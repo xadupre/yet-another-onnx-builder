@@ -27,10 +27,6 @@ class Range_11(OpRunKernel):
     def run(self, starts: OpRunTensor, limit: OpRunTensor, delta: OpRunTensor) -> OpRunTensor:
         return OpRunTensor(
             torch.arange(
-                starts.tensor,
-                limit.tensor,
-                delta.tensor,
-                dtype=starts.dtype,
-                device=self.device,
+                starts.tensor, limit.tensor, delta.tensor, dtype=starts.dtype, device=self.device
             )
         )

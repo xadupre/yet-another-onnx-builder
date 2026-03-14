@@ -236,9 +236,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     def test_simple_export_pool_bfloat16(self):
         import torch
         from onnxruntime import InferenceSession
-        from yobx.torch_bench.export_model_helper import (
-            WrapInferenceSessionForTorch,
-        )
+        from yobx.torch_bench.export_model_helper import WrapInferenceSessionForTorch
 
         class Neuron(torch.nn.Module):
             def __init__(self):

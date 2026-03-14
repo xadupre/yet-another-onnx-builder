@@ -15,13 +15,7 @@ import pprint
 from typing import Optional
 import numpy as np
 import onnx
-from onnx import (
-    TensorProto,
-    ValueInfoProto,
-    helper as oh,
-    numpy_helper as onh,
-    load as onnx_load,
-)
+from onnx import TensorProto, ValueInfoProto, helper as oh, numpy_helper as onh, load as onnx_load
 from onnx.checker import check_model
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.ext_test_case import (
@@ -92,9 +86,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             infer_shapes_options=True,
             verbose=0,
             optimization_options=OptimizationOptions(
-                remove_identity=False,
-                verbose=0,
-                patterns="default",
+                remove_identity=False, verbose=0, patterns="default"
             ),
         )
         optimized = gr.to_onnx()
@@ -233,8 +225,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 model,
                 infer_shapes_options=True,
                 optimization_options=OptimizationOptions(
-                    patterns=["Cast", "ReshapeMatMulReshape", "UnsqueezeUnsqueeze"],
-                    verbose=10,
+                    patterns=["Cast", "ReshapeMatMulReshape", "UnsqueezeUnsqueeze"], verbose=10
                 ),
                 verbose=10,
             )
@@ -380,8 +371,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             lambda: GraphBuilder(
                 model,
                 optimization_options=OptimizationOptions(
-                    patterns=["Cast", "ReshapeMatMulReshape", "UnsqueezeUnsqueeze"],
-                    verbose=10,
+                    patterns=["Cast", "ReshapeMatMulReshape", "UnsqueezeUnsqueeze"], verbose=10
                 ),
                 infer_shapes_options=True,
                 verbose=10,
@@ -561,8 +551,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         self.assertIn("ExpandPattern", s)
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Reshape", "Cast", "MatMul", "Reshape"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Reshape", "Cast", "MatMul", "Reshape"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(2, len(opt_onx.graph.initializer))
 
@@ -581,10 +570,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 ],
                 "dummy",
                 [_mkv_("X", TFLOAT, [32, 128]), _mkv_("Y", TFLOAT, [3, 5, 128, 64])],
-                [
-                    _mkv_("Z", TFLOAT, [3, 5, 32, 64]),
-                    _mkv_("r1", TFLOAT, [1, 1, 128, 32]),
-                ],
+                [_mkv_("Z", TFLOAT, [3, 5, 32, 64]), _mkv_("r1", TFLOAT, [1, 1, 128, 32])],
                 [onh.from_array(np.array([1, 1, 32, 128], dtype=np.int64), name="s1")],
             )
         )
@@ -600,8 +586,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Reshape", "Transpose", "MatMul"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Reshape", "Transpose", "MatMul"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(1, len(opt_onx.graph.initializer))
 
@@ -622,9 +607,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 ],
                 "dummy",
                 [_mkv_("X", TFLOAT, [32, 128]), _mkv_("Y", TFLOAT, [3, 5, 128, 64])],
-                [
-                    _mkv_("Z", TFLOAT, [3, 5, 32, 64]),
-                ],
+                [_mkv_("Z", TFLOAT, [3, 5, 32, 64])],
                 [onh.from_array(np.array([1, 1, 32, 128], dtype=np.int64), name="s1")],
             )
         )
@@ -640,8 +623,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Reshape", "Transpose", "MatMul"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Reshape", "Transpose", "MatMul"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(1, len(opt_onx.graph.initializer))
 
@@ -660,9 +642,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 ],
                 "dummy",
                 [_mkv_("X", TFLOAT, [128, 32]), _mkv_("Y", TFLOAT, [128, 64])],
-                [
-                    _mkv_("Z", TFLOAT, [32, 64]),
-                ],
+                [_mkv_("Z", TFLOAT, [32, 64])],
             )
         )
         check_model(model)
@@ -676,10 +656,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["TransposeMatMul"]),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Gemm"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Gemm"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
@@ -692,13 +669,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 [
                     oh.make_node("Transpose", ["X"], ["xm1"], perm=[1, 0]),
                     oh.make_node(
-                        "Gemm",
-                        ["xm1", "Y"],
-                        ["Z"],
-                        alpha=2.0,
-                        beta=0.0,
-                        transA=1,
-                        transB=1,
+                        "Gemm", ["xm1", "Y"], ["Z"], alpha=2.0, beta=0.0, transA=1, transB=1
                     ),
                 ],
                 "dummy",
@@ -717,10 +688,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["TransposeMatMul"]),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Gemm"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Gemm"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
@@ -780,8 +748,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Slice", "Slice", "Neg", "Concat"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Slice", "Slice", "Neg", "Concat"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(4, len(opt_onx.graph.initializer))
 
@@ -841,8 +808,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Slice", "Slice", "Neg", "Concat"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Slice", "Slice", "Neg", "Concat"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(4, len(opt_onx.graph.initializer))
 
@@ -886,10 +852,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["MulMulMulScalar"]),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Mul", "Mul"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Mul", "Mul"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(1, len(opt_onx.graph.initializer))
 
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
@@ -932,10 +895,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["MulMulMulScalar"]),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Mul", "Div"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Mul", "Div"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(1, len(opt_onx.graph.initializer))
 
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
@@ -973,10 +933,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["Sub1Mul"]),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Mul", "Sub"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Mul", "Sub"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
@@ -1069,10 +1026,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["ExpandBroadcast"]),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Mul"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Mul"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
@@ -1526,9 +1480,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 "dummy",
                 [_mkv_("X", TFLOAT, [3, 2])],
                 [_mkv_("Y", TFLOAT, [1])],
-                [
-                    onh.from_array(np.array([], dtype=np.int64), name="shape"),
-                ],
+                [onh.from_array(np.array([], dtype=np.int64), name="shape")],
             )
         )
         check_model(model)
@@ -2320,8 +2272,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Add", "Cast", "Exp", "Add", "Add"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Add", "Cast", "Exp", "Add", "Add"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(0, len(opt_onx.graph.initializer))
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
@@ -2358,10 +2309,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["CastOpCast"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Cast", "Add"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Cast", "Add"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
         self.assertNotEqual(inputs, new_inputs)
@@ -2398,10 +2346,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Cast", "Add", "Cast"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Cast", "Add", "Cast"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
         self.assertNotEqual(inputs, new_inputs)
@@ -2437,10 +2382,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["CastOpCast"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Neg"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Neg"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
         self.assertNotEqual(inputs, new_inputs)
@@ -2474,10 +2416,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["Identity"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Add", "Mul"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Add", "Mul"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(1, len(opt_onx.graph.initializer))
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
         self.assertNotEqual(inputs, new_inputs)
@@ -2515,10 +2454,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["Identity"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Neg"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Neg"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
         self.assertNotEqual(inputs, new_inputs)
@@ -2555,10 +2491,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["Identity"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Add", "Mul"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Add", "Mul"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(1, len(opt_onx.graph.initializer))
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
         self.assertNotEqual(inputs, new_inputs)
@@ -2592,10 +2525,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["Identity"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Add"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Add"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(1, len(opt_onx.graph.initializer))
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
         self.assertNotEqual(inputs, new_inputs)
@@ -2631,10 +2561,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["Identity"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Identity"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
         self.assertNotEqual(inputs, new_inputs)
@@ -2668,10 +2595,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["Identity"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Mul"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Mul"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(1, len(opt_onx.graph.initializer))
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
         self.assertNotEqual(inputs, new_inputs)
@@ -2711,8 +2635,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["ReduceSum", "Cast", "Mul", "Sub"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["ReduceSum", "Cast", "Mul", "Sub"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(1, len(opt_onx.graph.initializer))
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
@@ -2731,8 +2654,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             origin,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["Expand", "ReshapeReshape", "MatMulReshape2Of3"],
-                verbose=0,
+                patterns=["Expand", "ReshapeReshape", "MatMulReshape2Of3"], verbose=0
             ),
         )
         onx = gr.to_onnx(optimize=True)
@@ -2750,10 +2672,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 ],
                 "dummy",
                 [_mkv_("X", TFLOAT, ["a", "b"])],
-                [
-                    _mkv_("Y", TFLOAT, ["a", 1, "b"]),
-                    _mkv_("Z", TensorProto.BOOL, ["a", 1, "b"]),
-                ],
+                [_mkv_("Y", TFLOAT, ["a", 1, "b"]), _mkv_("Z", TensorProto.BOOL, ["a", 1, "b"])],
                 [
                     onh.from_array(np.array([1], dtype=np.int64), name="axis"),
                     onh.from_array(np.array([-1], dtype=np.float32), name="m_one"),
@@ -2771,10 +2690,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             optimization_options=OptimizationOptions(patterns=["UnsqueezeEqual"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Unsqueeze", "Equal"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Unsqueeze", "Equal"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(2, len(opt_onx.graph.initializer))
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
         self.assertNotEqual(inputs, new_inputs)
@@ -2896,10 +2812,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                     ),
                 )
                 opt_onx = gr.to_onnx(optimize=True)
-                self.assertEqual(
-                    ["LayerNormalization"],
-                    [n.op_type for n in opt_onx.graph.node],
-                )
+                self.assertEqual(["LayerNormalization"], [n.op_type for n in opt_onx.graph.node])
                 self.assertEqual(1, len(opt_onx.graph.initializer))
                 new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
                 self.assertNotEqual(inputs, new_inputs)
@@ -2922,8 +2835,7 @@ class TestGraphPatternOptimization(ExtTestCase):
 
                 if torch.cuda.device_count() > 0:
                     opt_ref = InferenceSession(
-                        opt_onx.SerializeToString(),
-                        providers=["CUDAExecutionProvider"],
+                        opt_onx.SerializeToString(), providers=["CUDAExecutionProvider"]
                     )
                     got = opt_ref.run(None, feeds)[0]
                     self.assertEqualArray(expected, got, atol=1e-3)
@@ -2952,8 +2864,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                     ),
                     onh.from_array(
                         np.array(
-                            [2] if kwargs.get("axis", -1) == 0 else [2, 3, 4],
-                            dtype=np.float32,
+                            [2] if kwargs.get("axis", -1) == 0 else [2, 3, 4], dtype=np.float32
                         ),
                         name="scale",
                     ),
@@ -2995,10 +2906,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                     ),
                 )
                 opt_onx = gr.to_onnx(optimize=True)
-                self.assertEqual(
-                    ["LayerNormalization"],
-                    [n.op_type for n in opt_onx.graph.node],
-                )
+                self.assertEqual(["LayerNormalization"], [n.op_type for n in opt_onx.graph.node])
                 self.assertEqual(1, len(opt_onx.graph.initializer))
                 new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
                 self.assertNotEqual(inputs, new_inputs)
@@ -3021,8 +2929,7 @@ class TestGraphPatternOptimization(ExtTestCase):
 
                 if torch.cuda.device_count() > 0:
                     opt_ref = InferenceSession(
-                        opt_onx.SerializeToString(),
-                        providers=["CUDAExecutionProvider"],
+                        opt_onx.SerializeToString(), providers=["CUDAExecutionProvider"]
                     )
                     got = opt_ref.run(None, feeds)[0]
                     self.assertEqualArray(expected, got, atol=1e-3)
@@ -3056,12 +2963,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         from onnxruntime import InferenceSession
 
         for dtype in [np.float32, np.float16]:
-            for kwargs in [
-                dict(axis=0),
-                {},
-                dict(axis=0, fixed=False),
-                dict(fixed=False),
-            ]:
+            for kwargs in [dict(axis=0), {}, dict(axis=0, fixed=False), dict(fixed=False)]:
                 model = self._get_model_redln(dtype=dtype, **kwargs)
                 feeds = {"X": (self._range(2, 3) + np.array([1, 2, 3])).astype(dtype)}
 
@@ -3087,12 +2989,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                     [n.op_type for n in opt_onx.graph.node],
                     (
                         ["LayerNormalization"],
-                        [
-                            "Shape",
-                            "ConstantOfShape",
-                            "ConstantOfShape",
-                            "LayerNormalization",
-                        ],
+                        ["Shape", "ConstantOfShape", "ConstantOfShape", "LayerNormalization"],
                     ),
                 )
                 self.assertIn(len(opt_onx.graph.initializer), (0, 2))
@@ -3111,8 +3008,7 @@ class TestGraphPatternOptimization(ExtTestCase):
 
                 if torch.cuda.device_count() > 0:
                     opt_ref = InferenceSession(
-                        opt_onx.SerializeToString(),
-                        providers=["CUDAExecutionProvider"],
+                        opt_onx.SerializeToString(), providers=["CUDAExecutionProvider"]
                     )
                     got = opt_ref.run(None, feeds)[0]
                     self.assertEqualArray(expected, got, atol=1e-3)
@@ -3143,10 +3039,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["MulMulMatMul"],
-                verbose=0,
-            ),
+            optimization_options=OptimizationOptions(patterns=["MulMulMatMul"], verbose=0),
             verbose=0,
         )
         opt_onx = gr.to_onnx(optimize=True)
@@ -3180,15 +3073,13 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["TransposeReshapeTranspose"],
-                verbose=0,
+                patterns=["TransposeReshapeTranspose"], verbose=0
             ),
             verbose=0,
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Transpose", "Transpose", "Reshape"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Transpose", "Transpose", "Reshape"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(1, len(opt_onx.graph.initializer))
 
@@ -3219,15 +3110,13 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["TransposeReshapeTranspose"],
-                verbose=0,
+                patterns=["TransposeReshapeTranspose"], verbose=0
             ),
             verbose=0,
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Reshape", "Transpose", "Transpose"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Reshape", "Transpose", "Transpose"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(1, len(opt_onx.graph.initializer))
 
@@ -3265,16 +3154,12 @@ class TestGraphPatternOptimization(ExtTestCase):
                     model,
                     infer_shapes_options=True,
                     optimization_options=OptimizationOptions(
-                        patterns=["TransposeEqualReshape"],
-                        verbose=10,
+                        patterns=["TransposeEqualReshape"], verbose=10
                     ),
                     verbose=0,
                 )
                 opt_onx = gr.to_onnx(optimize=True)
-                self.assertEqual(
-                    ["Reshape", "Add"],
-                    [n.op_type for n in opt_onx.graph.node],
-                )
+                self.assertEqual(["Reshape", "Add"], [n.op_type for n in opt_onx.graph.node])
                 self.assertEqual(2, len(opt_onx.graph.initializer))
 
                 opt_ref = self._check_with_ort(opt_onx)
@@ -3287,10 +3172,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 [
                     oh.make_node("Cast", ["X"], ["xc"], to=TensorProto.FLOAT),
                     oh.make_node(
-                        "LayerNormalization",
-                        ["xc", "scale", "bias"],
-                        ["norm"],
-                        stash_type=1,
+                        "LayerNormalization", ["xc", "scale", "bias"], ["norm"], stash_type=1
                     ),
                     oh.make_node("Cast", ["norm"], ["Y"], to=TensorProto.FLOAT16),
                 ],
@@ -3314,16 +3196,13 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["CastLayerNormalizationCast"],
-                verbose=0,
-                constant_folding=False,
+                patterns=["CastLayerNormalizationCast"], verbose=0, constant_folding=False
             ),
             verbose=0,
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Cast", "Cast", "LayerNormalization"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Cast", "Cast", "LayerNormalization"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(2, len(opt_onx.graph.initializer))
 
@@ -3338,12 +3217,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             oh.make_graph(
                 [
                     oh.make_node("Cast", ["X"], ["xc"], to=TensorProto.FLOAT),
-                    oh.make_node(
-                        "RMSNormalization",
-                        ["xc", "scale"],
-                        ["norm"],
-                        stash_type=1,
-                    ),
+                    oh.make_node("RMSNormalization", ["xc", "scale"], ["norm"], stash_type=1),
                     oh.make_node("Cast", ["norm"], ["Y"], to=TensorProto.FLOAT16),
                 ],
                 "dummy",
@@ -3363,9 +3237,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["CastLayerNormalizationCast"],
-                verbose=0,
-                constant_folding=False,
+                patterns=["CastLayerNormalizationCast"], verbose=0, constant_folding=False
             ),
             verbose=0,
         )
@@ -3405,17 +3277,11 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["LeakyRelu"],
-                verbose=0,
-            ),
+            optimization_options=OptimizationOptions(patterns=["LeakyRelu"], verbose=0),
             verbose=0,
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["LeakyRelu"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["LeakyRelu"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
@@ -3454,17 +3320,11 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["LeakyRelu"],
-                verbose=0,
-            ),
+            optimization_options=OptimizationOptions(patterns=["LeakyRelu"], verbose=0),
             verbose=0,
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["LeakyRelu", "LeakyRelu"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["LeakyRelu", "LeakyRelu"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
@@ -3504,17 +3364,11 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["LeakyRelu"],
-                verbose=0,
-            ),
+            optimization_options=OptimizationOptions(patterns=["LeakyRelu"], verbose=0),
             verbose=0,
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertNotEqual(
-            ["LeakyRelu"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertNotEqual(["LeakyRelu"], [n.op_type for n in opt_onx.graph.node])
 
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
@@ -3540,9 +3394,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 "dummy",
                 [_mkv_("X", TFLOAT, [512, 3, 64, 64]), _mkv_("W", TFLOAT, [64, 3, 4, 4])],
                 [_mkv_("Y", TFLOAT, [512, 64, 32, 32])],
-                [
-                    onh.from_array(np.zeros((64,), dtype=np.float32), name="B"),
-                ],
+                [onh.from_array(np.zeros((64,), dtype=np.float32), name="B")],
             ),
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
@@ -3560,17 +3412,11 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["ConvBiasNull"],
-                verbose=0,
-            ),
+            optimization_options=OptimizationOptions(patterns=["ConvBiasNull"], verbose=0),
             verbose=0,
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Conv"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Conv"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         excs = []
@@ -3628,17 +3474,11 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["ConvBiasNull"],
-                verbose=0,
-            ),
+            optimization_options=OptimizationOptions(patterns=["ConvBiasNull"], verbose=0),
             verbose=0,
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Conv"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Conv"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -3695,10 +3535,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             verbose=0,
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Conv"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Conv"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(1, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -3716,7 +3553,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                         ["X", "scale", "B", "input_mean", "input_var"],
                         ["Y"],
                         epsilon=0.0,
-                    ),
+                    )
                 ],
                 "dummy",
                 [_mkv_("X", TFLOAT, [1024, 16])],
@@ -3747,10 +3584,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             verbose=0,
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Identity"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(0, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -3770,7 +3604,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                         epsilon=0.5,
                         momentum=1.0,
                         training_mode=1,
-                    ),
+                    )
                 ],
                 "dummy",
                 [_mkv_("X", TFLOAT, [2, 3, 4, 5])],
@@ -3803,10 +3637,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         opt_onx = gr.to_onnx(optimize=True)
 
         self.assertIn("ReduceMean", pretty_onnx(opt_onx))
-        self.assertNotEqual(
-            ["BatchNormalization"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertNotEqual(["BatchNormalization"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(4, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -3826,7 +3657,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                         epsilon=0.5,
                         momentum=1.0,
                         training_mode=1,
-                    ),
+                    )
                 ],
                 "dummy",
                 [_mkv_("X", TFLOAT, [2, 3, 4, 5])],
@@ -3858,10 +3689,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         opt_onx = gr.to_onnx(optimize=True)
 
         self.assertIn("ReduceMean", pretty_onnx(opt_onx))
-        self.assertNotEqual(
-            ["BatchNormalization"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertNotEqual(["BatchNormalization"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(4, len(opt_onx.graph.initializer))
 
         opt_ref = InferenceSession(
@@ -4046,9 +3874,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=[MatMulAddPattern(allow_reshape=True)],
-                verbose=0,
-                constant_folding=True,
+                patterns=[MatMulAddPattern(allow_reshape=True)], verbose=0, constant_folding=True
             ),
             verbose=0,
         )
@@ -4095,9 +3921,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=[MatMulAddPattern(allow_reshape=True)],
-                verbose=0,
-                constant_folding=True,
+                patterns=[MatMulAddPattern(allow_reshape=True)], verbose=0, constant_folding=True
             ),
             verbose=0,
         )
@@ -4147,9 +3971,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=[MatMulAddPattern(allow_reshape=True)],
-                verbose=10,
-                constant_folding=True,
+                patterns=[MatMulAddPattern(allow_reshape=True)], verbose=10, constant_folding=True
             ),
             verbose=0,
         )
@@ -4169,9 +3991,7 @@ class TestGraphPatternOptimization(ExtTestCase):
     def test_matmul_transpose_cst(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("Gemm", ["X", "B"], ["Z"]),
-                ],
+                [oh.make_node("Gemm", ["X", "B"], ["Z"])],
                 "dummy",
                 [_mkv_("X", TFLOAT, [2, 3])],
                 [_mkv_("Z", TFLOAT, [2, 2])],
@@ -4191,9 +4011,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["GemmTranspose"],
-                verbose=0,
-                constant_folding=False,
+                patterns=["GemmTranspose"], verbose=0, constant_folding=False
             ),
             verbose=0,
         )
@@ -4234,9 +4052,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["SliceSlice"],
-                verbose=0,
-                constant_folding=True,
+                patterns=["SliceSlice"], verbose=0, constant_folding=True
             ),
             verbose=0,
         )
@@ -4276,9 +4092,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["SliceSlice"],
-                verbose=0,
-                constant_folding=True,
+                patterns=["SliceSlice"], verbose=0, constant_folding=True
             ),
             verbose=0,
         )
@@ -4318,9 +4132,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["SliceSlice"],
-                verbose=0,
-                constant_folding=True,
+                patterns=["SliceSlice"], verbose=0, constant_folding=True
             ),
             verbose=0,
         )
@@ -4360,9 +4172,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["SliceSlice"],
-                verbose=0,
-                constant_folding=True,
+                patterns=["SliceSlice"], verbose=0, constant_folding=True
             ),
             verbose=0,
         )
@@ -4402,9 +4212,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["ClipClip"],
-                verbose=0,
-                constant_folding=True,
+                patterns=["ClipClip"], verbose=0, constant_folding=True
             ),
             verbose=0,
         )
@@ -4450,9 +4258,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["SequenceConstructAt"],
-                verbose=0,
-                constant_folding=True,
+                patterns=["SequenceConstructAt"], verbose=0, constant_folding=True
             ),
             verbose=0,
         )
@@ -4638,11 +4444,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             ir_version=10,
         )
         check_model(model)
-        gr = GraphBuilder(
-            model,
-            infer_shapes_options=InferShapesOptions.BUILDER,
-            verbose=5,
-        )
+        gr = GraphBuilder(model, infer_shapes_options=InferShapesOptions.BUILDER, verbose=5)
         shapes = gr._known_shapes
         assert (
             "new_shape" in gr._known_value_shape
@@ -4733,9 +4535,7 @@ class TestGraphPatternOptimization(ExtTestCase):
     def test_transpose_equal_reshape(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("Transpose", ["X"], ["Y"], perm=[0, 2, 1, 3]),
-                ],
+                [oh.make_node("Transpose", ["X"], ["Y"], perm=[0, 2, 1, 3])],
                 "dummy",
                 [_mkv_("X", TFLOAT, [3, 2, 1, 5])],
                 [_mkv_("Y", TFLOAT, ["a", "b", "c", "d"])],
@@ -4757,10 +4557,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
 
-        self.assertEqual(
-            ["Reshape"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Reshape"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(len(opt_onx.graph.initializer), 1)
 
         opt_ref = InferenceSession(
@@ -4803,10 +4600,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
 
-        self.assertEqual(
-            ["MatMul", "Relu", "Transpose"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["MatMul", "Relu", "Transpose"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(len(opt_onx.graph.initializer), 0)
 
         opt_ref = InferenceSession(
@@ -4847,10 +4641,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
 
-        self.assertEqual(
-            ["Identity"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(len(opt_onx.graph.initializer), 0)
 
         opt_ref = InferenceSession(
@@ -4891,10 +4682,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
 
-        self.assertEqual(
-            ["Identity"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(len(opt_onx.graph.initializer), 0)
 
         opt_ref = InferenceSession(
@@ -4935,10 +4723,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
 
-        self.assertEqual(
-            ["Identity"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(len(opt_onx.graph.initializer), 0)
 
         opt_ref = InferenceSession(
@@ -4979,10 +4764,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
 
-        self.assertEqual(
-            ["Squeeze"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Squeeze"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(len(opt_onx.graph.initializer), 1)
 
         opt_ref = InferenceSession(
@@ -5020,10 +4802,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
 
-        self.assertEqual(
-            ["Identity"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
         self.assertEqual(len(opt_onx.graph.initializer), 0)
 
         opt_ref = InferenceSession(
@@ -5118,16 +4897,10 @@ class TestGraphPatternOptimization(ExtTestCase):
                         ["cond"],
                         ["Z_c"],
                         then_branch=oh.make_graph(
-                            [oh.make_node("Add", ["X00", "one"], ["Y"])],
-                            "then",
-                            [],
-                            [_mkv_("Y")],
+                            [oh.make_node("Add", ["X00", "one"], ["Y"])], "then", [], [_mkv_("Y")]
                         ),
                         else_branch=oh.make_graph(
-                            [oh.make_node("Sub", ["X0", "one"], ["Y"])],
-                            "else",
-                            [],
-                            [_mkv_("Y")],
+                            [oh.make_node("Sub", ["X0", "one"], ["Y"])], "else", [], [_mkv_("Y")]
                         ),
                     ),
                     oh.make_node("CastLike", ["Z_c", "X"], ["Z"]),
@@ -5536,18 +5309,14 @@ class TestGraphPatternOptimization(ExtTestCase):
     def test_concat_empty(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("Concat", ["X", "Y", "I"], ["Z"], axis=0),
-                ],
+                [oh.make_node("Concat", ["X", "Y", "I"], ["Z"], axis=0)],
                 "test",
                 [
                     oh.make_tensor_value_info("X", TensorProto.INT64, ["a"]),
                     oh.make_tensor_value_info("Y", TensorProto.INT64, ["b"]),
                 ],
                 [oh.make_tensor_value_info("Z", TensorProto.INT64, ["c"])],
-                [
-                    onh.from_array(np.array([], dtype=np.int64), name="I"),
-                ],
+                [onh.from_array(np.array([], dtype=np.int64), name="I")],
             ),
             opset_imports=[oh.make_operatorsetid("", 18)],
             ir_version=10,
@@ -6196,8 +5965,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Sin", "Cos", "Cast", "Concat"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Sin", "Cos", "Cast", "Concat"], [n.op_type for n in opt_onx.graph.node]
         )
         ref = ExtendedReferenceEvaluator(opt_onx)
         zz = ref.run(None, feeds)[0]
@@ -6313,9 +6081,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 ],
                 "test",
                 [oh.make_tensor_value_info("X", TFLOAT, ["a", 1])],
-                [
-                    oh.make_tensor_value_info("Y", TFLOAT, ["a", 2]),
-                ],
+                [oh.make_tensor_value_info("Y", TFLOAT, ["a", 2])],
                 [onh.from_array(np.array([2], dtype=np.int64), name="two")],
             ),
             opset_imports=[oh.make_operatorsetid("", 18)],
@@ -6369,8 +6135,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
-            ["Shape", "Shape", "Expand", "Expand", "Mul"],
-            [n.op_type for n in opt_onx.graph.node],
+            ["Shape", "Shape", "Expand", "Expand", "Mul"], [n.op_type for n in opt_onx.graph.node]
         )
 
         gr = GraphBuilder(
@@ -6416,16 +6181,11 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["SameChildren"],
-                remove_duplicated_shape=True,
-                verbose=10,
+                patterns=["SameChildren"], remove_duplicated_shape=True, verbose=10
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Shape", "Expand", "Mul"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Shape", "Expand", "Mul"], [n.op_type for n in opt_onx.graph.node])
 
         gr = GraphBuilder(
             model,
@@ -7219,10 +6979,7 @@ class TestGraphPatternOptimization(ExtTestCase):
     def test_not_not(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("Not", ["X"], ["xs"]),
-                    oh.make_node("Not", ["xs"], ["Y"]),
-                ],
+                [oh.make_node("Not", ["X"], ["xs"]), oh.make_node("Not", ["xs"], ["Y"])],
                 "dummy",
                 [_mkv_("X", TBOOL, ["a", 2])],
                 [_mkv_("Y", TBOOL, ["a", 2])],
@@ -7270,10 +7027,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         # Not followed by And instead of Where - NotWherePattern requires Not -> Where
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("Not", ["X"], ["nx"]),
-                    oh.make_node("And", ["nx", "X"], ["Y"]),
-                ],
+                [oh.make_node("Not", ["X"], ["nx"]), oh.make_node("And", ["nx", "X"], ["Y"])],
                 "dummy",
                 [_mkv_("X", TBOOL, ["a", "b"])],
                 [_mkv_("Y", TBOOL, ["a", "b"])],
@@ -7352,10 +7106,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 ],
                 "dummy",
                 [_mkv_("X", TFLOAT, ["a", "b"])],
-                [
-                    _mkv_("Y1", TFLOAT, ["b"]),
-                    _mkv_("Y2", TINT64, ["b"]),
-                ],
+                [_mkv_("Y1", TFLOAT, ["b"]), _mkv_("Y2", TINT64, ["b"])],
                 [onh.from_array(np.array([1], dtype=np.int64), name="one")],
             ),
             opset_imports=[oh.make_opsetid("", 22)],
@@ -7430,10 +7181,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 ],
                 "dummy",
                 [_mkv_("X", TFLOAT, [2, 3, 4])],
-                [
-                    _mkv_("r1", TFLOAT, [3, 4, 2]),
-                    _mkv_("Y", TFLOAT, [4, 2, 3]),
-                ],
+                [_mkv_("r1", TFLOAT, [3, 4, 2]), _mkv_("Y", TFLOAT, [4, 2, 3])],
             ),
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,

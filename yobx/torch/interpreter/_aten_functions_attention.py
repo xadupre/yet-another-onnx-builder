@@ -258,10 +258,7 @@ def aten_scaled_dot_product_attention(
     set_type_shape_unary_op(g, attn_weight, mul_qk_add)
     if mask_type == TensorProto.BOOL:
         attn_weight = g.op.Where(
-            g.op.IsNaN(attn_weight, name=name),
-            np.array([0], dtype=dtype),
-            attn_weight,
-            name=name,
+            g.op.IsNaN(attn_weight, name=name), np.array([0], dtype=dtype), attn_weight, name=name
         )
 
     if dropout_p != 0:
@@ -355,13 +352,10 @@ def aten__scaled_dot_product_flash_attention(
     )
 
     # The following are not consumed by the graph.
-    (
-        logsumexp,
-        empty_tensor_int,
-        empty_int,
-        empty_tensor_float,
-    ) = _aten__scaled_dot_product_flash_attention_fillin_empty_outputs(
-        g, sts, [outputs[1], outputs[3], outputs[8], outputs[4]], query, name=name
+    logsumexp, empty_tensor_int, empty_int, empty_tensor_float = (
+        _aten__scaled_dot_product_flash_attention_fillin_empty_outputs(
+            g, sts, [outputs[1], outputs[3], outputs[8], outputs[4]], query, name=name
+        )
     )
 
     empty_tensor_int2 = g.op.Identity(empty_tensor_int, name=name)
@@ -433,13 +427,10 @@ def aten__scaled_dot_product_flash_attention_for_cpu(
     assert (
         len(outputs) == 8
     ), f"Unexpected number of outputs {len(outputs)}, outputs={outputs}{g.get_debug_msg()}"
-    (
-        logsumexp,
-        empty_tensor_int,
-        empty_int,
-        empty_tensor_float,
-    ) = _aten__scaled_dot_product_flash_attention_fillin_empty_outputs(
-        g, sts, [outputs[1], outputs[3], outputs[4], outputs[8]], query, name=name
+    logsumexp, empty_tensor_int, empty_int, empty_tensor_float = (
+        _aten__scaled_dot_product_flash_attention_fillin_empty_outputs(
+            g, sts, [outputs[1], outputs[3], outputs[4], outputs[8]], query, name=name
+        )
     )
 
     empty_tensor_int2 = g.op.Identity(empty_tensor_int, name=name)
@@ -534,9 +525,4 @@ def aten__scaled_dot_product_efficient_attention(
         outputs=[outputs[3]],
     )
 
-    return (
-        result,  # 0
-        logsumexp,  # 1
-        empty_tensor_int,  # 2
-        empty_tensor_int2,  # 3
-    )
+    return (result, logsumexp, empty_tensor_int, empty_tensor_int2)  # 0  # 1  # 2  # 3

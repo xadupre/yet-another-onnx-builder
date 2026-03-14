@@ -110,10 +110,7 @@ def sklearn_birch(
         # ||x||² — sum of squares over the feature axis → (N, 1)
         x_sq = g.op.Mul(X, X, name=f"{name}_x_sq")
         x_sq_sum = g.op.ReduceSum(
-            x_sq,
-            np.array([1], dtype=np.int64),
-            keepdims=1,
-            name=f"{name}_x_sq_sum",
+            x_sq, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_x_sq_sum"
         )  # (N, 1)
 
         # ||c||² — precomputed constant for each centre → (1, K)
@@ -137,9 +134,7 @@ def sklearn_birch(
     # Distances output (optional second output).
     if n_outputs >= 2:
         distances = g.op.Identity(
-            distances_clipped,
-            name=f"{name}_distances",
-            outputs=outputs[1:2],
+            distances_clipped, name=f"{name}_distances", outputs=outputs[1:2]
         )
         assert isinstance(distances, str)
         if not sts:
@@ -148,27 +143,14 @@ def sklearn_birch(
         distances = distances_clipped
 
     # Nearest subcluster index → (N,)
-    subcluster_idx = g.op.ArgMin(
-        distances_clipped,
-        axis=1,
-        keepdims=0,
-        name=f"{name}_argmin",
-    )
+    subcluster_idx = g.op.ArgMin(distances_clipped, axis=1, keepdims=0, name=f"{name}_argmin")
 
     # Map subcluster indices to final cluster labels via subcluster_labels_.
     # subcluster_labels_ shape: (K,) — a lookup table of int64 values.
     subcluster_labels = estimator.subcluster_labels_.astype(np.int64)
-    label_idx = g.op.Gather(
-        subcluster_labels,
-        subcluster_idx,
-        axis=0,
-        name=f"{name}_gather",
-    )
+    label_idx = g.op.Gather(subcluster_labels, subcluster_idx, axis=0, name=f"{name}_gather")
     labels = g.op.Cast(
-        label_idx,
-        to=onnx.TensorProto.INT64,
-        name=f"{name}_cast",
-        outputs=outputs[:1],
+        label_idx, to=onnx.TensorProto.INT64, name=f"{name}_cast", outputs=outputs[:1]
     )
     assert isinstance(labels, str)
     if not sts:

@@ -261,8 +261,7 @@ class TestStatisticsOnFile(ExtTestCase):
 
     def test_statistics_on_file_missing_raises(self):
         self.assertRaise(
-            lambda: statistics_on_file("/tmp/nonexistent_file_12345.py"),
-            AssertionError,
+            lambda: statistics_on_file("/tmp/nonexistent_file_12345.py"), AssertionError
         )
 
     def test_statistics_on_folder_no_aggregation(self):
@@ -485,8 +484,7 @@ class TestExtTestCaseAssertions(ExtTestCase):
 
     def test_tryCall_returns_none_on_match(self):
         result = self.tryCall(
-            lambda: (_ for _ in ()).throw(ValueError("some specific error")),
-            none_if="specific",
+            lambda: (_ for _ in ()).throw(ValueError("some specific error")), none_if="specific"
         )
         self.assertIsNone(result)
 

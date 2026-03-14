@@ -40,9 +40,7 @@ def _compute_node_depths(tree) -> np.ndarray:
 
 
 def _extract_iforest_attributes_legacy(
-    estimators: list,
-    estimators_features: list,
-    n_estimators: int,
+    estimators: list, estimators_features: list, n_estimators: int
 ) -> dict:
     """
     Extracts combined tree attributes for all isolation trees, encoding each
@@ -150,10 +148,7 @@ def _extract_iforest_attributes_legacy(
 
 
 def _extract_iforest_attributes_v5(
-    estimators: list,
-    estimators_features: list,
-    n_estimators: int,
-    itype: int,
+    estimators: list, estimators_features: list, n_estimators: int, itype: int
 ) -> dict:
     """
     Extracts combined tree attributes for all isolation trees in the
@@ -282,10 +277,7 @@ def _extract_iforest_attributes_v5(
         cumulative_leaf_offset += max(n_leaves, 1)
 
     nodes_splits_tensor = oh.make_tensor(
-        "nodes_splits",
-        itype,
-        (len(all_nodes_splits),),
-        np.array(all_nodes_splits, dtype=dtype),
+        "nodes_splits", itype, (len(all_nodes_splits),), np.array(all_nodes_splits, dtype=dtype)
     )
     nodes_modes_tensor = oh.make_tensor(
         "nodes_modes",
@@ -294,10 +286,7 @@ def _extract_iforest_attributes_v5(
         np.array(all_nodes_modes, dtype=np.uint8),
     )
     leaf_weights_tensor = oh.make_tensor(
-        "leaf_weights",
-        itype,
-        (len(all_leaf_weights),),
-        np.array(all_leaf_weights, dtype=dtype),
+        "leaf_weights", itype, (len(all_leaf_weights),), np.array(all_leaf_weights, dtype=dtype)
     )
 
     return dict(
@@ -421,29 +410,19 @@ def sklearn_isolation_forest(
 
     # Flatten (N, 1) → (N,)
     avg_depth_flat = g.op.Reshape(
-        avg_depth_raw,
-        np.array([-1], dtype=np.int64),
-        name=f"{name}_reshape",
+        avg_depth_raw, np.array([-1], dtype=np.int64), name=f"{name}_reshape"
     )
 
     # Cast to the input dtype when float64 is requested (legacy tree always outputs float32).
     if ml_opset < 5 and itype == onnx.TensorProto.DOUBLE:
-        avg_depth = g.op.Cast(
-            avg_depth_flat,
-            to=onnx.TensorProto.DOUBLE,
-            name=f"{name}_cast_f64",
-        )
+        avg_depth = g.op.Cast(avg_depth_flat, to=onnx.TensorProto.DOUBLE, name=f"{name}_cast_f64")
         np_dtype = np.float64
     else:
         avg_depth = avg_depth_flat
 
     # score = 2^(-avg_depth / normalization) = exp(avg_depth * (-log(2) / normalization))
     scale = np_dtype(-np.log(2.0) / normalization)
-    exponent = g.op.Mul(
-        avg_depth,
-        np.array([scale], dtype=np_dtype),
-        name=f"{name}_scale",
-    )
+    exponent = g.op.Mul(avg_depth, np.array([scale], dtype=np_dtype), name=f"{name}_scale")
     score = g.op.Exp(exponent, name=f"{name}_exp")
 
     # score_samples = -score
@@ -451,11 +430,7 @@ def sklearn_isolation_forest(
 
     # decision_function = score_samples - offset_
     offset_arr = np.array([offset], dtype=np_dtype)
-    decision = g.op.Sub(
-        score_samples,
-        offset_arr,
-        name=f"{name}_decision",
-    )
+    decision = g.op.Sub(score_samples, offset_arr, name=f"{name}_decision")
 
     # label = 1 if decision_function >= 0 else -1
     zero_arr = np.array([np_dtype(0)], dtype=np_dtype)

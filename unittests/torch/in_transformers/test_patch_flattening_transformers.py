@@ -1,12 +1,7 @@
 import unittest
 import torch
 from transformers.modeling_outputs import BaseModelOutput
-from yobx.ext_test_case import (
-    ExtTestCase,
-    ignore_warnings,
-    requires_torch,
-    requires_transformers,
-)
+from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch, requires_transformers
 from yobx.helpers import flatten_object
 from yobx.torch.in_transformers.cache_helper import (
     make_encoder_decoder_cache,
@@ -31,8 +26,7 @@ class TestPatchFlattening(ExtTestCase):
         with register_flattening_functions(patch_transformers=True):
             flat, _spec = torch.utils._pytree.tree_flatten(cache)
             self.assertEqual(
-                "#4[T1s4x4x4,T1s4x4x4,T1s5x5x5,T1s5x5x5]",
-                self.string_type(flat, with_shape=True),
+                "#4[T1s4x4x4,T1s4x4x4,T1s5x5x5,T1s5x5x5]", self.string_type(flat, with_shape=True)
             )
             cache2 = torch.utils._pytree.tree_unflatten(flat, _spec)
             self.assertEqual(
@@ -81,10 +75,7 @@ class TestPatchFlattening(ExtTestCase):
         cache = make_dynamic_cache([(torch.rand((4, 4, 4)), torch.rand((4, 4, 4)))])
         with register_flattening_functions(patch_transformers=True):
             flat, _spec = torch.utils._pytree.tree_flatten(cache)
-            self.assertEqual(
-                "#2[T1s4x4x4,T1s4x4x4]",
-                self.string_type(flat, with_shape=True),
-            )
+            self.assertEqual("#2[T1s4x4x4,T1s4x4x4]", self.string_type(flat, with_shape=True))
             cache2 = torch.utils._pytree.tree_unflatten(flat, _spec)
             self.assertEqual(
                 self.string_type(cache, with_shape=True, with_min_max=True),
@@ -146,10 +137,7 @@ class TestPatchFlattening(ExtTestCase):
         bo = BaseModelOutput(last_hidden_state=torch.rand((4, 4, 4)))
         with register_flattening_functions(patch_transformers=True):
             flat, _spec = torch.utils._pytree.tree_flatten(bo)
-            self.assertEqual(
-                "#1[T1s4x4x4]",
-                self.string_type(flat, with_shape=True),
-            )
+            self.assertEqual("#1[T1s4x4x4]", self.string_type(flat, with_shape=True))
             bo2 = torch.utils._pytree.tree_unflatten(flat, _spec)
             self.assertEqual(
                 self.string_type(bo, with_shape=True, with_min_max=True),

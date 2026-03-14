@@ -50,10 +50,7 @@ class LightEmitter(BaseEmitter):
         repl = {"bool": "bool_", "object": "object_", "str": "str_"}
         sdtype = repl.get(str(value.dtype), str(str(value.dtype)))
         package = "np" if hasattr(np, sdtype) else "ml_dtypes"
-        return [
-            f"cst(np.array({value.tolist()}, dtype={package}.{sdtype}))",
-            f"rename({name!r})",
-        ]
+        return [f"cst(np.array({value.tolist()}, dtype={package}.{sdtype}))", f"rename({name!r})"]
 
     def _emit_input(self, **kwargs: Dict[str, Any]) -> List[str]:
         name = kwargs["name"]

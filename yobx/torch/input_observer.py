@@ -11,9 +11,7 @@ EOL = "\n"
 
 
 def _flatten_unflatten_for_dynamic_shapes(
-    obj: Any,
-    use_dict: bool = True,
-    change_function: Callable[[torch.Tensor], Any] | None = None,
+    obj: Any, use_dict: bool = True, change_function: Callable[[torch.Tensor], Any] | None = None
 ) -> Any:
     """Returns the object in a different structure similar to what
     the definition of the dynamic shapes should use.
@@ -278,9 +276,7 @@ class InputCandidate:
         return self._n_tensors_for_args_kwargs
 
     def _set_aligned_flat_list(
-        self,
-        aligned_flat_list: list[torch.Tensor | None],
-        aligned_spec: pytree.PyTreeSpec,
+        self, aligned_flat_list: list[torch.Tensor | None], aligned_spec: pytree.PyTreeSpec
     ):
         self.aligned_flat_list = aligned_flat_list
         self.aligned_spec = aligned_spec
@@ -636,10 +632,7 @@ class InputObserverInfo:
                     {
                         **dict(zip(pos_names, flat_dynamic_shapes[:n_args])),
                         **dict(
-                            zip(
-                                list(self._best_candidate.kwargs),
-                                flat_dynamic_shapes[n_args:],
-                            )
+                            zip(list(self._best_candidate.kwargs), flat_dynamic_shapes[n_args:])
                         ),
                         **dict.fromkeys(self._best_candidate.cst_kwargs, None),
                     }
@@ -654,10 +647,7 @@ class InputObserverInfo:
                     **dict(zip(pos_names, flat_dynamic_shapes[:n_args])),
                     var_pos: tuple(flat_dynamic_shapes[n_args:i_kwargs]),
                     **dict(
-                        zip(
-                            list(self._best_candidate.kwargs),
-                            flat_dynamic_shapes[i_kwargs:],
-                        )
+                        zip(list(self._best_candidate.kwargs), flat_dynamic_shapes[i_kwargs:])
                     ),
                     **dict.fromkeys(self._best_candidate.cst_kwargs, None),
                 }
@@ -697,10 +687,7 @@ class InputObserverInfo:
             change_function=change_function,
         )
         if self._best_candidate.cst_kwargs:
-            ds_kwargs = {
-                **ds_kwargs,
-                **dict.fromkeys(self._best_candidate.cst_kwargs, None),
-            }
+            ds_kwargs = {**ds_kwargs, **dict.fromkeys(self._best_candidate.cst_kwargs, None)}
         if not ds_kwargs and not self.args_name_and_position:
             return tuple(ds_args)
         if not ds_args:
@@ -840,10 +827,7 @@ class InputObserverInfo:
         # type checking
         assert candidate is not None
         assert candidate.aligned_spec is not None
-        args, kwargs = pytree.tree_unflatten(
-            aligned_flat_list,
-            candidate.aligned_spec,
-        )
+        args, kwargs = pytree.tree_unflatten(aligned_flat_list, candidate.aligned_spec)
         if self._best_candidate.cst_kwargs:
             kwargs = {**kwargs, **self._best_candidate.cst_kwargs}
 
@@ -1026,11 +1010,7 @@ class InputObserver:
         self.value_if_missing = value_if_missing or {}
 
     def _replaced_method(
-        self,
-        *args,
-        _captured_method: Callable | None = None,
-        _store_n_calls: int = 3,
-        **kwargs,
+        self, *args, _captured_method: Callable | None = None, _store_n_calls: int = 3, **kwargs
     ):
         assert _captured_method is not None, "_captured_forward cannot be None"
         assert self.info is not None, "info cannot be None"
@@ -1050,10 +1030,7 @@ class InputObserver:
 
     @contextlib.contextmanager
     def __call__(
-        self,
-        model: torch.nn.Module,
-        store_n_calls: int = 3,
-        method_name: str = "forward",
+        self, model: torch.nn.Module, store_n_calls: int = 3, method_name: str = "forward"
     ) -> Generator:
         """Starts collecting inputs and outputs of a specific method.
         The model method is replaced by a new one collecting tensors
@@ -1211,9 +1188,7 @@ class InputObserver:
             assert self.info._best_candidate is not None
             assert self.info._captured_inputs is not None
             index_or_candidate.align_with(
-                self.info._best_candidate,
-                self.info._captured_inputs,
-                self.info.signature_names,
+                self.info._best_candidate, self.info._captured_inputs, self.info.signature_names
             )
         return self.info.infer_arguments(
             index_or_candidate=index_or_candidate, flat=flat, as_args_kwargs=as_args_kwargs

@@ -258,11 +258,7 @@ def to_svg(dot: str) -> str:
     :raises RuntimeError: if *dot* exits with a non-zero return code
     """
     try:
-        proc = subprocess.run(
-            ["dot", "-Tsvg"],
-            input=dot.encode(),
-            capture_output=True,
-        )
+        proc = subprocess.run(["dot", "-Tsvg"], input=dot.encode(), capture_output=True)
     except FileNotFoundError as e:
         raise FileNotFoundError(
             "The dot executable was not found. "

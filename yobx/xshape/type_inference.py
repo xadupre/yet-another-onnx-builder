@@ -76,9 +76,7 @@ def infer_types(
 
 
 def _infer_types_function(
-    proto: FunctionProto,
-    input_types: Sequence[int],
-    exc: bool = True,
+    proto: FunctionProto, input_types: Sequence[int], exc: bool = True
 ) -> Tuple[int, ...]:
     """
     Tries to infer the type of an output or all outputs.
@@ -98,10 +96,7 @@ def _infer_types_function(
 
 
 def _infer_types_node(
-    node: NodeProto,
-    input_types: Sequence[int],
-    output_name: Optional[str],
-    exc: bool = True,
+    node: NodeProto, input_types: Sequence[int], output_name: Optional[str], exc: bool = True
 ) -> Union[int, Sequence[int]]:
     """
     Tries to infer the type of an output or all outputs.

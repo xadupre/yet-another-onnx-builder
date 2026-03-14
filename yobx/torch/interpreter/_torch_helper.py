@@ -20,19 +20,9 @@ def create_input_names(
 
 def create_symtype(cls, pytype, shape_env, val):
     symbol = shape_env.create_symbol(
-        val,
-        source=ConstantSource(__file__),
-        dynamic_dim=DimDynamic.DUCK,
-        constraint_dim=None,
+        val, source=ConstantSource(__file__), dynamic_dim=DimDynamic.DUCK, constraint_dim=None
     )
-    return cls(
-        SymNode(
-            symbol,
-            shape_env,
-            pytype,
-            hint=val,
-        )
-    )
+    return cls(SymNode(symbol, shape_env, pytype, hint=val))
 
 
 def create_symint(i: int, shape_env=None) -> "torch.SymInt":

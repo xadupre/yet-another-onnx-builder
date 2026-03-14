@@ -86,11 +86,7 @@ class ConstantToInitializerPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         cst = g.get_computed_constant(node.output[0])
         assert (
             cst is not None

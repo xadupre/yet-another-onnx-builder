@@ -225,9 +225,7 @@ class SimplifiedLayerNormalizationPattern(PatternOptimization):
                 source="SimplifiedLayerNormalizationPattern.apply.axis",
             )
             ga = g.make_node(
-                "Gather",
-                [sh.output[0], axis_name],
-                name=f"{self.__class__.__name__}--{nname}",
+                "Gather", [sh.output[0], axis_name], name=f"{self.__class__.__name__}--{nname}"
             )
             # sc = g.make_node_check_opset(
             #    "Unsqueeze", [ga.output[0]], axes=[0],
@@ -396,10 +394,7 @@ class SkipLayerNormalizationPattern(PatternOptimization):
         return MatchResult(self, nodes, self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        add_node: NodeProto,
-        norm_node: NodeProto,
+        self, g: "GraphBuilder", add_node: NodeProto, norm_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         atts = []
         epsilon = g.get_attribute(norm_node, "epsilon", exc=False)
@@ -605,10 +600,7 @@ class SkipSimplifiedLayerNormalizationPattern(PatternOptimization):
         return MatchResult(self, [add, node], self.apply)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node_add: NodeProto,
-        node_simplified: NodeProto,
+        self, g: "GraphBuilder", node_add: NodeProto, node_simplified: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         layer = g.make_node(
             "SkipSimplifiedLayerNormalization",
@@ -872,10 +864,7 @@ class SkipSimplifiedLayerNormalizationMulPattern(PatternOptimization):
         return MatchResult(self, [node, mul_node], self.apply)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        skip_simp_node: NodeProto,
-        mul_node: NodeProto,
+        self, g: "GraphBuilder", skip_simp_node: NodeProto, mul_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         index_cst = 1 if mul_node.input[0] == skip_simp_node.output[0] else 0
         cst_skip = g.get_computed_constant(skip_simp_node.input[2])
@@ -1126,10 +1115,7 @@ class SimplifiedLayerNormalizationMulPattern(PatternOptimization):
         return MatchResult(self, [node, mul_node], self.apply)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        simp_node: NodeProto,
-        mul_node: NodeProto,
+        self, g: "GraphBuilder", simp_node: NodeProto, mul_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         index_cst = 1 if mul_node.input[0] == simp_node.output[0] else 0
         cst_skip = g.get_computed_constant(simp_node.input[1])

@@ -139,11 +139,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         assert self.ir_version, f"{self.ir_version=} is wrong, {self.main_opset=}"
 
         self._graph = ir.Graph(
-            name="graph",
-            inputs=[],
-            outputs=[],
-            nodes=[],
-            opset_imports=self.opsets,
+            name="graph", inputs=[], outputs=[], nodes=[], opset_imports=self.opsets
         )
         self._inner: OSGraphBuilder = OSGraphBuilder(self._graph)
 
@@ -386,10 +382,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
             ) from None
 
     def set_type_shape_unary_op(
-        self,
-        name: str,
-        input_name: str,
-        itype: Optional[int] = None,
+        self, name: str, input_name: str, itype: Optional[int] = None
     ) -> bool:
         return set_type_shape_unary_op(self, name, input_name, itype)  # type: ignore[arg-type]
 
@@ -617,10 +610,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
     # ------------------------------------------------------------------
 
     def to_onnx(
-        self,
-        large_model: bool = False,
-        external_threshold: int = 1024,
-        inline: bool = True,
+        self, large_model: bool = False, external_threshold: int = 1024, inline: bool = True
     ) -> Union[
         onnx.FunctionProto,
         onnx.ModelProto,

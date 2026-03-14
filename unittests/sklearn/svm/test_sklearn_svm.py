@@ -17,14 +17,12 @@ from yobx.sklearn import to_onnx
 class TestSklearnLinearSVC(ExtTestCase):
 
     _X_bin = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [0, 1], [9, 10], [2, 3], [4, 5]],
-        dtype=np.float32,
+        [[1, 2], [3, 4], [5, 6], [7, 8], [0, 1], [9, 10], [2, 3], [4, 5]], dtype=np.float32
     )
     _y_bin = np.array([0, 0, 1, 1, 0, 1, 0, 1])
 
     _X_multi = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [0, 1], [8, 9]],
-        dtype=np.float32,
+        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [0, 1], [8, 9]], dtype=np.float32
     )
     _y_multi = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2])
 
@@ -65,8 +63,7 @@ class TestSklearnLinearSVC(ExtTestCase):
 class TestSklearnLinearSVR(ExtTestCase):
 
     _X = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [0, 1], [9, 10], [2, 3], [4, 5]],
-        dtype=np.float32,
+        [[1, 2], [3, 4], [5, 6], [7, 8], [0, 1], [9, 10], [2, 3], [4, 5]], dtype=np.float32
     )
     _y = np.array([1.0, 2.0, 3.0, 4.0, 0.5, 5.0, 1.5, 2.5])
 

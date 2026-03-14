@@ -865,8 +865,7 @@ def to_onnx(
     output_dynamic_shapes: Optional[Union[Dict[str, Any], Tuple[Any]]] = None,
     validate_onnx: Union[bool, float] = False,
 ) -> Union[
-    Union[ModelProto, ModelContainer],
-    Tuple[Union[ModelProto, ModelContainer], GraphBuilder],
+    Union[ModelProto, ModelContainer], Tuple[Union[ModelProto, ModelContainer], GraphBuilder]
 ]:
     """
     Exports a torch model into ONNX using

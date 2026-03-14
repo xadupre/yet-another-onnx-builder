@@ -181,10 +181,7 @@ class RotaryConcatPartPattern(PatternOptimization):
         if g.is_used_more_than_once(node.input[0]) or g.is_used_more_than_once(node.input[1]):
             return self.none(node, inspect.currentframe().f_lineno)
 
-        concat_left, concat_right = (
-            g.node_before(node.input[0]),
-            g.node_before(node.input[1]),
-        )
+        concat_left, concat_right = (g.node_before(node.input[0]), g.node_before(node.input[1]))
         if concat_left is None or concat_right is None:
             return self.none(node, inspect.currentframe().f_lineno)
         if len(concat_left.input) != 2 or len(concat_right.input) != 2:
@@ -353,30 +350,18 @@ class RotaryConcatPartPattern(PatternOptimization):
             neg_out = neg_right.output[0]
             pos = list(concat_right.input).index(neg_out)
             concat_inputs = (
-                [
-                    neg_right.output[0],
-                    split.output[0] if is_split else slice_left.output[0],
-                ]
+                [neg_right.output[0], split.output[0] if is_split else slice_left.output[0]]
                 if pos == 0
-                else [
-                    split.output[0] if is_split else slice_left.output[0],
-                    neg_right.output[0],
-                ]
+                else [split.output[0] if is_split else slice_left.output[0], neg_right.output[0]]
             )
             neg = neg_right
         else:
             neg_out = neg_left.output[0]
             pos = list(concat_left.input).index(neg_out)
             concat_inputs = (
-                [
-                    neg_left.output[0],
-                    split.output[1] if is_split else slice_right.output[0],
-                ]
+                [neg_left.output[0], split.output[1] if is_split else slice_right.output[0]]
                 if pos == 0
-                else [
-                    split.output[1] if is_split else slice_right.output[0],
-                    neg_left.output[0],
-                ]
+                else [split.output[1] if is_split else slice_right.output[0], neg_left.output[0]]
             )
             neg = neg_left
 
@@ -485,11 +470,7 @@ class RotaryConcatPartPattern(PatternOptimization):
 
         slice_left = g.node_before(tr_update_left.input[0])
         slice_right = g.node_before(tr_update_right.input[0])
-        if slice_left.op_type not in (
-            "Slice",
-            "Neg",
-            "Split",
-        ) or slice_right.op_type not in (
+        if slice_left.op_type not in ("Slice", "Neg", "Split") or slice_right.op_type not in (
             "Slice",
             "Neg",
             "Split",
@@ -517,15 +498,7 @@ class RotaryConcatPartPattern(PatternOptimization):
             neg_right = slice_right
             slice_right = g.node_before(neg_right.input[0])
 
-        nodes2 = [
-            cst_left,
-            slice_left,
-            neg_left,
-            cst_right,
-            slice_right,
-            neg_right,
-            node,
-        ]
+        nodes2 = [cst_left, slice_left, neg_left, cst_right, slice_right, neg_right, node]
 
         if any(
             (

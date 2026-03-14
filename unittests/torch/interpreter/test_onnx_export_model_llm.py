@@ -4,12 +4,7 @@ import unittest
 import warnings
 import torch
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.ext_test_case import (
-    ExtTestCase,
-    ignore_warnings,
-    requires_torch,
-    skipif_ci_windows,
-)
+from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch, skipif_ci_windows
 from yobx.xbuilder import OptimizationOptions
 from yobx.torch.interpreter import to_onnx
 from yobx.helpers.onnx_helper import pretty_onnx
@@ -111,11 +106,7 @@ class TestOnnxExportLlama(ExtTestCase):
             input_tensors = input_tensors[0]
             expected = model(*input_tensors)
             onx = export_utils(
-                "test_nn_dynamo_false",
-                model,
-                *input_tensors,
-                remove_unused=True,
-                verbose=0,
+                "test_nn_dynamo_false", model, *input_tensors, remove_unused=True, verbose=0
             )
             xp = [x.numpy() for x in input_tensors]
             feeds = {f"input{i}": x for i, x in enumerate(xp)}

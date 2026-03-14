@@ -87,8 +87,7 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
 
     def test_ridge_cv(self):
         X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]],
-            dtype=np.float32,
+            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]], dtype=np.float32
         )
         y = np.array([1.0, 2.0, 3.0, 4.0, 1.5, 2.5, 3.5, 4.5])
         self._check_single_regressor(RidgeCV(cv=3), X, y)
@@ -100,8 +99,7 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
 
     def test_lasso_cv(self):
         X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]],
-            dtype=np.float32,
+            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]], dtype=np.float32
         )
         y = np.array([1.0, 2.0, 3.0, 4.0, 1.5, 2.5, 3.5, 4.5])
         self._check_single_regressor(LassoCV(cv=3), X, y)
@@ -113,8 +111,7 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
 
     def test_elastic_net_cv(self):
         X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]],
-            dtype=np.float32,
+            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]], dtype=np.float32
         )
         y = np.array([1.0, 2.0, 3.0, 4.0, 1.5, 2.5, 3.5, 4.5])
         self._check_single_regressor(ElasticNetCV(cv=3), X, y)
@@ -126,8 +123,7 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
 
     def test_lars_cv(self):
         X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]],
-            dtype=np.float32,
+            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]], dtype=np.float32
         )
         y = np.array([1.0, 2.0, 3.0, 4.0, 1.5, 2.5, 3.5, 4.5])
         self._check_single_regressor(LarsCV(cv=3), X, y)
@@ -139,17 +135,13 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
 
     def test_lasso_lars_cv(self):
         X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]],
-            dtype=np.float32,
+            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]], dtype=np.float32
         )
         y = np.array([1.0, 2.0, 3.0, 4.0, 1.5, 2.5, 3.5, 4.5])
         self._check_single_regressor(LassoLarsCV(cv=3), X, y)
 
     def test_lasso_lars_ic(self):
-        X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]],
-            dtype=np.float32,
-        )
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
         y = np.array([1.0, 2.0, 3.0, 4.0, 1.5, 2.5])
         self._check_single_regressor(LassoLarsIC(), X, y)
 
@@ -185,8 +177,7 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
 
     def test_orthogonal_matching_pursuit_cv(self):
         X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]],
-            dtype=np.float32,
+            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [6, 7], [8, 9]], dtype=np.float32
         )
         y = np.array([1.0, 2.0, 3.0, 4.0, 1.5, 2.5, 3.5, 4.5])
         self._check_single_regressor(OrthogonalMatchingPursuitCV(cv=3), X, y)
@@ -201,10 +192,7 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
     # --------------------------------------------------------------------- #
 
     def test_multi_task_lasso(self):
-        X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]],
-            dtype=np.float32,
-        )
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
         y = np.array([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0], [4.0, 5.0], [1.5, 2.5], [2.5, 3.5]])
         for dtype in (np.float32, np.float64):
             Xd = X.astype(dtype)
@@ -225,10 +213,7 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
             self.assertEqualArray(expected, ort_result, atol=1e-4)
 
     def test_multi_task_elastic_net(self):
-        X = np.array(
-            [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]],
-            dtype=np.float32,
-        )
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5]], dtype=np.float32)
         y = np.array([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0], [4.0, 5.0], [1.5, 2.5], [2.5, 3.5]])
         for dtype in (np.float32, np.float64):
             Xd = X.astype(dtype)
@@ -252,8 +237,7 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
 
     # Use strictly-positive targets for GLMs with log link
     _X = np.array(
-        [[0.5, 1.0], [1.0, 2.0], [1.5, 3.0], [2.0, 4.0], [2.5, 5.0], [3.0, 6.0]],
-        dtype=np.float32,
+        [[0.5, 1.0], [1.0, 2.0], [1.5, 3.0], [2.0, 4.0], [2.5, 5.0], [3.0, 6.0]], dtype=np.float32
     )
     _y = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
 

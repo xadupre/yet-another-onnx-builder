@@ -206,9 +206,7 @@ class TestGraphOrderOptimization(ExtTestCase):
                 onx,
                 infer_shapes_options=False,
                 optimization_options=OptimizationOptions(
-                    patterns=None,
-                    verbose=10,
-                    order=OrderAlgorithm.RANDOM,
+                    patterns=None, verbose=10, order=OrderAlgorithm.RANDOM
                 ),
                 verbose=0,
             )
@@ -251,10 +249,7 @@ class TestGraphOrderOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=None,
-                verbose=verbose,
-                order=OrderAlgorithm.SHAPE,
-                passes=("order",),
+                patterns=None, verbose=verbose, order=OrderAlgorithm.SHAPE, passes=("order",)
             ),
             verbose=0,
         )

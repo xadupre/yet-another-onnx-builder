@@ -89,10 +89,7 @@ class TestAffinityPropagation(ExtTestCase):
         rng = np.random.default_rng(3)
         X = rng.standard_normal((30, 4)).astype(np.float32)
         pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("ap", AffinityPropagation(random_state=0)),
-            ]
+            [("scaler", StandardScaler()), ("ap", AffinityPropagation(random_state=0))]
         )
         pipe.fit(X)
 

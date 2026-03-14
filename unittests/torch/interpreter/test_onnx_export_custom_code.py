@@ -3,12 +3,7 @@ from collections import Counter
 from typing import Any, Dict, List
 import numpy as np
 import onnx
-from yobx.ext_test_case import (
-    ExtTestCase,
-    requires_torch,
-    skipif_ci_windows,
-    ignore_warnings,
-)
+from yobx.ext_test_case import ExtTestCase, requires_torch, skipif_ci_windows, ignore_warnings
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder import GraphBuilder
 from yobx.torch import ExportOptions
@@ -122,14 +117,7 @@ class TestOnnxExportCustomCode(ExtTestCase):
         ]
         self.assertEqual(
             names,
-            [
-                "x",
-                "same",
-                "<built-in function add>",
-                "same",
-                "<built-in function mul>",
-                "output",
-            ],
+            ["x", "same", "<built-in function add>", "same", "<built-in function mul>", "output"],
         )
 
         # This is what it should produce.
@@ -541,9 +529,7 @@ class TestMakeUndefinedDimension(ExtTestCase):
         @op.register_fake
         def op_fake(x, y):
             return torch.empty(
-                x.shape[0],
-                make_undefined_dimension(min(x.shape[1], y.shape[0])),
-                dtype=x.dtype,
+                x.shape[0], make_undefined_dimension(min(x.shape[1], y.shape[0])), dtype=x.dtype
             )
 
         class Model(torch.nn.Module):

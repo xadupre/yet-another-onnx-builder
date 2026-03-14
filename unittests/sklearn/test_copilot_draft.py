@@ -184,10 +184,7 @@ class TestDraftConverterWithCopilot(ExtTestCase):
 
         with patch("urllib.request.urlopen", side_effect=fake_urlopen):
             code = draft_converter_with_copilot(
-                Ridge,
-                token="fake-github-pat",
-                dry_run=True,
-                verbose=0,
+                Ridge, token="fake-github-pat", dry_run=True, verbose=0
             )
 
         self.assertEqual(code, self._FAKE_CODE)
@@ -217,11 +214,7 @@ class TestDraftConverterWithCopilot(ExtTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with patch("urllib.request.urlopen", side_effect=fake_urlopen):
                 code = draft_converter_with_copilot(
-                    Ridge,
-                    token="fake-github-pat",
-                    output_dir=tmp,
-                    dry_run=False,
-                    verbose=0,
+                    Ridge, token="fake-github-pat", output_dir=tmp, dry_run=False, verbose=0
                 )
 
             out_file = os.path.join(tmp, "ridge.py")
@@ -256,10 +249,7 @@ class TestDraftConverterWithCopilot(ExtTestCase):
             # new_subpkg does NOT exist yet
             with patch("urllib.request.urlopen", side_effect=fake_urlopen):
                 draft_converter_with_copilot(
-                    Ridge,
-                    token="fake-github-pat",
-                    output_dir=new_pkg,
-                    dry_run=False,
+                    Ridge, token="fake-github-pat", output_dir=new_pkg, dry_run=False
                 )
 
             self.assertTrue(os.path.exists(os.path.join(new_pkg, "__init__.py")))

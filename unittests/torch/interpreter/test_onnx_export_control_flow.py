@@ -316,12 +316,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         import torch
 
         class Model(torch.nn.Module):
-            def forward(
-                self,
-                input_ids,
-                image_features,
-                vocab_size,
-            ):
+            def forward(self, input_ids, image_features, vocab_size):
                 if image_features.numel():
                     input_shape = input_ids.size()
                     input_ids = input_ids.view(-1, input_shape[-1])
@@ -352,8 +347,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         expected = [model(*inp) for inp in inputs]
 
         self.assertEqual(
-            string_type(expected, with_shape=True),
-            "#2[(T7s2x12,T7s8,T7s8),(T7s2x12,T7s0,T7s0)]",
+            string_type(expected, with_shape=True), "#2[(T7s2x12,T7s8,T7s8),(T7s2x12,T7s0,T7s0)]"
         )
 
         class Model2(torch.nn.Module):
@@ -420,8 +414,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
             with self.subTest(input2_shape=inp[1].shape):
                 feeds = dict(
                     zip(
-                        [_.name for _ in onx.graph.input],
-                        [_.detach().cpu().numpy() for _ in inp],
+                        [_.name for _ in onx.graph.input], [_.detach().cpu().numpy() for _ in inp]
                     )
                 )
                 got = sess.run(None, feeds)
@@ -441,8 +434,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
             with self.subTest(input2_shape=inp[1].shape):
                 feeds = dict(
                     zip(
-                        [_.name for _ in onx.graph.input],
-                        [_.detach().cpu().numpy() for _ in inp],
+                        [_.name for _ in onx.graph.input], [_.detach().cpu().numpy() for _ in inp]
                     )
                 )
                 got = sess.run(None, feeds)

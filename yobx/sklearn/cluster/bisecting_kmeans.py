@@ -151,10 +151,7 @@ def sklearn_bisecting_kmeans(
         centers_T = centers.T  # (F, K)
         x_sq = g.op.Mul(X, X, name=f"{name}_x_sq")
         x_sq_sum = g.op.ReduceSum(
-            x_sq,
-            np.array([1], dtype=np.int64),
-            keepdims=1,
-            name=f"{name}_x_sq_sum",
+            x_sq, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_x_sq_sum"
         )  # (N, 1)
         c_sq = (np.sum(centers**2, axis=1, keepdims=True).T).astype(dtype)  # (1, K)
         cross = g.op.MatMul(X, centers_T, name=f"{name}_cross")  # (N, K)
@@ -168,11 +165,7 @@ def sklearn_bisecting_kmeans(
     n_outputs = len(outputs)
 
     if n_outputs >= 2:
-        distances = g.op.Identity(
-            eucl_dists,
-            name=f"{name}_distances",
-            outputs=outputs[1:2],
-        )
+        distances = g.op.Identity(eucl_dists, name=f"{name}_distances", outputs=outputs[1:2])
         assert isinstance(distances, str)
         if not sts:
             g.set_type(distances, itype)
@@ -207,8 +200,7 @@ def sklearn_bisecting_kmeans(
 
         direction = (right_c - left_c).reshape(-1, 1).astype(dtype)  # (F, 1)
         threshold = np.array(
-            [(float(np.dot(right_c, right_c)) - float(np.dot(left_c, left_c))) / 2.0],
-            dtype=dtype,
+            [(float(np.dot(right_c, right_c)) - float(np.dot(left_c, left_c))) / 2.0], dtype=dtype
         )  # (1,)
 
         dot = g.op.MatMul(X, direction, name=f"{name}_node{node_idx}_dot")  # (N, 1)
@@ -260,11 +252,7 @@ def sklearn_bisecting_kmeans(
             contrib: Optional[str] = None
         else:
             leaf_label_val = np.array([leaf_label], dtype=np.int64)
-            contrib = g.op.Mul(
-                leaf_mask_int,
-                leaf_label_val,
-                name=f"{name}_contrib{leaf_label}",
-            )
+            contrib = g.op.Mul(leaf_mask_int, leaf_label_val, name=f"{name}_contrib{leaf_label}")
 
         if label_sum is None:
             label_sum = contrib  # may be None if leaf_label == 0

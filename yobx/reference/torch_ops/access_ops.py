@@ -7,12 +7,7 @@ from . import OpRunKernel, OpRunTensor
 class Gather_1(OpRunKernel):
     "Gather"
 
-    def __init__(
-        self,
-        node: onnx.NodeProto,
-        version: Optional[int] = None,
-        verbose: int = 0,
-    ):
+    def __init__(self, node: onnx.NodeProto, version: Optional[int] = None, verbose: int = 0):
         super().__init__(node, version, verbose=verbose)
         axis = self.get_attribute_int(node, "axis", 0)
         assert isinstance(axis, int), f"Unexpected value for attribute axis={axis!r}"
@@ -29,12 +24,7 @@ class Gather_1(OpRunKernel):
 class ScatterND_16(OpRunKernel):
     "ScatterND"
 
-    def __init__(
-        self,
-        node: onnx.NodeProto,
-        version: Optional[int] = None,
-        verbose: int = 0,
-    ):
+    def __init__(self, node: onnx.NodeProto, version: Optional[int] = None, verbose: int = 0):
         super().__init__(node, version, verbose=verbose)
         self.reduction = self.get_attribute_string(node, "reduction", "none")
 

@@ -23,9 +23,7 @@ class TestInferenceSession(ExtTestCase):
         return x.reshape(tuple(shape)).astype(np.float32)
 
     @classmethod
-    def _get_model(
-        cls,
-    ) -> Tuple[onnx.ModelProto, Dict[str, np.ndarray], Tuple[np.ndarray, ...]]:
+    def _get_model(cls) -> Tuple[onnx.ModelProto, Dict[str, np.ndarray], Tuple[np.ndarray, ...]]:
         model = oh.make_model(
             oh.make_graph(
                 [

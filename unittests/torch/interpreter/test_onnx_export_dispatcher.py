@@ -2,12 +2,7 @@ import unittest
 from typing import List
 
 import onnx
-from yobx.ext_test_case import (
-    ExtTestCase,
-    ignore_warnings,
-    requires_torch,
-    skipif_ci_windows,
-)
+from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch, skipif_ci_windows
 from yobx.torch.interpreter import ForceDispatcher
 
 
@@ -49,16 +44,10 @@ class TestForceDispatcher(ExtTestCase):
         self.assertEqual(converted, [False, True, False])
 
     def test_convert_into_type_unsupported_raises(self):
-        self.assertRaise(
-            lambda: ForceDispatcher._convert_into_type(str),
-            RuntimeError,
-        )
+        self.assertRaise(lambda: ForceDispatcher._convert_into_type(str), RuntimeError)
 
     def test_convert_into_type_none_raises(self):
-        self.assertRaise(
-            lambda: ForceDispatcher._convert_into_type(None),
-            AssertionError,
-        )
+        self.assertRaise(lambda: ForceDispatcher._convert_into_type(None), AssertionError)
 
     # ------------------------------------------------------------------
     # _process_signature
@@ -148,10 +137,7 @@ class TestForceDispatcher(ExtTestCase):
 
     def test_init_custom_params(self):
         dispatcher = ForceDispatcher(
-            domain="my.domain",
-            version=3,
-            strict=True,
-            only_registered=True,
+            domain="my.domain", version=3, strict=True, only_registered=True
         )
         self.assertEqual(dispatcher.domain, "my.domain")
         self.assertEqual(dispatcher.version, 3)
@@ -245,9 +231,7 @@ class TestForceDispatcher(ExtTestCase):
             pass
 
         dispatcher = ForceDispatcher(
-            signatures={"testlib_fd2_scaled_default": sig_fn},
-            domain="testlib_fd2",
-            version=1,
+            signatures={"testlib_fd2_scaled_default": sig_fn}, domain="testlib_fd2", version=1
         )
         onx = to_onnx(model, (x,), dispatcher=dispatcher)
         self.assertIsInstance(onx, onnx.ModelProto)
@@ -283,15 +267,9 @@ class TestForceDispatcher(ExtTestCase):
 
         # No signatures provided but only_registered=True: should raise
         dispatcher = ForceDispatcher(
-            signatures={},
-            domain="testlib_fd3",
-            version=1,
-            only_registered=True,
+            signatures={}, domain="testlib_fd3", version=1, only_registered=True
         )
-        self.assertRaise(
-            lambda: to_onnx(model, (x,), dispatcher=dispatcher),
-            AssertionError,
-        )
+        self.assertRaise(lambda: to_onnx(model, (x,), dispatcher=dispatcher), AssertionError)
 
     @skipif_ci_windows("dynamo not working on Windows")
     @requires_torch("2.5", "module 'torch.library' has no attribute 'infer_schema'")

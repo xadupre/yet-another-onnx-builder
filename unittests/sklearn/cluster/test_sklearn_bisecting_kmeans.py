@@ -201,10 +201,7 @@ class TestBisectingKMeans(ExtTestCase):
         rng = np.random.default_rng(2)
         X = rng.standard_normal((30, 4)).astype(np.float32)
         pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("bkm", BisectingKMeans(n_clusters=3, random_state=0)),
-            ]
+            [("scaler", StandardScaler()), ("bkm", BisectingKMeans(n_clusters=3, random_state=0))]
         )
         pipe.fit(X)
 

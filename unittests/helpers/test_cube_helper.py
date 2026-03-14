@@ -13,12 +13,7 @@ from yobx.helpers._log_helper import (
     mann_kendall,
     breaking_last_point,
 )
-from yobx.helpers.cube_helper import (
-    CubeLogs,
-    CubeLogsPerformance,
-    CubePlot,
-    CubeViewDef,
-)
+from yobx.helpers.cube_helper import CubeLogs, CubeLogsPerformance, CubePlot, CubeViewDef
 
 
 class TestCubeHelper(ExtTestCase):
@@ -70,16 +65,10 @@ class TestCubeHelper(ExtTestCase):
         cube = CubeLogs(
             [
                 dict(
-                    date="1/1/2001",
-                    version_python="3.13",
-                    model_exporter="A",
-                    time_latency=5.6,
+                    date="1/1/2001", version_python="3.13", model_exporter="A", time_latency=5.6
                 ),
                 dict(
-                    date="1/1/2001",
-                    version_python="3.13",
-                    model_exporter="B",
-                    time_latency=5.7,
+                    date="1/1/2001", version_python="3.13", model_exporter="B", time_latency=5.7
                 ),
             ]
         )
@@ -340,11 +329,7 @@ class TestCubeHelper(ExtTestCase):
                 "eager/torch_script/default",
                 "eager/torch_script/none",
             ],
-            [
-                "sdpa/export-nostrict/none",
-                "sdpa/olive-exporter/ir",
-                "sdpa/olive-exporter/none",
-            ],
+            ["sdpa/export-nostrict/none", "sdpa/olive-exporter/ir", "sdpa/olive-exporter/none"],
         ]
         self.assertEqual(expected, spl)
 
@@ -386,11 +371,7 @@ class TestCubeHelper(ExtTestCase):
                 "eager/torch_script/default",
                 "eager/torch_script/none",
             ],
-            [
-                "sdpa/export-nostrict/none",
-                "sdpa/olive-exporter/ir",
-                "sdpa/olive-exporter/none",
-            ],
+            ["sdpa/export-nostrict/none", "sdpa/olive-exporter/ir", "sdpa/olive-exporter/none"],
             ["eager/custom/default", "eager/custom/default+onnxruntime", "eager/custom/none"],
             ["eager/onnx_dynamo/ir", "eager/onnx_dynamo/none", "eager/onnx_dynamo/os_ort"],
             [

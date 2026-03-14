@@ -1,9 +1,7 @@
 from typing import List
 
 
-def get_experimental_patterns(
-    verbose: int = 0,
-) -> List["PatternOptimization"]:  # noqa: F821
+def get_experimental_patterns(verbose: int = 0) -> List["PatternOptimization"]:  # noqa: F821
     """
     Returns a default list of optimization patterns for experimentation.
     It is equal to the following list.

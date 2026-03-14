@@ -14,17 +14,11 @@ import transformers.cache_utils
 from transformers.cache_utils import Cache, DynamicCache, EncoderDecoderCache, StaticCache
 from transformers.modeling_outputs import BaseModelOutput
 from .cache_helper import make_dynamic_cache, make_static_cache, CacheKeyValue
-from ..flatten import (
-    make_flattening_function_for_dataclass,
-    register_class_flattening,
-)
+from ..flatten import make_flattening_function_for_dataclass, register_class_flattening
 
 SUPPORTED_DATACLASSES: Set[type] = set()
 
-WRONG_REGISTRATIONS = {
-    DynamicCache: "4.50",
-    BaseModelOutput: None,
-}
+WRONG_REGISTRATIONS = {DynamicCache: "4.50", BaseModelOutput: None}
 
 SHORTEN_LAYER_NAMES = {
     "DynamicLayer": "D",
@@ -91,10 +85,7 @@ def _flatten_with_keys_cache(
 
 
 def _unflatten_cache(
-    make_cache: Callable,
-    values: List[Any],
-    context: pytree.Context,
-    output_type=None,
+    make_cache: Callable, values: List[Any], context: pytree.Context, output_type=None
 ) -> DynamicCache:
     """Restores a cache from python objects."""
     expected = list(
@@ -124,9 +115,7 @@ def _unflatten_cache(
 ##############
 
 
-def flatten_dynamic_cache(
-    dynamic_cache: DynamicCache,
-) -> Tuple[List[Any], pytree.Context]:
+def flatten_dynamic_cache(dynamic_cache: DynamicCache) -> Tuple[List[Any], pytree.Context]:
     """
     Serializes a :class:`transformers.cache_utils.DynamicCache` with python objects.
 
@@ -175,9 +164,7 @@ def unflatten_dynamic_cache(
 #############
 
 
-def flatten_static_cache(
-    cache: StaticCache,
-) -> Tuple[List[Any], pytree.Context]:
+def flatten_static_cache(cache: StaticCache) -> Tuple[List[Any], pytree.Context]:
     """Serializes a :class:`transformers.cache_utils.StaticCache` with python objects."""
     ca = CacheKeyValue(cache)
     assert not ca.key_cache or cache.max_cache_len == ca.key_cache[0].shape[2], (
@@ -188,9 +175,7 @@ def flatten_static_cache(
     return _flatten_key_value_cache(cache)
 
 
-def flatten_with_keys_static_cache(
-    cache: StaticCache,
-) -> Tuple[List[Any], pytree.Context]:
+def flatten_with_keys_static_cache(cache: StaticCache) -> Tuple[List[Any], pytree.Context]:
     """Serializes a :class:`transformers.cache_utils.StaticCache` with python objects."""
     return _flatten_with_keys_cache(cache)
 
@@ -264,11 +249,9 @@ def _lower_name_with_(name: str) -> str:
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
 
-(
-    flatten_base_model_output,
-    flatten_with_keys_base_model_output,
-    unflatten_base_model_output,
-) = make_flattening_function_for_dataclass(BaseModelOutput, SUPPORTED_DATACLASSES)
+flatten_base_model_output, flatten_with_keys_base_model_output, unflatten_base_model_output = (
+    make_flattening_function_for_dataclass(BaseModelOutput, SUPPORTED_DATACLASSES)
+)
 
 
 TRANSFORMERS_CLASSES = {
@@ -285,9 +268,6 @@ TRANSFORMERS_CLASSES = {
         flatten_with_keys_encoder_decoder_cache,
     ),
     StaticCache: lambda: register_class_flattening(
-        StaticCache,
-        flatten_static_cache,
-        unflatten_static_cache,
-        flatten_with_keys_static_cache,
+        StaticCache, flatten_static_cache, unflatten_static_cache, flatten_with_keys_static_cache
     ),
 }

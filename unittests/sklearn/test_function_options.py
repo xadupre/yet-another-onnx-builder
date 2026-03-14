@@ -191,9 +191,7 @@ class TestSklearnFunctionOptions(ExtTestCase):
     def test_custom_domain_is_used(self):
         ss = StandardScaler().fit(self.X)
         custom_opts = FunctionOptions(
-            name="sklearn_op",
-            domain="acme.corp.v1",
-            move_initializer_to_constant=True,
+            name="sklearn_op", domain="acme.corp.v1", move_initializer_to_constant=True
         )
         onx = to_onnx(ss, (self.X,), function_options=custom_opts)
 

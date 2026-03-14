@@ -4,13 +4,7 @@ import numpy as np
 from onnx import NodeProto, SparseTensorProto, TensorProto, TensorShapeProto, ValueInfoProto
 from onnx.checker import check_model
 from onnx.defs import onnx_opset_version
-from onnx.helper import (
-    make_graph,
-    make_model,
-    make_node,
-    make_opsetid,
-    make_tensor_value_info,
-)
+from onnx.helper import make_graph, make_model, make_node, make_opsetid, make_tensor_value_info
 from onnx.numpy_helper import from_array
 
 
@@ -157,10 +151,7 @@ class OnnxGraph:
         return name
 
     def make_input(
-        self,
-        name: str,
-        elem_type: int = TensorProto.FLOAT,
-        shape: Optional[Any] = None,
+        self, name: str, elem_type: int = TensorProto.FLOAT, shape: Optional[Any] = None
     ) -> ValueInfoProto:
         """
         Registers an input tensor and returns its :class:`onnx.ValueInfoProto`.
@@ -178,10 +169,7 @@ class OnnxGraph:
         return var
 
     def vin(
-        self,
-        name: str,
-        elem_type: int = TensorProto.FLOAT,
-        shape: Optional[Any] = None,
+        self, name: str, elem_type: int = TensorProto.FLOAT, shape: Optional[Any] = None
     ) -> "Var":  # noqa: F821
         """
         Declares a new graph input and returns a :class:`Var`.
@@ -194,18 +182,10 @@ class OnnxGraph:
         from ._var import Var
 
         proto = self.make_input(name, elem_type=elem_type, shape=shape)
-        return Var(
-            self,
-            proto.name,
-            elem_type=proto.type.tensor_type.elem_type,
-            shape=shape,
-        )
+        return Var(self, proto.name, elem_type=proto.type.tensor_type.elem_type, shape=shape)
 
     def make_output(
-        self,
-        name: str,
-        elem_type: int = TensorProto.FLOAT,
-        shape: Optional[Any] = None,
+        self, name: str, elem_type: int = TensorProto.FLOAT, shape: Optional[Any] = None
     ) -> ValueInfoProto:
         """
         Registers a graph output and returns its :class:`onnx.ValueInfoProto`.
@@ -326,11 +306,7 @@ class OnnxGraph:
         if proto is None:
             return Var(self, tr)
         if isinstance(proto, ValueInfoProto):
-            return Var(
-                self,
-                proto.name,
-                elem_type=proto.type.tensor_type.elem_type,
-            )
+            return Var(self, proto.name, elem_type=proto.type.tensor_type.elem_type)
         if isinstance(proto, TensorProto):
             return Var(self, proto.name, elem_type=proto.data_type, shape=tuple(proto.dims))
         return Var(self, tr)

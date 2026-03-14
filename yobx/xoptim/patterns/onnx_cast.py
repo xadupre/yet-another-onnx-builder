@@ -95,11 +95,7 @@ class CastPattern(PatternOptimization):
 
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         new_node = g.make_node(
             "Identity",
             node.input,
@@ -206,10 +202,7 @@ class CastCastPattern(PatternOptimization):
         )
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        cast1: NodeProto,
-        cast2: NodeProto,
+        self, g: "GraphBuilder", cast1: NodeProto, cast2: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         itype = g.get_type(cast1.input[0])
         middle_type = g.get_attribute(cast1, "to").i
@@ -360,11 +353,7 @@ class CastCastBinaryPattern(PatternOptimization):
         return MatchResult(self, [left, right, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        left: NodeProto,
-        right: NodeProto,
-        node: NodeProto,
+        self, g: "GraphBuilder", left: NodeProto, right: NodeProto, node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         to = g.get_attribute(left, "to")
 

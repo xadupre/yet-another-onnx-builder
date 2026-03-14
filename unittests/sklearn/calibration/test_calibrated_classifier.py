@@ -19,14 +19,12 @@ from yobx.sklearn import to_onnx
 class TestSklearnCalibratedClassifierCV(ExtTestCase):
 
     _X_bin = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [0, 1], [9, 10], [2, 3], [4, 5]],
-        dtype=np.float32,
+        [[1, 2], [3, 4], [5, 6], [7, 8], [0, 1], [9, 10], [2, 3], [4, 5]], dtype=np.float32
     )
     _y_bin = np.array([0, 0, 1, 1, 0, 1, 0, 1])
 
     _X_multi = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [6, 7], [1, 3]],
-        dtype=np.float32,
+        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [6, 7], [1, 3]], dtype=np.float32
     )
     _y_multi = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2])
 

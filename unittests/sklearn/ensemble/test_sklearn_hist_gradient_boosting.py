@@ -19,8 +19,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
     def test_hgb_regressor_float32(self):
         """HGBRegressor, float32 input, legacy opset (ai.onnx.ml < 5)."""
         X = np.array(
-            [[1, 2], [2, 3], [3, 4], [4, 5], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float32,
+            [[1, 2], [2, 3], [3, 4], [4, 5], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float32
         )
         y = np.array([1.0, 1.5, 2.0, 2.5, 8.0, 9.0, 9.5, 10.0], dtype=np.float32)
         est = HistGradientBoostingRegressor(max_iter=5, max_depth=3, random_state=42)
@@ -49,8 +48,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
     def test_hgb_regressor_float64(self):
         """HGBRegressor, float64 input, legacy opset (ai.onnx.ml < 5)."""
         X = np.array(
-            [[1, 2], [2, 3], [3, 4], [4, 5], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float64,
+            [[1, 2], [2, 3], [3, 4], [4, 5], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float64
         )
         y = np.array([1.0, 1.5, 2.0, 2.5, 8.0, 9.0, 9.5, 10.0])
         est = HistGradientBoostingRegressor(max_iter=5, max_depth=3, random_state=42)
@@ -76,8 +74,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
     def test_hgb_regressor_float32_v5(self):
         """HGBRegressor, float32 input, ai.onnx.ml opset 5 (TreeEnsemble)."""
         X = np.array(
-            [[1, 2], [2, 3], [3, 4], [4, 5], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float32,
+            [[1, 2], [2, 3], [3, 4], [4, 5], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float32
         )
         y = np.array([1.0, 1.5, 2.0, 2.5, 8.0, 9.0, 9.5, 10.0], dtype=np.float32)
         est = HistGradientBoostingRegressor(max_iter=5, max_depth=3, random_state=42)
@@ -106,8 +103,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
     def test_hgb_regressor_float64_v5(self):
         """HGBRegressor, float64 input, ai.onnx.ml opset 5 (TreeEnsemble)."""
         X = np.array(
-            [[1, 2], [2, 3], [3, 4], [4, 5], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float64,
+            [[1, 2], [2, 3], [3, 4], [4, 5], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float64
         )
         y = np.array([1.0, 1.5, 2.0, 2.5, 8.0, 9.0, 9.5, 10.0])
         est = HistGradientBoostingRegressor(max_iter=5, max_depth=3, random_state=42)
@@ -140,8 +136,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
     def test_hgb_classifier_binary_float32(self):
         """HGBClassifier binary, float32 input, legacy opset."""
         X = np.array(
-            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float32,
+            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float32
         )
         y = np.array([0, 0, 0, 0, 1, 1, 1, 1])
         est = HistGradientBoostingClassifier(max_iter=5, max_depth=3, random_state=42)
@@ -173,8 +168,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
     def test_hgb_classifier_binary_float64(self):
         """HGBClassifier binary, float64 input, legacy opset."""
         X = np.array(
-            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float64,
+            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float64
         )
         y = np.array([0, 0, 0, 0, 1, 1, 1, 1])
         est = HistGradientBoostingClassifier(max_iter=5, max_depth=3, random_state=42)
@@ -204,8 +198,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
     def test_hgb_classifier_binary_float32_v5(self):
         """HGBClassifier binary, float32 input, ai.onnx.ml opset 5."""
         X = np.array(
-            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float32,
+            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float32
         )
         y = np.array([0, 0, 0, 0, 1, 1, 1, 1])
         est = HistGradientBoostingClassifier(max_iter=5, max_depth=3, random_state=42)
@@ -237,8 +230,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
     def test_hgb_classifier_binary_float64_v5(self):
         """HGBClassifier binary, float64 input, ai.onnx.ml opset 5."""
         X = np.array(
-            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]],
-            dtype=np.float64,
+            [[1, 2], [2, 3], [2, 4], [3, 4], [8, 9], [9, 9], [9, 10], [10, 11]], dtype=np.float64
         )
         y = np.array([0, 0, 0, 0, 1, 1, 1, 1])
         est = HistGradientBoostingClassifier(max_iter=5, max_depth=3, random_state=42)

@@ -142,10 +142,7 @@ class TestKNeighborsClassifier(ExtTestCase):
         y = (X[:, 0] > 0).astype(np.int64)
 
         pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("clf", KNeighborsClassifier(n_neighbors=3)),
-            ]
+            [("scaler", StandardScaler()), ("clf", KNeighborsClassifier(n_neighbors=3))]
         )
         pipe.fit(X, y)
 
@@ -338,10 +335,7 @@ class TestKNeighborsRegressor(ExtTestCase):
         y = X[:, 0] + X[:, 1]
 
         pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("reg", KNeighborsRegressor(n_neighbors=5)),
-            ]
+            [("scaler", StandardScaler()), ("reg", KNeighborsRegressor(n_neighbors=5))]
         )
         pipe.fit(X, y)
 

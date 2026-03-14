@@ -310,10 +310,7 @@ class TorchReferenceEvaluator:
             self.opsets = {d.domain: d.version for d in proto.opset_import}
             for f in proto.functions:
                 self.functions[f.domain, f.name] = self.__class__(
-                    f,
-                    providers=providers,
-                    local_functions=self.functions,
-                    verbose=self.verbose,
+                    f, providers=providers, local_functions=self.functions, verbose=self.verbose
                 )
             self._build_initializers(proto.graph.initializer)
             self._build_initializers(proto.graph.node)

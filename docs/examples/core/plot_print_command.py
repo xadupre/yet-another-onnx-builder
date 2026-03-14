@@ -31,10 +31,7 @@ TFLOAT = onnx.TensorProto.FLOAT
 
 model = oh.make_model(
     oh.make_graph(
-        [
-            oh.make_node("Add", ["X", "Y"], ["added"]),
-            oh.make_node("Relu", ["added"], ["Z"]),
-        ],
+        [oh.make_node("Add", ["X", "Y"], ["added"]), oh.make_node("Relu", ["added"], ["Z"])],
         "add_relu",
         [
             oh.make_tensor_value_info("X", TFLOAT, [2, 3]),

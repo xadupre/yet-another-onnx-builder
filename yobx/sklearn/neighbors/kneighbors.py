@@ -9,11 +9,7 @@ from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 # Metric name aliases used to canonicalise the value of ``effective_metric_``.
-_METRIC_ALIASES: Dict[str, str] = {
-    "l1": "manhattan",
-    "cityblock": "manhattan",
-    "l2": "euclidean",
-}
+_METRIC_ALIASES: Dict[str, str] = {"l1": "manhattan", "cityblock": "manhattan", "l2": "euclidean"}
 
 # Metrics that can be delegated to ``com.microsoft.CDist``.
 # Only ``euclidean`` and ``sqeuclidean`` are universally supported across
@@ -131,10 +127,7 @@ def _compute_pairwise_distances(
 
         x_sq = g.op.Mul(X, X, name=f"{name}_x_sq")
         x_sq_sum = g.op.ReduceSum(
-            x_sq,
-            np.array([1], dtype=np.int64),
-            keepdims=1,
-            name=f"{name}_x_sq_sum",
+            x_sq, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_x_sq_sum"
         )  # (N, 1)
         cross = g.op.MatMul(X, training_T, name=f"{name}_cross")  # (N, M)
         two = np.array([2], dtype=dtype)
@@ -151,14 +144,10 @@ def _compute_pairwise_distances(
         norm_eps = np.array([1e-12], dtype=dtype)  # minimum norm to avoid division by zero
         x_sq = g.op.Mul(X, X, name=f"{name}_x_sq")
         x_sq_sum = g.op.ReduceSum(
-            x_sq,
-            np.array([1], dtype=np.int64),
-            keepdims=1,
-            name=f"{name}_x_sq_sum",
+            x_sq, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_x_sq_sum"
         )  # (N, 1)
         x_norm = g.op.Sqrt(
-            g.op.Max(x_sq_sum, norm_eps, name=f"{name}_x_sq_clip"),
-            name=f"{name}_x_norm",
+            g.op.Max(x_sq_sum, norm_eps, name=f"{name}_x_sq_clip"), name=f"{name}_x_norm"
         )  # (N, 1)
         x_normalized = g.op.Div(X, x_norm, name=f"{name}_x_normd")  # (N, F)
 
@@ -172,9 +161,7 @@ def _compute_pairwise_distances(
         # Cosine distance is theoretically in [0, 2]; clip for float safety.
         two = np.array([2.0], dtype=dtype)
         cos_dist = g.op.Min(
-            g.op.Max(cos_dist, zero, name=f"{name}_cos_lo"),
-            two,
-            name=f"{name}_cos_hi",
+            g.op.Max(cos_dist, zero, name=f"{name}_cos_lo"), two, name=f"{name}_cos_hi"
         )
         return cos_dist
 
@@ -186,10 +173,7 @@ def _compute_pairwise_distances(
         diff = g.op.Sub(x_3d, c_3d, name=f"{name}_diff")  # (N, M, F)
         abs_diff = g.op.Abs(diff, name=f"{name}_abs")  # (N, M, F)
         return g.op.ReduceSum(
-            abs_diff,
-            np.array([2], dtype=np.int64),
-            keepdims=0,
-            name=f"{name}_l1",
+            abs_diff, np.array([2], dtype=np.int64), keepdims=0, name=f"{name}_l1"
         )  # (N, M)
 
     if metric == "chebyshev":
@@ -200,10 +184,7 @@ def _compute_pairwise_distances(
         diff = g.op.Sub(x_3d, c_3d, name=f"{name}_diff")  # (N, M, F)
         abs_diff = g.op.Abs(diff, name=f"{name}_abs")  # (N, M, F)
         return g.op.ReduceMax(
-            abs_diff,
-            np.array([2], dtype=np.int64),
-            keepdims=0,
-            name=f"{name}_linf",
+            abs_diff, np.array([2], dtype=np.int64), keepdims=0, name=f"{name}_linf"
         )  # (N, M)
 
     if metric == "minkowski":
@@ -228,10 +209,7 @@ def _compute_pairwise_distances(
         inv_p_arr = np.array([1.0 / p], dtype=dtype)
         powered = g.op.Pow(abs_diff, p_arr, name=f"{name}_pow")
         sum_pow = g.op.ReduceSum(
-            powered,
-            np.array([2], dtype=np.int64),
-            keepdims=0,
-            name=f"{name}_sum",
+            powered, np.array([2], dtype=np.int64), keepdims=0, name=f"{name}_sum"
         )
         return g.op.Pow(sum_pow, inv_p_arr, name=f"{name}_root")
 
@@ -335,27 +313,17 @@ def sklearn_knn_classifier(
 
     # 2. k nearest neighbours - values (N, k) and indices (N, k)
     _topk_values, nn_indices = g.op.TopK(
-        dists,
-        np.array([k], dtype=np.int64),
-        axis=1,
-        largest=0,
-        sorted=1,
-        name=f"{name}_topk",
+        dists, np.array([k], dtype=np.int64), axis=1, largest=0, sorted=1, name=f"{name}_topk"
     )
 
     # 3. Gather encoded labels for k neighbours: (N, k)
     neighbor_labels = g.op.Gather(
-        training_labels_encoded,
-        nn_indices,
-        axis=0,
-        name=f"{name}_gather",
+        training_labels_encoded, nn_indices, axis=0, name=f"{name}_gather"
     )
 
     # 4. Flatten to (N*k,) then one-hot encode to (N*k, n_classes)
     flat_labels = g.op.Reshape(
-        neighbor_labels,
-        np.array([-1], dtype=np.int64),
-        name=f"{name}_flat",
+        neighbor_labels, np.array([-1], dtype=np.int64), name=f"{name}_flat"
     )
     one_hot = g.op.OneHot(
         flat_labels,
@@ -367,27 +335,17 @@ def sklearn_knn_classifier(
 
     # 5. Reshape to (N, k, n_classes) and sum votes: (N, n_classes)
     one_hot_3d = g.op.Reshape(
-        one_hot,
-        np.array([-1, k, n_classes], dtype=np.int64),
-        name=f"{name}_3d",
+        one_hot, np.array([-1, k, n_classes], dtype=np.int64), name=f"{name}_3d"
     )
     vote_counts = g.op.ReduceSum(
-        one_hot_3d,
-        np.array([1], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_votes",
+        one_hot_3d, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_votes"
     )  # (N, n_classes)
     # Ensure float type is propagated for downstream Div node.
     assert isinstance(vote_counts, str)
     g.set_type(vote_counts, onnx.TensorProto.FLOAT)
 
     # 6. Predicted class index: (N,) int64
-    class_idx = g.op.ArgMax(
-        vote_counts,
-        axis=1,
-        keepdims=0,
-        name=f"{name}_argmax",
-    )
+    class_idx = g.op.ArgMax(vote_counts, axis=1, keepdims=0, name=f"{name}_argmax")
 
     # 7. Map back to the actual class labels: (N,)
     if np.issubdtype(classes_arr.dtype, np.integer):
@@ -396,11 +354,7 @@ def sklearn_knn_classifier(
         classes_init = classes_arr
 
     labels = g.op.Gather(
-        classes_init,
-        class_idx,
-        axis=0,
-        name=f"{name}_labels",
-        outputs=outputs[:1],
+        classes_init, class_idx, axis=0, name=f"{name}_labels", outputs=outputs[:1]
     )
     assert isinstance(labels, str)
     if not sts:
@@ -415,17 +369,9 @@ def sklearn_knn_classifier(
     if n_out >= 2:
         # Probabilities: normalise vote counts → (N, n_classes) in [0, 1]
         total = g.op.ReduceSum(
-            vote_counts,
-            np.array([1], dtype=np.int64),
-            keepdims=1,
-            name=f"{name}_total",
+            vote_counts, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_total"
         )  # (N, 1)
-        probabilities = g.op.Div(
-            vote_counts,
-            total,
-            name=f"{name}_proba",
-            outputs=outputs[1:2],
-        )
+        probabilities = g.op.Div(vote_counts, total, name=f"{name}_proba", outputs=outputs[1:2])
         assert isinstance(probabilities, str)
         if not sts:
             g.set_type(probabilities, onnx.TensorProto.FLOAT)
@@ -499,21 +445,11 @@ def sklearn_knn_regressor(
 
     # 2. k nearest neighbour indices: (N, k)
     _topk_values, nn_indices = g.op.TopK(
-        dists,
-        np.array([k], dtype=np.int64),
-        axis=1,
-        largest=0,
-        sorted=1,
-        name=f"{name}_topk",
+        dists, np.array([k], dtype=np.int64), axis=1, largest=0, sorted=1, name=f"{name}_topk"
     )
 
     # 3. Gather regression targets for k neighbours: (N, k)
-    neighbor_targets = g.op.Gather(
-        training_targets,
-        nn_indices,
-        axis=0,
-        name=f"{name}_gather",
-    )
+    neighbor_targets = g.op.Gather(training_targets, nn_indices, axis=0, name=f"{name}_gather")
 
     # 4. Average over k neighbours: (N,)
     predictions = g.op.ReduceMean(
