@@ -49,7 +49,7 @@ def _to_model(attn, hs, cos, sin, mask=None, target_opset=22):
     the graph output, and returns the resulting :class:`onnx.ModelProto`.
     """
     from yobx.xbuilder import GraphBuilder
-    from yobx.torch.in_transformers.models import llama_attention_to_onnx
+    from yobx.torch.in_transformers.classes import llama_attention_to_onnx
     from yobx.torch.torch_helper import torch_dtype_to_onnx_dtype
 
     if isinstance(target_opset, int):
