@@ -508,9 +508,29 @@ def _set_shape_type_op_any_castlike(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_compress(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Compress."
-    return set_type_shape_binary_op(
-        self, node.output[0], node.input[0], itype=self.get_type(node.input[0])
-    )
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    att = self.get_attribute(node, "axis", exc=False)
+    if att is not None:
+        axis = att.i
+        if self.has_shape(node.input[0]):
+            shape = list(self.get_shape(node.input[0]))
+            if axis < 0:
+                axis = len(shape) + axis
+            shape[axis] = self.unique_dimension_name("NEWDIM_compress")
+            new_shape = tuple(shape)
+            self.set_shape(node.output[0], new_shape)
+            return new_shape
+        if self.has_rank(node.input[0]):
+            self.set_rank(node.output[0], self.get_rank(node.input[0]))
+            return True
+    else:
+        # No axis: input is flattened first, output is 1-D with unknown size
+        new_shape = (self.unique_dimension_name("NEWDIM_compress"),)
+        self.set_shape(node.output[0], new_shape)
+        return new_shape
 
 
 def _set_shape_type_op_any_concat(self: ShapeBuilder, node: NodeProto):

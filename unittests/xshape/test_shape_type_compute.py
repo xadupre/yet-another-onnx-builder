@@ -607,6 +607,38 @@ class TestShapeTypeCompute(ExtTestCase):
         b = BasicShapeBuilder()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
+        # No axis: input is flattened, output is 1-D with unknown size
+        self.assertEqual(b.get_rank("Y"), 1)
+
+    def test_op_compress_axis0(self):
+        model = _make_model(
+            [oh.make_node("Compress", ["X", "cond"], ["Y"], axis=0)],
+            [_mkv_("X", TFLOAT, [3, 4]), _mkv_("cond", TBOOL, [3])],
+            [_mkv_("Y", TFLOAT, [None, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        # axis=0: same rank, axis dim is unknown, other dims preserved
+        self.assertEqual(b.get_rank("Y"), 2)
+        shape = b.get_shape("Y")
+        self.assertIsInstance(shape[0], str)
+        self.assertEqual(shape[1], 4)
+
+    def test_op_compress_axis1(self):
+        model = _make_model(
+            [oh.make_node("Compress", ["X", "cond"], ["Y"], axis=1)],
+            [_mkv_("X", TFLOAT, [3, 4]), _mkv_("cond", TBOOL, [4])],
+            [_mkv_("Y", TFLOAT, [3, None])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        # axis=1: same rank, axis dim is unknown, other dims preserved
+        self.assertEqual(b.get_rank("Y"), 2)
+        shape = b.get_shape("Y")
+        self.assertEqual(shape[0], 3)
+        self.assertIsInstance(shape[1], str)
 
     def test_op_concat(self):
         model = _make_model(
