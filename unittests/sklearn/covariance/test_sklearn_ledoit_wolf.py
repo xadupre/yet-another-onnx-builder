@@ -46,11 +46,32 @@ class TestLedoitWolf(ExtTestCase):
         X = self._make_data(seed=1)
         self._check(LedoitWolf(assume_centered=True), X)
 
-    def test_ledoit_wolf_float64(self):
+    def test_ledoit_wolf_float32(self):
         from sklearn.covariance import LedoitWolf
         from yobx.sklearn import to_onnx
 
         rng = np.random.default_rng(2)
+        X = rng.standard_normal((40, 3)).astype(np.float32)
+        lw = LedoitWolf()
+        lw.fit(X)
+        onx = to_onnx(lw, (X,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        mahal_onnx = results[0]
+
+        expected = lw.mahalanobis(X).astype(np.float32)
+        self.assertEqualArray(expected, mahal_onnx, atol=1e-4)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected, ort_results[0], atol=1e-4)
+
+    def test_ledoit_wolf_float64(self):
+        from sklearn.covariance import LedoitWolf
+        from yobx.sklearn import to_onnx
+
+        rng = np.random.default_rng(3)
         X = rng.standard_normal((40, 3)).astype(np.float64)
         lw = LedoitWolf()
         lw.fit(X)
@@ -62,6 +83,10 @@ class TestLedoitWolf(ExtTestCase):
 
         expected = lw.mahalanobis(X)
         self.assertEqualArray(expected, mahal_onnx, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected, ort_results[0], atol=1e-5)
 
     def test_ledoit_wolf_op_types(self):
         from sklearn.covariance import LedoitWolf
