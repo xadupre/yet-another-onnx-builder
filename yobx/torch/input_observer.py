@@ -640,9 +640,17 @@ class InputObserverInfo:
         if dim_names is True:
             dim_names = self._build_auto_dim_names(shape_lists, dynamic_shapes)
 
+        # Ensure _position_to_args_kwargs is built before using it below.
+        self._best_candidate.build_mappings()
+
         flat_dynamic_shapes = [
-            {dim: torch.export.Dim.DYNAMIC for dim in dims}
-            for dims in dynamic_shapes
+            {
+                dim: self._resolve_dim_label(
+                    self._best_candidate._position_to_args_kwargs[flat_idx], dim, dim_names
+                )
+                for dim in dims
+            }
+            for flat_idx, dims in enumerate(dynamic_shapes)
         ]
         if return_flat:
             return tuple(flat_dynamic_shapes)
@@ -658,55 +666,46 @@ class InputObserverInfo:
                 and not self.args_name_and_position
             ):
                 # only positional arguments
-                return self._post_process_dim_names(tuple(flat_dynamic_shapes), dim_names)
+                return tuple(flat_dynamic_shapes)
             if not self._best_candidate.args:
                 # only named arguments
                 ds = dict(zip(list(self._best_candidate.kwargs), flat_dynamic_shapes))
-                return self._post_process_dim_names(
-                    self._post_process_for_kwargs(
-                        {**ds, **dict.fromkeys(self._best_candidate.cst_kwargs, None)}
-                    ),
-                    dim_names,
+                return self._post_process_for_kwargs(
+                    {**ds, **dict.fromkeys(self._best_candidate.cst_kwargs, None)}
                 )
             if not self.args_name_and_position:
                 # positional arguments needs to be moved to the named arguments
                 n_args = len(self._best_candidate.args)
                 pos_names = self.signature_names[:n_args]
-                return self._post_process_dim_names(
-                    self._post_process_for_kwargs(
-                        {
-                            **dict(zip(pos_names, flat_dynamic_shapes[:n_args])),
-                            **dict(
-                                zip(
-                                    list(self._best_candidate.kwargs),
-                                    flat_dynamic_shapes[n_args:],
-                                )
-                            ),
-                            **dict.fromkeys(self._best_candidate.cst_kwargs, None),
-                        }
-                    ),
-                    dim_names,
+                return self._post_process_for_kwargs(
+                    {
+                        **dict(zip(pos_names, flat_dynamic_shapes[:n_args])),
+                        **dict(
+                            zip(
+                                list(self._best_candidate.kwargs),
+                                flat_dynamic_shapes[n_args:],
+                            )
+                        ),
+                        **dict.fromkeys(self._best_candidate.cst_kwargs, None),
+                    }
                 )
             # positional arguments needs to be moved to the named arguments
             n_args = min(len(self._best_candidate.args), self.args_name_and_position[1])
             i_kwargs = max(len(self._best_candidate.args), self.args_name_and_position[1])
             var_pos = self.args_name_and_position[0]
             pos_names = self.signature_names[:n_args]
-            return self._post_process_dim_names(
-                self._post_process_for_kwargs(
-                    {
-                        **dict(zip(pos_names, flat_dynamic_shapes[:n_args])),
-                        var_pos: tuple(flat_dynamic_shapes[n_args:i_kwargs]),
-                        **dict(
-                            zip(
-                                list(self._best_candidate.kwargs),
-                                flat_dynamic_shapes[i_kwargs:],
-                            )
-                        ),
-                        **dict.fromkeys(self._best_candidate.cst_kwargs, None),
-                    }
-                ),
-                dim_names,
+            return self._post_process_for_kwargs(
+                {
+                    **dict(zip(pos_names, flat_dynamic_shapes[:n_args])),
+                    var_pos: tuple(flat_dynamic_shapes[n_args:i_kwargs]),
+                    **dict(
+                        zip(
+                            list(self._best_candidate.kwargs),
+                            flat_dynamic_shapes[i_kwargs:],
+                        )
+                    ),
+                    **dict.fromkeys(self._best_candidate.cst_kwargs, None),
+                }
             )
 
         # nested types, here comes the fun part because the shapes cannot be unflattened,
@@ -748,30 +747,22 @@ class InputObserverInfo:
                 **dict.fromkeys(self._best_candidate.cst_kwargs, None),
             }
         if not ds_kwargs and not self.args_name_and_position:
-            return self._post_process_dim_names(tuple(ds_args), dim_names)
+            return tuple(ds_args)
         if not ds_args:
-            return self._post_process_dim_names(
-                self._post_process_for_kwargs(ds_kwargs), dim_names
-            )
+            return self._post_process_for_kwargs(ds_kwargs)
 
         if not self.args_name_and_position:
             pos_names = self.signature_names[: len(ds_args)]
-            return self._post_process_dim_names(
-                self._post_process_for_kwargs({**dict(zip(pos_names, ds_args)), **ds_kwargs}),
-                dim_names,
-            )
+            return self._post_process_for_kwargs({**dict(zip(pos_names, ds_args)), **ds_kwargs})
 
         n_args = min(len(ds_args), self.args_name_and_position[1])
         pos_names = self.signature_names[:n_args]
-        return self._post_process_dim_names(
-            self._post_process_for_kwargs(
-                {
-                    **dict(zip(pos_names, ds_args[:n_args])),
-                    self.args_name_and_position[0]: tuple(ds_args[n_args:]),
-                    **ds_kwargs,
-                }
-            ),
-            dim_names,
+        return self._post_process_for_kwargs(
+            {
+                **dict(zip(pos_names, ds_args[:n_args])),
+                self.args_name_and_position[0]: tuple(ds_args[n_args:]),
+                **ds_kwargs,
+            }
         )
 
     def infer_arguments(
@@ -946,61 +937,46 @@ class InputObserverInfo:
             )
         return {**new_kwargs, self.kwargs_name: keywords}
 
-    def _post_process_dim_names(
+    def _resolve_dim_label(
         self,
-        result: tuple | dict,
+        arg_or_kwarg: int | str,
+        dim: int,
         dim_names: dict[str | int, dict[int, str]] | None,
-    ) -> tuple | dict:
-        """Apply *dim_names* labels to the structured dynamic-shapes result.
+    ) -> Any:
+        """Returns the string label or ``torch.export.Dim.DYNAMIC`` for a dynamic dimension.
 
-        Called at every return point of :meth:`infer_dynamic_shapes` (except
-        the internal ``return_flat`` path) to substitute ``torch.export.Dim.DYNAMIC``
-        placeholders with string labels wherever *dim_names* specifies one.
+        Used directly when constructing ``flat_dynamic_shapes`` in
+        :meth:`infer_dynamic_shapes` so that string labels are embedded into the
+        per-tensor shape dicts as soon as they are built, rather than as a
+        post-processing step.
 
         Args:
-            result: The structured dynamic-shapes result — either a ``tuple``
-                (positional-only args) or a ``dict`` (named args).
-            dim_names: Mapping from input identifier (name ``str`` or position
-                ``int``) to ``{dim_index: label}`` dict, as received by
-                :meth:`infer_dynamic_shapes`.  ``None`` or empty → no-op.
+            arg_or_kwarg: The positional index (``int``) or keyword name (``str``)
+                that identifies which input this tensor belongs to, as stored in
+                ``InputCandidate._position_to_args_kwargs``.
+            dim: Dimension index within the tensor.
+            dim_names: Mapping from input identifier to per-dimension string labels,
+                as passed to :meth:`infer_dynamic_shapes`.  ``None`` or empty
+                → always returns ``torch.export.Dim.DYNAMIC``.
 
         Returns:
-            The same structure with dynamic-dimension values replaced by the
-            corresponding string labels wherever a match is found.
+            A string label when *dim_names* provides one for this input and dimension,
+            otherwise ``torch.export.Dim.DYNAMIC``.
         """
         if not dim_names:
-            return result
-
-        def _apply(shape_val: Any, per_input_names: dict[int, str]) -> Any:
-            """Recursively substitute dim values in a shape dict or nested container."""
-            if isinstance(shape_val, dict):
-                return {d: per_input_names.get(d, v) for d, v in shape_val.items()}
-            if isinstance(shape_val, tuple):
-                return tuple(_apply(v, per_input_names) for v in shape_val)
-            if isinstance(shape_val, list):
-                return [_apply(v, per_input_names) for v in shape_val]
-            return shape_val
-
-        if isinstance(result, tuple):
-            new_parts: list[Any] = []
-            for pos, shape in enumerate(result):
-                per_input = dim_names.get(pos)
-                if per_input is None and pos < len(self.signature_names):
-                    per_input = dim_names.get(self.signature_names[pos])
-                new_parts.append(_apply(shape, per_input) if per_input else shape)
-            return tuple(new_parts)
-
-        new_result: dict[str, Any] = {}
-        for key, shape in result.items():
-            per_input = dim_names.get(key)
-            if per_input is None and isinstance(key, str):
-                try:
-                    pos = self.signature_names.index(key)
-                    per_input = dim_names.get(pos)
-                except ValueError:
-                    pass
-            new_result[key] = _apply(shape, per_input) if per_input else shape
-        return new_result
+            return torch.export.Dim.DYNAMIC
+        per_input = dim_names.get(arg_or_kwarg)
+        if per_input is None and isinstance(arg_or_kwarg, int):
+            sig_name = (
+                self.signature_names[arg_or_kwarg]
+                if arg_or_kwarg < len(self.signature_names)
+                else None
+            )
+            if sig_name is not None:
+                per_input = dim_names.get(sig_name)
+        if per_input is None or dim not in per_input:
+            return torch.export.Dim.DYNAMIC
+        return per_input[dim]
 
     def _build_auto_dim_names(
         self,
