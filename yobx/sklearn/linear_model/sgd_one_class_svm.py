@@ -1,7 +1,6 @@
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
-import onnx
 from sklearn.linear_model import SGDOneClassSVM
 
 from ..register import register_sklearn_converter

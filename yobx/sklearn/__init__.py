@@ -36,6 +36,7 @@ def register_sklearn_converters():
         # already done
         return
     from .calibration import register as register_calibration
+    from .category_encoders import register as register_category_encoders
     from .cluster import register as register_cluster
     from .compose import register as register_compose
     from .covariance import register as register_covariance
@@ -66,6 +67,7 @@ def register_sklearn_converters():
     from .xgboost import register as register_xgboost
 
     register_calibration()
+    register_category_encoders()
     register_cluster()
     register_compose()
     register_covariance()

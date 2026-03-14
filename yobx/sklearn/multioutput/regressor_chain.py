@@ -92,9 +92,7 @@ def sklearn_regressor_chain(
     if len(per_chain_preds) == 1:
         chain_preds = g.op.Identity(per_chain_preds[0], name=f"{name}_chain")
     else:
-        chain_preds = g.op.Concat(
-            *per_chain_preds, axis=1, name=f"{name}_chain_concat"
-        )
+        chain_preds = g.op.Concat(*per_chain_preds, axis=1, name=f"{name}_chain_concat")
 
     if not g.has_type(chain_preds):
         g.set_type(chain_preds, itype)

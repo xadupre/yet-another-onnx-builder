@@ -606,6 +606,42 @@ def requires_xgboost(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
+def has_category_encoders(version: str = "") -> bool:
+    "Returns True if category_encoders is installed and its version is high enough."
+    import packaging.version as pv
+
+    try:
+        import category_encoders
+    except (ImportError, AttributeError):
+        return False
+    if not hasattr(category_encoders, "__version__"):
+        return False
+    if not version:
+        return True
+    return pv.Version(category_encoders.__version__) >= pv.Version(version)
+
+
+def requires_category_encoders(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`category_encoders` is not recent enough."""
+    try:
+        import category_encoders
+    except (AttributeError, ImportError):
+        return unittest.skip(msg or "category_encoders not installed")
+
+    if not hasattr(category_encoders, "__version__"):
+        return unittest.skip(msg or "category_encoders not installed")
+
+    if not version:
+        return lambda x: x
+
+    import packaging.version as pv
+
+    if pv.Version(category_encoders.__version__) < pv.Version(version):
+        msg = f"category_encoders version {category_encoders.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def has_lightgbm(version: str = "") -> bool:
     "Returns True if LightGBM is installed and its version is high enough."
     import packaging.version as pv

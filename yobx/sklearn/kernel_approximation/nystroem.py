@@ -50,9 +50,7 @@ def sklearn_nystroem(
     :raises NotImplementedError: for callable kernels, ``kernel='precomputed'``,
         or unsupported kernel names
     """
-    assert isinstance(estimator, Nystroem), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(estimator, Nystroem), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     kernel = estimator.kernel

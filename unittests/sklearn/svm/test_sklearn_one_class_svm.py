@@ -96,9 +96,7 @@ class TestSklearnOneClassSVM(ExtTestCase):
 
             clear_mask = np.abs(expected_scores) > 1e-3
             if clear_mask.any():
-                self.assertEqualArray(
-                    clf.predict(Xd)[clear_mask], ort_results[0][clear_mask]
-                )
+                self.assertEqualArray(clf.predict(Xd)[clear_mask], ort_results[0][clear_mask])
 
     def test_one_class_svm_poly_kernel(self):
         self._check_one_class_svm(self._X, kernel="poly")
