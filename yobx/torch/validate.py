@@ -19,7 +19,7 @@ DEFAULT_PROMPT = "Continue: it rains, what should I do?"
 def validate_model(
     model_id: str,
     prompt: str = DEFAULT_PROMPT,
-    exporter: str = "custom",
+    exporter: str = "yobx",
     optimization: Optional[str] = "default",
     verbose: int = 0,
     dump_folder: Optional[str] = None,
@@ -50,7 +50,7 @@ def validate_model(
     :param model_id: HuggingFace model id, e.g. ``"arnir0/Tiny-LLM"``
     :param prompt: Text prompt used to drive the generation step.
         Defaults to :data:`DEFAULT_PROMPT`.
-    :param exporter: ONNX exporter to use, e.g. ``"custom"`` (default),
+    :param exporter: ONNX exporter to use, e.g. ``"yobx"`` (default),
         ``"onnx-dynamo"``, or ``"modelbuilder"``.
     :param optimization: Optimisation level applied after export.
         Passed directly to :func:`yobx.torch.to_onnx`.  ``None`` means no

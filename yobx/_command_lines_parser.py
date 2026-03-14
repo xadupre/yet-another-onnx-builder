@@ -765,9 +765,9 @@ def get_parser_validate() -> ArgumentParser:
     parser.add_argument(
         "-e",
         "--export",
-        default="custom",
+        default="yobx",
         type=str,
-        help="ONNX exporter to use (default: 'custom').",
+        help="ONNX exporter to use (default: 'yobx').",
     )
     parser.add_argument(
         "--opt",
