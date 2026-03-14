@@ -1,6 +1,10 @@
 yet-another-onnx-builder documentation
 ======================================
 
+.. image:: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_core.yml/badge.svg
+    :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_core.yml
+    :alt: core
+
 .. image:: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_sklearn.yml/badge.svg
     :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_sklearn.yml
     :alt: scikit-learn

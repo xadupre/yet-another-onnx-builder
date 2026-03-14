@@ -606,6 +606,42 @@ def requires_xgboost(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
+def has_category_encoders(version: str = "") -> bool:
+    "Returns True if category_encoders is installed and its version is high enough."
+    import packaging.version as pv
+
+    try:
+        import category_encoders
+    except (ImportError, AttributeError):
+        return False
+    if not hasattr(category_encoders, "__version__"):
+        return False
+    if not version:
+        return True
+    return pv.Version(category_encoders.__version__) >= pv.Version(version)
+
+
+def requires_category_encoders(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`category_encoders` is not recent enough."""
+    try:
+        import category_encoders
+    except (AttributeError, ImportError):
+        return unittest.skip(msg or "category_encoders not installed")
+
+    if not hasattr(category_encoders, "__version__"):
+        return unittest.skip(msg or "category_encoders not installed")
+
+    if not version:
+        return lambda x: x
+
+    import packaging.version as pv
+
+    if pv.Version(category_encoders.__version__) < pv.Version(version):
+        msg = f"category_encoders version {category_encoders.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def has_lightgbm(version: str = "") -> bool:
     "Returns True if LightGBM is installed and its version is high enough."
     import packaging.version as pv
@@ -1392,23 +1428,26 @@ class ExtTestCase(unittest.TestCase):
         self.assertEqualArray(expected, value, atol=atol, rtol=rtol, msg=msg)
 
     def check_ort(
-        self, onx: "onnx.ModelProto"  # noqa: F821
+        self, onx: Union["onnx.ModelProto", str]  # noqa: F821
     ) -> "onnxruntime.InferenceSession":  # noqa: F821
         return self._check_with_ort(onx, cpu=True)
 
     def _check_with_ort(
-        self, proto: "onnx.ModelProto", cpu: bool = False  # noqa: F821
+        self, proto: Union["onnx.ModelProto", str], cpu: bool = False  # noqa: F821
     ) -> "onnxruntime.InferenceSession":  # noqa: F821
         from onnxruntime import InferenceSession, get_available_providers
 
         providers = ["CPUExecutionProvider"]
         if not cpu and "CUDAExecutionProvider" in get_available_providers():
             providers.insert(0, "CUDAExecutionProvider")
-        return InferenceSession(proto.SerializeToString(), providers=providers)
+        return InferenceSession(
+            proto.SerializeToString() if hasattr(proto, "SerializeToString") else proto,
+            providers=providers,
+        )
 
     def make_inference_session(
         self,
-        onx: "onnx.ModelProto",  # noqa: F821
+        onx: Union["onnx.ModelProto", str],  # noqa: F821
         cpu: bool = True,
     ) -> "onnxruntime.InferenceSession":  # noqa: F821
         return self._check_with_ort(onx, cpu=cpu)

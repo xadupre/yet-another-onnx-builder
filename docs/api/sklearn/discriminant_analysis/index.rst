@@ -6,3 +6,4 @@ yobx.sklearn.discriminant_analysis
     :caption: modules
 
     lda
+    qda

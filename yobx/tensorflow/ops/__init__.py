@@ -10,6 +10,7 @@ def register():
     from . import nn_ops  # noqa: F401
     from . import padding  # noqa: F401
     from . import pooling  # noqa: F401
+    from . import random_ops  # noqa: F401
     from . import reduction_ops  # noqa: F401
     from . import shape_ops  # noqa: F401
     from . import unary_ops  # noqa: F401
