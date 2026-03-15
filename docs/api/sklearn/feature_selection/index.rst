@@ -9,3 +9,4 @@ yobx.sklearn.feature_selection
     select_fwe
     select_k_best
     select_percentile
+    variance_threshold

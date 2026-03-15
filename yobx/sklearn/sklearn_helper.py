@@ -15,28 +15,15 @@ except ImportError:
     OutlierMixin = None  # type: ignore
 
 
-def _is_cluster_transformer(estimator: BaseEstimator) -> bool:
-    """
-    Returns True for estimators that are ``ClusterMixin`` subclasses whose
-    primary role is *feature transformation* rather than sample clustering.
-
-    Such estimators (e.g. :class:`~sklearn.cluster.FeatureAgglomeration`)
-    produce a single output tensor (the transformed feature matrix) rather
-    than the ``(labels, distances)`` pair produced by regular clustering
-    models.
-    """
-    return isinstance(estimator, FeatureAgglomeration)
-
-
-def _is_selector(estimator: BaseEstimator) -> bool:
-    """Returns True when *estimator* is a feature selector (SelectorMixin)."""
-    return SelectorMixin is not None and isinstance(estimator, SelectorMixin)
-
-
 def _should_use_feature_names(estimator: BaseEstimator) -> bool:
     """Returns True when get_feature_names_out() should drive output naming."""
-    return not isinstance(estimator, ClusterMixin) and (
-        not is_classifier(estimator) or _is_selector(estimator)
+    return (
+        (SelectorMixin is not None and isinstance(estimator, SelectorMixin))
+        or (
+            isinstance(estimator, FeatureAgglomeration)
+            and not isinstance(estimator, ClusterMixin)
+        )
+        or (not isinstance(estimator, ClusterMixin) and not is_classifier(estimator))
     )
 
 
@@ -60,11 +47,11 @@ def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
 
 def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
-    if _is_selector(estimator):
+    if SelectorMixin is not None and isinstance(estimator, SelectorMixin):
         return 1
     if is_classifier(estimator):
         return 2 if _classifier_has_predict_proba(estimator) else 1
-    if _is_cluster_transformer(estimator):
+    if isinstance(estimator, FeatureAgglomeration) and not isinstance(estimator, ClusterMixin):
         return 1
     if isinstance(estimator, (ClusterMixin, BaseMixture, OutlierMixin)):
         return 2
@@ -76,33 +63,14 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
     if hasattr(estimator, "get_feature_names_out"):
         if isinstance(estimator, Pipeline):
             last_step = estimator.steps[-1][1]
-            if (
-                not isinstance(last_step, ClusterMixin) or _is_cluster_transformer(last_step)
-            ) and not is_classifier(last_step):
-                try:
-                    return post_process_output_names(
-                        last_step, list(last_step.get_feature_names_out())
-                    )
-                except AttributeError:
-                    pass
-        elif (
-            not isinstance(estimator, ClusterMixin) or _is_cluster_transformer(estimator)
-        ) and not is_classifier(estimator):
-            try:
+            if _should_use_feature_names(last_step):
                 return post_process_output_names(
-                    estimator, list(estimator.get_feature_names_out())
+                    last_step, list(last_step.get_feature_names_out())
                 )
-            except AttributeError:
-                pass
         elif _should_use_feature_names(estimator):
-            try:
-                return post_process_output_names(
-                    estimator, list(estimator.get_feature_names_out())
-                )
-            except AttributeError:
-                pass
+            return post_process_output_names(estimator, list(estimator.get_feature_names_out()))
 
-    if _is_selector(estimator):
+    if SelectorMixin is not None and isinstance(estimator, SelectorMixin):
         return ["Y"]
     if is_classifier(estimator):
         if _classifier_has_predict_proba(estimator):
@@ -119,7 +87,7 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
     last = estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
     if OutlierMixin is not None and isinstance(last, OutlierMixin):
         return ["label", "scores"]
-    if isinstance(last, ClusterMixin) and not _is_cluster_transformer(last):
+    if isinstance(last, ClusterMixin) and not isinstance(last, FeatureAgglomeration):
         return ["label", "distances"]
     if isinstance(last, BaseMixture):
         return ["label", "probabilities"]

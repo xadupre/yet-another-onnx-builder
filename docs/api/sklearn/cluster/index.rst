@@ -11,3 +11,4 @@ yobx.sklearn.cluster
     feature_agglomeration
     kmeans
     mean_shift
+    mini_batch_kmeans
