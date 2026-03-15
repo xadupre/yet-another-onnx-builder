@@ -1,7 +1,13 @@
 from typing import Sequence
 from sklearn.base import BaseEstimator, ClusterMixin, OutlierMixin, is_classifier, is_regressor
+from sklearn.cluster import FeatureAgglomeration
 from sklearn.mixture._base import BaseMixture
 from sklearn.pipeline import Pipeline
+
+try:
+    from sklearn.feature_selection._base import SelectorMixin
+except ImportError:
+    SelectorMixin = None  # type: ignore
 
 try:
     from sklearn.base import OutlierMixin
@@ -9,74 +15,37 @@ except ImportError:
     OutlierMixin = None  # type: ignore
 
 
-def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
-    """
-    Returns True when *estimator* is a fitted classifier that genuinely
-    supports :meth:`predict_proba`.
-
-    For most classifiers, checking ``hasattr(estimator, 'predict_proba')``
-    is sufficient.  However, :class:`sklearn.linear_model.SGDClassifier`
-    (and its subclasses such as :class:`~sklearn.linear_model.Perceptron`)
-    defines ``predict_proba`` as a method that raises :exc:`AttributeError`
-    at runtime for non-probabilistic loss functions (e.g. ``'hinge'``).
-    Because Python's ``hasattr`` catches :exc:`AttributeError`, it returns
-    ``False`` in those cases — so the plain ``hasattr`` check already works
-    correctly for fitted :class:`~sklearn.linear_model.SGDClassifier`
-    instances.
-    """
-    return hasattr(estimator, "predict_proba")
+def _should_use_feature_names(estimator: BaseEstimator) -> bool:
+    """Returns True when get_feature_names_out() should drive output naming."""
+    return (
+        (SelectorMixin is not None and isinstance(estimator, SelectorMixin))
+        or isinstance(estimator, FeatureAgglomeration)
+        or (not isinstance(estimator, ClusterMixin) and not is_classifier(estimator))
+    )
 
 
 def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
+    if SelectorMixin is not None and isinstance(estimator, SelectorMixin):
+        return 1
     if is_classifier(estimator):
-        return 2 if _classifier_has_predict_proba(estimator) else 1
-    if isinstance(estimator, (ClusterMixin, BaseMixture, OutlierMixin)):
+        return 2 if hasattr(estimator, "predict_proba") else 1
+    if isinstance(estimator, FeatureAgglomeration):
+        return 1
+    if isinstance(estimator, (ClusterMixin, BaseMixture)) or (
+        OutlierMixin is not None and isinstance(estimator, OutlierMixin)
+    ):
         return 2
+    # For Pipelines, check the last step explicitly (mirrors get_output_names fallback).
+    if isinstance(estimator, Pipeline):
+        last = estimator.steps[-1][1]
+        if isinstance(last, FeatureAgglomeration):
+            return 1
+        if isinstance(last, (ClusterMixin, BaseMixture)) or (
+            OutlierMixin is not None and isinstance(last, OutlierMixin)
+        ):
+            return 2
     return 1
-
-
-def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
-    """Returns output names for every estimator."""
-    if hasattr(estimator, "get_feature_names_out"):
-        if isinstance(estimator, Pipeline):
-            last_step = estimator.steps[-1][1]
-            if not isinstance(last_step, ClusterMixin) and not is_classifier(last_step):
-                try:
-                    return post_process_output_names(
-                        last_step, list(last_step.get_feature_names_out())
-                    )
-                except AttributeError:
-                    pass
-        elif not isinstance(estimator, ClusterMixin) and not is_classifier(estimator):
-            try:
-                return post_process_output_names(
-                    estimator, list(estimator.get_feature_names_out())
-                )
-            except AttributeError:
-                pass
-    if is_classifier(estimator):
-        if _classifier_has_predict_proba(estimator):
-            return ["label", "probabilities"]
-        return ["label"]
-    if OutlierMixin is not None and isinstance(estimator, OutlierMixin):
-        return ["label", "scores"]
-    if isinstance(estimator, BaseMixture):
-        return ["label", "probabilities"]
-    if isinstance(estimator, OutlierMixin):
-        return ["label", "scores"]
-    if is_regressor(estimator):
-        return ["predictions"]
-    last = estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
-    if OutlierMixin is not None and isinstance(last, OutlierMixin):
-        return ["label", "scores"]
-    if isinstance(last, ClusterMixin):
-        return ["label", "distances"]
-    if isinstance(last, BaseMixture):
-        return ["label", "probabilities"]
-    if isinstance(last, OutlierMixin):
-        return ["label", "scores"]
-    return ["Y"]
 
 
 def post_process_output_names(
@@ -91,6 +60,52 @@ def post_process_output_names(
     raise NotImplementedError(
         f"Not implemented with {output_names=}, {n_outputs=} and estimator is {type(estimator)}."
     )
+
+
+def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
+    """Returns output names for every estimator."""
+    if hasattr(estimator, "get_feature_names_out"):
+        if isinstance(estimator, Pipeline):
+            last_step = estimator.steps[-1][1]
+            if _should_use_feature_names(last_step):
+                try:
+                    return post_process_output_names(
+                        last_step, list(last_step.get_feature_names_out())
+                    )
+                except AttributeError:
+                    pass
+        elif _should_use_feature_names(estimator):
+            try:
+                return post_process_output_names(
+                    estimator, list(estimator.get_feature_names_out())
+                )
+            except AttributeError:
+                pass
+
+    if SelectorMixin is not None and isinstance(estimator, SelectorMixin):
+        return ["Y"]
+    if is_classifier(estimator):
+        if hasattr(estimator, "predict_proba"):
+            return ["label", "probabilities"]
+        return ["label"]
+    if OutlierMixin is not None and isinstance(estimator, OutlierMixin):
+        return ["label", "scores"]
+    if isinstance(estimator, BaseMixture):
+        return ["label", "probabilities"]
+    if isinstance(estimator, OutlierMixin):
+        return ["label", "scores"]
+    if is_regressor(estimator):
+        return ["predictions"]
+    last = estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
+    if OutlierMixin is not None and isinstance(last, OutlierMixin):
+        return ["label", "scores"]
+    if isinstance(last, ClusterMixin) and not isinstance(last, FeatureAgglomeration):
+        return ["label", "distances"]
+    if isinstance(last, BaseMixture):
+        return ["label", "probabilities"]
+    if isinstance(last, OutlierMixin):
+        return ["label", "scores"]
+    return ["Y"]
 
 
 def _longest_prefix(s1: str, s2: str) -> str:
