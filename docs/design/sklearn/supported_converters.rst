@@ -8,8 +8,9 @@ The following :epkg:`scikit-learn` estimators and transformers have a
 registered converter in :mod:`yobx.sklearn`.  The list is generated
 programmatically from the live converter registry.  External-library
 estimators from :epkg:`lightgbm`, :epkg:`xgboost`, and
-:epkg:`category_encoders` are always listed; see
-:ref:`l-design-sklearn-like-converters` for architecture details.
+:epkg:`category_encoders` are listed when the corresponding optional
+dependencies are installed; see :ref:`l-design-sklearn-like-converters`
+for architecture details.
 
 Coverage Table
 ==============
