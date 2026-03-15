@@ -40,10 +40,12 @@ def register_sklearn_converters():
     from .cluster import register as register_cluster
     from .compose import register as register_compose
     from .covariance import register as register_covariance
+    from .cross_decomposition import register as register_cross_decomposition
     from .decomposition import register as register_decomposition
     from .discriminant_analysis import register as register_discriminant_analysis
     from .dummy import register as register_dummy
     from .ensemble import register as register_ensemble
+    from .feature_extraction import register as register_feature_extraction
     from .feature_selection import register as register_feature_selection
     from .gaussian_process import register as register_gaussian_process
     from .imblearn import register as register_imblearn
@@ -72,10 +74,12 @@ def register_sklearn_converters():
     register_cluster()
     register_compose()
     register_covariance()
+    register_cross_decomposition()
     register_decomposition()
     register_discriminant_analysis()
     register_dummy()
     register_ensemble()
+    register_feature_extraction()
     register_feature_selection()
     register_gaussian_process()
     register_imblearn()
