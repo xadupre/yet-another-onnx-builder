@@ -183,6 +183,7 @@ module = [
     "yobx.sklearn.ensemble.*",
     "yobx.sklearn.feature_extraction.*",
     "yobx.sklearn.gaussian_process.*",
+    "yobx.sklearn.imblearn.*",
     "yobx.sklearn.impute.*",
     "yobx.sklearn.isotonic.*",
     "yobx.sklearn.kernel_ridge.*",

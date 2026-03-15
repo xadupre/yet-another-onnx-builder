@@ -68,8 +68,7 @@ class TestSklearnEasyEnsembleClassifier(ExtTestCase):
             Xd = self._X.astype(dtype)
             clf = EEC(
                 estimator=AdaBoostClassifier(
-                    estimator=DecisionTreeClassifier(max_depth=1, random_state=0),
-                    random_state=0,
+                    estimator=DecisionTreeClassifier(max_depth=1, random_state=0), random_state=0
                 ),
                 n_estimators=3,
                 random_state=0,
