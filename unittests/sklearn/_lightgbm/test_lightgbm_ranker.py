@@ -90,9 +90,11 @@ class TestLGBMRanker(ExtTestCase):
             result["objective"] = "unknown_rank_obj"
             return result
 
-        with patch.object(ranker.booster_, "dump_model", side_effect=patched_dump):
-            with self.assertRaises(NotImplementedError):
-                to_onnx(ranker, (X,))
+        with (
+            patch.object(ranker.booster_, "dump_model", side_effect=patched_dump),
+            self.assertRaises(NotImplementedError),
+        ):
+            to_onnx(ranker, (X,))
 
     def test_lgbm_ranker_dtypes_opsets(self):
         """LGBMRanker: float32/float64 x ai.onnx.ml opset 3 and 5."""
