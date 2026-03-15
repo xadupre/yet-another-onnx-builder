@@ -1,6 +1,6 @@
 """
-ONNX converters for :class:`lightgbm.LGBMClassifier` and
-:class:`lightgbm.LGBMRegressor`.
+ONNX converters for :class:`lightgbm.LGBMClassifier`,
+:class:`lightgbm.LGBMRegressor`, and :class:`lightgbm.LGBMModel`.
 
 The trees are extracted from the fitted booster via
 ``booster_.dump_model()`` and encoded using the ONNX ML
@@ -12,8 +12,8 @@ The trees are extracted from the fitted booster via
   a sigmoid function and assembled into a ``[N, 2]`` probability matrix.
 * **Multi-class classification** — per-class margins are passed through
   softmax to produce a ``[N, n_classes]`` probability matrix.
-* **Regression** — raw margin output with an objective-dependent output
-  transform:
+* **Regression / LGBMModel** — raw margin output with an
+  objective-dependent output transform:
 
   * Identity objectives (``regression``, ``regression_l1``, ``huber``,
     ``quantile``, ``mape``, …): no transform; raw == prediction.
@@ -37,7 +37,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import onnx
 import onnx.helper as oh
-from lightgbm import LGBMRegressor, LGBMClassifier
+from lightgbm import LGBMRegressor, LGBMClassifier, LGBMModel
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
@@ -729,6 +729,87 @@ def sklearn_lgbm_regressor(
     # input is float64 (reference evaluator) or always output float32 (ORT).
     # We normalise by inserting an explicit Cast(→itype) so that both runtimes
     # behave consistently before any output transform is applied.
+    raw_scores = g.make_node("Cast", [raw_scores], outputs=1, name=f"{name}_tree_cast", to=itype)
+
+    # Apply the objective-specific output transform (Exp / identity).
+    if out_transform == "exp":
+        raw_scores = g.op.Exp(raw_scores, name=f"{name}_exp")
+    # out_transform is None → identity, no node needed.
+
+    cast_result = g.make_node(
+        "Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype
+    )
+    return cast_result
+
+
+# ---------------------------------------------------------------------------
+# LGBMModel converter
+# ---------------------------------------------------------------------------
+
+
+@register_sklearn_converter(LGBMModel)
+def sklearn_lgbm_model(
+    g: GraphBuilderExtendedProtocol,
+    sts: Dict,
+    outputs: List[str],
+    estimator,
+    X: str,
+    name: str = "lgbm_model",
+) -> str:
+    """Convert an :class:`lightgbm.LGBMModel` to ONNX.
+
+    :class:`~lightgbm.LGBMModel` is the base class for all LightGBM
+    sklearn-compatible estimators.  Its :meth:`~lightgbm.LGBMModel.predict`
+    method returns raw booster predictions (one value per sample for
+    single-output objectives).
+
+    The raw margin (sum of all tree leaf values) is computed via a
+    ``TreeEnsembleRegressor`` / ``TreeEnsemble`` node, and then an
+    objective-dependent output transform is applied to match
+    :meth:`~lightgbm.LGBMModel.predict`:
+
+    * Identity (``regression``, ``regression_l1``, ``huber``, ``quantile``,
+      ``mape``, …): no transform.
+    * ``poisson``, ``tweedie``: ``exp(margin)``.
+
+    Unsupported objectives raise :class:`NotImplementedError`.
+
+    :param g: the graph builder to add nodes to
+    :param sts: shapes dict (passed through, not used internally)
+    :param outputs: desired output names ``[predictions]``
+    :param estimator: a fitted ``LGBMModel``
+    :param X: input tensor name
+    :param name: prefix for node names added to the graph
+    :return: output tensor name (shape ``[N, 1]``)
+    :raises NotImplementedError: if the model's objective is not supported
+    """
+    booster = estimator.booster_
+    model_dict = booster.dump_model()
+    objective: str = model_dict["objective"]
+
+    # Validate early so the error message is clear before we build any graph.
+    out_transform = _get_reg_output_transform(objective)
+
+    ml_opset = g.get_opset("ai.onnx.ml")
+    itype = g.get_type(X)
+
+    trees = model_dict["tree_info"]
+    tree_out_name = f"{outputs[0]}_tree_out"
+
+    raw_scores = _emit_lgbm_tree_node(
+        g,
+        X,
+        name,
+        n_targets=1,
+        trees=trees,
+        ml_opset=ml_opset,
+        intermediate_name=tree_out_name,
+        itype=itype,
+    )
+
+    # Normalise dtype: insert an explicit Cast(→itype) so both the reference
+    # evaluator (float64) and ORT (float32 by default) behave consistently
+    # before any output transform is applied.
     raw_scores = g.make_node("Cast", [raw_scores], outputs=1, name=f"{name}_tree_cast", to=itype)
 
     # Apply the objective-specific output transform (Exp / identity).
