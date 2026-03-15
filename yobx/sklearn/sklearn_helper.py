@@ -27,27 +27,31 @@ def _should_use_feature_names(estimator: BaseEstimator) -> bool:
     )
 
 
-def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
-    """
-    Returns True when *estimator* is a fitted classifier that genuinely
-    supports :meth:`predict_proba`.
-
-    For most classifiers, checking ``hasattr(estimator, 'predict_proba')``
-    is sufficient.  However, :class:`sklearn.linear_model.SGDClassifier`
-    (and its subclasses such as :class:`~sklearn.linear_model.Perceptron`)
-    defines ``predict_proba`` as a method that raises :exc:`AttributeError`
-    at runtime for non-probabilistic loss functions (e.g. ``'hinge'``).
-    Because Python's ``hasattr`` catches :exc:`AttributeError`, it returns
-    ``False`` in those cases — so the plain ``hasattr`` check already works
-    correctly for fitted :class:`~sklearn.linear_model.SGDClassifier`
-    instances.
-    """
-    return hasattr(estimator, "predict_proba")
-
-
 def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
-    return len(get_output_names(estimator))
+    if SelectorMixin is not None and isinstance(estimator, SelectorMixin):
+        return 1
+    if is_classifier(estimator):
+        return 2 if hasattr(estimator, "predict_proba") else 1
+    if isinstance(estimator, FeatureAgglomeration) and not isinstance(estimator, ClusterMixin):
+        return 1
+    if isinstance(estimator, (ClusterMixin, BaseMixture, OutlierMixin)):
+        return 2
+    return 1
+
+
+def post_process_output_names(
+    estimator: BaseEstimator, output_names: Sequence[str]
+) -> Sequence[str]:
+    """Makes sures the number of outputs is expected."""
+    n_outputs = get_n_expected_outputs(estimator)
+    if len(output_names) == n_outputs:
+        return output_names
+    if n_outputs == 1:
+        return [longest_prefix(output_names)]
+    raise NotImplementedError(
+        f"Not implemented with {output_names=}, {n_outputs=} and estimator is {type(estimator)}."
+    )
 
 
 def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
@@ -65,7 +69,7 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
     if SelectorMixin is not None and isinstance(estimator, SelectorMixin):
         return ["Y"]
     if is_classifier(estimator):
-        if _classifier_has_predict_proba(estimator):
+        if hasattr(estimator, "predict_proba"):
             return ["label", "probabilities"]
         return ["label"]
     if OutlierMixin is not None and isinstance(estimator, OutlierMixin):
@@ -86,20 +90,6 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
     if isinstance(last, OutlierMixin):
         return ["label", "scores"]
     return ["Y"]
-
-
-def post_process_output_names(
-    estimator: BaseEstimator, output_names: Sequence[str]
-) -> Sequence[str]:
-    """Makes sures the number of outputs is expected."""
-    n_outputs = get_n_expected_outputs(estimator)
-    if len(output_names) == n_outputs:
-        return output_names
-    if n_outputs == 1:
-        return [longest_prefix(output_names)]
-    raise NotImplementedError(
-        f"Not implemented with {output_names=}, {n_outputs=} and estimator is {type(estimator)}."
-    )
 
 
 def _longest_prefix(s1: str, s2: str) -> str:
