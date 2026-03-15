@@ -87,9 +87,7 @@ class TestLGBMModel(ExtTestCase):
                     results = ref.run(None, {"X": X})
                     predictions = results[0]
 
-                    expected = (
-                        model.predict(X32).astype(np.float32).astype(dtype).reshape(-1, 1)
-                    )
+                    expected = model.predict(X32).astype(np.float32).astype(dtype).reshape(-1, 1)
                     self.assertEqualArray(expected, predictions, atol=1e-4)
 
                     sess = self.check_ort(onx)
@@ -104,11 +102,7 @@ class TestLGBMModel(ExtTestCase):
         X = rng.standard_normal((50, 4)).astype(np.float32)
         y = rng.poisson(lam=3, size=50).astype(np.float32) + 1.0
         model = LGBMModel(
-            objective="poisson",
-            n_estimators=5,
-            max_depth=3,
-            random_state=0,
-            verbose=-1,
+            objective="poisson", n_estimators=5, max_depth=3, random_state=0, verbose=-1
         )
         model.fit(X, y)
 
@@ -190,9 +184,7 @@ class TestLGBMModel(ExtTestCase):
                     results = ref.run(None, {"X": X})
                     predictions = results[0]
 
-                    expected = (
-                        model.predict(X32).astype(np.float32).astype(dtype).reshape(-1, 1)
-                    )
+                    expected = model.predict(X32).astype(np.float32).astype(dtype).reshape(-1, 1)
                     self.assertEqualArray(expected, predictions, atol=1e-5)
 
                     sess = self.check_ort(onx)

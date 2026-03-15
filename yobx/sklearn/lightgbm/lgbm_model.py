@@ -27,29 +27,17 @@ are supported, as well as ``float32`` and ``float64`` inputs.
 """
 
 from typing import Dict, List, Optional, Union
-import numpy as np
 from lightgbm.sklearn import LGBMModel
 from ...typing import GraphBuilderExtendedProtocol
 from ..register import register_sklearn_converter
-from .lgbm import (
-    _RANK_IDENTITY_OBJECTIVES,
-    _emit_lgbm_tree_node,
-    _get_reg_output_transform,
-)
+from .lgbm import _RANK_IDENTITY_OBJECTIVES, _emit_lgbm_tree_node, _get_reg_output_transform
 
 #: LightGBM binary classification objectives.
 _CLF_BINARY_OBJECTIVES = frozenset({"binary"})
 
 #: LightGBM multi-class classification objectives.
 _CLF_MULTICLASS_OBJECTIVES = frozenset(
-    {
-        "multiclass",
-        "softmax",
-        "multiclassova",
-        "multiclass_ova",
-        "ovr",
-        "multiclass_ovr",
-    }
+    {"multiclass", "softmax", "multiclassova", "multiclass_ova", "ovr", "multiclass_ovr"}
 )
 
 
@@ -98,9 +86,7 @@ def sklearn_lgbm_model(
     tree_out_name = f"{outputs[0]}_tree_out"
 
     if base_obj in _CLF_BINARY_OBJECTIVES:
-        return _lgbm_model_binary(
-            g, outputs, X, name, trees, ml_opset, itype, tree_out_name
-        )
+        return _lgbm_model_binary(g, outputs, X, name, trees, ml_opset, itype, tree_out_name)
 
     if base_obj in _CLF_MULTICLASS_OBJECTIVES:
         n_classes: int = int(model_dict.get("num_tree_per_iteration", 1))
@@ -109,9 +95,7 @@ def sklearn_lgbm_model(
         )
 
     if base_obj in _RANK_IDENTITY_OBJECTIVES:
-        return _lgbm_model_ranking(
-            g, outputs, X, name, trees, ml_opset, itype, tree_out_name
-        )
+        return _lgbm_model_ranking(g, outputs, X, name, trees, ml_opset, itype, tree_out_name)
 
     # Default: regression (validates objective and raises for unknown objectives)
     out_transform = _get_reg_output_transform(objective)
@@ -146,9 +130,7 @@ def _lgbm_model_binary(
         intermediate_name=tree_out_name,
         itype=itype,
     )
-    raw_scores = g.make_node(
-        "Cast", [raw_scores], outputs=1, name=f"{name}_tree_cast", to=itype
-    )
+    raw_scores = g.make_node("Cast", [raw_scores], outputs=1, name=f"{name}_tree_cast", to=itype)
     proba = g.op.Sigmoid(raw_scores, name=f"{name}_sigmoid")
     return g.make_node("Cast", [proba], outputs=outputs, name=f"{name}_cast", to=itype)
 
@@ -175,9 +157,7 @@ def _lgbm_model_multiclass(
         intermediate_name=tree_out_name,
         itype=itype,
     )
-    raw_scores = g.make_node(
-        "Cast", [raw_scores], outputs=1, name=f"{name}_tree_cast", to=itype
-    )
+    raw_scores = g.make_node("Cast", [raw_scores], outputs=1, name=f"{name}_tree_cast", to=itype)
     proba = g.op.Softmax(raw_scores, axis=1, name=f"{name}_softmax")
     return g.make_node("Cast", [proba], outputs=outputs, name=f"{name}_cast", to=itype)
 
@@ -204,9 +184,7 @@ def _lgbm_model_ranking(
         itype=itype,
     )
     # Identity link — normalise dtype and assign output name in a single Cast.
-    return g.make_node(
-        "Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype
-    )
+    return g.make_node("Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype)
 
 
 def _lgbm_model_regression(
@@ -231,11 +209,7 @@ def _lgbm_model_regression(
         intermediate_name=tree_out_name,
         itype=itype,
     )
-    raw_scores = g.make_node(
-        "Cast", [raw_scores], outputs=1, name=f"{name}_tree_cast", to=itype
-    )
+    raw_scores = g.make_node("Cast", [raw_scores], outputs=1, name=f"{name}_tree_cast", to=itype)
     if out_transform == "exp":
         raw_scores = g.op.Exp(raw_scores, name=f"{name}_exp")
-    return g.make_node(
-        "Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype
-    )
+    return g.make_node("Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype)
