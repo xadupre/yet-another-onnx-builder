@@ -6,3 +6,4 @@ yobx.sklearn.feature_selection
     :caption: modules
 
     select_percentile
+    variance_threshold
