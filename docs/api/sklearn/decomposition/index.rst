@@ -6,6 +6,7 @@ yobx.sklearn.decomposition
     :caption: modules
 
     factor_analysis
+    fast_ica
     gaussian_random_projection
     incremental_pca
     kernel_pca
