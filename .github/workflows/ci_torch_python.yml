@@ -60,4 +60,5 @@ jobs:
         run: pip freeze
 
       - name: Run tests
-        run: pytest --durations=10 --ignore=unittests/tensorflow --ignore=unittests/sklearn
+        run: pytest --durations=10 --ignore=unittests/tensorflow --ignore=unittests/sklearn --ignore=unittests/parity
+

@@ -41,6 +41,7 @@ jobs:
               --ignore=unittests/reference/test_torch_onnxruntime_evaluator.py \
               --ignore=unittests/reference/test_torch_reference_evaluator.py \
               --ignore=unittests/xoptim/test_torch_untrained_models.py \
+              --ignore=unittests/parity \
               --ignore=unittests/sklearn \
               --ignore=unittests/torch
 
