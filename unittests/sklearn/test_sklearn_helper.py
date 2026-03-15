@@ -271,6 +271,73 @@ class TestGetOutputNames(ExtTestCase):
         est = self._fit(LogisticRegression)
         self.assertFalse(_should_use_feature_names(est))
 
+    # ------------------------------------------------------------------ consistency
+
+    def test_consistency_all_estimators(self):
+        """get_n_expected_outputs must equal len(get_output_names) for every estimator type."""
+        from sklearn.cluster import Birch, FeatureAgglomeration, KMeans
+        from sklearn.ensemble import IsolationForest, RandomForestClassifier, RandomForestRegressor
+        from sklearn.feature_selection import VarianceThreshold
+        from sklearn.linear_model import LinearRegression, LogisticRegression, SGDClassifier
+        from sklearn.mixture import GaussianMixture
+        from sklearn.pipeline import Pipeline
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.svm import OneClassSVM
+        from yobx.sklearn.sklearn_helper import get_n_expected_outputs, get_output_names
+
+        estimators = [
+            # classifiers
+            self._fit(LogisticRegression),
+            self._fit(SGDClassifier, loss="hinge"),
+            self._fit(RandomForestClassifier, n_estimators=2, random_state=0),
+            # regressors
+            LinearRegression().fit(self.X, self.y_binary.astype(float)),
+            RandomForestRegressor(n_estimators=2, random_state=0).fit(
+                self.X, self.y_binary.astype(float)
+            ),
+            # clustering
+            self._fit_unsupervised(KMeans, n_clusters=2, n_init=10, random_state=0),
+            self._fit_unsupervised(Birch, n_clusters=2),
+            self._fit_unsupervised(FeatureAgglomeration, n_clusters=2),
+            # transformers
+            self._fit_unsupervised(StandardScaler),
+            self._fit_unsupervised(VarianceThreshold),
+            # outlier detectors
+            self._fit_unsupervised(OneClassSVM),
+            self._fit_unsupervised(IsolationForest, random_state=0),
+            # mixture models
+            self._fit_unsupervised(GaussianMixture, n_components=2, random_state=0),
+            # pipelines
+            Pipeline([("ss", StandardScaler()), ("km", KMeans(n_clusters=2, n_init=10))]).fit(
+                self.X
+            ),
+            Pipeline(
+                [("ss", StandardScaler()), ("fa", FeatureAgglomeration(n_clusters=2))]
+            ).fit(self.X),
+            Pipeline([("ss", StandardScaler()), ("clf", LogisticRegression())]).fit(
+                self.X, self.y_binary
+            ),
+            Pipeline(
+                [("ss", StandardScaler()), ("iso", IsolationForest(random_state=0))]
+            ).fit(self.X),
+            Pipeline([("ss", StandardScaler()), ("reg", LinearRegression())]).fit(
+                self.X, self.y_binary.astype(float)
+            ),
+            Pipeline([("ss1", StandardScaler()), ("ss2", StandardScaler())]).fit(self.X),
+        ]
+
+        for est in estimators:
+            n = get_n_expected_outputs(est)
+            names = list(get_output_names(est))
+            self.assertEqual(
+                n,
+                len(names),
+                msg=(
+                    f"get_n_expected_outputs={n} != len(get_output_names)={len(names)} "
+                    f"for {type(est).__name__}"
+                ),
+            )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
