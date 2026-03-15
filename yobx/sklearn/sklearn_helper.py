@@ -4,9 +4,19 @@ from sklearn.mixture._base import BaseMixture
 from sklearn.pipeline import Pipeline
 
 try:
+    from sklearn.feature_selection._base import SelectorMixin
+except ImportError:
+    SelectorMixin = None  # type: ignore
+
+try:
     from sklearn.base import OutlierMixin
 except ImportError:
     OutlierMixin = None  # type: ignore
+
+
+def _is_selector(estimator: BaseEstimator) -> bool:
+    """Returns True when *estimator* is a feature selector (SelectorMixin)."""
+    return SelectorMixin is not None and isinstance(estimator, SelectorMixin)
 
 
 def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
@@ -29,6 +39,8 @@ def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
 
 def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
+    if _is_selector(estimator):
+        return 1
     if is_classifier(estimator):
         return 2 if _classifier_has_predict_proba(estimator) else 1
     if isinstance(estimator, (ClusterMixin, BaseMixture, OutlierMixin)):
@@ -48,13 +60,17 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
                     )
                 except AttributeError:
                     pass
-        elif not isinstance(estimator, ClusterMixin) and not is_classifier(estimator):
+        elif not isinstance(estimator, ClusterMixin) and (
+            not is_classifier(estimator) or _is_selector(estimator)
+        ):
             try:
                 return post_process_output_names(
                     estimator, list(estimator.get_feature_names_out())
                 )
             except AttributeError:
                 pass
+    if _is_selector(estimator):
+        return ["Y"]
     if is_classifier(estimator):
         if _classifier_has_predict_proba(estimator):
             return ["label", "probabilities"]

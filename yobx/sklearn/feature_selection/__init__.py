@@ -1,2 +1,2 @@
 def register():
-    from . import select_percentile
+    from . import rfe, select_percentile

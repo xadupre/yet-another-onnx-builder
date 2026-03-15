@@ -5,4 +5,5 @@ yobx.sklearn.feature_selection
     :maxdepth: 1
     :caption: modules
 
+    rfe
     select_percentile
