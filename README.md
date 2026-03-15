@@ -46,7 +46,7 @@ It provides:
 - It supports multiple opsets and multiple domains.
 - It allows the user to directly onnx model with [Spox](https://spox.readthedocs.io/en/latest/) or [onnxscript](https://microsoft.github.io/onnxscript/)/[ir-py](https://onnx.ai/ir-py/).
 
-Its unique API accross all converters:
+Its unique API across all converters:
 
 ```python
 # the model is called 

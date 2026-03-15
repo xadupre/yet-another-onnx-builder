@@ -1,6 +1,18 @@
 scikit-learn Export to ONNX
 ===========================
 
+.. toctree::
+   :maxdepth: 1
+
+   expected_api
+   sklearn_converter
+   sklearn_like_converter
+   supported_converters
+   custom_converter
+   contrib_ops
+   copilot_draft
+   debug
+
 A basic :epkg:`scikit-learn` model may look like the following,
 a scaler following by an estimator. Every model can be converter
 with model :func:`~yobx.sklearn.to_onnx`.
@@ -78,18 +90,6 @@ after normalizing the data. The normalizer was implicitly switching the type
 to float64 while ONNX was keeping float32.
 If followed by a tree, a small difference could make the model
 choose a different decision path and produce a very different output.
-
-.. toctree::
-   :maxdepth: 1
-
-   expected_api
-   sklearn_converter
-   sklearn_like_converter
-   supported_converters
-   custom_converter
-   contrib_ops
-   copilot_draft
-   debug
 
 Finally, the example given at the top of the page would be converted
 into the mode which follows.
