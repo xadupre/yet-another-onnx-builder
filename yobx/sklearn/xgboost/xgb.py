@@ -1,6 +1,6 @@
 """
-ONNX converters for :class:`xgboost.XGBClassifier` and
-:class:`xgboost.XGBRegressor`.
+ONNX converters for :class:`xgboost.XGBClassifier`,
+:class:`xgboost.XGBRegressor`, and :class:`xgboost.XGBRFRegressor`.
 
 The trees are extracted from the fitted booster via
 ``booster.get_dump(dump_format='json')`` and encoded using the ONNX ML
@@ -25,6 +25,10 @@ The trees are extracted from the fitted booster via
 
 * Multi-class objectives: no bias (base score is zero for each class).
 
+* **Random Forest Regression** (:class:`~xgboost.XGBRFRegressor`) — uses
+  the same tree-ensemble representation as :class:`~xgboost.XGBRegressor`;
+  the converter delegates directly to :func:`sklearn_xgb_regressor`.
+
 The conversion supports XGBoost 2.x and 3.x and treats the stored ``base_score``
 configuration value as the untransformed prediction-space value.
 
@@ -40,7 +44,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import onnx
 import onnx.helper as oh
-from xgboost import XGBRegressor, XGBClassifier
+from xgboost import XGBRegressor, XGBClassifier, XGBRFRegressor
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
@@ -785,3 +789,49 @@ def sklearn_xgb_regressor(
         "Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype
     )
     return cast_result
+
+
+# ---------------------------------------------------------------------------
+# XGBRFRegressor converter
+# ---------------------------------------------------------------------------
+
+
+@register_sklearn_converter(XGBRFRegressor)
+def sklearn_xgbrf_regressor(
+    g: GraphBuilderExtendedProtocol,
+    sts: Dict,
+    outputs: List[str],
+    estimator,
+    X: str,
+    name: str = "xgbrf_regressor",
+) -> str:
+    """Convert an :class:`xgboost.XGBRFRegressor` to ONNX.
+
+    :class:`~xgboost.XGBRFRegressor` is a random-forest variant of
+    :class:`~xgboost.XGBRegressor` and shares the same booster
+    representation.  This converter delegates directly to
+    :func:`sklearn_xgb_regressor`.
+
+    The raw margin (sum of all tree leaf values, averaged over the forest)
+    is computed via a ``TreeEnsembleRegressor`` / ``TreeEnsemble`` node,
+    the XGBoost ``base_score`` bias is added, and then an
+    objective-dependent output transform is applied to match
+    :meth:`~xgboost.XGBRFRegressor.predict`:
+
+    * Identity (``reg:squarederror``, ``reg:absoluteerror``, …): no transform.
+    * ``reg:logistic``: ``sigmoid(margin)``.
+    * ``count:poisson``, ``reg:gamma``, ``reg:tweedie``, ``survival:cox``:
+      ``exp(margin)``.
+
+    Unsupported objectives raise :class:`NotImplementedError`.
+
+    :param g: the graph builder to add nodes to
+    :param sts: shapes dict (passed through, not used internally)
+    :param outputs: desired output names ``[predictions]``
+    :param estimator: a fitted ``XGBRFRegressor``
+    :param X: input tensor name
+    :param name: prefix for node names added to the graph
+    :return: output tensor name (shape ``[N, 1]``)
+    :raises NotImplementedError: if the model's objective is not supported
+    """
+    return sklearn_xgb_regressor(g, sts, outputs, estimator, X, name=name)
