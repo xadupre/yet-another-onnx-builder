@@ -4,13 +4,13 @@ Unit tests for yobx.sklearn converters.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
-from yobx.reference import ExtendedReferenceEvaluator
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
 
 

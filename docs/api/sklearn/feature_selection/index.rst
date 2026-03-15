@@ -5,4 +5,8 @@ yobx.sklearn.feature_selection
     :maxdepth: 1
     :caption: modules
 
+    rfe
+    select_fwe
+    select_k_best
     select_percentile
+    variance_threshold
