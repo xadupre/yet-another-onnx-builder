@@ -54,21 +54,4 @@ time, so ONNX inference pipelines skip any step that exposes
 ``fit_resample`` and only convert the remaining transformers and the
 final estimator.
 
-Two converters are registered in :mod:`yobx.sklearn.imblearn`:
-
-* **imblearn Pipeline** — wraps ``imblearn.pipeline.Pipeline``.  At
-  conversion time the steps that expose ``fit_resample`` are filtered
-  out; the remaining steps are forwarded to their own registered
-  converters exactly as a standard ``sklearn.pipeline.Pipeline`` would
-  be.
-
-* **EasyEnsembleClassifier** — wraps
-  ``imblearn.ensemble.EasyEnsembleClassifier``, a
-  ``BaggingClassifier`` subclass whose sub-estimators are imblearn
-  ``Pipeline`` instances (resampler + classifier).  The converter
-  iterates ``estimators_`` / ``estimators_features_``, applies the
-  imblearn Pipeline converter to each, averages the predicted
-  probabilities (soft vote), and emits ``(label, proba)`` — the same
-  logic used by the ``BaggingClassifier`` converter.
-
 See :mod:`yobx.sklearn.imblearn` for the full API reference.
