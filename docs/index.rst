@@ -36,7 +36,22 @@ yet-another-onnx-builder documentation
 
 **yet-another-onnx-builder** (``yobx``) proposes a unique API to convert machine learning models
 to `ONNX <https://onnx.ai>`_ format and manipulating ONNX graphs programmatically.
-It provides:
+It can export from many libraries:
+
+**standard machine learning**
+
+* [categorical_encoders](https://contrib.scikit-learn.org/category_encoders/)
+* [imbalanced-learn](https://imbalanced-learn.org/stable/)
+* [lightgbm](https://lightgbm.readthedocs.io)
+* [scikit-learn](https://scikit-learn.org)
+* [xgboost](https://xgboost.readthedocs.io)
+
+**deeplearning**
+
+* [tensorflow](https://www.tensorflow.org)
+* [torch](https://pytorch.org)
+
+It also provides:
 
 - A :ref:`graph builder API <l-design-graph-builder>` for constructing and optimizing ONNX graphs,
   with built-in shape inference and a pattern-based
@@ -58,7 +73,7 @@ Its unique API:
     onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, **options)
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Contents
 
    design/sklearn/index
