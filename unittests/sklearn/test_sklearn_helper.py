@@ -276,7 +276,11 @@ class TestGetOutputNames(ExtTestCase):
     def test_consistency_all_estimators(self):
         """get_n_expected_outputs must equal len(get_output_names) for every estimator type."""
         from sklearn.cluster import Birch, FeatureAgglomeration, KMeans
-        from sklearn.ensemble import IsolationForest, RandomForestClassifier, RandomForestRegressor
+        from sklearn.ensemble import (
+            IsolationForest,
+            RandomForestClassifier,
+            RandomForestRegressor,
+        )
         from sklearn.feature_selection import VarianceThreshold
         from sklearn.linear_model import LinearRegression, LogisticRegression, SGDClassifier
         from sklearn.mixture import GaussianMixture
@@ -311,15 +315,15 @@ class TestGetOutputNames(ExtTestCase):
             Pipeline([("ss", StandardScaler()), ("km", KMeans(n_clusters=2, n_init=10))]).fit(
                 self.X
             ),
-            Pipeline(
-                [("ss", StandardScaler()), ("fa", FeatureAgglomeration(n_clusters=2))]
-            ).fit(self.X),
+            Pipeline([("ss", StandardScaler()), ("fa", FeatureAgglomeration(n_clusters=2))]).fit(
+                self.X
+            ),
             Pipeline([("ss", StandardScaler()), ("clf", LogisticRegression())]).fit(
                 self.X, self.y_binary
             ),
-            Pipeline(
-                [("ss", StandardScaler()), ("iso", IsolationForest(random_state=0))]
-            ).fit(self.X),
+            Pipeline([("ss", StandardScaler()), ("iso", IsolationForest(random_state=0))]).fit(
+                self.X
+            ),
             Pipeline([("ss", StandardScaler()), ("reg", LinearRegression())]).fit(
                 self.X, self.y_binary.astype(float)
             ),

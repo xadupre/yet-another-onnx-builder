@@ -76,7 +76,9 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
                     pass
         elif _should_use_feature_names(estimator):
             try:
-                return post_process_output_names(estimator, list(estimator.get_feature_names_out()))
+                return post_process_output_names(
+                    estimator, list(estimator.get_feature_names_out())
+                )
             except AttributeError:
                 pass
 
