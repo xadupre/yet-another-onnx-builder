@@ -990,10 +990,10 @@ class ConcatReshapePattern(PatternOptimization):
             %% Flow
             X --> SH1
             X --> SH2
+            SH1 --> CC
+            SH2 --> CC
             I1 --> CC
             I2 --> CC
-            SH2 --> CC
-            SH1 --> CC
             CC --> R
             X --> R
             R --> Y
