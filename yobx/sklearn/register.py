@@ -64,8 +64,10 @@ def get_sklearn_estimator_coverage(
 
     Args
     ----
-        rst: returns the information a RST text
-        libraries: `'all'` to include all available modules,
+        rst:
+            returns the information a RST text
+        libraries:
+            `'all'` to include all available modules,
             or a list of libraries to include such as
             ``('sklearn'`, `lightgbm', ...)``
 
