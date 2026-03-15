@@ -37,9 +37,7 @@ def sklearn_select_k_best(
     :param name: prefix name for the added nodes
     :return: output name
     """
-    assert isinstance(
-        estimator, SelectKBest
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, SelectKBest), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     indices = estimator.get_support(indices=True).astype(np.int64)

@@ -184,10 +184,7 @@ class TestSklearnRFECV(ExtTestCase):
 
         X, y = self._make_data(np.float32)
         pipe = Pipeline(
-            [
-                ("sel", RFECV(estimator=LogisticRegression(), cv=3)),
-                ("clf", LogisticRegression()),
-            ]
+            [("sel", RFECV(estimator=LogisticRegression(), cv=3)), ("clf", LogisticRegression())]
         )
         pipe.fit(X, y)
 
@@ -218,10 +215,7 @@ class TestSklearnRFECV(ExtTestCase):
 
         X, y = self._make_data(np.float64)
         pipe = Pipeline(
-            [
-                ("sel", RFECV(estimator=LogisticRegression(), cv=3)),
-                ("clf", LogisticRegression()),
-            ]
+            [("sel", RFECV(estimator=LogisticRegression(), cv=3)), ("clf", LogisticRegression())]
         )
         pipe.fit(X, y)
 

@@ -84,10 +84,7 @@ class TestSelectFwe(ExtTestCase):
 
         X, y = self._make_data(np.float32)
         pipe = Pipeline(
-            [
-                ("sel", SelectFwe(score_func=f_classif, alpha=0.05)),
-                ("clf", LogisticRegression()),
-            ]
+            [("sel", SelectFwe(score_func=f_classif, alpha=0.05)), ("clf", LogisticRegression())]
         )
         pipe.fit(X, y)
 
@@ -118,10 +115,7 @@ class TestSelectFwe(ExtTestCase):
 
         X, y = self._make_data(np.float64)
         pipe = Pipeline(
-            [
-                ("sel", SelectFwe(score_func=f_classif, alpha=0.05)),
-                ("clf", LogisticRegression()),
-            ]
+            [("sel", SelectFwe(score_func=f_classif, alpha=0.05)), ("clf", LogisticRegression())]
         )
         pipe.fit(X, y)
 
