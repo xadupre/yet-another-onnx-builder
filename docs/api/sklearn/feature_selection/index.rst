@@ -7,6 +7,7 @@ yobx.sklearn.feature_selection
 
     rfe
     select_fdr
+    select_from_model
     select_fpr
     select_fwe
     select_k_best
