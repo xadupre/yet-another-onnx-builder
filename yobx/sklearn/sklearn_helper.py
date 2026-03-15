@@ -19,10 +19,7 @@ def _should_use_feature_names(estimator: BaseEstimator) -> bool:
     """Returns True when get_feature_names_out() should drive output naming."""
     return (
         (SelectorMixin is not None and isinstance(estimator, SelectorMixin))
-        or (
-            isinstance(estimator, FeatureAgglomeration)
-            and not isinstance(estimator, ClusterMixin)
-        )
+        or isinstance(estimator, FeatureAgglomeration)
         or (not isinstance(estimator, ClusterMixin) and not is_classifier(estimator))
     )
 
@@ -47,7 +44,17 @@ def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
 
 def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
-    return len(get_output_names(estimator))
+    if SelectorMixin is not None and isinstance(estimator, SelectorMixin):
+        return 1
+    if is_classifier(estimator):
+        return 2 if _classifier_has_predict_proba(estimator) else 1
+    if isinstance(estimator, FeatureAgglomeration):
+        return 1
+    if isinstance(estimator, (ClusterMixin, BaseMixture)) or (
+        OutlierMixin is not None and isinstance(estimator, OutlierMixin)
+    ):
+        return 2
+    return 1
 
 
 def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
@@ -56,11 +63,17 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
         if isinstance(estimator, Pipeline):
             last_step = estimator.steps[-1][1]
             if _should_use_feature_names(last_step):
-                return post_process_output_names(
-                    last_step, list(last_step.get_feature_names_out())
-                )
+                try:
+                    return post_process_output_names(
+                        last_step, list(last_step.get_feature_names_out())
+                    )
+                except AttributeError:
+                    pass
         elif _should_use_feature_names(estimator):
-            return post_process_output_names(estimator, list(estimator.get_feature_names_out()))
+            try:
+                return post_process_output_names(estimator, list(estimator.get_feature_names_out()))
+            except AttributeError:
+                pass
 
     if SelectorMixin is not None and isinstance(estimator, SelectorMixin):
         return ["Y"]
