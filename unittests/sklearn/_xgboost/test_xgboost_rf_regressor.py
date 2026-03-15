@@ -112,7 +112,10 @@ class TestXGBoostRFRegressor(ExtTestCase):
 
         X, y = self._make_regression_data()
         pipe = Pipeline(
-            [("scaler", StandardScaler()), ("reg", XGBRFRegressor(n_estimators=3, random_state=0))]
+            [
+                ("scaler", StandardScaler()),
+                ("reg", XGBRFRegressor(n_estimators=3, random_state=0)),
+            ]
         )
         pipe.fit(X, y)
 
