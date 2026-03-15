@@ -141,9 +141,8 @@ class ReduceReshapePattern(PatternOptimization):
 
             %% Flow
             X --> RS
-            RS --> xr[ ]
+            RS --> R
             C -->|shape| R
-            xr --> R
             R --> Y
 
             %% Styling
@@ -281,9 +280,8 @@ class ReshapeReshapePattern(PatternOptimization):
             %% Flow
             C1 -->|sh1| R1
             X --> R1
-            R1 --> s1[ ]
+            R1 --> R2
             C2 -->|sh2| R2
-            s1 --> R2
             R2 --> s2
 
             %% Styling
@@ -591,17 +589,14 @@ class Reshape2Of3Pattern(PatternOptimization):
             %% Flow
             C1 -->|shape1| R1
             X --> R1
-            R1 --> xr[ ]
             C2 -->|shape2| R2
             Y --> R2
-            R2 --> yr[ ]
-            xr --> M
-            yr --> M
-            M --> xrr_int[ ]
+            R1 --> M
+            R2 --> M
+            M --> xrr
+            M --> R3
             C3 -->|shape3| R3
-            xrr_int --> R3
             R3 --> Z
-            xrr_int --> xrr
 
             %% Styling
             class C1 constNode
@@ -637,10 +632,9 @@ class Reshape2Of3Pattern(PatternOptimization):
             %% Flow
             X --> M
             Y --> M
-            M --> z_int[ ]
-            z_int --> Z
+            M --> Z
             C2 -->|shape2| R
-            z_int --> R
+            M --> R
             R --> xrr
 
             %% Styling
@@ -861,12 +855,10 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
             %% Flow
             C1 -->|sh1| R1
             X --> R1
-            R1 --> xc[ ]
             C2 -->|sh2| R2
             Y --> R2
-            R2 --> yc[ ]
-            xc --> A
-            yc --> A
+            R1 --> A
+            R2 --> A
             A --> Z
 
             %% Styling
@@ -899,9 +891,8 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
             %% Flow
             X --> A
             Y --> A
-            A --> add_out[ ]
+            A --> R
             C1 -->|sh1| R
-            add_out --> R
             R --> Z
 
             %% Styling
@@ -999,15 +990,12 @@ class ConcatReshapePattern(PatternOptimization):
             %% Flow
             X --> SH1
             X --> SH2
-            SH1 --> D2[ ]
-            SH2 --> D1[ ]
             I1 --> CC
             I2 --> CC
-            D1 --> CC
-            D2 --> CC
-            CC --> d[ ]
+            SH2 --> CC
+            SH1 --> CC
+            CC --> R
             X --> R
-            d --> R
             R --> Y
 
             %% Styling
@@ -1044,9 +1032,8 @@ class ConcatReshapePattern(PatternOptimization):
             I2 --> CC
             D1 --> CC
             CM1 --> CC
-            CC --> d_concat[ ]
+            CC --> R
             X --> R
-            d_concat --> R
             R --> Y
 
             %% Styling
@@ -1185,12 +1172,10 @@ class StaticConcatReshapePattern(PatternOptimization):
 
             %% Flow
             X --> SH
-            SH --> D2[ ]
+            SH --> CC
             I1 --> CC
-            D2 --> CC
-            CC --> dc[ ]
+            CC --> R
             X --> R
-            dc --> R
             R --> Y
 
             %% Styling
@@ -1221,9 +1206,8 @@ class StaticConcatReshapePattern(PatternOptimization):
             %% Flow
             I1 --> CC
             CM1 --> CC
-            CC --> d_concat[ ]
+            CC --> R
             X --> R
-            d_concat --> R
             R --> Y
 
             %% Styling
@@ -1346,12 +1330,10 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
 
             %% Flow
             X --> SH
-            SH --> D2[ ]
+            SH --> CC
             I1 --> CC
-            D2 --> CC
-            CC --> dshape[ ]
+            CC --> R
             X --> R
-            dshape --> R
             R --> Y
 
             %% Styling
@@ -1572,13 +1554,11 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
 
             %% Flow
             X --> SH
-            SH --> D2[ ]
+            SH --> CC
             one --> CC
-            D2 --> CC
             one --> CC
-            CC --> dshape2[ ]
+            CC --> R
             X --> R
-            dshape2 --> R
             R --> Y
 
             %% Styling
@@ -1725,9 +1705,8 @@ class UnsqueezeReshapePattern(PatternOptimization):
             %% Flow
             C1 -->|axes| U
             X --> U
-            U --> xu0[ ]
+            U --> R
             C2 -->|shape| R
-            xu0 --> R
             R --> Z
 
             %% Styling
@@ -1850,9 +1829,8 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
             %% Flow
             C -->|axes| U
             X --> U
-            U --> xu0[ ]
+            U --> R
             S3 -->|shape| R
-            xu0 --> R
             R --> Z
 
             %% Styling
