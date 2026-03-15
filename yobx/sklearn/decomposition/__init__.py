@@ -6,4 +6,5 @@ def register():
     from . import latent_dirichlet_allocation
     from . import pca
     from . import pls_regression
+    from . import pls_svd
     from . import truncated_svd
