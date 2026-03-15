@@ -1,8 +1,13 @@
 from typing import Sequence
-from sklearn.base import BaseEstimator, ClusterMixin, OutlierMixin, TransformerMixin, is_classifier, is_regressor
+from sklearn.base import BaseEstimator, ClusterMixin, OutlierMixin, is_classifier, is_regressor
 from sklearn.cluster import FeatureAgglomeration
 from sklearn.mixture._base import BaseMixture
 from sklearn.pipeline import Pipeline
+
+try:
+    from sklearn.feature_selection._base import SelectorMixin
+except ImportError:
+    SelectorMixin = None  # type: ignore
 
 try:
     from sklearn.base import OutlierMixin
@@ -21,6 +26,18 @@ def _is_cluster_transformer(estimator: BaseEstimator) -> bool:
     models.
     """
     return isinstance(estimator, FeatureAgglomeration)
+
+
+def _is_selector(estimator: BaseEstimator) -> bool:
+    """Returns True when *estimator* is a feature selector (SelectorMixin)."""
+    return SelectorMixin is not None and isinstance(estimator, SelectorMixin)
+
+
+def _should_use_feature_names(estimator: BaseEstimator) -> bool:
+    """Returns True when get_feature_names_out() should drive output naming."""
+    return not isinstance(estimator, ClusterMixin) and (
+        not is_classifier(estimator) or _is_selector(estimator)
+    )
 
 
 def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
@@ -43,6 +60,8 @@ def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
 
 def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
+    if _is_selector(estimator):
+        return 1
     if is_classifier(estimator):
         return 2 if _classifier_has_predict_proba(estimator) else 1
     if _is_cluster_transformer(estimator):
@@ -75,6 +94,16 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
                 )
             except AttributeError:
                 pass
+        elif _should_use_feature_names(estimator):
+            try:
+                return post_process_output_names(
+                    estimator, list(estimator.get_feature_names_out())
+                )
+            except AttributeError:
+                pass
+
+    if _is_selector(estimator):
+        return ["Y"]
     if is_classifier(estimator):
         if _classifier_has_predict_proba(estimator):
             return ["label", "probabilities"]

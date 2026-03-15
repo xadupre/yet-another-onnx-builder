@@ -47,7 +47,6 @@ img.logo {
      constNode  – deep rose fill / light pink stroke  (light: #f9f pink)
      opNode     – deep navy fill / light blue stroke   (light: #bbf blue)
      ioNode     – deep forest fill / light green stroke (light: #dfd green)
-     interNode  – dark charcoal fill / medium grey stroke (light: #eee grey)
 */
 :root[data-mode=dark] .mermaid .constNode rect,
 :root[data-mode=dark] .mermaid .constNode polygon,
@@ -71,14 +70,6 @@ img.logo {
 :root[data-mode=darkest] .mermaid .ioNode polygon {
     fill: #1a4a1a !important;
     stroke: #88cc88 !important;
-}
-
-:root[data-mode=dark] .mermaid .interNode rect,
-:root[data-mode=dark] .mermaid .interNode polygon,
-:root[data-mode=darkest] .mermaid .interNode rect,
-:root[data-mode=darkest] .mermaid .interNode polygon {
-    fill: #2d2d2d !important;
-    stroke: #888 !important;
 }
 
 :root[data-mode=dark] .mermaid .node .label,

@@ -159,10 +159,7 @@ class TestFeatureAgglomeration(ExtTestCase):
         rng = np.random.default_rng(6)
         X = rng.standard_normal((30, 8)).astype(np.float32)
         pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("fa", FeatureAgglomeration(n_clusters=3)),
-            ]
+            [("scaler", StandardScaler()), ("fa", FeatureAgglomeration(n_clusters=3))]
         )
         pipe.fit(X)
 

@@ -1,7 +1,6 @@
 from typing import Dict, List
 
 import numpy as np
-import onnx
 from sklearn.cluster import FeatureAgglomeration
 
 from ..register import register_sklearn_converter
@@ -108,9 +107,7 @@ def sklearn_feature_agglomeration(
             )  # (N, 1)
             cluster_tensors.append(reduced)
 
-        out = g.op.Concat(
-            *cluster_tensors, axis=1, name=f"{name}_concat", outputs=outputs[:1]
-        )
+        out = g.op.Concat(*cluster_tensors, axis=1, name=f"{name}_concat", outputs=outputs[:1])
 
     else:
         raise NotImplementedError(
