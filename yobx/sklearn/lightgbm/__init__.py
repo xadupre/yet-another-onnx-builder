@@ -11,7 +11,7 @@ def register():
 
 
 def all_estimators() -> List[Tuple[str, type]]:
-    """Returns all estimators in :epkg:`xgboost`."""
+    """Returns all estimators in :epkg:`lightgbm`."""
     import inspect
 
     try:
