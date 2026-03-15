@@ -6,4 +6,6 @@ yobx.sklearn.feature_selection
     :caption: modules
 
     rfe
+    select_fwe
+    select_k_best
     select_percentile
