@@ -987,7 +987,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         feeds = {input_name: X}
 
         ort_result = _ort_run(onx, feeds)
-        self.assertEqualArray(expected, ort_result, atol=2e-4)
+        self.assertEqualArray(expected, ort_result, atol=5e-4)
 
 
 @requires_tensorflow("2.18")

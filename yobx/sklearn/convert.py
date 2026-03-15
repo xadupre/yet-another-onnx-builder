@@ -1,5 +1,4 @@
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
-import numpy as np
 from onnx import ModelProto, ValueInfoProto
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
@@ -7,16 +6,14 @@ from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.utils.validation import check_is_fitted
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExtendedModelContainer
-from ..helpers.onnx_helper import np_dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
+from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from ..xbuilder.function_options import FunctionOptions
 from .register import get_sklearn_converter, sklearn_exportable_methods
 from .sklearn_helper import get_output_names
 
 
-def _extract_value_info_proto(
-    vip: ValueInfoProto,
-) -> Tuple[str, int, Optional[Tuple]]:
+def _extract_value_info_proto(vip: ValueInfoProto) -> Tuple[str, int, Optional[Tuple]]:
     """Extract ``(name, elem_type, shape)`` from a :class:`onnx.ValueInfoProto`.
 
     :param vip: an ONNX value-info descriptor
@@ -283,7 +280,9 @@ def to_onnx(
             shape = list(arg.shape)
             for axis, dim in ds.items():
                 shape[axis] = dim
-            g.make_tensor_input(name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1)
+            g.make_tensor_input(  # type: ignore
+                name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1  # type: ignore
+            )  # type: ignore
 
     # Build the sts dict (shared state for converters). function_options, if set,
     # is passed explicitly to container converters below.
