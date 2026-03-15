@@ -49,7 +49,9 @@ def sklearn_exportable_methods() -> Tuple[str, ...]:
     return "transform", "predict", "predict_proba", "mahalanobis", "score_samples"
 
 
-def get_sklearn_estimator_coverage(rst: bool = False, libraries: Union[str, Tuple[str, ...]] = "all"):
+def get_sklearn_estimator_coverage(
+    rst: bool = False, libraries: Union[str, Tuple[str, ...]] = "all"
+):
     """
     Returns a coverage report for scikit-learn estimators.
 
@@ -153,11 +155,7 @@ def get_sklearn_estimator_coverage(rst: bool = False, libraries: Union[str, Tupl
     for row in rows:
         cat = row["category"]
         fct = row["yobx"]
-        if isinstance(fct, tuple):
-            cvt_name, cvt_module = fct
-            yobx_mark = "✓"
-            cvt = f":func:`{cvt_name} <{cvt_module}.{cvt_name}>`"
-        elif fct:
+        if fct:
             yobx_mark = "✓"
             cvt = f":func:`{fct.__name__} <{fct.__module__}.{fct.__name__}>`"
         else:

@@ -50,6 +50,7 @@ class TestSklearnRegister(ExtTestCase):
         rst = get_sklearn_estimator_coverage(rst=True)
         self.assertIsInstance(rst, str)
         self.assertIn("**Coverage**", rst)
+        self.assertRaise(lambda: get_sklearn_estimator_coverage(libraries=("nolib",)), ValueError)
 
 
 if __name__ == "__main__":
