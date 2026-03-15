@@ -125,12 +125,9 @@ def _build_input_specs(input_names, args, dynamic_shapes):
             tt = arg.type.tensor_type
             np_dtype = tensor_dtype_to_np_dtype(tt.elem_type)
             if tt.HasField("shape"):
-                shape = []
-                for dim in tt.shape.dim:
-                    if dim.dim_value > 0:
-                        shape.append(dim.dim_value)
-                    else:
-                        shape.append(None)
+                shape = [
+                    (dim.dim_param if dim.dim_param else dim.dim_value) for dim in tt.shape.dim
+                ]
             else:
                 shape = [None]
             specs.append(tf.TensorSpec(shape=shape, dtype=tf.as_dtype(np_dtype), name=name))
