@@ -11,10 +11,7 @@ from yobx.reference import ExtendedReferenceEvaluator
 @requires_sklearn("1.4")
 class TestOrdinalEncoder(ExtTestCase):
     def _make_data(self, dtype=np.float32):
-        X = np.array(
-            [[1.0, 0.0], [2.0, 1.0], [3.0, 0.0], [1.0, 2.0], [2.0, 1.0]],
-            dtype=dtype,
-        )
+        X = np.array([[1.0, 0.0], [2.0, 1.0], [3.0, 0.0], [1.0, 2.0], [2.0, 1.0]], dtype=dtype)
         return X
 
     def _run_test(self, enc, X_train, X_test, dtype):

@@ -24,7 +24,8 @@ def sklearn_ordinal_encoder(
     Converts a :class:`sklearn.preprocessing.OrdinalEncoder` into ONNX.
 
     Each feature column is independently mapped from its category value to an
-    integer ordinal (0-based position in the sorted :attr:`~sklearn.preprocessing.OrdinalEncoder.categories_`
+    integer ordinal (0-based position in the sorted
+    :attr:`~sklearn.preprocessing.OrdinalEncoder.categories_`
     list).  Unknown categories and missing (``NaN``) inputs are handled via
     ``Where`` overrides.
 
@@ -76,7 +77,11 @@ def sklearn_ordinal_encoder(
     emv_is_nan = isinstance(encoded_missing_value, float) and math.isnan(encoded_missing_value)
     nan_val = np.array([[np.nan if emv_is_nan else float(encoded_missing_value)]], dtype=dtype)
 
-    unk_is_nan = isinstance(unknown_value, float) and math.isnan(unknown_value) if unknown_value is not None else False
+    unk_is_nan = (
+        isinstance(unknown_value, float) and math.isnan(unknown_value)
+        if unknown_value is not None
+        else False
+    )
     if handle_unknown == "use_encoded_value":
         unk_val = np.array([[np.nan if unk_is_nan else float(unknown_value)]], dtype=dtype)
     else:
