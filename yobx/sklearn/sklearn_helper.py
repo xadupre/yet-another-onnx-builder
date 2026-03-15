@@ -47,15 +47,7 @@ def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
 
 def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
-    if SelectorMixin is not None and isinstance(estimator, SelectorMixin):
-        return 1
-    if is_classifier(estimator):
-        return 2 if _classifier_has_predict_proba(estimator) else 1
-    if isinstance(estimator, FeatureAgglomeration) and not isinstance(estimator, ClusterMixin):
-        return 1
-    if isinstance(estimator, (ClusterMixin, BaseMixture, OutlierMixin)):
-        return 2
-    return 1
+    return len(get_output_names(estimator))
 
 
 def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
