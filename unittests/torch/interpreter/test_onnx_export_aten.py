@@ -3480,38 +3480,46 @@ class TestOnnxExportAten(ExtTestCase):
     def test_aten_grouped_mm_no_offset(self):
         import torch
 
-        # torch.nn.functional.grouped_mm requires bfloat16 inputs.
-        # The ONNX conversion upcasts bfloat16 to float32 for MatMul since
-        # OnnxRuntime does not support bfloat16 MatMul on CPU.
-        # Small cyclic integer inputs (values 1,2,3) are used: they are
-        # exactly representable in bfloat16, produce distinct non-trivial
-        # results, and their dot products (max K*9=576) are also exact in
-        # bfloat16, so bfloat16 and float32 accumulation agree exactly.
-        class Model(torch.nn.Module):
-            def forward(self, a, b):
-                res = torch.nn.functional.grouped_mm(
-                    a.to(torch.bfloat16), b.transpose(-2, -1).to(torch.bfloat16)
-                )
-                torch._check(res.dtype == torch.bfloat16, lambda: f"{res.dtype=}")
-                return res.to(torch.float32)
-
+        # Test with all model input dtypes: float16, float32, bfloat16.
+        # The model always casts inputs to bfloat16 before calling grouped_mm
+        # (PyTorch's grouped_mm only accepts bfloat16 in torch.export).
+        # The converter upcasts bfloat16 to float32 for MatMul since ORT
+        # does not support bfloat16 MatMul on CPU.
+        # Cyclic integer inputs {1, 2, 3} are exactly representable in all
+        # tested dtypes, produce distinct non-trivial outputs, and their dot
+        # products (max K*9=576) are also exact — results are deterministic.
         G, M, N, K = 4, 16, 32, 64
-        a = (torch.arange(G * M * K, dtype=torch.float32).reshape(G, M, K) % 3) + 1
-        b = (torch.arange(G * N * K, dtype=torch.float32).reshape(G, N, K) % 3) + 1
-        model = Model()
-        expected = model(a, b)
-        self.assertEqualArray(
-            expected,
-            (a.to(torch.bfloat16) @ b.transpose(-2, -1).to(torch.bfloat16)).to(torch.float32),
-        )
-        ep = torch.export.export(model, (a, b))
-        names = [str(n.target) for n in ep.graph.nodes]
-        self.assertIn("aten._grouped_mm.default", names)
-        onx = to_onnx(
-            model, (a, b), dynamic_shapes=({0: "G", 1: "M", 2: "K"}, {0: "G", 1: "N", 2: "K"})
-        )
-        self.dump_onnx("test_aten_grouped_mm_no_offset.onnx", onx)
-        self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=1e-5)
+        a_src = (torch.arange(G * M * K, dtype=torch.float32).reshape(G, M, K) % 3) + 1
+        b_src = (torch.arange(G * N * K, dtype=torch.float32).reshape(G, N, K) % 3) + 1
+
+        for dtype in (torch.float16, torch.float32, torch.bfloat16):
+            with self.subTest(dtype=dtype):
+
+                def make_model():
+                    class Model(torch.nn.Module):
+                        def forward(self, a, b):
+                            res = torch.nn.functional.grouped_mm(
+                                a.to(torch.bfloat16), b.transpose(-2, -1).to(torch.bfloat16)
+                            )
+                            return res.to(torch.float32)
+
+                    return Model()
+
+                a, b = a_src.to(dtype), b_src.to(dtype)
+                model = make_model()
+                expected = model(a, b)
+                ep = torch.export.export(model, (a, b))
+                names = [str(n.target) for n in ep.graph.nodes]
+                self.assertIn("aten._grouped_mm.default", names)
+                onx = to_onnx(
+                    model,
+                    (a, b),
+                    dynamic_shapes=({0: "G", 1: "M", 2: "K"}, {0: "G", 1: "N", 2: "K"}),
+                )
+                self.dump_onnx(f"test_aten_grouped_mm_no_offset_{dtype}.onnx", onx)
+                if dtype != torch.bfloat16:
+                    # ORT cannot execute models with bfloat16 inputs on CPU
+                    self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=1e-5)
 
     def test_aten_grouped_mm_offsets(self):
         import torch
