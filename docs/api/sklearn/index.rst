@@ -19,6 +19,7 @@ yobx.sklearn
     cluster/index
     compose/index
     covariance/index
+    cross_decomposition/index
     decomposition/index
     discriminant_analysis/index
     dummy/index
