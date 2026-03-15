@@ -3483,9 +3483,10 @@ class TestOnnxExportAten(ExtTestCase):
         # torch.nn.functional.grouped_mm requires bfloat16 inputs.
         # The ONNX conversion upcasts bfloat16 to float32 for MatMul since
         # OnnxRuntime does not support bfloat16 MatMul on CPU.
-        # Using integer-valued inputs ensures that bfloat16 and float32 matmul
-        # produce exactly the same result (e.g. ones: K ones summed = K = 64.0,
-        # exactly representable in bfloat16), making the test deterministic.
+        # Small cyclic integer inputs (values 1,2,3) are used: they are
+        # exactly representable in bfloat16, produce distinct non-trivial
+        # results, and their dot products (max K*9=576) are also exact in
+        # bfloat16, so bfloat16 and float32 accumulation agree exactly.
         class Model(torch.nn.Module):
             def forward(self, a, b):
                 res = torch.nn.functional.grouped_mm(
@@ -3495,8 +3496,8 @@ class TestOnnxExportAten(ExtTestCase):
                 return res.to(torch.float32)
 
         G, M, N, K = 4, 16, 32, 64
-        a = torch.ones(G, M, K, device="cpu", dtype=torch.float32)
-        b = torch.ones(G, N, K, device="cpu", dtype=torch.float32)
+        a = (torch.arange(G * M * K, dtype=torch.float32).reshape(G, M, K) % 3) + 1
+        b = (torch.arange(G * N * K, dtype=torch.float32).reshape(G, N, K) % 3) + 1
         model = Model()
         expected = model(a, b)
         self.assertEqualArray(
