@@ -179,7 +179,5 @@ def get_sklearn_estimator_coverage(
         if predictable:
             n_possible += 1
     coverage_pct = n_done / n_possible * 100 if n_possible > 0 else 0.0
-    rst_rows.extend(
-        ["", "", f"**Coverage**: {n_done}/{n_possible} ~ {coverage_pct:1.1f}%"]
-    )
+    rst_rows.extend(["", "", f"**Coverage**: {n_done}/{n_possible} ~ {coverage_pct:1.1f}%"])
     return "\n".join(rst_rows)
