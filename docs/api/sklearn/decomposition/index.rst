@@ -13,4 +13,5 @@ yobx.sklearn.decomposition
     latent_dirichlet_allocation
     pca
     pls_regression
+    pls_svd
     truncated_svd
