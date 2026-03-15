@@ -3480,6 +3480,12 @@ class TestOnnxExportAten(ExtTestCase):
     def test_aten_grouped_mm_no_offset(self):
         import torch
 
+        # torch.nn.functional.grouped_mm requires bfloat16 inputs.
+        # The ONNX conversion upcasts bfloat16 to float32 for MatMul since
+        # OnnxRuntime does not support bfloat16 MatMul on CPU.
+        # Using integer-valued inputs ensures that bfloat16 and float32 matmul
+        # produce exactly the same result (e.g. ones: K ones summed = K = 64.0,
+        # exactly representable in bfloat16), making the test deterministic.
         class Model(torch.nn.Module):
             def forward(self, a, b):
                 res = torch.nn.functional.grouped_mm(
@@ -3489,8 +3495,8 @@ class TestOnnxExportAten(ExtTestCase):
                 return res.to(torch.float32)
 
         G, M, N, K = 4, 16, 32, 64
-        a = torch.randn(G, M, K, device="cpu", dtype=torch.float32)
-        b = torch.randn(G, N, K, device="cpu", dtype=torch.float32)
+        a = torch.ones(G, M, K, device="cpu", dtype=torch.float32)
+        b = torch.ones(G, N, K, device="cpu", dtype=torch.float32)
         model = Model()
         expected = model(a, b)
         self.assertEqualArray(
@@ -3503,7 +3509,8 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model, (a, b), dynamic_shapes=({0: "G", 1: "M", 2: "K"}, {0: "G", 1: "N", 2: "K"})
         )
-        self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=2e-2)
+        self.dump_onnx("test_aten_grouped_mm_no_offset.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=1e-5)
 
     def test_aten_grouped_mm_offsets(self):
         import torch
