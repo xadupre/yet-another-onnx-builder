@@ -640,6 +640,27 @@ def requires_category_encoders(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
+def requires_imblearn(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`imbalanced-learn` is not recent enough."""
+    try:
+        import imblearn
+    except (AttributeError, ImportError):
+        return unittest.skip(msg or "imbalanced-learn not installed")
+
+    if not hasattr(imblearn, "__version__"):
+        return unittest.skip(msg or "imbalanced-learn not installed")
+
+    if not version:
+        return lambda x: x
+
+    import packaging.version as pv
+
+    if pv.Version(imblearn.__version__) < pv.Version(version):
+        msg = f"imbalanced-learn version {imblearn.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def has_lightgbm(version: str = "") -> bool:
     "Returns True if LightGBM is installed and its version is high enough."
     import packaging.version as pv

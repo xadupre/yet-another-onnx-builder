@@ -184,7 +184,7 @@ def to_onnx(
     )
     check_is_fitted(
         _fitted_check_target,
-        attributes=["transform", "predict", "mahalanobis", "score_samples"],
+        attributes=["transform", "predict", "mahalanobis", "score_samples", "fit_resample"],
         all_or_any=any,
         msg=(
             "This %(name)s instance has neither a 'transform', 'predict', "

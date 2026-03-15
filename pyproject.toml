@@ -54,6 +54,10 @@ category_encoders = [
     "scikit-learn>=1.4",
     "category-encoders>=2.6",
 ]
+imblearn = [
+    "scikit-learn>=1.4",
+    "imbalanced-learn>=0.10",
+]
 lightgbm = [
     "scikit-learn>=1.4",
     "lightgbm>=3.0",

@@ -38,6 +38,7 @@ def register_sklearn_converters():
     from .calibration import register as register_calibration
     from .category_encoders import register as register_category_encoders
     from .cluster import register as register_cluster
+    from .imblearn import register as register_imblearn
     from .compose import register as register_compose
     from .covariance import register as register_covariance
     from .decomposition import register as register_decomposition
@@ -69,6 +70,7 @@ def register_sklearn_converters():
     register_calibration()
     register_category_encoders()
     register_cluster()
+    register_imblearn()
     register_compose()
     register_covariance()
     register_decomposition()

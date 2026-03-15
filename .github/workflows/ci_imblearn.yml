@@ -1,0 +1,58 @@
+name: ci-imblearn
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 5 * * *"
+
+jobs:
+  imblearn_tests:
+    name: imblearn (ubuntu-latest, py3.12, imblearn-${{ matrix.imblearn-version }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        imblearn-version: ["0.12", "0.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,imblearn,sklearn]"
+
+      - name: Install imbalanced-learn==${{ matrix.imblearn-version }}
+        run: pip install "imbalanced-learn==${{ matrix.imblearn-version }}.*" && pip freeze
+
+      - name: pip freeze
+        run: pip freeze
+
+      - name: Run imblearn tests with no coverage
+        if: matrix.imblearn-version != '0.14'
+        run: |
+          cd unittests/sklearn/imblearn
+          python -m unittest discover -v
+
+      - name: Run imblearn tests with coverage
+        if: matrix.imblearn-version == '0.14'
+        run: |
+          cd unittests/sklearn/imblearn
+          coverage run -m unittest discover -v
+          coverage xml
+          cp *.xml ../../..
+          cd ../../..
+
+      - name: Upload coverage to Codecov
+        if: matrix.imblearn-version == '0.14'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          flags: imblearn

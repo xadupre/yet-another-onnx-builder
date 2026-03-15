@@ -25,6 +25,7 @@ yobx.sklearn
     ensemble/index
     feature_selection/index
     gaussian_process/index
+    imblearn/index
     impute/index
     isotonic/index
     kernel_approximation/index

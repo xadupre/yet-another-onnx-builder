@@ -46,6 +46,12 @@ def sklearn_pipeline(
     assert isinstance(estimator, Pipeline), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
+    # Pre-register the final output names so that g.unique_name() calls
+    # for intermediate steps cannot accidentally claim the same names,
+    # which would cause a naming collision when the last step writes its output.
+    for n in outputs:
+        g.unique_name(n)
+
     current_input = [X]
     for i, (step_name, step) in enumerate(estimator.steps):
         if i == len(estimator.steps) - 1:
