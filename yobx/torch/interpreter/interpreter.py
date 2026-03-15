@@ -10,7 +10,7 @@ import numpy as np
 from onnx import TensorProto
 from ...container.model_container import _get_type
 from ...helpers import string_type, make_hash, flatten_object
-from ...xbuilder import GraphBuilder, FunctionOptions
+from ...xbuilder import GraphBuilder, FunctionOptions, GraphBuilderTorchProtocol
 from ...xbuilder._virtual_tensor import VirtualTensor
 from ...xshape._shape_helper import all_int, DYNAMIC_SHAPE
 from ...xshape.rename_expressions import parse_expression_tokens
@@ -48,7 +48,7 @@ class DynamoInterpreter:
 
     def __init__(
         self,
-        graph_builder: GraphBuilder,
+        graph_builder: GraphBuilderTorchProtocol,
         retriever: Callable,
         dispatcher: Optional["Dispatcher"] = None,  # noqa: F821
         example_inputs: Optional[Tuple["torch.Tensor", ...]] = None,  # noqa: F821
