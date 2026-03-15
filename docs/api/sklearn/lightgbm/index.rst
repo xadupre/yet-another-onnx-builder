@@ -6,3 +6,4 @@ yobx.sklearn.lightgbm
     :caption: modules
 
     lgbm
+    lgbm_ranker

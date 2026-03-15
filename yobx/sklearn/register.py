@@ -35,13 +35,41 @@ def get_sklearn_converters():
     return dict(SKLEARN_CONVERTERS)
 
 
-def get_sklearn_estimator_coverage():
-    """Return a coverage report for scikit-learn estimators.
+def sklearn_exportable_methods() -> Tuple[str, ...]:
+    """
+    Returns the methods which can be exported into ONNX.
+
+    .. runpython::
+        :showcode:
+
+        from yobx.sklearn.register import sklearn_exportable_methods
+
+        print(sklearn_exportable_methods())
+    """
+    return "transform", "predict", "predict_proba", "mahalanobis", "score_samples"
+
+
+def get_sklearn_estimator_coverage(
+    rst: bool = False, libraries: Union[str, Tuple[str, ...]] = "all"
+):
+    """
+    Returns a coverage report for scikit-learn estimators.
 
     Enumerates every estimator/transformer exposed by
-    :func:`sklearn.utils.all_estimators` and reports which ones already have
-    a converter registered in :mod:`yobx.sklearn` and which ones are supported
-    by :epkg:`sklearn-onnx` (``skl2onnx``), when that package is installed.
+    :func:`sklearn.utils.all_estimators`  but also by other libraries
+    following the same design and supported by this package.
+    It reports which ones already have
+    a converter registered in :mod:`yobx.sklearn`,
+    when that package is installed.
+
+    Args
+    ----
+        rst:
+            returns the information a RST text
+        libraries:
+            `'all'` to include all available modules,
+            or a list of libraries to include such as
+            ``('sklearn', 'lightgbm', ...)``
 
     Returns
     -------
@@ -59,29 +87,99 @@ def get_sklearn_estimator_coverage():
         ``"yobx"``
             the converting function if a converter is registered in :mod:`yobx.sklearn`.
     """
-    from sklearn.utils import all_estimators
+    if not rst:
 
-    def _public_module(cls):
-        parts = cls.__module__.split(".")
-        return ".".join(p for p in parts if not p.startswith("_"))
+        def _public_module(cls):
+            parts = cls.__module__.split(".")
+            return ".".join(p for p in parts if not p.startswith("_"))
 
-    # Enumerates all sklearn estimators, explicitly including *predictable* transforms.
-    # Then add any yobx-registered converters not captured by the type filter.
-    all_pairs = dict(all_estimators())
-    for cls in SKLEARN_CONVERTERS:
-        if cls.__name__ not in all_pairs:
-            all_pairs[cls.__name__] = cls
+        if libraries == "all":
+            libraries = "category_encoders", "lightgbm", "sklearn", "xgboost"
 
-    rows = []
-    for _name, cls in sorted(all_pairs.items(), key=lambda x: x[0]):
-        rows.append(
-            {
-                "category": cls.__module__.split(".")[-2].strip("_"),
-                "name": cls.__name__,
-                "predictable": hasattr(cls, "transform") or hasattr(cls, "predict"),
-                "cls": cls,
-                "module": _public_module(cls),
-                "yobx": SKLEARN_CONVERTERS.get(cls, None),
-            }
+        all_pairs = {}
+        for lib in libraries:
+            if lib == "sklearn":
+                from sklearn.utils import all_estimators
+
+                all_pairs.update(dict(all_estimators()))
+            elif lib == "xgboost":
+                from .xgboost import all_estimators
+
+                all_pairs.update(dict(all_estimators()))
+            elif lib == "lightgbm":
+                from .lightgbm import all_estimators
+
+                all_pairs.update(dict(all_estimators()))
+            elif lib == "category_encoders":
+                from .category_encoders import all_estimators
+
+                all_pairs.update(dict(all_estimators()))
+            else:
+                raise ValueError(f"Unknown libraries {lib!r}")
+
+        for cls in SKLEARN_CONVERTERS:
+            if cls.__name__ not in all_pairs:
+                all_pairs[cls.__name__] = cls
+
+        methods = sklearn_exportable_methods()
+        rows = []
+
+        for _name, cls in sorted(all_pairs.items(), key=lambda x: x[0]):
+            rows.append(
+                {
+                    "category": cls.__module__.split(".")[-2].strip("_"),
+                    "name": cls.__name__,
+                    "predictable": any(hasattr(cls, m) for m in methods),
+                    "cls": cls,
+                    "module": _public_module(cls),
+                    "yobx": SKLEARN_CONVERTERS.get(cls, None),
+                }
+            )
+        return rows
+
+    rows = get_sklearn_estimator_coverage(libraries=libraries)
+    rows = sorted(rows, key=lambda x: (x["category"], x["name"]))
+
+    # Header
+    rst_rows = [
+        ".. list-table::",
+        "    :header-rows: 1",
+        "",
+        "    * - category",
+        "      - estimator",
+        "      - predictable",
+        "      - yobx",
+        "      - converter",
+    ]
+
+    n_possible = 0
+    n_done = 0
+    for row in rows:
+        cat = row["category"]
+        fct = row["yobx"]
+        if fct:
+            yobx_mark = "✓"
+            cvt = f":func:`{fct.__name__} <{fct.__module__}.{fct.__name__}>`"
+        else:
+            yobx_mark = ""
+            cvt = ""
+        predictable = "✓" if row["predictable"] else ""
+        clss = f":class:`{row['name']} <{row['module']}.{row['name']}>`"
+        rst_rows.extend(
+            [
+                f"    * - {cat}",
+                f"      - {clss}",
+                f"      - {predictable}",
+                f"      - {yobx_mark}",
+                f"      - {cvt}",
+            ]
         )
-    return rows
+        if yobx_mark:
+            n_done += 1
+        if predictable:
+            n_possible += 1
+    coverage_pct = n_done / n_possible * 100 if n_possible > 0 else 0.0
+    rst_rows.extend(
+        ["", "", f"**Coverage**: {n_done}/{n_possible} ~ {coverage_pct:1.1f}%"]
+    )
+    return "\n".join(rst_rows)
