@@ -1019,15 +1019,12 @@ class ConcatReshapePattern(PatternOptimization):
             %% Flow
             X --> SH1
             X --> SH2
-            SH1 --> D2[ ]
-            SH2 --> D1[ ]
+            SH1 --> CC
+            SH2 --> CC
             I1 --> CC
             I2 --> CC
-            D1 --> CC
-            D2 --> CC
-            CC --> d[ ]
+            CC --> R
             X --> R
-            d --> R
             R --> Y
 
             %% Styling
@@ -1039,9 +1036,6 @@ class ConcatReshapePattern(PatternOptimization):
             class I1 ioNode
             class I2 ioNode
             class Y ioNode
-            class D1 interNode
-            class D2 interNode
-            class d interNode
 
     Outcome of the fusion:
 
@@ -1068,9 +1062,8 @@ class ConcatReshapePattern(PatternOptimization):
             I2 --> CC
             D1 --> CC
             CM1 --> CC
-            CC --> d_concat[ ]
+            CC --> R
             X --> R
-            d_concat --> R
             R --> Y
 
             %% Styling
@@ -1082,7 +1075,6 @@ class ConcatReshapePattern(PatternOptimization):
             class I2 ioNode
             class D1 ioNode
             class Y ioNode
-            class d_concat interNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
