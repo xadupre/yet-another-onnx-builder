@@ -33,7 +33,7 @@ jobs:
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
 
       - name: Install dependencies
-        run: pip install -e ".[dev,torch]"
+        run: pip install -e ".[dev,torch,transformers]"
 
       - name: install transformers==4.49 and pip freeze
         run: pip install transformers==4.49 && pip freeze
@@ -74,14 +74,14 @@ jobs:
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
 
       - name: Install dependencies
-        run: pip install -e ".[dev,torch]"
-
-      - name: install transformers==5.2 and pip freeze
-        run: pip install transformers==5.2 && pip freeze
-      - name: Run tests with transformers==5.2
-        run: pytest unittests/torch --durations=10
+        run: pip install -e ".[dev,torch,transformers]"
 
       - name: install transformers==5.3 and pip freeze
         run: pip install transformers==5.3 && pip freeze
       - name: Run tests with transformers==5.3
+        run: pytest unittests/torch --durations=10
+
+      - name: install transformers==5.2 and pip freeze
+        run: pip install transformers==5.2 && pip freeze
+      - name: Run tests with transformers==5.2
         run: pytest unittests/torch --durations=10

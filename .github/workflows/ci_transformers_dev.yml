@@ -25,7 +25,7 @@ jobs:
       - name: Install development version of transformers
         run: pip install git+https://github.com/huggingface/transformers.git
       - name: Install dependencies
-        run: pip install -e ".[dev,torch]"
+        run: pip install -e ".[dev,torch,transformers]"
       - name: pip freeze
         run: pip freeze
       - name: Run tests

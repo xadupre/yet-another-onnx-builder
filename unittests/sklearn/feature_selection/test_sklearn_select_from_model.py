@@ -92,12 +92,7 @@ class TestSelectFromModel(ExtTestCase):
         X, y = self._make_data(np.float32)
         pipe = Pipeline(
             [
-                (
-                    "sel",
-                    SelectFromModel(
-                        RandomForestClassifier(n_estimators=10, random_state=0)
-                    ),
-                ),
+                ("sel", SelectFromModel(RandomForestClassifier(n_estimators=10, random_state=0))),
                 ("clf", LogisticRegression()),
             ]
         )
@@ -132,12 +127,7 @@ class TestSelectFromModel(ExtTestCase):
         X, y = self._make_data(np.float64)
         pipe = Pipeline(
             [
-                (
-                    "sel",
-                    SelectFromModel(
-                        RandomForestClassifier(n_estimators=10, random_state=0)
-                    ),
-                ),
+                ("sel", SelectFromModel(RandomForestClassifier(n_estimators=10, random_state=0))),
                 ("clf", LogisticRegression()),
             ]
         )
