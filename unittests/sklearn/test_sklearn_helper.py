@@ -257,7 +257,6 @@ class TestGetOutputNames(ExtTestCase):
         self.assertTrue(_should_use_feature_names(est))
 
     def test_should_use_feature_names_cluster(self):
-        """Regular ClusterMixin (not FeatureAgglomeration) → _should_use_feature_names returns False."""
         from sklearn.cluster import KMeans
         from yobx.sklearn.sklearn_helper import _should_use_feature_names
 
