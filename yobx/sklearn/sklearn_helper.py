@@ -19,6 +19,13 @@ def _is_selector(estimator: BaseEstimator) -> bool:
     return SelectorMixin is not None and isinstance(estimator, SelectorMixin)
 
 
+def _should_use_feature_names(estimator: BaseEstimator) -> bool:
+    """Returns True when get_feature_names_out() should drive output naming."""
+    return not isinstance(estimator, ClusterMixin) and (
+        not is_classifier(estimator) or _is_selector(estimator)
+    )
+
+
 def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
     """
     Returns True when *estimator* is a fitted classifier that genuinely
@@ -60,9 +67,7 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
                     )
                 except AttributeError:
                     pass
-        elif not isinstance(estimator, ClusterMixin) and (
-            not is_classifier(estimator) or _is_selector(estimator)
-        ):
+        elif _should_use_feature_names(estimator):
             try:
                 return post_process_output_names(
                     estimator, list(estimator.get_feature_names_out())

@@ -1,10 +1,24 @@
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import numpy as np
 from sklearn.feature_selection import RFE, RFECV
 
 from ...typing import GraphBuilderExtendedProtocol
 from ..register import register_sklearn_converter
+
+
+def _sklearn_rfe_transform(
+    g: GraphBuilderExtendedProtocol,
+    outputs: List[str],
+    estimator: Union[RFE, RFECV],
+    X: str,
+    name: str,
+) -> str:
+    """Shared implementation: select fitted feature indices via Gather."""
+    indices = estimator.get_support(indices=True).astype(np.int64)
+    res = g.op.Gather(X, indices, axis=1, name=name, outputs=outputs)
+    assert isinstance(res, str)
+    return res
 
 
 @register_sklearn_converter(RFE)
@@ -39,12 +53,7 @@ def sklearn_rfe(
     """
     assert isinstance(estimator, RFE), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
-
-    indices = estimator.get_support(indices=True).astype(np.int64)
-    res = g.op.Gather(X, indices, axis=1, name=name, outputs=outputs)
-
-    assert isinstance(res, str)
-    return res
+    return _sklearn_rfe_transform(g, outputs, estimator, X, name)
 
 
 @register_sklearn_converter(RFECV)
@@ -79,9 +88,4 @@ def sklearn_rfecv(
     """
     assert isinstance(estimator, RFECV), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
-
-    indices = estimator.get_support(indices=True).astype(np.int64)
-    res = g.op.Gather(X, indices, axis=1, name=name, outputs=outputs)
-
-    assert isinstance(res, str)
-    return res
+    return _sklearn_rfe_transform(g, outputs, estimator, X, name)
