@@ -98,7 +98,7 @@ def sklearn_feature_agglomeration(
         reduce_op = "ReduceMax" if pooling_func is np.max else "ReduceMin"
         cluster_tensors = []
         axis_arr = np.array([1], dtype=np.int64)
-        for c in np.unique(labels):
+        for c in range(n_clusters):
             col_indices = np.where(labels == c)[0].astype(np.int64)
             gathered = g.op.Gather(
                 X, col_indices, axis=1, name=f"{name}_gather_{c}"

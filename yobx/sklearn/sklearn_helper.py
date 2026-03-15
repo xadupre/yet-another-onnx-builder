@@ -20,7 +20,7 @@ def _is_cluster_transformer(estimator: BaseEstimator) -> bool:
     than the ``(labels, distances)`` pair produced by regular clustering
     models.
     """
-    return isinstance(estimator, (FeatureAgglomeration,))
+    return isinstance(estimator, FeatureAgglomeration)
 
 
 def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
