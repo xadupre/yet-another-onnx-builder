@@ -29,6 +29,9 @@ class TestList(ExtTestCase):
             for f in os.listdir(folder)
             if "." not in f and "__" not in f and not f.startswith("test_")
         }
+        for f in {"_xgboost", "_lightgbm", "_category_encoders"}:
+            if f in subfolders:
+                subfolders.add(f[1:])
         not_here = subs - subfolders & subs
 
         self.assertEmpty(not_here)

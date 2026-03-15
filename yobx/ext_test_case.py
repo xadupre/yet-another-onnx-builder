@@ -624,10 +624,10 @@ def requires_category_encoders(version: str = "", msg: str = "") -> Callable:
     try:
         import category_encoders
     except (AttributeError, ImportError):
-        return unittest.skip(msg or "category_encoders not installed")
+        return unittest.skip(msg or "category_encoders not installed (1)")
 
     if not hasattr(category_encoders, "__version__"):
-        return unittest.skip(msg or "category_encoders not installed")
+        return unittest.skip(msg or "category_encoders not installed (2)")
 
     if not version:
         return lambda x: x
