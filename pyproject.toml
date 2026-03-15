@@ -29,7 +29,6 @@ dev = [
     "pytest-coverage",
     "pytest-subtests",
     "ruff",
-    "skl2onnx",
     "xlsxwriter",
 ]
 docs = [
@@ -39,7 +38,7 @@ docs = [
     "openpyxl",
     "pandas",
     "piccolo-theme",
-    "skl2onnx",
+    "skl2onnx",  # for one example
     "sphinx>=7",
     "sphinxcontrib-mermaid",
     "sphinx-copybutton",
