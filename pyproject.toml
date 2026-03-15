@@ -173,6 +173,7 @@ module = [
     "yobx.sklearn.category_encoders.*",
     "yobx.sklearn.cluster.*",
     "yobx.sklearn.coveriance.*",
+    "yobx.sklearn.cross_decomposition.*",
     "yobx.sklearn.decomposition.*",
     "yobx.sklearn.discriminant_analysis.*",
     "yobx.sklearn.ensemble.*",
