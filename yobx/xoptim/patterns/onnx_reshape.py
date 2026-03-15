@@ -61,7 +61,6 @@ class ShapedBasedReshapePattern(ReshapePattern):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c'])
             C[Constant <br/> value: 0, 0, -1]
@@ -88,7 +87,6 @@ class ShapedBasedReshapePattern(ReshapePattern):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             X[Input: X] --> ID[Identity]
             S[Input: shape2] -.->|Invalid?| ID
             ID --> xrr[Output: xrr]
@@ -134,7 +132,6 @@ class ReduceReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 3, 2])
             C[Constant <br/> value: 3]
@@ -155,7 +152,6 @@ class ReduceReshapePattern(PatternOptimization):
             class R opNode
             class X ioNode
             class Y ioNode
-            class xr interNode
 
     Outcome of the fusion:
 
@@ -166,7 +162,6 @@ class ReduceReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 3, 2])
             RS[[ReduceSum <br/> axes=1, keepdims=0]]
@@ -275,7 +270,6 @@ class ReshapeReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 128])
             C1[Constant <br/> value: 4096, 7, 7, 128]
@@ -299,7 +293,6 @@ class ReshapeReshapePattern(PatternOptimization):
             class R2 opNode
             class X ioNode
             class s2 ioNode
-            class s1 interNode
 
     Outcome of the fusion:
 
@@ -310,7 +303,6 @@ class ReshapeReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 128])
             C2[Constant <br/> value: 4096, 49, 128]
@@ -583,7 +575,6 @@ class Reshape2Of3Pattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 4])
             Y([Input: Y <br/> float, 2, 3, 4])
@@ -624,9 +615,6 @@ class Reshape2Of3Pattern(PatternOptimization):
             class Y ioNode
             class xrr ioNode
             class Z ioNode
-            class xr interNode
-            class yr interNode
-            class xrr_int interNode
 
     Outcome of the fusion:
 
@@ -637,7 +625,6 @@ class Reshape2Of3Pattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 4])
             Y([Input: Y <br/> float, 2, 3, 4])
@@ -664,7 +651,6 @@ class Reshape2Of3Pattern(PatternOptimization):
             class Y ioNode
             class xrr ioNode
             class Z ioNode
-            class z_int interNode
     """
 
     _op_types = element_wise_binary_op_types()
@@ -862,7 +848,6 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 4])
             Y([Input: Y <br/> float, 'a', 4])
@@ -893,8 +878,6 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
             class X ioNode
             class Y ioNode
             class Z ioNode
-            class xc interNode
-            class yc interNode
 
     Outcome of the fusion:
 
@@ -905,7 +888,6 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 4])
             Y([Input: Y <br/> float, 'a', 4])
@@ -929,7 +911,6 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
             class X ioNode
             class Y ioNode
             class Z ioNode
-            class add_out interNode
     """
 
     _op_types = element_wise_binary_op_types()
@@ -1005,7 +986,6 @@ class ConcatReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c', 'd'])
             I1([Input: I1 <br/> int64, 1])
@@ -1039,9 +1019,6 @@ class ConcatReshapePattern(PatternOptimization):
             class I1 ioNode
             class I2 ioNode
             class Y ioNode
-            class D1 interNode
-            class D2 interNode
-            class d interNode
 
     Outcome of the fusion:
 
@@ -1052,7 +1029,6 @@ class ConcatReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c', 'd'])
             I1([Input: I1 <br/> int64, 1])
@@ -1082,7 +1058,6 @@ class ConcatReshapePattern(PatternOptimization):
             class I2 ioNode
             class D1 ioNode
             class Y ioNode
-            class d_concat interNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1200,7 +1175,6 @@ class StaticConcatReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             I1([Input: I1 <br/> int64, 1])
@@ -1226,8 +1200,6 @@ class StaticConcatReshapePattern(PatternOptimization):
             class X ioNode
             class I1 ioNode
             class Y ioNode
-            class D2 interNode
-            class dc interNode
 
     Outcome of the fusion:
 
@@ -1238,7 +1210,6 @@ class StaticConcatReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             I1([Input: I1 <br/> int64, 1])
@@ -1262,7 +1233,6 @@ class StaticConcatReshapePattern(PatternOptimization):
             class X ioNode
             class I1 ioNode
             class Y ioNode
-            class d_concat interNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1366,7 +1336,6 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             I1[Initializer <br/> value: -1]
@@ -1392,8 +1361,6 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
             class R opNode
             class X ioNode
             class Y ioNode
-            class D2 interNode
-            class dshape interNode
 
     Outcome of the fusion:
 
@@ -1404,7 +1371,6 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             C[Constant <br/> value: 6, -1]
@@ -1596,7 +1562,6 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             one[Initializer <br/> value: 1]
@@ -1623,8 +1588,6 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
             class R opNode
             class X ioNode
             class Y ioNode
-            class D2 interNode
-            class dshape2 interNode
 
     Outcome of the fusion:
 
@@ -1635,7 +1598,6 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 2, 3, 'd'])
             C[Constant <br/> value: 0, 4]
@@ -1752,7 +1714,6 @@ class UnsqueezeReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c'])
             C1[Constant <br/> value: 2]
@@ -1776,7 +1737,6 @@ class UnsqueezeReshapePattern(PatternOptimization):
             class R opNode
             class X ioNode
             class Z ioNode
-            class xu0 interNode
 
     Outcome of the fusion:
 
@@ -1787,7 +1747,6 @@ class UnsqueezeReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 'b', 'c'])
             C[Constant <br/> value: 1]
@@ -1880,7 +1839,6 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 8, 16])
             S3([Input: shape3 <br/> int64, 2])
@@ -1904,7 +1862,6 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
             class X ioNode
             class S3 ioNode
             class Z ioNode
-            class xu0 interNode
 
     Outcome of the fusion:
 
@@ -1915,7 +1872,6 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef interNode fill:#eee,stroke:#999,color:#333
             %% Nodes
             X([Input: X <br/> float, 'a', 8, 16])
             S3([Input: shape3 <br/> int64, 2])
