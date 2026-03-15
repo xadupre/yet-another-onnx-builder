@@ -17,11 +17,21 @@ Yet another onnx builder, patches, flattening functions...
 **[Documentation](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/index.html)**
 
 **yet-another-onnx-builder** (`yobx`) proposes a unique API to convert machine learning models
-to [ONNX](https://onnx.ai) format from many libraries,
-[torch](https://pytorch.org), [tensorflow](https://www.tensorflow.org),
-[scikit-learn](https://scikit-learn.org),
-[xgboost](https://xgboost.readthedocs.io),
-[lightgbm](https://lightgbm.readthedocs.io).
+to [ONNX](https://onnx.ai) format from many libraries:
+
+**standard machine learning**
+
+* [categorical_encoders](https://contrib.scikit-learn.org/category_encoders/)
+* [imbalanced-learn](https://imbalanced-learn.org/stable/)
+* [lightgbm](https://lightgbm.readthedocs.io)
+* [scikit-learn](https://scikit-learn.org)
+* [xgboost](https://xgboost.readthedocs.io)
+
+**deeplearning**
+
+* [tensorflow](https://www.tensorflow.org)
+* [torch](https://pytorch.org)
+
 It provides:
 
 - A **graph builder API** for constructing and optimizing ONNX graphs, with built-in shape
@@ -36,10 +46,13 @@ It provides:
 - It supports multiple opsets and multiple domains.
 - It allows the user to directly onnx model with [Spox](https://spox.readthedocs.io/en/latest/) or [onnxscript](https://microsoft.github.io/onnxscript/)/[ir-py](https://onnx.ai/ir-py/).
 
-Its unique API:
+Its unique API across all converters:
 
 ```python
 # the model is called 
 expected = model(*args, **kwargs)
-onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, **options)
+onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, target_opset=22, **options)
 ```
+
+[onnxruntime](https://onnxruntime.ai/) optimizations are triggered with
+``target_opset={"": 22, "com.microsoft": 1}``.
