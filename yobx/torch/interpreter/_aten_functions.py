@@ -4305,14 +4305,15 @@ def aten__grouped_mm(
         TensorProto.FLOAT16,
     }, f"unexpected type for mat_a={mat_a!r}: {dtype_a=}{g.get_debug_msg()}"
     if offs is None:
-        if dtype_a != TensorProto.FLOAT:
+        if dtype_a == TensorProto.BFLOAT16:
+            # OnnxRuntime does not support bfloat16 MatMul on CPU, upcast to float32
             ma = g.op.Cast(mat_a, to=TensorProto.FLOAT, name=name)
             mb = g.op.Cast(mat_b, to=TensorProto.FLOAT, name=name)
             mm = g.op.MatMul(ma, mb, name=name)
             res = g.op.Cast(mm, to=dtype_a, name=name, outputs=outputs)
         else:
-            ma, mb = mat_a, mat_b
-            res = g.op.MatMul(ma, mb, name=name, outputs=outputs)
+            # float32 and float16 are natively supported by OnnxRuntime
+            res = g.op.MatMul(mat_a, mat_b, name=name, outputs=outputs)
         if not sts:
             set_type_shape_matmul(g, res, mat_a, mat_b)
         return res
@@ -4327,7 +4328,8 @@ def aten__grouped_mm(
             ), f"unable to retrieve constant offs={offs!r} is not a constant{g.get_debug_msg()}"
             offsets = cst.tolist()
 
-        if dtype_a != TensorProto.FLOAT:
+        if dtype_a == TensorProto.BFLOAT16:
+            # OnnxRuntime does not support bfloat16 MatMul on CPU, upcast to float32
             ma = g.op.Cast(mat_a, to=TensorProto.FLOAT, name=name)
             mb = g.op.Cast(mat_b, to=TensorProto.FLOAT, name=name)
         else:
@@ -4346,7 +4348,7 @@ def aten__grouped_mm(
             cats.append(g.op.UnsqueezeAnyOpset(mm, g.ZERO, name=name))
             last = off
         concatenation = g.op.Concat(*cats, axis=0, name=name)
-        if dtype_a != TensorProto.FLOAT:
+        if dtype_a == TensorProto.BFLOAT16:
             concatenation = g.op.Cast(concatenation, to=dtype_a, name=name)
         res = g.op.Identity(concatenation, name=name, outputs=outputs)
         if not sts:
@@ -4368,7 +4370,8 @@ def aten__grouped_mm(
             offs, g.MINUS_ONE, np.array([loop_size], dtype=np.int64), g.ZERO, name=name
         )
 
-        if dtype_a != TensorProto.FLOAT:
+        if dtype_a == TensorProto.BFLOAT16:
+            # OnnxRuntime does not support bfloat16 MatMul on CPU, upcast to float32
             ma = g.op.Cast(mat_a, to=TensorProto.FLOAT, name=name)
             mb = g.op.Cast(mat_b, to=TensorProto.FLOAT, name=name)
         else:
@@ -4430,7 +4433,7 @@ def aten__grouped_mm(
             cats.append(g.op.UnsqueezeAnyOpset(mm, g.ZERO, name=name))
 
         concatenation = g.op.Concat(*cats, axis=0, name=name)
-        if dtype_a != TensorProto.FLOAT:
+        if dtype_a == TensorProto.BFLOAT16:
             concatenation = g.op.Cast(concatenation, to=dtype_a, name=name)
         res = g.op.Identity(concatenation, name=name, outputs=outputs)
         if not sts:
@@ -4449,7 +4452,8 @@ def aten__grouped_mm(
     ), f"Unexpected rank {g.get_rank(mat_b)} for {mat_b!r}{g.get_debug_msg()}"
 
     # generic case, no constant
-    if dtype_a != TensorProto.FLOAT:
+    if dtype_a == TensorProto.BFLOAT16:
+        # OnnxRuntime does not support bfloat16 MatMul on CPU, upcast to float32
         ma = g.op.Cast(mat_a, to=TensorProto.FLOAT, name=name)
         mb = g.op.Cast(mat_b, to=TensorProto.FLOAT, name=name)
     else:
@@ -4511,8 +4515,8 @@ def aten__grouped_mm(
         scan_output_axes=[0],
         scan_output_directions=[0],
     )
-    g.set_type(scan_output, TensorProto.FLOAT)
-    if dtype_a != TensorProto.FLOAT:
+    g.set_type(scan_output, TensorProto.FLOAT if dtype_a == TensorProto.BFLOAT16 else dtype_a)
+    if dtype_a == TensorProto.BFLOAT16:
         res = g.op.Cast(scan_output, to=dtype_a, name=name, outputs=outputs)
     else:
         res = g.op.Identity(scan_output, name=name, outputs=outputs)
