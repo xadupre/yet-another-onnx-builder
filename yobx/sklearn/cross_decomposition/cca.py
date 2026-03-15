@@ -1,6 +1,5 @@
 from typing import Dict, List
 
-import numpy as np
 from sklearn.cross_decomposition import CCA
 
 from ..register import register_sklearn_converter
@@ -24,7 +23,7 @@ def sklearn_cca(
 
     .. code-block:: text
 
-        X  ──Sub(_x_mean)──►  centered  ──Div(_x_std)──►  scaled  ──MatMul(x_rotations_)──►  output
+        X ──Sub(_x_mean)──► centered ── Div(_x_std)──► scaled ──MatMul(x_rotations_) ──► output
 
     The input is centred by subtracting ``_x_mean``, normalized by dividing
     by ``_x_std``, then projected using ``x_rotations_`` to obtain the
