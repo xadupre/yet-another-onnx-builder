@@ -12,6 +12,7 @@ With the following versions:
 
 .. runpython::
 
+    import category_encoders
     import lightgbm
     import numpy
     import ml_dtypes
@@ -28,6 +29,7 @@ With the following versions:
     import xgboost
 
     for m in [
+        category_encoders,
         lightgbm,
         numpy,
         ml_dtypes,

@@ -91,7 +91,7 @@ intersphinx_mapping = {
     "onnx": ("https://onnx.ai/onnx/", None),
     "onnxruntime": ("https://onnxruntime.ai/docs/api/python/", None),
     "onnxscript": ("https://microsoft.github.io/onnxscript/", None),
-    "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", None),
+    "pandas": ("https://pandas.pydata.org/docs/", None),
     "python": (f"https://docs.python.org/{sys.version_info.major}", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "sklearn": ("https://scikit-learn.org/stable/", None),
@@ -102,6 +102,8 @@ intersphinx_mapping = {
     ),
     "torch": ("https://docs.pytorch.org/docs/stable/", None),
 }
+
+suppress_warnings = ["intersphinx.external"]
 
 sphinx_gallery_conf = {
     # path to your examples scripts

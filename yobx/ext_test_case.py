@@ -624,10 +624,10 @@ def requires_category_encoders(version: str = "", msg: str = "") -> Callable:
     try:
         import category_encoders
     except (AttributeError, ImportError):
-        return unittest.skip(msg or "category_encoders not installed")
+        return unittest.skip(msg or "category_encoders not installed (1)")
 
     if not hasattr(category_encoders, "__version__"):
-        return unittest.skip(msg or "category_encoders not installed")
+        return unittest.skip(msg or "category_encoders not installed (2)")
 
     if not version:
         return lambda x: x
@@ -1036,6 +1036,10 @@ class ExtTestCase(unittest.TestCase):
 
     _warns: List[Tuple[str, int, Warning]] = []
     _todos: List[Tuple[Callable, str]] = []
+
+    def shortDescription(self):
+        # To remove annoying display on the screen every time verbosity is enabled.
+        return None
 
     def unit_test_going(self) -> bool:
         """
