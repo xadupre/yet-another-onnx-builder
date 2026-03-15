@@ -99,10 +99,7 @@ class TestSelectKBest(ExtTestCase):
 
         X, y = self._make_data(np.float32)
         pipe = Pipeline(
-            [
-                ("sel", SelectKBest(score_func=f_classif, k=5)),
-                ("clf", LogisticRegression()),
-            ]
+            [("sel", SelectKBest(score_func=f_classif, k=5)), ("clf", LogisticRegression())]
         )
         pipe.fit(X, y)
 
@@ -133,10 +130,7 @@ class TestSelectKBest(ExtTestCase):
 
         X, y = self._make_data(np.float64)
         pipe = Pipeline(
-            [
-                ("sel", SelectKBest(score_func=f_classif, k=5)),
-                ("clf", LogisticRegression()),
-            ]
+            [("sel", SelectKBest(score_func=f_classif, k=5)), ("clf", LogisticRegression())]
         )
         pipe.fit(X, y)
 

@@ -35,7 +35,7 @@ def get_sklearn_converters():
     return dict(SKLEARN_CONVERTERS)
 
 
-def sklearn_exportable_methods() -> Tuple[str]:
+def sklearn_exportable_methods() -> Tuple[str, ...]:
     """
     Returns the methods which can be exported into ONNX.
 
@@ -49,7 +49,7 @@ def sklearn_exportable_methods() -> Tuple[str]:
     return "transform", "predict", "predict_proba", "mahalanobis", "score_samples"
 
 
-def get_sklearn_estimator_coverage(rst: bool = False, libraries: Union[str, Tuple[str]] = "all"):
+def get_sklearn_estimator_coverage(rst: bool = False, libraries: Union[str, Tuple[str, ...]] = "all"):
     """
     Returns a coverage report for scikit-learn estimators.
 
@@ -164,11 +164,11 @@ def get_sklearn_estimator_coverage(rst: bool = False, libraries: Union[str, Tupl
             yobx_mark = ""
             cvt = ""
         predictable = "✓" if row["predictable"] else ""
-        cls = f":class:`{row['name']} <{row['module']}.{row['name']}>`"
+        clss = f":class:`{row['name']} <{row['module']}.{row['name']}>`"
         rst_rows.extend(
             [
                 f"    * - {cat}",
-                f"      - {cls}",
+                f"      - {clss}",
                 f"      - {predictable}",
                 f"      - {yobx_mark}",
                 f"      - {cvt}",
