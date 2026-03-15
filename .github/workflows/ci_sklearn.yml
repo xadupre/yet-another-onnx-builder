@@ -26,7 +26,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -e ".[category_encoders,dev,lightgbm,sklearn,xgboost]"
+        run: pip install -e ".[category_encoders,dev,imblearn,lightgbm,sklearn,xgboost]"
 
       - name: Install scikit-learn==${{ matrix.sklearn-version }}
         run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*" && pip freeze
