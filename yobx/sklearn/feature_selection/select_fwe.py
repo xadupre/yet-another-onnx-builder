@@ -19,11 +19,12 @@ def sklearn_select_fwe(
     """
     Converts a :class:`sklearn.feature_selection.SelectFwe` into ONNX.
 
-    After fitting, the transformer keeps the features whose p-value is below
-    the family-wise error rate threshold ``alpha / n_features``.  The selected
-    column indices are stored in ``estimator.get_support(indices=True)`` and
-    are fixed constants at conversion time, so the ONNX graph contains a
-    single ``Gather`` node that selects those columns from the input matrix:
+    After fitting, the transformer keeps the features whose uncorrected
+    p-value is below the family-wise error rate threshold *alpha*.  The
+    selected column indices are stored in
+    ``estimator.get_support(indices=True)`` and are fixed constants at
+    conversion time, so the ONNX graph contains a single ``Gather`` node
+    that selects those columns from the input matrix:
 
     .. code-block:: text
 
@@ -37,9 +38,7 @@ def sklearn_select_fwe(
     :param name: prefix name for the added nodes
     :return: output name
     """
-    assert isinstance(
-        estimator, SelectFwe
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, SelectFwe), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     indices = estimator.get_support(indices=True).astype(np.int64)
