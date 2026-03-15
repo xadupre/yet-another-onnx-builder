@@ -1,6 +1,6 @@
 """
-ONNX converters for :class:`xgboost.XGBClassifier` and
-:class:`xgboost.XGBRegressor`.
+ONNX converters for :class:`xgboost.XGBClassifier`, :class:`xgboost.XGBRegressor`,
+and :class:`xgboost.XGBRanker`.
 
 The trees are extracted from the fitted booster via
 ``booster.get_dump(dump_format='json')`` and encoded using the ONNX ML
@@ -40,7 +40,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import onnx
 import onnx.helper as oh
-from xgboost import XGBRegressor, XGBClassifier
+from xgboost import XGBRegressor, XGBClassifier, XGBRanker
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
@@ -70,6 +70,13 @@ _REG_SIGMOID_OBJECTIVES = frozenset({"reg:logistic"})
 #: Regression objectives that apply ``exp`` as the output transform
 #: (log-link objectives).
 _REG_EXP_OBJECTIVES = frozenset({"count:poisson", "reg:gamma", "reg:tweedie", "survival:cox"})
+
+# ---------------------------------------------------------------------------
+# Supported ranking objectives (all use identity output transform).
+# ---------------------------------------------------------------------------
+
+#: Ranking objectives that use the identity link (no output transform).
+_RANK_IDENTITY_OBJECTIVES = frozenset({"rank:pairwise", "rank:ndcg", "rank:map"})
 
 
 # ---------------------------------------------------------------------------
@@ -456,6 +463,25 @@ def _get_reg_output_transform(objective: str) -> Optional[str]:
     )
 
 
+def _get_rank_output_transform(objective: str) -> Optional[str]:
+    """Validate the objective for an :class:`~xgboost.XGBRanker` and return the output transform.
+
+    All supported ranking objectives use the identity output transform (raw
+    margin scores are returned directly).
+
+    :param objective: XGBoost ranking objective string (e.g. ``"rank:pairwise"``)
+    :return: ``None`` (identity — no output transform).
+    :raises NotImplementedError: when *objective* is not supported by this
+        converter.
+    """
+    if objective in _RANK_IDENTITY_OBJECTIVES:
+        return None
+    raise NotImplementedError(
+        f"XGBRanker ONNX converter: objective {objective!r} is not yet supported. "
+        f"Supported objectives — identity: {sorted(_RANK_IDENTITY_OBJECTIVES)}."
+    )
+
+
 def _emit_tree_node(
     g: GraphBuilderExtendedProtocol,
     X: str,
@@ -781,6 +807,86 @@ def sklearn_xgb_regressor(
         raw_scores = g.op.Exp(raw_scores, name=f"{name}_exp")
     # out_transform is None → identity, no node needed.
 
+    cast_result = g.make_node(
+        "Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype
+    )
+    return cast_result
+
+
+# ---------------------------------------------------------------------------
+# XGBRanker converter
+# ---------------------------------------------------------------------------
+
+
+@register_sklearn_converter(XGBRanker)
+def sklearn_xgb_ranker(
+    g: GraphBuilderExtendedProtocol,
+    sts: Dict,
+    outputs: List[str],
+    estimator,
+    X: str,
+    name: str = "xgb_ranker",
+) -> str:
+    """Convert an :class:`xgboost.XGBRanker` to ONNX.
+
+    The raw margin (sum of all tree leaf values) is computed via a
+    ``TreeEnsembleRegressor`` / ``TreeEnsemble`` node and the XGBoost
+    ``base_score`` bias is added to produce the ranking score.  All
+    supported ranking objectives use the identity output transform — the
+    raw margin is the final predicted score, matching
+    :meth:`~xgboost.XGBRanker.predict`:
+
+    * ``rank:pairwise``, ``rank:ndcg``, ``rank:map``: identity (no transform).
+
+    Unsupported objectives raise :class:`NotImplementedError`.
+
+    :param g: the graph builder to add nodes to
+    :param sts: shapes dict (passed through, not used internally)
+    :param outputs: desired output names ``[scores]``
+    :param estimator: a fitted ``XGBRanker``
+    :param X: input tensor name
+    :param name: prefix for node names added to the graph
+    :return: output tensor name (shape ``[N, 1]``)
+    :raises NotImplementedError: if the model's objective is not supported
+    """
+    booster = estimator.get_booster()
+    objective: str = estimator.objective or "rank:pairwise"
+
+    # Validate early so the error message is clear before we build any graph.
+    _get_rank_output_transform(objective)
+
+    ml_opset = g.get_opset("ai.onnx.ml")
+    itype = g.get_type(X)
+    dtype = tensor_dtype_to_np_dtype(itype)
+
+    trees_json = [json.loads(t) for t in booster.get_dump(dump_format="json")]
+    feature_names = booster.feature_names
+    feature_name_to_idx = {fn: i for i, fn in enumerate(feature_names)} if feature_names else None
+
+    tree_out_name = f"{outputs[0]}_tree_out"
+
+    raw_scores = _emit_tree_node(
+        g,
+        X,
+        name,
+        n_targets=1,
+        trees_json=trees_json,
+        feature_name_to_idx=feature_name_to_idx,
+        ml_opset=ml_opset,
+        intermediate_name=tree_out_name,
+        itype=itype,
+    )
+
+    raw_scores = g.make_node("Cast", [raw_scores], outputs=1, name=f"{name}_tree_cast", to=itype)
+
+    # Add margin-space bias derived from base_score.
+    base_score = _get_base_score(booster)
+    bias = _compute_margin_bias(base_score, objective)
+    if abs(bias) > 1e-8:
+        bias_arr = np.array([bias], dtype=dtype)
+        raw_scores = g.op.Add(raw_scores, bias_arr, name=f"{name}_bias")
+
+    # All ranking objectives use identity output transform — raw margin is the score.
     cast_result = g.make_node(
         "Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype
     )
