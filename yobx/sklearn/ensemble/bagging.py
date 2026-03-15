@@ -13,7 +13,7 @@ def _select_features(
     g: GraphBuilderExtendedProtocol, X: str, feature_indices: np.ndarray, name: str
 ) -> str:
     """
-    Selects a subset of columns from *X* using a :onnx:`Gather` node.
+    Selects a subset of columns from *X* using a `Gather` node.
 
     :param g: graph builder
     :param X: name of the ``(N, F)`` input tensor

@@ -32,7 +32,7 @@ def sklearn_missing_indicator(
 
         X ──IsNaN──► mask [N, F]  ──► output
 
-    When ``features='missing-only'``, a :onnx:`Gather` node selects only
+    When ``features='missing-only'``, a `Gather` node selects only
     the columns recorded in ``estimator.features_``:
 
     .. code-block:: text
