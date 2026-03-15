@@ -2,6 +2,7 @@
 
 [![core](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_core.yml/badge.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_core.yml)
 [![scikit-learn](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_sklearn.yml/badge.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_sklearn.yml)
+[![imbalanced-learn](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_imblearn.yml/badge.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_imblearn.yml)
 [![tensorflow](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_tensorflow.yml/badge.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_tensorflow.yml)
 [![pytorch](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_tensorflow.yml/ci_torch.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_torch.yml)
 [![Documentation](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/docs.yml/badge.svg)](https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/docs.yml)

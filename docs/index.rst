@@ -9,6 +9,10 @@ yet-another-onnx-builder documentation
     :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_sklearn.yml
     :alt: scikit-learn
 
+.. image:: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_imblearn.yml/badge.svg
+    :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_imblearn.yml
+    :alt: imbalanced-learn
+
 .. image:: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_tensorflow.yml/badge.svg
     :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_tensorflow.yml
     :alt: tensorflow
