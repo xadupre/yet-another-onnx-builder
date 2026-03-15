@@ -1,6 +1,7 @@
 """
 ONNX converters for :class:`lightgbm.LGBMClassifier`,
-:class:`lightgbm.LGBMRegressor`, and :class:`lightgbm.LGBMModel`.
+:class:`lightgbm.LGBMRegressor`, :class:`lightgbm.LGBMRanker`,
+and :class:`lightgbm.LGBMModel`.
 
 The trees are extracted from the fitted booster via
 ``booster_.dump_model()`` and encoded using the ONNX ML
@@ -20,6 +21,9 @@ The trees are extracted from the fitted booster via
   * Exp objectives (``poisson``, ``tweedie``): ``exp(margin)``; prediction
     is in positive-real space.
 
+* **Ranking** — raw margin output (identity transform); output shape
+  ``[N, 1]``.  Supported objectives: ``lambdarank``, ``rank_xendcg``.
+
 **Numerical splits**: LightGBM's condition *"go to left child when
 x ≤ split_condition"* maps to ``BRANCH_LEQ`` for both ``ai.onnx.ml``
 opset ≤ 4 and opset ≥ 5 — exact match.
@@ -37,7 +41,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import onnx
 import onnx.helper as oh
-from lightgbm import LGBMRegressor, LGBMClassifier, LGBMModel
+from lightgbm import LGBMRegressor, LGBMClassifier, LGBMRanker, LGBMModel
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
@@ -68,6 +72,9 @@ _REG_IDENTITY_OBJECTIVES = frozenset(
 #: Regression objectives that apply ``exp`` as the output transform
 #: (log-link objectives).
 _REG_EXP_OBJECTIVES = frozenset({"poisson", "tweedie"})
+
+#: Ranking objectives that use the identity link (no output transform).
+_RANK_IDENTITY_OBJECTIVES = frozenset({"lambdarank", "rank_xendcg"})
 
 
 def _get_reg_output_transform(objective: str) -> Optional[str]:
@@ -736,6 +743,76 @@ def sklearn_lgbm_regressor(
         raw_scores = g.op.Exp(raw_scores, name=f"{name}_exp")
     # out_transform is None → identity, no node needed.
 
+    cast_result = g.make_node(
+        "Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype
+    )
+    return cast_result
+
+
+# ---------------------------------------------------------------------------
+# LGBMRanker converter
+# ---------------------------------------------------------------------------
+
+
+@register_sklearn_converter(LGBMRanker)
+def sklearn_lgbm_ranker(
+    g: GraphBuilderExtendedProtocol,
+    sts: Dict,
+    outputs: List[str],
+    estimator,
+    X: str,
+    name: str = "lgbm_ranker",
+) -> str:
+    """Convert an :class:`lightgbm.LGBMRanker` to ONNX.
+
+    The raw margin (sum of all tree leaf values) is computed via a
+    ``TreeEnsembleRegressor`` / ``TreeEnsemble`` node.  Ranking objectives
+    always use the identity link, so no output transform is applied.
+
+    Supported objectives: ``lambdarank`` (default), ``rank_xendcg``.
+
+    :param g: the graph builder to add nodes to
+    :param sts: shapes dict (passed through, not used internally)
+    :param outputs: desired output names ``[scores]``
+    :param estimator: a fitted ``LGBMRanker``
+    :param X: input tensor name
+    :param name: prefix for node names added to the graph
+    :return: output tensor name (shape ``[N, 1]``)
+    :raises NotImplementedError: if the model's objective is not supported
+    """
+    booster = estimator.booster_
+    model_dict = booster.dump_model()
+    objective: str = model_dict["objective"]
+
+    # Strip any extra parameters and validate the objective.
+    base_obj = objective.split()[0].split(":")[0]
+    if base_obj not in _RANK_IDENTITY_OBJECTIVES:
+        raise NotImplementedError(
+            f"LGBMRanker ONNX converter: objective {objective!r} is not yet supported. "
+            f"Supported objectives: {sorted(_RANK_IDENTITY_OBJECTIVES)}."
+        )
+
+    ml_opset = g.get_opset("ai.onnx.ml")
+    itype = g.get_type(X)
+
+    trees = model_dict["tree_info"]
+    tree_out_name = f"{outputs[0]}_tree_out"
+
+    raw_scores = _emit_lgbm_tree_node(
+        g,
+        X,
+        name,
+        n_targets=1,
+        trees=trees,
+        ml_opset=ml_opset,
+        intermediate_name=tree_out_name,
+        itype=itype,
+    )
+
+    # Normalise dtype (same rationale as LGBMRegressor).
+    raw_scores = g.make_node("Cast", [raw_scores], outputs=1, name=f"{name}_tree_cast", to=itype)
+
+    # Identity link — no output transform needed.
     cast_result = g.make_node(
         "Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype
     )
