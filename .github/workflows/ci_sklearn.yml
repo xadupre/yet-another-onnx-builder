@@ -34,63 +34,15 @@ jobs:
       - name: pip freeze
         run: pip freeze
 
-      - name: Run unittest files having an issue with pytest
+      - name: Run sklearn tests
         if: matrix.sklearn-version != '1.8'
-        run: |
-          python unittests/sklearn/decomposition/test_latent_dirichlet_allocation.py
-          python unittests/sklearn/decomposition/test_pls_regression.py
-          python unittests/sklearn/ensemble/test_sklearn_gradient_boosting.py
-          python unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
-          python unittests/sklearn/mixture/test_gaussian_mixture.py
-          python unittests/sklearn/preprocessing/test_power_transformer.py
-
-      - name: Run sklearn tests with no coverage
-        if: matrix.sklearn-version != '1.8'
-        run: |
-            pytest --durations=10 \
-              --ignore=unittests/builder/oxs \
-              --ignore=unittests/reference/test__inference_session_torch.py \
-              --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
-              --ignore=unittests/reference/test_torch_onnxruntime_evaluator.py \
-              --ignore=unittests/reference/test_torch_reference_evaluator.py \
-              --ignore=unittests/xoptim/test_torch_untrained_models.py \
-              --ignore=unittests/tensorflow \
-              --ignore=unittests/torch \
-              --ignore unittests/sklearn/decomposition/test_latent_dirichlet_allocation.py \
-              --ignore unittests/sklearn/decomposition/test_pls_regression.py \
-              --ignore unittests/sklearn/ensemble/test_sklearn_gradient_boosting.py \
-              --ignore unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py \
-              --ignore unittests/sklearn/mixture/test_gaussian_mixture.py \
-              --ignore unittests/sklearn/preprocessing/test_power_transformer.py  # AttributeError: module 'torch' has no attribute 'Tensor'
-
-      - name: Run unittest files with coverage, not pytest
-        if: matrix.sklearn-version == '1.8'
-        run: |
-          python -m coverage run --source=yobx --append unittests/sklearn/decomposition/test_latent_dirichlet_allocation.py
-          python -m coverage run --source=yobx --append unittests/sklearn/decomposition/test_pls_regression.py
-          python -m coverage run --source=yobx --append unittests/sklearn/ensemble/test_sklearn_gradient_boosting.py
-          python -m coverage run --source=yobx --append unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py
-          python -m coverage run --source=yobx --append unittests/sklearn/mixture/test_gaussian_mixture.py
-          python -m coverage run --source=yobx --append unittests/sklearn/preprocessing/test_power_transformer.py
+        run: python -m unittest discover -v -s unittests/sklearn
 
       - name: Run sklearn tests with coverage
         if: matrix.sklearn-version == '1.8'
         run: |
-            pytest --cov=yobx --cov-append --cov-report=xml --durations=10 \
-              --ignore=unittests/builder/oxs \
-              --ignore=unittests/reference/test__inference_session_torch.py \
-              --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
-              --ignore=unittests/reference/test_torch_onnxruntime_evaluator.py \
-              --ignore=unittests/reference/test_torch_reference_evaluator.py \
-              --ignore=unittests/xoptim/test_torch_untrained_models.py \
-              --ignore=unittests/tensorflow \
-              --ignore=unittests/torch \
-              --ignore unittests/sklearn/decomposition/test_latent_dirichlet_allocation.py \
-              --ignore unittests/sklearn/decomposition/test_pls_regression.py \
-              --ignore unittests/sklearn/ensemble/test_sklearn_gradient_boosting.py \
-              --ignore unittests/sklearn/ensemble/test_sklearn_hist_gradient_boosting_multiclass.py \
-              --ignore unittests/sklearn/mixture/test_gaussian_mixture.py \
-              --ignore unittests/sklearn/preprocessing/test_power_transformer.py  # AttributeError: module 'torch' has no attribute 'Tensor'
+          python -m coverage run --source=yobx -m unittest discover -v -s unittests/sklearn
+          python -m coverage xml
 
       - name: Upload coverage to Codecov
         if: matrix.sklearn-version == '1.8'
