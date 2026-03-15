@@ -80,10 +80,7 @@ class TorchReferenceEvaluatorBackend(onnx.backend.base.Backend):
         raise NotImplementedError("Unable to run the model node by node.")
 
 
-backend_test = onnx.backend.test.BackendTest(
-    TorchReferenceEvaluatorBackend,
-    __name__,
-)
+backend_test = onnx.backend.test.BackendTest(TorchReferenceEvaluatorBackend, __name__)
 
 # The following tests are too slow with the reference implementation (Conv).
 backend_test.exclude(

@@ -107,10 +107,7 @@ class SequenceConstructAtPattern(PatternOptimization):
         return MatchResult(self, [node, *next_nodes], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node_seq: NodeProto,
-        *node_ats: NodeProto,
+        self, g: "GraphBuilder", node_seq: NodeProto, *node_ats: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         assert len(node_seq.input) == len(
             node_ats

@@ -185,11 +185,7 @@ class SlicesSplitPattern(PatternOptimization):
 
         return MatchResult(self, users, self.apply)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        *nodes: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", *nodes: NodeProto) -> List[NodeProto]:  # noqa: F821
         # nodes are all slices
 
         starts = [op.input[1] for op in nodes]
@@ -379,11 +375,7 @@ class GathersSplitPattern(PatternOptimization):
 
         return MatchResult(self, users, self.apply)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        *gather_nodes: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", *gather_nodes: NodeProto) -> List[NodeProto]:  # noqa: F821
         # nodes are all slices
 
         axis = g.get_attribute_with_default(gather_nodes[0], "axis", default_value=0)
@@ -523,10 +515,7 @@ class SplitConcatPattern(PatternOptimization):
         return MatchResult(self, [node, only_node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        split_node: NodeProto,
-        concat_node: NodeProto,
+        self, g: "GraphBuilder", split_node: NodeProto, concat_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         return [
             g.make_node(

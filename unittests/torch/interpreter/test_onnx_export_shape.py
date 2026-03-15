@@ -45,9 +45,7 @@ class TestOnnxExportShape(ExtTestCase):
             )
             opt_options = (
                 OptimizationOptions(
-                    patterns=patterns,
-                    processor=processor,
-                    constant_folding=constant_folding,
+                    patterns=patterns, processor=processor, constant_folding=constant_folding
                 )
                 if patterns or processor != "CPU"
                 else None

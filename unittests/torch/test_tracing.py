@@ -185,8 +185,7 @@ class TestCustomTracer(ExtTestCase):
         graph = torch.fx.Graph()
         x = graph.placeholder("x")
         sliced = graph.call_function(
-            torch.ops.aten.slice.Tensor,
-            args=(x, 0, 0, 9223372036854775807),
+            torch.ops.aten.slice.Tensor, args=(x, 0, 0, 9223372036854775807)
         )
         graph.output(sliced)
 
@@ -205,10 +204,7 @@ class TestCustomTracer(ExtTestCase):
         graph = torch.fx.Graph()
         x = graph.placeholder("x")
         y = graph.placeholder("y")
-        copy_node = graph.call_function(
-            torch.ops.aten.copy_.default,
-            args=(x, y),
-        )
+        copy_node = graph.call_function(torch.ops.aten.copy_.default, args=(x, y))
         graph.output(copy_node)
 
         # Set shape meta so the copy_ is recognized as unnecessary
@@ -257,10 +253,7 @@ class TestCustomTracer(ExtTestCase):
     def test_make_args_names_dict_with_list_value(self):
         import torch.utils._pytree as pytree
 
-        concrete_args = {
-            "x": torch.randn(3, 4),
-            "items": [torch.randn(2, 4), torch.randn(2, 4)],
-        }
+        concrete_args = {"x": torch.randn(3, 4), "items": [torch.randn(2, 4), torch.randn(2, 4)]}
         flat, _spec = pytree.tree_flatten(concrete_args)
         names = CustomTracer.make_args_names(concrete_args, flat)
         self.assertEqual(names, ["x", "items_0", "items_1"])
@@ -286,10 +279,7 @@ class TestCustomTracer(ExtTestCase):
                 return x + items[0] + items[1]
 
         model = Model()
-        concrete_args = {
-            "x": torch.randn(3, 4),
-            "items": [torch.randn(3, 4), torch.randn(3, 4)],
-        }
+        concrete_args = {"x": torch.randn(3, 4), "items": [torch.randn(3, 4), torch.randn(3, 4)]}
         wrapped, arg_names = CustomTracer.make_wrapped_model(model, concrete_args)
         self.assertIsInstance(wrapped, torch.nn.Module)
         self.assertEqual(arg_names, ["x", "items_0", "items_1"])
@@ -390,8 +380,7 @@ class TestTracing(ExtTestCase):
         expected = model(x)
         graph = CustomTracer().trace(model, remove_inplace=False)
         self.assertEqual(
-            len([node for node in graph.nodes if len(node.users) == 0 and node.op != "output"]),
-            1,
+            len([node for node in graph.nodes if len(node.users) == 0 and node.op != "output"]), 1
         )
         self.assertIn("(%clone, 3)", str(graph))
         graph = CustomTracer().trace(model, remove_inplace=True)
@@ -417,8 +406,7 @@ class TestTracing(ExtTestCase):
         expected = model(x)
         graph = CustomTracer().trace(model, remove_inplace=False)
         self.assertEqual(
-            len([node for node in graph.nodes if len(node.users) == 0 and node.op != "output"]),
-            2,
+            len([node for node in graph.nodes if len(node.users) == 0 and node.op != "output"]), 2
         )
         self.assertIn("(%clone, 3)", str(graph))
         graph = CustomTracer().trace(model, remove_inplace=True)
@@ -967,11 +955,7 @@ class TestTracing(ExtTestCase):
         nested = [
             torch.randn((4, 5)),
             [torch.randn((7, 5)), torch.randn((8, 5))],
-            {
-                "a": torch.randn((14, 5)),
-                "b": torch.randn((12, 5)),
-                "cl": [torch.randn((11, 5))],
-            },
+            {"a": torch.randn((14, 5)), "b": torch.randn((12, 5)), "cl": [torch.randn((11, 5))]},
         ]
         flat_list, tree_spec = torch.utils._pytree.tree_flatten(nested)
 
@@ -992,11 +976,7 @@ class TestTracing(ExtTestCase):
         nested = [
             torch.randn((4, 5)),
             [torch.randn((7, 5)), torch.randn((8, 5))],
-            {
-                "a": torch.randn((14, 5)),
-                "b": torch.randn((12, 5)),
-                "cl": [torch.randn((11, 5))],
-            },
+            {"a": torch.randn((14, 5)), "b": torch.randn((12, 5)), "cl": [torch.randn((11, 5))]},
         ]
         flat_list, tree_spec = torch.utils._pytree.tree_flatten(nested)
         self.assertEqual(len(flat_list), 6)

@@ -15,20 +15,12 @@ class OpsVar:
 
     def ArgMax(self, axis: int = 0, keepdims: int = 1, select_last_index: int = 0) -> "Var":
         return self.make_node(
-            "ArgMax",
-            self,
-            axis=axis,
-            keepdims=keepdims,
-            select_last_index=select_last_index,
+            "ArgMax", self, axis=axis, keepdims=keepdims, select_last_index=select_last_index
         )
 
     def ArgMin(self, axis: int = 0, keepdims: int = 1, select_last_index: int = 0) -> "Var":
         return self.make_node(
-            "ArgMin",
-            self,
-            axis=axis,
-            keepdims=keepdims,
-            select_last_index=select_last_index,
+            "ArgMin", self, axis=axis, keepdims=keepdims, select_last_index=select_last_index
         )
 
     def AveragePool(
@@ -114,10 +106,7 @@ class OpsVar:
 
     def IsInf(self, detect_negative: int = 1, detect_positive: int = 1) -> "Var":
         return self.make_node(
-            "IsInf",
-            self,
-            detect_negative=detect_negative,
-            detect_positive=detect_positive,
+            "IsInf", self, detect_negative=detect_negative, detect_positive=detect_positive
         )
 
     def LRN(
@@ -196,18 +185,12 @@ class OpsVar:
 
     def ReduceLogSum(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
         return self.make_node(
-            "ReduceLogSum",
-            self,
-            keepdims=keepdims,
-            noop_with_empty_axes=noop_with_empty_axes,
+            "ReduceLogSum", self, keepdims=keepdims, noop_with_empty_axes=noop_with_empty_axes
         )
 
     def ReduceLogSumExp(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
         return self.make_node(
-            "ReduceLogSumExp",
-            self,
-            keepdims=keepdims,
-            noop_with_empty_axes=noop_with_empty_axes,
+            "ReduceLogSumExp", self, keepdims=keepdims, noop_with_empty_axes=noop_with_empty_axes
         )
 
     def ReduceMax(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
@@ -237,10 +220,7 @@ class OpsVar:
 
     def ReduceSumSquare(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
         return self.make_node(
-            "ReduceSumSquare",
-            self,
-            keepdims=keepdims,
-            noop_with_empty_axes=noop_with_empty_axes,
+            "ReduceSumSquare", self, keepdims=keepdims, noop_with_empty_axes=noop_with_empty_axes
         )
 
     def Selu(self, alpha: float = 1.6732631921768188, gamma: float = 1.0507010221481323) -> "Var":
@@ -324,11 +304,7 @@ class OpsVar:
         clip: Optional[float] = None,
         layout: int = 0,
     ) -> "Vars":
-        kwargs: dict = {
-            "direction": direction,
-            "hidden_size": hidden_size,
-            "layout": layout,
-        }
+        kwargs: dict = {"direction": direction, "hidden_size": hidden_size, "layout": layout}
         if activations is not None:
             kwargs["activations"] = activations
         if clip is not None:
@@ -360,16 +336,9 @@ class OpsVar:
             kwargs["strides"] = strides
         return self.make_node("MaxPool", self, **kwargs)
 
-    def NegativeLogLikelihoodLoss(
-        self,
-        ignore_index: int = 0,
-        reduction: str = "mean",
-    ) -> "Var":
+    def NegativeLogLikelihoodLoss(self, ignore_index: int = 0, reduction: str = "mean") -> "Var":
         return self.make_node(
-            "NegativeLogLikelihoodLoss",
-            self,
-            ignore_index=ignore_index,
-            reduction=reduction,
+            "NegativeLogLikelihoodLoss", self, ignore_index=ignore_index, reduction=reduction
         )
 
     def Unique(self, axis: Optional[int] = None, sorted: int = 1) -> "Vars":

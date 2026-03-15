@@ -249,13 +249,7 @@ phase_data = [
 
 for x0, fc, ec, title, lines in phase_data:
     box = mpatches.FancyBboxPatch(
-        (x0, 0.8),
-        3.6,
-        3.2,
-        boxstyle="round,pad=0.15",
-        linewidth=1.5,
-        edgecolor=ec,
-        facecolor=fc,
+        (x0, 0.8), 3.6, 3.2, boxstyle="round,pad=0.15", linewidth=1.5, edgecolor=ec, facecolor=fc
     )
     ax.add_patch(box)
     ax.text(x0 + 1.8, 3.7, title, ha="center", va="center", fontsize=9, fontweight="bold")

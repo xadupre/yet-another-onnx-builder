@@ -96,14 +96,10 @@ class PatchInfo:
             patch=patch,
             family=family,
             do=lambda: PatchInfo._setattr(  # type: ignore
-                module_or_class,
-                method_or_function_name,
-                patch,
+                module_or_class, method_or_function_name, patch
             ),
             undo=lambda original: PatchInfo._setattr(  # type: ignore
-                module_or_class,
-                method_or_function_name,
-                original,
+                module_or_class, method_or_function_name, original
             ),
             _last_patched_function=_last_patched_function,
         )

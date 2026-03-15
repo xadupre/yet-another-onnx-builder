@@ -149,9 +149,7 @@ def _collect_meta_features_regressor(
 
         # Predictions are 1-D (N,) → reshape to (N, 1).
         reshaped = g.op.Reshape(
-            est_output,
-            np.array([-1, 1], dtype=np.int64),
-            name=f"{est_name}_reshape",
+            est_output, np.array([-1, 1], dtype=np.int64), name=f"{est_name}_reshape"
         )
         per_estimator_preds.append(reshaped)
 
@@ -225,16 +223,10 @@ def _collect_meta_features_classifier(
 
             # Cast labels/predictions to the input float dtype so they are
             # compatible with probability-based meta-features.
-            casted = g.op.Cast(
-                est_output,
-                to=itype,
-                name=f"{est_name}_cast",
-            )
+            casted = g.op.Cast(est_output, to=itype, name=f"{est_name}_cast")
             # Reshape 1-D (N,) → (N, 1).
             reshaped = g.op.Reshape(
-                casted,
-                np.array([-1, 1], dtype=np.int64),
-                name=f"{est_name}_reshape",
+                casted, np.array([-1, 1], dtype=np.int64), name=f"{est_name}_reshape"
             )
             per_estimator_preds.append(reshaped)
 

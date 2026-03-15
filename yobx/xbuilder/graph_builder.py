@@ -509,11 +509,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         return False
 
     def make_subset_builder(
-        self,
-        input_names: List[str],
-        name: str,
-        domain: str,
-        add_local_functions: bool = False,
+        self, input_names: List[str], name: str, domain: str, add_local_functions: bool = False
     ) -> "GraphBuilder":
         """
         Creates a copy of the existing builder but with information reduced to the input_names
@@ -840,11 +836,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         return f"no pretty: {type(tensor)}"
 
     def pretty_node(
-        self,
-        node: Optional[NodeProto],
-        limit: int = 80,
-        short: bool = True,
-        shape: bool = False,
+        self, node: Optional[NodeProto], limit: int = 80, short: bool = True, shape: bool = False
     ) -> str:
         """
         Pretty rendering for a node.
@@ -1742,12 +1734,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if k in self._known_value_shape:
                 del self._known_value_shape[k]
 
-    def set_shapes_types(
-        self,
-        name: Union[str, "torch.fx.Node"],
-        where: str,
-        value: Any,
-    ):
+    def set_shapes_types(self, name: Union[str, "torch.fx.Node"], where: str, value: Any):
         if hasattr(name, "name"):
             name = name.name
         self._known_torch_value[name] = (where, value)  # type: ignore
@@ -1995,11 +1982,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             self.set_rank(name, self.get_rank(like))
 
     def set_device(
-        self,
-        name: str,
-        device: Union[int, str],
-        exc: bool = True,
-        keep_this_device: bool = False,
+        self, name: str, device: Union[int, str], exc: bool = True, keep_this_device: bool = False
     ):
         """
         Sets the shape for a result. It is exists, it checks the new shape
@@ -2603,7 +2586,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         "",
                         np.array([d], dtype=np.int64),
                         source="GraphBuilder.make_shape_from_results.conc",
-                    ),
+                    )
                 )
                 if shape_shape is not None:
                     shape_shape += 1
@@ -3163,9 +3146,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 assert self.has_rank(dim), f"dim={dim!r} has no rank{self.get_debug_msg()}"
                 if self.get_rank(dim) == 0:
                     return self.op.UnsqueezeAnyOpset(
-                        dim,
-                        self.ZERO,
-                        name=f"get_dynamic_dimension_a_{dim}",
+                        dim, self.ZERO, name=f"get_dynamic_dimension_a_{dim}"
                     )
                 return dim
             assert dim in self.dynamic_objects, (
@@ -3651,11 +3632,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         return name
 
     def make_tensor_sequence_input(
-        self,
-        name: str,
-        elem_type: Any,
-        shape: DYNAMIC_SHAPE,
-        marker: str = "",
+        self, name: str, elem_type: Any, shape: DYNAMIC_SHAPE, marker: str = ""
     ) -> str:
         """
         Adds a tensor input to the onnx graph.
@@ -3672,10 +3649,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             input_name = self.input_names[self.current_input]
             if input_name != name:
                 add_node = lambda: self.make_node(  # noqa: E731
-                    "Identity",
-                    [input_name],
-                    [name],
-                    name="make_tensor_input_id",
+                    "Identity", [input_name], [name], name="make_tensor_input_id"
                 )
         else:
             self.input_names.append(name)
@@ -4013,10 +3987,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self.outputs = new_outputs
 
     def verify_shape(
-        self,
-        shape: Optional[DYNAMIC_SHAPE],
-        elem_type: int,
-        name: Optional[str] = None,
+        self, shape: Optional[DYNAMIC_SHAPE], elem_type: int, name: Optional[str] = None
     ) -> Optional[DYNAMIC_SHAPE]:
         assert isinstance(elem_type, int), f"elem_type must be an integer not {type(elem_type)}"
         assert shape is None or isinstance(
@@ -4191,15 +4162,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             inputs
             and isinstance(inputs[0], str)
             and op_type
-            in {
-                "Reshape",
-                "Shape",
-                "Size",
-                "Transpose",
-                "Cast",
-                "Squeeze",
-                "Unsqueeze",
-            }
+            in {"Reshape", "Shape", "Size", "Transpose", "Cast", "Squeeze", "Unsqueeze"}
         ):
 
             def _get(name, attributes, kwargs):
@@ -6571,8 +6534,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 self.initializers_dict[k] = v
                 self.initializers_dict_sources[k] = g.initializers_dict_sources[k]
                 self.set_name(
-                    k,
-                    marker=g._events.get((k, "set_event"), "optimize_node_subgraphs_inplace"),
+                    k, marker=g._events.get((k, "set_event"), "optimize_node_subgraphs_inplace")
                 )
                 self.set_type(k, g.get_type(k))
                 self.set_shape(k, g.get_shape(k))
@@ -6709,11 +6671,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     if k == "n":
                         continue
                     local_stats.append(
-                        dict(
-                            pattern=f"apply_constant_folding_{k}",
-                            value=v,
-                            iteration=0,
-                        )
+                        dict(pattern=f"apply_constant_folding_{k}", value=v, iteration=0)
                     )
         elif pass_name == "patterns":
             if (
@@ -6736,12 +6694,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         if statistics is not None:
             statistics.append(
-                dict(
-                    pattern=pass_name,
-                    removed=nr,
-                    added=na,
-                    time_in=time.perf_counter() - begin,
-                )
+                dict(pattern=pass_name, removed=nr, added=na, time_in=time.perf_counter() - begin)
             )
             if local_stats:
                 if isinstance(local_stats, list):
@@ -7286,11 +7239,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 f"replacements are\n{pprint.pformat(replacements)}"
             )
             new_node = oh.make_node(
-                node.op_type,
-                new_inputs,
-                new_outputs,
-                domain=node.domain,
-                name=node.name,
+                node.op_type, new_inputs, new_outputs, domain=node.domain, name=node.name
             )
 
             if cls._has_subgraph_possibly(node):
@@ -7301,8 +7250,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         att
                         if att.type != AttributeProto.GRAPH
                         else oh.make_attribute(
-                            att.name,
-                            cls._rename_inputs_in_subgraph(att.g, replacements),
+                            att.name, cls._rename_inputs_in_subgraph(att.g, replacements)
                         )
                     )
             else:
@@ -7801,8 +7749,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     self.opsets[node_domain] = opsets[node_domain]
                 else:
                     self.opsets[node_domain] = choose_consistent_domain_opset(
-                        node_domain,
-                        opsets=self.opsets,
+                        node_domain, opsets=self.opsets
                     )
 
         assert n_existing, "Any output of the new node is connected to existing names."
@@ -8744,11 +8691,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             )
         self._check_function_order()
 
-        fct = builder.to_onnx(
-            function_options=function_options,
-            optimize=optimize,
-            inline=False,
-        )
+        fct = builder.to_onnx(function_options=function_options, optimize=optimize, inline=False)
         assert isinstance(fct, (dict, FunctionProto)), (
             f"Unexpected type {type(fct)}, function_options={function_options}"
             f"{self.get_debug_msg()}"
@@ -8808,9 +8751,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             repl = {}
             for k, v in fct["initializers_dict"].items():
                 new_name = self.add_initializer(
-                    self.unique_name(k),
-                    v,
-                    source=f"GraphBuilder.make_local_function/from({k})",
+                    self.unique_name(k), v, source=f"GraphBuilder.make_local_function/from({k})"
                 )
                 repl[k] = new_name
             renaming = fct["initializers_renaming"]
@@ -9051,8 +8992,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 modified = True
                 node_attributes.append(
                     oh.make_attribute(
-                        att.name,
-                        self._rename_op_type_in_local_functions(att.g, replacements),
+                        att.name, self._rename_op_type_in_local_functions(att.g, replacements)
                     )
                 )
             if modified:
@@ -10181,9 +10121,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         )
 
     def set_type_shape_unary_op(
-        self,
-        name: str,
-        input_name: str,
-        itype: Optional[int] = None,
+        self, name: str, input_name: str, itype: Optional[int] = None
     ) -> bool:
         return set_type_shape_unary_op(self, name, input_name, itype)  # type: ignore

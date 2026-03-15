@@ -110,10 +110,7 @@ class MulMulMulScalarPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         cst_left = g.get_computed_constant(node_left.input[1])
         cst_right = g.get_computed_constant(node_right.input[1])
-        if cst_left.shape not in {tuple(), (1,)} or cst_right.shape not in {
-            tuple(),
-            (1,),
-        }:
+        if cst_left.shape not in {tuple(), (1,)} or cst_right.shape not in {tuple(), (1,)}:
             return self.none(node, inspect.currentframe().f_lineno)
 
         if (node_left.op_type == "Div" or node_right.op_type == "Div") and (
@@ -386,11 +383,7 @@ class SwitchOrderBinaryPattern(PatternOptimization):
             f"shape_right={shape_right}, shape_before_left={shape_before_left}, "
             f"shape_before_right={shape_before_right}"
         )
-        cases = [
-            max(r_b_left, r_b_right),
-            max(r_right, r_b_left),
-            max(r_right, r_b_right),
-        ]
+        cases = [max(r_b_left, r_b_right), max(r_right, r_b_left), max(r_right, r_b_right)]
 
         if cases[0] < min(cases[1], cases[2]):
             return 0

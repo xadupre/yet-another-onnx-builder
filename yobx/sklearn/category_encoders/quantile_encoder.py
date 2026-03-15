@@ -146,10 +146,7 @@ def category_encoders_quantile_encoder(
         col_i = feat_idx[feat_name]
         # Extract column: shape (N, 1)
         col_slice = g.op.Gather(
-            X,
-            np.array([col_i], dtype=np.int64),
-            axis=1,
-            name=f"{name}_gather{col_i}",
+            X, np.array([col_i], dtype=np.int64), axis=1, name=f"{name}_gather{col_i}"
         )
 
         if feat_name in cols_set:

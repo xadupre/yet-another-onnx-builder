@@ -1,0 +1,546 @@
+"""
+Validates an ONNX export for a HuggingFace model using
+:class:`InputObserver <yobx.torch.InputObserver>` and a default text prompt.
+
+Unlike :func:`onnx_diagnostic.torch_models.validate.validate_model`, which uses
+random/dummy tensors as inputs, this module captures real model inputs by running the
+model on a default prompt through an :class:`InputObserver`.  The observed inputs and
+inferred dynamic shapes are then used for the ONNX export.
+"""
+
+import contextlib
+from typing import Any, Dict, Optional, Tuple
+import os
+
+DEFAULT_PROMPT = "Continue: it rains, what should I do?"
+"""Default text prompt used when validating text-generation models."""
+
+
+def _to_onnx(*args, exporter: str = "yobx", **kwargs):
+    if exporter == "yobx":
+        from ..xbuilder import OptimizationOptions
+        from . import to_onnx
+
+        new_kwargs = {}
+        for k, v in kwargs.items():
+            if k == "opset_version":
+                new_kwargs["target_opset"] = v
+            elif k == "optimization":
+                if v in ("default", "default+onnxruntime"):
+                    new_kwargs["options"] = OptimizationOptions(patterns=v)
+                else:
+                    raise ValueError(f"unexpected value {v!r} for k={k!r}")
+            else:
+                new_kwargs[k] = v
+
+        return to_onnx(*args, **new_kwargs)
+    if exporter in ("dynamo", "onnx-dynamo", "modelbuilder"):
+        import torch
+
+        # Build a kwargs dict that torch.onnx.export understands.
+        # Keys like "optimization" have no equivalent — skip them.
+        # "filename" maps to the "f" positional-style param of older APIs; the
+        # newer (2.x dynamo) API returns an ExportOutput that must be saved.
+        dynamo_kwargs: dict = {"optimize": False, "dynamo": True}
+        for k, v in kwargs.items():
+            if k == "filename":
+                dynamo_kwargs["f"] = v
+            elif k == "optimization":
+                dynamo_kwargs["optimize"] = v in (
+                    "default",
+                    "ir",
+                    "default+onnxruntime",
+                    "os_ort",
+                )
+            elif k == "verbose":
+                dynamo_kwargs["report"] = True
+            else:
+                dynamo_kwargs[k] = v
+
+        if exporter == "modelbuilder":
+            dynamo_kwargs.setdefault("dynamo", True)
+
+        epo = torch.onnx.export(*args, **dynamo_kwargs)
+        if kwargs.get("optimization", "") in ("os_ort", "default+onnxruntime"):
+            from onnxscript.rewriter.ort_fusions import optimize_for_ort
+
+            optimize_for_ort(epo)  # type: ignore
+        # saving is part of the the export
+        return epo
+    raise NotImplementedError(f"exporter={exporter!r} not implemented.")
+
+
+def _load_config(
+    model_id: str,
+    config_overrides: Optional[Dict[str, Any]],
+    verbose: int,
+    quiet: bool,
+    summary: Dict[str, Any],
+    collected_data: Dict[str, Any],
+):
+    """Load the model config (bundled → local HF cache → network) and apply overrides."""
+    from transformers import AutoConfig
+
+    if verbose:
+        print(f"[validate_model] loading config for {model_id!r}")
+
+    try:
+        from .in_transformers.models import get_cached_configuration
+
+        _cached = get_cached_configuration(model_id)
+        if _cached is not None:
+            config = _cached
+            summary["config_from_cache"] = "bundled"
+        else:
+            try:
+                config = AutoConfig.from_pretrained(model_id, local_files_only=True)
+                summary["config_from_cache"] = "local"
+            except OSError:
+                config = AutoConfig.from_pretrained(model_id)
+                summary["config_from_cache"] = False
+    except Exception as exc:
+        summary["error_config"] = str(exc)
+        if not quiet:
+            raise
+        return None
+
+    if config_overrides:
+        for k, v in config_overrides.items():
+            setattr(config, k, v)
+        summary["config_overrides"] = str(config_overrides)
+
+    collected_data["config"] = config
+    return config
+
+
+def _load_tokenizer(model_id: str, verbose: int, quiet: bool, summary: Dict[str, Any]):
+    """Load the tokenizer (local HF cache first, then network)."""
+    from transformers import AutoTokenizer
+
+    if verbose:
+        print(f"[validate_model] loading tokenizer for {model_id!r}")
+
+    try:
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
+        except OSError:
+            tokenizer = AutoTokenizer.from_pretrained(model_id)
+    except Exception as exc:
+        summary["error_tokenizer"] = str(exc)
+        if not quiet:
+            raise
+        return None
+
+    return tokenizer
+
+
+def _load_model(
+    model_id: str,
+    config,
+    random_weights: bool,
+    torch_dtype,
+    torch_device,
+    verbose: int,
+    quiet: bool,
+    summary: Dict[str, Any],
+    collected_data: Dict[str, Any],
+):
+    """Load (or instantiate with random weights) the CausalLM model."""
+    import torch
+    from transformers import AutoModelForCausalLM
+
+    if verbose:
+        if random_weights:
+            print(
+                f"[validate_model] creating model from config (random weights) for {model_id!r}"
+            )
+        else:
+            print(f"[validate_model] loading model for {model_id!r}")
+
+    dtype_kwargs: Dict[str, Any] = {"torch_dtype": torch_dtype} if torch_dtype is not None else {}
+    try:
+        if random_weights:
+            model: torch.nn.Module = AutoModelForCausalLM.from_config(config, **dtype_kwargs)
+        else:
+            try:
+                model = AutoModelForCausalLM.from_pretrained(
+                    model_id, config=config, local_files_only=True, **dtype_kwargs
+                )
+                summary["model_from_cache"] = True
+            except OSError:
+                model = AutoModelForCausalLM.from_pretrained(
+                    model_id, config=config, **dtype_kwargs
+                )
+                summary["model_from_cache"] = False
+        model = model.to(torch_device)
+        model.eval()
+    except Exception as exc:
+        summary["error_model"] = str(exc)
+        if not quiet:
+            raise
+        return None
+
+    collected_data["model"] = model
+    return model
+
+
+def _capture_inputs(
+    model,
+    input_ids,
+    attention_mask,
+    max_new_tokens: int,
+    patch: bool,
+    prompt: str,
+    verbose: int,
+    quiet: bool,
+    summary: Dict[str, Any],
+    collected_data: Dict[str, Any],
+):
+    """Run model.generate under an InputObserver to capture real inputs."""
+    from .flatten import register_flattening_functions
+    from .input_observer import InputObserver
+    from .patch import apply_patches_for_model
+
+    if verbose:
+        print(f"[validate_model] capturing inputs with InputObserver (prompt={prompt!r})")
+
+    observer = InputObserver()
+
+    try:
+        with (
+            register_flattening_functions(patch_transformers=patch),
+            (
+                apply_patches_for_model(patch_transformers=patch, model=model)
+                if patch
+                else contextlib.nullcontext()
+            ),
+            observer(model),
+        ):
+            generate_kwargs: Dict[str, Any] = dict(
+                input_ids=input_ids, do_sample=False, max_new_tokens=max_new_tokens
+            )
+            if attention_mask is not None:
+                generate_kwargs["attention_mask"] = attention_mask
+            model.generate(**generate_kwargs)
+    except Exception as exc:
+        summary["error_observer"] = str(exc)
+        if not quiet:
+            raise
+        return None
+
+    collected_data["observer"] = observer
+    summary["n_captured"] = len(observer.info or [])
+
+    if verbose:
+        print(f"[validate_model] captured {len(observer.info or [])} input set(s)")
+
+    return observer
+
+
+def _infer_shapes(observer, patch: bool, verbose: int, collected_data: Dict[str, Any]):
+    """Infer export kwargs and dynamic shapes from the captured observer."""
+    from .flatten import register_flattening_functions
+
+    with register_flattening_functions(patch_transformers=patch):
+        kwargs = observer.infer_arguments()
+        dynamic_shapes = observer.infer_dynamic_shapes(set_batch_dimension_for=True)
+
+    collected_data["kwargs"] = kwargs
+    collected_data["dynamic_shapes"] = dynamic_shapes
+
+    if verbose:
+        from ..helpers import string_type
+
+        print(f"[validate_model] kwargs: {string_type(kwargs, with_shape=True)}")
+        print(f"[validate_model] dynamic_shapes: {dynamic_shapes}")
+
+    return kwargs, dynamic_shapes
+
+
+def _export(
+    model,
+    model_id: str,
+    kwargs: Dict[str, Any],
+    dynamic_shapes,
+    exporter: str,
+    opset: int,
+    optimization: Optional[str],
+    patch: bool,
+    dump_folder: Optional[str],
+    verbose: int,
+    quiet: bool,
+    summary: Dict[str, Any],
+    collected_data: Dict[str, Any],
+):
+    """Export the model to ONNX and store the output filename."""
+    from .flatten import register_flattening_functions
+    from .patch import apply_patches_for_model
+
+    if dump_folder is not None:
+        os.makedirs(dump_folder, exist_ok=True)
+        model_name = model_id.replace("/", "-")
+        filename = os.path.join(dump_folder, f"{model_name}.onnx")
+    else:
+        import tempfile
+
+        _tmpdir = tempfile.mkdtemp()
+        model_name = model_id.replace("/", "-")
+        filename = os.path.join(_tmpdir, f"{model_name}.onnx")
+
+    collected_data["filename"] = filename
+
+    if verbose:
+        print(f"[validate_model] exporting to ONNX ({exporter=}, {opset=}) -> {filename!r}")
+
+    try:
+        export_kwargs: Dict[str, Any] = {}
+        if optimization is not None:
+            export_kwargs["optimization"] = optimization
+
+        with (
+            register_flattening_functions(patch_transformers=patch),
+            (
+                apply_patches_for_model(patch_torch=patch, patch_transformers=patch, model=model)
+                if patch
+                else contextlib.nullcontext()
+            ),
+        ):
+            _to_onnx(
+                model,
+                (),
+                kwargs=kwargs,
+                dynamic_shapes=dynamic_shapes,
+                filename=filename,
+                exporter=exporter,
+                opset_version=opset,
+                verbose=max(0, verbose - 1),
+                **export_kwargs,
+            )
+        summary["export"] = "OK"
+    except Exception as exc:
+        summary["export"] = "FAILED"
+        summary["error_export"] = str(exc)
+        if not quiet:
+            raise
+        return False
+
+    if verbose:
+        print(f"[validate_model] export succeeded -> {filename!r}")
+
+    return True
+
+
+def _check_discrepancies(
+    observer,
+    filename: str,
+    verbose: int,
+    quiet: bool,
+    summary: Dict[str, Any],
+    collected_data: Dict[str, Any],
+):
+    """Run ONNX Runtime on every captured input set and compare against PyTorch outputs."""
+    if verbose:
+        print("[validate_model] checking discrepancies ...")
+    try:
+        disc_data = observer.check_discrepancies(filename)
+        collected_data["discrepancies"] = disc_data
+        n_ok = sum(1 for row in disc_data if row.get("SUCCESS", False))
+        n_total = len(disc_data)
+        summary["discrepancies_ok"] = n_ok
+        summary["discrepancies_total"] = n_total
+        summary["discrepancies"] = "OK" if n_ok == n_total else "FAILED"
+        if verbose:
+            print(f"[validate_model] discrepancies: {n_ok}/{n_total} OK")
+    except Exception as exc:
+        summary["discrepancies"] = "FAILED"
+        summary["error_discrepancies"] = str(exc)
+        if not quiet:
+            raise
+
+
+def validate_model(
+    model_id: str,
+    prompt: str = DEFAULT_PROMPT,
+    exporter: str = "yobx",
+    optimization: Optional[str] = "default",
+    verbose: int = 0,
+    dump_folder: Optional[str] = None,
+    opset: int = 22,
+    dtype: Optional[str] = None,
+    device: Optional[str] = None,
+    max_new_tokens: int = 10,
+    do_run: bool = True,
+    patch: bool = True,
+    quiet: bool = False,
+    tokenized_inputs: Optional[Dict[str, Any]] = None,
+    config_overrides: Optional[Dict[str, Any]] = None,
+    random_weights: bool = False,
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Validates an ONNX export for any HuggingFace ``model_id`` by capturing real
+    model inputs with :class:`InputObserver <yobx.torch.InputObserver>` and a
+    text *prompt*, instead of relying on dummy / random tensors.
+
+    The function:
+
+    1. Loads the model config for *model_id* (cached copy preferred).
+    2. Optionally applies *config_overrides* to tweak the architecture
+       (e.g. reduce ``num_hidden_layers`` for a faster test).
+    3. Loads the tokeniser and the pretrained model weights — or, when
+       *random_weights* is ``True``, instantiates the model directly from the
+       (potentially modified) config without downloading any weights.
+    4. Runs :meth:`model.generate` with *prompt* inside an
+       :class:`InputObserver <yobx.torch.InputObserver>` context to collect
+       real input/output tensors.
+    5. Exports the model to ONNX using the observed inputs and the inferred
+       dynamic shapes.
+    6. Computes discrepancies between the original PyTorch outputs and the
+       ONNX runtime outputs for every captured input set.
+
+    :param model_id: HuggingFace model id, e.g. ``"arnir0/Tiny-LLM"``
+    :param prompt: Text prompt used to drive the generation step.
+        Defaults to :data:`DEFAULT_PROMPT`.
+    :param exporter: ONNX exporter to use, e.g. ``"yobx"`` (default),
+        ``"modelbuilder"``, or ``"onnx-dynamo"``.
+    :param optimization: Optimisation level applied after export.
+        Passed directly to :func:`yobx.torch.to_onnx`.  ``None`` means no
+        optimisation; ``"default"`` applies the default set.
+    :param verbose: Verbosity level (0 = silent).
+    :param dump_folder: When given, all artefacts (ONNX file, export logs …)
+        are saved under this directory.
+    :param opset: ONNX opset version to target (default 22).
+    :param dtype: Cast the model (and inputs) to this dtype before exporting,
+        e.g. ``"float16"``.  ``None`` keeps the default (``float32``).
+    :param device: Run on this device, e.g. ``"cpu"`` or ``"cuda"``.
+        ``None`` defaults to CPU.
+    :param max_new_tokens: Number of tokens generated by
+        :meth:`model.generate` during input capture (default 10).
+        Larger values capture more past-key-value shapes.
+    :param do_run: When ``True`` (default), checks that the ONNX model can be
+        run after export and computes discrepancies.
+    :param patch: Apply ``apply_patches_for_model`` and
+        ``register_flattening_functions`` during export (default ``True``).
+    :param quiet: When ``True``, exceptions are caught and reported in the
+        returned summary dictionary rather than re-raised.
+    :param tokenized_inputs: Optional pre-tokenized inputs to use instead of
+        running the tokenizer on *prompt*.  Should be a dict with at least
+        ``"input_ids"`` and optionally ``"attention_mask"`` (mirrors the output
+        of a HuggingFace tokenizer).  When provided the tokenizer is not loaded
+        and *prompt* is only stored in the summary for reference.
+    :param config_overrides: Optional mapping of config attribute names to new
+        values applied to the model config before the model is instantiated,
+        e.g. ``{"num_hidden_layers": 2}``.  Useful to create a smaller model
+        for testing without changing the architecture definition on disk.
+    :param random_weights: When ``True``, instantiate the model from the
+        (possibly modified) config with random weights instead of downloading
+        the pretrained weights.  This avoids any network access for the model
+        itself, which is useful for fast unit-testing or CI validation.
+    :return: A 2-tuple ``(summary, data)`` where *summary* is a flat
+        ``{str: value}`` dictionary suitable for display or logging, and
+        *data* collects all intermediate artefacts.
+
+    Example::
+
+        from yobx.torch.validate import validate_model
+
+        summary, data = validate_model("arnir0/Tiny-LLM", verbose=1)
+        for k, v in sorted(summary.items()):
+            print(f":{k},{v};")
+    """
+    import torch
+
+    summary: Dict[str, Any] = {"model_id": model_id, "prompt": prompt}
+    collected_data: Dict[str, Any] = {}
+
+    # ------------------------------------------------------------------ device / dtype
+    torch_device = torch.device(device or "cpu")
+    torch_dtype: Optional[torch.dtype] = None
+    if dtype is not None:
+        torch_dtype = getattr(torch, dtype)
+
+    # ----------------------------------------------------------------- config
+    config = _load_config(model_id, config_overrides, verbose, quiet, summary, collected_data)
+    if config is None:
+        return summary, collected_data
+
+    # --------------------------------------------------------------- tokenizer
+    if tokenized_inputs is None:
+        tokenizer = _load_tokenizer(model_id, verbose, quiet, summary)
+        if tokenizer is None:
+            return summary, collected_data
+    else:
+        tokenizer = None
+
+    # --------------------------------------------------------------- load model
+    model = _load_model(
+        model_id,
+        config,
+        random_weights,
+        torch_dtype,
+        torch_device,
+        verbose,
+        quiet,
+        summary,
+        collected_data,
+    )
+    if model is None:
+        return summary, collected_data
+
+    # ---------------------------------------------------------- tokenise prompt / use supplied
+    if tokenized_inputs is not None:
+        inputs = tokenized_inputs
+    else:
+        inputs = tokenizer(prompt, return_tensors="pt")  # type: ignore
+    input_ids = inputs["input_ids"].to(torch_device)
+    attention_mask = inputs.get("attention_mask")
+    if attention_mask is not None:
+        attention_mask = attention_mask.to(torch_device)
+
+    collected_data["input_ids"] = input_ids
+    collected_data["attention_mask"] = attention_mask
+
+    # ------------------------------------------------------- capture with observer
+    observer = _capture_inputs(
+        model,
+        input_ids,
+        attention_mask,
+        max_new_tokens,
+        patch,
+        prompt,
+        verbose,
+        quiet,
+        summary,
+        collected_data,
+    )
+    if observer is None:
+        return summary, collected_data
+
+    # ---------------------------------------------------- infer args & shapes
+    kwargs, dynamic_shapes = _infer_shapes(observer, patch, verbose, collected_data)
+
+    # ------------------------------------------------------------------- export
+    ok = _export(
+        model,
+        model_id,
+        kwargs,
+        dynamic_shapes,
+        exporter,
+        opset,
+        optimization,
+        patch,
+        dump_folder,
+        verbose,
+        quiet,
+        summary,
+        collected_data,
+    )
+    if not ok:
+        return summary, collected_data
+
+    # --------------------------------------------------------- check discrepancies
+    if do_run:
+        _check_discrepancies(
+            observer, collected_data["filename"], verbose, quiet, summary, collected_data
+        )
+
+    return summary, collected_data

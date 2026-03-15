@@ -153,11 +153,7 @@ class MiniOnnxBuilder:
                     }
                 else:
                     op_type = "RandomUniform"
-                    kwargs = {
-                        "low": float(mini),
-                        "high": float(maxi),
-                        "seed": 0.0,
-                    }
+                    kwargs = {"low": float(mini), "high": float(maxi), "seed": 0.0}
                 shape = tuple(map(int, tensor.shape))
                 self.nodes.append(
                     # pyrefly: ignore[bad-argument-type]
@@ -439,10 +435,7 @@ def _flatten_iterator(obj: Any, sep: str) -> Iterator:
 
 
 def create_onnx_model_from_input_tensors(
-    inputs: Any,
-    switch_low_high: Optional[bool] = None,
-    randomize: bool = False,
-    sep: str = "___",
+    inputs: Any, switch_low_high: Optional[bool] = None, randomize: bool = False, sep: str = "___"
 ) -> onnx.ModelProto:
     """
     Creates a model proto including all the value as initializers.

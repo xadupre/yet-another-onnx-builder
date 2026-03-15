@@ -63,10 +63,7 @@ def _explicit_pads(
 
 @register_tf_op_converter("Conv2D")
 def convert_conv2d(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``Conv2D`` (NHWC / HWIO) → ONNX ``Conv`` (NCHW / OIHW).
@@ -109,11 +106,6 @@ def convert_conv2d(
     # Filter: HWIO → OIHW
     w_oihw = g.op.Transpose(op.inputs[1].name, perm=[3, 2, 0, 1], name=f"{op.name}_w_t")
     # ONNX Conv (NCHW)
-    y_nchw = g.op.Conv(
-        x_nchw,
-        w_oihw,
-        name=f"{op.name}_conv",
-        **conv_kwargs,
-    )
+    y_nchw = g.op.Conv(x_nchw, w_oihw, name=f"{op.name}_conv", **conv_kwargs)
     # Output: NCHW → NHWC
     return g.op.Transpose(y_nchw, perm=[0, 2, 3, 1], outputs=outputs[:1], name=op.name)

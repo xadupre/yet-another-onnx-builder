@@ -5,12 +5,7 @@ from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
 
 # Mapping from sklearn kernel names to ONNX kernel type strings.
-_KERNEL_MAP = {
-    "linear": "LINEAR",
-    "poly": "POLY",
-    "rbf": "RBF",
-    "sigmoid": "SIGMOID",
-}
+_KERNEL_MAP = {"linear": "LINEAR", "poly": "POLY", "rbf": "RBF", "sigmoid": "SIGMOID"}
 
 _SVC_TYPES = (SVC, NuSVC)
 _SVR_TYPES = (SVR, NuSVR)

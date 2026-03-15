@@ -91,6 +91,7 @@ testpaths = ["unittests"]
 [tool.black]
 line-length = 98
 extend-exclude = '''.*clones*'''
+skip-magic-trailing-comma = true
 
 [tool.ruff]
 

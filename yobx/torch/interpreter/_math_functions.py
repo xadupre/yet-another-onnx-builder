@@ -6,11 +6,7 @@ T = str
 
 
 def math_ceil(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    name="math_ceil",
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name="math_ceil"
 ) -> T:
     "math_ceil"
     itype = g.get_type_known(outputs[0])
@@ -20,11 +16,7 @@ def math_ceil(
 
 
 def math_trunc(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    name="math_trunc",
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name="math_trunc"
 ) -> T:
     "math_trunc"
     itype = g.get_type_known(outputs[0])
@@ -32,9 +24,7 @@ def math_trunc(
         itype = TensorProto.INT64
     res = g.op.Cast(
         g.op.Mul(
-            g.op.Floor(g.op.Abs(x, name=name), name=name),
-            g.op.Sign(x, name=name),
-            name=name,
+            g.op.Floor(g.op.Abs(x, name=name), name=name), g.op.Sign(x, name=name), name=name
         ),
         to=itype,
         name=name,

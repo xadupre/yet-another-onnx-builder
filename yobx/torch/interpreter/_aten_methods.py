@@ -91,12 +91,7 @@ def aten_meth_detach(
 
 
 def aten_meth_eq(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    y: T,
-    name="meth_eq",
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T, name="meth_eq"
 ) -> T:
     "equal"
     return aten_eq(g, sts, outputs, x, y, name=name)
@@ -115,11 +110,7 @@ def aten_meth___eq__(
 
 
 def aten_meth_expand(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    *dims: List[int],
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, *dims: List[int]
 ) -> T:
     "expand"
     return aten_expand(g, sts, outputs, x, dims, name=".expand")
@@ -225,12 +216,7 @@ def aten_meth_masked_fill(
 
 
 def aten_meth_masked_fill_(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    mask: T,
-    value: Any,
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, mask: T, value: Any
 ) -> T:
     "masked"
     raise RuntimeError(
@@ -261,11 +247,7 @@ def aten_meth_mean(
     )
     if not sts:
         set_type_shape_reduce_op(
-            g,
-            outputs[0],
-            x,
-            keepdim=keepdim,
-            axes=(dim,) if isinstance(dim, int) else dim,
+            g, outputs[0], x, keepdim=keepdim, axes=(dim,) if isinstance(dim, int) else dim
         )
     return res
 
@@ -286,21 +268,14 @@ def aten_meth_numel(
 
 
 def aten_meth_pow(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    exponent: T,
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, exponent: T
 ) -> T:
     "pow"
     assert isinstance(x, str), f"Unexpected type {type(x)} (x={x!r}, exponent={exponent!r})"
     if isinstance(exponent, (int, float)):
         cst = g.make_initializer(
             "",
-            np.array(
-                exponent,
-                dtype=tensor_dtype_to_np_dtype(g.get_type(x)),
-            ),
+            np.array(exponent, dtype=tensor_dtype_to_np_dtype(g.get_type(x))),
             source="aten_meth_pow.exponent.scalar",
         )
     elif isinstance(exponent, np.array):
@@ -320,11 +295,7 @@ def aten_meth_pow(
 
 
 def aten_meth_repeat(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    *repeats: List[int],
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, *repeats: List[int]
 ) -> T:
     "repeat"
     return aten_repeat(g, sts, outputs, x, repeats, name=".repeat")
@@ -411,13 +382,7 @@ def aten_meth_sum(
         x, axes, outputs=outputs, keepdims=1 if keepdim else 0, name=".sum"
     )
     if not sts:
-        set_type_shape_reduce_op(
-            g,
-            outputs[0],
-            x,
-            keepdim=keepdim,
-            axes=tuple(map(int, axes)),
-        )
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim, axes=tuple(map(int, axes)))
     return res
 
 
@@ -501,11 +466,7 @@ def aten_meth_transpose(
 
 
 def aten_meth_unsqueeze(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    input_name: T,
-    dim: int,
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], input_name: T, dim: int
 ) -> T:
     "unsqueeze"
     new_name = g.unique_name(f"{input_name}_axes")

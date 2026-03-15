@@ -269,11 +269,5 @@ def to_graph_pattern_matching(
             rows.append(f"{_clean(n_)} = {_clean(node_name)}.input[{i_}]")
         continue
 
-    rows.extend(
-        [
-            "",
-            "# list of nodes",
-            f"nodes = [{', '.join(map(_clean,nodes_names[::-1]))}]",
-        ]
-    )
+    rows.extend(["", "# list of nodes", f"nodes = [{', '.join(map(_clean,nodes_names[::-1]))}]"])
     return "\n".join(rows)

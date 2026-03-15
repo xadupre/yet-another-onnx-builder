@@ -80,9 +80,7 @@ def _get_gb_baseline(estimator) -> np.ndarray:
 
 
 def _extract_gb_attributes_legacy(
-    estimators: np.ndarray,
-    learning_rate: float,
-    n_targets: int,
+    estimators: np.ndarray, learning_rate: float, n_targets: int
 ) -> Dict:
     """
     Extract ``TreeEnsembleRegressor`` attributes from the 2-D ``estimators_``
@@ -183,10 +181,7 @@ def _extract_gb_attributes_legacy(
 
 
 def _extract_gb_attributes_v5(
-    estimators: np.ndarray,
-    learning_rate: float,
-    n_targets: int,
-    itype: int,
+    estimators: np.ndarray, learning_rate: float, n_targets: int, itype: int
 ) -> Dict:
     """
     Extract ``TreeEnsemble`` (``ai.onnx.ml`` opset 5) attributes from the
@@ -303,10 +298,7 @@ def _extract_gb_attributes_v5(
                 cumulative_leaf_offset += n_leaves
 
     nodes_splits_tensor = oh.make_tensor(
-        "nodes_splits",
-        itype,
-        (len(all_nodes_splits),),
-        np.array(all_nodes_splits, dtype=dtype),
+        "nodes_splits", itype, (len(all_nodes_splits),), np.array(all_nodes_splits, dtype=dtype)
     )
     nodes_modes_tensor = oh.make_tensor(
         "nodes_modes",
@@ -315,10 +307,7 @@ def _extract_gb_attributes_v5(
         np.array(all_nodes_modes, dtype=np.uint8),
     )
     leaf_weights_tensor = oh.make_tensor(
-        "leaf_weights",
-        itype,
-        (len(all_leaf_weights),),
-        np.array(all_leaf_weights, dtype=dtype),
+        "leaf_weights", itype, (len(all_leaf_weights),), np.array(all_leaf_weights, dtype=dtype)
     )
 
     return dict(
@@ -429,10 +418,7 @@ def _build_gb_raw_output_v5(
     bv = baseline.flatten().astype(tensor_dtype_to_np_dtype(itype))
     bv_expanded = bv.reshape(1, n_targets)
     add_result = g.op.Add(
-        te_out_name,
-        bv_expanded,
-        name=f"{name}_add_baseline",
-        outputs=raw_outputs,
+        te_out_name, bv_expanded, name=f"{name}_add_baseline", outputs=raw_outputs
     )
     return add_result if isinstance(add_result, str) else add_result[0]
 
@@ -491,35 +477,14 @@ def sklearn_gradient_boosting_regressor(
     ml_opset = g.get_opset("ai.onnx.ml")
     if ml_opset >= 5:
         raw = _build_gb_raw_output_v5(
-            g,
-            X,
-            name,
-            estimators,
-            learning_rate,
-            n_targets,
-            baseline,
-            tree_outputs,
-            itype=itype,
+            g, X, name, estimators, learning_rate, n_targets, baseline, tree_outputs, itype=itype
         )
     else:
         raw = _build_gb_raw_output_legacy(
-            g,
-            X,
-            name,
-            estimators,
-            learning_rate,
-            n_targets,
-            baseline,
-            tree_outputs,
+            g, X, name, estimators, learning_rate, n_targets, baseline, tree_outputs
         )
 
-    cast_result = g.make_node(
-        "Cast",
-        [raw],
-        outputs=outputs,
-        name=f"{name}_cast_f64",
-        to=itype,
-    )
+    cast_result = g.make_node("Cast", [raw], outputs=outputs, name=f"{name}_cast_f64", to=itype)
     return cast_result if isinstance(cast_result, str) else cast_result[0]
 
 
@@ -579,26 +544,11 @@ def sklearn_gradient_boosting_classifier(
 
     if ml_opset >= 5:
         raw = _build_gb_raw_output_v5(
-            g,
-            X,
-            name,
-            estimators,
-            learning_rate,
-            n_targets,
-            baseline,
-            [raw_name],
-            itype=itype,
+            g, X, name, estimators, learning_rate, n_targets, baseline, [raw_name], itype=itype
         )
     else:
         raw = _build_gb_raw_output_legacy(
-            g,
-            X,
-            name,
-            estimators,
-            learning_rate,
-            n_targets,
-            baseline,
-            [raw_name],
+            g, X, name, estimators, learning_rate, n_targets, baseline, [raw_name]
         )
 
     raw_typed = g.op.Cast(raw, to=itype, name=f"{name}_cast_raw")
@@ -623,22 +573,14 @@ def sklearn_gradient_boosting_classifier(
     if np.issubdtype(classes.dtype, np.integer):  # type: ignore
         classes_arr = classes.astype(np.int64)
         label = g.op.Gather(
-            classes_arr,
-            label_idx_i64,
-            axis=0,
-            name=f"{name}_label",
-            outputs=outputs[:1],
+            classes_arr, label_idx_i64, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         if not sts:
             g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
-            classes_arr,
-            label_idx_i64,
-            axis=0,
-            name=f"{name}_label_str",
-            outputs=outputs[:1],
+            classes_arr, label_idx_i64, axis=0, name=f"{name}_label_str", outputs=outputs[:1]
         )
         if not sts:
             g.set_type(label, onnx.TensorProto.STRING)

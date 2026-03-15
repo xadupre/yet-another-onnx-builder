@@ -178,12 +178,7 @@ class TestBirch(ExtTestCase):
 
         rng = np.random.default_rng(2)
         X = rng.standard_normal((30, 4)).astype(np.float32)
-        pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("birch", Birch(n_clusters=3)),
-            ]
-        )
+        pipe = Pipeline([("scaler", StandardScaler()), ("birch", Birch(n_clusters=3))])
         pipe.fit(X)
 
         onx = to_onnx(pipe, (X,))

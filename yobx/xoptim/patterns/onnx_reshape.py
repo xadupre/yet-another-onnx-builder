@@ -37,11 +37,7 @@ class ReshapePattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         new_node = g.make_node(
             "Identity",
             node.input[:1],
@@ -239,10 +235,7 @@ class ReduceReshapePattern(PatternOptimization):
         return MatchResult(self, [node, next_node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-        next_node: NodeProto,
+        self, g: "GraphBuilder", node: NodeProto, next_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         axes = g.get_attribute(node, "axes", exc=False)
         if axes is None:
@@ -463,10 +456,7 @@ class ReshapeReshapePattern(PatternOptimization):
         return tuple((-1 if s == 0 else s) for s in list_att)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-        next_node: NodeProto,
+        self, g: "GraphBuilder", node: NodeProto, next_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         if g.is_constant(next_node.input[1]):
             cst2 = g.get_computed_constant(next_node.input[1])
@@ -984,11 +974,7 @@ class ReshapeReshapeBinaryPattern(PatternOptimization):
         return MatchResult(self, [left, right, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        left: NodeProto,
-        right: NodeProto,
-        node: NodeProto,
+        self, g: "GraphBuilder", left: NodeProto, right: NodeProto, node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         new_node = g.make_node(
             node.op_type,
@@ -1148,15 +1134,10 @@ class ConcatReshapePattern(PatternOptimization):
         return MatchResult(self, [gen, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        concat: NodeProto,
-        reshape: NodeProto,
+        self, g: "GraphBuilder", concat: NodeProto, reshape: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         m1 = g.make_initializer(
-            "",
-            np.array([-1], dtype=np.int64),
-            source="ConcatReshapePattern.m1",
+            "", np.array([-1], dtype=np.int64), source="ConcatReshapePattern.m1"
         )
         inputs = []
         done = False
@@ -1321,15 +1302,10 @@ class StaticConcatReshapePattern(PatternOptimization):
         return MatchResult(self, [gen, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        concat: NodeProto,
-        reshape: NodeProto,
+        self, g: "GraphBuilder", concat: NodeProto, reshape: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         m1 = g.make_initializer(
-            "",
-            np.array([-1], dtype=np.int64),
-            source="ConcatReshapePattern.m1",
+            "", np.array([-1], dtype=np.int64), source="ConcatReshapePattern.m1"
         )
         inputs = []
         done = False
@@ -1588,18 +1564,12 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        reshape: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", reshape: NodeProto) -> List[NodeProto]:  # noqa: F821
         aligned_reshape = self._align_shapes(
             g.get_shape_renamed(reshape.input[0]), g.get_shape_renamed(reshape.output[0])
         )
         new_shape = g.make_initializer(
-            "",
-            np.array(aligned_reshape, dtype=np.int64),
-            source="EditDistanceReshapePattern.m1",
+            "", np.array(aligned_reshape, dtype=np.int64), source="EditDistanceReshapePattern.m1"
         )
         return [
             g.make_node(
@@ -1751,18 +1721,12 @@ class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [node], self.apply, insert_at=node)
 
-    def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        reshape: NodeProto,
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", reshape: NodeProto) -> List[NodeProto]:  # noqa: F821
         op_type, axes = self._squeeze_axes(
             g.get_shape_renamed(reshape.input[0]), g.get_shape_renamed(reshape.output[0])
         )
         new_axes = g.make_initializer(
-            "",
-            np.array(axes, dtype=np.int64),
-            source="ReshapeIsSqueezePattern.m1",
+            "", np.array(axes, dtype=np.int64), source="ReshapeIsSqueezePattern.m1"
         )
         return [
             g.make_node(
@@ -1883,19 +1847,14 @@ class UnsqueezeReshapePattern(PatternOptimization):
         return None
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        unsqueeze: NodeProto,
-        reshape: NodeProto,
+        self, g: "GraphBuilder", unsqueeze: NodeProto, reshape: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         new_axes = self.compute_new_axes(
             tuple(map(int, g.get_computed_constant(unsqueeze.input[1]))),
             tuple(map(int, g.get_computed_constant(reshape.input[1]))),
         )
         axes = g.make_initializer(
-            "",
-            np.array(new_axes, dtype=np.int64),
-            source="UnsqueezeReshapePattern.a1",
+            "", np.array(new_axes, dtype=np.int64), source="UnsqueezeReshapePattern.a1"
         )
         return [
             g.make_node(
@@ -1904,7 +1863,7 @@ class UnsqueezeReshapePattern(PatternOptimization):
                 [reshape.output[0]],
                 name=f"{self.__class__.__name__}--{unsqueeze.name}",
                 doc_string=unsqueeze.doc_string,
-            ),
+            )
         ]
 
 
@@ -2017,10 +1976,7 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
         return MatchResult(self, [node_before, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node_before: NodeProto,
-        reshape_node: NodeProto,
+        self, g: "GraphBuilder", node_before: NodeProto, reshape_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         return [
             g.make_node(

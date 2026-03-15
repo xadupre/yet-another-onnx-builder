@@ -8,13 +8,7 @@ import os
 import unittest
 from typing import Optional
 import numpy as np
-from onnx import (
-    ModelProto,
-    TensorProto,
-    helper as oh,
-    numpy_helper as onh,
-    load as load_onnx,
-)
+from onnx import ModelProto, TensorProto, helper as oh, numpy_helper as onh, load as load_onnx
 from onnx.checker import check_model
 from onnx.shape_inference import infer_shapes
 from onnx.onnx_cpp2py_export.shape_inference import InferenceError
@@ -217,7 +211,7 @@ class TestGraphPatternCombination(ExtTestCase):
                     "UnsqueezeUnsqueeze",
                     "MatMulReshape2Of3",
                     "ReshapeReshape",
-                ],
+                ]
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
@@ -270,7 +264,7 @@ class TestGraphPatternCombination(ExtTestCase):
                     "UnsqueezeUnsqueeze",
                     "MatMulReshape2Of3",
                     "ReshapeReshape",
-                ],
+                ]
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)

@@ -293,15 +293,10 @@ class ReduceArgTopKPattern(PatternOptimization):
         return MatchResult(self, [reduce_node, node], self.apply)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        reduce_node: NodeProto,
-        arg_node: NodeProto,
+        self, g: "GraphBuilder", reduce_node: NodeProto, arg_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         one = g.make_initializer(
-            "",
-            np.array([1], dtype=np.int64),
-            source=f"{self.__class__.__name__}.K",
+            "", np.array([1], dtype=np.int64), source=f"{self.__class__.__name__}.K"
         )
         keepdims = g.get_attribute_with_default(arg_node, "keepdims", 1)
         axis = g.get_attribute_with_default(arg_node, "axis", 0)
@@ -326,9 +321,7 @@ class ReduceArgTopKPattern(PatternOptimization):
         ]
         if not keepdims:
             axis = g.make_initializer(
-                "",
-                np.array([axis], dtype=np.int64),
-                source=f"{self.__class__.__name__}.K",
+                "", np.array([axis], dtype=np.int64), source=f"{self.__class__.__name__}.K"
             )
             nodes.extend(
                 [

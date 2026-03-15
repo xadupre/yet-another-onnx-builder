@@ -25,10 +25,7 @@ _TF_DTYPE_TO_ONNX = {
 
 @register_tf_op_converter("RandomStandardNormal")
 def convert_random_standard_normal(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``RandomStandardNormal`` → ONNX ``ConstantOfShape`` +

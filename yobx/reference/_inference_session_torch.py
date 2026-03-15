@@ -108,8 +108,7 @@ class InferenceSessionForTorch(_InferenceSession):
         return ortvalues, output_devices
 
     def _ortvalues_to_torch_tensor(
-        self,
-        ortvalues: Union[List[ORTC.OrtValue], ORTC.OrtValueVector],  # type: ignore
+        self, ortvalues: Union[List[ORTC.OrtValue], ORTC.OrtValueVector]  # type: ignore
     ) -> Tuple[torch.Tensor, ...]:
         if len(ortvalues) == 0:
             return tuple()
@@ -231,8 +230,7 @@ class InferenceSessionForTorch(_InferenceSession):
         return pth_outputs
 
     def _ortvalues_to_numpy_tensor(
-        self,
-        ortvalues: Union[List[ORTC.OrtValue], ORTC.OrtValueVector],  # type: ignore
+        self, ortvalues: Union[List[ORTC.OrtValue], ORTC.OrtValueVector]  # type: ignore
     ) -> Tuple[Optional[TensorLike], ...]:
         if len(ortvalues) == 0:
             return tuple()

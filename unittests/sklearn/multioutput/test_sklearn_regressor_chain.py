@@ -125,12 +125,7 @@ class TestSklearnRegressorChain(ExtTestCase):
 
     def test_pipeline_with_regressor_chain(self):
         """RegressorChain at the end of a Pipeline."""
-        pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("rc", RegressorChain(Ridge())),
-            ]
-        )
+        pipe = Pipeline([("scaler", StandardScaler()), ("rc", RegressorChain(Ridge()))])
         pipe.fit(self._X, self._y)
 
         onx = to_onnx(pipe, (self._X,))

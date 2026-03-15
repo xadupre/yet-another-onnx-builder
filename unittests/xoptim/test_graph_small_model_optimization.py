@@ -60,9 +60,7 @@ class TestGraphSmallModelOptimization(ExtTestCase):
         model = Dummy()
         x = torch.rand(5, 3)
         onx = to_onnx(
-            model,
-            (x,),
-            options=OptimizationOptions(constant_folding=True, patterns=None),
+            model, (x,), options=OptimizationOptions(constant_folding=True, patterns=None)
         )
         after = [n.op_type for n in onx.graph.node if n.op_type == "Sqrt"]
         self.assertEqual(len(after), 0)

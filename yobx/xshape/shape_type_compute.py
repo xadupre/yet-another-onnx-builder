@@ -2,20 +2,13 @@ from collections import Counter
 from typing import List, Optional, Sequence, Tuple
 import numpy as np
 from onnx import NodeProto, TensorProto
-from ._shape_helper import (
-    DYNAMIC_SHAPE,
-    is_static_shape,
-    all_int,
-    all_int_or_str,
-)
+from ._shape_helper import DYNAMIC_SHAPE, is_static_shape, all_int, all_int_or_str
 from .simplify_expressions import simplify_expression
 from .shape_builder import ShapeBuilder
 
 
 def broadcast_shape(
-    sh1: DYNAMIC_SHAPE,
-    sh2: DYNAMIC_SHAPE,
-    graph_builder: Optional[ShapeBuilder] = None,
+    sh1: DYNAMIC_SHAPE, sh2: DYNAMIC_SHAPE, graph_builder: Optional[ShapeBuilder] = None
 ) -> DYNAMIC_SHAPE:
     """
     Computes the shape for many broadcasting operators.
@@ -147,12 +140,7 @@ def _set_shape_type_op_any_attention(g: ShapeBuilder, node: NodeProto):
                 g.set_rank(o, 4)
 
 
-def set_type_shape_reshape(
-    g: ShapeBuilder,
-    name: str,
-    input_name: str,
-    new_shape: Sequence[int],
-):
+def set_type_shape_reshape(g: ShapeBuilder, name: str, input_name: str, new_shape: Sequence[int]):
     "Sets the output shape for node type Reshape"
     g.set_type(name, g.get_type(input_name))
     if g.has_device(input_name):
@@ -184,10 +172,7 @@ def set_type_shape_reshape(
 
 
 def set_type_shape_unary_op(
-    g: ShapeBuilder,
-    name: str,
-    input_name: str,
-    itype: Optional[int] = None,
+    g: ShapeBuilder, name: str, input_name: str, itype: Optional[int] = None
 ) -> bool:
     """Sets the shape and type for an unary operator (abs, exp, ...)."""
     if g.has_device(input_name):
@@ -205,10 +190,7 @@ def set_type_shape_unary_op(
 
 
 def set_type_shape_unary_op_abs(
-    g: ShapeBuilder,
-    name: str,
-    input_name: str,
-    itype: Optional[int] = None,
+    g: ShapeBuilder, name: str, input_name: str, itype: Optional[int] = None
 ) -> bool:
     """Sets the shape and type for an unary operator (abs, exp, ...)."""
     if g.has_device(input_name):
@@ -376,14 +358,7 @@ def set_type_shape_matmul(g: ShapeBuilder, name: str, x: str, y: str) -> bool:
     return
 
 
-def set_type_shape_gemm(
-    g: ShapeBuilder,
-    name: str,
-    x: str,
-    y: str,
-    transA: int,
-    transB: int,
-):
+def set_type_shape_gemm(g: ShapeBuilder, name: str, x: str, y: str, transA: int, transB: int):
     "Sets the output shape for node type Gemm."
     if transA == 0 and transB == 0:
         return set_type_shape_matmul(g, name, x, y)
@@ -404,11 +379,7 @@ def set_type_shape_gemm(
 
 
 def set_type_shape_reduce_op(
-    g: ShapeBuilder,
-    name: str,
-    x: str,
-    keepdim: int,
-    axes: Optional[Tuple[int]] = None,
+    g: ShapeBuilder, name: str, x: str, keepdim: int, axes: Optional[Tuple[int]] = None
 ):
     "Sets the output shape for any Reduce type."
     assert keepdim in {None, 0, 1}, f"keepdim={keepdim!r} must be in {{0, 1}}"
@@ -479,10 +450,7 @@ def _set_shape_type_op_any_lp_normalization(self: ShapeBuilder, node: NodeProto)
 def _set_shape_type_op_any_cast(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Cast."
     return set_type_shape_unary_op(
-        self,
-        node.output[0],
-        node.input[0],
-        itype=self.get_attribute(node, "to").i,
+        self, node.output[0], node.input[0], itype=self.get_attribute(node, "to").i
     )
 
 
@@ -1121,11 +1089,7 @@ def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
         iaxes is not None
     ), f"iaxes=None when {axes=}, node.input={node.input}{self.get_debug_msg()}"
     return set_type_shape_reduce_op(
-        self,
-        node.output[0],
-        node.input[0],
-        keepdim=keepdim,
-        axes=iaxes,
+        self, node.output[0], node.input[0], keepdim=keepdim, axes=iaxes
     )
 
 
@@ -1357,9 +1321,9 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
                     continue
             d = input_shape[a]
             if isinstance(s, int) and s < 0:
-                s = f"(({d}){e})"
+                s = f"(({d})+({e}))"
             if isinstance(e, int) and e < 0:
-                e = f"(({d}){e})"
+                e = f"(({d})+({e}))"
             output_shape[a] = simplify_expression(f"{e}-{s}" if st == 1 else f"({e}-{s})//({st})")
             continue
 
@@ -1793,9 +1757,7 @@ def _set_shape_type_op_any_where(self: ShapeBuilder, node: NodeProto):
         and self.has_shape(node.input[2])
     ):
         sh1 = broadcast_shape(
-            self.get_shape(node.input[0]),
-            self.get_shape(node.input[1]),
-            graph_builder=self,
+            self.get_shape(node.input[0]), self.get_shape(node.input[1]), graph_builder=self
         )
         sh = broadcast_shape(sh1, self.get_shape(node.input[2]), graph_builder=self)
         self.set_shape(node.output[0], sh)
@@ -1811,9 +1773,7 @@ def _set_shape_type_op_any_where(self: ShapeBuilder, node: NodeProto):
 
 
 def _set_shape_type_op_any_unary(
-    self: ShapeBuilder,
-    node: NodeProto,
-    itype: Optional[int] = None,
+    self: ShapeBuilder, node: NodeProto, itype: Optional[int] = None
 ):
     "Sets the output shape for any unary type."
     return set_type_shape_unary_op(self, node.output[0], node.input[0], itype=itype)

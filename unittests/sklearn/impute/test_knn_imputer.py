@@ -15,10 +15,7 @@ class TestKNNImputer(ExtTestCase):
         from sklearn.impute import KNNImputer
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2, np.nan], [3, 4, 3], [np.nan, 6, 5], [8, 8, 7]],
-            dtype=np.float32,
-        )
+        X = np.array([[1, 2, np.nan], [3, 4, 3], [np.nan, 6, 5], [8, 8, 7]], dtype=np.float32)
         imp = KNNImputer(n_neighbors=2, weights="uniform")
         imp.fit(X)
 
@@ -38,10 +35,7 @@ class TestKNNImputer(ExtTestCase):
         from sklearn.impute import KNNImputer
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2, np.nan], [3, 4, 3], [np.nan, 6, 5], [8, 8, 7]],
-            dtype=np.float32,
-        )
+        X = np.array([[1, 2, np.nan], [3, 4, 3], [np.nan, 6, 5], [8, 8, 7]], dtype=np.float32)
         imp = KNNImputer(n_neighbors=2, weights="distance")
         imp.fit(X)
 
@@ -61,10 +55,7 @@ class TestKNNImputer(ExtTestCase):
         from sklearn.impute import KNNImputer
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1.0, 2.0, np.nan], [3.0, 4.0, 3.0], [np.nan, 6.0, 5.0]],
-            dtype=np.float64,
-        )
+        X = np.array([[1.0, 2.0, np.nan], [3.0, 4.0, 3.0], [np.nan, 6.0, 5.0]], dtype=np.float64)
         imp = KNNImputer(n_neighbors=2)
         imp.fit(X)
 
@@ -123,10 +114,7 @@ class TestKNNImputer(ExtTestCase):
         from sklearn.impute import KNNImputer
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1.0, 2.0, np.nan], [3.0, 4.0, 3.0], [5.0, 6.0, 5.0]],
-            dtype=np.float32,
-        )
+        X = np.array([[1.0, 2.0, np.nan], [3.0, 4.0, 3.0], [5.0, 6.0, 5.0]], dtype=np.float32)
         imp = KNNImputer(n_neighbors=1)
         imp.fit(X)
 
@@ -167,10 +155,7 @@ class TestKNNImputer(ExtTestCase):
         from sklearn.impute import KNNImputer
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2, np.nan], [3, 4, 3], [np.nan, 6, 5], [8, 8, 7]],
-            dtype=np.float32,
-        )
+        X = np.array([[1, 2, np.nan], [3, 4, 3], [np.nan, 6, 5], [8, 8, 7]], dtype=np.float32)
         imp = KNNImputer(n_neighbors=2, weights="uniform")
         imp.fit(X)
 
@@ -190,10 +175,7 @@ class TestKNNImputer(ExtTestCase):
         from sklearn.impute import KNNImputer
         from yobx.sklearn import to_onnx
 
-        X = np.array(
-            [[1, 2, np.nan], [3, 4, 3], [np.nan, 6, 5], [8, 8, 7]],
-            dtype=np.float32,
-        )
+        X = np.array([[1, 2, np.nan], [3, 4, 3], [np.nan, 6, 5], [8, 8, 7]], dtype=np.float32)
         imp = KNNImputer(n_neighbors=2, weights="distance")
         imp.fit(X)
 

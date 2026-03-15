@@ -31,14 +31,7 @@ class TestSklearnLocalOutlierFactor(ExtTestCase):
         dtype=np.float64,
     )
     # Test data distinct from training data to avoid self-distance effects.
-    _X_test = np.array(
-        [
-            [1.5, 2.5],
-            [3.5, 4.5],
-            [50.0, 100.0],  # clear outlier
-        ],
-        dtype=np.float64,
-    )
+    _X_test = np.array([[1.5, 2.5], [3.5, 4.5], [50.0, 100.0]], dtype=np.float64)  # clear outlier
 
     def _check(self, X, X_test, dtype, atol=1e-5, n_neighbors=3, **kwargs):
         Xd = X.astype(dtype)

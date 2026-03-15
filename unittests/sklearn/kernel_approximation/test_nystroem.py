@@ -23,10 +23,7 @@ class TestNystroem(ExtTestCase):
 
         X = self._make_data()
         est = Nystroem(
-            n_components=n_components,
-            kernel=kernel,
-            random_state=0,
-            **nystroem_kwargs,
+            n_components=n_components, kernel=kernel, random_state=0, **nystroem_kwargs
         )
         est.fit(X)
 
@@ -112,11 +109,7 @@ class TestNystroem(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         X = self._make_data()
-        est = Nystroem(
-            n_components=5,
-            kernel=lambda x, y: x @ y.T,
-            random_state=0,
-        )
+        est = Nystroem(n_components=5, kernel=lambda x, y: x @ y.T, random_state=0)
         est.fit(X)
 
         with self.assertRaises(NotImplementedError):

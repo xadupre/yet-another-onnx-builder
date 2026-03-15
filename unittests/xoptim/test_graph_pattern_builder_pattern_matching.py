@@ -11,10 +11,7 @@ import onnx.numpy_helper as onh
 from onnx.reference.op_run import OpRun
 from yobx.ext_test_case import ExtTestCase
 from yobx.typing import GraphBuilderExtendedProtocol
-from yobx.xoptim import (
-    EasyPatternOptimization,
-    make_pattern_from_onnx,
-)
+from yobx.xoptim import EasyPatternOptimization, make_pattern_from_onnx
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
 from yobx.xoptim import GraphBuilderPatternOptimization
@@ -78,21 +75,13 @@ class TestGraphPatternBuilder(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=[AddAddPattern(verbose=0)],
-                verbose=0,
+                patterns=[AddAddPattern(verbose=0)], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["AddAdd"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["AddAdd"], [n.op_type for n in opt_onx.graph.node])
 
-        feeds = {
-            "x": self._range(5, 6),
-            "y": self._range(5, 6),
-            "z": self._range(5, 6),
-        }
+        feeds = {"x": self._range(5, 6), "y": self._range(5, 6), "z": self._range(5, 6)}
         ref1 = ExtendedReferenceEvaluator(model)
         expected = ref1.run(None, feeds)
 
@@ -160,15 +149,11 @@ class TestGraphPatternBuilder(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=[AddAddAddAddPattern(verbose=0)],
-                verbose=0,
+                patterns=[AddAddAddAddPattern(verbose=0)], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["AddAddAddAdd"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["AddAddAddAdd"], [n.op_type for n in opt_onx.graph.node])
 
         feeds = {
             "x": self._range(5, 6),
@@ -222,10 +207,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                 return unsq1, unsq2
 
             def validate_mapping(
-                self,
-                g: GraphBuilderPatternOptimization,
-                deleted_nodes,
-                pattern_nodes,
+                self, g: GraphBuilderPatternOptimization, deleted_nodes, pattern_nodes
             ) -> bool:
                 # If some pattern needs to be rejected.
                 return True
@@ -248,9 +230,7 @@ class TestGraphPatternBuilder(ExtTestCase):
             onx,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=[RotaryEmbeddingPattern(verbose=0)],
-                remove_identity=False,
-                verbose=0,
+                patterns=[RotaryEmbeddingPattern(verbose=0)], remove_identity=False, verbose=0
             ),
         )
         if __name__ == "__main__":
@@ -302,9 +282,7 @@ class TestGraphPatternBuilder(ExtTestCase):
 
         model_apply = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("AddAdd", ["X", "Y", "Z"], ["F"], domain="ZZZ"),
-                ],
+                [oh.make_node("AddAdd", ["X", "Y", "Z"], ["F"], domain="ZZZ")],
                 "apply",
                 [
                     oh.make_tensor_value_info("X", TFLOAT, [None]),
@@ -344,16 +322,9 @@ class TestGraphPatternBuilder(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["AddAdd"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["AddAdd"], [n.op_type for n in opt_onx.graph.node])
 
-        feeds = {
-            "x": self._range(5, 6),
-            "y": self._range(5, 6),
-            "z": self._range(5, 6),
-        }
+        feeds = {"x": self._range(5, 6), "y": self._range(5, 6), "z": self._range(5, 6)}
         ref1 = ExtendedReferenceEvaluator(model)
         expected = ref1.run(None, feeds)
 
@@ -415,8 +386,7 @@ class TestGraphPatternBuilder(ExtTestCase):
             proto,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=[MulMulSigmoidPattern(verbose=1)],
-                verbose=0,
+                patterns=[MulMulSigmoidPattern(verbose=1)], verbose=0
             ),
         )
 
@@ -478,8 +448,7 @@ class TestGraphPatternBuilder(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=[SliceSplitPattern(verbose=0)],
-                verbose=0,
+                patterns=[SliceSplitPattern(verbose=0)], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
@@ -515,10 +484,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                     oh.make_tensor_value_info("W", TFLOAT, [None, None]),
                 ],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
         )
 
         class TransposeMatMulPattern(EasyPatternOptimization):
@@ -536,18 +502,14 @@ class TestGraphPatternBuilder(ExtTestCase):
             ) -> bool:
                 perm = list(g.get_attribute(deleted_nodes[0], "perm").ints)
                 expected_perm = list(range(len(perm)))
-                expected_perm[-2], expected_perm[-1] = (
-                    expected_perm[-1],
-                    expected_perm[-2],
-                )
+                expected_perm[-2], expected_perm[-1] = (expected_perm[-1], expected_perm[-2])
                 return expected_perm == perm
 
         gr = GraphBuilder(
             proto,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=[TransposeMatMulPattern(verbose=0)],
-                verbose=0,
+                patterns=[TransposeMatMulPattern(verbose=0)], verbose=0
             ),
         )
 
@@ -575,9 +537,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                     [oh.make_tensor_value_info("X", TFLOAT, [None, None])],
                     [oh.make_tensor_value_info("Y", TFLOAT, [None, None])],
                 ),
-                opset_imports=[
-                    oh.make_opsetid("", 18),
-                ],
+                opset_imports=[oh.make_opsetid("", 18)],
                 ir_version=9,
             ),
             oh.make_model(
@@ -600,9 +560,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                     [oh.make_tensor_value_info("Y", TFLOAT, [None, None])],
                     [onh.from_array(np.array([4, 4], dtype=np.int64), name="splits")],
                 ),
-                opset_imports=[
-                    oh.make_opsetid("", 18),
-                ],
+                opset_imports=[oh.make_opsetid("", 18)],
                 ir_version=9,
             ),
         ]
@@ -702,9 +660,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                 opt_onx = gr.to_onnx()
                 self.assertEqual(["Rotary"], [n.op_type for n in opt_onx.graph.node])
 
-                feeds = {
-                    "X": np.arange(24).reshape((3, 8)).astype(np.float32),
-                }
+                feeds = {"X": np.arange(24).reshape((3, 8)).astype(np.float32)}
                 ref1 = ExtendedReferenceEvaluator(proto)
                 expected = ref1.run(None, feeds)
 
@@ -742,10 +698,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                     oh.make_tensor_value_info("F2", TFLOAT, ["d"]),
                 ],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         check_model(model)
@@ -791,11 +744,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                 x, y, z = set(list(deleted_nodes[0].input) + list(deleted_nodes[1].input))
                 if not g.has_shape(x) or not g.has_shape(y) or not g.has_shape(z):
                     return False
-                x_shape, y_shape, z_shape = (
-                    g.get_shape(x),
-                    g.get_shape(y),
-                    g.get_shape(z),
-                )
+                x_shape, y_shape, z_shape = (g.get_shape(x), g.get_shape(y), g.get_shape(z))
 
                 if x_shape is None or y_shape is None or z_shape is None:
                     return False
@@ -842,10 +791,7 @@ class TestGraphPatternBuilder(ExtTestCase):
         verbose = 0
         for op_type, left in itertools.product(["Add", "Mul"], [False, True]):
             with self.subTest(op_type=op_type, left=left):
-                model = self._get_shared_input_model(
-                    op_type=op_type,
-                    left=left,
-                )
+                model = self._get_shared_input_model(op_type=op_type, left=left)
                 self.assertEqual(len(model.graph.node), 2)
 
                 gr = GraphBuilder(

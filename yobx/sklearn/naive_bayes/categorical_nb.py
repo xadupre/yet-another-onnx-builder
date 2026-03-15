@@ -66,12 +66,7 @@ def sklearn_categorical_nb(
 
         # Extract column f as a 1-D integer vector of shape (N,)
         # Gather with a scalar index on axis=1 gives shape (N,)
-        X_f = g.op.Gather(
-            X_int,
-            np.array(f, dtype=np.int64),
-            axis=1,
-            name=f"{name}_col_{f}",
-        )
+        X_f = g.op.Gather(X_int, np.array(f, dtype=np.int64), axis=1, name=f"{name}_col_{f}")
 
         # Look up log-probs: contrib shape (N, C)
         contrib = g.op.Gather(table, X_f, axis=0, name=f"{name}_contrib_{f}")

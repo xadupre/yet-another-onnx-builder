@@ -126,10 +126,7 @@ class SliceSlicePattern(PatternOptimization):
         return MatchResult(self, [before, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        before: NodeProto,
-        node: NodeProto,
+        self, g: "GraphBuilder", before: NodeProto, node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         # merges slices
 
@@ -210,9 +207,6 @@ class SliceSlicePattern(PatternOptimization):
             inputs.append(new_step)
 
         node = g.make_node(
-            "Slice",
-            inputs,
-            node.output,
-            name=f"{self.__class__.__name__}--{node.name}",
+            "Slice", inputs, node.output, name=f"{self.__class__.__name__}--{node.name}"
         )
         return [*conc, node]

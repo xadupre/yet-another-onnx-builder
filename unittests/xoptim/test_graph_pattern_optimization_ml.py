@@ -26,18 +26,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -68,10 +57,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
         )
         onx = oh.make_model_gen_version(
             graph,
-            opset_imports=[
-                oh.make_opsetid("", TARGET_OPSET),
-                oh.make_opsetid("ai.onnx.ml", 4),
-            ],
+            opset_imports=[oh.make_opsetid("", TARGET_OPSET), oh.make_opsetid("ai.onnx.ml", 4)],
         )
         check_model(onx)
 
@@ -111,18 +97,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -155,10 +130,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
         )
         onx = oh.make_model_gen_version(
             graph,
-            opset_imports=[
-                oh.make_opsetid("", TARGET_OPSET),
-                oh.make_opsetid("ai.onnx.ml", 4),
-            ],
+            opset_imports=[oh.make_opsetid("", TARGET_OPSET), oh.make_opsetid("ai.onnx.ml", 4)],
         )
         check_model(onx)
 
@@ -196,18 +168,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -241,18 +202,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -282,10 +232,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
         )
         onx = oh.make_model_gen_version(
             graph,
-            opset_imports=[
-                oh.make_opsetid("", TARGET_OPSET),
-                oh.make_opsetid("ai.onnx.ml", 4),
-            ],
+            opset_imports=[oh.make_opsetid("", TARGET_OPSET), oh.make_opsetid("ai.onnx.ml", 4)],
         )
         check_model(onx)
 
@@ -329,18 +276,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -374,18 +310,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -421,10 +346,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
         )
         onx = oh.make_model_gen_version(
             graph,
-            opset_imports=[
-                oh.make_opsetid("", TARGET_OPSET),
-                oh.make_opsetid("ai.onnx.ml", 4),
-            ],
+            opset_imports=[oh.make_opsetid("", TARGET_OPSET), oh.make_opsetid("ai.onnx.ml", 4)],
         )
         check_model(onx)
 
@@ -470,18 +392,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -515,18 +426,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -556,10 +456,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
         )
         onx = oh.make_model_gen_version(
             graph,
-            opset_imports=[
-                oh.make_opsetid("", TARGET_OPSET),
-                oh.make_opsetid("ai.onnx.ml", 4),
-            ],
+            opset_imports=[oh.make_opsetid("", TARGET_OPSET), oh.make_opsetid("ai.onnx.ml", 4)],
         )
         check_model(onx)
 
@@ -607,18 +504,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -652,18 +538,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -699,10 +574,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
         )
         onx = oh.make_model_gen_version(
             graph,
-            opset_imports=[
-                oh.make_opsetid("", TARGET_OPSET),
-                oh.make_opsetid("ai.onnx.ml", 4),
-            ],
+            opset_imports=[oh.make_opsetid("", TARGET_OPSET), oh.make_opsetid("ai.onnx.ml", 4)],
         )
         check_model(onx)
 
@@ -749,18 +621,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -794,18 +655,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -835,10 +685,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
         )
         onx = oh.make_model_gen_version(
             graph,
-            opset_imports=[
-                oh.make_opsetid("", TARGET_OPSET),
-                oh.make_opsetid("ai.onnx.ml", 4),
-            ],
+            opset_imports=[oh.make_opsetid("", TARGET_OPSET), oh.make_opsetid("ai.onnx.ml", 4)],
         )
         check_model(onx)
 
@@ -882,18 +729,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -927,18 +763,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
             nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
             nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            nodes_modes=[
-                rule,
-                rule,
-                "LEAF",
-                "LEAF",
-                "LEAF",
-                rule,
-                "LEAF",
-                rule,
-                "LEAF",
-                "LEAF",
-            ],
+            nodes_modes=[rule, rule, "LEAF", "LEAF", "LEAF", rule, "LEAF", rule, "LEAF", "LEAF"],
             nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
             nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
             nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
@@ -968,10 +793,7 @@ class TestGraphPatternOptimizationMl(ExtTestCase):
         )
         onx = oh.make_model_gen_version(
             graph,
-            opset_imports=[
-                oh.make_opsetid("", TARGET_OPSET),
-                oh.make_opsetid("ai.onnx.ml", 2),
-            ],
+            opset_imports=[oh.make_opsetid("", TARGET_OPSET), oh.make_opsetid("ai.onnx.ml", 2)],
         )
         check_model(onx)
 

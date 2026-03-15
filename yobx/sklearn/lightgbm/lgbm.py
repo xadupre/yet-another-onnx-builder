@@ -67,12 +67,7 @@ _REG_IDENTITY_OBJECTIVES = frozenset(
 
 #: Regression objectives that apply ``exp`` as the output transform
 #: (log-link objectives).
-_REG_EXP_OBJECTIVES = frozenset(
-    {
-        "poisson",
-        "tweedie",
-    }
-)
+_REG_EXP_OBJECTIVES = frozenset({"poisson", "tweedie"})
 
 
 def _get_reg_output_transform(objective: str) -> Optional[str]:
@@ -240,9 +235,7 @@ def _flatten_lgbm_tree(tree_structure: dict) -> Tuple[List[dict], List[dict], in
 
 
 def _build_lgbm_tree_attrs_legacy(
-    trees: List[dict],
-    n_targets: int,
-    is_classifier: bool = False,
+    trees: List[dict], n_targets: int, is_classifier: bool = False
 ) -> dict:
     """Build legacy ``TreeEnsembleRegressor`` / ``TreeEnsembleClassifier`` attribute arrays.
 
@@ -354,11 +347,7 @@ def _build_lgbm_tree_attrs_legacy(
     )
 
 
-def _build_lgbm_tree_attrs_v5(
-    trees: List[dict],
-    n_targets: int,
-    itype: int,
-) -> dict:
+def _build_lgbm_tree_attrs_v5(trees: List[dict], n_targets: int, itype: int) -> dict:
     """Build ``TreeEnsemble`` (``ai.onnx.ml`` opset 5) attribute arrays.
 
     The opset-5 encoding stores *internal* nodes and *leaf* nodes in separate
@@ -450,10 +439,7 @@ def _build_lgbm_tree_attrs_v5(
         cumulative_leaf_offset += n_leaves_appended
 
     nodes_splits_tensor = oh.make_tensor(
-        "nodes_splits",
-        itype,
-        (len(all_nodes_splits),),
-        np.array(all_nodes_splits, dtype=dtype),
+        "nodes_splits", itype, (len(all_nodes_splits),), np.array(all_nodes_splits, dtype=dtype)
     )
     nodes_modes_tensor = oh.make_tensor(
         "nodes_modes",
@@ -462,10 +448,7 @@ def _build_lgbm_tree_attrs_v5(
         np.array(all_nodes_modes, dtype=np.uint8),
     )
     leaf_weights_tensor = oh.make_tensor(
-        "leaf_weights",
-        itype,
-        (len(all_leaf_weights),),
-        np.array(all_leaf_weights, dtype=dtype),
+        "leaf_weights", itype, (len(all_leaf_weights),), np.array(all_leaf_weights, dtype=dtype)
     )
 
     return dict(
@@ -564,11 +547,7 @@ def _emit_lgbm_tree_node(
 
 
 def _gather_labels(
-    g: GraphBuilderExtendedProtocol,
-    label_idx: str,
-    classes,
-    name: str,
-    out_name: str,
+    g: GraphBuilderExtendedProtocol, label_idx: str, classes, name: str, out_name: str
 ) -> str:
     """Gather class labels from ``classes`` at positions ``label_idx``.
 
@@ -582,22 +561,14 @@ def _gather_labels(
     if np.issubdtype(classes.dtype, np.integer):
         classes_arr = classes.astype(np.int64)
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label",
-            outputs=[out_name],
+            classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=[out_name]
         )
         if not g.has_type(label):
             g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes, dtype=str)
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label_str",
-            outputs=[out_name],
+            classes_arr, label_idx, axis=0, name=f"{name}_label_str", outputs=[out_name]
         )
         if not g.has_type(label):
             g.set_type(label, onnx.TensorProto.STRING)

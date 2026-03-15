@@ -184,10 +184,7 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
         y = (X[:, 0] > 0).astype(np.int64)
 
         pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("clf", RadiusNeighborsClassifier(radius=2.0)),
-            ]
+            [("scaler", StandardScaler()), ("clf", RadiusNeighborsClassifier(radius=2.0))]
         )
         pipe.fit(X, y)
 
@@ -353,10 +350,7 @@ class TestRadiusNeighborsRegressor(ExtTestCase):
         y = X[:, 0] + X[:, 1]
 
         pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("reg", RadiusNeighborsRegressor(radius=2.0)),
-            ]
+            [("scaler", StandardScaler()), ("reg", RadiusNeighborsRegressor(radius=2.0))]
         )
         pipe.fit(X, y)
 

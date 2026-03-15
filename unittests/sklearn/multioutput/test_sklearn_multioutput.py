@@ -87,12 +87,7 @@ class TestSklearnMultiOutputRegressor(ExtTestCase):
 
     def test_pipeline_with_multi_output_regressor(self):
         """MultiOutputRegressor at the end of a Pipeline."""
-        pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("reg", MultiOutputRegressor(Ridge())),
-            ]
-        )
+        pipe = Pipeline([("scaler", StandardScaler()), ("reg", MultiOutputRegressor(Ridge()))])
         pipe.fit(self._X, self._y)
 
         onx = to_onnx(pipe, (self._X,))

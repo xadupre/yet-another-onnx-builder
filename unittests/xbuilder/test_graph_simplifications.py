@@ -229,7 +229,7 @@ class TestGraphSimplification(ExtTestCase):
                             else_branch=oh.make_graph(
                                 [
                                     # not shadowing
-                                    oh.make_node("Sub", ["X0", "three"], ["Y"]),
+                                    oh.make_node("Sub", ["X0", "three"], ["Y"])
                                 ],
                                 "else",
                                 [],
@@ -367,7 +367,7 @@ class TestGraphSimplification(ExtTestCase):
                             then_branch=oh.make_graph(
                                 [
                                     # shadowing
-                                    oh.make_node("Add", ["X00", "five"], ["Y"]),
+                                    oh.make_node("Add", ["X00", "five"], ["Y"])
                                 ],
                                 "then",
                                 [],

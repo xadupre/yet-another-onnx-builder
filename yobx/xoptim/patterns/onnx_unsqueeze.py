@@ -151,10 +151,7 @@ class SqueezeUnsqueezePattern(PatternOptimization):
         )
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node_first: NodeProto,
-        node_second: NodeProto,
+        self, g: "GraphBuilder", node_first: NodeProto, node_second: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         diff = self._diff_axes(g, node_first, node_second)
         assert diff is not None, "Match should not have happened then."
@@ -305,10 +302,7 @@ class UnsqueezeUnsqueezePattern(PatternOptimization):
         return current
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node: NodeProto,
-        next_node: NodeProto,
+        self, g: "GraphBuilder", node: NodeProto, next_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         axis1 = g.get_constant_or_attribute(node, "axis", 1)
         axis2 = g.get_constant_or_attribute(next_node, "axis", 1)

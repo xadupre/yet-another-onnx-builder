@@ -62,9 +62,7 @@ def sklearn_multi_output_regressor(
 
         # Reshape (N,) → (N, 1)
         reshaped = g.op.Reshape(
-            sub_output,
-            np.array([-1, 1], dtype=np.int64),
-            name=f"{sub_name}_reshape",
+            sub_output, np.array([-1, 1], dtype=np.int64), name=f"{sub_name}_reshape"
         )
         per_target_preds.append(reshaped)
 
@@ -197,8 +195,7 @@ def sklearn_multi_output_classifier(
 
         if not g.has_type(sub_label):
             g.set_type(
-                sub_label,
-                onnx.TensorProto.INT64 if all_integer else onnx.TensorProto.STRING,
+                sub_label, onnx.TensorProto.INT64 if all_integer else onnx.TensorProto.STRING
             )
 
         if all_integer:
@@ -209,9 +206,7 @@ def sklearn_multi_output_classifier(
 
         # Reshape (N,) → (N, 1)
         reshaped = g.op.Reshape(
-            label_typed,
-            np.array([-1, 1], dtype=np.int64),
-            name=f"{sub_name}_reshape",
+            label_typed, np.array([-1, 1], dtype=np.int64), name=f"{sub_name}_reshape"
         )
         per_target_labels.append(reshaped)
 
@@ -224,10 +219,7 @@ def sklearn_multi_output_classifier(
         )
 
     if not sts:
-        g.set_type(
-            labels,
-            onnx.TensorProto.INT64 if all_integer else onnx.TensorProto.STRING,
-        )
+        g.set_type(labels, onnx.TensorProto.INT64 if all_integer else onnx.TensorProto.STRING)
         n_targets = len(estimator.estimators_)
         if g.has_shape(X):
             batch_dim = g.get_shape(X)[0]
@@ -249,9 +241,7 @@ def sklearn_multi_output_classifier(
     unsqueezed: List[str] = []
     for i, proba in enumerate(per_target_probas):
         unsq = g.op.Unsqueeze(
-            proba,
-            np.array([1], dtype=np.int64),
-            name=f"{name}__est{i}_unsqueeze",
+            proba, np.array([1], dtype=np.int64), name=f"{name}__est{i}_unsqueeze"
         )
         unsqueezed.append(unsq)
 

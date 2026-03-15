@@ -740,10 +740,7 @@ class TestShapeTypeCompute(ExtTestCase):
         model = _make_model(
             [oh.make_node("MaxPool", ["X"], ["Y", "I"], kernel_shape=[2, 2], strides=[2, 2])],
             [_mkv_("X", TFLOAT, [1, 1, 6, 6])],
-            [
-                _mkv_("Y", TFLOAT, [1, 1, 3, 3]),
-                _mkv_("I", TINT64, [1, 1, 3, 3]),
-            ],
+            [_mkv_("Y", TFLOAT, [1, 1, 3, 3]), _mkv_("I", TINT64, [1, 1, 3, 3])],
         )
         b = BasicShapeBuilder()
         b.run_model(model)
@@ -1819,10 +1816,7 @@ class TestShapeTypeCompute(ExtTestCase):
         b.set_type("upd", TFLOAT)
         b.set_shape("upd", (5, 3, 4))
         node = oh.make_node(
-            "ScatterNDOfShape",
-            ["shape", "idx", "upd"],
-            ["Y"],
-            domain="com.microsoft",
+            "ScatterNDOfShape", ["shape", "idx", "upd"], ["Y"], domain="com.microsoft"
         )
         set_type_shape_scatter_nd_of_shape(b, node)
         self.assertEqual(b.get_type("Y"), TFLOAT)
@@ -1895,10 +1889,7 @@ class TestShapeTypeCompute(ExtTestCase):
             b.set_type(name, TFLOAT)
             b.set_rank(name, 3)
         node = oh.make_node(
-            "MultiHeadAttention",
-            ["Q", "K", "V"],
-            ["out1"],
-            domain="com.microsoft",
+            "MultiHeadAttention", ["Q", "K", "V"], ["out1"], domain="com.microsoft"
         )
         set_type_shape_multi_head_attention(b, node)
         self.assertEqual(b.get_rank("out1"), 3)
@@ -2218,11 +2209,7 @@ class TestShapeTypeCompute(ExtTestCase):
     def test_set_shape_type_op_any_attention_3d(self):
         # 3D input: (batch, seq, hidden_size) with q/kv head attributes
         g = _MockShapeBuilder()
-        for name, shape in [
-            ("Q", (2, 10, 512)),
-            ("K", (2, 10, 256)),
-            ("V", (2, 10, 256)),
-        ]:
+        for name, shape in [("Q", (2, 10, 512)), ("K", (2, 10, 256)), ("V", (2, 10, 256))]:
             g._types[name] = TFLOAT
             g._shapes[name] = shape
         node = oh.make_node("Attention", ["Q", "K", "V"], ["out"], q_num_heads=8, kv_num_heads=4)
@@ -2234,11 +2221,7 @@ class TestShapeTypeCompute(ExtTestCase):
     def test_set_shape_type_op_any_attention_3d_present_outputs(self):
         # 3D with present key/value outputs (output[1] and output[2]), no past inputs
         g = _MockShapeBuilder()
-        for name, shape in [
-            ("Q", (2, 10, 512)),
-            ("K", (2, 10, 512)),
-            ("V", (2, 10, 512)),
-        ]:
+        for name, shape in [("Q", (2, 10, 512)), ("K", (2, 10, 512)), ("V", (2, 10, 512))]:
             g._types[name] = TFLOAT
             g._shapes[name] = shape
         node = oh.make_node(
@@ -2567,11 +2550,7 @@ class TestDevicePropagation(ExtTestCase):
         b.set_device("X", -1)
         b.set_opset("ai.onnx.ml", 3)
         node = oh.make_node(
-            "TreeEnsembleRegressor",
-            ["X"],
-            ["Y"],
-            n_targets=2,
-            domain="ai.onnx.ml",
+            "TreeEnsembleRegressor", ["X"], ["Y"], n_targets=2, domain="ai.onnx.ml"
         )
         set_type_shape_tree_ensemble(b, node)
         self.assertEqual(b.get_device("Y"), -1)
@@ -2612,10 +2591,7 @@ class TestDevicePropagation(ExtTestCase):
         b.set_shape("updates", (2, 4))
         b.set_device("updates", -1)
         node = oh.make_node(
-            "ScatterNDOfShape",
-            ["shape", "indices", "updates"],
-            ["Y"],
-            domain="com.microsoft",
+            "ScatterNDOfShape", ["shape", "indices", "updates"], ["Y"], domain="com.microsoft"
         )
         set_type_shape_scatter_nd_of_shape(b, node)
         self.assertEqual(b.get_device("Y"), -1)
@@ -2665,10 +2641,7 @@ class TestDevicePropagation(ExtTestCase):
         b.set_rank("Q", 3)
         b.set_device("Q", -1)
         node = oh.make_node(
-            "MultiHeadAttention",
-            ["Q", "K", "V"],
-            ["out"],
-            domain="com.microsoft",
+            "MultiHeadAttention", ["Q", "K", "V"], ["out"], domain="com.microsoft"
         )
         set_type_shape_multi_head_attention(b, node)
         self.assertEqual(b.get_device("out"), -1)

@@ -112,9 +112,7 @@ def sklearn_one_class_svm(
 
     # Flatten (N, 1) → (N,) [float32]
     scores_f32 = g.op.Reshape(
-        raw_scores_name,
-        np.array([-1], dtype=np.int64),
-        name=f"{name}_reshape",
+        raw_scores_name, np.array([-1], dtype=np.int64), name=f"{name}_reshape"
     )
 
     # Cast to float64 if the input was float64.
@@ -128,11 +126,7 @@ def sklearn_one_class_svm(
                 outputs=outputs[1:2],
             )
         else:
-            scores = g.op.Cast(
-                scores_f32,
-                to=onnx.TensorProto.DOUBLE,
-                name=f"{name}_cast_f64",
-            )
+            scores = g.op.Cast(scores_f32, to=onnx.TensorProto.DOUBLE, name=f"{name}_cast_f64")
         zero = np.array([0], dtype=np.float64)
     else:
         if emit_scores:

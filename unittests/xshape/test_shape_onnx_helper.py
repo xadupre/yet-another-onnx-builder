@@ -84,11 +84,7 @@ class TestShapeOnnxHelper(ExtTestCase):
             [_mkv_("Z", TFLOAT, [3, 4])],
         )
         if_node = oh.make_node(
-            "If",
-            inputs=["cond"],
-            outputs=["Z"],
-            then_branch=then_graph,
-            else_branch=else_graph,
+            "If", inputs=["cond"], outputs=["Z"], then_branch=then_graph, else_branch=else_graph
         )
         model = oh.make_model(
             oh.make_graph(
@@ -126,10 +122,7 @@ class TestShapeOnnxHelper(ExtTestCase):
             ],
         )
         loop_node = oh.make_node(
-            "Loop",
-            inputs=["max_iter", "cond", "X"],
-            outputs=["Y"],
-            body=loop_body,
+            "Loop", inputs=["max_iter", "cond", "X"], outputs=["Y"], body=loop_body
         )
         model = oh.make_model(
             oh.make_graph(

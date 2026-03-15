@@ -105,10 +105,7 @@ class SwapRangeAddScalarPattern(PatternOptimization):
         return MatchResult(self, [node, node_add[0]], self.apply, insert_at=node_add[0])
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node_range: NodeProto,
-        node_add: NodeProto,
+        self, g: "GraphBuilder", node_range: NodeProto, node_add: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         start, end = node_range.input[:2]
 

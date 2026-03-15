@@ -316,9 +316,7 @@ def measure_time(
 
 
 def statistics_on_folder(
-    folder: Union[str, List[str]],
-    pattern: str = ".*[.]((py|rst))$",
-    aggregation: int = 0,
+    folder: Union[str, List[str]], pattern: str = ".*[.]((py|rst))$", aggregation: int = 0
 ) -> List[Dict[str, Union[int, float, str]]]:
     """
     Computes statistics on files in a folder.
@@ -730,9 +728,7 @@ def requires_numpy(version: str, msg: str = "") -> Callable:
 
 
 def requires_transformers(
-    version: str,
-    msg: str = "",
-    or_older_than: Optional[str] = None,
+    version: str, msg: str = "", or_older_than: Optional[str] = None
 ) -> Callable:
     """Skips a unit test if :epkg:`transformers` is not recent enough."""
     if not has_torch():
@@ -761,9 +757,7 @@ def requires_transformers(
 
 
 def requires_diffusers(
-    version: str,
-    msg: str = "",
-    or_older_than: Optional[str] = None,
+    version: str, msg: str = "", or_older_than: Optional[str] = None
 ) -> Callable:
     """Skips a unit test if :epkg:`transformers` is not recent enough."""
 
@@ -950,9 +944,7 @@ def has_onnxruntime_genai():
 
 
 def requires_onnxruntime_training(
-    push_back_batch: bool = False,
-    ortmodule: bool = False,
-    msg: str = "",
+    push_back_batch: bool = False, ortmodule: bool = False, msg: str = ""
 ) -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not onnxruntime_training."""
     try:
@@ -1446,9 +1438,7 @@ class ExtTestCase(unittest.TestCase):
         )
 
     def make_inference_session(
-        self,
-        onx: Union["onnx.ModelProto", str],  # noqa: F821
-        cpu: bool = True,
+        self, onx: Union["onnx.ModelProto", str], cpu: bool = True  # noqa: F821
     ) -> "onnxruntime.InferenceSession":  # noqa: F821
         return self._check_with_ort(onx, cpu=cpu)
 

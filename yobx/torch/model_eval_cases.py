@@ -120,14 +120,7 @@ def _flatten_inputs(x: Any) -> List["torch.Tensor"]:  # noqa: F821
         res = []
         for i in x:
             if i is None or isinstance(
-                i,
-                (
-                    torch.Tensor,
-                    torch.SymInt,
-                    torch.SymFloat,
-                    int,
-                    float,
-                ),
+                i, (torch.Tensor, torch.SymInt, torch.SymFloat, int, float)
             ):
                 res.append(i)
             else:
@@ -370,11 +363,7 @@ def _make_exporter_onnx(
         try:
             if verbose >= 2:
                 onx = torch.onnx.export(
-                    model,
-                    inputs,
-                    dynamic_shapes=dynamic_shapes,
-                    dynamo=True,
-                    report=True,
+                    model, inputs, dynamic_shapes=dynamic_shapes, dynamo=True, report=True
                 ).model_proto
             else:
                 with (
@@ -382,10 +371,7 @@ def _make_exporter_onnx(
                     contextlib.redirect_stderr(io.StringIO()),
                 ):
                     onx = torch.onnx.export(
-                        model,
-                        inputs,
-                        dynamic_shapes=dynamic_shapes,
-                        dynamo=True,
+                        model, inputs, dynamic_shapes=dynamic_shapes, dynamo=True
                     ).model_proto
         except Exception as e:
             if not quiet:
@@ -404,11 +390,7 @@ def _make_exporter_onnx(
         try:
             if verbose >= 2:
                 ep = torch.onnx.export(
-                    model,
-                    inputs,
-                    dynamic_shapes=dynamic_shapes,
-                    dynamo=True,
-                    report=True,
+                    model, inputs, dynamic_shapes=dynamic_shapes, dynamo=True, report=True
                 )
                 ep.optimize()
                 onx = ep.model_proto
@@ -418,10 +400,7 @@ def _make_exporter_onnx(
                     contextlib.redirect_stderr(io.StringIO()),
                 ):
                     ep = torch.onnx.export(
-                        model,
-                        inputs,
-                        dynamic_shapes=dynamic_shapes,
-                        dynamo=True,
+                        model, inputs, dynamic_shapes=dynamic_shapes, dynamo=True
                     )
                     ep.optimize()
                     onx = ep.model_proto
@@ -505,11 +484,7 @@ def _compares_on_one_example(
 
 
 def run_exporter(
-    exporter: str,
-    cls_model: type,
-    dynamic: bool = False,
-    quiet: bool = False,
-    verbose: int = 0,
+    exporter: str, cls_model: type, dynamic: bool = False, quiet: bool = False, verbose: int = 0
 ) -> Dict[str, Any]:
     """
     Runs an exporter and returns whether it fails or not.

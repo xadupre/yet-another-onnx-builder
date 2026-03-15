@@ -112,27 +112,17 @@ class TestDotHelper(ExtTestCase):
         TFLOAT = onnx.TensorProto.FLOAT
         then_z = oh.make_tensor_value_info("then_z", TFLOAT, [3])
         then_graph = oh.make_graph(
-            [oh.make_node("Add", ["X", "X"], ["then_z"])],
-            "then_branch",
-            [],
-            [then_z],
+            [oh.make_node("Add", ["X", "X"], ["then_z"])], "then_branch", [], [then_z]
         )
         else_z = oh.make_tensor_value_info("else_z", TFLOAT, [3])
         else_graph = oh.make_graph(
-            [oh.make_node("Neg", ["X"], ["else_z"])],
-            "else_branch",
-            [],
-            [else_z],
+            [oh.make_node("Neg", ["X"], ["else_z"])], "else_branch", [], [else_z]
         )
         model = oh.make_model(
             oh.make_graph(
                 [
                     oh.make_node(
-                        "If",
-                        ["cond"],
-                        ["Z"],
-                        then_branch=then_graph,
-                        else_branch=else_graph,
+                        "If", ["cond"], ["Z"], then_branch=then_graph, else_branch=else_graph
                     )
                 ],
                 "if_graph",

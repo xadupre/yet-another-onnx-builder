@@ -114,9 +114,7 @@ class ExportOptions:
         )
         self.fake = fake
         if aten_as_function is None:
-            from yobx.torch.interpreter.onnx_export import (
-                get_default_aten_as_function,
-            )
+            from yobx.torch.interpreter.onnx_export import get_default_aten_as_function
 
             aten_as_function = get_default_aten_as_function()  # type: ignore
         self.aten_as_function = aten_as_function
@@ -145,9 +143,7 @@ class ExportOptions:
         kw.update(kwargs)
         return ExportOptions(**kw)
 
-    def get_decomposition_table(
-        self,
-    ) -> Optional[Dict[TorchOpOverload, Callable[..., Any]]]:
+    def get_decomposition_table(self) -> Optional[Dict[TorchOpOverload, Callable[..., Any]]]:
         """
         Returns the decomposition table.
 
@@ -250,10 +246,7 @@ class ExportOptions:
             if target_name in {"aten::index_copy_"}:
                 ret = True
                 continue
-            if target_name in {
-                "aten:relu_",
-                "aten::mul_.Tensor",
-            }:
+            if target_name in {"aten:relu_", "aten::mul_.Tensor"}:
                 ret = len(node.users) == 0
                 continue
             if target_name in {
@@ -281,9 +274,7 @@ class ExportOptions:
 
         dyn_shapes = use_dyn_not_str(dynamic_shapes)
 
-        export_kwargs: Dict[str, Any] = {
-            "strict": self.strict,
-        }
+        export_kwargs: Dict[str, Any] = {"strict": self.strict}
         if prefer_deferred_runtime_asserts_over_guards:
             export_kwargs["prefer_deferred_runtime_asserts_over_guards"] = True
         if backed_size_oblivious == "auto":
@@ -302,11 +293,7 @@ class ExportOptions:
                 return ep
         assert backed_size_oblivious is False, f"{backed_size_oblivious=}, unexpected"
         return torch.export.export(
-            mod,
-            args or (),
-            kwargs=kwargs or {},
-            dynamic_shapes=dyn_shapes,
-            **export_kwargs,
+            mod, args or (), kwargs=kwargs or {}, dynamic_shapes=dyn_shapes, **export_kwargs
         )
 
     def export(
@@ -672,9 +659,7 @@ class ExportOptions:
         return dynamic_shapes
 
 
-def _get_decomposition_table_by_name(
-    name: str,
-) -> Dict[Any, Callable[..., Any]]:
+def _get_decomposition_table_by_name(name: str) -> Dict[Any, Callable[..., Any]]:
     """Returns the decomposition table by name (only ``'default'`` is supported here;
     ``'all'`` is handled as a special case in :func:`apply_decompositions`)."""
     import torch

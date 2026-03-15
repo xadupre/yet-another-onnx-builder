@@ -1,10 +1,6 @@
 import os
 import unittest
-from yobx.ext_test_case import (
-    ExtTestCase,
-    skipif_ci_windows,
-    requires_torch,
-)
+from yobx.ext_test_case import ExtTestCase, skipif_ci_windows, requires_torch
 from yobx.xbuilder import OptimizationOptions
 from yobx.torch.interpreter import to_onnx
 
@@ -53,10 +49,7 @@ def return_module_cls_explicit_break():
 
             def create_sequential():
                 return nn.Sequential(
-                    nn.Linear(128, 128),
-                    nn.ReLU(),
-                    nn.Linear(128, 128),
-                    nn.ReLU(),
+                    nn.Linear(128, 128), nn.ReLU(), nn.Linear(128, 128), nn.ReLU()
                 )
 
             self.mod1 = create_sequential()
@@ -88,9 +81,7 @@ def export_utils(prefix, model, *args, remove_unused=False, constant_folding=Tru
         tuple(args),
         input_names=["input"],
         options=OptimizationOptions(
-            remove_unused=remove_unused,
-            constant_folding=constant_folding,
-            patterns=None,
+            remove_unused=remove_unused, constant_folding=constant_folding, patterns=None
         ),
     )
     with open(name, "wb") as f:

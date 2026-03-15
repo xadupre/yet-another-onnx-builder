@@ -27,11 +27,7 @@ def _emit_label_and_proba(
     if np.issubdtype(classes.dtype, np.integer):
         classes_arr = classes.astype(np.int64)
         label = g.op.Gather(
-            classes_arr,
-            label_idx_cast,
-            axis=0,
-            name=f"{name}_label",
-            outputs=outputs[:1],
+            classes_arr, label_idx_cast, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:
@@ -39,11 +35,7 @@ def _emit_label_and_proba(
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
-            classes_arr,
-            label_idx_cast,
-            axis=0,
-            name=f"{name}_label_string",
-            outputs=outputs[:1],
+            classes_arr, label_idx_cast, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not sts:
@@ -236,17 +228,11 @@ def sklearn_bernoulli_nb(
     if estimator.binarize is not None:
         threshold = np.array(estimator.binarize, dtype=dtype)
         X_bin = g.op.Cast(
-            g.op.Greater(X, threshold, name=f"{name}_greater"),
-            to=itype,
-            name=f"{name}_binarize",
+            g.op.Greater(X, threshold, name=f"{name}_greater"), to=itype, name=f"{name}_binarize"
         )
     else:
         X_bin = X
 
-    jll = g.op.Add(
-        g.op.MatMul(X_bin, diff.T, name=f"{name}_jll_inner"),
-        bias,
-        name=f"{name}_jll",
-    )
+    jll = g.op.Add(g.op.MatMul(X_bin, diff.T, name=f"{name}_jll_inner"), bias, name=f"{name}_jll")
 
     return _emit_label_and_proba(g, sts, jll, estimator.classes_, dtype, name, outputs, itype)  # type: ignore

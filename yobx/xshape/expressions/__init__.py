@@ -6,7 +6,4 @@ from .rename_expressions import (
     rename_dynamic_expression,
     rename_expression,
 )
-from .simplify_expressions import (
-    simplify_expression,
-    simplify_two_expressions,
-)
+from .simplify_expressions import simplify_expression, simplify_two_expressions

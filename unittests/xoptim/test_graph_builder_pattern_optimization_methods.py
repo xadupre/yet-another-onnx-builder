@@ -85,10 +85,7 @@ class TestGraphBuilderPatternOptimizationMethods(ExtTestCase):
     def test_try_infer_shape_unknown_exc(self):
         """try_infer_shape raises RuntimeError for unknown name when exc=True."""
         _, gro = _make_simple_gbpo()
-        self.assertRaise(
-            lambda: gro.try_infer_shape("nonexistent", exc=True),
-            RuntimeError,
-        )
+        self.assertRaise(lambda: gro.try_infer_shape("nonexistent", exc=True), RuntimeError)
 
     # ------------------------------------------------------------------
     # make_node_check_opset
@@ -117,8 +114,7 @@ class TestGraphBuilderPatternOptimizationMethods(ExtTestCase):
         """make_node_check_opset raises RuntimeError for unsupported op types."""
         _, gro = _make_simple_gbpo()
         self.assertRaise(
-            lambda: gro.make_node_check_opset("MatMul", ["X", "Y"], ["Z"]),
-            RuntimeError,
+            lambda: gro.make_node_check_opset("MatMul", ["X", "Y"], ["Z"]), RuntimeError
         )
 
     def test_make_node_check_opset_wrong_domain(self):
@@ -239,9 +235,7 @@ class TestGraphBuilderPatternOptimizationMethods(ExtTestCase):
         """_chech_graph_verifies raises AssertionError for incompatible MatMul shapes."""
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("MatMul", ["X", "Y"], ["Z"]),
-                ],
+                [oh.make_node("MatMul", ["X", "Y"], ["Z"])],
                 "test",
                 [
                     oh.make_tensor_value_info("X", TFLOAT, [2, 3]),
@@ -259,10 +253,7 @@ class TestGraphBuilderPatternOptimizationMethods(ExtTestCase):
         )
         gro = GraphBuilderPatternOptimization(gr, patterns=[])
         matmul_node = gr.nodes[0]
-        self.assertRaise(
-            lambda: gro._chech_graph_verifies(matmul_node),
-            AssertionError,
-        )
+        self.assertRaise(lambda: gro._chech_graph_verifies(matmul_node), AssertionError)
 
     def test_chech_graph_verifies_non_matmul(self):
         """_chech_graph_verifies does nothing for non-MatMul/Gemm nodes."""
@@ -384,11 +375,7 @@ class TestPatternDebugPrint(ExtTestCase):
 
         pat = SimpleAddPattern(verbose=0)
         node = oh.make_node("Add", ["x", "y"], ["z"])
-        pat._debug = {
-            "iteration": 1,
-            "stacked": [1, 2],
-            "marked": {0: (node, node)},
-        }
+        pat._debug = {"iteration": 1, "stacked": [1, 2], "marked": {0: (node, node)}}
         result = pat._debug_print()
         self.assertIsInstance(result, str)
 

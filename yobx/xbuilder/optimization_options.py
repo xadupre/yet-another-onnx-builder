@@ -67,9 +67,7 @@ class OptimizationOptions:
         self,
         remove_unused: bool = True,
         constant_folding: Union[
-            bool,
-            Set[Union[str, Tuple[str, str]]],
-            Tuple[Union[str, Tuple[str, str]], ...],
+            bool, Set[Union[str, Tuple[str, str]]], Tuple[Union[str, Tuple[str, str]], ...]
         ] = (
             "Transpose",
             "Cast",

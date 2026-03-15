@@ -73,10 +73,7 @@ class TestOnnxExportComplex(ExtTestCase):
 
                 # No decomposition.
                 onx = to_onnx(
-                    model,
-                    (x,),
-                    dynamic_shapes=({0: "batch", 1: "length"},),
-                    target_opset=opset,
+                    model, (x,), dynamic_shapes=({0: "batch", 1: "length"},), target_opset=opset
                 )
                 # self.dump_onnx(f"test_fft_simple_1_{n}_{dim}_{norm}.onnx", onx)
                 self.assertEqual(onx.opset_import[0].domain, "")
@@ -191,10 +188,7 @@ class TestOnnxExportComplex(ExtTestCase):
 
                 # No decomposition.
                 onx = to_onnx(
-                    model,
-                    (x,),
-                    dynamic_shapes=({0: "batch", 1: "length"},),
-                    target_opset=opset,
+                    model, (x,), dynamic_shapes=({0: "batch", 1: "length"},), target_opset=opset
                 )
                 self.assertEqual(onx.opset_import[0].domain, "")
                 self.assertEqual(onx.opset_import[0].version, opset)
@@ -251,10 +245,7 @@ class TestOnnxExportComplex(ExtTestCase):
 
                 # No decomposition.
                 onx = to_onnx(
-                    model,
-                    (x,),
-                    dynamic_shapes=({0: "batch", 1: "length"},),
-                    target_opset=opset,
+                    model, (x,), dynamic_shapes=({0: "batch", 1: "length"},), target_opset=opset
                 )
                 self.assertEqual(onx.opset_import[0].domain, "")
                 self.assertEqual(onx.opset_import[0].version, opset)

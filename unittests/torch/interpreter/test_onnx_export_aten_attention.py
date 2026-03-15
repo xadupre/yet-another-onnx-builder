@@ -29,8 +29,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
         options = ExportOptions(aten_as_function=False)
         onx = to_onnx(model, inputs, dynamic_shapes=ds, export_options=options)
         self.assertNotIn(
-            "aten_scaled_dot_product_attention_default",
-            {n.op_type for n in onx.graph.node},
+            "aten_scaled_dot_product_attention_default", {n.op_type for n in onx.graph.node}
         )
         feeds = dict(zip(["query", "key", "value"], [x.detach().cpu().numpy() for x in inputs]))
         # self.dump_onnx("test_scaled_dot_product_attention_not_causal.onnx", onx)
@@ -71,8 +70,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
         options = ExportOptions(aten_as_function=False)
         onx = to_onnx(model, inputs, dynamic_shapes=ds, export_options=options)
         self.assertNotIn(
-            "aten_scaled_dot_product_attention_default",
-            [n.op_type for n in onx.graph.node],
+            "aten_scaled_dot_product_attention_default", [n.op_type for n in onx.graph.node]
         )
         feeds = dict(zip(["query", "key", "value"], [x.detach().cpu().numpy() for x in inputs]))
         # self.dump_onnx("test_scaled_dot_product_attention_causal.onnx", onx)
@@ -288,10 +286,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
                 )
                 self.dump_onnx(f"test_scaled_dot_product_attention_{opset}.onnx", onx)
                 if opset >= 24:
-                    self.assertEqual(
-                        ["Attention"],
-                        [n.op_type for n in onx.graph.node],
-                    )
+                    self.assertEqual(["Attention"], [n.op_type for n in onx.graph.node])
                 else:
                     self.assertEqual(
                         ["aten_scaled_dot_product_attention_default"],

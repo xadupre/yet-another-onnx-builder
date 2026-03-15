@@ -112,10 +112,7 @@ def sklearn_isotonic_regression(
     cmp_int = g.op.Cast(cmp, to=onnx.TensorProto.INT64, name=f"{name}_cast_cmp")
     # Sum across breakpoint axis to get the count of breakpoints <= x.
     seg_count = g.op.ReduceSum(
-        cmp_int,
-        np.array([1], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_seg_count",
+        cmp_int, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_seg_count"
     )  # (N,) int64, values in [0, K]
 
     # seg_lo = clamp(seg_count - 1, 0, K-2)

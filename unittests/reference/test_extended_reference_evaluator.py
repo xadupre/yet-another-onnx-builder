@@ -367,11 +367,7 @@ class TestReferenceOps(ExtTestCase):
                 oh.make_graph(
                     [
                         oh.make_node(
-                            "QuickGelu",
-                            ["X"],
-                            ["Z"],
-                            domain="com.microsoft",
-                            alpha=alpha,
+                            "QuickGelu", ["X"], ["Z"], domain="com.microsoft", alpha=alpha
                         )
                     ],
                     "name",
@@ -609,9 +605,7 @@ class TestReferenceOps(ExtTestCase):
         )
         inputs.append(
             oh.make_tensor_value_info(
-                "unsqueeze_9",
-                TFLOAT,
-                shape=(1, 16, "(s1-1)//8+1", "(s1-1)//8+1"),
+                "unsqueeze_9", TFLOAT, shape=(1, 16, "(s1-1)//8+1", "(s1-1)//8+1")
             )
         )
         inputs.append(oh.make_tensor_value_info("val_104", TINT64, shape=(4,)))
@@ -709,8 +703,7 @@ class TestReferenceOps(ExtTestCase):
         import onnxruntime
 
         sess = onnxruntime.InferenceSession(
-            model.SerializeToString(),
-            providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+            model.SerializeToString(), providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
         )
         expected = sess.run(None, feeds)
         self.assertEqualArrayAny(expected, got, atol=1)
@@ -758,10 +751,7 @@ class TestReferenceOps(ExtTestCase):
             "LinearRegression",
             ["x", "a", "b"],
             ["y"],
-            [
-                oh.make_node("MatMul", ["x", "a"], ["xa"]),
-                oh.make_node("Add", ["xa", "b"], ["y"]),
-            ],
+            [oh.make_node("MatMul", ["x", "a"], ["xa"]), oh.make_node("Add", ["xa", "b"], ["y"])],
             [oh.make_opsetid("", 14)],
             [],
         )
@@ -801,9 +791,7 @@ class TestReferenceOps(ExtTestCase):
             "LinearAdd",
             ["x", "a"],
             ["y"],
-            [
-                oh.make_node("Add", ["x", "a"], ["y"]),
-            ],
+            [oh.make_node("Add", ["x", "a"], ["y"])],
             [oh.make_opsetid("", 14)],
             [],
         )
@@ -851,14 +839,7 @@ class TestReferenceOps(ExtTestCase):
     def test_to_complex_2d(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node(
-                        "ToComplex",
-                        ["X"],
-                        ["Z"],
-                        domain="ai.onnx.complex",
-                    )
-                ],
+                [oh.make_node("ToComplex", ["X"], ["Z"], domain="ai.onnx.complex")],
                 "name",
                 [oh.make_tensor_value_info("X", TFLOAT, None)],
                 [oh.make_tensor_value_info("Z", TCOMPLEX64, None)],
@@ -874,14 +855,7 @@ class TestReferenceOps(ExtTestCase):
     def test_to_complex_1d(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node(
-                        "ToComplex",
-                        ["X"],
-                        ["Z"],
-                        domain="ai.onnx.complex",
-                    )
-                ],
+                [oh.make_node("ToComplex", ["X"], ["Z"], domain="ai.onnx.complex")],
                 "name",
                 [oh.make_tensor_value_info("X", TFLOAT, None)],
                 [oh.make_tensor_value_info("Z", TCOMPLEX64, None)],
@@ -897,14 +871,7 @@ class TestReferenceOps(ExtTestCase):
     def test_complex_module(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node(
-                        "ComplexModule",
-                        ["X"],
-                        ["Z"],
-                        domain="ai.onnx.complex",
-                    )
-                ],
+                [oh.make_node("ComplexModule", ["X"], ["Z"], domain="ai.onnx.complex")],
                 "name",
                 [oh.make_tensor_value_info("X", TCOMPLEX64, None)],
                 [oh.make_tensor_value_info("Z", TFLOAT, None)],
@@ -920,14 +887,7 @@ class TestReferenceOps(ExtTestCase):
     def test_complex_module_128(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node(
-                        "ComplexModule",
-                        ["X"],
-                        ["Z"],
-                        domain="ai.onnx.complex",
-                    )
-                ],
+                [oh.make_node("ComplexModule", ["X"], ["Z"], domain="ai.onnx.complex")],
                 "name",
                 [oh.make_tensor_value_info("X", TCOMPLEX128, None)],
                 [oh.make_tensor_value_info("Z", TDOUBLE, None)],

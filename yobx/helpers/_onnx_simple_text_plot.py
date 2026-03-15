@@ -89,13 +89,7 @@ def get_tensor_shape(obj):
 
 
 def _append_succ_pred(
-    subgraphs,
-    successors,
-    predecessors,
-    node_map,
-    node,
-    prefix="",
-    parent_node_name=None,
+    subgraphs, successors, predecessors, node_map, node, prefix="", parent_node_name=None
 ):
     node_name = prefix + node.name + "#" + "|".join(node.output)
     node_map[node_name] = node

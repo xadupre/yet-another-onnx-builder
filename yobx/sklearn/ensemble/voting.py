@@ -11,10 +11,7 @@ from ..sklearn_helper import get_n_expected_outputs
 
 
 def _label_to_class_index(
-    g: GraphBuilderExtendedProtocol,
-    label: str,
-    classes_arr: np.ndarray,
-    name: str,
+    g: GraphBuilderExtendedProtocol, label: str, classes_arr: np.ndarray, name: str
 ) -> str:
     """
     Maps a tensor of class labels to class indices ``0 … C-1`` by broadcasting
@@ -31,11 +28,7 @@ def _label_to_class_index(
     :return: name of the ``(N,)`` int64 class-index tensor
     """
     # Reshape label to (N, 1) for broadcasting.
-    label_2d = g.op.Reshape(
-        label,
-        np.array([-1, 1], dtype=np.int64),
-        name=f"{name}_reshape",
-    )
+    label_2d = g.op.Reshape(label, np.array([-1, 1], dtype=np.int64), name=f"{name}_reshape")
     # equal: (N, C) bool — True where label[i] == classes_[j]
     equal = g.op.Equal(label_2d, classes_arr, name=f"{name}_equal")
     # Cast to int64 and argmax over class axis → (N,) class indices.
@@ -64,11 +57,7 @@ def _build_label_output(
     if np.issubdtype(classes.dtype, np.integer):
         classes_arr = classes.astype(np.int64)
         label = g.op.Gather(
-            classes_arr,
-            winner_idx,
-            axis=0,
-            name=f"{name}_label",
-            outputs=outputs[:1],
+            classes_arr, winner_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not g.get_type(label):
@@ -76,11 +65,7 @@ def _build_label_output(
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
-            classes_arr,
-            winner_idx,
-            axis=0,
-            name=f"{name}_label_str",
-            outputs=outputs[:1],
+            classes_arr, winner_idx, axis=0, name=f"{name}_label_str", outputs=outputs[:1]
         )
         assert isinstance(label, str)
         if not g.get_type(label):
@@ -142,9 +127,7 @@ def sklearn_voting_regressor(
 
         # Ensure shape (N, 1) for stacking.
         pred_2d = g.op.Reshape(
-            sub_out,
-            np.array([-1, 1], dtype=np.int64),
-            name=f"{sub_name}_reshape",
+            sub_out, np.array([-1, 1], dtype=np.int64), name=f"{sub_name}_reshape"
         )
         preds.append(pred_2d)
 
@@ -164,10 +147,7 @@ def sklearn_voting_regressor(
         w = np.array(weights, dtype=dtype).reshape(1, -1)  # (1, E)
         weighted = g.op.Mul(stacked, w, name=f"{name}_weighted")
         sum_w = g.op.ReduceSum(
-            weighted,
-            np.array([1], dtype=np.int64),
-            keepdims=0,
-            name=f"{name}_wsum",
+            weighted, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_wsum"
         )
         total_w = np.array(float(sum(weights)), dtype=dtype)
         result = g.op.Div(sum_w, total_w, name=f"{name}_wdiv", outputs=outputs[:1])
@@ -268,9 +248,7 @@ def sklearn_voting_classifier(
 
             # Unsqueeze to (1, N, C) for stacking along axis 0.
             proba_3d = g.op.Unsqueeze(
-                sub_proba,
-                np.array([0], dtype=np.int64),
-                name=f"{sub_name}_unsqueeze",
+                sub_proba, np.array([0], dtype=np.int64), name=f"{sub_name}_unsqueeze"
             )
             probas.append(proba_3d)
 
@@ -278,19 +256,13 @@ def sklearn_voting_classifier(
 
         if weights is None:
             avg_proba = g.op.ReduceMean(
-                stacked,
-                np.array([0], dtype=np.int64),
-                keepdims=0,
-                name=f"{name}_mean",
+                stacked, np.array([0], dtype=np.int64), keepdims=0, name=f"{name}_mean"
             )  # (N, C)
         else:
             w = np.array(weights, dtype=dtype).reshape(-1, 1, 1)  # (E, 1, 1)
             weighted = g.op.Mul(stacked, w, name=f"{name}_weighted")
             wsum = g.op.ReduceSum(
-                weighted,
-                np.array([0], dtype=np.int64),
-                keepdims=0,
-                name=f"{name}_wsum",
+                weighted, np.array([0], dtype=np.int64), keepdims=0, name=f"{name}_wsum"
             )  # (N, C)
             total_w = np.array(float(sum(weights)), dtype=dtype)
             avg_proba = g.op.Div(wsum, total_w, name=f"{name}_wdiv")  # (N, C)
@@ -334,9 +306,7 @@ def sklearn_voting_classifier(
 
         # Reshape to (N, 1) and compare with (1, C) → (N, C) bool vote mask.
         class_idx_2d = g.op.Unsqueeze(
-            class_idx_i64,
-            np.array([1], dtype=np.int64),
-            name=f"{sub_name}_unsqueeze_cidx",
+            class_idx_i64, np.array([1], dtype=np.int64), name=f"{sub_name}_unsqueeze_cidx"
         )
         vote_bool = g.op.Equal(class_idx_2d, range_classes, name=f"{sub_name}_vote_bool")
         vote = g.op.Cast(vote_bool, to=onnx.TensorProto.FLOAT, name=f"{sub_name}_vote_cast")

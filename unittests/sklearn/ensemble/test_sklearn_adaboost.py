@@ -13,8 +13,7 @@ from yobx.sklearn import to_onnx
 @requires_sklearn("1.4")
 class TestSklearnAdaBoostClassifier(ExtTestCase):
     _X = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [9, 10]],
-        dtype=np.float32,
+        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [9, 10]], dtype=np.float32
     )
     _y_bin = np.array([0, 0, 1, 1, 0, 1, 0, 1])
     _y_multi = np.array([0, 0, 1, 1, 2, 2, 0, 1])
@@ -85,9 +84,7 @@ class TestSklearnAdaBoostClassifier(ExtTestCase):
         for dtype in (np.float32, np.float64):
             Xd = self._X.astype(dtype)
             clf = AdaBoostClassifier(
-                estimator=DecisionTreeClassifier(max_depth=2),
-                n_estimators=5,
-                random_state=0,
+                estimator=DecisionTreeClassifier(max_depth=2), n_estimators=5, random_state=0
             )
             clf.fit(Xd, y)
             onx = to_onnx(clf, (Xd,))
@@ -108,8 +105,7 @@ class TestSklearnAdaBoostClassifier(ExtTestCase):
 @requires_sklearn("1.4")
 class TestSklearnAdaBoostRegressor(ExtTestCase):
     _X = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [9, 10]],
-        dtype=np.float32,
+        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [9, 10]], dtype=np.float32
     )
     _y = np.array([1.5, 2.5, 3.5, 4.5, 2.0, 3.0, 1.0, 5.0], dtype=np.float32)
 
@@ -165,9 +161,7 @@ class TestSklearnAdaBoostRegressor(ExtTestCase):
             Xd = self._X.astype(dtype)
             yd = self._y.astype(dtype)
             reg = AdaBoostRegressor(
-                estimator=DecisionTreeRegressor(max_depth=2),
-                n_estimators=5,
-                random_state=0,
+                estimator=DecisionTreeRegressor(max_depth=2), n_estimators=5, random_state=0
             )
             reg.fit(Xd, yd)
             onx = to_onnx(reg, (Xd,))

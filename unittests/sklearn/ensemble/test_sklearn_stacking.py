@@ -93,10 +93,7 @@ class TestSklearnStackingRegressor(ExtTestCase):
         X, y = _make_reg_data()
         est = StackingRegressor(
             estimators=[
-                (
-                    "pipe",
-                    Pipeline([("scaler", StandardScaler()), ("ridge", Ridge())]),
-                ),
+                ("pipe", Pipeline([("scaler", StandardScaler()), ("ridge", Ridge())])),
                 ("dt", DecisionTreeRegressor(max_depth=2, random_state=0)),
             ],
             final_estimator=Ridge(),
@@ -241,10 +238,7 @@ class TestSklearnStackingClassifier(ExtTestCase):
                 (
                     "pipe",
                     Pipeline(
-                        [
-                            ("scaler", StandardScaler()),
-                            ("lr", LogisticRegression(max_iter=200)),
-                        ]
+                        [("scaler", StandardScaler()), ("lr", LogisticRegression(max_iter=200))]
                     ),
                 ),
                 ("dt", DecisionTreeClassifier(max_depth=2, random_state=0)),

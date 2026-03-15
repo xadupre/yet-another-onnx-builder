@@ -71,19 +71,16 @@ class TestOnnxHelper(ExtTestCase):
     def test_tensor_dtype_to_np_dtype_float8(self):
         self.assertEqual(tensor_dtype_to_np_dtype(onnx.TensorProto.BFLOAT16), ml_dtypes.bfloat16)
         self.assertEqual(
-            tensor_dtype_to_np_dtype(onnx.TensorProto.FLOAT8E4M3FN),
-            ml_dtypes.float8_e4m3fn,
+            tensor_dtype_to_np_dtype(onnx.TensorProto.FLOAT8E4M3FN), ml_dtypes.float8_e4m3fn
         )
         self.assertEqual(
-            tensor_dtype_to_np_dtype(onnx.TensorProto.FLOAT8E4M3FNUZ),
-            ml_dtypes.float8_e4m3fnuz,
+            tensor_dtype_to_np_dtype(onnx.TensorProto.FLOAT8E4M3FNUZ), ml_dtypes.float8_e4m3fnuz
         )
         self.assertEqual(
             tensor_dtype_to_np_dtype(onnx.TensorProto.FLOAT8E5M2), ml_dtypes.float8_e5m2
         )
         self.assertEqual(
-            tensor_dtype_to_np_dtype(onnx.TensorProto.FLOAT8E5M2FNUZ),
-            ml_dtypes.float8_e5m2fnuz,
+            tensor_dtype_to_np_dtype(onnx.TensorProto.FLOAT8E5M2FNUZ), ml_dtypes.float8_e5m2fnuz
         )
 
     def test_pretty_onnx(self):
@@ -100,9 +97,7 @@ class TestOnnxHelper(ExtTestCase):
                     oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq", "d_model"]),
                 ],
                 [oh.make_tensor_value_info("Z", TFLOAT, [None, None, None])],
-                [
-                    onh.from_array(np.array([0, 0, -1], dtype=np.int64), name="reshape_shape"),
-                ],
+                [onh.from_array(np.array([0, 0, -1], dtype=np.int64), name="reshape_shape")],
             ),
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
@@ -254,11 +249,7 @@ class TestOnnxHelper(ExtTestCase):
             [oh.make_tensor_value_info("res", TFLOAT, [3, 4])],
         )
         if_node = oh.make_node(
-            "If",
-            ["cond"],
-            ["result"],
-            then_branch=inner_graph,
-            else_branch=inner_graph,
+            "If", ["cond"], ["result"], then_branch=inner_graph, else_branch=inner_graph
         )
         outer_graph = oh.make_graph(
             [if_node],
@@ -288,9 +279,7 @@ class TestOnnxHelper(ExtTestCase):
                     oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq", "d_model"]),
                 ],
                 [oh.make_tensor_value_info("Z", TFLOAT, [None, None, None])],
-                [
-                    onh.from_array(np.array([0, 0, -1], dtype=np.int64), name="reshape_shape"),
-                ],
+                [onh.from_array(np.array([0, 0, -1], dtype=np.int64), name="reshape_shape")],
             ),
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
@@ -489,7 +478,7 @@ class TestOnnxHelper(ExtTestCase):
                         else_branch=oh.make_graph(
                             [
                                 # not shadowing
-                                oh.make_node("Sub", ["X0", "three"], ["Y"]),
+                                oh.make_node("Sub", ["X0", "three"], ["Y"])
                             ],
                             "else",
                             [],
@@ -513,11 +502,7 @@ class TestOnnxHelper(ExtTestCase):
             ir_version=10,
         )
         self.assertEqual(
-            (
-                {"three"},
-                set(),
-                {"cond", "Z", "X0", "Z_c", "three", "one_c", "Xred", "X00", "Y"},
-            ),
+            ({"three"}, set(), {"cond", "Z", "X0", "Z_c", "three", "one_c", "Xred", "X00", "Y"}),
             shadowing_names(model),
         )
 
@@ -697,11 +682,7 @@ class TestOnnxHelper(ExtTestCase):
             meta.value = "LLL"
         self.assertRaise(
             lambda: make_model_with_local_functions(
-                model,
-                "^LLL$",
-                metadata_key_prefix="source[",
-                verbose=1,
-                allow_extensions=False,
+                model, "^LLL$", metadata_key_prefix="source[", verbose=1, allow_extensions=False
             ),
             ValueError,
         )
@@ -766,10 +747,7 @@ class TestOnnxHelper(ExtTestCase):
             "LinearRegression",
             ["x", "a", "b"],
             ["y"],
-            [
-                oh.make_node("MatMul", ["x", "a"], ["xa"]),
-                oh.make_node("Add", ["xa", "b"], ["y"]),
-            ],
+            [oh.make_node("MatMul", ["x", "a"], ["xa"]), oh.make_node("Add", ["xa", "b"], ["y"])],
             [oh.make_opsetid("", 14)],
             [],
         )

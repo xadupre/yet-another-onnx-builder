@@ -1,10 +1,6 @@
 import numpy as np
 import onnx
-from sklearn.datasets import (
-    make_classification,
-    make_multilabel_classification,
-    make_regression,
-)
+from sklearn.datasets import make_classification, make_multilabel_classification, make_regression
 from sklearn.model_selection import train_test_split
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
@@ -224,12 +220,7 @@ def fit_multilabel_classification_model(
 
 
 def fit_multi_output_classification_model(
-    model,
-    n_classes=3,
-    n_samples=100,
-    n_features=4,
-    n_informative=5,
-    n_outputs=2,
+    model, n_classes=3, n_samples=100, n_features=4, n_informative=5, n_outputs=2
 ):
     """Fit a multi-output classification model on a synthetic integer dataset.
 

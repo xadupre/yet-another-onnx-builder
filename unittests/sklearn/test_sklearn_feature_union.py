@@ -16,10 +16,7 @@ from yobx.sklearn import to_onnx
 @requires_sklearn("1.4")
 class TestSklearnFeatureUnion(ExtTestCase):
     def test_feature_union_two_scalers(self):
-        X = np.array(
-            [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]],
-            dtype=np.float32,
-        )
+        X = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]], dtype=np.float32)
         fu = FeatureUnion([("std", StandardScaler()), ("mm", MinMaxScaler())])
         fu.fit(X)
 
@@ -41,10 +38,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_feature_union_single_transformer(self):
-        X = np.array(
-            [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]],
-            dtype=np.float32,
-        )
+        X = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]], dtype=np.float32)
         fu = FeatureUnion([("std", StandardScaler())])
         fu.fit(X)
 
@@ -60,10 +54,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_feature_union_drop_transformer(self):
-        X = np.array(
-            [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]],
-            dtype=np.float32,
-        )
+        X = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]], dtype=np.float32)
         fu = FeatureUnion([("std", StandardScaler()), ("drop", "drop")])
         fu.fit(X)
 
@@ -82,14 +73,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
 
     def test_pipeline_with_feature_union(self):
         X = np.array(
-            [
-                [1, 2, 3],
-                [4, 5, 6],
-                [7, 8, 9],
-                [10, 11, 12],
-                [2, 3, 4],
-                [5, 6, 7],
-            ],
+            [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12], [2, 3, 4], [5, 6, 7]],
             dtype=np.float32,
         )
         y = np.array([0, 0, 1, 1, 0, 1])
@@ -116,10 +100,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
 
     def test_feature_union_nested(self):
         """FeatureUnion inside another FeatureUnion."""
-        X = np.array(
-            [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]],
-            dtype=np.float32,
-        )
+        X = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]], dtype=np.float32)
         inner = FeatureUnion([("std", StandardScaler()), ("mm", MinMaxScaler())])
         outer = FeatureUnion([("inner", inner), ("std2", StandardScaler())])
         outer.fit(X)
@@ -137,10 +118,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
 
     def test_feature_union_as_functions(self):
         """Each sub-transformer of FeatureUnion is exported as a local function."""
-        X = np.array(
-            [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]],
-            dtype=np.float32,
-        )
+        X = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]], dtype=np.float32)
         fu = FeatureUnion([("std", StandardScaler()), ("mm", MinMaxScaler())])
         fu.fit(X)
 

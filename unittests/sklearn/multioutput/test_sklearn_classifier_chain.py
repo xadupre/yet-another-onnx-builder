@@ -21,8 +21,7 @@ class TestSklearnClassifierChain(ExtTestCase):
     """Tests for the ClassifierChain converter."""
 
     _X = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [1, 3], [5, 2]],
-        dtype=np.float32,
+        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [1, 3], [5, 2]], dtype=np.float32
     )
     _y = np.array(
         [[0, 1, 1], [1, 0, 0], [0, 1, 1], [1, 0, 0], [0, 0, 1], [1, 1, 0], [0, 1, 0], [1, 0, 1]]

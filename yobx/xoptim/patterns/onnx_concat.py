@@ -106,10 +106,7 @@ class ConcatGatherPattern(PatternOptimization):
         return MatchResult(self, [before, node], self.apply)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        concat_node: NodeProto,
-        gather_node: NodeProto,
+        self, g: "GraphBuilder", concat_node: NodeProto, gather_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         index = g.get_constant_scalar(gather_node.input[1])
         new_node = g.make_node(

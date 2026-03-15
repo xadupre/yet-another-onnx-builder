@@ -90,12 +90,7 @@ class Translator:
 
         for i in initializers:
             rows.extend(
-                self.emitter(
-                    EventType.INITIALIZER,
-                    name=i.name,
-                    init=i,
-                    value=to_array(i),
-                )
+                self.emitter(EventType.INITIALIZER, name=i.name, init=i, value=to_array(i))
             )
 
         rows.extend(
@@ -175,8 +170,7 @@ class Translator:
 
         rows.extend(
             self.emitter(
-                EventType.END_FUNCTION if is_function else EventType.END_GRAPH,
-                name=name,
+                EventType.END_FUNCTION if is_function else EventType.END_GRAPH, name=name
             )
         )
 
@@ -234,10 +228,7 @@ class Translator:
                 atts[att.name] = (att, att.s.decode("utf-8"))
                 continue
             if att.type == AttributeProto.STRINGS:
-                atts[att.name] = (
-                    att,
-                    np.array([s.decode("utf-8") for s in att.strings]),
-                )
+                atts[att.name] = (att, np.array([s.decode("utf-8") for s in att.strings]))
                 continue
             raise ValueError(
                 f"Attribute {att.name!r} with type {att.type} cannot be extracted yet."

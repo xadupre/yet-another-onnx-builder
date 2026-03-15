@@ -68,10 +68,7 @@ def sklearn_kernel_centerer(
     #   K_row_sum = K.sum(axis=1, keepdims=True)   → (N, 1)
     #   K_pred_cols = K_row_sum / n_train            → (N, 1)
     K_row_sum = g.op.ReduceSum(
-        X,
-        np.array([1], dtype=np.int64),
-        keepdims=1,
-        name=f"{name}_row_sum",
+        X, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_row_sum"
     )  # (N, 1)
     K_pred_cols = g.op.Div(K_row_sum, n_train_arr, name=f"{name}_pred_cols")  # (N, 1)
 

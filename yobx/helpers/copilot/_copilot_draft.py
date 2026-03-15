@@ -29,11 +29,7 @@ def _get_copilot_token(github_token: str) -> str:
     """
     url = "https://api.github.com/copilot_internal/v2/token"
     req = urllib.request.Request(
-        url,
-        headers={
-            "Authorization": f"token {github_token}",
-            "Accept": "application/json",
-        },
+        url, headers={"Authorization": f"token {github_token}", "Accept": "application/json"}
     )
     with urllib.request.urlopen(req) as resp:
         data = json.loads(resp.read().decode())
@@ -41,11 +37,7 @@ def _get_copilot_token(github_token: str) -> str:
 
 
 def _call_copilot_api(
-    token: str,
-    messages: list,
-    *,
-    model: str = "gpt-4o",
-    max_tokens: int = 2048,
+    token: str, messages: list, *, model: str = "gpt-4o", max_tokens: int = 2048
 ) -> str:
     """
     Call the GitHub Copilot chat-completions endpoint.
@@ -325,10 +317,7 @@ def draft_converter_with_copilot(
         "type-annotated Python 3.10+ code and always follow the exact "
         "conventions of the existing codebase."
     )
-    messages = [
-        {"role": "system", "content": system},
-        {"role": "user", "content": prompt},
-    ]
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
 
     if verbose:
         print("[copilot_draft] calling Copilot API …")

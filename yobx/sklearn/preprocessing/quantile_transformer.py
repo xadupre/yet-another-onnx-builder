@@ -119,18 +119,13 @@ def _ndtri_approx(g, p, dtype, name):
         name=f"{name}_den_high",
     )
     x_high = g.op.Neg(
-        g.op.Div(num_high, den_high, name=f"{name}_x_high_raw"),
-        name=f"{name}_x_high",
+        g.op.Div(num_high, den_high, name=f"{name}_x_high_raw"), name=f"{name}_x_high"
     )
 
     # ── region 2 (central) ───────────────────────────────────────────────
     q_cen = g.op.Sub(p_safe, np.array([0.5], dtype=dtype), name=f"{name}_q_cen")
     r = g.op.Mul(q_cen, q_cen, name=f"{name}_r")
-    num_cen = g.op.Mul(
-        _horner(g, r, a, dtype, f"{name}_na"),
-        q_cen,
-        name=f"{name}_num_cen",
-    )
+    num_cen = g.op.Mul(_horner(g, r, a, dtype, f"{name}_na"), q_cen, name=f"{name}_num_cen")
     # Denominator: ((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r + 1
     den_cen = g.op.Add(
         g.op.Mul(_horner(g, r, b, dtype, f"{name}_db"), r, name=f"{name}_db_r"),
@@ -194,10 +189,7 @@ def _interp_1d_batch(g, X, q_T_const, r_const, dtype, name):
 
     # ── Step 2: clamp to valid bucket range ──────────────────────────────
     left = g.op.Clip(
-        g.op.Sub(idx, one_i, name=f"{name}_idxm1"),
-        zero_i,
-        nq_m1,
-        name=f"{name}_left",
+        g.op.Sub(idx, one_i, name=f"{name}_idxm1"), zero_i, nq_m1, name=f"{name}_left"
     )
     right = g.op.Clip(idx, zero_i, nq_m1, name=f"{name}_right")
 
@@ -223,17 +215,10 @@ def _interp_1d_batch(g, X, q_T_const, r_const, dtype, name):
     denom = g.op.Sub(xp_right, xp_left, name=f"{name}_denom")
     # Avoid division by zero when left == right (boundary or tie).
     safe_denom = g.op.Where(
-        g.op.Equal(denom, zero_f, name=f"{name}_eq0"),
-        one_f,
-        denom,
-        name=f"{name}_sd",
+        g.op.Equal(denom, zero_f, name=f"{name}_eq0"), one_f, denom, name=f"{name}_sd"
     )
     t = g.op.Clip(
-        g.op.Div(
-            g.op.Sub(X, xp_left, name=f"{name}_xdiff"),
-            safe_denom,
-            name=f"{name}_t_raw",
-        ),
+        g.op.Div(g.op.Sub(X, xp_left, name=f"{name}_xdiff"), safe_denom, name=f"{name}_t_raw"),
         zero_f,
         one_f,
         name=f"{name}_t",
@@ -321,11 +306,7 @@ def sklearn_quantile_transformer(
 
     # result = 0.5 * (r1 - r2)
     half = np.array([0.5], dtype=dtype)
-    uniform = g.op.Mul(
-        g.op.Sub(r1, r2, name=f"{name}_bidir_sub"),
-        half,
-        name=f"{name}_uniform",
-    )
+    uniform = g.op.Mul(g.op.Sub(r1, r2, name=f"{name}_bidir_sub"), half, name=f"{name}_uniform")
 
     if estimator.output_distribution == "uniform":
         res = g.op.Identity(uniform, name=name, outputs=outputs)

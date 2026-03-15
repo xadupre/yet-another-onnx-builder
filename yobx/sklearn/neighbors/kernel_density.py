@@ -73,11 +73,7 @@ def _log_norm_constant(kernel: str, h: float, D: int, N: int) -> float:
 
 
 def _emit_sq_euclidean_distances(
-    g: GraphBuilderExtendedProtocol,
-    X: str,
-    X_train: np.ndarray,
-    dtype,
-    name: str,
+    g: GraphBuilderExtendedProtocol, X: str, X_train: np.ndarray, dtype, name: str
 ) -> str:
     """
     Emit ONNX ops for the squared Euclidean distance matrix ``(N_test, N_train)``.
@@ -111,10 +107,7 @@ def _emit_sq_euclidean_distances(
     c_sq = np.sum(X_train**2, axis=1)[np.newaxis, :].astype(dtype)  # (1, M)
     x_sq = g.op.Mul(X, X, name=f"{name}_xsq")
     x_sq_sum = g.op.ReduceSum(
-        x_sq,
-        np.array([1], dtype=np.int64),
-        keepdims=1,
-        name=f"{name}_xsqsum",
+        x_sq, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_xsqsum"
     )  # (N, 1)
     cross = g.op.MatMul(X, X_train.T.astype(dtype), name=f"{name}_cross")  # (N, M)
     two_cross = g.op.Mul(np.array(2.0, dtype=dtype), cross, name=f"{name}_2cross")
@@ -246,10 +239,7 @@ def sklearn_kernel_density(
         neg_half_h2 = np.array(-0.5 / h**2, dtype=dtype)
         log_kernel = g.op.Mul(sq_dists, neg_half_h2, name=f"{name}_lk")
         log_sum = g.op.ReduceLogSumExp(
-            log_kernel,
-            np.array([1], dtype=np.int64),
-            keepdims=0,
-            name=f"{name}_logsumexp",
+            log_kernel, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_logsumexp"
         )
 
     elif kernel == "exponential":
@@ -258,10 +248,7 @@ def sklearn_kernel_density(
         neg_inv_h = np.array(-1.0 / h, dtype=dtype)
         log_kernel = g.op.Mul(dists, neg_inv_h, name=f"{name}_lk")
         log_sum = g.op.ReduceLogSumExp(
-            log_kernel,
-            np.array([1], dtype=np.int64),
-            keepdims=0,
-            name=f"{name}_logsumexp",
+            log_kernel, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_logsumexp"
         )
 
     else:
@@ -310,22 +297,14 @@ def sklearn_kernel_density(
 
         # Sum kernel values over training points (axis=1) → (N,)
         kernel_sum = g.op.ReduceSum(
-            kernel_vals,
-            np.array([1], dtype=np.int64),
-            keepdims=0,
-            name=f"{name}_ksum",
+            kernel_vals, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_ksum"
         )  # (N,)
 
         # log(kernel_sum): produces −∞ when sum=0 (empty support), matching sklearn
         log_sum = g.op.Log(kernel_sum, name=f"{name}_log_ksum")
 
     # ── Step 3: Subtract log normalization constant ───────────────────────────
-    result = g.op.Sub(
-        log_sum,
-        log_norm_arr,
-        name=name,
-        outputs=outputs[:1],
-    )
+    result = g.op.Sub(log_sum, log_norm_arr, name=name, outputs=outputs[:1])
 
     assert isinstance(result, str)
     if not sts:

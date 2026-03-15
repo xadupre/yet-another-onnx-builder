@@ -18,8 +18,7 @@ from yobx.sklearn import to_onnx
 @requires_sklearn("1.4")
 class TestSklearnBaggingRegressor(ExtTestCase):
     _X = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [9, 10]],
-        dtype=np.float32,
+        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [9, 10]], dtype=np.float32
     )
     _y = np.array([1.5, 2.5, 3.5, 4.5, 2.0, 3.0, 1.0, 5.0], dtype=np.float32)
 
@@ -28,9 +27,7 @@ class TestSklearnBaggingRegressor(ExtTestCase):
             Xd = X.astype(dtype)
             yd = y.astype(dtype)
             reg = BaggingRegressor(
-                estimator=DecisionTreeRegressor(random_state=0),
-                random_state=0,
-                **kwargs,
+                estimator=DecisionTreeRegressor(random_state=0), random_state=0, **kwargs
             )
             reg.fit(Xd, yd)
             onx = to_onnx(reg, (Xd,))
@@ -62,11 +59,7 @@ class TestSklearnBaggingRegressor(ExtTestCase):
         for dtype in (np.float32, np.float64):
             Xd = self._X.astype(dtype)
             yd = self._y.astype(dtype)
-            reg = BaggingRegressor(
-                estimator=LinearRegression(),
-                n_estimators=5,
-                random_state=0,
-            )
+            reg = BaggingRegressor(estimator=LinearRegression(), n_estimators=5, random_state=0)
             reg.fit(Xd, yd)
             onx = to_onnx(reg, (Xd,))
 
@@ -80,9 +73,7 @@ class TestSklearnBaggingRegressor(ExtTestCase):
         """BaggingRegressor as last step in a Pipeline."""
         Xd = self._X.astype(np.float32)
         reg = BaggingRegressor(
-            estimator=DecisionTreeRegressor(random_state=0),
-            n_estimators=5,
-            random_state=0,
+            estimator=DecisionTreeRegressor(random_state=0), n_estimators=5, random_state=0
         )
         pipe = Pipeline([("scaler", StandardScaler()), ("reg", reg)])
         pipe.fit(Xd, self._y)
@@ -101,8 +92,7 @@ class TestSklearnBaggingRegressor(ExtTestCase):
 @requires_sklearn("1.4")
 class TestSklearnBaggingClassifier(ExtTestCase):
     _X = np.array(
-        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [9, 10]],
-        dtype=np.float32,
+        [[1, 2], [3, 4], [5, 6], [7, 8], [2, 3], [4, 5], [0, 1], [9, 10]], dtype=np.float32
     )
     _y_bin = np.array([0, 0, 1, 1, 0, 1, 0, 1])
     _y_multi = np.array([0, 0, 1, 1, 2, 2, 0, 1])
@@ -111,9 +101,7 @@ class TestSklearnBaggingClassifier(ExtTestCase):
         for dtype in (np.float32, np.float64):
             Xd = X.astype(dtype)
             clf = BaggingClassifier(
-                estimator=DecisionTreeClassifier(random_state=0),
-                random_state=0,
-                **kwargs,
+                estimator=DecisionTreeClassifier(random_state=0), random_state=0, **kwargs
             )
             clf.fit(Xd, y)
             onx = to_onnx(clf, (Xd,))
@@ -170,9 +158,7 @@ class TestSklearnBaggingClassifier(ExtTestCase):
         Xd = self._X.astype(np.float32)
         y = self._y_multi
         clf = BaggingClassifier(
-            estimator=DecisionTreeClassifier(random_state=0),
-            n_estimators=5,
-            random_state=0,
+            estimator=DecisionTreeClassifier(random_state=0), n_estimators=5, random_state=0
         )
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", clf)])
         pipe.fit(Xd, y)

@@ -55,29 +55,20 @@ y = (X[:, 0] + X[:, 1] > 0).astype(int)
 
 scaler = StandardScaler().fit(X)
 
-pipe = Pipeline(
-    [
-        ("scaler", StandardScaler()),
-        ("clf", LogisticRegression(max_iter=200)),
-    ]
-).fit(X, y)
+pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression(max_iter=200))]).fit(
+    X, y
+)
 
-ct = ColumnTransformer(
-    [
-        ("std", StandardScaler(), [0, 1]),
-        ("mms", MinMaxScaler(), [2, 3]),
-    ]
-).fit(X)
+ct = ColumnTransformer([("std", StandardScaler(), [0, 1]), ("mms", MinMaxScaler(), [2, 3])]).fit(
+    X
+)
 
 pipe_ct = Pipeline(
     [
         (
             "ct",
             ColumnTransformer(
-                [
-                    ("std", StandardScaler(), [0, 1]),
-                    ("mms", MinMaxScaler(), [2, 3]),
-                ]
+                [("std", StandardScaler(), [0, 1]), ("mms", MinMaxScaler(), [2, 3])]
             ),
         ),
         ("clf", LogisticRegression(max_iter=200)),
@@ -99,10 +90,7 @@ pipe_ct = Pipeline(
 #   threaded through as an extra input (recommended for portability).
 
 fopts = FunctionOptions(
-    name="sklearn_op",
-    domain="myapp",
-    move_initializer_to_constant=True,
-    export_as_function=True,
+    name="sklearn_op", domain="myapp", move_initializer_to_constant=True, export_as_function=True
 )
 
 # %%

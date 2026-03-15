@@ -165,10 +165,7 @@ class OpsVars:
         )
 
     def GridSample(
-        self,
-        align_corners: int = 0,
-        mode: str = "bilinear",
-        padding_mode: str = "zeros",
+        self, align_corners: int = 0, mode: str = "bilinear", padding_mode: str = "zeros"
     ) -> "Var":
         return self.make_node(
             "GridSample",
@@ -270,18 +267,12 @@ class OpsVars:
 
     def ReduceL1(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
         return self.make_node(
-            "ReduceL1",
-            *self.vars_,
-            keepdims=keepdims,
-            noop_with_empty_axes=noop_with_empty_axes,
+            "ReduceL1", *self.vars_, keepdims=keepdims, noop_with_empty_axes=noop_with_empty_axes
         )
 
     def ReduceL2(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
         return self.make_node(
-            "ReduceL2",
-            *self.vars_,
-            keepdims=keepdims,
-            noop_with_empty_axes=noop_with_empty_axes,
+            "ReduceL2", *self.vars_, keepdims=keepdims, noop_with_empty_axes=noop_with_empty_axes
         )
 
     def ReduceLogSum(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
@@ -302,10 +293,7 @@ class OpsVars:
 
     def ReduceMax(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
         return self.make_node(
-            "ReduceMax",
-            *self.vars_,
-            keepdims=keepdims,
-            noop_with_empty_axes=noop_with_empty_axes,
+            "ReduceMax", *self.vars_, keepdims=keepdims, noop_with_empty_axes=noop_with_empty_axes
         )
 
     def ReduceMean(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
@@ -318,10 +306,7 @@ class OpsVars:
 
     def ReduceMin(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
         return self.make_node(
-            "ReduceMin",
-            *self.vars_,
-            keepdims=keepdims,
-            noop_with_empty_axes=noop_with_empty_axes,
+            "ReduceMin", *self.vars_, keepdims=keepdims, noop_with_empty_axes=noop_with_empty_axes
         )
 
     def ReduceProd(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
@@ -334,10 +319,7 @@ class OpsVars:
 
     def ReduceSum(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
         return self.make_node(
-            "ReduceSum",
-            *self.vars_,
-            keepdims=keepdims,
-            noop_with_empty_axes=noop_with_empty_axes,
+            "ReduceSum", *self.vars_, keepdims=keepdims, noop_with_empty_axes=noop_with_empty_axes
         )
 
     def ReduceSumSquare(self, keepdims: int = 1, noop_with_empty_axes: int = 0) -> "Var":
@@ -414,12 +396,7 @@ class OpsVars:
 
     def TopK(self, axis: int = -1, largest: int = 1, sorted: int = 1) -> "Vars":
         return self.make_node(
-            "TopK",
-            *self.vars_,
-            axis=axis,
-            largest=largest,
-            sorted=sorted,
-            n_outputs=2,
+            "TopK", *self.vars_, axis=axis, largest=largest, sorted=sorted, n_outputs=2
         )
 
     def Trilu(self, upper: int = 1) -> "Var":
@@ -464,20 +441,14 @@ def _complete_ops_vars() -> None:
         if hasattr(OpsVars, name):
             continue
         setattr(
-            OpsVars,
-            name,
-            lambda self, _op=name: self._check_nin(2).make_node(_op, *self.vars_),
+            OpsVars, name, lambda self, _op=name: self._check_nin(2).make_node(_op, *self.vars_)
         )
 
     flexible_ops = ["Squeeze"]
     for name in flexible_ops:
         if hasattr(OpsVars, name):
             continue
-        setattr(
-            OpsVars,
-            name,
-            lambda self, _op=name: self.make_node(_op, *self.vars_),
-        )
+        setattr(OpsVars, name, lambda self, _op=name: self.make_node(_op, *self.vars_))
 
 
 _complete_ops_vars()

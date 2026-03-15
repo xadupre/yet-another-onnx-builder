@@ -37,11 +37,7 @@ class TestUnitTest(ExtTestCase):
             [
                 os.path.join(os.path.dirname(yobx.__file__)),
                 os.path.join(os.path.dirname(yobx.__file__), "..", "docs"),
-                os.path.join(
-                    os.path.dirname(yobx.__file__),
-                    "..",
-                    "unittests",
-                ),
+                os.path.join(os.path.dirname(yobx.__file__), "..", "unittests"),
             ],
             aggregation=2,
         )

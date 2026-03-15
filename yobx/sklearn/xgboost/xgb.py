@@ -69,14 +69,7 @@ _REG_SIGMOID_OBJECTIVES = frozenset({"reg:logistic"})
 
 #: Regression objectives that apply ``exp`` as the output transform
 #: (log-link objectives).
-_REG_EXP_OBJECTIVES = frozenset(
-    {
-        "count:poisson",
-        "reg:gamma",
-        "reg:tweedie",
-        "survival:cox",
-    }
-)
+_REG_EXP_OBJECTIVES = frozenset({"count:poisson", "reg:gamma", "reg:tweedie", "survival:cox"})
 
 
 # ---------------------------------------------------------------------------
@@ -268,10 +261,7 @@ def _build_xgb_tree_attrs_legacy(
 
 
 def _build_xgb_tree_attrs_v5(
-    trees_json: List[dict],
-    n_targets: int,
-    feature_name_to_idx: Optional[dict],
-    itype: int,
+    trees_json: List[dict], n_targets: int, feature_name_to_idx: Optional[dict], itype: int
 ) -> dict:
     """Build ``TreeEnsemble`` (``ai.onnx.ml`` opset 5) attribute arrays.
 
@@ -383,10 +373,7 @@ def _build_xgb_tree_attrs_v5(
         cumulative_leaf_offset += max(n_leaves, 1)
 
     nodes_splits_tensor = oh.make_tensor(
-        "nodes_splits",
-        itype,
-        (len(all_nodes_splits),),
-        np.array(all_nodes_splits, dtype=dtype),
+        "nodes_splits", itype, (len(all_nodes_splits),), np.array(all_nodes_splits, dtype=dtype)
     )
     nodes_modes_tensor = oh.make_tensor(
         "nodes_modes",
@@ -395,10 +382,7 @@ def _build_xgb_tree_attrs_v5(
         np.array(all_nodes_modes, dtype=np.uint8),
     )
     leaf_weights_tensor = oh.make_tensor(
-        "leaf_weights",
-        itype,
-        (len(all_leaf_weights),),
-        np.array(all_leaf_weights, dtype=dtype),
+        "leaf_weights", itype, (len(all_leaf_weights),), np.array(all_leaf_weights, dtype=dtype)
     )
 
     return dict(
@@ -505,10 +489,7 @@ def _emit_tree_node(
 
     if ml_opset >= 5:
         attrs = _build_xgb_tree_attrs_v5(
-            trees_json,
-            n_targets=n_targets,
-            feature_name_to_idx=feature_name_to_idx,
-            itype=itype,
+            trees_json, n_targets=n_targets, feature_name_to_idx=feature_name_to_idx, itype=itype
         )
         result = g.make_node(
             "TreeEnsemble",
@@ -563,9 +544,7 @@ def _emit_tree_node(
         return scores
     else:
         attrs = _build_xgb_tree_attrs_legacy(
-            trees_json,
-            n_targets=n_targets,
-            feature_name_to_idx=feature_name_to_idx,
+            trees_json, n_targets=n_targets, feature_name_to_idx=feature_name_to_idx
         )
         result = g.make_node(
             "TreeEnsembleRegressor",
@@ -583,11 +562,7 @@ def _emit_tree_node(
 
 
 def _gather_labels(
-    g: GraphBuilderExtendedProtocol,
-    label_idx: str,
-    classes,
-    name: str,
-    out_name: str,
+    g: GraphBuilderExtendedProtocol, label_idx: str, classes, name: str, out_name: str
 ) -> str:
     """Gather class labels from ``classes`` at positions ``label_idx``.
 
@@ -601,22 +576,14 @@ def _gather_labels(
     if np.issubdtype(classes.dtype, np.integer):
         classes_arr = classes.astype(np.int64)
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label",
-            outputs=[out_name],
+            classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=[out_name]
         )
         if not g.has_type(label):
             g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes, dtype=str)
         label = g.op.Gather(
-            classes_arr,
-            label_idx,
-            axis=0,
-            name=f"{name}_label_str",
-            outputs=[out_name],
+            classes_arr, label_idx, axis=0, name=f"{name}_label_str", outputs=[out_name]
         )
         if not g.has_type(label):
             g.set_type(label, onnx.TensorProto.STRING)

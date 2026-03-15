@@ -492,14 +492,7 @@ class _GraphPatterns(_GraphPredecessorSuccessors):
                     "pattern",
                     proto.input,
                     proto.output,
-                    [
-                        oh.make_node(
-                            name,
-                            proto.input,
-                            proto.output,
-                            domain="repeated",
-                        )
-                    ],
+                    [oh.make_node(name, proto.input, proto.output, domain="repeated")],
                     opset_imports=[oh.make_opsetid("repeated", 1)],
                 ),
             )
@@ -531,11 +524,7 @@ def find_largest_repeated_pattern(
     """
     if isinstance(onx, onnx.ModelProto):
         res = find_largest_repeated_pattern(
-            onx.graph,
-            min_freq=min_freq,
-            verbose=verbose,
-            all_instances=all_instances,
-            name=name,
+            onx.graph, min_freq=min_freq, verbose=verbose, all_instances=all_instances, name=name
         )
         if res is None:
             return res

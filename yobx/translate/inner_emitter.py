@@ -163,11 +163,7 @@ class InnerEmitter(BaseEmitter):
                 regular_atts.append((k, value))
 
         # Build argument list for oh.make_node
-        args = [
-            f"        {op_type!r},",
-            f"        {inputs},",
-            f"        {outputs},",
-        ]
+        args = [f"        {op_type!r},", f"        {inputs},", f"        {outputs},"]
         if domain:
             args.append(f"        domain={domain!r},")
         for k, value in regular_atts:

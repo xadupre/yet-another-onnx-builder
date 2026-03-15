@@ -34,8 +34,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
         self.assertEqual(choose_consistent_domain_opset("com.microsoft", {"": 18}), 1)
         self.assertIsInstance(choose_consistent_domain_opset("", {"com.microsoft": 1}), int)
         self.assertRaise(
-            lambda: choose_consistent_domain_opset("", {"ai.onnx.ml": 10}),
-            AssertionError,
+            lambda: choose_consistent_domain_opset("", {"ai.onnx.ml": 10}), AssertionError
         )
 
     @skipif_ci_windows("get_all_schemas_with_history returns wrong values")
@@ -59,10 +58,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                         value=onh.from_array(np.array([0], dtype=np.float32)),
                     ),
                     oh.make_node(
-                        "ScatterND",
-                        ["cst", "indices", "updates"],
-                        ["Z"],
-                        reduction="add",
+                        "ScatterND", ["cst", "indices", "updates"], ["Z"], reduction="add"
                     ),
                 ],
                 "dummy",
@@ -73,9 +69,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                 ],
                 [oh.make_tensor_value_info("Z", TFLOAT, [None, None, None])],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-            ],
+            opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
         check_model(model)
@@ -87,10 +81,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["ScatterNDOfShape"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["ScatterNDOfShape"], [n.op_type for n in opt_onx.graph.node])
 
         feeds = {
             "shape": np.array([5, 6], dtype=np.int64),
@@ -111,11 +102,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
         self.assertEqualArray(expected[0], got[0])
 
     def _get_aamm_model(
-        self,
-        op_type: str,
-        left: bool,
-        other_type: Optional[str] = None,
-        negative: bool = False,
+        self, op_type: str, left: bool, other_type: Optional[str] = None, negative: bool = False
     ) -> ModelProto:
         if other_type is None:
             other_type = op_type
@@ -141,10 +128,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                 ],
                 [oh.make_tensor_value_info("F", TFLOAT, ["d"])],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         check_model(model)
@@ -183,17 +167,12 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
     def test_mul_sigmoid(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("Sigmoid", ["X"], ["xs"]),
-                    oh.make_node("Mul", ["X", "xs"], ["Y"]),
-                ],
+                [oh.make_node("Sigmoid", ["X"], ["xs"]), oh.make_node("Mul", ["X", "xs"], ["Y"])],
                 "dummy",
                 [oh.make_tensor_value_info("X", TFLOAT, [None, None])],
                 [oh.make_tensor_value_info("Y", TFLOAT, [None, None])],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-            ],
+            opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
         check_model(model)
@@ -205,14 +184,9 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["MulSigmoid"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["MulSigmoid"], [n.op_type for n in opt_onx.graph.node])
 
-        feeds = {
-            "X": np.arange(18).reshape((3, 6)).astype(np.float32),
-        }
+        feeds = {"X": np.arange(18).reshape((3, 6)).astype(np.float32)}
         ref1 = ExtendedReferenceEvaluator(model)
         expected = ref1.run(None, feeds)
 
@@ -247,9 +221,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                 [oh.make_tensor_value_info("Y", TFLOAT, [None, None])],
                 [onh.from_array(np.array([4, 4], dtype=np.int64), name="splits")],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-            ],
+            opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
         check_model(model)
@@ -261,14 +233,9 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["Rotary"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["Rotary"], [n.op_type for n in opt_onx.graph.node])
 
-        feeds = {
-            "X": np.arange(24).reshape((3, 8)).astype(np.float32),
-        }
+        feeds = {"X": np.arange(24).reshape((3, 8)).astype(np.float32)}
         ref1 = ExtendedReferenceEvaluator(model)
         expected = ref1.run(None, feeds)
 
@@ -331,9 +298,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                 [oh.make_tensor_value_info("Y", TFLOAT, [None, None])],
                 [onh.from_array(np.array([5.67], dtype=np.float32), name="cst")],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-            ],
+            opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
         check_model(model)
@@ -345,14 +310,9 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["ReplaceZero"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["ReplaceZero"], [n.op_type for n in opt_onx.graph.node])
 
-        feeds = {
-            "X": (np.arange(18).reshape((3, 6)) - 3).astype(np.float32),
-        }
+        feeds = {"X": (np.arange(18).reshape((3, 6)) - 3).astype(np.float32)}
         ref1 = ExtendedReferenceEvaluator(model)
         expected = ref1.run(None, feeds)
 
@@ -369,17 +329,13 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
     def test_negx_plus1(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("Sub", ["one", "X"], ["Y"]),
-                ],
+                [oh.make_node("Sub", ["one", "X"], ["Y"])],
                 "dummy",
                 [oh.make_tensor_value_info("X", TFLOAT, [None, None])],
                 [oh.make_tensor_value_info("Y", TFLOAT, [None, None])],
                 [onh.from_array(np.array([1], dtype=np.float32), name="one")],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-            ],
+            opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
         check_model(model)
@@ -391,14 +347,9 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["NegXplus1"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["NegXplus1"], [n.op_type for n in opt_onx.graph.node])
 
-        feeds = {
-            "X": (np.arange(18).reshape((3, 6)) - 3).astype(np.float32),
-        }
+        feeds = {"X": (np.arange(18).reshape((3, 6)) - 3).astype(np.float32)}
         ref1 = ExtendedReferenceEvaluator(model)
         expected = ref1.run(None, feeds)
 
@@ -443,9 +394,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                     onh.from_array(np.array([1024, 1024], dtype=np.int64), name="shape"),
                 ],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-            ],
+            opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
         check_model(model)
@@ -453,21 +402,13 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["TriMatrix"],
-                processor="CPU,CUDA",
-                verbose=0,
-                constant_folding=False,
+                patterns=["TriMatrix"], processor="CPU,CUDA", verbose=0, constant_folding=False
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["TriMatrix"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual(["TriMatrix"], [n.op_type for n in opt_onx.graph.node])
 
-        feeds = {
-            "X": (np.arange(18).reshape((3, 6)) - 3).astype(np.float32),
-        }
+        feeds = {"X": (np.arange(18).reshape((3, 6)) - 3).astype(np.float32)}
         ref1 = ExtendedReferenceEvaluator(model)
         expected = ref1.run(None, feeds)
 
@@ -514,14 +455,9 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         suffix = "32" if out_type == TFLOAT else "16"
-        self.assertEqual(
-            [f"Transpose2DCastFP{suffix}"],
-            [n.op_type for n in opt_onx.graph.node],
-        )
+        self.assertEqual([f"Transpose2DCastFP{suffix}"], [n.op_type for n in opt_onx.graph.node])
 
-        feeds = {
-            "X": (np.arange(32).reshape((4, 8)) - 3).astype(np.float32),
-        }
+        feeds = {"X": (np.arange(32).reshape((4, 8)) - 3).astype(np.float32)}
         ref1 = ExtendedReferenceEvaluator(model)
         expected = ref1.run(None, feeds)
 
@@ -548,10 +484,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
             other_type = "Sub" if op_type == "Mul" else "Mul"
             with self.subTest(op_type=op_type, left=left, negative=negative):
                 model = self._get_aamm_model(
-                    op_type=op_type,
-                    left=left,
-                    other_type=other_type,
-                    negative=negative,
+                    op_type=op_type, left=left, other_type=other_type, negative=negative
                 )
                 self.assertEqual(len(model.graph.node), 2)
                 gr = GraphBuilder(
@@ -598,10 +531,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                     oh.make_tensor_value_info("F2", TFLOAT, ["d"]),
                 ],
             ),
-            opset_imports=[
-                oh.make_opsetid("", 18),
-                oh.make_opsetid("com.microsoft", 1),
-            ],
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
         )
         check_model(model)
@@ -610,10 +540,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
     def test_add_mul_shared_input_pattern(self):
         for op_type, left in itertools.product(["Add", "Mul"], [True, False]):
             with self.subTest(op_type=op_type, left=left):
-                model = self._get_shared_input_model(
-                    op_type=op_type,
-                    left=left,
-                )
+                model = self._get_shared_input_model(op_type=op_type, left=left)
                 self.assertEqual(len(model.graph.node), 2)
                 gr = GraphBuilder(
                     model,
@@ -678,9 +605,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                 op_type1 = op_type
                 op_type2 = "Mul" if op_type == "Add" else "Add"
                 model = self._get_add_mul_transpose_model(
-                    op_type1=op_type1,
-                    op_type2=op_type2,
-                    left=left,
+                    op_type1=op_type1, op_type2=op_type2, left=left
                 )
                 self.assertEqual(len(model.graph.node), 2)
                 gr = GraphBuilder(
@@ -724,9 +649,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                     ),
                     oh.make_node("Equal", ["indices", "m_one"], ["masked_indices"]),
                     oh.make_node(
-                        "Where",
-                        ["masked_indices", "zero", "updates"],
-                        ["masked_updates"],
+                        "Where", ["masked_indices", "zero", "updates"], ["masked_updates"]
                     ),
                     oh.make_node(
                         "ScatterND",
@@ -766,14 +689,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
 
         data = np.zeros((32, 16), dtype=dtype)
         indices = np.array(
-            [
-                [0, 1, 2],
-                [2, 3, 4],
-                [-1, 30, 31],
-                [-1, 7, 8],
-                [10, 11, -1],
-                [20, -1, 21],
-            ],
+            [[0, 1, 2], [2, 3, 4], [-1, 30, 31], [-1, 7, 8], [10, 11, -1], [20, -1, 21]],
             dtype=np.int64,
         )
         indices = indices[..., np.newaxis]

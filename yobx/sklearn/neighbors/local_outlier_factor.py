@@ -138,12 +138,7 @@ def sklearn_local_outlier_factor(
 
     # 2. k nearest neighbours: topk_dists (N, k), topk_idx (N, k)
     topk_dists, topk_idx = g.op.TopK(
-        dists,
-        np.array([k], dtype=np.int64),
-        axis=1,
-        largest=0,
-        sorted=1,
-        name=f"{name}_topk",
+        dists, np.array([k], dtype=np.int64), axis=1, largest=0, sorted=1, name=f"{name}_topk"
     )
 
     # 3. k-distances of the neighbours (from their own fit): (N, k)
@@ -155,10 +150,7 @@ def sklearn_local_outlier_factor(
 
     # 5. Mean reachability distance + epsilon: (N,)
     mean_reach = g.op.ReduceMean(
-        reach_dists,
-        np.array([1], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_mean_reach",
+        reach_dists, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_mean_reach"
     )
     eps = np.array([1e-10], dtype=dtype)
     mean_reach_eps = g.op.Add(mean_reach, eps, name=f"{name}_mean_reach_eps")
@@ -179,10 +171,7 @@ def sklearn_local_outlier_factor(
 
     # 9. score_samples = -mean(lrd_ratios): (N,)
     mean_ratio = g.op.ReduceMean(
-        lrd_ratios,
-        np.array([1], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_mean_ratio",
+        lrd_ratios, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_mean_ratio"
     )
     score_samples = g.op.Neg(mean_ratio, name=f"{name}_score_samples")
 

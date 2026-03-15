@@ -170,10 +170,7 @@ class TestSplineTransformer(ExtTestCase):
         y = rng.standard_normal(50).astype(np.float32)
 
         pipe = Pipeline(
-            [
-                ("spline", SplineTransformer(n_knots=5, degree=3)),
-                ("reg", LinearRegression()),
-            ]
+            [("spline", SplineTransformer(n_knots=5, degree=3)), ("reg", LinearRegression())]
         )
         pipe.fit(X, y)
 

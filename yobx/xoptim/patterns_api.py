@@ -265,9 +265,7 @@ class PatternOptimization:
                 )
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        *nodes: Sequence[NodeProto],
+        self, g: "GraphBuilder", *nodes: Sequence[NodeProto]  # noqa: F821
     ) -> List[NodeProto]:
         """
         The method does the rewriting. It assumes it can happen.
@@ -316,10 +314,7 @@ class EasyPatternOptimization(PatternOptimization):
         return self._validate_parameters[key]
 
     def match_pattern(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        *args: List[str],
-        **kwargs: Dict[str, Any],
+        self, g: "GraphBuilder", *args: List[str], **kwargs: Dict[str, Any]  # noqa: F821
     ):
         """Builds the pattern to match."""
         raise NotImplementedError(
@@ -327,9 +322,7 @@ class EasyPatternOptimization(PatternOptimization):
         )
 
     def _build_pattern(
-        self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
-        fct: Callable,
+        self, g: "GraphBuilderPatternOptimization", fct: Callable  # noqa: F821
     ) -> "GraphBuilderPatternOptimization":  # noqa: F821
         from .graph_builder_optim import GraphBuilderPatternOptimization
 
@@ -385,8 +378,7 @@ class EasyPatternOptimization(PatternOptimization):
         """
 
     def _get_match_pattern(
-        self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        self, g: "GraphBuilderPatternOptimization"  # noqa: F821
     ) -> "GraphBuilderPatternOptimization":  # noqa: F821
         cache_key = 0, tuple(sorted(g.opsets.items()))
         if cache_key in self._cache:
@@ -397,8 +389,7 @@ class EasyPatternOptimization(PatternOptimization):
         return pat
 
     def _get_apply_pattern(
-        self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        self, g: "GraphBuilderPatternOptimization"  # noqa: F821
     ) -> "GraphBuilderPatternOptimization":  # noqa: F821
         cache_key = 1, tuple(sorted(g.opsets.items()))
         if cache_key in self._cache:
@@ -453,13 +444,7 @@ class EasyPatternOptimization(PatternOptimization):
         # predecessors
         if len(n.input) != len(pn.input):
             # not the same number of inputs
-            self._hint(
-                "BACKWARD: not the same number of inputs",
-                "-- pattern",
-                pn,
-                "-- model",
-                n,
-            )
+            self._hint("BACKWARD: not the same number of inputs", "-- pattern", pn, "-- model", n)
             return self.none(node, inspect.currentframe().f_lineno)
 
         pattern_input_names = set(pat.input_names)
@@ -496,13 +481,7 @@ class EasyPatternOptimization(PatternOptimization):
             pred = g.node_before(i)
             if pred is None:
                 # No node in the graph.
-                self._hint(
-                    "BACKWARD: no node in the graph",
-                    "-- pred",
-                    pred,
-                    "-- ppred",
-                    ppred,
-                )
+                self._hint("BACKWARD: no node in the graph", "-- pred", pred, "-- ppred", ppred)
                 return self.none(node, inspect.currentframe().f_lineno)
             if pred.op_type != ppred.op_type or len(pred.input) != len(ppred.input):
                 # Distinct type
@@ -581,11 +560,7 @@ class EasyPatternOptimization(PatternOptimization):
             if len(n.output) != len(pn.output):
                 # not the same number of outputs
                 self._hint(
-                    "FORWARD: not the same number of outputs",
-                    "-- pattern",
-                    pn,
-                    "-- model",
-                    n,
+                    "FORWARD: not the same number of outputs", "-- pattern", pn, "-- model", n
                 )
                 return self.none(node, inspect.currentframe().f_lineno)
             matched_results = list(zip(n.output, pn.output))
@@ -1173,9 +1148,7 @@ class EasyPatternOptimization(PatternOptimization):
         )
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        *nodes: Sequence[NodeProto],
+        self, g: "GraphBuilder", *nodes: Sequence[NodeProto]  # noqa: F821
     ) -> List[NodeProto]:
         # Why build the pattern gain
         pat = self._get_match_pattern(g)
@@ -1297,11 +1270,7 @@ class EasyPatternOptimization(PatternOptimization):
                     continue
 
             new_node = g.make_node(
-                node.op_type,
-                new_inputs,
-                new_outputs,
-                domain=node.domain,
-                name=node.name,
+                node.op_type, new_inputs, new_outputs, domain=node.domain, name=node.name
             )
             new_node.attribute.extend(node.attribute)
             new_nodes.append(new_node)
@@ -1337,9 +1306,7 @@ class OnnxEasyPatternOptimization(EasyPatternOptimization):
         self._apply_model = apply_model
 
     def _build_pattern(
-        self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
-        fct: Callable,
+        self, g: "GraphBuilderPatternOptimization", fct: Callable  # noqa: F821
     ) -> "GraphBuilderPatternOptimization":  # noqa: F821
         if fct == self.match_pattern:
             onx = self._match_model

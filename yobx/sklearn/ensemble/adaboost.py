@@ -99,9 +99,7 @@ def sklearn_adaboost_classifier(
 
         # Reshape label (N,) → (N, 1) to broadcast-compare with classes (1, C)
         label_2d = g.op.Reshape(
-            sub_label,
-            np.array([-1, 1], dtype=np.int64),
-            name=f"{sub_name}_reshape",
+            sub_label, np.array([-1, 1], dtype=np.int64), name=f"{sub_name}_reshape"
         )
         # one_hot_bool: (N, C) — True where label[i] matches classes_[k]
         one_hot_bool = g.op.Equal(label_2d, classes_const, name=f"{sub_name}_eq")
@@ -137,10 +135,7 @@ def sklearn_adaboost_classifier(
         signed = g.op.Mul(decision, sign_mask, name=f"{name}_sign")
         g.set_type(signed, itype)
         decision_1d = g.op.ReduceSum(
-            signed,
-            np.array([1], dtype=np.int64),
-            keepdims=0,
-            name=f"{name}_reduce",
+            signed, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_reduce"
         )
         g.set_type(decision_1d, itype)
 
@@ -152,9 +147,7 @@ def sklearn_adaboost_classifier(
         if emit_proba:
             # predict_proba: stack([-d, d]) / 2, then softmax
             dec_2d = g.op.Unsqueeze(
-                decision_1d,
-                np.array([1], dtype=np.int64),
-                name=f"{name}_unsqueeze",
+                decision_1d, np.array([1], dtype=np.int64), name=f"{name}_unsqueeze"
             )
             neg_dec = g.op.Neg(dec_2d, name=f"{name}_neg_dec")
             stacked = g.op.Concat(neg_dec, dec_2d, axis=1, name=f"{name}_stack")
@@ -257,9 +250,7 @@ def sklearn_adaboost_regressor(
         # Unsqueeze (N,) → (N, 1) for column-wise concat
         # (use Reshape to also handle predictions of shape (N, 1))
         pred_2d = g.op.Reshape(
-            sub_pred,
-            np.array([-1, 1], dtype=np.int64),
-            name=f"{sub_name}_reshape",
+            sub_pred, np.array([-1, 1], dtype=np.int64), name=f"{sub_name}_reshape"
         )
         pred_cols.append(pred_2d)
 
@@ -270,12 +261,7 @@ def sklearn_adaboost_regressor(
     # ------------------------------------------------------------------
     k_val = np.array([n_est], dtype=np.int64)
     sorted_vals, sorted_idx = g.op.TopK(
-        all_preds,
-        k_val,
-        largest=0,
-        sorted=1,
-        name=f"{name}_topk",
-        outputs=2,
+        all_preds, k_val, largest=0, sorted=1, name=f"{name}_topk", outputs=2
     )
 
     # ------------------------------------------------------------------
@@ -286,11 +272,7 @@ def sklearn_adaboost_regressor(
     weights_sorted = g.op.Gather(weights_const, sorted_idx, axis=0, name=f"{name}_gather_w")
 
     # Cumulative sum along estimator axis → (N, E)
-    cumsum = g.op.CumSum(
-        weights_sorted,
-        np.array(1, dtype=np.int64),
-        name=f"{name}_cumsum",
-    )
+    cumsum = g.op.CumSum(weights_sorted, np.array(1, dtype=np.int64), name=f"{name}_cumsum")
 
     # Find first position where cumsum >= 0.5 * total_weight
     at_or_above = g.op.GreaterOrEqual(cumsum, half_total, name=f"{name}_ge")
@@ -301,18 +283,13 @@ def sklearn_adaboost_regressor(
 
     # Gather the prediction value at each sample's median position
     median_pos_2d = g.op.Unsqueeze(
-        median_pos,
-        np.array([1], dtype=np.int64),
-        name=f"{name}_median_unsqueeze",
+        median_pos, np.array([1], dtype=np.int64), name=f"{name}_median_unsqueeze"
     )  # (N, 1)
     result_2d = g.op.GatherElements(
         sorted_vals, median_pos_2d, axis=1, name=f"{name}_gather_pred"
     )  # (N, 1)
     result = g.op.Reshape(
-        result_2d,
-        np.array([-1], dtype=np.int64),
-        name=f"{name}_reshape",
-        outputs=outputs[:1],
+        result_2d, np.array([-1], dtype=np.int64), name=f"{name}_reshape", outputs=outputs[:1]
     )
     assert isinstance(result, str)
     return result

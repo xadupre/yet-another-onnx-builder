@@ -4,7 +4,7 @@ import re
 import sys
 import textwrap
 import onnx
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from argparse import ArgumentParser, RawTextHelpFormatter, BooleanOptionalAction
 
 
@@ -56,14 +56,7 @@ def get_parser_dot() -> ArgumentParser:
         required=False,
         help="dot model to output or empty to print out the result",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        type=int,
-        default=0,
-        required=False,
-        help="verbosity",
-    )
+    parser.add_argument("-v", "--verbose", type=int, default=0, required=False, help="verbosity")
     parser.add_argument(
         "-r",
         "--run",
@@ -120,13 +113,7 @@ def get_parser_find() -> ArgumentParser:
             """),
         epilog="Enables some quick validation.",
     )
-    parser.add_argument(
-        "-i",
-        "--input",
-        type=str,
-        required=True,
-        help="onnx model to search",
-    )
+    parser.add_argument("-i", "--input", type=str, required=True, help="onnx model to search")
     parser.add_argument(
         "-n",
         "--names",
@@ -135,14 +122,7 @@ def get_parser_find() -> ArgumentParser:
         help="Names to look at comma separated values, if 'SHADOW', "
         "search for shadowing names.",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        default=0,
-        type=int,
-        required=False,
-        help="verbosity",
-    )
+    parser.add_argument("-v", "--verbose", default=0, type=int, required=False, help="verbosity")
     parser.add_argument(
         "--v2",
         default=False,
@@ -222,10 +202,7 @@ def get_parser_agg() -> ArgumentParser:
         "--recent should be added.",
     )
     parser.add_argument(
-        "--raw",
-        default=True,
-        action=BooleanOptionalAction,
-        help="Keeps the raw data in a sheet.",
+        "--raw", default=True, action=BooleanOptionalAction, help="Keeps the raw data in a sheet."
     )
     parser.add_argument("-t", "--time", default="DATE", help="Date or time column")
     parser.add_argument(
@@ -281,11 +258,7 @@ def get_parser_agg() -> ArgumentParser:
             Their definition is part of class CubeLogsPerformance.
             """),
     )
-    parser.add_argument(
-        "--csv",
-        default="raw-short",
-        help="Views to dump as csv files.",
-    )
+    parser.add_argument("--csv", default="raw-short", help="Views to dump as csv files.")
     parser.add_argument("-v", "--verbose", type=int, default=0, help="verbosity")
     parser.add_argument(
         "--filter-in",
@@ -416,14 +389,7 @@ def get_parser_partition() -> ArgumentParser:
         default="namespace,source[",
         help="allowed prefixes for keys in the metadata",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        default=0,
-        required=False,
-        type=int,
-        help="verbosity",
-    )
+    parser.add_argument("-v", "--verbose", default=0, required=False, type=int, help="verbosity")
     return parser
 
 
@@ -610,10 +576,7 @@ def _cmd_run_doc_examples(argv: List[Any]):
         print(f"[run-doc-examples] scanning {len(files)} file(s) ...")
 
     _, n_failed = run_runpython_blocks(
-        files,
-        verbose=args.verbose,
-        raise_on_error=False,
-        timeout=args.timeout,
+        files, verbose=args.verbose, raise_on_error=False, timeout=args.timeout
     )
 
     if n_failed:
@@ -680,14 +643,7 @@ def get_parser_copilot_draft() -> ArgumentParser:
         action="store_true",
         help="Print the generated code without writing any file.",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        type=int,
-        default=0,
-        required=False,
-        help="verbosity",
-    )
+    parser.add_argument("-v", "--verbose", type=int, default=0, required=False, help="verbosity")
     return parser
 
 
@@ -727,6 +683,166 @@ def _cmd_copilot_draft(argv: List[Any]):
     )
 
 
+def get_parser_validate() -> ArgumentParser:
+    _DEFAULT_PROMPT = "Continue: it rains, what should I do?"
+    parser = ArgumentParser(
+        prog="validate",
+        description=textwrap.dedent("""
+            Validates an ONNX export for a HuggingFace model.
+            Unlike onnx_diagnostic validate which uses random/dummy inputs,
+            this command captures real inputs by running the model on a default
+            text prompt with InputObserver, then exports to ONNX and checks
+            discrepancies.
+            """),
+        epilog=textwrap.dedent("""
+            Examples:
+
+                python -m yobx validate -m arnir0/Tiny-LLM -v 1
+                python -m yobx validate -m arnir0/Tiny-LLM -v 1 -o dump_validate
+                python -m yobx validate -m arnir0/Tiny-LLM --no-patch --no-run
+            """),
+        formatter_class=RawTextHelpFormatter,
+    )
+    parser.add_argument(
+        "-m",
+        "--mid",
+        type=str,
+        required=True,
+        help="Model id, usually <author>/<name> on HuggingFace Hub.",
+    )
+    parser.add_argument(
+        "-p",
+        "--prompt",
+        type=str,
+        default=_DEFAULT_PROMPT,
+        help=f"Text prompt used to drive model.generate() during input capture. "
+        f"Default: {_DEFAULT_PROMPT!r}",
+    )
+    parser.add_argument(
+        "-e", "--export", default="yobx", type=str, help="ONNX exporter to use (default: 'yobx')."
+    )
+    parser.add_argument(
+        "--opt",
+        default="default",
+        type=str,
+        required=False,
+        help="Optimisation level applied after export (default: 'default').",
+    )
+    parser.add_argument(
+        "-r",
+        "--run",
+        default=True,
+        action=BooleanOptionalAction,
+        help="Check discrepancies after export (default: True).",
+    )
+    parser.add_argument(
+        "--patch",
+        default=True,
+        action=BooleanOptionalAction,
+        help="Apply apply_patches_for_model and register_flattening_functions "
+        "during input capture and export (default: True).",
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        default=False,
+        action=BooleanOptionalAction,
+        help="Catch exceptions and report them in the summary instead of re-raising.",
+    )
+    parser.add_argument(
+        "--opset", default=22, type=int, help="ONNX opset version to target (default: 22)."
+    )
+    parser.add_argument(
+        "--dtype",
+        default=None,
+        type=str,
+        help="Cast the model and inputs to this dtype before exporting, e.g. 'float16'.",
+    )
+    parser.add_argument(
+        "--device",
+        default=None,
+        type=str,
+        help="Device to run on, e.g. 'cpu' or 'cuda' (default: 'cpu').",
+    )
+    parser.add_argument(
+        "--max-new-tokens",
+        default=10,
+        type=int,
+        help="Number of tokens generated by model.generate() during input capture "
+        "(default: 10).",
+    )
+    parser.add_argument(
+        "-o",
+        "--dump-folder",
+        default=None,
+        type=str,
+        help="Save ONNX artefacts under this folder.",
+    )
+    parser.add_argument(
+        "-v", "--verbose", default=0, type=int, help="Verbosity level (default: 0)."
+    )
+    parser.add_argument(
+        "--random-weights",
+        default=False,
+        action="store_true",
+        help="Instantiate the model from config with random weights instead of "
+        "downloading pretrained weights (useful for fast CI tests).",
+    )
+    parser.add_argument(
+        "--config-override",
+        default=None,
+        action="append",
+        metavar="KEY=VALUE",
+        dest="config_override",
+        help="Override a config attribute before creating the model, "
+        "e.g. --config-override num_hidden_layers=2. "
+        "Can be repeated for multiple overrides.",
+    )
+    return parser
+
+
+def _cmd_validate(argv: List[Any]):
+    import ast
+
+    from .torch.validate import validate_model
+
+    parser = get_parser_validate()
+    args = parser.parse_args(argv[1:])
+
+    config_overrides: Optional[Dict[str, Any]] = None
+    if args.config_override:
+        config_overrides = {}
+        for item in args.config_override:
+            k, _, v = item.partition("=")
+            try:
+                config_overrides[k.strip()] = ast.literal_eval(v.strip())
+            except Exception:
+                config_overrides[k.strip()] = v.strip()
+
+    summary, _data = validate_model(
+        model_id=args.mid,
+        prompt=args.prompt,
+        exporter=args.export,
+        optimization=args.opt,
+        verbose=args.verbose,
+        dump_folder=args.dump_folder,
+        opset=args.opset,
+        dtype=args.dtype,
+        device=args.device,
+        max_new_tokens=args.max_new_tokens,
+        do_run=args.run,
+        patch=args.patch,
+        quiet=args.quiet,
+        config_overrides=config_overrides,
+        random_weights=args.random_weights,
+    )
+
+    print("")
+    print("-- summary --")
+    for k, v in sorted(summary.items()):
+        print(f":{k},{v};")
+
+
 def get_main_parser() -> ArgumentParser:
     parser = ArgumentParser(
         prog="yobx",
@@ -743,6 +859,7 @@ def get_main_parser() -> ArgumentParser:
             partition         - partition a model, each partition appears as local function
             print             - prints the model on standard output
             run-doc-examples  - run all runpython:: and gdot:: examples in RST/Python files
+            validate          - validate a model (knowing its model id on HuggingFace Hub)
             """),
     )
     parser.add_argument(
@@ -755,6 +872,7 @@ def get_main_parser() -> ArgumentParser:
             "partition",
             "print",
             "run-doc-examples",
+            "validate",
         ],
         help="Selects a command.",
     )
@@ -770,6 +888,7 @@ def main(argv: Optional[List[Any]] = None):
         partition=_cmd_partition,
         print=_cmd_print,
         **{"run-doc-examples": _cmd_run_doc_examples},
+        validate=_cmd_validate,
     )
 
     if argv is None:
@@ -787,6 +906,7 @@ def main(argv: Optional[List[Any]] = None):
                 partition=get_parser_partition,
                 print=get_parser_print,
                 **{"run-doc-examples": get_parser_run_doc_examples},
+                validate=get_parser_validate,
             )
             cmd = argv[0]
             if cmd not in parsers:

@@ -55,9 +55,7 @@ class TestGraphBuilderProtocolExists(ExtTestCase):
         ]
         for name in required:
             self.assertIn(
-                name,
-                dir(GraphBuilderProtocol),
-                msg=f"GraphBuilderProtocol is missing '{name}'",
+                name, dir(GraphBuilderProtocol), msg=f"GraphBuilderProtocol is missing '{name}'"
             )
 
 
@@ -172,10 +170,7 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
             "make_node",
             "to_onnx",
         ]:
-            self.assertTrue(
-                hasattr(g, attr),
-                msg=f"OnnxScriptGraphBuilder missing '{attr}'",
-            )
+            self.assertTrue(hasattr(g, attr), msg=f"OnnxScriptGraphBuilder missing '{attr}'")
 
     def test_input_output_names(self):
         g = self._make_simple_model()
@@ -233,12 +228,7 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
 class TestGraphBuilderExtendedProtocol(ExtTestCase):
     """GraphBuilder satisfies GraphBuilderExtendedProtocol."""
 
-    EXTENDED_ATTRS = [
-        "main_opset",
-        "unique_name",
-        "op",
-        "set_type_shape_unary_op",
-    ]
+    EXTENDED_ATTRS = ["main_opset", "unique_name", "op", "set_type_shape_unary_op"]
 
     def test_extended_protocol_has_required_methods(self):
         for name in self.EXTENDED_ATTRS:
@@ -252,8 +242,7 @@ class TestGraphBuilderExtendedProtocol(ExtTestCase):
         g = GraphBuilder(18, ir_version=9)
         for attr in self.EXTENDED_ATTRS:
             self.assertTrue(
-                hasattr(g, attr),
-                msg=f"GraphBuilder missing extended attribute '{attr}'",
+                hasattr(g, attr), msg=f"GraphBuilder missing extended attribute '{attr}'"
             )
 
     def test_graphbuilder_is_instance_extended(self):
@@ -299,9 +288,7 @@ class TestOpsetProtocol(ExtTestCase):
 
     def test_opset_protocol_has_getattr(self):
         self.assertIn(
-            "__getattr__",
-            dir(OpsetProtocol),
-            msg="OpsetProtocol is missing '__getattr__'",
+            "__getattr__", dir(OpsetProtocol), msg="OpsetProtocol is missing '__getattr__'"
         )
 
     def test_graphbuilder_op_satisfies_protocol(self):

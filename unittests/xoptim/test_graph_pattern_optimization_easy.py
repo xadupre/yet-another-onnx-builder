@@ -11,11 +11,7 @@ Use:
 import unittest
 import numpy as np
 import onnx
-from onnx import (
-    TensorProto,
-    helper as oh,
-    numpy_helper as onh,
-)
+from onnx import TensorProto, helper as oh, numpy_helper as onh
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
@@ -91,18 +87,10 @@ class TestGraphPatternOptimizationEasy(ExtTestCase):
                         oh.make_node("Cast", ["w2"], ["w2f"], to=TFLOAT),
                         oh.make_node("Cast", ["neq1"], ["neq1f"], to=TFLOAT),
                         oh.make_node(
-                            "ReduceSum",
-                            ["w2f"],
-                            ["red1"],
-                            keepdims=0,
-                            noop_with_empty_axes=0,
+                            "ReduceSum", ["w2f"], ["red1"], keepdims=0, noop_with_empty_axes=0
                         ),
                         oh.make_node(
-                            "ReduceSum",
-                            ["neq1f"],
-                            ["red2"],
-                            keepdims=0,
-                            noop_with_empty_axes=0,
+                            "ReduceSum", ["neq1f"], ["red2"], keepdims=0, noop_with_empty_axes=0
                         ),
                         oh.make_node("Cast", ["red1"], ["red1_16"], to=TFLOAT16),
                         oh.make_node("Cast", ["red2"], ["red2_16"], to=TFLOAT16),
@@ -122,7 +110,7 @@ class TestGraphPatternOptimizationEasy(ExtTestCase):
                     ],
                 ),
                 opset_imports=[oh.make_opsetid("", 18)],
-            ),
+            )
         ]
 
         for model in models:

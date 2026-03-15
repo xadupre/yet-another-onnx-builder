@@ -78,9 +78,7 @@ class FunctionPackedMatMulPattern(PatternOptimization):
         )
 
     def apply(
-        self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
-        *nodes: NodeProto,
+        self, g: "GraphBuilderPatternOptimization", *nodes: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         matmul_nodes = [n for n in nodes if n.op_type == "MatMul"]
         reshape_nodes = [n for n in nodes if n.op_type == "Reshape"]
@@ -179,10 +177,7 @@ class FunctionSplitRotaryMulPattern(SimplifyingEasyPatternFunction):
         s1, s2 = g.op.Split(rot, split2, outputs=2, axis=-1)
         neg = g.op.Neg(s2)
         fullrot = g.op.Concat(neg, s1, axis=-1)
-        add = g.op.Add(
-            g.op.Mul(rot, C2),
-            g.op.Mul(fullrot, C1),
-        )
+        add = g.op.Add(g.op.Mul(rot, C2), g.op.Mul(fullrot, C1))
         return g.op.Concat(add, part, axis=-1)
 
     def apply_pattern(self, g: GraphBuilder, X, split1, split2, C1, C2):

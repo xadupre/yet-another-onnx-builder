@@ -306,9 +306,7 @@ class TestShapeBuilder(ExtTestCase):
     def test_evaluate_shape(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("Concat", ["X", "Y"], ["Z"], axis=1),
-                ],
+                [oh.make_node("Concat", ["X", "Y"], ["Z"], axis=1)],
                 "dummy",
                 [_mkv_("Y", TFLOAT, ["batch", "seq1"]), _mkv_("X", TFLOAT, ["batch", "seq2"])],
                 [_mkv_("Z", TFLOAT, [None, None])],
@@ -384,9 +382,7 @@ class TestShapeBuilder(ExtTestCase):
                     oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq", "d_model"]),
                 ],
                 [oh.make_tensor_value_info("Z", TFLOAT, [None, None, None])],
-                [
-                    onh.from_array(np.array([0, 0, -1], dtype=np.int64), name="reshape_shape"),
-                ],
+                [onh.from_array(np.array([0, 0, -1], dtype=np.int64), name="reshape_shape")],
             ),
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,

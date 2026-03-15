@@ -16,10 +16,7 @@ from ...typing import GraphBuilderExtendedProtocol
 
 @register_tf_op_converter("GatherV2")
 def convert_gather_v2(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: tf.Operation,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
     """
     Converts TF ``GatherV2`` (``tf.gather``) → ONNX ``Gather``.
@@ -31,9 +28,5 @@ def convert_gather_v2(
     axis_op = op.inputs[2].op
     axis = int(tf.make_ndarray(axis_op.get_attr("value")))
     return g.op.Gather(
-        op.inputs[0].name,
-        op.inputs[1].name,
-        axis=axis,
-        outputs=outputs[:1],
-        name=op.name,
+        op.inputs[0].name, op.inputs[1].name, axis=axis, outputs=outputs[:1], name=op.name
     )
