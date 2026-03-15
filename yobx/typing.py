@@ -3,6 +3,7 @@ from typing import (
     Callable,
     Dict,
     Iterable,
+    Iterator,
     List,
     Optional,
     Protocol,
@@ -309,3 +310,999 @@ class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
         """
         ...
 
+
+@runtime_checkable
+class GraphBuilderTorchProtocol(GraphBuilderExtendedProtocol, Protocol):
+    """Protocol for graph builders that support the full torch-exporter API.
+
+    This protocol extends :class:`GraphBuilderExtendedProtocol` with the
+    additional methods and attributes used by
+    :class:`~yobx.torch.interpreter.DynamoInterpreter` (the *torch exporter*)
+    when translating a ``torch.fx`` graph into ONNX.
+
+    The extra surface covers:
+
+    * **Rank helpers** — :meth:`has_rank`, :meth:`get_rank`, :meth:`set_rank`.
+    * **Device helpers** — :meth:`has_device`, :meth:`get_device`,
+      :meth:`set_device`.
+    * **Extended type / shape** — :meth:`get_type_known`,
+      :meth:`set_shapes_types`.
+    * **Tensor-sequence support** — :meth:`is_sequence`, :meth:`get_sequence`,
+      :meth:`set_sequence`, :meth:`make_tensor_sequence_input`.
+    * **Dynamic-shape helpers** — :meth:`is_dynamic_shape`,
+      :meth:`get_input_dynamic_shape`, :meth:`get_is_dimension`,
+      :meth:`verify_dynamic_shape`, :meth:`register_dynamic_objects_from_shape`,
+      :meth:`make_dynamic_object`, :meth:`add_dynamic_object`,
+      :meth:`make_new_dynamic_shape`.
+    * **Sub-builder / local-function support** — :meth:`make_nodes`,
+      :meth:`make_local_function`, :meth:`make_subset_builder`.
+    * **Miscellaneous** — :meth:`add_stat`, :meth:`pretty_text`,
+      :meth:`register_users`, :meth:`extract_input_names_from_args`.
+    * **State attributes** — ``anyop``, ``as_function``, ``local_domain``,
+      ``verbose``, ``torch``, ``optimization_options``, ``dynamic_shapes``,
+      ``dynamic_objects``, ``dynamic_dimensions_source``, ``nodes``,
+      ``outputs``, ``opsets``, ``initializers_dict``, ``raise_list``,
+      ``was_inputs_renamed``, ``last_added_node``.
+    """
+
+    # ------------------------------------------------------------------
+    # Attributes / properties
+    # ------------------------------------------------------------------
+
+    @property
+    def anyop(self) -> "OpsetProtocol":
+        """An opset helper that allows operators from any domain.
+
+        Identical to :attr:`~GraphBuilderExtendedProtocol.op` but configured
+        to accept unknown domains.  Used by the torch exporter to emit
+        custom-domain operators such as ``ai.onnx.complex``.
+
+        :return: an :class:`OpsetProtocol`-compatible object
+        """
+        ...
+
+    as_function: bool
+    """``True`` when the graph is being exported as a local function."""
+
+    local_domain: str
+    """Domain name used for local functions created during the export."""
+
+    verbose: int
+    """Verbosity level (``0`` = silent)."""
+
+    torch: Any
+    """Reference to the :mod:`torch` module, or ``None`` when PyTorch is
+    not installed."""
+
+    optimization_options: Any
+    """Optimization options forwarded to the builder's optimisation pass."""
+
+    dynamic_shapes: Any
+    """Dynamic-shapes specification provided to the exporter, or ``None``."""
+
+    dynamic_objects: Dict[str, Any]
+    """Map of dynamic dimension names (strings) to their current values
+    (e.g. :class:`torch.SymInt` instances or :class:`int` literals)."""
+
+    dynamic_dimensions_source: Dict[str, Any]
+    """Map of dynamic dimension names to the graph inputs / axes they
+    originate from."""
+
+    nodes: List[Any]
+    """Ordered list of ONNX :class:`~onnx.NodeProto` objects accumulated
+    so far."""
+
+    outputs: List[Any]
+    """List of declared graph outputs."""
+
+    opsets: Dict[str, int]
+    """Map of ONNX domain names to their opset versions."""
+
+    initializers_dict: Dict[str, Any]
+    """Map of initializer names to their :class:`~onnx.TensorProto` values."""
+
+    raise_list: Optional[Set[str]]
+    """When set, the builder raises an exception if a result in this set is
+    produced — useful for debugging."""
+
+    was_inputs_renamed: bool
+    """``True`` when the builder renamed some graph inputs during
+    construction."""
+
+    @property
+    def last_added_node(self) -> Optional[Any]:
+        """The most recently appended ONNX node, or ``None`` when the graph
+        is still empty.
+
+        :return: an :class:`~onnx.NodeProto` or ``None``
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Rank helpers
+    # ------------------------------------------------------------------
+
+    def has_rank(self, name: str) -> bool:
+        """Returns ``True`` when the rank of tensor *name* is known.
+
+        :param name: tensor name
+        """
+        ...
+
+    def get_rank(self, name: str) -> int:
+        """Returns the rank (number of dimensions) of tensor *name*.
+
+        :param name: tensor name
+        :return: non-negative integer rank
+        """
+        ...
+
+    def set_rank(self, name: str, value: int) -> None:
+        """Records the rank for tensor *name*.
+
+        :param name: tensor name
+        :param value: rank (number of dimensions)
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Device helpers
+    # ------------------------------------------------------------------
+
+    def has_device(self, name: str) -> bool:
+        """Returns ``True`` when the device of tensor *name* is known.
+
+        :param name: tensor name
+        """
+        ...
+
+    def get_device(self, name: str) -> int:
+        """Returns the device index for tensor *name*.
+
+        The convention is ``-1`` for CPU and a non-negative index for a
+        CUDA device.
+
+        :param name: tensor name
+        :return: device index
+        """
+        ...
+
+    def set_device(
+        self, name: str, device: Any, exc: bool = True, keep_this_device: bool = False
+    ) -> None:
+        """Records the device for tensor *name*.
+
+        :param name: tensor name
+        :param device: device identifier — an :class:`int` index, a
+            :class:`torch.device`, or a constant name
+        :param exc: raise an exception on inconsistency
+        :param keep_this_device: overwrite an already-known device
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Extended type / shape knowledge
+    # ------------------------------------------------------------------
+
+    def get_type_known(self, name: str, exc: bool = False) -> Optional[int]:
+        """Returns the ONNX element type inferred by torch for *name*, or
+        ``None`` when unavailable.
+
+        :param name: tensor name
+        :param exc: raise an exception when the value is malformed
+        :return: ONNX element type integer or ``None``
+        """
+        ...
+
+    def set_shapes_types(self, name: Any, where: str, value: Any) -> None:
+        """Records a torch-side ``(where, value)`` annotation for *name*.
+
+        The annotation is later consulted by :meth:`get_type_known` to
+        resolve type mismatches between ONNX and torch.
+
+        :param name: tensor name (or a :class:`torch.fx.Node`)
+        :param where: source label (e.g. ``"run_node"``)
+        :param value: annotation value (a tuple describing type / shape)
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Tensor-sequence support
+    # ------------------------------------------------------------------
+
+    def is_sequence(self, name: str) -> bool:
+        """Returns ``True`` when *name* has been registered as a tensor
+        sequence.
+
+        :param name: tensor name
+        """
+        ...
+
+    def get_sequence(self, name: str) -> Dict[str, Any]:
+        """Returns sequence metadata for *name*.
+
+        :param name: tensor name
+        :return: dictionary with keys such as ``"dtype"``, ``"shapes"``,
+            ``"ranks"``
+        """
+        ...
+
+    def set_sequence(
+        self,
+        name: str,
+        dtype: Any,
+        shapes: Optional[Any] = None,
+        ranks: Optional[Any] = None,
+        unknown: bool = False,
+    ) -> None:
+        """Marks *name* as a tensor sequence.
+
+        :param name: tensor name
+        :param dtype: element type (ONNX integer or tuple of integers)
+        :param shapes: optional tuple of per-element shapes
+        :param ranks: optional tuple of per-element ranks
+        :param unknown: set ``True`` when sequence contents are unknown
+        """
+        ...
+
+    def make_tensor_sequence_input(
+        self, name: str, elem_type: Any, shape: Any, marker: str = ""
+    ) -> str:
+        """Registers a tensor-sequence graph input and returns its name.
+
+        :param name: desired input name
+        :param elem_type: ONNX element type for the sequence elements
+        :param shape: shape of each element
+        :param marker: optional label for debugging / provenance
+        :return: the registered input name
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Dynamic-shape helpers
+    # ------------------------------------------------------------------
+
+    def is_dynamic_shape(
+        self,
+        shape: Any,
+        verify: bool = True,
+        allow_none: bool = False,
+        allow_new_dynamic_dimension: bool = False,
+    ) -> bool:
+        """Returns ``True`` when *shape* contains at least one dynamic
+        (non-integer) dimension.
+
+        :param shape: shape tuple to check
+        :param verify: verify that symbolic names are registered
+        :param allow_none: treat ``None`` entries as dynamic
+        :param allow_new_dynamic_dimension: allow unregistered symbolic dims
+        """
+        ...
+
+    def get_input_dynamic_shape(
+        self,
+        name: Optional[str],
+        input_index: int,
+        example_shape: Any,
+        dynamic_shapes: Optional[Any] = None,
+        example_value: Optional[Any] = None,
+    ) -> Any:
+        """Returns the dynamic shape specification for a graph input.
+
+        :param name: input name
+        :param input_index: positional index of the input
+        :param example_shape: concrete shape of an example input
+        :param dynamic_shapes: override the builder's ``dynamic_shapes``
+        :param example_value: one example tensor value
+        :return: shape tuple (mixing ``int`` for static dimensions and
+            ``str`` for dynamic ones)
+        """
+        ...
+
+    def get_is_dimension(
+        self,
+        name: str,
+        elem_type: Optional[int] = None,
+        shape: Optional[Any] = None,
+        n_outputs: Optional[int] = None,
+        exc: bool = True,
+    ) -> bool:
+        """Returns ``True`` when *name* represents a scalar dynamic-dimension
+        value (e.g. the result of ``aten.sym_size``).
+
+        :param name: tensor name
+        :param elem_type: expected ONNX element type hint
+        :param shape: expected shape hint
+        :param n_outputs: number of outputs produced by the enclosing node
+        :param exc: raise when ambiguous
+        """
+        ...
+
+    def verify_dynamic_shape(
+        self, shape: Any, name: Optional[str] = None, add: bool = True
+    ) -> Optional[Any]:
+        """Normalises *shape*, replacing symbolic dimensions with their
+        registered string names.
+
+        :param shape: raw shape (may contain :class:`torch.SymInt`)
+        :param name: tensor name for context messages
+        :param add: register newly encountered symbolic dims automatically
+        :return: normalised shape tuple or ``None`` if *shape* is ``None``
+        """
+        ...
+
+    def register_dynamic_objects_from_shape(self, shape: Any) -> None:
+        """Registers all dynamic-dimension objects found in *shape*.
+
+        :param shape: shape tuple potentially containing symbolic dimensions
+        """
+        ...
+
+    def make_dynamic_object(
+        self,
+        name: str,
+        value: Any,
+        shape_as_input: bool = False,
+        input_name: Optional[str] = None,
+        axis: Optional[int] = None,
+    ) -> Optional[str]:
+        """Creates and registers a dynamic dimension object.
+
+        :param name: name for the dynamic dimension
+        :param value: :class:`torch.SymInt` or similar symbolic value
+        :param shape_as_input: add the dimension as a scalar graph input
+        :param input_name: the tensor input this dimension originates from
+        :param axis: the axis of *input_name* this dimension corresponds to
+        :return: the registered name, or ``None``
+        """
+        ...
+
+    def add_dynamic_object(
+        self,
+        key: str,
+        value: Any,
+        name: Optional[str] = None,
+        dim: Optional[int] = None,
+        parse: bool = False,
+        check_tokens: bool = True,
+    ) -> None:
+        """Registers *value* as the dynamic dimension named *key*.
+
+        :param key: symbolic dimension name
+        :param value: :class:`torch.SymInt`, :class:`int`, or similar
+        :param name: tensor input this dimension originates from
+        :param dim: axis of *name* this dimension corresponds to
+        :param parse: also register sub-expressions of *value*
+        :param check_tokens: verify sub-tokens are registered first
+        """
+        ...
+
+    def make_new_dynamic_shape(self, rank: int, prefix: str = "d") -> Tuple[Any, ...]:
+        """Creates a dynamic shape of the given *rank* with fresh symbolic
+        dimensions.
+
+        :param rank: number of dimensions
+        :param prefix: prefix for the generated dimension names
+        :return: tuple of :class:`torch.SymInt` objects
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Sub-builder and local-function support
+    # ------------------------------------------------------------------
+
+    def make_nodes(
+        self,
+        builder: Any,
+        input_names: List[str],
+        output_names: List[str],
+        prefix: str = "",
+        function_options: Optional[Any] = None,
+        optimize: bool = False,
+        force_rename_with_prefix: Optional[str] = None,
+    ) -> Any:
+        """Appends all nodes and initializers from *builder* into this
+        graph.
+
+        :param builder: source :class:`GraphBuilder`
+        :param input_names: names of the inputs that correspond to
+            *builder*'s inputs in the current graph
+        :param output_names: desired output names in the current graph
+        :param prefix: prefix applied to every result name from *builder*
+            when *function_options* is ``None``
+        :param function_options: when set the sub-graph is exported as a
+            local ONNX function
+        :param optimize: run optimizations on the appended sub-graph
+        :param force_rename_with_prefix: force this prefix regardless of
+            *function_options*
+        :return: output name(s) in the current graph
+        """
+        ...
+
+    def make_local_function(
+        self,
+        builder: Any,
+        function_options: Any,
+        optimize: bool = False,
+        metadata_props: Optional[Dict[str, str]] = None,
+    ) -> Tuple[List[str], Tuple[str, str]]:
+        """Converts *builder* into a local ONNX function and registers it.
+
+        :param builder: source :class:`GraphBuilder` for the function body
+        :param function_options: controls naming, inlining, and weight
+            handling
+        :param optimize: run optimizations on the function body
+        :param metadata_props: extra key/value metadata for the function
+        :return: ``(added_initializers, (domain, name))``
+        """
+        ...
+
+    def make_subset_builder(
+        self, input_names: List[str], name: str, domain: str, add_local_functions: bool = False
+    ) -> Any:
+        """Creates a reduced copy of this builder that covers only the
+        tensors reachable from *input_names*.
+
+        :param input_names: graph inputs for the subset
+        :param name: local-function name for the subset
+        :param domain: local-function domain for the subset
+        :param add_local_functions: copy local functions into the subset
+        :return: new :class:`GraphBuilder` instance
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Miscellaneous methods
+    # ------------------------------------------------------------------
+
+    def add_stat(self, kind: str, name: str) -> None:
+        """Records a conversion statistic (no-op in most implementations).
+
+        :param kind: statistic category
+        :param name: statistic name
+        """
+        ...
+
+    def pretty_text(self, add_fx_graph: bool = False, recursive: bool = True) -> str:
+        """Returns a human-readable multi-line description of the graph.
+
+        :param add_fx_graph: include the original FX graph text
+        :param recursive: include local functions
+        :return: formatted string
+        """
+        ...
+
+    def register_users(self, name: str, users: Iterable[str]) -> None:
+        """Registers the consumers of tensor *name* (used for validation).
+
+        :param name: producer tensor name
+        :param users: iterable of consumer tensor names
+        """
+        ...
+
+    def extract_input_names_from_args(self, args: Any) -> List[str]:
+        """Extracts all known tensor names from a (possibly nested) args
+        structure.
+
+        :param args: flat or nested sequence of values; strings that are
+            known graph names are collected
+        :return: deduplicated list of input tensor names
+        """
+        ...
+
+
+@runtime_checkable
+class GraphBuilderPatternOptimizationProtocol(Protocol):
+    """Protocol describing the expected API of the graph pattern optimizer.
+
+    Any class that implements this protocol can be passed as the *g* argument
+    to :meth:`~yobx.xoptim.PatternOptimization.match` and related methods.
+    The concrete implementation is
+    :class:`yobx.xoptim.GraphBuilderPatternOptimization`.
+
+    The protocol covers all attributes and methods that pattern authors
+    typically call on the optimizer object inside their ``match()``
+    implementations.
+    """
+
+    # ------------------------------------------------------------------
+    # Instance attributes surfaced as Protocol members
+    # ------------------------------------------------------------------
+
+    @property
+    def verbose(self) -> int:
+        """Current verbosity level."""
+        ...
+
+    @property
+    def processor(self) -> str:
+        """Target processor(s), e.g. ``"CPU"`` or ``"CPU,CUDA"``."""
+        ...
+
+    @property
+    def builder(self) -> Any:
+        """The underlying :class:`~yobx.xbuilder.GraphBuilder` instance."""
+        ...
+
+    # ------------------------------------------------------------------
+    # Graph-level properties
+    # ------------------------------------------------------------------
+
+    @property
+    def main_opset(self) -> int:
+        """Opset version for the main (``""``/ONNX) domain.
+
+        :return: integer opset version
+        """
+        ...
+
+    @property
+    def opsets(self) -> Dict[str, int]:
+        """Mapping from domain name to opset version.
+
+        :return: dict of domain → opset version
+        """
+        ...
+
+    @property
+    def nodes(self) -> List[Any]:
+        """Ordered list of :class:`~onnx.NodeProto` objects in the graph.
+
+        :return: list of nodes
+        """
+        ...
+
+    @property
+    def input_names(self) -> List[str]:
+        """Names of the graph inputs.
+
+        :return: list of input names
+        """
+        ...
+
+    @property
+    def output_names(self) -> List[str]:
+        """Names of the graph outputs.
+
+        :return: list of output names
+        """
+        ...
+
+    @property
+    def inputs(self) -> List[Any]:
+        """Graph input value infos.
+
+        :return: list of :class:`~onnx.ValueInfoProto` objects
+        """
+        ...
+
+    @property
+    def outputs(self) -> List[Any]:
+        """Graph output value infos.
+
+        :return: list of :class:`~onnx.ValueInfoProto` objects
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Node navigation
+    # ------------------------------------------------------------------
+
+    def iter_nodes(self) -> Iterator[Any]:
+        """Iterates over all nodes in the graph.
+
+        :return: iterator of :class:`~onnx.NodeProto`
+        """
+        ...
+
+    def node_before(self, name: str) -> Optional[Any]:
+        """Returns the node that produces output *name*, or ``None``.
+
+        :param name: result name
+        :return: :class:`~onnx.NodeProto` or ``None`` if *name* is an input
+            or initializer
+        """
+        ...
+
+    def next_node(self, name: str) -> Any:
+        """Returns the unique consumer of *name*.  Raises if there is not
+        exactly one consumer.
+
+        :param name: result name
+        :return: :class:`~onnx.NodeProto`
+        """
+        ...
+
+    def next_nodes(self, name: str) -> List[Any]:
+        """Returns all nodes that consume *name*.
+
+        :param name: result name
+        :return: list of :class:`~onnx.NodeProto`
+        """
+        ...
+
+    def get_position(self, node: Any) -> int:
+        """Returns the position (index) of *node* in the graph node list.
+
+        :param node: a :class:`~onnx.NodeProto`
+        :return: zero-based index
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Liveness / usage queries
+    # ------------------------------------------------------------------
+
+    def is_used(self, name: str) -> bool:
+        """Returns ``True`` when *name* is consumed by any node or is a
+        graph output.
+
+        :param name: result name
+        """
+        ...
+
+    def is_used_more_than_once(self, name: str) -> bool:
+        """Returns ``True`` when *name* has more than one consumer, is a
+        graph output, or is referenced by a sub-graph.
+
+        :param name: result name
+        """
+        ...
+
+    def is_used_only_by(self, name: str, *nodes: Any) -> bool:
+        """Returns ``True`` when *name* is consumed exclusively by the
+        given nodes.
+
+        :param name: result name
+        :param nodes: the only permitted consumers
+        """
+        ...
+
+    def is_output(self, name: str) -> bool:
+        """Returns ``True`` when *name* is a graph output.
+
+        :param name: result name
+        """
+        ...
+
+    def is_used_by_subgraph(self, name: str) -> bool:
+        """Returns ``True`` when *name* is used inside a sub-graph.
+
+        :param name: result name
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Constant queries
+    # ------------------------------------------------------------------
+
+    def is_constant(self, name: str) -> bool:
+        """Returns ``True`` when *name* is a known constant (initializer
+        or the output of a constant-foldable node chain).
+
+        :param name: result name
+        """
+        ...
+
+    def is_constant_scalar(
+        self, name: str, value: Optional[Any] = None, broadcast: bool = False
+    ) -> bool:
+        """Returns ``True`` when *name* is a scalar constant.
+
+        :param name: result name
+        :param value: if not ``None``, also check that the scalar equals
+            this value
+        :param broadcast: treat shapes ``(1,)``, ``(1,1)``, … as scalar
+        """
+        ...
+
+    def get_constant_shape(self, name: str, exc: bool = True) -> Optional[Tuple[int, ...]]:
+        """Returns the shape of constant *name*.
+
+        :param name: result name
+        :param exc: raise an exception if the shape cannot be determined
+        :return: shape tuple, or ``None`` when *exc* is ``False``
+        """
+        ...
+
+    def get_computed_constant(self, name: str, statistics: Optional[List[str]] = None) -> Any:
+        """Returns the evaluated value of constant *name*.
+
+        :param name: result name
+        :param statistics: optional list of summary statistics to compute
+            (``"min"``, ``"max"``); when given, a list of values is returned
+        :return: :class:`numpy.ndarray` or a list of statistics
+        """
+        ...
+
+    def get_constant_scalar(self, name: str, broadcast: bool = False) -> Union[int, float]:
+        """Returns the scalar value of constant *name*.
+
+        :param name: result name
+        :param broadcast: accept shapes such as ``(1,)`` or ``(1,1)``
+        :return: ``int``, ``float``, or ``complex``
+        """
+        ...
+
+    def get_constant_or_attribute(
+        self, node: Any, attribute: str, input_index: int, cvt: Optional[Callable] = None
+    ) -> Any:
+        """Returns the value of an operator attribute or input depending on
+        the opset version.  Some attributes became inputs in newer opsets.
+
+        :param node: :class:`~onnx.NodeProto`
+        :param attribute: attribute name (used in older opsets)
+        :param input_index: input index (used in newer opsets)
+        :param cvt: optional conversion callable applied to the result
+        :return: attribute or constant value
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Type / shape queries
+    # ------------------------------------------------------------------
+
+    def has_type(self, name: str) -> bool:
+        """Returns ``True`` when the element type of *name* is known.
+
+        :param name: result name
+        """
+        ...
+
+    def get_type(self, name: str) -> int:
+        """Returns the ONNX element type integer for *name*.
+
+        :param name: result name
+        :return: element type (e.g. ``TensorProto.FLOAT``)
+        """
+        ...
+
+    def has_rank(self, name: str) -> bool:
+        """Returns ``True`` when the rank of *name* is known.
+
+        :param name: result name
+        """
+        ...
+
+    def get_rank(self, name: str) -> int:
+        """Returns the rank of *name*.
+
+        :param name: result name
+        :return: number of dimensions
+        """
+        ...
+
+    def has_shape(self, name: str) -> bool:
+        """Returns ``True`` when the full shape of *name* is known.
+
+        :param name: result name
+        """
+        ...
+
+    def get_shape(self, name: str) -> Tuple[Union[int, str], ...]:
+        """Returns the shape of *name*.
+
+        :param name: result name
+        :return: tuple where each element is an ``int`` or a symbolic
+            dimension string
+        """
+        ...
+
+    def same_shape(self, a: str, b: str) -> bool:
+        """Returns ``True`` when *a* and *b* have the same shape,
+        taking registered constraints into account.
+
+        :param a: first result name
+        :param b: second result name
+        """
+        ...
+
+    def get_shape_renamed(self, name: str) -> Tuple[Union[int, str], ...]:
+        """Returns the shape of *name* using user-visible dimension names.
+
+        :param name: result name
+        :return: shape tuple with user dimension names
+        """
+        ...
+
+    def try_infer_type(self, name: str, exc: bool = False) -> int:
+        """Tries to infer the element type of *name*, propagating through
+        the graph if necessary.
+
+        :param name: result name
+        :param exc: raise an exception when the type cannot be determined
+        :return: element type integer, or ``0`` when unknown
+        """
+        ...
+
+    def try_infer_shape(
+        self, name: str, exc: bool = False
+    ) -> Optional[Tuple[Union[int, str], ...]]:
+        """Tries to infer the shape of *name*.
+
+        :param name: result name
+        :param exc: raise an exception when the shape cannot be determined
+        :return: shape tuple or ``None``
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Attribute helpers
+    # ------------------------------------------------------------------
+
+    def get_attribute(self, node: Any, att_name: str, exc: bool = True) -> Optional[Any]:
+        """Returns the :class:`~onnx.AttributeProto` named *att_name* on
+        *node*.
+
+        :param node: :class:`~onnx.NodeProto`
+        :param att_name: attribute name
+        :param exc: raise an exception if the attribute is missing
+        :return: :class:`~onnx.AttributeProto` or ``None``
+        """
+        ...
+
+    def get_attribute_with_default(self, node: Any, name: str, default_value: Any) -> Any:
+        """Returns the value of attribute *name* on *node*, or
+        *default_value* if the attribute is absent.
+
+        :param node: :class:`~onnx.NodeProto`
+        :param name: attribute name
+        :param default_value: fallback value
+        :return: attribute value or *default_value*
+        """
+        ...
+
+    def get_attributes_with_default(self, node: Any, **default_values: Any) -> Dict[str, Any]:
+        """Returns a dict of attribute values for *node*, substituting
+        *default_values* for any missing attributes.
+
+        :param node: :class:`~onnx.NodeProto`
+        :param default_values: keyword arguments mapping attribute names to
+            their default values
+        :return: dict of attribute name → value
+        """
+        ...
+
+    def get_axis(self, node: Any, default_axis: Optional[int] = None) -> int:
+        """Returns the ``axis`` attribute of *node*.
+
+        :param node: :class:`~onnx.NodeProto`
+        :param default_axis: default value when the attribute is absent
+        :return: axis integer
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Processor / constraint helpers
+    # ------------------------------------------------------------------
+
+    def has_processor(self, processor: str) -> bool:
+        """Returns ``True`` when *processor* is in the active processor list.
+
+        :param processor: processor name, e.g. ``"CUDA"``
+        """
+        ...
+
+    def get_registered_constraints(self) -> Dict[str, Set[Union[str, int]]]:
+        """Returns the shape constraints registered on the builder.
+
+        :return: mapping from constraint name to set of allowed values
+        """
+        ...
+
+    def has_exact_same_constant_in_context(self, name: str) -> Optional[bool]:
+        """Checks whether an identical constant already exists in the graph.
+
+        :param name: constant name to look up
+        :return: ``True``/``False`` when known, ``None`` otherwise
+        """
+        ...
+
+    def do_not_turn_constant_initializers_maybe_because_of_showing(self, name: str) -> bool:
+        """Returns ``True`` when the initializer for *name* must not be
+        folded into a ``Constant`` node (e.g. because it is displayed).
+
+        :param name: initializer name
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Node / initializer creation
+    # ------------------------------------------------------------------
+
+    def make_initializer(
+        self,
+        name: str,
+        value: Any,
+        external: bool = False,
+        msg: str = "",
+        source: Optional[str] = None,
+        give_unique: bool = True,
+    ) -> str:
+        """Adds a constant initializer and returns its (possibly
+        auto-generated) name.
+
+        :param name: desired name (may be empty for auto-naming)
+        :param value: :class:`numpy.ndarray` or
+            :class:`~onnx.TensorProto` value
+        :param external: store as external data
+        :param msg: optional debug message
+        :param source: optional source tag for debugging
+        :param give_unique: generate a unique name when *name* is already
+            taken
+        :return: the registered name
+        """
+        ...
+
+    def unique_name(self, prefix: str) -> str:
+        """Returns a name derived from *prefix* that has not been used yet.
+
+        :param prefix: name prefix
+        :return: unique name
+        """
+        ...
+
+    def make_node(
+        self,
+        op_type: str,
+        inputs: Union[str, List[str]],
+        outputs: Union[int, List[str], str] = 1,
+        domain: str = "",
+        attributes: Optional[List[Any]] = None,
+        name: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Creates an ONNX node (without adding it to the graph) and
+        returns the :class:`~onnx.NodeProto`.
+
+        :param op_type: operator type
+        :param inputs: input name(s)
+        :param outputs: number of outputs (``int``), single output name
+            (``str``), or list of output names
+        :param domain: operator domain
+        :param attributes: list of :class:`~onnx.AttributeProto` objects
+        :param name: node name
+        :param kwargs: operator attributes as Python primitives
+        :return: :class:`~onnx.NodeProto`
+        """
+        ...
+
+    def make_node_check_opset(
+        self,
+        op_type: str,
+        inputs: Union[str, List[str]],
+        outputs: Union[int, List[str], str] = 1,
+        domain: str = "",
+        attributes: Optional[List[Any]] = None,
+        name: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Like :meth:`make_node` but adapts certain operators for the
+        active opset (e.g. ``Squeeze``/``Unsqueeze`` axis handling changed
+        between opset 11 and 13).
+
+        :param op_type: operator type
+        :param inputs: input name(s)
+        :param outputs: number of outputs (``int``), single output name
+            (``str``), or list of output names
+        :param domain: operator domain (must be ``""`` for the main domain)
+        :param attributes: list of :class:`~onnx.AttributeProto` objects
+        :param name: node name
+        :param kwargs: operator attributes as Python primitives
+        :return: :class:`~onnx.NodeProto`
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Miscellaneous
+    # ------------------------------------------------------------------
+
+    def pretty_text(self, add_fx_graph: bool = False, recursive: bool = True) -> str:
+        """Returns a human-readable text rendering of the graph.
+
+        :param add_fx_graph: include the FX graph representation when
+            available
+        :param recursive: recurse into sub-graphs
+        :return: multi-line string
+        """
+        ...

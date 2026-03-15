@@ -375,10 +375,7 @@ class TestGraphBuilderTorchProtocol(ExtTestCase):
         # its MRO.  We cannot use issubclass() for runtime-checkable protocols
         # that declare data attributes (Python raises TypeError), so we inspect
         # the MRO directly.
-        self.assertIn(
-            GraphBuilderExtendedProtocol,
-            GraphBuilderTorchProtocol.__mro__,
-        )
+        self.assertIn(GraphBuilderExtendedProtocol, GraphBuilderTorchProtocol.__mro__)
 
     def test_protocol_has_torch_attrs(self):
         for name in self.TORCH_ONLY_ATTRS:
@@ -391,10 +388,7 @@ class TestGraphBuilderTorchProtocol(ExtTestCase):
     def test_graphbuilder_has_torch_attrs(self):
         g = GraphBuilder(18, ir_version=9)
         for name in self.TORCH_ONLY_ATTRS:
-            self.assertTrue(
-                hasattr(g, name),
-                msg=f"GraphBuilder missing attribute '{name}'",
-            )
+            self.assertTrue(hasattr(g, name), msg=f"GraphBuilder missing attribute '{name}'")
 
     def test_graphbuilder_is_instance_torch_protocol(self):
         g = GraphBuilder(18, ir_version=9)
