@@ -7,3 +7,4 @@ yobx.sklearn.lightgbm
 
     lgbm
     lgbm_model
+    lgbm_ranker
