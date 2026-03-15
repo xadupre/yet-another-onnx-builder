@@ -6,6 +6,7 @@ def register():
         max_abs_scaler,
         min_max_scaler,
         one_hot_encoder,
+        ordinal_encoder,
         polynomial_features,
         power_transformer,
         quantile_transformer,

@@ -33,7 +33,7 @@ jobs:
       - name: Install nightly version
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Install dependencies
-        run: pip install -e ".[category_encoders,docs,lightgbm,sklearn,spox,tensorflow,torch,xgboost]"
+        run: pip install -e ".[category_encoders,docs,lightgbm,sklearn,spox,tensorflow,torch,transformers,xgboost]"
       - name: pip freeze
         run: pip freeze
       - name: Build documentation

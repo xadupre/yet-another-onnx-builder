@@ -6,16 +6,22 @@ Supported Converters
 
 The following :epkg:`scikit-learn` estimators and transformers have a
 registered converter in :mod:`yobx.sklearn`.  The list is generated
-programmatically from the live converter registry.
+programmatically from the live converter registry.  External-library
+estimators from :epkg:`lightgbm`, :epkg:`xgboost`, and
+:epkg:`category_encoders` are listed when the corresponding optional
+dependencies are installed; see :ref:`l-design-sklearn-like-converters`
+for architecture details.
 
 Coverage Table
 ==============
 
 The table below lists all :epkg:`scikit-learn` estimators and transformers,
 showing which ones have a native converter in :mod:`yobx.sklearn` among those
-which can (*predictable*).
+which can (*predictable*).  External-library estimators are appended at the
+end.
 
-* **yobx** — ✓ if a converter is registered in :mod:`yobx.sklearn`.
+scikit-learn
+------------
 
 .. runpython::
     :showcode:
@@ -26,37 +32,46 @@ which can (*predictable*).
 
     register_sklearn_converters()
 
-    rows = get_sklearn_estimator_coverage()
-    rows = sorted(rows, key=lambda x: (x["category"], x["name"]))
+    print(get_sklearn_estimator_coverage(libraries=("sklearn",), rst=True))
 
-    # Header
-    print(".. list-table::")
-    print("    :header-rows: 1")
-    print()
-    print("    * - category")
-    print("      - estimator")
-    print("      - predictable")
-    print("      - yobx")
-    print("      - converter")
+category_encoders
+-----------------
 
-    n_possible = 0
-    n_done = 0
-    for row in rows:
-        cat = row["category"]
-        fct = row["yobx"]
-        yobx_mark = "✓" if fct else ""
-        predictable = "✓" if row["predictable"] else ""
-        cls = f":class:`{row['name']} <{row['module']}.{row['name']}>`"
-        cvt = f":func:`{fct.__name__} <{fct.__module__}.{fct.__name__}>`" if fct else ""
-        print(f"    * - {cat}")
-        print(f"      - {cls}")
-        print(f"      - {predictable}")
-        print(f"      - {yobx_mark}")
-        print(f"      - {cvt}")
-        if yobx_mark:
-            n_done += 1
-        if predictable:
-            n_possible += 1
-    print()
-    print()
-    print(f"**Coverage**: {n_done}/{n_possible} ~ {n_done/n_possible * 100:1.1f}%")
+.. runpython::
+    :showcode:
+    :rst:
+
+    from yobx.sklearn import register_sklearn_converters
+    from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+    register_sklearn_converters()
+
+    print(get_sklearn_estimator_coverage(libraries=("category_encoders",), rst=True))
+
+lightgbm
+--------
+
+.. runpython::
+    :showcode:
+    :rst:
+
+    from yobx.sklearn import register_sklearn_converters
+    from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+    register_sklearn_converters()
+
+    print(get_sklearn_estimator_coverage(libraries=("lightgbm",), rst=True))
+
+xgboost
+-------
+
+.. runpython::
+    :showcode:
+    :rst:
+
+    from yobx.sklearn import register_sklearn_converters
+    from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+    register_sklearn_converters()
+
+    print(get_sklearn_estimator_coverage(libraries=("xgboost",), rst=True))
