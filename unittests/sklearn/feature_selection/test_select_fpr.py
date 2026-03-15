@@ -65,10 +65,7 @@ class TestSelectFpr(ExtTestCase):
 
         X, y = self._make_data(np.float32)
         pipe = Pipeline(
-            [
-                ("sel", SelectFpr(score_func=f_classif, alpha=0.5)),
-                ("clf", LogisticRegression()),
-            ]
+            [("sel", SelectFpr(score_func=f_classif, alpha=0.5)), ("clf", LogisticRegression())]
         )
         pipe.fit(X, y)
 
@@ -99,10 +96,7 @@ class TestSelectFpr(ExtTestCase):
 
         X, y = self._make_data(np.float64)
         pipe = Pipeline(
-            [
-                ("sel", SelectFpr(score_func=f_classif, alpha=0.5)),
-                ("clf", LogisticRegression()),
-            ]
+            [("sel", SelectFpr(score_func=f_classif, alpha=0.5)), ("clf", LogisticRegression())]
         )
         pipe.fit(X, y)
 
