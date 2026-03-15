@@ -24,6 +24,7 @@ yobx.sklearn
     discriminant_analysis/index
     dummy/index
     ensemble/index
+    feature_extraction/index
     feature_selection/index
     gaussian_process/index
     impute/index
