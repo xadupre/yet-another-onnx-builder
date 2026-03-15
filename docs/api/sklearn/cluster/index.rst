@@ -10,3 +10,4 @@ yobx.sklearn.cluster
     bisecting_kmeans
     kmeans
     mean_shift
+    mini_batch_kmeans
