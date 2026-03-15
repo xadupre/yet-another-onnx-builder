@@ -1,7 +1,8 @@
 """
 ONNX converters for :class:`xgboost.XGBClassifier`,
 :class:`xgboost.XGBRFClassifier`,
-:class:`xgboost.XGBRegressor`, and :class:`xgboost.XGBRFRegressor`.
+:class:`xgboost.XGBRegressor`, :class:`xgboost.XGBRFRegressor`,
+and :class:`xgboost.XGBRanker`.
 
 The trees are extracted from the fitted booster via
 ``booster.get_dump(dump_format='json')`` and encoded using the ONNX ML
@@ -41,7 +42,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import onnx
 import onnx.helper as oh
-from xgboost import XGBRegressor, XGBClassifier, XGBRFRegressor, XGBRFClassifier
+from xgboost import XGBRegressor, XGBClassifier, XGBRFRegressor, XGBRFClassifier, XGBRanker
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
@@ -71,6 +72,14 @@ _REG_SIGMOID_OBJECTIVES = frozenset({"reg:logistic"})
 #: Regression objectives that apply ``exp`` as the output transform
 #: (log-link objectives).
 _REG_EXP_OBJECTIVES = frozenset({"count:poisson", "reg:gamma", "reg:tweedie", "survival:cox"})
+
+# ---------------------------------------------------------------------------
+# Supported ranking objectives (all use the identity link).
+# ---------------------------------------------------------------------------
+
+#: Ranking objectives supported by the XGBRanker converter.
+#: All ranking objectives use the identity link (no output transform).
+_RANK_IDENTITY_OBJECTIVES = frozenset({"rank:pairwise", "rank:ndcg", "rank:map"})
 
 
 # ---------------------------------------------------------------------------
@@ -833,6 +842,77 @@ def sklearn_xgb_regressor(
         raw_scores = g.op.Exp(raw_scores, name=f"{name}_exp")
     # out_transform is None → identity, no node needed.
 
+    cast_result = g.make_node(
+        "Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype
+    )
+    return cast_result
+
+
+# ---------------------------------------------------------------------------
+# XGBRanker converter
+# ---------------------------------------------------------------------------
+
+
+@register_sklearn_converter(XGBRanker)
+def sklearn_xgb_ranker(
+    g: GraphBuilderExtendedProtocol,
+    sts: Dict,
+    outputs: List[str],
+    estimator,
+    X: str,
+    name: str = "xgb_ranker",
+) -> str:
+    """Convert an :class:`xgboost.XGBRanker` to ONNX.
+
+    The raw margin (sum of all tree leaf values) is computed via a
+    ``TreeEnsembleRegressor`` / ``TreeEnsemble`` node.  Ranking objectives
+    always use the identity link, so no output transform is applied.
+
+    Supported objectives: ``rank:pairwise`` (default), ``rank:ndcg``,
+    ``rank:map``.
+
+    :param g: the graph builder to add nodes to
+    :param sts: shapes dict (passed through, not used internally)
+    :param outputs: desired output names ``[scores]``
+    :param estimator: a fitted ``XGBRanker``
+    :param X: input tensor name
+    :param name: prefix for node names added to the graph
+    :return: output tensor name (shape ``[N, 1]``)
+    :raises NotImplementedError: if the model's objective is not supported
+    """
+    booster = estimator.get_booster()
+    objective: str = estimator.objective or "rank:pairwise"
+
+    # Strip any extra parameters (e.g. "rank:pairwise") and validate.
+    base_obj = objective.split()[0]
+    if base_obj not in _RANK_IDENTITY_OBJECTIVES:
+        raise NotImplementedError(
+            f"XGBRanker ONNX converter: objective {objective!r} is not yet supported. "
+            f"Supported objectives: {sorted(_RANK_IDENTITY_OBJECTIVES)}."
+        )
+
+    ml_opset = g.get_opset("ai.onnx.ml")
+    itype = g.get_type(X)
+
+    trees_json = [json.loads(t) for t in booster.get_dump(dump_format="json")]
+    feature_names = booster.feature_names
+    feature_name_to_idx = {fn: i for i, fn in enumerate(feature_names)} if feature_names else None
+
+    tree_out_name = f"{outputs[0]}_tree_out"
+
+    raw_scores = _emit_tree_node(
+        g,
+        X,
+        name,
+        n_targets=1,
+        trees_json=trees_json,
+        feature_name_to_idx=feature_name_to_idx,
+        ml_opset=ml_opset,
+        intermediate_name=tree_out_name,
+        itype=itype,
+    )
+
+    # Normalize dtype — identity link, no transform needed.
     cast_result = g.make_node(
         "Cast", [raw_scores], outputs=outputs, name=f"{name}_cast", to=itype
     )
