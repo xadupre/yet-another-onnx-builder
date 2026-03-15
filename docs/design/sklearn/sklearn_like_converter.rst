@@ -16,7 +16,7 @@ using the same registry-based architecture as the other
 +--------------------------------+-------------------------------------------+
 | :epkg:`xgboost`                | :mod:`yobx.sklearn.xgboost`               |
 +--------------------------------+-------------------------------------------+
-| :epkg:`lightgm`                | :mod:`yobx.sklearn.lightgbm`              |
+| :epkg:`lightgbm`               | :mod:`yobx.sklearn.lightgbm`              |
 +--------------------------------+-------------------------------------------+
 
 Comparison: XGBoost vs LightGBM
