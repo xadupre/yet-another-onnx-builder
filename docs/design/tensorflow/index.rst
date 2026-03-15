@@ -4,6 +4,11 @@
 TensorFlow Export to ONNX
 =========================
 
+.. toctree::
+   :maxdepth: 1
+
+   supported_ops
+
 :func:`yobx.tensorflow.to_onnx` converts a :epkg:`TensorFlow`/:epkg:`Keras`
 model into an :class:`onnx.ModelProto`.  The implementation is a
 **proof-of-concept** that traces the model with
@@ -226,9 +231,3 @@ To extend the built-in op coverage:
         return g.op.ReduceSum(
             op.inputs[0].name, axes, keepdims=keepdims, outputs=outputs, name=op.name
         )
-
-.. toctree::
-   :maxdepth: 1
-
-   supported_ops
-
