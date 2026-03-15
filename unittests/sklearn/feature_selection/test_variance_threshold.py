@@ -104,10 +104,7 @@ class TestVarianceThreshold(ExtTestCase):
         X = self._make_data(np.float32)
         y = (X[:, 1] > 0).astype(int)
         pipe = Pipeline(
-            [
-                ("sel", VarianceThreshold(threshold=0.1)),
-                ("clf", LogisticRegression()),
-            ]
+            [("sel", VarianceThreshold(threshold=0.1)), ("clf", LogisticRegression())]
         )
         pipe.fit(X, y)
 
@@ -139,10 +136,7 @@ class TestVarianceThreshold(ExtTestCase):
         X = self._make_data(np.float64)
         y = (X[:, 1] > 0).astype(int)
         pipe = Pipeline(
-            [
-                ("sel", VarianceThreshold(threshold=0.1)),
-                ("clf", LogisticRegression()),
-            ]
+            [("sel", VarianceThreshold(threshold=0.1)), ("clf", LogisticRegression())]
         )
         pipe.fit(X, y)
 
