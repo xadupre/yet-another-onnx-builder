@@ -9,7 +9,7 @@ from ..container import ExtendedModelContainer
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from ..xbuilder.function_options import FunctionOptions
-from .register import get_sklearn_converter
+from .register import get_sklearn_converter, sklearn_exportable_methods
 from .sklearn_helper import get_output_names
 
 
@@ -184,7 +184,7 @@ def to_onnx(
     )
     check_is_fitted(
         _fitted_check_target,
-        attributes=["transform", "predict", "mahalanobis", "score_samples"],
+        attributes=sklearn_exportable_methods(),
         all_or_any=any,
         msg=(
             "This %(name)s instance has neither a 'transform', 'predict', "
