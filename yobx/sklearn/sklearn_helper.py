@@ -1,5 +1,6 @@
 from typing import Sequence
-from sklearn.base import BaseEstimator, ClusterMixin, OutlierMixin, is_classifier, is_regressor
+from sklearn.base import BaseEstimator, ClusterMixin, OutlierMixin, TransformerMixin, is_classifier, is_regressor
+from sklearn.cluster import FeatureAgglomeration
 from sklearn.mixture._base import BaseMixture
 from sklearn.pipeline import Pipeline
 
@@ -7,6 +8,19 @@ try:
     from sklearn.base import OutlierMixin
 except ImportError:
     OutlierMixin = None  # type: ignore
+
+
+def _is_cluster_transformer(estimator: BaseEstimator) -> bool:
+    """
+    Returns True for estimators that are ``ClusterMixin`` subclasses whose
+    primary role is *feature transformation* rather than sample clustering.
+
+    Such estimators (e.g. :class:`~sklearn.cluster.FeatureAgglomeration`)
+    produce a single output tensor (the transformed feature matrix) rather
+    than the ``(labels, distances)`` pair produced by regular clustering
+    models.
+    """
+    return isinstance(estimator, (FeatureAgglomeration,))
 
 
 def _classifier_has_predict_proba(estimator: BaseEstimator) -> bool:
@@ -31,6 +45,8 @@ def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
     if is_classifier(estimator):
         return 2 if _classifier_has_predict_proba(estimator) else 1
+    if _is_cluster_transformer(estimator):
+        return 1
     if isinstance(estimator, (ClusterMixin, BaseMixture, OutlierMixin)):
         return 2
     return 1
@@ -41,14 +57,18 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
     if hasattr(estimator, "get_feature_names_out"):
         if isinstance(estimator, Pipeline):
             last_step = estimator.steps[-1][1]
-            if not isinstance(last_step, ClusterMixin) and not is_classifier(last_step):
+            if (
+                not isinstance(last_step, ClusterMixin) or _is_cluster_transformer(last_step)
+            ) and not is_classifier(last_step):
                 try:
                     return post_process_output_names(
                         last_step, list(last_step.get_feature_names_out())
                     )
                 except AttributeError:
                     pass
-        elif not isinstance(estimator, ClusterMixin) and not is_classifier(estimator):
+        elif (
+            not isinstance(estimator, ClusterMixin) or _is_cluster_transformer(estimator)
+        ) and not is_classifier(estimator):
             try:
                 return post_process_output_names(
                     estimator, list(estimator.get_feature_names_out())
@@ -70,7 +90,7 @@ def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
     last = estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
     if OutlierMixin is not None and isinstance(last, OutlierMixin):
         return ["label", "scores"]
-    if isinstance(last, ClusterMixin):
+    if isinstance(last, ClusterMixin) and not _is_cluster_transformer(last):
         return ["label", "distances"]
     if isinstance(last, BaseMixture):
         return ["label", "probabilities"]
