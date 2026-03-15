@@ -37,17 +37,17 @@ jobs:
       - name: Run sklearn tests with no coverage
         if: matrix.sklearn-version != '1.8'
         run: |
-          cd unittest/sklearn
+          cd unittests/sklearn
           python -m unittest discover -v
 
       - name: Run unittest files with coverage, not pytest
         if: matrix.sklearn-version == '1.8'
         run: |
-          cd unittest/sklearn
+          cd unittests/sklearn
           coverage run -m unittest discover -v
           coverage xml
           cp *.xml ../..
-          cd unittest/sklearn
+          cd ../..
 
       - name: Upload coverage to Codecov
         if: matrix.sklearn-version == '1.8'
