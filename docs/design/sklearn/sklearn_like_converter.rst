@@ -5,7 +5,8 @@ External Libraries Based on scikit-learn
 ========================================
 
 :func:`yobx.sklearn.to_onnx` converts fitted estimators to ONNX
-from :epkg:`xgboost`, :epkg:`lightgbm`, :epkg:`category_encoders`
+from :epkg:`xgboost`, :epkg:`lightgbm`, :epkg:`category_encoders`,
+and :epkg:`imbalanced-learn`
 using the same registry-based architecture as the other
 :mod:`yobx.sklearn` converters.
 
@@ -17,6 +18,8 @@ using the same registry-based architecture as the other
 | :epkg:`xgboost`                | :mod:`yobx.sklearn.xgboost`               |
 +--------------------------------+-------------------------------------------+
 | :epkg:`lightgbm`               | :mod:`yobx.sklearn.lightgbm`              |
++--------------------------------+-------------------------------------------+
+| :epkg:`imbalanced-learn`       | :mod:`yobx.sklearn.imblearn`              |
 +--------------------------------+-------------------------------------------+
 
 Comparison: XGBoost vs LightGBM
@@ -41,3 +44,14 @@ Regression transform                Identity / Sigmoid / Exp          Identity /
 Multi-class targets per round       ``n_classes`` trees               ``n_classes`` trees
 Binary classifier raw outputs       1 tree per round (sigmoid)        1 tree per round (sigmoid)
 ==================================  ================================  ==============================
+
+imbalanced-learn
+================
+
+:epkg:`imbalanced-learn` extends :epkg:`scikit-learn` with resampling
+techniques for imbalanced datasets.  Resampling only happens at training
+time, so ONNX inference pipelines skip any step that exposes
+``fit_resample`` and only convert the remaining transformers and the
+final estimator.
+
+See :mod:`yobx.sklearn.imblearn` for the full API reference.
