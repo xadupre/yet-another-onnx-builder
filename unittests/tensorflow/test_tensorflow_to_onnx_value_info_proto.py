@@ -25,9 +25,9 @@ class TestTensorflowToOnnxValueInfoProto(ExtTestCase):
         onx = to_onnx(model, (vip,))
 
         # The graph input must carry the name from the ValueInfoProto.
-        self.assertEqual(onx.graph.input[0].name, "my_input")
+        self.assertEqual(onx.graph.input[0].name, "my_input:0")
 
-        feeds = {"my_input": X}
+        feeds = {"my_input:0": X}
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, feeds)[0]
         expected = model(X).numpy()
@@ -43,9 +43,9 @@ class TestTensorflowToOnnxValueInfoProto(ExtTestCase):
         vip = onnx.helper.make_tensor_value_info("my_input", onnx.TensorProto.FLOAT, [None, 3])
         onx = to_onnx(model, (vip,), input_names=["override_name"])
 
-        self.assertEqual(onx.graph.input[0].name, "override_name")
+        self.assertEqual(onx.graph.input[0].name, "override_name:0")
 
-        feeds = {"override_name": X}
+        feeds = {"override_name:0": X}
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, feeds)[0]
         expected = model(X).numpy()
