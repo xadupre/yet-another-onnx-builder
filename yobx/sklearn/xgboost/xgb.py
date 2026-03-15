@@ -1,6 +1,6 @@
 """
-ONNX converters for :class:`xgboost.XGBClassifier` and
-:class:`xgboost.XGBRegressor`.
+ONNX converters for :class:`xgboost.XGBClassifier`,
+:class:`xgboost.XGBRFClassifier`, and :class:`xgboost.XGBRegressor`.
 
 The trees are extracted from the fitted booster via
 ``booster.get_dump(dump_format='json')`` and encoded using the ONNX ML
@@ -10,8 +10,12 @@ The trees are extracted from the fitted booster via
 
 * **Binary classification** — the raw per-sample margin is passed through
   a sigmoid function and assembled into a ``[N, 2]`` probability matrix.
+  Applies to both :class:`~xgboost.XGBClassifier` and
+  :class:`~xgboost.XGBRFClassifier`.
 * **Multi-class classification** — per-class margins are passed through
   softmax to produce a ``[N, n_classes]`` probability matrix.
+  Applies to both :class:`~xgboost.XGBClassifier` and
+  :class:`~xgboost.XGBRFClassifier`.
 * **Regression** — raw margin output with the XGBoost ``base_score`` bias
   added, followed by an objective-dependent output transform:
 
@@ -40,7 +44,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import onnx
 import onnx.helper as oh
-from xgboost import XGBRegressor, XGBClassifier
+from xgboost import XGBRegressor, XGBClassifier, XGBRFClassifier
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
@@ -135,11 +139,35 @@ def _get_base_score(booster) -> float:
         return 0.5
 
 
+def _get_num_parallel_tree(booster) -> int:
+    """Return the ``num_parallel_tree`` value from an XGBoost booster.
+
+    When ``num_parallel_tree > 1`` (e.g. :class:`~xgboost.XGBRFClassifier`),
+    XGBoost groups trees in blocks of ``num_parallel_tree`` before cycling
+    through targets.  The correct ``target_id`` for tree *i* is then::
+
+        target_id = (tree_idx // num_parallel_tree) % n_targets
+
+    rather than the simpler ``tree_idx % n_targets`` that holds when
+    ``num_parallel_tree == 1``.
+
+    :param booster: fitted :class:`xgboost.Booster`
+    :return: ``num_parallel_tree`` as an integer (1 if not set or on error)
+    """
+    try:
+        cfg = json.loads(booster.save_config())
+        raw = cfg["learner"]["gradient_booster"]["gbtree_model_param"]["num_parallel_tree"]
+        return int(raw)
+    except Exception:
+        return 1
+
+
 def _build_xgb_tree_attrs_legacy(
     trees_json: List[dict],
     n_targets: int,
     feature_name_to_idx: Optional[dict] = None,
     is_classifier: bool = False,
+    num_parallel_tree: int = 1,
 ) -> dict:
     """Build legacy ``TreeEnsembleRegressor`` / ``TreeEnsembleClassifier`` attribute arrays.
 
@@ -151,10 +179,13 @@ def _build_xgb_tree_attrs_legacy(
     the ONNX ``BRANCH_LT`` *true* branch (``x < threshold``), matching
     XGBoost's exact semantics.
 
-    Each tree is assigned ``target_id = tree_idx % n_targets`` so that for
-    multi-class models (``n_targets = n_classes``) tree contributions are
-    routed to the correct class channel; for binary/regression models
-    ``n_targets = 1`` and all trees contribute to target 0.
+    Each tree is assigned ``target_id = (tree_idx // num_parallel_tree) % n_targets``
+    so that for multi-class models (``n_targets = n_classes``) tree contributions
+    are routed to the correct class channel.  When ``num_parallel_tree == 1``
+    (standard boosting) this reduces to ``tree_idx % n_targets``.  For random
+    forest models (``num_parallel_tree > 1``, e.g.
+    :class:`~xgboost.XGBRFClassifier`) XGBoost groups ``num_parallel_tree``
+    consecutive trees per target before advancing to the next target.
 
     :param trees_json: list of root node dicts from
         ``booster.get_dump(dump_format='json')``
@@ -164,6 +195,8 @@ def _build_xgb_tree_attrs_legacy(
     :param is_classifier: when ``True`` the returned dict uses ``class_*``
         attribute keys (for ``TreeEnsembleClassifier``) instead of the
         ``target_*`` keys used by ``TreeEnsembleRegressor``
+    :param num_parallel_tree: number of parallel trees per target per boosting
+        round (default ``1``; set to ``n_estimators`` for random forest models)
     :return: flat attribute dict for the tree ensemble operator
     """
     all_featureids: List[int] = []
@@ -184,7 +217,7 @@ def _build_xgb_tree_attrs_legacy(
     for tree_idx, tree_root in enumerate(trees_json):
         nodes: dict = {}
         _collect_nodes(tree_root, nodes)
-        target_id = tree_idx % n_targets
+        target_id = (tree_idx // num_parallel_tree) % n_targets
 
         for node_id in sorted(nodes.keys()):
             node = nodes[node_id]
@@ -261,7 +294,11 @@ def _build_xgb_tree_attrs_legacy(
 
 
 def _build_xgb_tree_attrs_v5(
-    trees_json: List[dict], n_targets: int, feature_name_to_idx: Optional[dict], itype: int
+    trees_json: List[dict],
+    n_targets: int,
+    feature_name_to_idx: Optional[dict],
+    itype: int,
+    num_parallel_tree: int = 1,
 ) -> dict:
     """Build ``TreeEnsemble`` (``ai.onnx.ml`` opset 5) attribute arrays.
 
@@ -275,6 +312,8 @@ def _build_xgb_tree_attrs_v5(
     :param dtype: numpy float dtype for splits / weights; defaults to
         ``np.float32``
     :param feature_name_to_idx: optional feature-name → index mapping
+    :param num_parallel_tree: number of parallel trees per target per boosting
+        round (default ``1``; set to ``n_estimators`` for random forest models)
     :return: attribute dict for ``TreeEnsemble``
     """
     all_nodes_featureids: List[int] = []
@@ -297,7 +336,7 @@ def _build_xgb_tree_attrs_v5(
     for tree_idx, tree_root in enumerate(trees_json):
         nodes: dict = {}
         _collect_nodes(tree_root, nodes)
-        target_id = tree_idx % n_targets
+        target_id = (tree_idx // num_parallel_tree) % n_targets
 
         # Partition nodes into internal (has children) and leaf (no children).
         internal_nodes = sorted(nid for nid, n in nodes.items() if "leaf" not in n)
@@ -467,6 +506,7 @@ def _emit_tree_node(
     intermediate_name: Optional[str] = None,
     is_classifier: bool = False,
     itype: int = 0,
+    num_parallel_tree: int = 1,
 ) -> str:
     """Emit a ``TreeEnsembleRegressor`` / ``TreeEnsembleClassifier`` / ``TreeEnsemble`` ONNX node.
 
@@ -483,13 +523,19 @@ def _emit_tree_node(
         ``TreeEnsembleClassifier`` node instead of ``TreeEnsembleRegressor``
         and returns the scores (second output)
     :param itype: onnx float dtype for numeric attributes
+    :param num_parallel_tree: number of parallel trees per target per boosting
+        round (default ``1``; set to ``n_estimators`` for random forest models)
     :return: output tensor name (shape ``[N, n_targets]``)
     """
     out_arg = [intermediate_name] if intermediate_name else 1
 
     if ml_opset >= 5:
         attrs = _build_xgb_tree_attrs_v5(
-            trees_json, n_targets=n_targets, feature_name_to_idx=feature_name_to_idx, itype=itype
+            trees_json,
+            n_targets=n_targets,
+            feature_name_to_idx=feature_name_to_idx,
+            itype=itype,
+            num_parallel_tree=num_parallel_tree,
         )
         result = g.make_node(
             "TreeEnsemble",
@@ -507,6 +553,7 @@ def _emit_tree_node(
             n_targets=n_targets,
             feature_name_to_idx=feature_name_to_idx,
             is_classifier=True,
+            num_parallel_tree=num_parallel_tree,
         )
         # The ONNX reference evaluator requires at least 2 class labels.
         # For binary (n_targets=1) we declare [0, 1] so the output scores
@@ -544,7 +591,10 @@ def _emit_tree_node(
         return scores
     else:
         attrs = _build_xgb_tree_attrs_legacy(
-            trees_json, n_targets=n_targets, feature_name_to_idx=feature_name_to_idx
+            trees_json,
+            n_targets=n_targets,
+            feature_name_to_idx=feature_name_to_idx,
+            num_parallel_tree=num_parallel_tree,
         )
         result = g.make_node(
             "TreeEnsembleRegressor",
@@ -591,11 +641,11 @@ def _gather_labels(
 
 
 # ---------------------------------------------------------------------------
-# XGBClassifier converter
+# XGBClassifier / XGBRFClassifier converter
 # ---------------------------------------------------------------------------
 
 
-@register_sklearn_converter(XGBClassifier)
+@register_sklearn_converter((XGBClassifier, XGBRFClassifier))
 def sklearn_xgb_classifier(
     g: GraphBuilderExtendedProtocol,
     sts: Dict,
@@ -604,7 +654,8 @@ def sklearn_xgb_classifier(
     X: str,
     name: str = "xgb_classifier",
 ) -> Tuple[str, str]:
-    """Convert an :class:`xgboost.XGBClassifier` to ONNX.
+    """Convert an :class:`xgboost.XGBClassifier` or
+    :class:`xgboost.XGBRFClassifier` to ONNX.
 
     The converter supports:
 
@@ -620,7 +671,7 @@ def sklearn_xgb_classifier(
     :param g: the graph builder to add nodes to
     :param sts: shapes dict (passed through, not used internally)
     :param outputs: desired output names ``[label, probabilities]``
-    :param estimator: a fitted ``XGBClassifier``
+    :param estimator: a fitted ``XGBClassifier`` or ``XGBRFClassifier``
     :param X: input tensor name
     :param name: prefix for node names added to the graph
     :return: tuple ``(label_result_name, proba_result_name)``
@@ -636,6 +687,7 @@ def sklearn_xgb_classifier(
     trees_json = [json.loads(t) for t in booster.get_dump(dump_format="json")]
     feature_names = booster.feature_names
     feature_name_to_idx = {fn: i for i, fn in enumerate(feature_names)} if feature_names else None
+    num_parallel_tree = _get_num_parallel_tree(booster)
 
     n_targets = 1 if is_binary else n_classes
 
@@ -649,6 +701,7 @@ def sklearn_xgb_classifier(
         ml_opset=ml_opset,
         is_classifier=True,
         itype=itype,
+        num_parallel_tree=num_parallel_tree,
     )
 
     classes = estimator.classes_
