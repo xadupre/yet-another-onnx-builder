@@ -94,7 +94,7 @@ def get_sklearn_estimator_coverage(
             return ".".join(p for p in parts if not p.startswith("_"))
 
         if libraries == "all":
-            libraries = "category_encoders", "lightgbm", "sklearn", "xgboost"
+            libraries = "category_encoders", "imblearn", "lightgbm", "sklearn", "xgboost"
 
         all_pairs = {}
         for lib in libraries:
@@ -112,6 +112,10 @@ def get_sklearn_estimator_coverage(
                 all_pairs.update(dict(all_estimators()))
             elif lib == "category_encoders":
                 from .category_encoders import all_estimators
+
+                all_pairs.update(dict(all_estimators()))
+            elif lib == "imblearn":
+                from .imblearn import all_estimators
 
                 all_pairs.update(dict(all_estimators()))
             else:

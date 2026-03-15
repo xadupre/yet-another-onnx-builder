@@ -5,6 +5,7 @@ def register():
     try:
         import lightgbm
         from . import lgbm
+        from . import lgbm_model
     except ImportError:
         # No lightgbm installed.
         pass

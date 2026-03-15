@@ -1,9 +1,8 @@
-yobx.sklearn.lightgbm
+yobx.sklearn.imblearn
 =====================
 
 .. toctree::
     :maxdepth: 1
     :caption: modules
 
-    lgbm
-    lgbm_model
+    easy_ensemble

@@ -1,6 +1,6 @@
 """
-ONNX converters for :class:`xgboost.XGBClassifier` and
-:class:`xgboost.XGBRegressor`.
+ONNX converters for :class:`xgboost.XGBClassifier`,
+:class:`xgboost.XGBRegressor`, and :class:`xgboost.XGBRFRegressor`.
 
 The trees are extracted from the fitted booster via
 ``booster.get_dump(dump_format='json')`` and encoded using the ONNX ML
@@ -40,7 +40,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import onnx
 import onnx.helper as oh
-from xgboost import XGBRegressor, XGBClassifier
+from xgboost import XGBRegressor, XGBClassifier, XGBRFRegressor
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
@@ -693,7 +693,7 @@ def sklearn_xgb_classifier(
 # ---------------------------------------------------------------------------
 
 
-@register_sklearn_converter(XGBRegressor)
+@register_sklearn_converter((XGBRegressor, XGBRFRegressor))
 def sklearn_xgb_regressor(
     g: GraphBuilderExtendedProtocol,
     sts: Dict,
@@ -702,24 +702,31 @@ def sklearn_xgb_regressor(
     X: str,
     name: str = "xgb_regressor",
 ) -> str:
-    """Convert an :class:`xgboost.XGBRegressor` to ONNX.
+    """Convert an :class:`xgboost.XGBRegressor` or :class:`xgboost.XGBRFRegressor` to ONNX.
 
     The raw margin (sum of all tree leaf values) is computed via a
     ``TreeEnsembleRegressor`` / ``TreeEnsemble`` node, the XGBoost
     ``base_score`` bias is added, and then an objective-dependent output
-    transform is applied to match :meth:`~xgboost.XGBRegressor.predict`:
+    transform is applied to match :meth:`~xgboost.XGBRegressor.predict` /
+    :meth:`~xgboost.XGBRFRegressor.predict`:
 
     * Identity (``reg:squarederror``, ``reg:absoluteerror``, …): no transform.
     * ``reg:logistic``: ``sigmoid(margin)``.
     * ``count:poisson``, ``reg:gamma``, ``reg:tweedie``, ``survival:cox``:
       ``exp(margin)``.
 
+    :class:`~xgboost.XGBRFRegressor` is a random-forest-style variant of
+    :class:`~xgboost.XGBRegressor`.  It sets ``num_parallel_tree`` equal to
+    ``n_estimators`` and performs a single boosting round, so all trees
+    contribute to the same output target and the ONNX representation is
+    identical to the gradient-boosting case.
+
     Unsupported objectives raise :class:`NotImplementedError`.
 
     :param g: the graph builder to add nodes to
     :param sts: shapes dict (passed through, not used internally)
     :param outputs: desired output names ``[predictions]``
-    :param estimator: a fitted ``XGBRegressor``
+    :param estimator: a fitted ``XGBRegressor`` or ``XGBRFRegressor``
     :param X: input tensor name
     :param name: prefix for node names added to the graph
     :return: output tensor name (shape ``[N, 1]``)
