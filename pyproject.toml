@@ -72,11 +72,14 @@ tensorflow = [
 ]
 torch = [
     "accelerate",
-    "huggingface_hub",
     "onnxscript @ git+https://github.com/microsoft/onnxscript.git",
     "optree",
     "sentencepiece",
     "torch>=2.10",
+]
+transformers = [    
+    "huggingface_hub",
+    "scikit-learn",  # one function requires it to compute ROC curve
     "transformers>=4.45",
 ]
 

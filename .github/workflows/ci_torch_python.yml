@@ -54,7 +54,7 @@ jobs:
         run: pip install torch==2.10.0 torchvision torchaudio
 
       - name: Install dependencies
-        run: pip install -e ".[dev,torch]"
+        run: pip install -e ".[dev,torch,transformers]"
 
       - name: pip freeze
         run: pip freeze
