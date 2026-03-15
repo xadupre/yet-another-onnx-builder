@@ -60,6 +60,10 @@ lightgbm = [
 sklearn = [
     "scikit-learn>=1.4",
 ]
+imblearn = [
+    "scikit-learn>=1.4",
+    "imbalanced-learn>=0.11",
+]
 xgboost = [
     "scikit-learn>=1.4",
     "xgboost>=3.0",

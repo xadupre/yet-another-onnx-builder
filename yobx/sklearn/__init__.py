@@ -46,6 +46,7 @@ def register_sklearn_converters():
     from .ensemble import register as register_ensemble
     from .feature_selection import register as register_feature_selection
     from .gaussian_process import register as register_gaussian_process
+    from .imblearn import register as register_imblearn
     from .impute import register as register_impute
     from .isotonic import register as register_isotonic
     from .kernel_approximation import register as register_kernel_approximation
@@ -77,6 +78,7 @@ def register_sklearn_converters():
     register_ensemble()
     register_feature_selection()
     register_gaussian_process()
+    register_imblearn()
     register_impute()
     register_isotonic()
     register_kernel_approximation()
