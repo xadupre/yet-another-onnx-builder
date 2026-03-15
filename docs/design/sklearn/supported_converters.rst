@@ -71,28 +71,25 @@ via :func:`yobx.sklearn.to_onnx` using the same registry mechanism.
 
 See :ref:`l-design-sklearn-like-converters` for architecture details.
 
-.. runpython::
-    :showcode:
-    :rst:
+.. list-table::
+    :header-rows: 1
 
-    from yobx.sklearn.register import get_external_library_converters
-
-    rows = get_external_library_converters()
-    rows = sorted(rows, key=lambda x: (x["library"], x["class_name"]))
-
-    # Group by library for the table
-    print(".. list-table::")
-    print("    :header-rows: 1")
-    print()
-    print("    * - library")
-    print("      - estimator")
-    print("      - converter")
-
-    for row in rows:
-        lib = f":epkg:`{row['library']}`"
-        cls = row["class_name"]
-        cvt = f":func:`{row['converter_name']} <{row['converter_module']}.{row['converter_name']}>`"
-        print(f"    * - {lib}")
-        print(f"      - ``{cls}``")
-        print(f"      - {cvt}")
+    * - library
+      - estimator
+      - converter
+    * - :epkg:`category_encoders`
+      - ``QuantileEncoder``
+      - :func:`category_encoders_quantile_encoder <yobx.sklearn.category_encoders.quantile_encoder.category_encoders_quantile_encoder>`
+    * - :epkg:`lightgbm`
+      - ``LGBMClassifier``
+      - :func:`sklearn_lgbm_classifier <yobx.sklearn.lightgbm.lgbm.sklearn_lgbm_classifier>`
+    * - :epkg:`lightgbm`
+      - ``LGBMRegressor``
+      - :func:`sklearn_lgbm_regressor <yobx.sklearn.lightgbm.lgbm.sklearn_lgbm_regressor>`
+    * - :epkg:`xgboost`
+      - ``XGBClassifier``
+      - :func:`sklearn_xgb_classifier <yobx.sklearn.xgboost.xgb.sklearn_xgb_classifier>`
+    * - :epkg:`xgboost`
+      - ``XGBRegressor``
+      - :func:`sklearn_xgb_regressor <yobx.sklearn.xgboost.xgb.sklearn_xgb_regressor>`
 
