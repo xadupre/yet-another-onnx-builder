@@ -49,6 +49,11 @@ jobs:
           cp *.xml ../..
           cd ../..
 
+      - name: Parity with sklearn-onnx
+        run: |
+          pip install skl2onnx
+          pytest --durations=10 unittests/parity
+
       - name: Upload coverage to Codecov
         if: matrix.sklearn-version == '1.8'
         uses: codecov/codecov-action@v5
