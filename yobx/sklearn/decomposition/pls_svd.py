@@ -1,5 +1,4 @@
 from typing import Dict, List
-import numpy as np
 from sklearn.cross_decomposition import PLSSVD
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
@@ -22,7 +21,7 @@ def sklearn_pls_svd(
 
     .. code-block:: text
 
-        X  ──Sub(_x_mean)──►  centered  ──Div(_x_std)──►  scaled  ──MatMul(x_weights_)──►  x_scores
+        X ──Sub(_x_mean)──► centered ── Div(_x_std) ──► scaled ── MatMul(x_weights_)──► x_scores
 
     The input is centred and scaled, then projected onto the left singular
     vectors ``x_weights_``, giving ``x_scores`` of shape ``(N, n_components)``.
@@ -35,9 +34,7 @@ def sklearn_pls_svd(
     :param name: prefix name for the added nodes
     :return: output tensor name
     """
-    assert isinstance(
-        estimator, PLSSVD
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, PLSSVD), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
