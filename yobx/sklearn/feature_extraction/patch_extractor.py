@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 from sklearn.feature_extraction.image import PatchExtractor
@@ -88,9 +88,9 @@ def sklearn_patch_extractor(
 
     ph, pw = estimator.patch_size
 
-    assert ph <= h and pw <= w, (
-        f"patch_size {estimator.patch_size} must not exceed image size ({h}, {w})."
-    )
+    assert (
+        ph <= h and pw <= w
+    ), f"patch_size {estimator.patch_size} must not exceed image size ({h}, {w})."
 
     patches: List[str] = []
     axes_hw = np.array([1, 2], dtype=np.int64)
@@ -99,13 +99,9 @@ def sklearn_patch_extractor(
         for j in range(w - pw + 1):
             starts = np.array([i, j], dtype=np.int64)
             ends = np.array([i + ph, j + pw], dtype=np.int64)
-            patch = g.op.Slice(
-                X, starts, ends, axes_hw, name=f"{name}_slice_{i}_{j}"
-            )
+            patch = g.op.Slice(X, starts, ends, axes_hw, name=f"{name}_slice_{i}_{j}")
             patch_unsqueezed = g.op.Unsqueeze(
-                patch,
-                np.array([1], dtype=np.int64),
-                name=f"{name}_unsqueeze_{i}_{j}",
+                patch, np.array([1], dtype=np.int64), name=f"{name}_unsqueeze_{i}_{j}"
             )
             patches.append(patch_unsqueezed)
 
