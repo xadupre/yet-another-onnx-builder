@@ -1037,6 +1037,10 @@ class ExtTestCase(unittest.TestCase):
     _warns: List[Tuple[str, int, Warning]] = []
     _todos: List[Tuple[Callable, str]] = []
 
+    def shortDescription(self):
+        # To remove annoying display on the screen every time verbosity is enabled.
+        return None
+
     def unit_test_going(self) -> bool:
         """
         Enables a flag telling the script is running while testing it.
