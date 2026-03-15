@@ -54,10 +54,11 @@ jobs:
         run: pip install torch==2.10.0 torchvision torchaudio
 
       - name: Install dependencies
-        run: pip install -e ".[dev,torch]"
+        run: pip install -e ".[dev,torch,transformers]"
 
       - name: pip freeze
         run: pip freeze
 
       - name: Run tests
-        run: pytest --durations=10 --ignore=unittests/tensorflow --ignore=unittests/sklearn
+        run: pytest --durations=10 --ignore=unittests/tensorflow --ignore=unittests/sklearn --ignore=unittests/parity
+

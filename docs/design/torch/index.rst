@@ -1,6 +1,18 @@
 Torch Export to ONNX
 ====================
 
+.. toctree::
+   :maxdepth: 1
+
+   converter
+   flatten
+   flatten_list
+   patches
+   patches_list
+   input_observer
+   supported_aten_functions
+   case_coverage
+
 This section describes the design of the PyTorch-to-ONNX conversion pipeline.
 The entry point is :func:`yobx.torch.interpreter.to_onnx`, which accepts a
 :class:`torch.nn.Module` and representative inputs and returns an
@@ -26,16 +38,3 @@ internal torch/transformers patches are needed for successful tracing
 (:ref:`l-design-patches`), and how real forward passes can be used to infer
 export arguments and dynamic shapes automatically
 (:ref:`l-design-input-observer`).
-
-.. toctree::
-   :maxdepth: 1
-
-   converter
-   flatten
-   flatten_list
-   patches
-   patches_list
-   input_observer
-   supported_aten_functions
-   case_coverage
-
