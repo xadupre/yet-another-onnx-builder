@@ -361,54 +361,6 @@ class GraphBuilderTorchProtocol(GraphBuilderExtendedProtocol, Protocol):
         """
         ...
 
-    as_function: bool
-    """``True`` when the graph is being exported as a local function."""
-
-    local_domain: str
-    """Domain name used for local functions created during the export."""
-
-    verbose: int
-    """Verbosity level (``0`` = silent)."""
-
-    torch: Any
-    """Reference to the :mod:`torch` module, or ``None`` when PyTorch is
-    not installed."""
-
-    optimization_options: Any
-    """Optimization options forwarded to the builder's optimisation pass."""
-
-    dynamic_shapes: Any
-    """Dynamic-shapes specification provided to the exporter, or ``None``."""
-
-    dynamic_objects: Dict[str, Any]
-    """Map of dynamic dimension names (strings) to their current values
-    (e.g. :class:`torch.SymInt` instances or :class:`int` literals)."""
-
-    dynamic_dimensions_source: Dict[str, Any]
-    """Map of dynamic dimension names to the graph inputs / axes they
-    originate from."""
-
-    nodes: List[Any]
-    """Ordered list of ONNX :class:`~onnx.NodeProto` objects accumulated
-    so far."""
-
-    outputs: List[Any]
-    """List of declared graph outputs."""
-
-    opsets: Dict[str, int]
-    """Map of ONNX domain names to their opset versions."""
-
-    initializers_dict: Dict[str, Any]
-    """Map of initializer names to their :class:`~onnx.TensorProto` values."""
-
-    raise_list: Optional[Set[str]]
-    """When set, the builder raises an exception if a result in this set is
-    produced — useful for debugging."""
-
-    was_inputs_renamed: bool
-    """``True`` when the builder renamed some graph inputs during
-    construction."""
-
     @property
     def last_added_node(self) -> Optional[Any]:
         """The most recently appended ONNX node, or ``None`` when the graph
