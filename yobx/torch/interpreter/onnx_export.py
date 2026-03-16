@@ -931,7 +931,10 @@ def to_onnx(
     if target_opset is None:
         target_opset = min(DEFAULT_TARGET_OPSET, onnx_opset_version() - 1)
     if options is None:
-        options = OptimizationOptions()
+        if isinstance(target_opset, dict) and "com.microsoft" in target_opset:
+            options = OptimizationOptions(patterns="default+onnxruntime")
+        else:
+            options = OptimizationOptions()
     begin = time.perf_counter()
 
     verbose = max(verbose, int(os.environ.get("ONNXVERBOSE", verbose)))
