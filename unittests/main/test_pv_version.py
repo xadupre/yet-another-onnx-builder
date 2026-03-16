@@ -8,7 +8,7 @@ class TestPvVersion(ExtTestCase):
         self.assertLess(PvVersion("3.4.5"), PvVersion("3.4.6"))
 
     def test_pv_raise(self):
-        self.assertRaise(lambda: PvVersion("5.0.7"), ValueError)
+        self.assertRaise(lambda: PvVersion("5.0.07"), ValueError)
 
     def test_pv_version2(self):
         self.assertEqual(PvVersion("5.0"), PvVersion("5.0"))
