@@ -319,7 +319,7 @@ def _build_path_map(tree) -> Dict[int, str]:
 
     while stack:
         node_id, path = stack.pop()
-        current_path = path + [node_id]
+        current_path = [*path, node_id]
 
         if tree.children_left[node_id] == _LEAF:
             spath = ["0"] * tree.node_count
