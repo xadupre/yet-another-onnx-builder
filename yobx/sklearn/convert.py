@@ -39,7 +39,7 @@ class ConvertOptions(ConvertOptionsProtocol):
 
     def __repr__(self):
         rows = []
-        for name in self.options:
+        for name in self.OPTIONS:
             rows.append(f"    {name}={getattr(self, name)},")
         text = "\n".join(rows)
         return f"{self.__class__.__name__}(\n{text}\n)"
@@ -245,7 +245,7 @@ def to_onnx(
         to customize function naming.  Pass ``None`` (the default) to disable
         function wrapping and produce a flat graph.
         when *large_model* is True
-    :param convert_options: see :class`yobx.sklearn.ConvertOptions`
+    :param convert_options: see :class:`yobx.sklearn.ConvertOptions`
 
     .. note::
 
