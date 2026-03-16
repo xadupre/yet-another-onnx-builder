@@ -456,5 +456,51 @@ class TestLlamaAttentionConverter(ExtTestCase):
         self.assertIn("Attention", op_types)
 
 
+@requires_transformers("")
+class TestLlamaAttentionRegistration(ExtTestCase):
+    """Tests for the :mod:`yobx.torch.in_transformers` converter registry."""
+
+    def test_register_transformer_converters_populates_registry(self):
+        """register_transformer_converters populates TRANSFORMER_CONVERTERS."""
+        from yobx.torch.in_transformers import (
+            register_transformer_converters,
+            get_transformer_converters,
+        )
+        from transformers.models.llama.modeling_llama import LlamaAttention
+
+        register_transformer_converters()
+        converters = get_transformer_converters()
+        self.assertIn(LlamaAttention, converters)
+
+    def test_get_transformer_converter_returns_llama_attention_to_onnx(self):
+        """get_transformer_converter(LlamaAttention) returns llama_attention_to_onnx."""
+        from yobx.torch.in_transformers import (
+            register_transformer_converters,
+            get_transformer_converter,
+        )
+        from yobx.torch.in_transformers.classes import llama_attention_to_onnx
+        from transformers.models.llama.modeling_llama import LlamaAttention
+
+        register_transformer_converters()
+        converter = get_transformer_converter(LlamaAttention)
+        self.assertIs(converter, llama_attention_to_onnx)
+
+    def test_models_exports_llama_attention_to_onnx(self):
+        """llama_attention_to_onnx is importable from yobx.torch.in_transformers.models."""
+        from yobx.torch.in_transformers.models import llama_attention_to_onnx
+        from yobx.torch.in_transformers.classes import (
+            llama_attention_to_onnx as llama_attention_to_onnx_classes,
+        )
+
+        self.assertIs(llama_attention_to_onnx, llama_attention_to_onnx_classes)
+
+    def test_get_transformer_converter_raises_for_unknown_type(self):
+        """get_transformer_converter raises ValueError for unregistered types."""
+        from yobx.torch.in_transformers import get_transformer_converter
+
+        with self.assertRaises(ValueError):
+            get_transformer_converter(int)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

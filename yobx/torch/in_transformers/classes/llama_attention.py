@@ -552,3 +552,16 @@ def llama_attention_to_onnx(
             attn_out = g.op.Add(attn_out, o_bv, name=name)
 
     return attn_out
+
+
+try:
+    from transformers.models.llama.modeling_llama import (  # noqa: E402
+        LlamaAttention as _LlamaAttention,
+    )
+    from ..register import (  # noqa: E402
+        register_transformer_converter as _register_transformer_converter,
+    )
+
+    _register_transformer_converter(_LlamaAttention)(llama_attention_to_onnx)
+except ImportError:
+    pass
