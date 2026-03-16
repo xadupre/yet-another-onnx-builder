@@ -11,7 +11,12 @@ required method/property exists with a functional smoke test).
 
 import unittest
 from onnx import TensorProto
-from yobx.typing import GraphBuilderProtocol, GraphBuilderExtendedProtocol, OpsetProtocol
+from yobx.typing import (
+    GraphBuilderProtocol,
+    GraphBuilderExtendedProtocol,
+    GraphBuilderTorchProtocol,
+    OpsetProtocol,
+)
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
 from yobx.xbuilder import GraphBuilder
 
@@ -311,6 +316,107 @@ class TestOnnxScriptOpsetProtocol(ExtTestCase):
 
         g = OnnxScriptGraphBuilder(18)
         self.assertIsInstance(g.op, OpsetProtocol)
+
+
+class TestGraphBuilderTorchProtocol(ExtTestCase):
+    """GraphBuilderTorchProtocol is importable and has the expected members."""
+
+    # Methods / properties added beyond GraphBuilderExtendedProtocol.
+    TORCH_ONLY_ATTRS = [
+        # rank helpers
+        "has_rank",
+        "get_rank",
+        "set_rank",
+        # device helpers
+        "has_device",
+        "get_device",
+        "set_device",
+        # extended type / shape
+        "get_type_known",
+        "set_shapes_types",
+        # sequence support
+        "is_sequence",
+        "get_sequence",
+        "set_sequence",
+        "make_tensor_sequence_input",
+        # dynamic-shape helpers
+        "is_dynamic_shape",
+        "get_input_dynamic_shape",
+        "get_is_dimension",
+        "verify_dynamic_shape",
+        "register_dynamic_objects_from_shape",
+        "make_dynamic_object",
+        "add_dynamic_object",
+        "make_new_dynamic_shape",
+        # sub-builder / local functions
+        "make_nodes",
+        "make_local_function",
+        "make_subset_builder",
+        # misc methods
+        "add_stat",
+        "pretty_text",
+        "register_users",
+        "extract_input_names_from_args",
+        # state attributes / properties
+        "anyop",
+        "last_added_node",
+    ]
+
+    def test_import_from_typing(self):
+        self.assertIsNotNone(GraphBuilderTorchProtocol)
+
+    def test_import_from_xbuilder(self):
+        from yobx.xbuilder import GraphBuilderTorchProtocol as T
+
+        self.assertIs(T, GraphBuilderTorchProtocol)
+
+    def test_is_subprotocol_of_extended(self):
+        # GraphBuilderTorchProtocol must list GraphBuilderExtendedProtocol in
+        # its MRO.  We cannot use issubclass() for runtime-checkable protocols
+        # that declare data attributes (Python raises TypeError), so we inspect
+        # the MRO directly.
+        self.assertIn(GraphBuilderExtendedProtocol, GraphBuilderTorchProtocol.__mro__)
+
+    def test_protocol_has_torch_attrs(self):
+        for name in self.TORCH_ONLY_ATTRS:
+            self.assertIn(
+                name,
+                dir(GraphBuilderTorchProtocol),
+                msg=f"GraphBuilderTorchProtocol is missing '{name}'",
+            )
+
+    def test_graphbuilder_has_torch_attrs(self):
+        g = GraphBuilder(18, ir_version=9)
+        for name in self.TORCH_ONLY_ATTRS:
+            self.assertTrue(hasattr(g, name), msg=f"GraphBuilder missing attribute '{name}'")
+
+    def test_graphbuilder_is_instance_torch_protocol(self):
+        g = GraphBuilder(18, ir_version=9)
+        self.assertIsInstance(g, GraphBuilderTorchProtocol)
+
+    def test_has_rank_returns_false_for_unknown(self):
+        g = GraphBuilder(18, ir_version=9)
+        self.assertFalse(g.has_rank("nonexistent"))
+
+    def test_set_get_rank(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("x", TensorProto.FLOAT, (2, 3))
+        g.set_rank("x", 2)
+        self.assertTrue(g.has_rank("x"))
+        self.assertEqual(g.get_rank("x"), 2)
+
+    def test_is_sequence_false_for_regular_tensor(self):
+        g = GraphBuilder(18, ir_version=9)
+        g.make_tensor_input("x", TensorProto.FLOAT, (2,))
+        self.assertFalse(g.is_sequence("x"))
+
+    def test_anyop_attribute_exists(self):
+        g = GraphBuilder(18, ir_version=9)
+        self.assertIsNotNone(g.anyop)
+
+    def test_last_added_node_none_on_empty_graph(self):
+        g = GraphBuilder(18, ir_version=9)
+        self.assertIsNone(g.last_added_node)
 
 
 if __name__ == "__main__":
