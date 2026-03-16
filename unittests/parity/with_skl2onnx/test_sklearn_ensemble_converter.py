@@ -168,6 +168,11 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         self.assertEqual(ort_out[2].ndim, 2)
         self.assertEqual(ort_out[2].shape[0], X_test.shape[0])
         self.assertEqual(ort_out[2].shape[1], model.n_estimators)
+        # The decision_path output should be an integer array of non-negative indices/indicators
+        self.assertTrue(np.issubdtype(ort_out[2].dtype, np.integer))
+        self.assertTrue(np.issubdtype(ref_out[2].dtype, np.integer))
+        self.assertTrue(np.all(ort_out[2] >= 0))
+        self.assertTrue(np.all(ref_out[2] >= 0))
 
     def test_model_random_forest_regressor_decision_path(self):
         X, y = make_regression(n_samples=200, n_features=5, random_state=42)
