@@ -1,3 +1,6 @@
+import re
+
+
 class PvVersion:
     """Simple version of packaging.version.Version."""
 
@@ -9,7 +12,9 @@ class PvVersion:
     def __init__(self, version: str):
         self.version = version
         self.t_version = tuple(
-            self.to_int(i) for i in version.split(".") if not i.startswith(("dev", "rc", "post"))
+            self.to_int(i)
+            for i in re.split(r"[.+]", version)
+            if not i.startswith(("dev", "rc", "post", "cpu", "cu"))
         )
 
     def __repr__(self) -> str:
