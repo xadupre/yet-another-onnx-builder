@@ -40,7 +40,7 @@ It can export from many libraries:
 
 **standard machine learning**
 
-* :epkg:`categorical_encoders`
+* :epkg:`category_encoders`
 * :epkg:`imbalanced-learn`
 * :epkg:`lightgbm`
 * :epkg:`scikit-learn`
