@@ -1309,7 +1309,7 @@ class TestInputObserver(ExtTestCase):
 
         kwargs = dict(x=torch.randn((5, 6)), y=torch.randn((1, 6)))
         model = Model()
-        with self.assertRaisesRegex(ValueError, "There are 1 mandatory positional arguments"):
+        with apply_patches_for_model(patch_torch=True, model=model):
             torch.export.export(
                 model,
                 (),

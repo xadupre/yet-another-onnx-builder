@@ -1,18 +1,16 @@
 import unittest
 import warnings
 from typing import Any
-import packaging.version as pv
 import numpy
 import onnx.backend.base
 import onnx.backend.test
-import onnx.shape_inference
-import onnx.version_converter
 from onnx import ModelProto
 from onnx.backend.base import Device, DeviceType
 from onnx.defs import onnx_opset_version
 import onnxruntime
 from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 from yobx.ext_test_case import has_torch
+from yobx.pv_version import PvVersion
 
 ORT_OPSET = max(21, onnx_opset_version() - 2)
 
@@ -309,7 +307,7 @@ if onnx_opset_version() <= 26:
     )
 
 
-if pv.Version(onnxruntime.__version__) <= pv.Version("1.25"):
+if PvVersion(onnxruntime.__version__) <= PvVersion("1.25"):
     backend_test.exclude("(test_attention_4d_with|test_attention_4d_gqa)")
 
 # import all test cases at global scope to make them visible to python.unittest

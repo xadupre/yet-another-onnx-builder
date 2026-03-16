@@ -42,7 +42,7 @@ def _to_model(attn, hs, cos, sin, mask=None, target_opset=22):
     the graph output, and returns the resulting :class:`onnx.ModelProto`.
     """
     from yobx.xbuilder import GraphBuilder
-    from yobx.torch.in_transformers.classes import llama_attention_to_onnx
+    from yobx.torch.in_transformers.classes.llama_attention import llama_attention_to_onnx
     from yobx.torch.torch_helper import torch_dtype_to_onnx_dtype
 
     if isinstance(target_opset, int):
@@ -69,7 +69,7 @@ def _to_model(attn, hs, cos, sin, mask=None, target_opset=22):
     return g.to_onnx(optimize=False)
 
 
-@requires_transformers("5.07")
+@requires_transformers("5.0.7")
 class TestLlamaAttentionConverter(ExtTestCase):
     """Unit tests for :func:`llama_attention_to_onnx`."""
 
@@ -454,6 +454,43 @@ class TestLlamaAttentionConverter(ExtTestCase):
         model = _to_model(attn, hs, cos, sin, target_opset=24)
         op_types = {n.op_type for n in model.graph.node}
         self.assertIn("Attention", op_types)
+
+
+@requires_transformers("")
+class TestLlamaAttentionRegistration(ExtTestCase):
+    """Tests for the :mod:`yobx.torch.in_transformers` converter registry."""
+
+    def test_register_transformer_converters_populates_registry(self):
+        """register_transformer_converters populates TRANSFORMER_CONVERTERS."""
+        from yobx.torch.in_transformers import (
+            register_transformer_converters,
+            get_transformer_converters,
+        )
+        from transformers.models.llama.modeling_llama import LlamaAttention
+
+        register_transformer_converters()
+        converters = get_transformer_converters()
+        self.assertIn(LlamaAttention, converters)
+
+    def test_get_transformer_converter_returns_llama_attention_to_onnx(self):
+        """get_transformer_converter(LlamaAttention) returns llama_attention_to_onnx."""
+        from yobx.torch.in_transformers import (
+            register_transformer_converters,
+            get_transformer_converter,
+        )
+        from yobx.torch.in_transformers.classes.llama_attention import llama_attention_to_onnx
+        from transformers.models.llama.modeling_llama import LlamaAttention
+
+        register_transformer_converters()
+        converter = get_transformer_converter(LlamaAttention)
+        self.assertIs(converter, llama_attention_to_onnx)
+
+    def test_get_transformer_converter_raises_for_unknown_type(self):
+        """get_transformer_converter raises ValueError for unregistered types."""
+        from yobx.torch.in_transformers import get_transformer_converter
+
+        with self.assertRaises(ValueError):
+            get_transformer_converter(int)
 
 
 if __name__ == "__main__":

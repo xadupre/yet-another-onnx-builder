@@ -1,5 +1,4 @@
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-import packaging.version as pv
 import torch
 import transformers
 
@@ -260,10 +259,12 @@ def make_dynamic_cache(
         assert isinstance(cls_layers, list), f"Unexpected type cls_layers={cls_layers}"
         assert isinstance(cls_kwargs, list), f"Unexpected type cls_kwargs={cls_kwargs}"
 
+    from ...pv_version import PvVersion
+
     if (
         key_value_pairs
         and isinstance(key_value_pairs[0][0], torch._subclasses.fake_tensor.FakeTensor)
-        and pv.Version(transformers.__version__) >= pv.Version("4.56")
+        and PvVersion(transformers.__version__) >= PvVersion("4.56")
     ):
         cache = transformers.cache_utils.DynamicCache()
         cache.layers.extend(

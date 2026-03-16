@@ -81,10 +81,12 @@ Example::
 from typing import Optional
 import numpy as np
 from onnx import TensorProto
+from transformers.models.llama.modeling_llama import LlamaAttention
 
 from ....helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ....typing import GraphBuilderExtendedProtocol
 from ...torch_helper import to_numpy
+from ..register import register_transformer_converter
 
 T = str
 
@@ -304,6 +306,7 @@ def _mha_com_microsoft(
     return out
 
 
+@register_transformer_converter(LlamaAttention)
 def llama_attention_to_onnx(
     g: GraphBuilderExtendedProtocol,
     attn: "LlamaAttention",  # noqa: F821
