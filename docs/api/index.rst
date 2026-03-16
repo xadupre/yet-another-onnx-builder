@@ -6,6 +6,7 @@ API Reference
 
    doc
    ext_test_case
+   pv_version
    typing
    builder/index
    container/index

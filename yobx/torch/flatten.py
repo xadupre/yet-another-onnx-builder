@@ -4,6 +4,7 @@ import re
 from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple
 import optree
 import torch.utils._pytree as pytree
+from ..pv_version import PvVersion
 from ..helpers import string_type
 
 PATCH_OF_PATCHES: Set[Any] = set()
@@ -174,8 +175,6 @@ def register_cache_flattening(
     :param verbosity: verbosity level
     :return: information to unpatch
     """
-    import packaging.version as pv
-
     wrong: Dict[type, Optional[str]] = {}
     transformers_version = None
     if patch_transformers:
@@ -183,7 +182,7 @@ def register_cache_flattening(
         from .in_transformers.flatten_class import WRONG_REGISTRATIONS
 
         wrong |= WRONG_REGISTRATIONS
-        transformers_version = pv.Version(transformers.__version__)
+        transformers_version = PvVersion(transformers.__version__)
 
     registration_functions = flattening_functions(
         patch_transformers=patch_transformers, verbose=verbose
@@ -201,10 +200,10 @@ def register_cache_flattening(
         if (
             cls in pytree.SUPPORTED_NODES
             and cls not in PATCH_OF_PATCHES
-            # and pv.Version(torch.__version__) < pv.Version("2.7")
+            # and PvVersion(torch.__version__) < PvVersion("2.7")
             and (
                 version is None
-                or (transformers_version and transformers_version >= pv.Version(version))
+                or (transformers_version and transformers_version >= PvVersion(version))
             )
         ):
             assert cls in registration_functions, (

@@ -42,7 +42,7 @@ def _to_model(attn, hs, cos, sin, mask=None, target_opset=22):
     the graph output, and returns the resulting :class:`onnx.ModelProto`.
     """
     from yobx.xbuilder import GraphBuilder
-    from yobx.torch.in_transformers.classes import llama_attention_to_onnx
+    from yobx.torch.in_transformers.classes.llama_attention import llama_attention_to_onnx
     from yobx.torch.torch_helper import torch_dtype_to_onnx_dtype
 
     if isinstance(target_opset, int):
@@ -69,7 +69,7 @@ def _to_model(attn, hs, cos, sin, mask=None, target_opset=22):
     return g.to_onnx(optimize=False)
 
 
-@requires_transformers("5.07")
+@requires_transformers("5.0.7")
 class TestLlamaAttentionConverter(ExtTestCase):
     """Unit tests for :func:`llama_attention_to_onnx`."""
 
@@ -478,21 +478,12 @@ class TestLlamaAttentionRegistration(ExtTestCase):
             register_transformer_converters,
             get_transformer_converter,
         )
-        from yobx.torch.in_transformers.classes import llama_attention_to_onnx
+        from yobx.torch.in_transformers.classes.llama_attention import llama_attention_to_onnx
         from transformers.models.llama.modeling_llama import LlamaAttention
 
         register_transformer_converters()
         converter = get_transformer_converter(LlamaAttention)
         self.assertIs(converter, llama_attention_to_onnx)
-
-    def test_models_exports_llama_attention_to_onnx(self):
-        """llama_attention_to_onnx is importable from yobx.torch.in_transformers.models."""
-        from yobx.torch.in_transformers.models import llama_attention_to_onnx
-        from yobx.torch.in_transformers.classes import (
-            llama_attention_to_onnx as llama_attention_to_onnx_classes,
-        )
-
-        self.assertIs(llama_attention_to_onnx, llama_attention_to_onnx_classes)
 
     def test_get_transformer_converter_raises_for_unknown_type(self):
         """get_transformer_converter raises ValueError for unregistered types."""

@@ -1,3 +1,4 @@
+from .pv_version import PvVersion
 from .convert import to_onnx, ConvertOptions
 
 __all__ = [
@@ -18,9 +19,7 @@ def has_sklearn(version: str = ""):
         return False
     if not version:
         return True
-    import packaging.version as pv
-
-    return pv.Version(version) <= pv.Version(sklearn.__version__)
+    return PvVersion(version) <= PvVersion(sklearn.__version__)
 
 
 class NumericalDiscrepancyWarning(UserWarning):

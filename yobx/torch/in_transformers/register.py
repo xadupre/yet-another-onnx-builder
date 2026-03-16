@@ -58,7 +58,10 @@ Currently registered converters
 from typing import Dict, Callable, Tuple, Union
 
 TRANSFORMER_CONVERTERS: Dict[type, Callable] = {}
-"""Module-level registry mapping *transformers* module classes to their ONNX converter functions."""
+"""
+Module-level registry mapping *transformers*
+module classes to their ONNX converter functions.
+"""
 
 
 def register_transformer_converter(cls: Union[type, Tuple[type, ...]]):

@@ -555,4 +555,3 @@ def llama_attention_to_onnx(
             attn_out = g.op.Add(attn_out, o_bv, name=name)
 
     return attn_out
-
