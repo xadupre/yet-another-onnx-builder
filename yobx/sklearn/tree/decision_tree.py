@@ -313,19 +313,27 @@ def _build_path_map(tree) -> Dict[int, str]:
     """
     result: Dict[int, str] = {}
 
-    def recurse(node_id: int, path: List[int]) -> None:
-        path.append(node_id)
+    # Iterative DFS using an explicit stack to avoid hitting Python's recursion limit
+    # on very deep trees.
+    stack: List[Tuple[int, List[int]]] = [(0, [])]
+
+    while stack:
+        node_id, path = stack.pop()
+        current_path = path + [node_id]
+
         if tree.children_left[node_id] == _LEAF:
             spath = ["0"] * tree.node_count
-            for nid in path:
+            for nid in current_path:
                 spath[nid] = "1"
             result[node_id] = "".join(spath)
         else:
-            recurse(int(tree.children_left[node_id]), path)
-            recurse(int(tree.children_right[node_id]), path)
-        path.pop()
+            left_child = int(tree.children_left[node_id])
+            right_child = int(tree.children_right[node_id])
+            # Push right child first so that left subtree is processed first,
+            # matching the original recursive traversal order.
+            stack.append((right_child, current_path))
+            stack.append((left_child, current_path))
 
-    recurse(0, [])
     return result
 
 
