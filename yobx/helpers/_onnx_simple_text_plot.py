@@ -435,9 +435,9 @@ def onnx_simple_text_plot(
         :showcode:
         :warningout: DeprecationWarning, FutureWarning
 
-        import numpy
+        import numpy as np
         from sklearn.cluster import KMeans
-        from yobx.sklearn.to_onnx import to_onnx
+        from yobx.sklearn import to_onnx
         from yobx.helpers.onnx_helper import pretty_onnx
 
         x = np.random.randn(10, 3)

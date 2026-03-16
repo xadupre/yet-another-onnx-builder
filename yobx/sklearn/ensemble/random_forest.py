@@ -560,7 +560,7 @@ def _sklearn_random_forest_classifier_v5(
         _emit_decision_path_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dp")
         extra_idx += 1
     if g.convert_options.has("decision_leaf", estimator):
-        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
         _emit_decision_leaf_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dl")
     return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
@@ -686,7 +686,7 @@ def _sklearn_random_forest_regressor_v5(
         _emit_decision_path_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dp")
         extra_idx += 1
     if g.convert_options.has("decision_leaf", estimator) and len(outputs) > extra_idx:
-        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
         _emit_decision_leaf_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dl")
     return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
@@ -856,6 +856,6 @@ def sklearn_extra_trees_regressor(
         _emit_decision_path_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dp")
         extra_idx += 1
     if g.convert_options.has("decision_leaf", estimator) and len(outputs) > extra_idx:
-        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
         _emit_decision_leaf_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dl")
     return outputs[0] if len(outputs) == 1 else tuple(outputs)
