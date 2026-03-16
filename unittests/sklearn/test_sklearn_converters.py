@@ -9,7 +9,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, hide_stdout
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
 
@@ -528,6 +528,27 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
 
         vip = onnx.helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [None, 2])
         onx = to_onnx(pipe, (vip,))
+
+        self.assertEqual(onx.graph.input[0].name, "X")
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X": X})[0]
+        expected = pipe.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    @hide_stdout()
+    def test_verbosity(self):
+        """ValueInfoProto works with a Pipeline (scaler + regressor)."""
+        import onnx
+        from sklearn.linear_model import LinearRegression
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        pipe = Pipeline([("scaler", StandardScaler()), ("reg", LinearRegression())])
+        pipe.fit(X, y)
+
+        vip = onnx.helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [None, 2])
+        onx = to_onnx(pipe, (vip,), verbose=1)
 
         self.assertEqual(onx.graph.input[0].name, "X")
 

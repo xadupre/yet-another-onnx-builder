@@ -208,11 +208,8 @@ def to_onnx(
         a matrix is the inverse of another one.
         See :ref:`l-plot-sklearn-pls-float32`.
     """
-    _fitted_check_target = (
-        estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
-    )
     check_is_fitted(
-        _fitted_check_target,
+        estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator,
         attributes=sklearn_exportable_methods(),
         all_or_any=any,
         msg=(
@@ -240,6 +237,19 @@ def to_onnx(
         if "com.microsoft" in dict_target_opset
         else {}
     )
+
+    if verbose:
+        if issubclass(builder_cls, GraphBuilder):
+            kwargs["verbose"] = verbose
+
+        from ..helpers import string_type
+
+        print(f"[yobx.sklearn.to_onnx] export with builder {builder_cls!r})")
+        print(f"[yobx.sklearn.to_onnx] {dict_target_opset=}")
+        print(f"[yobx.sklearn.to_onnx] args={string_type(args, with_shape=True)}")
+        if extra_converters:
+            print(f"[yobx.sklearn.to_onnx] with {len(extra_converters)} extra converters")
+
     g = builder_cls(dict_target_opset, **kwargs)
 
     cls = type(estimator)
@@ -306,6 +316,28 @@ def to_onnx(
         g.make_tensor_output(name, indexed=False, allow_untyped_output=True)
     # When local functions are requested we must NOT inline them; pass inline=False
     # so the function bodies are preserved in the returned ModelProto.
+    if isinstance(g, GraphBuilder):
+        onx, stats = g.to_onnx(
+            large_model=large_model,
+            external_threshold=external_threshold,
+            inline=(not function_options) or not function_options.export_as_function,
+            return_optimize_report=True,
+        )
+        if verbose:
+            import pandas
+
+            print(f"[yobx.sklearn.to_onnx] done, output type is {type(onx)}")
+
+            df = pandas.DataFrame(stats)
+            for c in ["added", "removed"]:
+                df[c] = df[c].fillna(0).astype(int)
+            agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
+            agg = agg[(agg["added"] > 0) | (agg["removed"] > 0)].sort_values(
+                "removed", ascending=False
+            )
+            if agg.shape[0]:
+                print(agg.to_string())
+        return onx
     return g.to_onnx(
         large_model=large_model,
         external_threshold=external_threshold,
