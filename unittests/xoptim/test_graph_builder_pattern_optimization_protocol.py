@@ -38,7 +38,7 @@ class TestGraphBuilderPatternOptimizationProtocolImport(ExtTestCase):
 
         self.assertTrue(
             isinstance(GraphBuilderPatternOptimizationProtocol, type(runtime_checkable))
-            or hasattr(GraphBuilderPatternOptimizationProtocol, "_is_protocol"),
+            or hasattr(GraphBuilderPatternOptimizationProtocol, "_is_protocol")
         )
 
 
@@ -128,8 +128,7 @@ class TestGraphBuilderPatternOptimizationSatisfiesProtocol(ExtTestCase):
         go = _make_optimizer()
         for attr in TestGraphBuilderPatternOptimizationProtocolMembers.REQUIRED_MEMBERS:
             self.assertTrue(
-                hasattr(go, attr),
-                msg=f"GraphBuilderPatternOptimization is missing '{attr}'",
+                hasattr(go, attr), msg=f"GraphBuilderPatternOptimization is missing '{attr}'"
             )
 
     def test_main_opset(self):
