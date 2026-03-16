@@ -12,10 +12,11 @@ from sklearn.model_selection import train_test_split
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
+from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
 
 
-class TestSklearnEnsembleConverters(unittest.TestCase):
+class TestSklearnEnsembleConverters(ExtTestCase):
     def test_model_random_forest_classifier(self):
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)

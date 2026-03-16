@@ -2,19 +2,15 @@ import unittest
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import (
-    MaxAbsScaler,
-    MinMaxScaler,
-    Normalizer,
-    StandardScaler,
-)
+from sklearn.preprocessing import MaxAbsScaler, MinMaxScaler, Normalizer, StandardScaler
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
+from yobx.ext_test_case import ExtTestCase
 from yobx.sklearn.tests_helper import dump_data_and_model
 
 
-class TestSklearnPreprocessingConverters(unittest.TestCase):
+class TestSklearnPreprocessingConverters(ExtTestCase):
     def _make_data(self):
         X, _ = make_classification(n_samples=100, n_features=5, random_state=42)
         X = X.astype(np.float32)

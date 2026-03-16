@@ -6,11 +6,12 @@ from sklearn.model_selection import train_test_split
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import DoubleTensorType
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
+from yobx.ext_test_case import ExtTestCase
 from yobx.sklearn.tests_helper import dump_data_and_model
 import onnxruntime
 
 
-class TestSklearnLinearModelConverters(unittest.TestCase):
+class TestSklearnLinearModelConverters(ExtTestCase):
     def test_model_linear_regression(self):
         X, y = make_regression(n_samples=100, n_features=5, random_state=42)
         X = X.astype(np.float64)
@@ -67,9 +68,7 @@ class TestSklearnLinearModelConverters(unittest.TestCase):
             options={"zipmap": False},
         )
         self.assertTrue(model_onnx is not None)
-        dump_data_and_model(
-            X_test, model, model_onnx, basename="SklearnLogisticRegression"
-        )
+        dump_data_and_model(X_test, model, model_onnx, basename="SklearnLogisticRegression")
 
     def test_model_logistic_regression_multiclass(self):
         X, y = make_classification(

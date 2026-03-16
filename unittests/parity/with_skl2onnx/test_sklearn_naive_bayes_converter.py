@@ -6,10 +6,12 @@ from sklearn.naive_bayes import GaussianNB
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
+from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.sklearn.tests_helper import dump_data_and_model
 
 
-class TestSklearnNaiveBayesConverters(unittest.TestCase):
+class TestSklearnNaiveBayesConverters(ExtTestCase):
+    @requires_sklearn("1.8")  # type issue
     def test_model_gaussian_nb(self):
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
@@ -26,6 +28,7 @@ class TestSklearnNaiveBayesConverters(unittest.TestCase):
         self.assertTrue(model_onnx is not None)
         dump_data_and_model(X_test, model, model_onnx, basename="SklearnGaussianNB")
 
+    @requires_sklearn("1.8")  # type issue
     def test_model_gaussian_nb_multiclass(self):
         X, y = make_classification(
             n_samples=300,
@@ -47,9 +50,7 @@ class TestSklearnNaiveBayesConverters(unittest.TestCase):
             options={"zipmap": False},
         )
         self.assertTrue(model_onnx is not None)
-        dump_data_and_model(
-            X_test, model, model_onnx, basename="SklearnGaussianNBMulticlass"
-        )
+        dump_data_and_model(X_test, model, model_onnx, basename="SklearnGaussianNBMulticlass")
 
 
 if __name__ == "__main__":

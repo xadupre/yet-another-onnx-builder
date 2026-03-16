@@ -6,10 +6,11 @@ from sklearn.svm import LinearSVC
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
+from yobx.ext_test_case import ExtTestCase
 from yobx.sklearn.tests_helper import dump_data_and_model
 
 
-class TestSklearnSVMConverters(unittest.TestCase):
+class TestSklearnSVMConverters(ExtTestCase):
     def test_model_linear_svc(self):
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
@@ -45,9 +46,7 @@ class TestSklearnSVMConverters(unittest.TestCase):
             target_opset=TARGET_OPSET,
         )
         self.assertTrue(model_onnx is not None)
-        dump_data_and_model(
-            X_test, model, model_onnx, basename="SklearnLinearSVCMulticlass"
-        )
+        dump_data_and_model(X_test, model, model_onnx, basename="SklearnLinearSVCMulticlass")
 
 
 if __name__ == "__main__":
