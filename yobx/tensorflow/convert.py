@@ -1,9 +1,10 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
-from onnx import ModelProto
+from onnx import ModelProto, ValueInfoProto
 import tensorflow as tf
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExtendedModelContainer
+from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from .register import get_tf_op_converter
 from .tensorflow_helper import tf_dtype_to_np_dtype
@@ -29,7 +30,10 @@ def to_onnx(
     converted individually to an equivalent ONNX node by a registered converter.
 
     :param model: a Keras model or layer (must be built / called at least once)
-    :param args: dummy inputs (numpy arrays); used to determine dtypes and shapes
+    :param args: dummy inputs (numpy arrays **or** :class:`onnx.ValueInfoProto`
+        descriptors); used to determine dtypes and shapes.  When a
+        :class:`~onnx.ValueInfoProto` is provided no actual data is needed —
+        the element type and shape are taken directly from the proto.
     :param input_names: optional list of names for the ONNX input tensors
     :param dynamic_shapes: optional per-input axis-to-dim-name mappings.
         When *None*, axis 0 is treated as a dynamic batch dimension for every input.
@@ -70,7 +74,14 @@ def to_onnx(
     if input_names is not None and len(input_names) != len(args):
         raise ValueError(f"Length mismatch: {len(args)=} but input_names={input_names!r}")
     if input_names is None:
-        input_names = ["X"] if len(args) == 1 else [f"X{i}" for i in range(len(args))]
+        # For ValueInfoProto arguments use the embedded name as the default.
+        default_names = []
+        for j, arg in enumerate(args):
+            if isinstance(arg, ValueInfoProto):
+                default_names.append(arg.name or (f"X{j}" if len(args) > 1 else "X"))
+            else:
+                default_names.append("X" if len(args) == 1 else f"X{j}")
+        input_names = default_names
 
     # Build TensorSpec objects for tracing (make batch dim dynamic by default).
     input_specs = _build_input_specs(input_names, args, dynamic_shapes)
@@ -88,9 +99,43 @@ def to_onnx(
         if "com.microsoft" in dict_target_opset
         else {}
     )
+
+    if verbose:
+        if issubclass(builder_cls, GraphBuilder):  # type: ignore
+            kwargs["verbose"] = verbose  # type: ignore
+
+        from ..helpers import string_type
+
+        print(f"[yobx.tensorflow.to_onnx] export with builder {builder_cls!r})")
+        print(f"[yobx.tensorflow.to_onnx] {dict_target_opset=}")
+        print(f"[yobx.tensorflow.to_onnx] args={string_type(args, with_shape=True)}")
+        if extra_converters:
+            print(f"[yobx.tensorflow.to_onnx] with {len(extra_converters)} extra converters")
+
     g = builder_cls(dict_target_opset, **kwargs)  # type: ignore
 
     _convert_concrete_function(cf, g, args, input_specs, verbose, extra_converters or {})
+    if isinstance(g, GraphBuilder):
+        onx, stats = g.to_onnx(  # type: ignore
+            large_model=large_model,
+            external_threshold=external_threshold,
+            return_optimize_report=True,
+        )
+        if verbose:
+            import pandas
+
+            print(f"[yobx.tensorflow.to_onnx] done, output type is {type(onx)}")
+
+            df = pandas.DataFrame(stats)
+            for c in ["added", "removed"]:
+                df[c] = df[c].fillna(0).astype(int)
+            agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
+            agg = agg[(agg["added"] > 0) | (agg["removed"] > 0)].sort_values(
+                "removed", ascending=False
+            )
+            if agg.shape[0]:
+                print(agg.to_string())
+        return onx  # type: ignore
     return g.to_onnx(large_model=large_model, external_threshold=external_threshold)  # type: ignore
 
 
@@ -100,17 +145,36 @@ def to_onnx(
 
 
 def _build_input_specs(input_names, args, dynamic_shapes):
-    """Builds a :class:`tensorflow.TensorSpec` for each dummy input."""
+    """Builds a :class:`tensorflow.TensorSpec` for each dummy input.
+
+    Each element of *args* may be a numpy array **or** an
+    :class:`onnx.ValueInfoProto`.  In the latter case the shape and dtype are
+    extracted from the proto; ``None`` is used for any dimension that is not
+    a positive integer (symbolic or unknown dimensions are treated as dynamic).
+    """
     specs = []
     for i, (name, arg) in enumerate(zip(input_names, args)):
-        arr = np.asarray(arg)
-        shape = list(arr.shape)
-        if dynamic_shapes and i < len(dynamic_shapes):
-            for axis, _ in dynamic_shapes[i].items():
-                shape[axis] = None
-        elif shape:
-            shape[0] = None  # default: make the batch dimension dynamic
-        specs.append(tf.TensorSpec(shape=shape, dtype=tf.as_dtype(arr.dtype), name=name))
+        if isinstance(arg, ValueInfoProto):
+            # Extract dtype and shape from the ValueInfoProto.
+            tt = arg.type.tensor_type
+            np_dtype = tensor_dtype_to_np_dtype(tt.elem_type)
+            if tt.HasField("shape"):
+                shape = [
+                    (None if dim.dim_param else (dim.dim_value or None))
+                    for idim, dim in enumerate(tt.shape.dim)
+                ]
+            else:
+                shape = [None]
+            specs.append(tf.TensorSpec(shape=shape, dtype=tf.as_dtype(np_dtype), name=name))
+        else:
+            arr = np.asarray(arg)
+            shape = list(arr.shape)
+            if dynamic_shapes and i < len(dynamic_shapes):
+                for axis, _ in dynamic_shapes[i].items():
+                    shape[axis] = None
+            elif shape:
+                shape[0] = None  # default: make the batch dimension dynamic
+            specs.append(tf.TensorSpec(shape=shape, dtype=tf.as_dtype(arr.dtype), name=name))
     return specs
 
 
