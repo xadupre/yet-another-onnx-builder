@@ -57,3 +57,8 @@ to_onnx
 +++++++
 
 .. autofunction:: yobx.sklearn.to_onnx
+
+ConvertOptions
+++++++++++++++
+
+.. autofunction:: yobx.sklearn.ConvertOptions

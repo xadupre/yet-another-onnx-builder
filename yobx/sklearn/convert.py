@@ -1,16 +1,48 @@
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
 from onnx import ModelProto, ValueInfoProto
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.utils.validation import check_is_fitted
 from .. import DEFAULT_TARGET_OPSET
+from ..typing import ConvertOptionsProtocol
 from ..container import ExtendedModelContainer
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from ..xbuilder.function_options import FunctionOptions
 from .register import get_sklearn_converter, sklearn_exportable_methods
 from .sklearn_helper import get_output_names
+
+
+class ConvertOptions(ConvertOptionsProtocol):
+    """
+    Tunes the way every piece of a model is exported.
+
+    :param decision_leaf: tells if decision_leaf must be exposed
+        as a thrid output for trees or a tree
+    """
+
+    OPTIONS = ["decision_leaf"]
+
+    def __init__(self, decision_leaf: Union[bool, Set[str]] = False):
+        self.decision_leaf = decision_leaf
+
+    def __repr__(self):
+        rows = []
+        for name in self.options:
+            rows.append(f"    {name}={getattr(self, name)},")
+        text = "\n".join(rows)
+        return f"{self.__class__.__name__}(\n{text}\n)"
+
+    def has(self, option_name: str, piece: BaseEstimator) -> bool:
+        """Tells of options `option_name` applies on estimator `piece`."""
+        if not self.decisition_leaf:
+            return False
+        if self.decision_leaf is True:
+            return True
+        raise NotImplementedError(
+            f"Not implemented with decision_leaf is not a boolean but {self.decision_leaf!r}."
+        )
 
 
 def _extract_value_info_proto(vip: ValueInfoProto) -> Tuple[str, int, Optional[Tuple]]:
@@ -150,6 +182,7 @@ def to_onnx(
     large_model: bool = False,
     external_threshold: int = 1024,
     function_options: Optional[FunctionOptions] = None,
+    convert_options: Optional[ConvertOptions] = None,
 ) -> Union[ModelProto, ExtendedModelContainer]:
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
@@ -198,6 +231,7 @@ def to_onnx(
         to customize function naming.  Pass ``None`` (the default) to disable
         function wrapping and produce a flat graph.
         when *large_model* is True
+    :param convert_options: see :class`yobx.sklearn.ConvertOptions`
 
     .. note::
 
@@ -237,6 +271,8 @@ def to_onnx(
         if "com.microsoft" in dict_target_opset
         else {}
     )
+    if convert_options:
+        kwargs["convert_options"] = convert_options
 
     if verbose:
         if issubclass(builder_cls, GraphBuilder):

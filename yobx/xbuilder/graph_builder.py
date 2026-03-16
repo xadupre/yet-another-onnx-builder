@@ -38,6 +38,7 @@ import onnx.numpy_helper as onh
 from onnx.external_data_helper import uses_external_data
 from onnx.model_container import make_large_tensor_proto
 from onnx.shape_inference import infer_shapes as onnx_infer_shapes
+from ..typing import ConvertOptionsProtocol, DefaultConvertOptions
 from ..container.model_container import ExtendedModelContainer, _get_type
 from ..helpers.mini_onnx_builder import proto_from_array
 from ..helpers import make_hash, string_signature, string_type
@@ -141,6 +142,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     :param _opsets: to overwrite opsets when the builder receives a `GraphProto`
     :param _context: known names from the parent graph is any
     :param _parent: parent owning the builder is any
+    :param convert_options: options to modify the way estimators are converted
 
     Important attributes:
 
@@ -279,6 +281,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         _opsets: Optional[Dict[str, int]] = None,
         _context: Optional[Set[str]] = None,
         _parent: Optional[Union["GraphBuilder", Tuple["GraphBuilder", NodeProto]]] = None,
+        convert_options: Optional[ConvertOptionsProtocol] = None,
     ):
         self.maybe_disable_fake_tensor_mode = contextlib.nullcontext
         if os.environ.get("NOTORCH", "0") in ("1", "true"):
@@ -301,6 +304,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         self.TEMPLATE_TYPE = TEMPLATE_TYPE
 
+        self._convert_options = convert_options or DefaultConvertOptions()
         self.optimization_options = optimization_options or OptimizationOptions(verbose=verbose)
         self.local_domain = local_domain
         self.as_function = as_function
@@ -453,6 +457,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         else:
             raise NotImplementedError(f"{type(target_opset_or_existing_proto)} is not supported.")
 
+    @property
+    def convert_options(self) -> ConvertOptionsProtocol:
+        """Returns the converting options."""
+        return self._convert_options
+
     def has_exact_same_constant_in_context(self, name: str) -> Optional[bool]:
         """
         Tells if this constant already exiting in the context of the main graph.
@@ -553,6 +562,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             local_domain=self.local_domain,
             dynamic_shapes=ds2,
             _parent=self,
+            convert_options=self.convert_options,
         )
         new_builder.dynamic_objects = self.dynamic_objects.copy()
 

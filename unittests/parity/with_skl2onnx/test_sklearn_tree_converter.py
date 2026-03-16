@@ -12,7 +12,7 @@ from sklearn.tree import (
     ExtraTreeRegressor,
 )
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
-from yobx.sklearn import to_onnx
+from yobx.sklearn import to_onnx, ConvertOptions
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
 
@@ -32,7 +32,6 @@ class TestSklearnTreeConverters(ExtTestCase):
                 )
             ],
             target_opset=TARGET_OPSET,
-            options={"zipmap": False},
         )
         self.assertTrue(model_onnx is not None)
         feeds = {model_onnx.graph.input[0].name: X_test}
@@ -126,7 +125,7 @@ class TestSklearnTreeConverters(ExtTestCase):
                 )
             ],
             target_opset=TARGET_OPSET,
-            options={"decision_path": True},
+            convert_options=ConvertOptions(decision_leaf=True),
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 3)
@@ -164,7 +163,7 @@ class TestSklearnTreeConverters(ExtTestCase):
                 )
             ],
             target_opset=TARGET_OPSET,
-            options={"decision_leaf": True},
+            convert_options=ConvertOptions(decision_leaf=True),
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 3)
@@ -204,7 +203,7 @@ class TestSklearnTreeConverters(ExtTestCase):
                 )
             ],
             target_opset=TARGET_OPSET,
-            options={"decision_path": True},
+            convert_options=ConvertOptions(decision_leaf=True),
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 2)
@@ -275,7 +274,7 @@ class TestSklearnTreeConverters(ExtTestCase):
                 )
             ],
             target_opset=TARGET_OPSET,
-            options={"decision_path": True},
+            convert_options=ConvertOptions(decision_leaf=True),
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 3)
@@ -312,7 +311,7 @@ class TestSklearnTreeConverters(ExtTestCase):
                 )
             ],
             target_opset=TARGET_OPSET,
-            options={"decision_path": True},
+            convert_options=ConvertOptions(decision_leaf=True),
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 2)

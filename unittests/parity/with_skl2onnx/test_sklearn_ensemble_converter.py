@@ -16,7 +16,7 @@ from sklearn.model_selection import train_test_split
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.sklearn import to_onnx
+from yobx.sklearn import to_onnx, ConvertOptions
 
 
 class TestSklearnEnsembleConverters(ExtTestCase):
@@ -145,7 +145,7 @@ class TestSklearnEnsembleConverters(ExtTestCase):
                 )
             ],
             target_opset=TARGET_OPSET,
-            options={"decision_path": True},
+            convert_options=ConvertOptions(decision_leaf=True),
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 3)
@@ -183,7 +183,7 @@ class TestSklearnEnsembleConverters(ExtTestCase):
                 )
             ],
             target_opset=TARGET_OPSET,
-            options={"decision_path": True},
+            convert_options=ConvertOptions(decision_leaf=True),
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 2)
@@ -219,7 +219,7 @@ class TestSklearnEnsembleConverters(ExtTestCase):
                 )
             ],
             target_opset=TARGET_OPSET,
-            options={"decision_path": True},
+            convert_options=ConvertOptions(decision_leaf=True),
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 3)
@@ -257,7 +257,7 @@ class TestSklearnEnsembleConverters(ExtTestCase):
                 )
             ],
             target_opset=TARGET_OPSET,
-            options={"decision_path": True},
+            convert_options=ConvertOptions(decision_leaf=True),
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 2)

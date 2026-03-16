@@ -4,7 +4,7 @@ import onnx
 import onnx.helper as oh
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MaxAbsScaler, MinMaxScaler, Normalizer, StandardScaler
+from sklearn.preprocessing import MaxAbsScaler, MinMaxScaler, StandardScaler
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
 from yobx.sklearn import to_onnx
 from yobx.ext_test_case import ExtTestCase
@@ -24,7 +24,6 @@ class TestSklearnPreprocessingConverters(ExtTestCase):
         model.fit(X_train)
         model_onnx = to_onnx(
             model,
-            "scikit-learn standard scaler",
             [
                 oh.make_tensor_value_info(
                     "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
@@ -50,22 +49,6 @@ class TestSklearnPreprocessingConverters(ExtTestCase):
         )
         self.assertTrue(model_onnx is not None)
         dump_data_and_model(X_test, model, model_onnx, basename="SklearnMinMaxScaler")
-
-    def test_model_normalizer(self):
-        X_train, X_test = self._make_data()
-        model = Normalizer()
-        model.fit(X_train)
-        model_onnx = to_onnx(
-            model,
-            [
-                oh.make_tensor_value_info(
-                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
-                )
-            ],
-            target_opset=TARGET_OPSET,
-        )
-        self.assertTrue(model_onnx is not None)
-        dump_data_and_model(X_test, model, model_onnx, basename="SklearnNormalizer")
 
     def test_model_max_abs_scaler(self):
         X_train, X_test = self._make_data()

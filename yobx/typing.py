@@ -28,6 +28,23 @@ class InferenceSessionLike(Protocol):
 
 
 @runtime_checkable
+class ConvertOptionsProtocol(Protocol):
+    """Protocol for a class giving indications on how to convert a model."""
+
+    def has(self, option_name: str, piece: object) -> bool:
+        """Returns true if option `option_name` applies to `piece`"""
+        ...
+
+
+class DefaultConvertOptions(ConvertOptionsProtocol):
+    """All options are disabled."""
+
+    def has(self, option_name: str, piece: object) -> bool:
+        """Returns always False."""
+        return False
+
+
+@runtime_checkable
 class GraphBuilderProtocol(Protocol):
     """Protocol describing the expected API for graph builders.
 
@@ -45,6 +62,11 @@ class GraphBuilderProtocol(Protocol):
     @property
     def output_names(self) -> List[str]:
         """Returns the list of output names."""
+        ...
+
+    @property
+    def convert_options(self) -> ConvertOptionsProtocol:
+        """Returns covnerting options."""
         ...
 
     def get_opset(self, domain: str, exc: bool = True) -> int:
