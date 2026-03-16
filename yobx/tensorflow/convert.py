@@ -101,7 +101,7 @@ def to_onnx(
     )
 
     if verbose:
-        if issubclass(builder_cls, GraphBuilder):
+        if issubclass(builder_cls, GraphBuilder):  # type: ignore
             kwargs["verbose"] = verbose  # type: ignore
 
         from ..helpers import string_type
@@ -135,7 +135,7 @@ def to_onnx(
             )
             if agg.shape[0]:
                 print(agg.to_string())
-        return onx
+        return onx  # type: ignore
     return g.to_onnx(large_model=large_model, external_threshold=external_threshold)  # type: ignore
 
 
