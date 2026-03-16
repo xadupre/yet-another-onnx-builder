@@ -1,7 +1,7 @@
 import os
 import unittest
 import yobx.sklearn as yskl
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.sklearn import register_sklearn_converters
 from yobx.sklearn.register import get_sklearn_estimator_coverage
 
@@ -51,6 +51,31 @@ class TestSklearnRegister(ExtTestCase):
         self.assertIsInstance(rst, str)
         self.assertIn("**Coverage**", rst)
         self.assertRaise(lambda: get_sklearn_estimator_coverage(libraries=("nolib",)), ValueError)
+
+    @requires_sklearn("1.8")
+    def test_get_sklearn_estimator_coverage_per_lib(self):
+        register_sklearn_converters()
+        boundaries = {
+            "sklearn": (100, 300),
+            "imblearn": (1, 20),
+            "xgboost": (5, 5),
+            "lightgbm": (3, 3),
+            "category_encoders": (10, 20),
+        }
+        for lib, (mine, maxe) in boundaries.items():
+            with self.subTest(lib=lib):
+                res = get_sklearn_estimator_coverage(libraries=lib, rst=False)
+                self.assertIsInstance(res, list)
+                self.assertGreaterOrEqual(len(res), mine)
+                self.assertLessOrEqual(len(res), maxe)
+                modules = {r["module"] for r in res}
+                self.assertTrue(
+                    all(m.startswith(lib) for m in modules),
+                    lambda: f"lib={lib!r}, modules={modules}",
+                )
+                rst = get_sklearn_estimator_coverage(libraries=lib, rst=True)
+                n_lines = len(rst.split("\n"))
+                self.assertLess(n_lines, (len(res) + 2) * 5 + 2)
 
 
 if __name__ == "__main__":

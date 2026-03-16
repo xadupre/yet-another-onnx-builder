@@ -21,7 +21,7 @@ to [ONNX](https://onnx.ai) format from many libraries:
 
 **standard machine learning**
 
-* [categorical_encoders](https://contrib.scikit-learn.org/category_encoders/)
+* [category_encoders](https://contrib.scikit-learn.org/category_encoders/)
 * [imbalanced-learn](https://imbalanced-learn.org/stable/)
 * [lightgbm](https://lightgbm.readthedocs.io)
 * [scikit-learn](https://scikit-learn.org)
