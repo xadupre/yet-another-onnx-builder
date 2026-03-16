@@ -24,4 +24,9 @@ def register_transformer_converters():
         converter = get_transformer_converter(LlamaAttention)
         # converter is llama_attention_to_onnx
     """
-    from . import classes  # noqa: F401 - triggers auto-registration as side effect
+    try:
+        import transformers  # noqa: F401
+
+        from . import classes  # noqa: F401 - triggers auto-registration as side effect
+    except ImportError:
+        pass
