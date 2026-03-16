@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tupl
 import numpy as np
 from onnx import AttributeProto, FunctionProto, ModelProto, NodeProto, TensorProto
 from ..helpers.onnx_helper import make_idn
+from ..typing import GraphBuilderPatternOptimizationProtocol
 
 
 def string_to_elem_type(name: str) -> int:
@@ -141,7 +142,7 @@ class PatternOptimization:
 
     def enumerate_matches(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimizationProtocol,
         subset_nodes: Optional[List[NodeProto]] = None,
     ) -> Iterator[MatchResult]:
         """
@@ -186,7 +187,7 @@ class PatternOptimization:
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimizationProtocol,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -322,7 +323,7 @@ class EasyPatternOptimization(PatternOptimization):
         )
 
     def _build_pattern(
-        self, g: "GraphBuilderPatternOptimization", fct: Callable  # noqa: F821
+        self, g: GraphBuilderPatternOptimizationProtocol, fct: Callable
     ) -> "GraphBuilderPatternOptimization":  # noqa: F821
         from .graph_builder_optim import GraphBuilderPatternOptimization
 
@@ -378,7 +379,7 @@ class EasyPatternOptimization(PatternOptimization):
         """
 
     def _get_match_pattern(
-        self, g: "GraphBuilderPatternOptimization"  # noqa: F821
+        self, g: GraphBuilderPatternOptimizationProtocol
     ) -> "GraphBuilderPatternOptimization":  # noqa: F821
         cache_key = 0, tuple(sorted(g.opsets.items()))
         if cache_key in self._cache:
@@ -389,7 +390,7 @@ class EasyPatternOptimization(PatternOptimization):
         return pat
 
     def _get_apply_pattern(
-        self, g: "GraphBuilderPatternOptimization"  # noqa: F821
+        self, g: GraphBuilderPatternOptimizationProtocol
     ) -> "GraphBuilderPatternOptimization":  # noqa: F821
         cache_key = 1, tuple(sorted(g.opsets.items()))
         if cache_key in self._cache:
@@ -412,7 +413,7 @@ class EasyPatternOptimization(PatternOptimization):
 
     def _match_backward(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimizationProtocol,
         node: NodeProto,
         pat: "GraphBuilderPatternOptimization",  # noqa: F821
         marked: Dict[int, Tuple[NodeProto, NodeProto]],
@@ -523,7 +524,7 @@ class EasyPatternOptimization(PatternOptimization):
 
     def _match_forward(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimizationProtocol,
         node: NodeProto,
         pat: "GraphBuilderPatternOptimization",  # noqa: F821
         marked: Dict[int, Tuple[NodeProto, NodeProto]],
@@ -819,7 +820,7 @@ class EasyPatternOptimization(PatternOptimization):
 
     def validate_mapping(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimizationProtocol,
         deleted_nodes: List[NodeProto],
         pattern_nodes: Optional[List[NodeProto]] = None,
     ) -> bool:
@@ -835,7 +836,7 @@ class EasyPatternOptimization(PatternOptimization):
 
     def validate_attribute_mapping(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimizationProtocol,
         deleted_nodes: List[NodeProto],
         pattern_nodes: Optional[List[NodeProto]] = None,
     ) -> bool:
@@ -972,7 +973,7 @@ class EasyPatternOptimization(PatternOptimization):
 
     def match(
         self,
-        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        g: GraphBuilderPatternOptimizationProtocol,
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
@@ -1306,7 +1307,7 @@ class OnnxEasyPatternOptimization(EasyPatternOptimization):
         self._apply_model = apply_model
 
     def _build_pattern(
-        self, g: "GraphBuilderPatternOptimization", fct: Callable  # noqa: F821
+        self, g: GraphBuilderPatternOptimizationProtocol, fct: Callable
     ) -> "GraphBuilderPatternOptimization":  # noqa: F821
         if fct == self.match_pattern:
             onx = self._match_model

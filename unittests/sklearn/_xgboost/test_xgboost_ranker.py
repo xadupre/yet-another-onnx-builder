@@ -133,10 +133,7 @@ class TestXGBoostRanker(ExtTestCase):
 
         X, y, group = self._make_ranking_data()
         pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("ranker", XGBRanker(n_estimators=3, random_state=0)),
-            ]
+            [("scaler", StandardScaler()), ("ranker", XGBRanker(n_estimators=3, random_state=0))]
         )
         pipe.fit(X, y, ranker__group=group)
 
