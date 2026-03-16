@@ -376,6 +376,9 @@ subclass :class:`~yobx.typing.DefaultConvertOptions` and override ``has``:
 Alternatively, any object whose class implements the single-method
 :class:`~yobx.typing.ConvertOptionsProtocol` is accepted directly.
 
+See :ref:`l-plot-sklearn-convert-options` for a full runnable example
+of ``decision_path`` and ``decision_leaf`` on single trees and ensembles.
+
 Alternative implementations
 ===========================
 
