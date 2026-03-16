@@ -267,6 +267,115 @@ The helper :meth:`set_type_shape_unary_op
     g.set_type_shape_unary_op(result, X)
     return result
 
+Convert Options
+===============
+
+:class:`~yobx.typing.ConvertOptionsProtocol` is a lightweight protocol that
+lets callers **opt-in to extra outputs** on a per-estimator basis without
+changing the core converter signatures.
+
+Protocol contract
+-----------------
+
+Any object that implements the single method below satisfies the protocol and
+can be passed to :func:`~yobx.sklearn.to_onnx` as the ``convert_options``
+argument:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Method
+     - Description
+   * - ``has(option_name: str, piece: object) -> bool``
+     - Return ``True`` when the option identified by *option_name* should be
+       activated for the estimator *piece*.  The second argument is the fitted
+       scikit-learn estimator currently being converted, which lets callers
+       enable an option only for a specific step inside a
+       :class:`~sklearn.pipeline.Pipeline`.
+
+Inside a converter, the options object is accessible via the graph builder's
+``convert_options`` property (``g.convert_options``):
+
+.. code-block:: python
+
+    # Inside a converter function:
+    if g.convert_options.has("decision_path", estimator):
+        # emit the extra decision-path output
+        ...
+
+Built-in options: ``ConvertOptions``
+-------------------------------------
+
+:class:`~yobx.sklearn.ConvertOptions` is the default implementation shipped
+with the package.  It currently exposes two boolean flags:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 55
+
+   * - Option name
+     - Type
+     - Description
+   * - ``decision_path``
+     - ``bool``
+     - When ``True``, an extra output tensor is appended for each tree/ensemble
+       estimator.  For a single :class:`~sklearn.tree.DecisionTreeClassifier`
+       or :class:`~sklearn.tree.DecisionTreeRegressor` the shape is
+       ``(N, 1)``; for ensemble models
+       (:class:`~sklearn.ensemble.RandomForestClassifier`,
+       :class:`~sklearn.ensemble.RandomForestRegressor`,
+       :class:`~sklearn.ensemble.ExtraTreesClassifier`,
+       :class:`~sklearn.ensemble.ExtraTreesRegressor`) the shape is
+       ``(N, n_estimators)``.  Each value is a binary string encoding the
+       root-to-leaf path through the tree.
+   * - ``decision_leaf``
+     - ``bool``
+     - When ``True``, an extra output tensor (``int64``) is appended containing
+       the zero-based leaf node index reached by each sample.  Shapes follow
+       the same convention as ``decision_path``.
+
+Passing options to ``to_onnx``
+--------------------------------
+
+.. code-block:: python
+
+    import numpy as np
+    from sklearn.tree import DecisionTreeClassifier
+    from yobx.sklearn import to_onnx, ConvertOptions
+
+    X = np.random.default_rng(0).standard_normal((20, 4)).astype(np.float32)
+    y = (X[:, 0] > 0).astype(int)
+    clf = DecisionTreeClassifier(max_depth=3).fit(X, y)
+
+    opts = ConvertOptions(decision_path=True)
+    model_onnx = to_onnx(clf, (X,), convert_options=opts)
+    # The exported model now has three outputs:
+    #   output_0 – label (int64, shape [N])
+    #   output_1 – probabilities (float32, shape [N, 2])
+    #   output_2 – decision path (object/string, shape [N, 1])
+
+Implementing a custom protocol
+--------------------------------
+
+You can supply any object with a ``has`` method.  The simplest way is to
+subclass :class:`~yobx.typing.DefaultConvertOptions` and override ``has``:
+
+.. code-block:: python
+
+    from yobx.typing import DefaultConvertOptions
+
+    class MyOptions(DefaultConvertOptions):
+        def has(self, option_name: str, piece: object) -> bool:
+            # Only enable decision_leaf for RandomForestClassifier:
+            from sklearn.ensemble import RandomForestClassifier
+            if option_name == "decision_leaf":
+                return isinstance(piece, RandomForestClassifier)
+            return False
+
+Alternatively, any object whose class implements the single-method
+:class:`~yobx.typing.ConvertOptionsProtocol` is accepted directly.
+
 Alternative implementations
 ===========================
 
