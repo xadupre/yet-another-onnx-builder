@@ -41,12 +41,12 @@ jobs:
       - name: Run sklearn tests with no coverage
         if: matrix.sklearn-version != '1.8'
         run: |
-          python -m unittest discover -s unittests/sklearn
+          PYTHONWARNINGS="ignore::FutureWarning,ignore::RuntimeWarning" python -m unittest discover -s unittests/sklearn
 
       - name: Run unittest files with coverage, not pytest
         if: matrix.sklearn-version == '1.8'
         run: |
-          coverage run -m unittest discover -s unittests/sklearn
+          PYTHONWARNINGS="ignore::FutureWarning,ignore::RuntimeWarning" coverage run -m unittest discover -s unittests/sklearn
           coverage xml
 
       - name: Parity with sklearn-onnx

@@ -177,6 +177,7 @@ The user may need extra outputs coming from the model.
 This is driven by class :class:`yobx.sklearn.ConvertOptions`
 which exposes all the possible ways to change the default behaviour
 if the converters.
+See :ref:`l-plot-sklearn-convert-options` for a worked example.
 
 yobx VS skl2onnx
 ================
