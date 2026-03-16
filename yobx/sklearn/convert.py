@@ -1,5 +1,5 @@
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
-from onnx import ModelProto
+from onnx import ModelProto, ValueInfoProto
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline, FeatureUnion
@@ -11,6 +11,30 @@ from ..xbuilder import GraphBuilder, OptimizationOptions
 from ..xbuilder.function_options import FunctionOptions
 from .register import get_sklearn_converter, sklearn_exportable_methods
 from .sklearn_helper import get_output_names
+
+
+def _extract_value_info_proto(vip: ValueInfoProto) -> Tuple[str, int, Optional[Tuple]]:
+    """Extract ``(name, elem_type, shape)`` from a :class:`onnx.ValueInfoProto`.
+
+    :param vip: an ONNX value-info descriptor
+    :return: tuple ``(name, elem_type, shape)`` where *shape* is ``None`` when
+        no shape information is present, and otherwise a tuple whose elements
+        are ``int`` for static dimensions, a non-empty ``str`` for symbolic
+        dimensions, and an auto-generated name such as ``"_unk_0_"`` for
+        dimensions with no value and no symbolic name.
+    """
+    name = vip.name
+    tt = vip.type.tensor_type
+    elem_type = tt.elem_type
+    if tt.HasField("shape"):
+        shape_dims = [
+            (dim.dim_param if dim.dim_param else (dim.dim_value or f"dim_{name}_{idim}"))
+            for idim, dim in enumerate(tt.shape.dim)
+        ]
+        shape: Optional[Tuple] = tuple(shape_dims)
+    else:
+        shape = None
+    return name, elem_type, shape
 
 
 def _default_ai_onnx_ml(main_opset: int) -> int:
@@ -133,7 +157,12 @@ def to_onnx(
     the others are static.
 
     :param estimator: estimator
-    :param args: dummy inputs
+    :param args: dummy inputs; each element may be a numpy array **or** an
+        :class:`onnx.ValueInfoProto` that explicitly describes the input
+        tensor's name, element type and shape.  When a
+        :class:`~onnx.ValueInfoProto` is provided no actual data is required,
+        and the ``dynamic_shapes`` parameter is ignored for that input (the
+        shape is taken directly from the proto).
     :param dynamic_shapes: dynamic shapes, if not specified, the first dimension
         is dynamic, the others are static
     :param target_opset: opset to use; either an integer for the default domain
@@ -179,11 +208,8 @@ def to_onnx(
         a matrix is the inverse of another one.
         See :ref:`l-plot-sklearn-pls-float32`.
     """
-    _fitted_check_target = (
-        estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
-    )
     check_is_fitted(
-        _fitted_check_target,
+        estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator,
         attributes=sklearn_exportable_methods(),
         all_or_any=any,
         msg=(
@@ -211,6 +237,19 @@ def to_onnx(
         if "com.microsoft" in dict_target_opset
         else {}
     )
+
+    if verbose:
+        if issubclass(builder_cls, GraphBuilder):
+            kwargs["verbose"] = verbose  # type: ignore
+
+        from ..helpers import string_type
+
+        print(f"[yobx.sklearn.to_onnx] export with builder {builder_cls!r})")
+        print(f"[yobx.sklearn.to_onnx] {dict_target_opset=}")
+        print(f"[yobx.sklearn.to_onnx] args={string_type(args, with_shape=True)}")
+        if extra_converters:
+            print(f"[yobx.sklearn.to_onnx] with {len(extra_converters)} extra converters")
+
     g = builder_cls(dict_target_opset, **kwargs)
 
     cls = type(estimator)
@@ -223,16 +262,30 @@ def to_onnx(
         if len(input_names) != len(args):
             raise ValueError(f"Length mismatch: {len(args)=} but input_names={input_names!r}")
     else:
-        input_names = ["X"] if len(args) == 1 else [f"X{i}" for i in range(len(args))]
+        # Derive default input names; for ValueInfoProto use the embedded name.
+        default_names = []
+        for j, arg in enumerate(args):
+            if isinstance(arg, ValueInfoProto):
+                default_names.append(arg.name or (f"X{j}" if len(args) > 1 else "X"))
+            else:
+                default_names.append("X" if len(args) == 1 else f"X{j}")
+        input_names = default_names
     for i, (name, arg) in enumerate(zip(input_names, args)):
-        if dynamic_shapes:
-            ds = dynamic_shapes[i]
+        if isinstance(arg, ValueInfoProto):
+            # Use name/type/shape directly from the ValueInfoProto.
+            _, elem_type, shape = _extract_value_info_proto(arg)
+            g.make_tensor_input(name, elem_type, shape, device=-1)
         else:
-            ds = {0: "batch"}
-        shape = list(arg.shape)
-        for axis, dim in ds.items():
-            shape[axis] = dim
-        g.make_tensor_input(name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1)
+            if dynamic_shapes:
+                ds = dynamic_shapes[i]
+            else:
+                ds = {0: "batch"}
+            shape = list(arg.shape)
+            for axis, dim in ds.items():
+                shape[axis] = dim
+            g.make_tensor_input(  # type: ignore
+                name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1  # type: ignore
+            )  # type: ignore
 
     # Build the sts dict (shared state for converters). function_options, if set,
     # is passed explicitly to container converters below.
@@ -263,6 +316,28 @@ def to_onnx(
         g.make_tensor_output(name, indexed=False, allow_untyped_output=True)
     # When local functions are requested we must NOT inline them; pass inline=False
     # so the function bodies are preserved in the returned ModelProto.
+    if isinstance(g, GraphBuilder):
+        onx, stats = g.to_onnx(  # type: ignore
+            large_model=large_model,
+            external_threshold=external_threshold,
+            inline=(not function_options) or not function_options.export_as_function,
+            return_optimize_report=True,
+        )
+        if verbose:
+            import pandas
+
+            print(f"[yobx.sklearn.to_onnx] done, output type is {type(onx)}")
+
+            df = pandas.DataFrame(stats)
+            for c in ["added", "removed"]:
+                df[c] = df[c].fillna(0).astype(int)
+            agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
+            agg = agg[(agg["added"] > 0) | (agg["removed"] > 0)].sort_values(
+                "removed", ascending=False
+            )
+            if agg.shape[0]:
+                print(agg.to_string())
+        return onx
     return g.to_onnx(
         large_model=large_model,
         external_threshold=external_threshold,

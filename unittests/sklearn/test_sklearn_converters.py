@@ -9,7 +9,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, hide_stdout
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
 
@@ -471,6 +471,91 @@ class TestGetSklearnEstimatorCoverage(ExtTestCase):
         rows = get_sklearn_estimator_coverage()
         names = [r["name"] for r in rows]
         self.assertEqual(names, sorted(names))
+
+
+@requires_sklearn("1.4")
+class TestSklearnToOnnxValueInfoProto(ExtTestCase):
+    """Tests that to_onnx accepts :class:`onnx.ValueInfoProto` as input descriptors."""
+
+    def test_standard_scaler_value_info_proto(self):
+        """ValueInfoProto replaces the numpy array as input specification."""
+        import onnx
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        ss = StandardScaler()
+        ss.fit(X)
+
+        vip = onnx.helper.make_tensor_value_info("features", onnx.TensorProto.FLOAT, ["N", 2])
+        onx = to_onnx(ss, (vip,))
+
+        # The ONNX graph input must use the name from the ValueInfoProto.
+        self.assertEqual(onx.graph.input[0].name, "features")
+        # Shape dim 0 should be symbolic ("N"), dim 1 should be static 2.
+        shape = onx.graph.input[0].type.tensor_type.shape
+        self.assertEqual(shape.dim[0].dim_param, "N")
+        self.assertEqual(shape.dim[1].dim_value, 2)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"features": X})[0]
+        self.assertEqualArray(ss.transform(X).astype(np.float32), result, atol=1e-5)
+
+    def test_standard_scaler_value_info_proto_with_input_names_override(self):
+        """input_names overrides the name embedded in a ValueInfoProto."""
+        import onnx
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        ss = StandardScaler()
+        ss.fit(X)
+
+        vip = onnx.helper.make_tensor_value_info("features", onnx.TensorProto.FLOAT, ["N", 2])
+        onx = to_onnx(ss, (vip,), input_names=["my_input"])
+
+        self.assertEqual(onx.graph.input[0].name, "my_input")
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"my_input": X})[0]
+        self.assertEqualArray(ss.transform(X).astype(np.float32), result, atol=1e-5)
+
+    def test_pipeline_value_info_proto(self):
+        """ValueInfoProto works with a Pipeline (scaler + regressor)."""
+        import onnx
+        from sklearn.linear_model import LinearRegression
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        pipe = Pipeline([("scaler", StandardScaler()), ("reg", LinearRegression())])
+        pipe.fit(X, y)
+
+        vip = onnx.helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [None, 2])
+        onx = to_onnx(pipe, (vip,))
+
+        self.assertEqual(onx.graph.input[0].name, "X")
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X": X})[0]
+        expected = pipe.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    @hide_stdout()
+    def test_verbosity(self):
+        """ValueInfoProto works with a Pipeline (scaler + regressor)."""
+        import onnx
+        from sklearn.linear_model import LinearRegression
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        pipe = Pipeline([("scaler", StandardScaler()), ("reg", LinearRegression())])
+        pipe.fit(X, y)
+
+        vip = onnx.helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [None, 2])
+        onx = to_onnx(pipe, (vip,), verbose=1)
+
+        self.assertEqual(onx.graph.input[0].name, "X")
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X": X})[0]
+        expected = pipe.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected, result, atol=1e-5)
 
 
 if __name__ == "__main__":
