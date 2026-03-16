@@ -150,6 +150,7 @@ def to_onnx(
     large_model: bool = False,
     external_threshold: int = 1024,
     function_options: Optional[FunctionOptions] = None,
+    options: Optional[Dict[str, Any]] = None,
 ) -> Union[ModelProto, ExtendedModelContainer]:
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
@@ -198,6 +199,16 @@ def to_onnx(
         to customize function naming.  Pass ``None`` (the default) to disable
         function wrapping and produce a flat graph.
         when *large_model* is True
+    :param options: optional dict of converter options passed to tree and ensemble
+        converters via the shared state (``sts``).  Supported keys:
+
+        * ``"decision_path"`` (:class:`bool`) — when ``True``, an extra output
+          tensor is appended containing the binary decision path string(s) for
+          each input sample.  For single trees the shape is ``(N, 1)``; for
+          ensembles ``(N, n_estimators)``.
+        * ``"decision_leaf"`` (:class:`bool`) — when ``True``, an extra output
+          tensor is appended containing the leaf node index (int64) for each
+          input sample.  Shapes follow the same convention as ``decision_path``.
 
     .. note::
 
@@ -291,6 +302,14 @@ def to_onnx(
     # is passed explicitly to container converters below.
     sts: Dict[str, Any] = {}
     output_names = list(get_output_names(estimator))
+
+    if options:
+        sts["options"] = options
+        # Append extra output names requested via options.
+        if options.get("decision_path", False):
+            output_names.append("decision_path")
+        if options.get("decision_leaf", False):
+            output_names.append("decision_leaf")
 
     is_container = isinstance(estimator, (Pipeline, ColumnTransformer, FeatureUnion))
 
