@@ -3,6 +3,10 @@ name: Documentation Verbose
 on:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   doc_examples:
     name: doc verbose (ubuntu-latest, py3.13)
