@@ -341,6 +341,12 @@ def to_onnx(
     # is passed explicitly to container converters below.
     sts: Dict[str, Any] = {}
     output_names = list(get_output_names(estimator))
+    # Append extra output names requested by convert_options so that converters
+    # can detect them via len(outputs) > extra_idx and emit the extra nodes.
+    if convert_options:
+        for _extra_opt in ConvertOptions.OPTIONS:
+            if convert_options.has(_extra_opt, estimator):
+                output_names.append(_extra_opt)
 
     is_container = isinstance(estimator, (Pipeline, ColumnTransformer, FeatureUnion))
 
