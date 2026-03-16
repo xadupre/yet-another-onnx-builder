@@ -62,17 +62,18 @@ class TestSklearnRegister(ExtTestCase):
             "category_encoders": (10, 20),
         }
         for lib, (mine, maxe) in boundaries.items():
-            res = get_sklearn_estimator_coverage(libraries=lib, rst=False)
-            self.assertIsInstance(res, list)
-            self.assertGreaterOrEqual(len(res), mine)
-            self.assertLessOrEqual(len(res), maxe)
-            modules = {r["module"] for r in res}
-            self.assertTrue(
-                all(m.startswith(lib) for m in modules), lambda: f"lib={lib!r}, modules={modules}"
-            )
-            rst = get_sklearn_estimator_coverage(libraries=lib, rst=True)
-            n_lines = len(rst.split("\n"))
-            self.assertLess(n_lines, (len(res) + 2) * 5 + 2)
+            with self.subTest(lib=lib):
+                res = get_sklearn_estimator_coverage(libraries=lib, rst=False)
+                self.assertIsInstance(res, list)
+                self.assertGreaterOrEqual(len(res), mine)
+                self.assertLessOrEqual(len(res), maxe)
+                modules = {r["module"] for r in res}
+                self.assertTrue(
+                    all(m.startswith(lib) for m in modules), lambda: f"lib={lib!r}, modules={modules}"
+                )
+                rst = get_sklearn_estimator_coverage(libraries=lib, rst=True)
+                n_lines = len(rst.split("\n"))
+                self.assertLess(n_lines, (len(res) + 2) * 5 + 2)
 
 
 if __name__ == "__main__":
