@@ -522,6 +522,71 @@ class TestOnnxExportCornerCase(ExtTestCase):
         torch.testing.assert_close(expected, got)
         self.assertEqualArray(expected, got)
 
+    @requires_torch()
+    @ignore_warnings((UserWarning, DeprecationWarning))
+    def test_com_microsoft_opset_triggers_ort_optimizations(self):
+        """When target_opset includes 'com.microsoft', ort optimizations are auto-enabled."""
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        x = torch.randn(2, 3)
+        y = torch.randn(2, 3)
+
+        # No explicit options — 'com.microsoft' in target_opset should trigger
+        # OptimizationOptions(patterns="default+onnxruntime") automatically.
+        _onx, builder_ort = to_onnx(
+            Model(),
+            (x, y),
+            target_opset={"": 22, "com.microsoft": 1},
+            return_builder=True,
+        )
+        n_ort = len(builder_ort.optimization_options.patterns)
+
+        # Default opset (integer) should use the standard default patterns.
+        _onx2, builder_default = to_onnx(
+            Model(),
+            (x, y),
+            target_opset=22,
+            return_builder=True,
+        )
+        n_default = len(builder_default.optimization_options.patterns)
+
+        self.assertGreater(
+            n_ort,
+            n_default,
+            "com.microsoft in target_opset should produce more patterns than the default",
+        )
+
+    @requires_torch()
+    @ignore_warnings((UserWarning, DeprecationWarning))
+    def test_com_microsoft_opset_does_not_override_explicit_options(self):
+        """Explicit options must not be overridden when target_opset includes 'com.microsoft'."""
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        x = torch.randn(2, 3)
+        y = torch.randn(2, 3)
+
+        explicit_options = OptimizationOptions(patterns="default")
+        _onx, builder = to_onnx(
+            Model(),
+            (x, y),
+            target_opset={"": 22, "com.microsoft": 1},
+            options=explicit_options,
+            return_builder=True,
+        )
+        self.assertIs(
+            builder.optimization_options,
+            explicit_options,
+            "Explicit options should not be replaced by the auto-detected ort options",
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
