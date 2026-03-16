@@ -27,7 +27,10 @@ def _extract_value_info_proto(vip: ValueInfoProto) -> Tuple[str, int, Optional[T
     tt = vip.type.tensor_type
     elem_type = tt.elem_type
     if tt.HasField("shape"):
-        shape_dims = [(dim.dim_param if dim.dim_param else dim.dim_value) for dim in tt.shape]
+        shape_dims = [
+            (dim.dim_param if dim.dim_param else (dim.dim_value or f"dim_{name}_{idim}"))
+            for idim, dim in enumerate(tt.shape.dim)
+        ]
         shape: Optional[Tuple] = tuple(shape_dims)
     else:
         shape = None
