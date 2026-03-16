@@ -96,6 +96,7 @@ intersphinx_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "sklearn": ("https://scikit-learn.org/stable/", None),
     "skl2onnx": ("https://onnx.ai/sklearn-onnx/", None),
+    "sktorch": ("https://skorch.readthedocs.io/en/latest/", None),
     "tensorflow": (
         "https://www.tensorflow.org/api_docs/python",
         "https://github.com/mr-ubik/tensorflow-intersphinx/raw/master/tf2_py_objects.inv",
@@ -196,6 +197,7 @@ epkg_dictionary = {
     "scikit-learn": "https://scikit-learn.org/stable/",
     "scipy": "https://scipy.org/",
     "sklearn-onnx": "https://onnx.ai/sklearn-onnx/",
+    "sktorch": "https://skorch.readthedocs.io/en/latest/",
     "sphinx-gallery": "https://github.com/sphinx-gallery/sphinx-gallery",
     "sphinx-runpython": "https://github.com/sdpython/sphinx-runpython",
     "spox": "https://spox.readthedocs.io/en/latest/",

@@ -301,6 +301,163 @@ def _extract_tree_attributes_v5(tree, n_classes: int, is_classifier: bool, itype
     )
 
 
+def _build_path_map(tree) -> Dict[int, str]:
+    """Build a mapping from leaf node id to the binary path string for that leaf.
+
+    For each leaf node the returned string has length ``tree.node_count``
+    and encodes the nodes visited on the root-to-leaf path as ``'1'``,
+    all other positions as ``'0'``.
+
+    :param tree: sklearn ``tree_`` attribute of a fitted estimator
+    :return: dict mapping leaf_node_id (int) -> path_string (str)
+    """
+    result: Dict[int, str] = {}
+
+    # Iterative DFS using an explicit stack to avoid hitting Python's recursion limit
+    # on very deep trees.
+    stack: List[Tuple[int, List[int]]] = [(0, [])]
+
+    while stack:
+        node_id, path = stack.pop()
+        current_path = [*path, node_id]
+
+        if tree.children_left[node_id] == _LEAF:
+            spath = ["0"] * tree.node_count
+            for nid in current_path:
+                spath[nid] = "1"
+            result[node_id] = "".join(spath)
+        else:
+            left_child = int(tree.children_left[node_id])
+            right_child = int(tree.children_right[node_id])
+            # Push right child first so that left subtree is processed first,
+            # matching the original recursive traversal order.
+            stack.append((right_child, current_path))
+            stack.append((left_child, current_path))
+
+    return result
+
+
+def _make_leaf_id_node(g: GraphBuilderExtendedProtocol, tree, X: str, name: str) -> str:
+    """Emit a tree ensemble node that outputs the leaf node id for each sample.
+
+    Chooses between ``TreeEnsemble`` (``ai.onnx.ml`` opset >= 5) and the
+    legacy ``TreeEnsembleRegressor`` (opset <= 4) based on the graph's
+    registered opset.
+
+    :param g: graph builder
+    :param tree: sklearn ``tree_`` attribute
+    :param X: input tensor name
+    :param name: prefix for the internal node name
+    :return: output tensor name; shape ``(N, 1)``, dtype float32
+    """
+    ml_opset = g.get_opset("ai.onnx.ml")
+    itype = g.get_type(X)
+
+    if ml_opset >= 5:
+        # Build v5 attributes and override leaf_weights with leaf node IDs.
+        attrs = _extract_tree_attributes_v5(tree, n_classes=1, is_classifier=False, itype=itype)
+        dtype = tensor_dtype_to_np_dtype(itype)
+        leaf_nodes = [nid for nid in range(tree.node_count) if tree.children_left[nid] == _LEAF]
+        # Any valid fitted tree has at least one leaf, so leaf_nodes is always non-empty.
+        lw = np.array([float(nid) for nid in leaf_nodes], dtype=dtype)
+        attrs["leaf_weights"] = oh.make_tensor("leaf_weights", itype, (len(lw),), lw)
+        return g.make_node(
+            "TreeEnsemble",
+            [X],
+            outputs=1,
+            domain="ai.onnx.ml",
+            name=f"{name}_leaf_te",
+            post_transform=0,  # NONE
+            aggregate_function=1,  # SUM
+            **attrs,  # type: ignore
+        )
+
+    # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4).
+    attrs = _extract_tree_attributes(tree, n_classes=1, is_classifier=False)
+    attrs["target_weights"] = [float(nid) for nid in attrs["target_nodeids"]]
+    return g.make_node(
+        "TreeEnsembleRegressor",
+        [X],
+        outputs=1,
+        domain="ai.onnx.ml",
+        name=f"{name}_leaf_reg",
+        n_targets=1,
+        post_transform="NONE",
+        **attrs,  # type: ignore
+    )
+
+
+def _emit_decision_path_for_tree(
+    g: GraphBuilderExtendedProtocol, tree, X: str, output_name: str, name: str
+) -> str:
+    """Emit ONNX nodes to compute the ``decision_path`` output for a single tree.
+
+    Uses :func:`_make_leaf_id_node` to obtain the float leaf node id, then
+    maps it to a binary path string via a ``LabelEncoder`` (``ai.onnx.ml``),
+    and reshapes to ``(N, 1)``.
+
+    :param g: graph builder
+    :param tree: sklearn ``tree_`` attribute
+    :param X: input tensor name
+    :param output_name: desired output tensor name; shape ``(N, 1)``, dtype string
+    :param name: prefix for the internal node names
+    :return: *output_name*
+    """
+    leaf_id = _make_leaf_id_node(g, tree, X, name)
+
+    path_map = _build_path_map(tree)
+    sorted_items = sorted(path_map.items())
+    keys_floats = [float(k) for k, _ in sorted_items]
+    values_strings = [v for _, v in sorted_items]
+
+    encoded = g.make_node(
+        "LabelEncoder",
+        [leaf_id],
+        outputs=1,
+        domain="ai.onnx.ml",
+        name=f"{name}_path_enc",
+        default_string="0" * tree.node_count,
+        keys_floats=keys_floats,
+        values_strings=values_strings,
+    )
+
+    g.op.Reshape(
+        encoded,
+        np.array([-1, 1], dtype=np.int64),
+        name=f"{name}_path_reshape",
+        outputs=[output_name],
+    )
+    return output_name
+
+
+def _emit_decision_leaf_for_tree(
+    g: GraphBuilderExtendedProtocol, tree, X: str, output_name: str, name: str
+) -> str:
+    """Emit ONNX nodes to compute the ``decision_leaf`` output for a single tree.
+
+    Uses :func:`_make_leaf_id_node` to obtain the float leaf node id, casts
+    the result to int64, and reshapes to ``(N, 1)``.
+
+    :param g: graph builder
+    :param tree: sklearn ``tree_`` attribute
+    :param X: input tensor name
+    :param output_name: desired output tensor name; shape ``(N, 1)``, dtype int64
+    :param name: prefix for the internal node names
+    :return: *output_name*
+    """
+    leaf_id_f32 = _make_leaf_id_node(g, tree, X, name)
+
+    leaf_id = g.op.Cast(leaf_id_f32, to=onnx.TensorProto.INT64, name=f"{name}_leaf_cast")
+
+    g.op.Reshape(
+        leaf_id,
+        np.array([-1, 1], dtype=np.int64),
+        name=f"{name}_leaf_reshape",
+        outputs=[output_name],
+    )
+    return output_name
+
+
 @register_sklearn_converter((DecisionTreeClassifier,))
 def sklearn_decision_tree_classifier(
     g: GraphBuilderExtendedProtocol,
@@ -351,10 +508,11 @@ def sklearn_decision_tree_classifier(
         classlabels = classes.astype(str).tolist()  # type: ignore
         label_kwargs = {"classlabels_strings": classlabels}
 
-    result = g.make_node(
+    # TreeEnsembleClassifier always produces exactly 2 outputs (label, probabilities).
+    g.make_node(
         "TreeEnsembleClassifier",
         [X],
-        outputs=outputs,
+        outputs=outputs[:2],
         domain="ai.onnx.ml",
         name=name,
         post_transform="NONE",
@@ -362,9 +520,16 @@ def sklearn_decision_tree_classifier(
         **label_kwargs,
     )
 
-    if isinstance(result, str):
-        return result, result
-    return result[0], result[1]
+    # Emit optional extra outputs requested via sts["options"].
+    extra_idx = 2
+    if g.convert_options.has("decision_path", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_path_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dp")
+        extra_idx += 1
+    if g.convert_options.has("decision_leaf", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
+        _emit_decision_leaf_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dl")
+    return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
 
 def _sklearn_decision_tree_classifier_v5(
@@ -407,7 +572,7 @@ def _sklearn_decision_tree_classifier_v5(
     assert isinstance(scores, str)
 
     # Rename scores to the desired probabilities output name.
-    proba = g.op.Identity(scores, name=f"{name}_proba", outputs=outputs[1:])
+    proba = g.op.Identity(scores, name=f"{name}_proba", outputs=outputs[1:2])
     assert isinstance(proba, str)
 
     # Derive the predicted label via ArgMax over the class axis.
@@ -431,7 +596,16 @@ def _sklearn_decision_tree_classifier_v5(
         if not sts:
             g.set_type(label, onnx.TensorProto.STRING)
 
-    return label, proba
+    # Emit optional extra outputs requested via sts["options"].
+    extra_idx = 2
+    if g.convert_options.has("decision_path", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_path_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dp")
+        extra_idx += 1
+    if g.convert_options.has("decision_leaf", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
+        _emit_decision_leaf_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dl")
+    return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
 
 @register_sklearn_converter((DecisionTreeRegressor,))
@@ -474,16 +648,26 @@ def sklearn_decision_tree_regressor(
         attrs = _extract_tree_attributes_v5(
             tree, n_classes=1, is_classifier=False, itype=g.get_type(X)
         )
-        return g.make_node(
+        g.make_node(
             "TreeEnsemble",
             [X],
-            outputs=outputs,
+            outputs=outputs[:1],
             domain="ai.onnx.ml",
             name=f"{name}_te",
             post_transform=0,  # NONE
             aggregate_function=1,  # SUM
             **attrs,  # type: ignore
         )
+        # Emit optional extra outputs.
+        extra_idx = 1
+        if g.convert_options.has("decision_path", estimator):
+            assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+            _emit_decision_path_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dp")
+            extra_idx += 1
+        if g.convert_options.has("decision_leaf", estimator):
+            assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
+            _emit_decision_leaf_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dl")
+        return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
     # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4)
     attrs = _extract_tree_attributes(tree, n_classes=1, is_classifier=False)
@@ -498,7 +682,16 @@ def sklearn_decision_tree_regressor(
         post_transform="NONE",
         **attrs,  # type: ignore
     )
-    cast_result = g.make_node(
-        "Cast", [tree_result], outputs=outputs, name=f"{name}_cast_f64", to=g.get_type(X)
+    g.make_node(
+        "Cast", [tree_result], outputs=outputs[:1], name=f"{name}_cast_f64", to=g.get_type(X)
     )
-    return cast_result
+    # Emit optional extra outputs.
+    extra_idx = 1
+    if g.convert_options.has("decision_path", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_path_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dp")
+        extra_idx += 1
+    if g.convert_options.has("decision_leaf", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
+        _emit_decision_leaf_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dl")
+    return outputs[0] if len(outputs) == 1 else tuple(outputs)

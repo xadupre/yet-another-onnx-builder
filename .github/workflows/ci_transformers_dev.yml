@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: "0 3 * * *"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   transformers_dev:
     name: tr-dev (ubuntu-latest, py3.13, transformers-dev, torch-nightly)

@@ -73,7 +73,7 @@ print("-----------------")
 # Replace forward method
 # ++++++++++++++++++++++
 #
-# We first capture inputs and outputs with an :class`InputObserver
+# We first capture inputs and outputs with an :class:`InputObserver
 # <yobx.investigate.input_observer>`.
 # We also need to registers additional patches for :epkg:`transformers`.
 # Then :epkg:`pytorch` knows how to flatten/unflatten inputs.

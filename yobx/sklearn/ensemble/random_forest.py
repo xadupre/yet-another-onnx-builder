@@ -11,7 +11,12 @@ from sklearn.ensemble import (
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter
-from ..tree.decision_tree import _LEAF, _NODE_MODE_LEQ
+from ..tree.decision_tree import (
+    _LEAF,
+    _NODE_MODE_LEQ,
+    _emit_decision_path_for_tree,
+    _emit_decision_leaf_for_tree,
+)
 
 
 def _extract_forest_attributes_legacy(
@@ -343,6 +348,58 @@ def _extract_forest_attributes_v5(
     )
 
 
+def _emit_decision_path_for_estimators(
+    g: GraphBuilderExtendedProtocol, estimators: list, X: str, output_name: str, name: str
+) -> str:
+    """Emits ONNX nodes to compute the ``decision_path`` output for an ensemble.
+
+    Computes a per-tree path string for each estimator and concatenates them
+    along axis 1 to produce a ``(N, n_estimators)`` string tensor.
+
+    :param g: graph builder
+    :param estimators: list of fitted base estimators (``estimator.estimators_``)
+    :param X: input tensor name
+    :param output_name: desired output tensor name
+    :param name: prefix for the internal node names
+    :return: *output_name*
+    """
+    per_tree_paths: List[str] = []
+    for i, base_est in enumerate(estimators):
+        path_i = g.unique_name(f"{name}_t{i}_path")
+        _emit_decision_path_for_tree(g, base_est.tree_, X, path_i, name=f"{name}_t{i}")
+        per_tree_paths.append(path_i)
+    g.make_node(
+        "Concat", per_tree_paths, outputs=[output_name], name=f"{name}_path_concat", axis=1
+    )
+    return output_name
+
+
+def _emit_decision_leaf_for_estimators(
+    g: GraphBuilderExtendedProtocol, estimators: list, X: str, output_name: str, name: str
+) -> str:
+    """Emit ONNX nodes to compute the ``decision_leaf`` output for an ensemble.
+
+    Computes a per-tree leaf index for each estimator and concatenates them
+    along axis 1 to produce a ``(N, n_estimators)`` int64 tensor.
+
+    :param g: graph builder
+    :param estimators: list of fitted base estimators (``estimator.estimators_``)
+    :param X: input tensor name
+    :param output_name: desired output tensor name
+    :param name: prefix for the internal node names
+    :return: *output_name*
+    """
+    per_tree_leaves: List[str] = []
+    for i, base_est in enumerate(estimators):
+        leaf_i = g.unique_name(f"{name}_t{i}_leaf")
+        _emit_decision_leaf_for_tree(g, base_est.tree_, X, leaf_i, name=f"{name}_t{i}")
+        per_tree_leaves.append(leaf_i)
+    g.make_node(
+        "Concat", per_tree_leaves, outputs=[output_name], name=f"{name}_leaf_concat", axis=1
+    )
+    return output_name
+
+
 @register_sklearn_converter((RandomForestClassifier,))
 def sklearn_random_forest_classifier(
     g: GraphBuilderExtendedProtocol,
@@ -412,14 +469,23 @@ def sklearn_random_forest_classifier(
     g.make_node(
         "TreeEnsembleClassifier",
         [X],
-        outputs=outputs,
+        outputs=outputs[:2],
         domain="ai.onnx.ml",
         name=name,
         post_transform="NONE",
         **attrs,  # type: ignore
         **label_kwargs,
     )
-    return tuple(outputs)
+
+    extra_idx = 2
+    if g.convert_options.has("decision_path", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_path_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dp")
+        extra_idx += 1
+    if g.convert_options.has("decision_leaf", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
+        _emit_decision_leaf_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dl")
+    return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
 
 def _sklearn_random_forest_classifier_v5(
@@ -464,7 +530,7 @@ def _sklearn_random_forest_classifier_v5(
     assert isinstance(scores, str)
 
     # Rename scores to the desired probabilities output name.
-    proba = g.op.Identity(scores, name=f"{name}_proba", outputs=outputs[1:])
+    proba = g.op.Identity(scores, name=f"{name}_proba", outputs=outputs[1:2])
     assert isinstance(proba, str)
 
     # Derive the predicted label via ArgMax over the class axis.
@@ -488,7 +554,15 @@ def _sklearn_random_forest_classifier_v5(
         if not sts:
             g.set_type(label, onnx.TensorProto.STRING)
 
-    return label, proba
+    extra_idx = 2
+    if g.convert_options.has("decision_path", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_path_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dp")
+        extra_idx += 1
+    if g.convert_options.has("decision_leaf", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
+        _emit_decision_leaf_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dl")
+    return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
 
 @register_sklearn_converter((RandomForestRegressor,))
@@ -556,10 +630,17 @@ def sklearn_random_forest_regressor(
     tree_result = node_result if isinstance(node_result, str) else node_result[0]
 
     # Cast float32 output back to float64 to match the input dtype.
-    cast_result = g.make_node(
-        "Cast", [tree_result], outputs=outputs, name=f"{name}_cast_f64", to=itype
-    )
-    return cast_result if isinstance(cast_result, str) else cast_result[0]
+    g.make_node("Cast", [tree_result], outputs=outputs[:1], name=f"{name}_cast_f64", to=itype)
+
+    extra_idx = 1
+    if g.convert_options.has("decision_path", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_path_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dp")
+        extra_idx += 1
+    if g.convert_options.has("decision_leaf", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
+        _emit_decision_leaf_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dl")
+    return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
 
 def _sklearn_random_forest_regressor_v5(
@@ -588,10 +669,10 @@ def _sklearn_random_forest_regressor_v5(
         estimators, n_classes=1, is_classifier=False, n_estimators=n_estimators, itype=itype
     )
 
-    result = g.make_node(
+    g.make_node(
         "TreeEnsemble",
         [X],
-        outputs=outputs,
+        outputs=outputs[:1],
         domain="ai.onnx.ml",
         name=f"{name}_te",
         post_transform=0,  # NONE
@@ -599,7 +680,15 @@ def _sklearn_random_forest_regressor_v5(
         **attrs,  # type: ignore
     )
 
-    return result if isinstance(result, str) else result[0]
+    extra_idx = 1
+    if g.convert_options.has("decision_path", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_path_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dp")
+        extra_idx += 1
+    if g.convert_options.has("decision_leaf", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
+        _emit_decision_leaf_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dl")
+    return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
 
 @register_sklearn_converter((ExtraTreesClassifier,))
@@ -671,14 +760,23 @@ def sklearn_extra_trees_classifier(
     g.make_node(
         "TreeEnsembleClassifier",
         [X],
-        outputs=outputs,
+        outputs=outputs[:2],
         domain="ai.onnx.ml",
         name=name,
         post_transform="NONE",
         **attrs,  # type: ignore
         **label_kwargs,
     )
-    return tuple(outputs)
+
+    extra_idx = 2
+    if g.convert_options.has("decision_path", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_path_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dp")
+        extra_idx += 1
+    if g.convert_options.has("decision_leaf", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
+        _emit_decision_leaf_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dl")
+    return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
 
 @register_sklearn_converter((ExtraTreesRegressor,))
@@ -750,7 +848,14 @@ def sklearn_extra_trees_regressor(
     tree_result = node_result if isinstance(node_result, str) else node_result[0]
 
     # Cast float32 output back to float64 to match the input dtype.
-    cast_result = g.make_node(
-        "Cast", [tree_result], outputs=outputs, name=f"{name}_cast_f64", to=itype
-    )
-    return cast_result if isinstance(cast_result, str) else cast_result[0]
+    g.make_node("Cast", [tree_result], outputs=outputs[:1], name=f"{name}_cast_f64", to=itype)
+
+    extra_idx = 1
+    if g.convert_options.has("decision_path", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_path_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dp")
+        extra_idx += 1
+    if g.convert_options.has("decision_leaf", estimator):
+        assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
+        _emit_decision_leaf_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dl")
+    return outputs[0] if len(outputs) == 1 else tuple(outputs)

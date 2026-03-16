@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: "0 4 * * *"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   torch_tests_4:
     name: tr-releases (ubuntu-latest, py3.13, transformers 4.57/4.55/4.49 torch-${{ matrix.torch-version }})

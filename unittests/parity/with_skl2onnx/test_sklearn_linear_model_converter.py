@@ -1,13 +1,14 @@
 import unittest
 import numpy as np
+import onnx
+import onnx.helper as oh
 from sklearn.datasets import make_classification, make_regression
 from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge
 from sklearn.model_selection import train_test_split
-from skl2onnx import convert_sklearn
-from skl2onnx.common.data_types import DoubleTensorType
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
 from yobx.ext_test_case import ExtTestCase
 from yobx.sklearn.tests_helper import dump_data_and_model
+from yobx.sklearn import to_onnx
 import onnxruntime
 
 
@@ -18,10 +19,13 @@ class TestSklearnLinearModelConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = LinearRegression()
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn linear regression",
-            [("input", DoubleTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.DOUBLE, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
         )
         self.assertTrue(model_onnx is not None)
@@ -39,10 +43,13 @@ class TestSklearnLinearModelConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = Ridge(alpha=0.5)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn ridge regression",
-            [("input", DoubleTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.DOUBLE, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
         )
         self.assertTrue(model_onnx is not None)
@@ -60,12 +67,14 @@ class TestSklearnLinearModelConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = LogisticRegression(random_state=42, max_iter=200)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn logistic regression",
-            [("input", DoubleTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.DOUBLE, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
-            options={"zipmap": False},
         )
         self.assertTrue(model_onnx is not None)
         dump_data_and_model(X_test, model, model_onnx, basename="SklearnLogisticRegression")
@@ -83,12 +92,14 @@ class TestSklearnLinearModelConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = LogisticRegression(random_state=42, max_iter=200)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn logistic regression multiclass",
-            [("input", DoubleTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.DOUBLE, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
-            options={"zipmap": False},
         )
         self.assertTrue(model_onnx is not None)
         dump_data_and_model(

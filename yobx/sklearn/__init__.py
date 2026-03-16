@@ -1,6 +1,11 @@
-from .convert import to_onnx
+from .convert import to_onnx, ConvertOptions
 
-__all__ = ["NumericalDiscrepancyWarning", "register_sklearn_converters", "to_onnx"]
+__all__ = [
+    "ConvertOptions",
+    "NumericalDiscrepancyWarning",
+    "register_sklearn_converters",
+    "to_onnx",
+]
 
 
 def has_sklearn(version: str = ""):

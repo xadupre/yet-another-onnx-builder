@@ -435,16 +435,16 @@ def onnx_simple_text_plot(
         :showcode:
         :warningout: DeprecationWarning, FutureWarning
 
-        import numpy
+        import numpy as np
         from sklearn.cluster import KMeans
-        from skl2onnx import to_onnx
+        from yobx.sklearn import to_onnx
         from yobx.helpers.onnx_helper import pretty_onnx
 
         x = np.random.randn(10, 3)
         y = np.random.randn(10)
         model = KMeans(3)
         model.fit(x, y)
-        onx = to_onnx(model, x.astype(np.float32),
+        onx = to_onnx(model, (x.astype(np.float32),),
                       target_opset=15)
         text = pretty_onnx(onx)
         print(text)
@@ -457,14 +457,14 @@ def onnx_simple_text_plot(
 
         import numpy
         from sklearn.cluster import KMeans
-        from skl2onnx import to_onnx
+        from yobx.sklearn import to_onnx
         from yobx.helpers.onnx_helper import pretty_onnx
 
         x = np.random.randn(10, 3)
         y = np.random.randn(10)
         model = KMeans(3)
         model.fit(x, y)
-        onx = to_onnx(model, x.astype(np.float32),
+        onx = to_onnx(model, (x.astype(np.float32),),
                       target_opset=15)
         text = pretty_onnx(onx, add_links=True)
         print(text)
@@ -477,14 +477,14 @@ def onnx_simple_text_plot(
         # onnx_simple_text_plot
         import numpy
         from sklearn.cluster import KMeans
-        from skl2onnx import to_onnx
+        from yobx.sklearn import to_onnx
         from yobx.helpers.dot_helper import to_dot
 
         x = np.random.randn(10, 3)
         y = np.random.randn(10)
         model = KMeans(3)
         model.fit(x, y)
-        model_onnx = to_onnx(model, x.astype(np.float32),
+        model_onnx = to_onnx(model, (x.astype(np.float32),),
                              target_opset=15)
         print("DOT-SECTION", to_dot(model_onnx))
     """
