@@ -1,6 +1,7 @@
 import unittest
 from yobx.ext_test_case import ExtTestCase, requires_torch, requires_cuda
-from yobx.torch.interpreter import to_onnx
+from yobx.torch import to_onnx
+from yobx.torch import apply_patches_for_model
 
 
 class TestOnnxExportDevice(ExtTestCase):
@@ -13,11 +14,13 @@ class TestOnnxExportDevice(ExtTestCase):
                 return kwargs["x"] + kwargs["y"]
 
         x, y = torch.randn(2, 3), torch.randn(2, 3)
-        Model()(x=x, y=y)
+        model = Model()
+        model(x=x, y=y)
         ds = {
             "kwargs": {"x": {0: torch.export.Dim("batch")}, "y": {0: torch.export.Dim("batch")}}
         }
-        ep = torch.export.export(Model(), tuple(), kwargs={"x": x, "y": y}, dynamic_shapes=ds)
+        with apply_patches_for_model(patch_torch=True, model=model):
+            ep = torch.export.export(Model(), tuple(), kwargs={"x": x, "y": y}, dynamic_shapes=ds)
         self.assertNotEmpty(ep)
 
     def test_export_devices(self):
