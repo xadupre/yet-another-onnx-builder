@@ -181,7 +181,7 @@ if the converters.
 yobx VS skl2onnx
 ================
 
-Both libaries converts :epkg:`scikit-learn` models to ONNX in a similar way.
+Both libraries convert :epkg:`scikit-learn` models to ONNX in a similar way.
 But `yobx` implements a unified way to convert models across different packages
 and is more scalable than `sklearn-onnx`.
 

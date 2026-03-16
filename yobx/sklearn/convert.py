@@ -44,7 +44,7 @@ class ConvertOptions(ConvertOptionsProtocol):
         text = "\n".join(rows)
         return f"{self.__class__.__name__}(\n{text}\n)"
 
-    def has(self, option_name: str, piece: BaseEstimator) -> bool:
+    def has(self, option_name: str, piece: BaseEstimator) -> bool:  # type: ignore[bad-override]
         """Tells of options `option_name` applies on estimator `piece`."""
         assert hasattr(
             self, option_name
@@ -286,10 +286,10 @@ def to_onnx(
         else {}
     )
     if convert_options:
-        kwargs["convert_options"] = convert_options
+        kwargs["convert_options"] = convert_options  # type: ignore
 
     if verbose:
-        if issubclass(builder_cls, GraphBuilder):
+        if issubclass(builder_cls, GraphBuilder):  # type: ignore
             kwargs["verbose"] = verbose  # type: ignore
 
         from ..helpers import string_type
@@ -330,9 +330,9 @@ def to_onnx(
                 ds = dynamic_shapes[i]
             else:
                 ds = {0: "batch"}
-            shape = list(arg.shape)
+            shape = list(arg.shape)  # type: ignore
             for axis, dim in ds.items():
-                shape[axis] = dim
+                shape[axis] = dim  # type: ignore
             g.make_tensor_input(  # type: ignore
                 name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1  # type: ignore
             )  # type: ignore
@@ -393,7 +393,7 @@ def to_onnx(
             )
             if agg.shape[0]:
                 print(agg.to_string())
-        return onx
+        return onx  # type: ignore
     return g.to_onnx(
         large_model=large_model,
         external_threshold=external_threshold,
