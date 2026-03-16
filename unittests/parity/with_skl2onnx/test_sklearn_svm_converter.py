@@ -1,11 +1,12 @@
 import unittest
 import numpy as np
+import onnx
+import onnx.helper as oh
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.svm import LinearSVC
-from skl2onnx import convert_sklearn
-from skl2onnx.common.data_types import FloatTensorType
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
+from yobx.sklearn import to_onnx
 from yobx.ext_test_case import ExtTestCase
 from yobx.sklearn.tests_helper import dump_data_and_model
 
@@ -17,10 +18,13 @@ class TestSklearnSVMConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = LinearSVC(random_state=42, max_iter=1000)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn linear svc",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
         )
         self.assertTrue(model_onnx is not None)
@@ -39,10 +43,13 @@ class TestSklearnSVMConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = LinearSVC(random_state=42, max_iter=1000)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn linear svc multiclass",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
         )
         self.assertTrue(model_onnx is not None)

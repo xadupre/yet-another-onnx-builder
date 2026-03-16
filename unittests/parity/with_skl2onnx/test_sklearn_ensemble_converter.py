@@ -1,6 +1,8 @@
 import unittest
 import numpy as np
 import onnxruntime
+import onnx
+import onnx.helper as oh
 from sklearn.datasets import make_classification, make_regression
 from sklearn.ensemble import (
     ExtraTreesClassifier,
@@ -11,11 +13,10 @@ from sklearn.ensemble import (
     RandomForestRegressor,
 )
 from sklearn.model_selection import train_test_split
-from skl2onnx import convert_sklearn
-from skl2onnx.common.data_types import FloatTensorType
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
+from yobx.sklearn import to_onnx
 
 
 class TestSklearnEnsembleConverters(ExtTestCase):
@@ -25,12 +26,14 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = RandomForestClassifier(n_estimators=5, max_depth=3, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn random forest classifier",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
-            options={"zipmap": False},
         )
         self.assertTrue(model_onnx is not None)
         feeds = {model_onnx.graph.input[0].name: X_test}
@@ -52,10 +55,13 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = RandomForestRegressor(n_estimators=5, max_depth=3, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn random forest regressor",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
         )
         self.assertTrue(model_onnx is not None)
@@ -75,12 +81,14 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = GradientBoostingClassifier(n_estimators=10, max_depth=2, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn gradient boosting classifier",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
-            options={"zipmap": False},
         )
         self.assertTrue(model_onnx is not None)
         feeds = {model_onnx.graph.input[0].name: X_test}
@@ -102,10 +110,13 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = GradientBoostingRegressor(n_estimators=10, max_depth=2, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn gradient boosting regressor",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
         )
         self.assertTrue(model_onnx is not None)
@@ -126,12 +137,15 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = RandomForestClassifier(n_estimators=5, max_depth=3, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn random forest classifier",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
-            options={"zipmap": False, "decision_path": True},
+            options={"decision_path": True},
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 3)
@@ -156,16 +170,18 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         self.assertEqual(ort_out[2].shape[1], model.n_estimators)
 
     def test_model_random_forest_regressor_decision_path(self):
-        """Check extra decision_path output for RandomForestRegressor."""
         X, y = make_regression(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = RandomForestRegressor(n_estimators=5, max_depth=3, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn random forest regressor",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
             options={"decision_path": True},
         )
@@ -195,12 +211,15 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = ExtraTreesClassifier(n_estimators=5, max_depth=3, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn extra trees classifier",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
-            options={"zipmap": False, "decision_path": True},
+            options={"decision_path": True},
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 3)
@@ -230,10 +249,13 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = ExtraTreesRegressor(n_estimators=5, max_depth=3, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn extra trees regressor",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
             options={"decision_path": True},
         )

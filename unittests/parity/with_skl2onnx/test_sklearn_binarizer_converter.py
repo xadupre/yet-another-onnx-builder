@@ -1,10 +1,11 @@
 import unittest
 import numpy as np
 from sklearn.preprocessing import Binarizer
-from skl2onnx import convert_sklearn
-from skl2onnx.common.data_types import FloatTensorType
+import onnx
+import onnx.helper as oh
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
 from yobx.ext_test_case import ExtTestCase
+from yobx.sklearn import to_onnx
 from yobx.sklearn.tests_helper import dump_data_and_model
 
 
@@ -13,10 +14,9 @@ class TestSklearnBinarizer(ExtTestCase):
         data = np.array([[1.0, -1.0, 2.0], [2.0, 0.0, 0.0], [0.0, 1.0, -1.0]], dtype=np.float32)
         model = Binarizer(threshold=0.5)
         model.fit(data)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn binarizer",
-            [("input", FloatTensorType(data.shape))],
+            [oh.make_tensor_value_info("input", onnx.TensorProto.FLOAT, [None, data.shape[1]])],
             target_opset=TARGET_OPSET,
         )
         self.assertTrue(model_onnx is not None)

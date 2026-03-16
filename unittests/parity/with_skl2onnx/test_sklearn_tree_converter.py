@@ -1,5 +1,7 @@
 import unittest
 import numpy as np
+import onnx
+import onnx.helper as oh
 import onnxruntime
 from sklearn.datasets import make_classification, make_regression
 from sklearn.model_selection import train_test_split
@@ -9,9 +11,8 @@ from sklearn.tree import (
     ExtraTreeClassifier,
     ExtraTreeRegressor,
 )
-from skl2onnx import convert_sklearn
-from skl2onnx.common.data_types import FloatTensorType
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
+from yobx.sklearn import to_onnx
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
 
@@ -23,10 +24,13 @@ class TestSklearnTreeConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = DecisionTreeClassifier(max_depth=4, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn decision tree classifier",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
             options={"zipmap": False},
         )
@@ -50,10 +54,14 @@ class TestSklearnTreeConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = DecisionTreeRegressor(max_depth=4, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
             "scikit-learn decision tree regressor",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
         )
         self.assertTrue(model_onnx is not None)
@@ -80,12 +88,14 @@ class TestSklearnTreeConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = DecisionTreeClassifier(max_depth=4, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn decision tree multiclass",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
-            options={"zipmap": False},
         )
         self.assertTrue(model_onnx is not None)
         feeds = {model_onnx.graph.input[0].name: X_test}
@@ -108,12 +118,15 @@ class TestSklearnTreeConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = DecisionTreeClassifier(max_depth=4, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn decision tree classifier",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
-            options={"zipmap": False, "decision_path": True},
+            options={"decision_path": True},
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 3)
@@ -143,12 +156,15 @@ class TestSklearnTreeConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = DecisionTreeClassifier(max_depth=4, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn decision tree classifier",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
-            options={"zipmap": False, "decision_leaf": True},
+            options={"decision_leaf": True},
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 3)
@@ -180,10 +196,13 @@ class TestSklearnTreeConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = DecisionTreeRegressor(max_depth=4, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn decision tree regressor",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
             options={"decision_path": True},
         )
@@ -211,10 +230,13 @@ class TestSklearnTreeConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = DecisionTreeRegressor(max_depth=4, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn decision tree regressor",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
             options={"decision_leaf": True},
         )
@@ -245,12 +267,15 @@ class TestSklearnTreeConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = ExtraTreeClassifier(max_depth=4, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn extra tree classifier",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
-            options={"zipmap": False, "decision_path": True},
+            options={"decision_path": True},
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 3)
@@ -279,10 +304,13 @@ class TestSklearnTreeConverters(ExtTestCase):
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
         model = ExtraTreeRegressor(max_depth=4, random_state=42)
         model.fit(X_train, y_train)
-        model_onnx = convert_sklearn(
+        model_onnx = to_onnx(
             model,
-            "scikit-learn extra tree regressor",
-            [("input", FloatTensorType([None, X_train.shape[1]]))],
+            [
+                oh.make_tensor_value_info(
+                    "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
+                )
+            ],
             target_opset=TARGET_OPSET,
             options={"decision_path": True},
         )
