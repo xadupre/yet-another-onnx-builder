@@ -240,7 +240,7 @@ def to_onnx(
 
     if verbose:
         if issubclass(builder_cls, GraphBuilder):
-            kwargs["verbose"] = verbose
+            kwargs["verbose"] = verbose  # type: ignore
 
         from ..helpers import string_type
 
@@ -317,7 +317,7 @@ def to_onnx(
     # When local functions are requested we must NOT inline them; pass inline=False
     # so the function bodies are preserved in the returned ModelProto.
     if isinstance(g, GraphBuilder):
-        onx, stats = g.to_onnx(
+        onx, stats = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,
             inline=(not function_options) or not function_options.export_as_function,
