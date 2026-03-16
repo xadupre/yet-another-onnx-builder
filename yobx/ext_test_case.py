@@ -1310,6 +1310,24 @@ class ExtTestCase(unittest.TestCase):
                 f"expected is {expected!r}, value is {value!r}({_msg(msg)}\n{e}"
             )
 
+    def assertTrue(self, cond: bool, msg: Optional[Union[Callable[[], str], str]] = None):
+        """Overwrites the error message to get a more explicit message about what is what."""
+        try:
+            super().assertTrue(cond)
+        except AssertionError as e:
+            raise AssertionError(  # noqa: B904
+                f"condition is False when it should be True({_msg(msg)}\n{e}"
+            )
+
+    def assertFalse(self, cond: bool, msg: Optional[Union[Callable[[], str], str]] = None):
+        """Overwrites the error message to get a more explicit message about what is what."""
+        try:
+            super().assertFalse(cond)
+        except AssertionError as e:
+            raise AssertionError(  # noqa: B904
+                f"condition is True when it should be False({_msg(msg)}\n{e}"
+            )
+
     def assertEqualAny(
         self,
         expected: Any,

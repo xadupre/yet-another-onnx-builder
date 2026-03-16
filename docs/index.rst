@@ -40,16 +40,16 @@ It can export from many libraries:
 
 **standard machine learning**
 
-* [categorical_encoders](https://contrib.scikit-learn.org/category_encoders/)
-* [imbalanced-learn](https://imbalanced-learn.org/stable/)
-* [lightgbm](https://lightgbm.readthedocs.io)
-* [scikit-learn](https://scikit-learn.org)
-* [xgboost](https://xgboost.readthedocs.io)
+* :epkg:`categorical_encoders`
+* :epkg:`imbalanced-learn`
+* :epkg:`lightgbm`
+* :epkg:`scikit-learn`
+* :epkg:`xgboost`
 
 **deeplearning**
 
-* [tensorflow](https://www.tensorflow.org)
-* [torch](https://pytorch.org)
+* :epkg:`tensorflow`
+* :epkg:`torch`
 
 It also provides:
 

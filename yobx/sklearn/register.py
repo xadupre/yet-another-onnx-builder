@@ -29,6 +29,12 @@ def get_sklearn_converter(cls: type):
     raise ValueError(f"Unable to find a converter for type {cls}.")
 
 
+def has_sklearn_converter(cls: type):
+    """Returns if the model has a converter."""
+    global SKLEARN_CONVERTERS
+    return cls in SKLEARN_CONVERTERS
+
+
 def get_sklearn_converters():
     """Returns all registered converters as a mapping from type to converter function."""
     global SKLEARN_CONVERTERS
@@ -50,7 +56,7 @@ def sklearn_exportable_methods() -> Tuple[str, ...]:
 
 
 def get_sklearn_estimator_coverage(
-    rst: bool = False, libraries: Union[str, Tuple[str, ...]] = "all"
+    libraries: Union[str, Tuple[str, ...]] = "all", rst: bool = False
 ):
     """
     Returns a coverage report for scikit-learn estimators.
@@ -64,12 +70,12 @@ def get_sklearn_estimator_coverage(
 
     Args
     ----
-        rst:
-            returns the information a RST text
         libraries:
             `'all'` to include all available modules,
             or a list of libraries to include such as
             ``('sklearn', 'lightgbm', ...)``
+        rst:
+            returns the information a RST text
 
     Returns
     -------
@@ -87,14 +93,16 @@ def get_sklearn_estimator_coverage(
         ``"yobx"``
             the converting function if a converter is registered in :mod:`yobx.sklearn`.
     """
+    if libraries == "all":
+        libraries = "category_encoders", "imblearn", "lightgbm", "sklearn", "xgboost"
+    if isinstance(libraries, str):
+        libraries = (libraries,)
+
     if not rst:
 
         def _public_module(cls):
             parts = cls.__module__.split(".")
             return ".".join(p for p in parts if not p.startswith("_"))
-
-        if libraries == "all":
-            libraries = "category_encoders", "imblearn", "lightgbm", "sklearn", "xgboost"
 
         all_pairs = {}
         for lib in libraries:
@@ -121,10 +129,6 @@ def get_sklearn_estimator_coverage(
             else:
                 raise ValueError(f"Unknown libraries {lib!r}")
 
-        for cls in SKLEARN_CONVERTERS:
-            if cls.__name__ not in all_pairs:
-                all_pairs[cls.__name__] = cls
-
         methods = sklearn_exportable_methods()
         rows = []
 
@@ -141,7 +145,7 @@ def get_sklearn_estimator_coverage(
             )
         return rows
 
-    rows = get_sklearn_estimator_coverage(libraries=libraries)
+    rows = get_sklearn_estimator_coverage(libraries=libraries, rst=False)
     rows = sorted(rows, key=lambda x: (x["category"], x["name"]))
 
     # Header
