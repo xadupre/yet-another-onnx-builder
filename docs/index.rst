@@ -40,16 +40,25 @@ It can export from many libraries:
 
 **standard machine learning**
 
-* :epkg:`category_encoders`
-* :epkg:`imbalanced-learn`
-* :epkg:`lightgbm`
-* :epkg:`scikit-learn`
-* :epkg:`xgboost`
++---------------------------------------+------------------------------+
+| :epkg:`category_encoders`             | :ref:`l-sklearn-converter`   |
++---------------------------------------+------------------------------+
+| :epkg:`imbalanced-learn`              | :ref:`l-sklearn-converter`   |
++---------------------------------------+------------------------------+
+| :epkg:`lightgbm`                      | :ref:`l-sklearn-converter`   |
++---------------------------------------+------------------------------+
+| :epkg:`scikit-learn`                  | :ref:`l-sklearn-converter`   |
++---------------------------------------+------------------------------+
+| :epkg:`xgboost`                       | :ref:`l-sklearn-converter`   |
++---------------------------------------+------------------------------+
 
 **deeplearning**
 
-* :epkg:`tensorflow`
-* :epkg:`torch`
++---------------------------------------+----------------------------------------+
+| :epkg:`tensorflow`                    | :ref:`l-design-tensorflow-converter`   |
++---------------------------------------+----------------------------------------+
+| :epkg:`torch`                         | :ref:`l-torch-converter`               |
++---------------------------------------+----------------------------------------+
 
 It also provides:
 
