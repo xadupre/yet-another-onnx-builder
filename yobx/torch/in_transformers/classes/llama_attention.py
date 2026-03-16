@@ -85,6 +85,17 @@ from onnx import TensorProto
 from ....helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ....typing import GraphBuilderExtendedProtocol
 from ...torch_helper import to_numpy
+from ..register import register_transformer_converter
+
+try:
+    from transformers.models.llama.modeling_llama import LlamaAttention as _LlamaAttention
+
+    _register = register_transformer_converter(_LlamaAttention)
+except ImportError:
+    _LlamaAttention = None
+
+    def _register(fct):
+        return fct
 
 T = str
 
@@ -304,6 +315,7 @@ def _mha_com_microsoft(
     return out
 
 
+@_register
 def llama_attention_to_onnx(
     g: GraphBuilderExtendedProtocol,
     attn: "LlamaAttention",  # noqa: F821
@@ -553,15 +565,3 @@ def llama_attention_to_onnx(
 
     return attn_out
 
-
-try:
-    from transformers.models.llama.modeling_llama import (  # noqa: E402
-        LlamaAttention as _LlamaAttention,
-    )
-    from ..register import (  # noqa: E402
-        register_transformer_converter as _register_transformer_converter,
-    )
-
-    _register_transformer_converter(_LlamaAttention)(llama_attention_to_onnx)
-except ImportError:
-    pass
