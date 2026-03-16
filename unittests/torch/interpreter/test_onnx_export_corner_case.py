@@ -538,20 +538,12 @@ class TestOnnxExportCornerCase(ExtTestCase):
         # No explicit options — 'com.microsoft' in target_opset should trigger
         # OptimizationOptions(patterns="default+onnxruntime") automatically.
         _onx, builder_ort = to_onnx(
-            Model(),
-            (x, y),
-            target_opset={"": 22, "com.microsoft": 1},
-            return_builder=True,
+            Model(), (x, y), target_opset={"": 22, "com.microsoft": 1}, return_builder=True
         )
         n_ort = len(builder_ort.optimization_options.patterns)
 
         # Default opset (integer) should use the standard default patterns.
-        _onx2, builder_default = to_onnx(
-            Model(),
-            (x, y),
-            target_opset=22,
-            return_builder=True,
-        )
+        _onx2, builder_default = to_onnx(Model(), (x, y), target_opset=22, return_builder=True)
         n_default = len(builder_default.optimization_options.patterns)
 
         self.assertGreater(
