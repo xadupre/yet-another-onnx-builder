@@ -1,4 +1,4 @@
-from .pv_version import PvVersion
+from ..pv_version import PvVersion
 from .convert import to_onnx, ConvertOptions
 
 __all__ = [
