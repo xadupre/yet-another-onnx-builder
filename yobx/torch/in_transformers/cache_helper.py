@@ -259,7 +259,7 @@ def make_dynamic_cache(
         assert isinstance(cls_layers, list), f"Unexpected type cls_layers={cls_layers}"
         assert isinstance(cls_kwargs, list), f"Unexpected type cls_kwargs={cls_kwargs}"
 
-    from ..pv_version import PvVersion
+    from ...pv_version import PvVersion
 
     if (
         key_value_pairs
