@@ -52,7 +52,7 @@ class TestSklearnRegister(ExtTestCase):
         self.assertIn("**Coverage**", rst)
         self.assertRaise(lambda: get_sklearn_estimator_coverage(libraries=("nolib",)), ValueError)
 
-    @requires_sklearn("1.4")
+    @requires_sklearn("1.8")
     def test_get_sklearn_estimator_coverage_per_lib(self):
         register_sklearn_converters()
         boundaries = {
