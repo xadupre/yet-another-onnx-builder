@@ -8,6 +8,8 @@ from .decision_tree import (
     _extract_tree_attributes,
     _extract_tree_attributes_v5,
     _sklearn_decision_tree_classifier_v5,
+    _emit_decision_path_for_tree,
+    _emit_decision_leaf_for_tree,
 )
 
 
@@ -67,10 +69,10 @@ def sklearn_extra_tree_classifier(
         classlabels = classes.astype(str).tolist()  # type: ignore
         label_kwargs = {"classlabels_strings": classlabels}
 
-    result = g.make_node(
+    g.make_node(
         "TreeEnsembleClassifier",
         [X],
-        outputs=outputs,
+        outputs=outputs[:2],
         domain="ai.onnx.ml",
         name=name,
         post_transform="NONE",
@@ -78,9 +80,15 @@ def sklearn_extra_tree_classifier(
         **label_kwargs,
     )
 
-    if isinstance(result, str):
-        return result, result
-    return result[0], result[1]
+    extra_idx = 2
+    if g.convert_options.has("decision_path", estimator) and len(outputs) > extra_idx:
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_path_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dp")
+        extra_idx += 1
+    if g.convert_options.has("decision_leaf", estimator) and len(outputs) > extra_idx:
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_leaf_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dl")
+    return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
 
 @register_sklearn_converter((ExtraTreeRegressor,))
@@ -127,16 +135,25 @@ def sklearn_extra_tree_regressor(
         attrs = _extract_tree_attributes_v5(
             tree, n_classes=1, is_classifier=False, itype=g.get_type(X)
         )
-        return g.make_node(
+        g.make_node(
             "TreeEnsemble",
             [X],
-            outputs=outputs,
+            outputs=outputs[:1],
             domain="ai.onnx.ml",
             name=f"{name}_te",
             post_transform=0,  # NONE
             aggregate_function=1,  # SUM
             **attrs,  # type: ignore
         )
+        extra_idx = 1
+        if g.convert_options.has("decision_path", estimator) and len(outputs) > extra_idx:
+            assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+            _emit_decision_path_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dp")
+            extra_idx += 1
+        if g.convert_options.has("decision_leaf", estimator) and len(outputs) > extra_idx:
+            assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+            _emit_decision_leaf_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dl")
+        return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
     # Legacy path: TreeEnsembleRegressor (ai.onnx.ml opset <= 4)
     attrs = _extract_tree_attributes(tree, n_classes=1, is_classifier=False)
@@ -151,7 +168,15 @@ def sklearn_extra_tree_regressor(
         post_transform="NONE",
         **attrs,  # type: ignore
     )
-    cast_result = g.make_node(
-        "Cast", [tree_result], outputs=outputs, name=f"{name}_cast_f64", to=g.get_type(X)
+    g.make_node(
+        "Cast", [tree_result], outputs=outputs[:1], name=f"{name}_cast_f64", to=g.get_type(X)
     )
-    return cast_result
+    extra_idx = 1
+    if g.convert_options.has("decision_path", estimator) and len(outputs) > extra_idx:
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_path_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dp")
+        extra_idx += 1
+    if g.convert_options.has("decision_leaf", estimator) and len(outputs) > extra_idx:
+        assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
+        _emit_decision_leaf_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dl")
+    return outputs[0] if len(outputs) == 1 else tuple(outputs)

@@ -55,7 +55,6 @@ class TestSklearnTreeConverters(ExtTestCase):
         model.fit(X_train, y_train)
         model_onnx = to_onnx(
             model,
-            "scikit-learn decision tree regressor",
             [
                 oh.make_tensor_value_info(
                     "input", onnx.TensorProto.FLOAT, [None, X_train.shape[1]]
@@ -144,9 +143,13 @@ class TestSklearnTreeConverters(ExtTestCase):
         np.testing.assert_allclose(ref_out[1], expected_proba, rtol=1e-5, atol=1e-5)
         # Verify the extra decision_path output matches between ORT and the reference evaluator
         np.testing.assert_array_equal(ort_out[2], ref_out[2])
-        # decision_path is a 2-D array of binary strings, one column per tree
+        # decision_path is a 2-D array of binary strings, shape (n_samples, 1) for a single tree
         self.assertEqual(ort_out[2].ndim, 2)
         self.assertEqual(ort_out[2].shape[0], X_test.shape[0])
+        # Verify the path strings match sklearn's decision_path sparse matrix
+        sklearn_dp = model.decision_path(X_test).toarray()
+        yobx_dp = np.array([[int(c) for c in s[0]] for s in ort_out[2]], dtype=np.int8)
+        np.testing.assert_array_equal(yobx_dp, sklearn_dp)
 
     def test_model_decision_tree_classifier_decision_leaf(self):
         """Check extra decision_leaf output for DecisionTreeClassifier."""
@@ -221,6 +224,10 @@ class TestSklearnTreeConverters(ExtTestCase):
         np.testing.assert_array_equal(ort_out[1], ref_out[1])
         self.assertEqual(ort_out[1].ndim, 2)
         self.assertEqual(ort_out[1].shape[0], X_test.shape[0])
+        # Verify path strings match sklearn's decision_path
+        sklearn_dp = model.decision_path(X_test).toarray()
+        yobx_dp = np.array([[int(c) for c in s[0]] for s in ort_out[1]], dtype=np.int8)
+        np.testing.assert_array_equal(yobx_dp, sklearn_dp)
 
     def test_model_decision_tree_regressor_decision_leaf(self):
         """Check extra decision_leaf output for DecisionTreeRegressor."""
@@ -295,6 +302,10 @@ class TestSklearnTreeConverters(ExtTestCase):
         np.testing.assert_array_equal(ort_out[2], ref_out[2])
         self.assertEqual(ort_out[2].ndim, 2)
         self.assertEqual(ort_out[2].shape[0], X_test.shape[0])
+        # Verify path strings match sklearn's decision_path
+        sklearn_dp = model.decision_path(X_test).toarray()
+        yobx_dp = np.array([[int(c) for c in s[0]] for s in ort_out[2]], dtype=np.int8)
+        np.testing.assert_array_equal(yobx_dp, sklearn_dp)
 
     def test_model_extra_tree_regressor_decision_path(self):
         """Check extra decision_path output for ExtraTreeRegressor."""
@@ -329,6 +340,10 @@ class TestSklearnTreeConverters(ExtTestCase):
         np.testing.assert_array_equal(ort_out[1], ref_out[1])
         self.assertEqual(ort_out[1].ndim, 2)
         self.assertEqual(ort_out[1].shape[0], X_test.shape[0])
+        # Verify path strings match sklearn's decision_path
+        sklearn_dp = model.decision_path(X_test).toarray()
+        yobx_dp = np.array([[int(c) for c in s[0]] for s in ort_out[1]], dtype=np.int8)
+        np.testing.assert_array_equal(yobx_dp, sklearn_dp)
 
 
 if __name__ == "__main__":
