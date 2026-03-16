@@ -244,7 +244,7 @@ class TestSklearnTreeConverters(ExtTestCase):
                 )
             ],
             target_opset=TARGET_OPSET,
-            convert_options=ConvertOptions(**{"decision_leaf": True}),
+            convert_options=ConvertOptions(decision_leaf=True),
         )
         self.assertTrue(model_onnx is not None)
         self.assertEqual(len(model_onnx.graph.output), 2)
