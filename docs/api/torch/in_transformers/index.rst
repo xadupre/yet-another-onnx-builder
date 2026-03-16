@@ -9,5 +9,6 @@ yobx.torch.in_transformers
     cache_helper
     flatten_class
     patches
+    register
     models/index
     classes/index
