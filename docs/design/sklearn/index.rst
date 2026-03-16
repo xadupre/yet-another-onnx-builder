@@ -1,3 +1,5 @@
+.. _l-sklearn-converter:
+
 scikit-learn Export to ONNX
 ===========================
 
