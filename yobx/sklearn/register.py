@@ -101,6 +101,19 @@ def get_sklearn_estimator_coverage(
     if not rst:
 
         def _public_module(cls):
+            if cls.__name__ in {"GammaRegressor", "PoissonRegressor", "TweedieRegressor"}:
+                return "sklearn.linear_model"
+            if cls.__name__ in {"HDBSCAN"}:
+                return "sklearn.cluster"
+            if cls.__name__ in {
+                "HistGradientBoostingClassifier",
+                "HistGradientBoostingRegressor",
+            }:
+                return "sklearn.ensemble"
+            if cls.__name__.startswith("LGBM"):
+                return "lightgbm"
+            if cls.__name__.startswith("XGB"):
+                return "xgboost"
             parts = cls.__module__.split(".")
             return ".".join(p for p in parts if not p.startswith("_"))
 
