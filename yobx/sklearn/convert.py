@@ -196,7 +196,7 @@ def to_onnx(
     large_model: bool = False,
     external_threshold: int = 1024,
     function_options: Optional[FunctionOptions] = None,
-    convert_options: Optional[ConvertOptions] = None,
+    convert_options: Optional[ConvertOptionsProtocol] = None,
 ) -> Union[ModelProto, ExtendedModelContainer]:
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
