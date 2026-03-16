@@ -99,9 +99,43 @@ def to_onnx(
         if "com.microsoft" in dict_target_opset
         else {}
     )
+
+    if verbose:
+        if issubclass(builder_cls, GraphBuilder):
+            kwargs["verbose"] = verbose  # type: ignore
+
+        from ..helpers import string_type
+
+        print(f"[yobx.tensorflow.to_onnx] export with builder {builder_cls!r})")
+        print(f"[yobx.tensorflow.to_onnx] {dict_target_opset=}")
+        print(f"[yobx.tensorflow.to_onnx] args={string_type(args, with_shape=True)}")
+        if extra_converters:
+            print(f"[yobx.tensorflow.to_onnx] with {len(extra_converters)} extra converters")
+
     g = builder_cls(dict_target_opset, **kwargs)  # type: ignore
 
     _convert_concrete_function(cf, g, args, input_specs, verbose, extra_converters or {})
+    if isinstance(g, GraphBuilder):
+        onx, stats = g.to_onnx(  # type: ignore
+            large_model=large_model,
+            external_threshold=external_threshold,
+            return_optimize_report=True,
+        )
+        if verbose:
+            import pandas
+
+            print(f"[yobx.tensorflow.to_onnx] done, output type is {type(onx)}")
+
+            df = pandas.DataFrame(stats)
+            for c in ["added", "removed"]:
+                df[c] = df[c].fillna(0).astype(int)
+            agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
+            agg = agg[(agg["added"] > 0) | (agg["removed"] > 0)].sort_values(
+                "removed", ascending=False
+            )
+            if agg.shape[0]:
+                print(agg.to_string())
+        return onx
     return g.to_onnx(large_model=large_model, external_threshold=external_threshold)  # type: ignore
 
 
