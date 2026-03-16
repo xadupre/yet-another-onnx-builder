@@ -126,7 +126,7 @@ def _build_input_specs(input_names, args, dynamic_shapes):
             np_dtype = tensor_dtype_to_np_dtype(tt.elem_type)
             if tt.HasField("shape"):
                 shape = [
-                    (dim.dim_param if dim.dim_param else (dim.dim_value or f"dim_{name}_{idim}"))
+                    (None if dim.dim_param else (dim.dim_value or None))
                     for idim, dim in enumerate(tt.shape.dim)
                 ]
             else:
