@@ -48,6 +48,20 @@ category_encoders
 
     print(get_sklearn_estimator_coverage(libraries=("category_encoders",), rst=True))
 
+imbalanced-learn
+----------------
+
+.. runpython::
+    :showcode:
+    :rst:
+
+    from yobx.sklearn import register_sklearn_converters
+    from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+    register_sklearn_converters()
+
+    print(get_sklearn_estimator_coverage(libraries=("imblearn",), rst=True))
+
 lightgbm
 --------
 
@@ -75,17 +89,3 @@ xgboost
     register_sklearn_converters()
 
     print(get_sklearn_estimator_coverage(libraries=("xgboost",), rst=True))
-
-imbalanced-learn
-----------------
-
-.. runpython::
-    :showcode:
-    :rst:
-
-    from yobx.sklearn import register_sklearn_converters
-    from yobx.sklearn.register import get_sklearn_estimator_coverage
-
-    register_sklearn_converters()
-
-    print(get_sklearn_estimator_coverage(libraries=("imblearn",), rst=True))

@@ -66,7 +66,7 @@ class GraphBuilderProtocol(Protocol):
 
     @property
     def convert_options(self) -> ConvertOptionsProtocol:
-        """Returns covnerting options."""
+        """Returns converting options."""
         ...
 
     def get_opset(self, domain: str, exc: bool = True) -> int:

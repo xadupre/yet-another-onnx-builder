@@ -169,3 +169,26 @@ To support a new :epkg:`scikit-learn` estimator:
     ):
         # ... emit ONNX nodes via g.op.*
         ...
+
+Converting Options
+==================
+
+The user may need extra outputs coming from the model.
+This is driven by class :class:`yobx.sklearn.ConvertOptions`
+which exposes all the possible ways to change the default behaviour
+if the converters.
+
+yobx VS skl2onnx
+================
+
+Both libaries converts :epkg:`scikit-learn` models to ONNX in a similar way.
+But `yobx` implements a unified way to convert models across different packages
+and is more scalable than `sklearn-onnx`.
+
+* `yobx` can then easily be extended to libraries such as :epkg:`sktorch`
+  since both exporters can use the same `GraphBuilder`.
+* It enables :epkg:`onnxruntime` optimizations whenever possible.
+* It allows the user to export estimator in a pipeline as local functions
+  (see :ref:`l-plot-sklearn-function-options`).
+* By using protocol, the default GraphBuilder can be replaced by other
+  GraphBuilder based on other packages such as :epkg:`onnxscript` or `spox`.
