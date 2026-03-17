@@ -4,6 +4,7 @@ from .translator import Translator
 from .inner_emitter import InnerEmitter, InnerEmitterCompact, InnerEmitterShortInitializer
 from .builder_emitter import BuilderEmitter
 from .light_emitter import LightEmitter
+from .mermaid_helper import to_mermaid
 
 
 def translate_header(api: str = "onnx"):

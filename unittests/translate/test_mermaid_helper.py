@@ -2,7 +2,8 @@ import unittest
 import onnx
 import onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
-from yobx.helpers.mermaid_helper import to_mermaid
+from yobx.translate.mermaid_helper import to_mermaid
+from yobx.translate import to_mermaid as to_mermaid_from_package
 
 
 class TestMermaidHelper(ExtTestCase):
@@ -161,6 +162,22 @@ class TestMermaidHelper(ExtTestCase):
         mermaid = to_mermaid(model)
         # Edge labels should include dtype and shape info
         self.assertIn("FLOAT", mermaid)
+
+    def test_importable_from_translate_package(self):
+        # to_mermaid should be importable directly from yobx.translate
+        TFLOAT = onnx.TensorProto.FLOAT
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Relu", ["X"], ["Y"])],
+                "relu_graph",
+                [oh.make_tensor_value_info("X", TFLOAT, [3])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [3])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        mermaid = to_mermaid_from_package(model)
+        self.assertIn("flowchart TD", mermaid)
 
 
 if __name__ == "__main__":

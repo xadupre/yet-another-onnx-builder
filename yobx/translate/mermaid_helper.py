@@ -4,7 +4,7 @@ import numpy as np
 import onnx
 import onnx.numpy_helper as onh
 from ..reference import ExtendedReferenceEvaluator as Inference
-from .onnx_helper import onnx_dtype_name, pretty_onnx, get_hidden_inputs
+from ..helpers.onnx_helper import onnx_dtype_name, pretty_onnx, get_hidden_inputs
 
 
 def _mermaid_id(prefix: str, index: int) -> str:
@@ -12,7 +12,7 @@ def _mermaid_id(prefix: str, index: int) -> str:
 
 
 def _mermaid_safe(text: str) -> str:
-    """Escape characters that break Mermaid node labels (quotes → single quotes)."""
+    """Escape characters that break Mermaid node labels (double quotes → single quotes)."""
     return text.replace('"', "'")
 
 
@@ -51,6 +51,9 @@ def _make_edge_label_mermaid(value_info: onnx.ValueInfoProto) -> str:
     return f"{onnx_dtype_name(itype)}({','.join(res)})"
 
 
+_MAX_INLINE_CONSTANT_SIZE = 10
+
+
 def to_mermaid(model: onnx.ModelProto) -> str:
     """
     Converts an ONNX model into a `Mermaid <https://mermaid.js.org/>`_ flowchart string.
@@ -64,7 +67,7 @@ def to_mermaid(model: onnx.ModelProto) -> str:
         import onnx
         import onnx.helper as oh
         import onnx.numpy_helper as onh
-        from yobx.helpers.mermaid_helper import to_mermaid
+        from yobx.translate.mermaid_helper import to_mermaid
 
         TFLOAT = onnx.TensorProto.FLOAT
         model = oh.make_model(
@@ -162,7 +165,9 @@ def to_mermaid(model: onnx.ModelProto) -> str:
             continue
         skip = False
         for att in node.attribute:
-            if att.name == "value" and (len(att.t.dims) > 1 or np.prod(tuple(att.t.dims)) > 10):
+            if att.name == "value" and (
+                len(att.t.dims) > 1 or np.prod(tuple(att.t.dims)) > _MAX_INLINE_CONSTANT_SIZE
+            ):
                 skip = True
                 break
         if skip:
@@ -177,7 +182,7 @@ def to_mermaid(model: onnx.ModelProto) -> str:
             # hide optional inputs already listed as graph inputs
             continue
         shape = tuple(init.dims)
-        if len(shape) == 0 or (len(shape) == 1 and shape[0] < 10):  # type: ignore[operator]
+        if len(shape) == 0 or (len(shape) == 1 and shape[0] < _MAX_INLINE_CONSTANT_SIZE):  # type: ignore[operator]
             a = onh.to_array(init)
             tiny_inits[init.name] = (
                 str(a) if len(shape) == 0 else f"[{', '.join([str(i) for i in a])}]"
