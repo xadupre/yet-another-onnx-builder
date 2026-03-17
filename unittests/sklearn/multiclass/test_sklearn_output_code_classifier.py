@@ -140,12 +140,56 @@ class TestSklearnOutputCodeClassifier(ExtTestCase):
         op_types = [n.op_type for n in onx.graph.node]
         # One Slice per sub-estimator
         self.assertIn("Slice", op_types)
-        # Distance computation
+        # Distance computation (standard path, no com.microsoft)
         self.assertIn("MatMul", op_types)
         self.assertIn("ReduceSum", op_types)
         # Argmin and label gathering
         self.assertIn("ArgMin", op_types)
         self.assertIn("Gather", op_types)
+
+    # ------------------------------------------------------------------
+    # CDist path (com.microsoft opset)
+    # ------------------------------------------------------------------
+
+    def test_cdist_float32(self):
+        """Distance computed via com.microsoft.CDist (float32)."""
+        clf = OutputCodeClassifier(
+            DecisionTreeClassifier(max_depth=3, random_state=0), code_size=2, random_state=0
+        )
+        clf.fit(self._X_multi, self._y_multi)
+
+        onx = to_onnx(clf, (self._X_multi,), target_opset={"": 18, "com.microsoft": 1})
+
+        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        self.assertIn(("CDist", "com.microsoft"), op_types)
+
+        domains = {oi.domain for oi in onx.opset_import}
+        self.assertIn("com.microsoft", domains)
+
+        expected_label = clf.predict(self._X_multi)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": self._X_multi})
+        self.assertEqualArray(expected_label, ort_results[0])
+
+    def test_cdist_float64(self):
+        """Distance computed via com.microsoft.CDist (float64)."""
+        X64 = self._X_multi.astype(np.float64)
+        clf = OutputCodeClassifier(
+            DecisionTreeClassifier(max_depth=3, random_state=0), code_size=2, random_state=0
+        )
+        clf.fit(X64, self._y_multi)
+
+        onx = to_onnx(clf, (X64,), target_opset={"": 18, "com.microsoft": 1})
+
+        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        self.assertIn(("CDist", "com.microsoft"), op_types)
+
+        expected_label = clf.predict(X64)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X64})
+        self.assertEqualArray(expected_label, ort_results[0])
 
 
 if __name__ == "__main__":
