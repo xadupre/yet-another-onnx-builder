@@ -1,6 +1,5 @@
 from typing import Dict, List
 
-import numpy as np
 from sklearn.neighbors import NeighborhoodComponentsAnalysis
 
 from ..register import register_sklearn_converter
