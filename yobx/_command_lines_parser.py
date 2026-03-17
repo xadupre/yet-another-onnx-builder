@@ -847,6 +847,86 @@ def _cmd_validate(argv: List[Any]):
         print(f":{k},{v};")
 
 
+def get_parser_stats() -> ArgumentParser:
+    parser = ArgumentParser(
+        prog="stats",
+        description=textwrap.dedent("""
+            Computes statistics on an ONNX model:
+            number of nodes per op_type and estimation of computational cost.
+            """),
+        formatter_class=RawTextHelpFormatter,
+    )
+    parser.add_argument("input", type=str, help="onnx model to analyse")
+    parser.add_argument(
+        "-o",
+        "--output",
+        default="",
+        type=str,
+        required=False,
+        help="output file (.json or .csv) or empty to print on standard output",
+    )
+    parser.add_argument("-v", "--verbose", type=int, default=0, required=False, help="verbosity")
+    return parser
+
+
+def _cmd_stats(argv: List[Any]):
+    import json
+
+    from .helpers.stats_helper import model_statistics
+
+    parser = get_parser_stats()
+    args = parser.parse_args(argv[1:])
+    if args.verbose:
+        print(f"-- loads {args.input!r}")
+    onx = onnx.load(args.input, load_external_data=False)
+    if args.verbose:
+        print("-- computes statistics")
+    stats = model_statistics(onx, verbose=args.verbose)
+
+    if args.output:
+        outname = process_outputname(args.output, args.input)
+        if outname.endswith(".csv"):
+            # Write node_count_per_op_type and flops_per_op_type as CSV
+            rows = []
+            for op, count in sorted(stats["node_count_per_op_type"].items()):
+                flops = stats["flops_per_op_type"].get(op)
+                rows.append({"op_type": op, "count": count, "estimated_flops": flops})
+            import csv
+
+            with open(outname, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=["op_type", "count", "estimated_flops"])
+                writer.writeheader()
+                writer.writerows(rows)
+        else:
+            # Default: JSON (strip node_stats for brevity unless verbose)
+            out = dict(stats)
+            if not args.verbose:
+                out.pop("node_stats", None)
+            with open(outname, "w") as f:
+                json.dump(out, f, indent=2, default=str)
+        if args.verbose:
+            print(f"-- saved into {outname!r}")
+    else:
+        _print_model_statistics(stats)
+
+
+def _print_model_statistics(stats: Dict[str, Any]) -> None:
+    """Prints model statistics on standard output."""
+    print(f"Number of nodes: {stats['n_nodes']}")
+    print("")
+    print("Nodes per op_type:")
+    for op, count in sorted(stats["node_count_per_op_type"].items()):
+        flops = stats["flops_per_op_type"].get(op)
+        flops_str = f"  estimated_flops={flops}" if flops is not None else ""
+        print(f"  {op}: {count}{flops_str}")
+    print("")
+    total = stats["total_estimated_flops"]
+    if total is not None:
+        print(f"Total estimated FLOPs: {total}")
+    else:
+        print("Total estimated FLOPs: n/a (dynamic shapes or unsupported op_types)")
+
+
 def get_main_parser() -> ArgumentParser:
     parser = ArgumentParser(
         prog="yobx",
@@ -863,6 +943,7 @@ def get_main_parser() -> ArgumentParser:
             partition         - partition a model, each partition appears as local function
             print             - prints the model on standard output
             run-doc-examples  - run all runpython:: and gdot:: examples in RST/Python files
+            stats             - compute statistics on an onnx model
             validate          - validate a model (knowing its model id on HuggingFace Hub)
             """),
     )
@@ -876,6 +957,7 @@ def get_main_parser() -> ArgumentParser:
             "partition",
             "print",
             "run-doc-examples",
+            "stats",
             "validate",
         ],
         help="Selects a command.",
@@ -892,6 +974,7 @@ def main(argv: Optional[List[Any]] = None):
         partition=_cmd_partition,
         print=_cmd_print,
         **{"run-doc-examples": _cmd_run_doc_examples},
+        stats=_cmd_stats,
         validate=_cmd_validate,
     )
 
@@ -910,6 +993,7 @@ def main(argv: Optional[List[Any]] = None):
                 partition=get_parser_partition,
                 print=get_parser_print,
                 **{"run-doc-examples": get_parser_run_doc_examples},
+                stats=get_parser_stats,
                 validate=get_parser_validate,
             )
             cmd = argv[0]

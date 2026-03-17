@@ -11,6 +11,7 @@ from yobx._command_lines_parser import (
     get_parser_partition,
     get_parser_print,
     get_parser_run_doc_examples,
+    get_parser_stats,
     process_outputname,
 )
 
@@ -120,6 +121,21 @@ class TestCommandLines(ExtTestCase):
             get_main_parser().print_help()
         text = st.getvalue()
         self.assertIn("run-doc-examples", text)
+
+    def test_parser_stats(self):
+        st = StringIO()
+        with redirect_stdout(st):
+            get_parser_stats().print_help()
+        text = st.getvalue()
+        self.assertIn("--output", text)
+        self.assertIn("--verbose", text)
+
+    def test_main_parser_has_stats(self):
+        st = StringIO()
+        with redirect_stdout(st):
+            get_main_parser().print_help()
+        text = st.getvalue()
+        self.assertIn("stats", text)
 
 
 if __name__ == "__main__":
