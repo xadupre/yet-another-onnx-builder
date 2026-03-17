@@ -1190,6 +1190,10 @@ class InputObserver:
         """Returns the number of stored set of inputs."""
         return 0 if not self.info else len(self.info)
 
+    def is_empty(self) -> bool:
+        """Returns True if no input was captured."""
+        return self.num_obs() == 0
+
     @contextlib.contextmanager
     def __call__(
         self, model: torch.nn.Module, store_n_calls: int = 3, method_name: str = "forward"
