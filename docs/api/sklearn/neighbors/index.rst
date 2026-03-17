@@ -11,3 +11,4 @@ yobx.sklearn.neighbors
     local_outlier_factor
     nearest_centroid
     radiusneighbors
+    radiusneighbors_transformer
