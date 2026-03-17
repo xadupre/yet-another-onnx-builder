@@ -10,5 +10,6 @@ yobx.sklearn.neighbors
     kernel_density
     local_outlier_factor
     nearest_centroid
+    neighborhood_components_analysis
     radiusneighbors
     radiusneighbors_transformer

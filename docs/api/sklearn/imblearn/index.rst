@@ -8,3 +8,4 @@ yobx.sklearn.imblearn
     balanced_random_forest
     easy_ensemble
     balanced_bagging
+    rus_boost
