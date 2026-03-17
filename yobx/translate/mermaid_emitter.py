@@ -6,7 +6,6 @@ import onnx
 
 from ..helpers.onnx_helper import get_hidden_inputs, onnx_dtype_name
 from .base_emitter import BaseEmitter
-from .translator import Translator
 
 _MAX_INLINE_CONSTANT_SIZE = 10
 
@@ -338,4 +337,3 @@ class MermaidEmitter(BaseEmitter):
             if att_proto.type == onnx.AttributeProto.GRAPH:
                 hidden |= get_hidden_inputs(att_proto.g)
         return hidden
-
