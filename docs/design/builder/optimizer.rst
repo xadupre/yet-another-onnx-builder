@@ -688,6 +688,8 @@ Nodes
   creates a node without adding it to the graph, deals with some constraints
   related to opset version
 
+.. _l-design-pattern-optimizer-debugging:
+
 Debugging Environment Variables
 ================================
 
