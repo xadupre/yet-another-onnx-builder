@@ -9,11 +9,117 @@ inferred dynamic shapes are then used for the ONNX export.
 """
 
 import contextlib
-from typing import Any, Dict, Optional, Tuple
+from dataclasses import dataclass, fields
+from typing import Any, Dict, List, Optional, Tuple, Union
 import os
 
 DEFAULT_PROMPT = "Continue: it rains, what should I do?"
 """Default text prompt used when validating text-generation models."""
+
+
+@dataclass
+class ValidateSummary:
+    """Flat summary dictionary returned by :func:`validate_model`.
+
+    Contains status flags and error messages collected during validation.
+    Fields that were not reached (e.g. because an earlier step failed) remain
+    ``None``.
+    """
+
+    model_id: str
+    """HuggingFace model identifier."""
+    prompt: str
+    """Text prompt used during validation."""
+    config_from_cache: Optional[Union[str, bool]] = None
+    """``"bundled"`` / ``"local"`` when config was loaded from cache, ``False`` for network."""
+    config_overrides: Optional[str] = None
+    """String representation of the config overrides applied."""
+    error_config: Optional[str] = None
+    """Error message if config loading failed."""
+    error_tokenizer: Optional[str] = None
+    """Error message if tokenizer loading failed."""
+    model_from_cache: Optional[bool] = None
+    """``True`` when the model was loaded from the local HF cache."""
+    error_model: Optional[str] = None
+    """Error message if model loading failed."""
+    n_captured: Optional[int] = None
+    """Number of input sets captured by the :class:`InputObserver`."""
+    error_observer: Optional[str] = None
+    """Error message if input capture failed."""
+    export: Optional[str] = None
+    """``"OK"`` or ``"FAILED"`` depending on whether the ONNX export succeeded."""
+    error_export: Optional[str] = None
+    """Error message if the ONNX export failed."""
+    discrepancies_ok: Optional[int] = None
+    """Number of input sets where ONNX Runtime results matched PyTorch."""
+    discrepancies_total: Optional[int] = None
+    """Total number of input sets checked for discrepancies."""
+    discrepancies: Optional[str] = None
+    """``"OK"`` or ``"FAILED"`` for the overall discrepancy check."""
+    error_discrepancies: Optional[str] = None
+    """Error message if the discrepancy check raised an exception."""
+
+    def items(self):
+        """Yield ``(field_name, value)`` pairs for every non-``None`` field.
+
+        This mirrors ``dict.items()`` so that existing code such as
+        ``for k, v in sorted(summary.items())`` keeps working without
+        modification.
+        """
+        for f in fields(self):
+            v = getattr(self, f.name)
+            if v is not None:
+                yield f.name, v
+
+    def __contains__(self, key: str) -> bool:
+        """Return ``True`` when *key* names a field that has been set (non-``None``)."""
+        return getattr(self, key, None) is not None
+
+    def __getitem__(self, key: str) -> Any:
+        """Dict-style read access: ``summary["model_id"]``."""
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(key)
+
+
+@dataclass
+class ValidateData:
+    """Intermediate artefacts collected by :func:`validate_model`.
+
+    All fields default to ``None`` and are populated progressively as
+    validation proceeds.
+    """
+
+    config: Optional[Any] = None
+    """Loaded ``transformers`` config object."""
+    model: Optional[Any] = None
+    """Loaded (or randomly-initialised) PyTorch model."""
+    input_ids: Optional[Any] = None
+    """Input token ids tensor used during capture."""
+    attention_mask: Optional[Any] = None
+    """Attention mask tensor used during capture."""
+    observer: Optional[Any] = None
+    """:class:`InputObserver` instance after capture."""
+    kwargs: Optional[Dict[str, Any]] = None
+    """Inferred export keyword arguments."""
+    dynamic_shapes: Optional[Any] = None
+    """Inferred dynamic shapes passed to the exporter."""
+    filename: Optional[str] = None
+    """Path to the exported ``.onnx`` file."""
+    discrepancies: Optional[List[Dict[str, Any]]] = None
+    """Per-input-set discrepancy records from :meth:`InputObserver.check_discrepancies`."""
+
+    def __contains__(self, key: str) -> bool:
+        """Return ``True`` when *key* names a field that has been set (non-``None``)."""
+        return getattr(self, key, None) is not None
+
+    def __getitem__(self, key: str) -> Any:
+        """Dict-style read access: ``data["observer"]``."""
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(key)
 
 
 def _to_onnx(*args, exporter: str = "yobx", **kwargs):
@@ -75,8 +181,8 @@ def _load_config(
     config_overrides: Optional[Dict[str, Any]],
     verbose: int,
     quiet: bool,
-    summary: Dict[str, Any],
-    collected_data: Dict[str, Any],
+    summary: "ValidateSummary",
+    collected_data: "ValidateData",
 ):
     """Load the model config (bundled → local HF cache → network) and apply overrides."""
     from transformers import AutoConfig
@@ -90,16 +196,16 @@ def _load_config(
         _cached = get_cached_configuration(model_id)
         if _cached is not None:
             config = _cached
-            summary["config_from_cache"] = "bundled"
+            summary.config_from_cache = "bundled"
         else:
             try:
                 config = AutoConfig.from_pretrained(model_id, local_files_only=True)
-                summary["config_from_cache"] = "local"
+                summary.config_from_cache = "local"
             except OSError:
                 config = AutoConfig.from_pretrained(model_id)
-                summary["config_from_cache"] = False
+                summary.config_from_cache = False
     except Exception as exc:
-        summary["error_config"] = str(exc)
+        summary.error_config = str(exc)
         if not quiet:
             raise
         return None
@@ -107,13 +213,13 @@ def _load_config(
     if config_overrides:
         for k, v in config_overrides.items():
             setattr(config, k, v)
-        summary["config_overrides"] = str(config_overrides)
+        summary.config_overrides = str(config_overrides)
 
-    collected_data["config"] = config
+    collected_data.config = config
     return config
 
 
-def _load_tokenizer(model_id: str, verbose: int, quiet: bool, summary: Dict[str, Any]):
+def _load_tokenizer(model_id: str, verbose: int, quiet: bool, summary: "ValidateSummary"):
     """Load the tokenizer (local HF cache first, then network)."""
     from transformers import AutoTokenizer
 
@@ -126,7 +232,7 @@ def _load_tokenizer(model_id: str, verbose: int, quiet: bool, summary: Dict[str,
         except OSError:
             tokenizer = AutoTokenizer.from_pretrained(model_id)
     except Exception as exc:
-        summary["error_tokenizer"] = str(exc)
+        summary.error_tokenizer = str(exc)
         if not quiet:
             raise
         return None
@@ -142,8 +248,8 @@ def _load_model(
     torch_device,
     verbose: int,
     quiet: bool,
-    summary: Dict[str, Any],
-    collected_data: Dict[str, Any],
+    summary: "ValidateSummary",
+    collected_data: "ValidateData",
 ):
     """Load (or instantiate with random weights) the CausalLM model."""
     import torch
@@ -166,21 +272,21 @@ def _load_model(
                 model = AutoModelForCausalLM.from_pretrained(
                     model_id, config=config, local_files_only=True, **dtype_kwargs
                 )
-                summary["model_from_cache"] = True
+                summary.model_from_cache = True
             except OSError:
                 model = AutoModelForCausalLM.from_pretrained(
                     model_id, config=config, **dtype_kwargs
                 )
-                summary["model_from_cache"] = False
+                summary.model_from_cache = False
         model = model.to(torch_device)
         model.eval()
     except Exception as exc:
-        summary["error_model"] = str(exc)
+        summary.error_model = str(exc)
         if not quiet:
             raise
         return None
 
-    collected_data["model"] = model
+    collected_data.model = model
     return model
 
 
@@ -193,8 +299,8 @@ def _capture_inputs(
     prompt: str,
     verbose: int,
     quiet: bool,
-    summary: Dict[str, Any],
-    collected_data: Dict[str, Any],
+    summary: "ValidateSummary",
+    collected_data: "ValidateData",
 ):
     """Run model.generate under an InputObserver to capture real inputs."""
     from .flatten import register_flattening_functions
@@ -223,13 +329,13 @@ def _capture_inputs(
                 generate_kwargs["attention_mask"] = attention_mask
             model.generate(**generate_kwargs)
     except Exception as exc:
-        summary["error_observer"] = str(exc)
+        summary.error_observer = str(exc)
         if not quiet:
             raise
         return None
 
-    collected_data["observer"] = observer
-    summary["n_captured"] = len(observer.info or [])
+    collected_data.observer = observer
+    summary.n_captured = len(observer.info or [])
 
     if verbose:
         print(f"[validate_model] captured {len(observer.info or [])} input set(s)")
@@ -237,7 +343,7 @@ def _capture_inputs(
     return observer
 
 
-def _infer_shapes(observer, patch: bool, verbose: int, collected_data: Dict[str, Any]):
+def _infer_shapes(observer, patch: bool, verbose: int, collected_data: "ValidateData"):
     """Infer export kwargs and dynamic shapes from the captured observer."""
     from .flatten import register_flattening_functions
 
@@ -245,8 +351,8 @@ def _infer_shapes(observer, patch: bool, verbose: int, collected_data: Dict[str,
         kwargs = observer.infer_arguments()
         dynamic_shapes = observer.infer_dynamic_shapes(set_batch_dimension_for=True)
 
-    collected_data["kwargs"] = kwargs
-    collected_data["dynamic_shapes"] = dynamic_shapes
+    collected_data.kwargs = kwargs
+    collected_data.dynamic_shapes = dynamic_shapes
 
     if verbose:
         from ..helpers import string_type
@@ -269,8 +375,8 @@ def _export(
     dump_folder: Optional[str],
     verbose: int,
     quiet: bool,
-    summary: Dict[str, Any],
-    collected_data: Dict[str, Any],
+    summary: "ValidateSummary",
+    collected_data: "ValidateData",
 ):
     """Export the model to ONNX and store the output filename."""
     from .flatten import register_flattening_functions
@@ -287,7 +393,7 @@ def _export(
         model_name = model_id.replace("/", "-")
         filename = os.path.join(_tmpdir, f"{model_name}.onnx")
 
-    collected_data["filename"] = filename
+    collected_data.filename = filename
 
     if verbose:
         print(f"[validate_model] exporting to ONNX ({exporter=}, {opset=}) -> {filename!r}")
@@ -316,10 +422,10 @@ def _export(
                 verbose=max(0, verbose - 1),
                 **export_kwargs,
             )
-        summary["export"] = "OK"
+        summary.export = "OK"
     except Exception as exc:
-        summary["export"] = "FAILED"
-        summary["error_export"] = str(exc)
+        summary.export = "FAILED"
+        summary.error_export = str(exc)
         if not quiet:
             raise
         return False
@@ -335,25 +441,25 @@ def _check_discrepancies(
     filename: str,
     verbose: int,
     quiet: bool,
-    summary: Dict[str, Any],
-    collected_data: Dict[str, Any],
+    summary: "ValidateSummary",
+    collected_data: "ValidateData",
 ):
     """Run ONNX Runtime on every captured input set and compare against PyTorch outputs."""
     if verbose:
         print("[validate_model] checking discrepancies ...")
     try:
         disc_data = observer.check_discrepancies(filename)
-        collected_data["discrepancies"] = disc_data
+        collected_data.discrepancies = disc_data
         n_ok = sum(1 for row in disc_data if row.get("SUCCESS", False))
         n_total = len(disc_data)
-        summary["discrepancies_ok"] = n_ok
-        summary["discrepancies_total"] = n_total
-        summary["discrepancies"] = "OK" if n_ok == n_total else "FAILED"
+        summary.discrepancies_ok = n_ok
+        summary.discrepancies_total = n_total
+        summary.discrepancies = "OK" if n_ok == n_total else "FAILED"
         if verbose:
             print(f"[validate_model] discrepancies: {n_ok}/{n_total} OK")
     except Exception as exc:
-        summary["discrepancies"] = "FAILED"
-        summary["error_discrepancies"] = str(exc)
+        summary.discrepancies = "FAILED"
+        summary.error_discrepancies = str(exc)
         if not quiet:
             raise
 
@@ -375,7 +481,7 @@ def validate_model(
     tokenized_inputs: Optional[Dict[str, Any]] = None,
     config_overrides: Optional[Dict[str, Any]] = None,
     random_weights: bool = False,
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+) -> Tuple["ValidateSummary", "ValidateData"]:
     """
     Validates an ONNX export for any HuggingFace ``model_id`` by capturing real
     model inputs with :class:`InputObserver <yobx.torch.InputObserver>` and a
@@ -435,9 +541,10 @@ def validate_model(
         (possibly modified) config with random weights instead of downloading
         the pretrained weights.  This avoids any network access for the model
         itself, which is useful for fast unit-testing or CI validation.
-    :return: A 2-tuple ``(summary, data)`` where *summary* is a flat
-        ``{str: value}`` dictionary suitable for display or logging, and
-        *data* collects all intermediate artefacts.
+    :return: A 2-tuple ``(summary, data)`` where *summary* is a
+        :class:`ValidateSummary` instance with status flags and error messages,
+        and *data* is a :class:`ValidateData` instance that collects all
+        intermediate artefacts.
 
     Example::
 
@@ -449,8 +556,8 @@ def validate_model(
     """
     import torch
 
-    summary: Dict[str, Any] = {"model_id": model_id, "prompt": prompt}
-    collected_data: Dict[str, Any] = {}
+    summary: ValidateSummary = ValidateSummary(model_id=model_id, prompt=prompt)
+    collected_data: ValidateData = ValidateData()
 
     # ------------------------------------------------------------------ device / dtype
     torch_device = torch.device(device or "cpu")
@@ -496,8 +603,8 @@ def validate_model(
     if attention_mask is not None:
         attention_mask = attention_mask.to(torch_device)
 
-    collected_data["input_ids"] = input_ids
-    collected_data["attention_mask"] = attention_mask
+    collected_data.input_ids = input_ids
+    collected_data.attention_mask = attention_mask
 
     # ------------------------------------------------------- capture with observer
     observer = _capture_inputs(
@@ -540,7 +647,7 @@ def validate_model(
     # --------------------------------------------------------- check discrepancies
     if do_run:
         _check_discrepancies(
-            observer, collected_data["filename"], verbose, quiet, summary, collected_data
+            observer, collected_data.filename, verbose, quiet, summary, collected_data
         )
 
     return summary, collected_data
