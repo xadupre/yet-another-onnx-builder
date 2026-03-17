@@ -8,6 +8,7 @@ def register():
         from . import (
             binary_encoder,
             one_hot_encoder,
+            ordinal_encoder,
             polynomial_encoder,
             quantile_encoder,
             woe_encoder,
