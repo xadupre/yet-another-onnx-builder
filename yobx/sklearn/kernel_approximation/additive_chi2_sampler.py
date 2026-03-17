@@ -93,8 +93,7 @@ def sklearn_additive_chi2_sampler(
     # ── Component 0: sqrt(x * sample_interval) ──────────────────────────────
     sqrt_coeff = np.array([sample_interval], dtype=dtype)
     sqrt_comp = g.op.Sqrt(
-        g.op.Mul(X, sqrt_coeff, name=f"{name}_sqrt_scaled"),
-        name=f"{name}_sqrt0",
+        g.op.Mul(X, sqrt_coeff, name=f"{name}_sqrt_scaled"), name=f"{name}_sqrt0"
     )
 
     components = [sqrt_comp]
@@ -123,14 +122,10 @@ def sklearn_additive_chi2_sampler(
 
             # cos and sin projections
             cos_comp = g.op.Mul(
-                factor,
-                g.op.Cos(log_step, name=f"{name}_cos_{j}"),
-                name=f"{name}_cos_comp_{j}",
+                factor, g.op.Cos(log_step, name=f"{name}_cos_{j}"), name=f"{name}_cos_comp_{j}"
             )
             sin_comp = g.op.Mul(
-                factor,
-                g.op.Sin(log_step, name=f"{name}_sin_{j}"),
-                name=f"{name}_sin_comp_{j}",
+                factor, g.op.Sin(log_step, name=f"{name}_sin_{j}"), name=f"{name}_sin_comp_{j}"
             )
 
             components.append(cos_comp)
@@ -150,6 +145,4 @@ def sklearn_additive_chi2_sampler(
             n_features = g.get_shape(X)[1]
             n_out_features = n_features * (2 * sample_steps - 1)
             g.set_shape(res, (batch_dim, n_out_features))
-        elif g.has_rank(X):
-            g.set_rank(res, 2)
     return res

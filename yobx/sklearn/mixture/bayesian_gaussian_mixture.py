@@ -106,8 +106,7 @@ def sklearn_bayesian_gaussian_mixture(
 
     # Variational log-lambda: n_features * log(2) + sum_f digamma(0.5*(dof-f))
     log_lambda = n_features * np.log(2.0) + np.sum(
-        digamma(0.5 * (dof - np.arange(0, n_features)[:, np.newaxis])),
-        axis=0,
+        digamma(0.5 * (dof - np.arange(0, n_features)[:, np.newaxis])), axis=0
     )  # (K,)
 
     # Extra constant correction per component (Wishart and mean-precision terms)
@@ -120,5 +119,5 @@ def sklearn_bayesian_gaussian_mixture(
     log_weights_effective = estimator._estimate_log_weights() + extra_c  # (K,)
 
     return _sklearn_mixture_core(
-        g, sts, outputs, estimator, X, name, log_weights=log_weights_effective,
+        g, sts, outputs, estimator, X, name, log_weights=log_weights_effective
     )

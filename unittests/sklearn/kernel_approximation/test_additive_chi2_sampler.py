@@ -13,9 +13,7 @@ class TestAdditiveChi2Sampler(ExtTestCase):
     def _make_data(self, seed=0, n_samples=30, n_features=5):
         rng = np.random.default_rng(seed)
         # AdditiveChi2Sampler requires non-negative input.
-        return np.abs(
-            rng.standard_normal((n_samples, n_features))
-        ).astype(np.float32)
+        return np.abs(rng.standard_normal((n_samples, n_features))).astype(np.float32)
 
     def _run(self, sample_steps, sample_interval=None, dtype=np.float32):
         from sklearn.kernel_approximation import AdditiveChi2Sampler
@@ -76,10 +74,7 @@ class TestAdditiveChi2Sampler(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         # Create a matrix that includes exact zeros.
-        X = np.array(
-            [[0.0, 1.0, 2.0], [3.0, 0.0, 0.5], [0.0, 0.0, 0.0]],
-            dtype=np.float32,
-        )
+        X = np.array([[0.0, 1.0, 2.0], [3.0, 0.0, 0.5], [0.0, 0.0, 0.0]], dtype=np.float32)
         est = AdditiveChi2Sampler(sample_steps=2)
         est.fit(X)
 
