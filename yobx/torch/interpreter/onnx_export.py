@@ -1165,3 +1165,96 @@ def validate_exported_onnx(
         assert not msgs, "\n".join(msgs)
 
     assert diff["abs"] <= atol, msg
+
+
+def check_model_weights(
+    model: "torch.nn.Module", proto: Union[ModelProto, ModelContainer]  # noqa: F821
+) -> List[Tuple[str, str, Optional[Tuple[int, ...]]]]:
+    """
+    After a model is exported to ONNX, checks that every initializer name in
+    the ONNX model can be traced back to a parameter or buffer of the original
+    PyTorch model.  When a name is found but the shape differs only by a
+    transposition (reversed dimension order), the initializer is reported as
+    ``"transposed"`` rather than ``"unknown"``.
+
+    :param model: original torch model
+    :param proto: exported ONNX model (``ModelProto`` or ``ModelContainer``);
+        the check results are also written to ``proto.metadata_props`` under
+        the key ``"check_model_weights"`` as a JSON string
+    :return: list of 3-tuples
+        ``(initializer_name, status, onnx_shape, original_shape)`` where
+        *status* is one of:
+
+        * ``"match"`` – name found in the original model and shape is
+          identical
+        * ``"status"`` – name found in the original model but the
+          ONNX shape is the reverse of the original shape (e.g. weight
+          that was folded with a ``Transpose`` node during optimization)
+        * ``"torch_shape"`` – name not found among the original parameters or
+          buffers at all
+
+    Example::
+
+        import torch
+        from yobx.torch.interpreter import to_onnx, check_model_weights
+
+        class Neuron(torch.nn.Module):
+            def __init__(self, n_dims: int, n_targets: int):
+                super().__init__()
+                self.linear = torch.nn.Linear(n_dims, n_targets)
+
+            def forward(self, x):
+                return torch.relu(self.linear(x))
+
+        model = Neuron(5, 3)
+        x = torch.rand(2, 5)
+        onx = to_onnx(model, (x,))
+        issues = check_model_weights(model, onx)
+        for name, status, onnx_shape, orig_shape in issues:
+            print(name, status, onnx_shape, orig_shape)
+    """
+    # Collect original parameter/buffer names and shapes.
+    original: Dict[str, Tuple[int, ...]] = {}
+    for name, param in model.named_parameters():
+        original[name] = tuple(param.shape)
+    for name, buf in model.named_buffers():
+        if name not in original:
+            original[name] = tuple(buf.shape)
+
+    # Retrieve the graph proto.
+    if isinstance(proto, ModelProto):
+        graph = proto.graph
+    else:
+        # ModelContainer
+        graph = proto.model_proto.graph
+
+    inits = {init.name: init for init in graph.initializer}
+    results = []
+    for weight_name, weight in model.named_parameters():
+        if weight_name in inits:
+            onnx_name = weight_name
+        else:
+            raise ValueError(f"Unable to find {weight_name!r} in {sorted(inits)}")
+
+        init = inits[onnx_name]
+
+        onnx_shape = tuple(init.dims)
+        orig_shape = tuple(weight.shape)
+        if onnx_shape == orig_shape:
+            status = "match"
+        elif len(onnx_shape) > 1 and len(orig_shape) > 1 and onnx_shape == orig_shape[::-1]:
+            status = "transposed"
+        else:
+            status = "shape_mismatch"
+
+        data = init.metadata_props.add()
+        data.key = "status"
+        data.value = status
+        data = init.metadata_props.add()
+        data.key = "torch_name"
+        data.value = weight_name
+        data = init.metadata_props.add()
+        data.key = "torch_shape"
+        data.value = str(orig_shape)
+        results.append((weight_name, status, orig_shape))
+    return results
