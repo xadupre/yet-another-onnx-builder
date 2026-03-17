@@ -35,6 +35,8 @@ class TestModelEvalCases(ExtTestCase):
                 "dynamo",
                 "dynamo-ir",
                 "export-tracing",
+                "yobx",
+                "yobx-tracing",
             ),
         )
         self.assertIsInstance(ev, list)
@@ -44,6 +46,9 @@ class TestModelEvalCases(ExtTestCase):
         evaluation(
             cases="SignatureListFixedLength", exporters="custom", quiet=False, dynamic=False
         )
+
+    def test_run_exporter_yobx(self):
+        evaluation(cases="SignatureListFixedLength", exporters="yobx", quiet=False, dynamic=False)
 
     def test_run_exporter_dynamo(self):
         evaluation(
@@ -69,6 +74,11 @@ class TestModelEvalCases(ExtTestCase):
             exporters="export-tracing",
             quiet=False,
             dynamic=False,
+        )
+
+    def test_run_exporter_yobx_tracing(self):
+        evaluation(
+            cases="SignatureListFixedLength", exporters="yobx-tracing", quiet=False, dynamic=False
         )
 
     def test_run_exporter_regex(self):
