@@ -1,7 +1,6 @@
 import numpy as np
 from typing import Dict, List, Union
 
-import onnx
 from onnx import TensorProto
 from onnx.helper import make_graph, make_node, make_tensor_value_info
 import onnx.numpy_helper as onh
@@ -80,14 +79,12 @@ def sklearn_nmf(
     beta_loss = estimator._beta_loss
     if beta_loss != 2:
         raise NotImplementedError(
-            f"NMF ONNX converter only supports beta_loss='frobenius' (2), "
-            f"got {beta_loss!r}."
+            f"NMF ONNX converter only supports beta_loss='frobenius' (2), got {beta_loss!r}."
         )
 
     if isinstance(estimator, NMF) and estimator.solver != "mu":
         raise NotImplementedError(
-            f"NMF ONNX converter only supports solver='mu', "
-            f"got {estimator.solver!r}."
+            f"NMF ONNX converter only supports solver='mu', got {estimator.solver!r}."
         )
 
     itype = g.get_type(X)
@@ -121,8 +118,7 @@ def sklearn_nmf(
     x_mean = g.op.ReduceMean(X, keepdims=0, name=f"{name}_xmean")  # scalar
     inv_k = np.array(1.0 / n_k, dtype=dtype)
     w_scalar = g.op.Sqrt(
-        g.op.Mul(x_mean, inv_k, name=f"{name}_mean_div_k"),
-        name=f"{name}_w_scalar",
+        g.op.Mul(x_mean, inv_k, name=f"{name}_mean_div_k"), name=f"{name}_w_scalar"
     )  # scalar
     w_11 = g.op.Reshape(w_scalar, np.array([1, 1], dtype=np.int64), name=f"{name}_w_11")
 
@@ -166,9 +162,7 @@ def sklearn_nmf(
     body_nodes = []
 
     # denom = W_in @ HHt
-    body_nodes.append(
-        make_node("MatMul", [b_W_in, f"{bp}_HHt"], [b_denom], name=f"{bp}_mm")
-    )
+    body_nodes.append(make_node("MatMul", [b_W_in, f"{bp}_HHt"], [b_denom], name=f"{bp}_mm"))
 
     denom_cur = b_denom
 
@@ -195,19 +189,13 @@ def sklearn_nmf(
     )
 
     # ratio = XHt / denom_safe  (XHt is an outer-scope tensor)
-    body_nodes.append(
-        make_node("Div", [XHt, b_denom_safe], [b_ratio], name=f"{bp}_div")
-    )
+    body_nodes.append(make_node("Div", [XHt, b_denom_safe], [b_ratio], name=f"{bp}_div"))
 
     # W_out = W_in * ratio
-    body_nodes.append(
-        make_node("Mul", [b_W_in, b_ratio], [b_W_out], name=f"{bp}_mul")
-    )
+    body_nodes.append(make_node("Mul", [b_W_in, b_ratio], [b_W_out], name=f"{bp}_mul"))
 
     # cond_out = cond_in  (always continue; Loop exits after max_iter steps)
-    body_nodes.append(
-        make_node("Identity", [b_cond_in], [b_cond_out], name=f"{bp}_cond_pass")
-    )
+    body_nodes.append(make_node("Identity", [b_cond_in], [b_cond_out], name=f"{bp}_cond_pass"))
 
     loop_body = make_graph(
         body_nodes,
@@ -232,13 +220,7 @@ def sklearn_nmf(
 
     # Create the Loop node; W0 is the initial loop-carried state
     W_final = g.unique_name(f"{name}_W_final")
-    g.make_node(
-        "Loop",
-        [M_name, cond_init, W0],
-        [W_final],
-        body=loop_body,
-        name=f"{name}_loop",
-    )
+    g.make_node("Loop", [M_name, cond_init, W0], [W_final], body=loop_body, name=f"{name}_loop")
     g.set_type(W_final, itype)
 
     res = g.op.Identity(W_final, name=name, outputs=outputs)
