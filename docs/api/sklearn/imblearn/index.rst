@@ -5,5 +5,6 @@ yobx.sklearn.imblearn
     :maxdepth: 1
     :caption: modules
 
+    balanced_random_forest
     easy_ensemble
     balanced_bagging
