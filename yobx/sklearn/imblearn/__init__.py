@@ -8,6 +8,7 @@ def register():
         from . import balanced_random_forest  # noqa: F401
         from . import easy_ensemble  # noqa: F401
         from . import balanced_bagging  # noqa: F401
+        from . import rus_boost  # noqa: F401
     except ImportError:
         # No imbalanced-learn installed.
         pass
