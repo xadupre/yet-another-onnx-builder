@@ -46,16 +46,14 @@ def sklearn_rbf_sampler(
     :param name: prefix name for the added nodes
     :return: output tensor name (shape ``(N, n_components)``)
     """
-    assert isinstance(estimator, RBFSampler), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(estimator, RBFSampler), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
 
     random_weights = estimator.random_weights_.astype(dtype)  # (n_features, n_components)
-    random_offset = estimator.random_offset_.astype(dtype)    # (n_components,)
+    random_offset = estimator.random_offset_.astype(dtype)  # (n_components,)
     n_components = int(random_weights.shape[1])
 
     scale = np.array([np.sqrt(2.0 / n_components)], dtype=dtype)
