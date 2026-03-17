@@ -59,6 +59,7 @@ class TestSklearnBalancedRandomForestClassifier(ExtTestCase):
         """BalancedRandomForestClassifier with a smaller number of trees."""
         self._check_clf(self._X, self._y_bin, n_estimators=3)
 
+    @requires_sklearn("1.8")  # numerical discrepancies
     def test_classifier_in_pipeline(self):
         """BalancedRandomForestClassifier as last step in a sklearn Pipeline."""
         Xd = self._X.astype(np.float32)
