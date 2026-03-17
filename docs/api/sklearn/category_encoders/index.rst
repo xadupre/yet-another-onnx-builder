@@ -5,4 +5,5 @@ yobx.sklearn.category_encoders
     :maxdepth: 1
     :caption: modules
 
+    polynomial_encoder
     quantile_encoder
