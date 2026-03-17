@@ -2,13 +2,12 @@ import unittest
 import onnx
 import onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
-from yobx.translate import to_mermaid as to_mermaid_from_package
 from yobx.translate import translate
-from yobx.translate.mermaid_helper import MermaidEmitter, to_mermaid
+from yobx.translate.mermaid_emitter import MermaidEmitter
 from yobx.translate.translator import Translator
 
 
-class TestMermaidHelper(ExtTestCase):
+class TestMermaidEmitter(ExtTestCase):
     def test_basic_graph(self):
         TFLOAT16 = onnx.TensorProto.FLOAT16
         model = oh.make_model(
@@ -34,7 +33,7 @@ class TestMermaidHelper(ExtTestCase):
             ir_version=9,
             opset_imports=[oh.make_opsetid("", 18)],
         )
-        mermaid = to_mermaid(model)
+        mermaid = translate(model, api="mermaid")
         self.assertIn("flowchart TD", mermaid)
         self.assertIn(":::input", mermaid)
         self.assertIn(":::output", mermaid)
@@ -50,10 +49,7 @@ class TestMermaidHelper(ExtTestCase):
 
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("MatMul", ["X", "W"], ["mm"]),
-                    oh.make_node("Relu", ["mm"], ["Z"]),
-                ],
+                [oh.make_node("MatMul", ["X", "W"], ["mm"]), oh.make_node("Relu", ["mm"], ["Z"])],
                 "matmul_relu",
                 [oh.make_tensor_value_info("X", TFLOAT, [4, 4])],
                 [oh.make_tensor_value_info("Z", TFLOAT, [4, 2])],
@@ -62,7 +58,7 @@ class TestMermaidHelper(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        mermaid = to_mermaid(model)
+        mermaid = translate(model, api="mermaid")
         self.assertIn("flowchart TD", mermaid)
         self.assertIn(":::init", mermaid)
         self.assertIn("MatMul_", mermaid)
@@ -95,7 +91,7 @@ class TestMermaidHelper(ExtTestCase):
             ir_version=9,
             opset_imports=[oh.make_opsetid("", 18)],
         )
-        mermaid = to_mermaid(model)
+        mermaid = translate(model, api="mermaid")
         self.assertIn("flowchart TD", mermaid)
         self.assertIn("Cast_", mermaid)
         self.assertIn("Add_", mermaid)
@@ -127,7 +123,7 @@ class TestMermaidHelper(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        mermaid = to_mermaid(model)
+        mermaid = translate(model, api="mermaid")
         self.assertIn("If_", mermaid)
         self.assertIn("-.->", mermaid)
 
@@ -143,7 +139,7 @@ class TestMermaidHelper(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        mermaid = to_mermaid(model)
+        mermaid = translate(model, api="mermaid")
         self.assertIn("classDef input", mermaid)
         self.assertIn("classDef init", mermaid)
         self.assertIn("classDef op", mermaid)
@@ -161,7 +157,7 @@ class TestMermaidHelper(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        mermaid = to_mermaid(model)
+        mermaid = translate(model, api="mermaid")
         # Edge labels should include dtype and shape info
         self.assertIn("FLOAT", mermaid)
 
@@ -178,7 +174,7 @@ class TestMermaidHelper(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        mermaid = to_mermaid_from_package(model)
+        mermaid = translate(model, api="mermaid")
         self.assertIn("flowchart TD", mermaid)
 
     def test_mermaid_emitter_directly(self):

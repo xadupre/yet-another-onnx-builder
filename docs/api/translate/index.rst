@@ -5,13 +5,14 @@ yobx.translate
     :maxdepth: 1
     :caption: modules
 
-    translator
     base_emitter
+    builder_emitter
     inner_emitter
     light_emitter
-    builder_emitter
     make_helper
+    mermaid_emitter
     reverse_graph_builder
+    translator
 
 Top-level helpers
 +++++++++++++++++
