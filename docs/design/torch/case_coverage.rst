@@ -53,7 +53,7 @@ to retrieve an ONNX model equivalent to the original model.
             print("    # code is missing")
         print()
         print()
-        for exporter in ("custom", "dynamo-ir"):
+        for exporter in ("yobx", "dynamo-ir", "tracing"):
             expname = exporter.replace("export-", "")
             print()
             print(expname)
