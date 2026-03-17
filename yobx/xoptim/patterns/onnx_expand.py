@@ -1496,7 +1496,8 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
 
         next_nodes = g.next_nodes(node.output[0])
-        assert len(next_nodes) == 1, "The previous test should have cleared out this case."
+        if len(next_nodes) != 1:
+            return self.none(node, inspect.currentframe().f_lineno)
         unsq_node = next_nodes[0]
 
         if unsq_node.op_type != "Unsqueeze" or unsq_node.domain != "":
@@ -1515,7 +1516,8 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
 
         next_next_nodes = g.next_nodes(unsq_node.output[0])
-        assert len(next_next_nodes) == 1, "The previous test should have cleared out this case."
+        if len(next_next_nodes) != 1:
+            return self.none(node, inspect.currentframe().f_lineno)
         expand2_node = next_next_nodes[0]
 
         if expand2_node.op_type != "Expand" or expand2_node.domain != "":
