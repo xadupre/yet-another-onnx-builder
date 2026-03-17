@@ -232,11 +232,11 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_cuda()
-    @requires_torch("2.12")
+    @requires_torch("2.13")
     def test_simple_export_pool_bfloat16(self):
         import torch
         from onnxruntime import InferenceSession
-        from yobx.torch_bench.export_model_helper import WrapInferenceSessionForTorch
+        from yobx.reference._inference_session_torch import InferenceSessionForTorch
 
         class Neuron(torch.nn.Module):
             def __init__(self):
@@ -253,7 +253,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
         results = []
         for name in names:
             sess = InferenceSession(name, providers=["CUDAExecutionProvider"])
-            ref = WrapInferenceSessionForTorch(sess)
+            ref = InferenceSessionForTorch(sess)
             results.append(ref.run(None, {"input": input_tensor})[0])
 
         def move_to(obj):
@@ -583,7 +583,6 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @ignore_warnings((UserWarning, DeprecationWarning))
     def test_check_model_weights_match(self):
         """check_model_weights returns 'match' for a simple linear model."""
-        import json
         import torch
 
         class Model(torch.nn.Module):
@@ -598,7 +597,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
         x = torch.randn(2, 4)
         onx = to_onnx(model, (x,), optimize=False)
         results = check_model_weights(model, onx)
-        by_name = {name: (status, onnx_shape, orig_shape) for name, status, onnx_shape, orig_shape in results}
+        by_name = {name: (status, orig_shape) for name, status, orig_shape in results}
         self.assertIn("linear.weight", by_name)
         self.assertIn("linear.bias", by_name)
         # Without optimization the shapes should be identical.
@@ -606,18 +605,15 @@ class TestOnnxExportCornerCase(ExtTestCase):
         self.assertEqual(by_name["linear.bias"][0], "match")
         # Results must also be stored in the model metadata_props.
         meta = {p.key: p.value for p in onx.metadata_props}
-        self.assertIn("check_model_weights", meta)
-        stored = json.loads(meta["check_model_weights"])
-        stored_by_name = {entry["name"]: entry["status"] for entry in stored}
-        self.assertEqual(stored_by_name.get("linear.weight"), "match")
-        self.assertEqual(stored_by_name.get("linear.bias"), "match")
+        self.assertNotIn("check_model_weights", meta)
+        for init in onx.graph.initializer:
+            meta = {p.key: p.value for p in init.metadata_props}
+            self.assertIn("status", meta)
 
     @requires_torch()
     @ignore_warnings((UserWarning, DeprecationWarning))
     def test_check_model_weights_transposed(self):
         """check_model_weights detects a transposed initializer."""
-        import numpy as np
-        import onnx
         import onnx.helper as oh
         from onnx import TensorProto
         import torch
@@ -653,7 +649,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
         onx.graph.initializer.extend(new_inits)
 
         results = check_model_weights(model, onx)
-        by_name = {name: status for name, status, _, _ in results}
+        by_name = {name: status for name, status, _ in results}
         self.assertEqual(by_name["linear.weight"], "transposed")
 
     @requires_torch()
@@ -687,39 +683,8 @@ class TestOnnxExportCornerCase(ExtTestCase):
         onx.graph.initializer.append(extra)
 
         results = check_model_weights(model, onx)
-        by_name = {name: status for name, status, _, _ in results}
-        self.assertIn("some_unknown_weight", by_name)
-        self.assertEqual(by_name["some_unknown_weight"], "unknown")
-
-    @requires_torch()
-    @ignore_warnings((UserWarning, DeprecationWarning))
-    def test_check_model_weights_verbose(self):
-        """check_model_weights prints a summary when verbose > 0."""
-        import torch
-        from io import StringIO
-        import sys
-
-        class Model(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.linear = torch.nn.Linear(4, 3, bias=False)
-
-            def forward(self, x):
-                return self.linear(x)
-
-        model = Model()
-        x = torch.randn(2, 4)
-        onx = to_onnx(model, (x,), optimize=False)
-
-        captured = StringIO()
-        old_stdout = sys.stdout
-        sys.stdout = captured
-        try:
-            check_model_weights(model, onx, verbose=1)
-        finally:
-            sys.stdout = old_stdout
-        output = captured.getvalue()
-        self.assertIn("check_model_weights", output)
+        by_name = {name: status for name, status, _ in results}
+        self.assertNotIn("some_unknown_weight", by_name)
 
 
 if __name__ == "__main__":

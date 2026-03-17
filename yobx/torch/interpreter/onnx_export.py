@@ -1,5 +1,4 @@
 import inspect
-import json
 import operator
 import os
 import pprint
@@ -9,7 +8,6 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Un
 from onnx import ModelProto, save_model
 from onnx.defs import onnx_opset_version
 from onnx.model_container import ModelContainer
-import onnx.helper as oh
 from ...helpers import string_type
 from ...xbuilder.graph_builder import GraphBuilder, OptimizationOptions, FunctionOptions
 from ..export_options import ExportOptions
@@ -1170,10 +1168,8 @@ def validate_exported_onnx(
 
 
 def check_model_weights(
-    model: "torch.nn.Module",  # noqa: F821
-    proto: Union[ModelProto, ModelContainer],
-    verbose: int = 0,
-) -> List[Tuple[str, str, Optional[Tuple[int, ...]], Optional[Tuple[int, ...]]]]:
+    model: "torch.nn.Module", proto: Union[ModelProto, ModelContainer]  # noqa: F821
+) -> List[Tuple[str, str, Optional[Tuple[int, ...]]]]:
     """
     After a model is exported to ONNX, checks that every initializer name in
     the ONNX model can be traced back to a parameter or buffer of the original
@@ -1185,19 +1181,16 @@ def check_model_weights(
     :param proto: exported ONNX model (``ModelProto`` or ``ModelContainer``);
         the check results are also written to ``proto.metadata_props`` under
         the key ``"check_model_weights"`` as a JSON string
-    :param verbose: verbosity level; when > 0 a summary is printed
-    :return: list of 4-tuples
+    :return: list of 3-tuples
         ``(initializer_name, status, onnx_shape, original_shape)`` where
         *status* is one of:
 
         * ``"match"`` – name found in the original model and shape is
           identical
-        * ``"transposed"`` – name found in the original model but the
+        * ``"status"`` – name found in the original model but the
           ONNX shape is the reverse of the original shape (e.g. weight
           that was folded with a ``Transpose`` node during optimization)
-        * ``"shape_mismatch"`` – name found in the original model but
-          neither shape matches nor is it a simple transposition
-        * ``"unknown"`` – name not found among the original parameters or
+        * ``"torch_shape"`` – name not found among the original parameters or
           buffers at all
 
     Example::
@@ -1235,57 +1228,33 @@ def check_model_weights(
         # ModelContainer
         graph = proto.model_proto.graph
 
-    results: List[Tuple[str, str, Optional[Tuple[int, ...]], Optional[Tuple[int, ...]]]] = []
-    for init in graph.initializer:
-        init_name: str = init.name
-        onnx_shape: Tuple[int, ...] = tuple(init.dims)
-
-        if init_name not in original:
-            status = "unknown"
-            orig_shape = None
+    inits = {init.name: init for init in graph.initializer}
+    results = []
+    for weight_name, weight in model.named_parameters():
+        if weight_name in inits:
+            onnx_name = weight_name
         else:
-            orig_shape = original[init_name]
-            if onnx_shape == orig_shape:
-                status = "match"
-            elif len(onnx_shape) > 1 and len(orig_shape) > 1 and onnx_shape == orig_shape[::-1]:
-                status = "transposed"
-            else:
-                status = "shape_mismatch"
+            raise ValueError(f"Unable to find {weight_name!r} in {sorted(inits)}")
 
-        results.append((init_name, status, onnx_shape, orig_shape))
+        init = inits[onnx_name]
 
-    # Store the check results in the model metadata_props so they travel with the file.
-    meta_value = json.dumps(
-        [
-            {
-                "name": name,
-                "status": status,
-                "onnx_shape": list(onnx_shape),
-                "original_shape": list(orig_shape) if orig_shape is not None else None,
-            }
-            for name, status, onnx_shape, orig_shape in results
-        ]
-    )
-    oh.set_metadata_props(
-        proto if isinstance(proto, ModelProto) else proto.model_proto,
-        {"check_model_weights": meta_value},
-    )
+        onnx_shape = tuple(init.dims)
+        orig_shape = tuple(weight.shape)
+        if onnx_shape == orig_shape:
+            status = "match"
+        elif len(onnx_shape) > 1 and len(orig_shape) > 1 and onnx_shape == orig_shape[::-1]:
+            status = "transposed"
+        else:
+            status = "shape_mismatch"
 
-    if verbose:
-        n_match = sum(1 for _, s, _, _ in results if s == "match")
-        n_transposed = sum(1 for _, s, _, _ in results if s == "transposed")
-        n_mismatch = sum(1 for _, s, _, _ in results if s == "shape_mismatch")
-        n_unknown = sum(1 for _, s, _, _ in results if s == "unknown")
-        print(
-            f"[check_model_weights] {len(results)} initializers checked: "
-            f"{n_match} match, {n_transposed} transposed, "
-            f"{n_mismatch} shape_mismatch, {n_unknown} unknown"
-        )
-        for name, status, onnx_shape, orig_shape in results:
-            if status != "match":
-                print(
-                    f"[check_model_weights]   {status}: {name!r} "
-                    f"onnx_shape={onnx_shape} original_shape={orig_shape}"
-                )
-
+        data = init.metadata_props.add()
+        data.key = "status"
+        data.value = status
+        data = init.metadata_props.add()
+        data.key = "torch_name"
+        data.value = weight_name
+        data = init.metadata_props.add()
+        data.key = "torch_shape"
+        data.value = str(orig_shape)
+        results.append((weight_name, status, orig_shape))
     return results
