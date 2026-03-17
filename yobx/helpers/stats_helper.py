@@ -3,11 +3,10 @@ Functions to compute statistics on an ONNX model such as number of nodes
 per op_type and estimation of computational cost.
 """
 
-import math
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import onnx
-from ..xshape.expressions.operations import dim_add, dim_mul, dim_multi_mul
+from ..xshape.expressions.operations import dim_add, dim_div, dim_mul, dim_multi_mul
 
 # Type aliases for the shape and literal lookup functions passed to per-op helpers.
 #
@@ -207,14 +206,16 @@ def _flops_sigmoid(
     node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
 ) -> Optional[int]:
     """exp + add + div ≈ 3 FLOPs per output element."""
-    return dim_mul(3, _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn)))
+    s = _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
+    return None if s is None else dim_mul(3, s)
 
 
 def _flops_softmax(
     node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
 ) -> Optional[int]:
     """exp + sum + div ≈ 3 FLOPs per output element."""
-    return dim_mul(3, _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn)))
+    s = _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
+    return None if s is None else dim_mul(3, s)
 
 
 def _flops_matmul(
@@ -308,9 +309,8 @@ def _flops_global_pool(
     N = in_shape[0]
     C = in_shape[1]
     spatial = in_shape[2:]
-    if not all(isinstance(d, int) for d in (N, C, *spatial)):
-        return None
-    return N * C * math.prod(spatial) if spatial else N * C
+    spatial_size = dim_multi_mul(*spatial) if spatial else 1
+    return dim_multi_mul(N, C, spatial_size)
 
 
 def _flops_batch_norm(
@@ -320,7 +320,7 @@ def _flops_batch_norm(
     if not node.output:
         return None
     s = _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
-    return None if s is None else 2 * s
+    return None if s is None else dim_mul(2, s)
 
 
 def _flops_layer_norm(
@@ -330,7 +330,7 @@ def _flops_layer_norm(
     if not node.output:
         return None
     s = _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
-    return None if s is None else 6 * s
+    return None if s is None else dim_mul(6, s)
 
 
 def _flops_reduce(
@@ -357,10 +357,8 @@ def _flops_lstm(
         return None
     seq, batch, input_size = x_shape[0], x_shape[1], x_shape[2]
     hidden_4 = w_shape[1]
-    if not all(isinstance(d, int) for d in (seq, batch, input_size, hidden_4)):
-        return None
-    hidden = hidden_4 // 4
-    return 2 * seq * batch * (input_size + hidden) * hidden_4
+    hidden = dim_div(hidden_4, 4)
+    return dim_multi_mul(2, seq, batch, dim_add(input_size, hidden), hidden_4)
 
 
 def _flops_gru(node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn) -> Optional[int]:
@@ -375,10 +373,8 @@ def _flops_gru(node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn)
         return None
     seq, batch, input_size = x_shape[0], x_shape[1], x_shape[2]
     hidden_3 = w_shape[1]
-    if not all(isinstance(d, int) for d in (seq, batch, input_size, hidden_3)):
-        return None
-    hidden = hidden_3 // 3
-    return 2 * seq * batch * (input_size + hidden) * hidden_3
+    hidden = dim_div(hidden_3, 3)
+    return dim_multi_mul(2, seq, batch, dim_add(input_size, hidden), hidden_3)
 
 
 def _flops_rnn(node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn) -> Optional[int]:
@@ -393,8 +389,6 @@ def _flops_rnn(node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn)
         return None
     seq, batch, input_size = x_shape[0], x_shape[1], x_shape[2]
     hidden = w_shape[1]
-    if all(isinstance(d, int) for d in (seq, batch, input_size, hidden)):
-        return 2 * seq * batch * (input_size + hidden) * hidden
     return dim_multi_mul(2, seq, batch, dim_add(input_size, hidden), hidden)
 
 
@@ -582,10 +576,10 @@ def model_statistics(model: onnx.ModelProto, verbose: int = 0) -> Dict[str, Any]
     for op, values in flops_by_op.items():
         op_total: Optional[int] = 0
         for v in values:
-            if v is None:
+            if v is None or not isinstance(v, int):
                 op_total = None
                 break
-            op_total += v  # type: ignore[operator]
+            op_total += v
         flops_per_op[op] = op_total
         if op_total is None:
             total = None
