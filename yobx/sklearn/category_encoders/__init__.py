@@ -2,14 +2,9 @@ from typing import List, Tuple
 
 
 def register():
-    from . import (
-        one_hot_encoder,
-        polynomial_encoder,
-        quantile_encoder,
-        woe_encoder,
-    )
+    from . import one_hot_encoder, polynomial_encoder, quantile_encoder, woe_encoder
 
-        
+
 def all_estimators() -> List[Tuple[str, type]]:
     """Returns all estimators in :epkg:`category_encoders`."""
     import inspect

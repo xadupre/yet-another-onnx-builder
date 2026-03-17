@@ -31,7 +31,8 @@ def _polynomial_encode_column(
     :param col_tensor: ONNX tensor name for a single-column slice, shape ``(N, 1)``
     :param known_vals: 1-D numpy array of known original category values (float)
     :param known_contrast: 2-D numpy array of contrast values, shape ``(n_known, n_contrasts)``
-    :param unknown_contrast: 1-D numpy array of values for unknown categories, shape ``(n_contrasts,)``
+    :param unknown_contrast: 1-D numpy array of values for unknown categories,
+        shape ``(n_contrasts,)``
     :param nan_contrast: 1-D numpy array of values for NaN inputs, shape ``(n_contrasts,)``
     :param dtype: numpy dtype for all float constants
     :param name: node name prefix
@@ -155,7 +156,11 @@ def category_encoders_polynomial_encoder(
 
         col_lookup[col] = {
             "known_vals": np.array(known_vals_list, dtype=dtype),
-            "known_contrast": np.stack(known_contrast_rows, axis=0) if known_contrast_rows else np.zeros((0, len(unknown_contrast)), dtype=dtype),
+            "known_contrast": (
+                np.stack(known_contrast_rows, axis=0)
+                if known_contrast_rows
+                else np.zeros((0, len(unknown_contrast)), dtype=dtype)
+            ),
             "unknown_contrast": unknown_contrast,
             "nan_contrast": nan_contrast,
             "out_cols": contrast_df.columns.tolist(),
