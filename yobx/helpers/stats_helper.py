@@ -5,7 +5,9 @@ per op_type and estimation of computational cost.
 
 import math
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+import numpy as np
 import onnx
+from ..xshape.expressions.operations import dim_add, dim_mul, dim_multi_mul
 
 # Type aliases for the shape and literal lookup functions passed to per-op helpers.
 #
@@ -21,8 +23,7 @@ _LiteralFn = Callable[[str], Optional[Tuple[int, ...]]]
 
 # Type alias for an op-level FLOPs estimator function.
 _FlopsHandler = Callable[
-    [onnx.NodeProto, "_ShapeFn", "_LiteralFn"],  # type: ignore[type-arg]
-    Optional[int],
+    [onnx.NodeProto, "_ShapeFn", "_LiteralFn"], Optional[int]  # type: ignore[type-arg]
 ]
 
 
@@ -44,16 +45,13 @@ def _get_attribute_value(node: onnx.NodeProto, name: str, default: Any = None) -
     return default
 
 
-def _static_size(shape: Optional[Tuple]) -> Optional[int]:
+def _literal_size(shape: Optional[Tuple]) -> Optional[int]:
     """Returns the number of elements in a static shape, or None if dynamic."""
     if shape is None:
         return None
-    n = 1
-    for d in shape:
-        if not isinstance(d, int) or d < 0:
-            return None
-        n *= d
-    return n
+    if all(isinstance(a, int) for a in shape):
+        return int(np.prod(shape))
+    return dim_multi_mul(*shape)
 
 
 def _resolve_shape(name: str, shape_fn: _ShapeFn, literal_fn: _LiteralFn) -> Optional[Tuple]:
@@ -194,7 +192,7 @@ def _flops_elementwise_unary(
 ) -> Optional[int]:
     """1 FLOPs per output element (unary element-wise ops)."""
     if node.output:
-        return _static_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
+        return _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
     return None
 
 
@@ -202,29 +200,21 @@ def _flops_elementwise_binary(
     node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
 ) -> Optional[int]:
     """1 FLOPs per output element (binary element-wise ops)."""
-    if node.output:
-        return _static_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
-    return None
+    return _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
 
 
 def _flops_sigmoid(
     node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
 ) -> Optional[int]:
     """exp + add + div ≈ 3 FLOPs per output element."""
-    if not node.output:
-        return None
-    s = _static_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
-    return None if s is None else 3 * s
+    return dim_mul(3, _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn)))
 
 
 def _flops_softmax(
     node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
 ) -> Optional[int]:
     """exp + sum + div ≈ 3 FLOPs per output element."""
-    if not node.output:
-        return None
-    s = _static_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
-    return None if s is None else 3 * s
+    return dim_mul(3, _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn)))
 
 
 def _flops_matmul(
@@ -241,14 +231,7 @@ def _flops_matmul(
         return None
     M, K = a[-2], a[-1]
     _K2, N = b[-2], b[-1]
-    if not (isinstance(M, int) and isinstance(K, int) and isinstance(N, int)):
-        return None
-    batch = 1
-    for d in a[:-2]:
-        if not isinstance(d, int):
-            return None
-        batch *= d
-    return 2 * batch * M * K * N
+    return dim_multi_mul(*[2, *a[:-2], M, K, N])
 
 
 def _flops_gemm(
@@ -265,12 +248,7 @@ def _flops_gemm(
     trans_b = int(_get_attribute_value(node, "transB", 0))
     M, K = (a[1], a[0]) if trans_a else (a[0], a[1])
     _K2, N = (b[1], b[0]) if trans_b else (b[0], b[1])
-    if not (isinstance(M, int) and isinstance(K, int) and isinstance(N, int)):
-        return None
-    flops = 2 * M * K * N
-    if len(node.input) >= 3 and node.input[2]:
-        flops += M * N
-    return flops
+    return dim_add(dim_multi_mul(2, M, K, N), dim_mul(M, N))
 
 
 def _flops_conv(
@@ -297,39 +275,25 @@ def _flops_conv(
     spatial_out = out_shape[2:]
     kernel = w_shape[2:]
     C_in_per_group = w_shape[1]
-    if not all(isinstance(d, int) for d in (N, C_out, C_in_per_group)):
-        return None
-    if not all(isinstance(d, int) for d in spatial_out):
-        return None
-    if not all(isinstance(d, int) for d in kernel):
-        return None
-    spatial_out_size = math.prod(spatial_out) if spatial_out else 1
-    kernel_size = math.prod(kernel) if kernel else 1
-    return 2 * N * C_out * C_in_per_group * kernel_size * spatial_out_size
+    spatial_out_size = dim_multi_mul(*spatial_out) if spatial_out else 1
+    kernel_size = dim_multi_mul(*kernel) if kernel else 1
+    return dim_multi_mul(2, N, C_out, C_in_per_group, kernel_size, spatial_out_size)
 
 
 def _flops_pool(
     node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
 ) -> Optional[int]:
     """N * C * spatial_out * kernel_size FLOPs for windowed pooling."""
-    if not node.output:
-        return None
     out_shape = _resolve_shape(node.output[0], shape_fn, literal_fn)
     if out_shape is None or len(out_shape) < 3:
         return None
     N = out_shape[0]
     C = out_shape[1]
-    if not isinstance(N, int) or not isinstance(C, int):
-        return None
     spatial_out = out_shape[2:]
-    if not all(isinstance(d, int) for d in spatial_out):
-        return None
-    spatial_out_size = math.prod(spatial_out) if spatial_out else 1
+    spatial_out_size = dim_multi_mul(*spatial_out) if spatial_out else 1
     kernel_shape = _get_attribute_value(node, "kernel_shape", None)
-    if kernel_shape is None:
-        return None
-    kernel_size = math.prod(kernel_shape) if kernel_shape else 1
-    return N * C * spatial_out_size * kernel_size
+    kernel_size = dim_multi_mul(*kernel_shape) if kernel_shape else 1
+    return dim_multi_mul(N, C, spatial_out_size, kernel_size)
 
 
 def _flops_global_pool(
@@ -355,7 +319,7 @@ def _flops_batch_norm(
     """mean + var + normalize ≈ 2 FLOPs per output element."""
     if not node.output:
         return None
-    s = _static_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
+    s = _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
     return None if s is None else 2 * s
 
 
@@ -365,7 +329,7 @@ def _flops_layer_norm(
     """mean + var + sub + div + scale + bias ≈ 6 FLOPs per output element."""
     if not node.output:
         return None
-    s = _static_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
+    s = _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
     return None if s is None else 6 * s
 
 
@@ -376,7 +340,7 @@ def _flops_reduce(
     if not node.input:
         return None
     in_shape = _resolve_shape(node.input[0], shape_fn, literal_fn)
-    return _static_size(in_shape)
+    return _literal_size(in_shape)
 
 
 def _flops_lstm(
@@ -399,9 +363,7 @@ def _flops_lstm(
     return 2 * seq * batch * (input_size + hidden) * hidden_4
 
 
-def _flops_gru(
-    node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
-) -> Optional[int]:
+def _flops_gru(node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn) -> Optional[int]:
     """2 * seq * batch * (input_size + hidden) * 3*hidden FLOPs."""
     if len(node.input) < 2:
         return None
@@ -419,9 +381,7 @@ def _flops_gru(
     return 2 * seq * batch * (input_size + hidden) * hidden_3
 
 
-def _flops_rnn(
-    node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
-) -> Optional[int]:
+def _flops_rnn(node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn) -> Optional[int]:
     """2 * seq * batch * (input_size + hidden) * hidden FLOPs."""
     if len(node.input) < 2:
         return None
@@ -433,14 +393,12 @@ def _flops_rnn(
         return None
     seq, batch, input_size = x_shape[0], x_shape[1], x_shape[2]
     hidden = w_shape[1]
-    if not all(isinstance(d, int) for d in (seq, batch, input_size, hidden)):
-        return None
-    return 2 * seq * batch * (input_size + hidden) * hidden
+    if all(isinstance(d, int) for d in (seq, batch, input_size, hidden)):
+        return 2 * seq * batch * (input_size + hidden) * hidden
+    return dim_multi_mul(2, seq, batch, dim_add(input_size, hidden), hidden)
 
 
-def _flops_zero_cost(
-    node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
-) -> int:
+def _flops_zero_cost(node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn) -> int:
     """Data movement ops: 0 FLOPs."""
     return 0
 
@@ -484,9 +442,7 @@ _OP_HANDLERS.update(
 
 
 def _estimate_node_flops(
-    node: onnx.NodeProto,
-    shape_fn: _ShapeFn,
-    literal_fn: _LiteralFn,
+    node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
 ) -> Optional[int]:
     """
     Estimates the number of floating-point operations for a single ONNX node.
@@ -507,10 +463,7 @@ def _estimate_node_flops(
     return handler(node, shape_fn, literal_fn)
 
 
-def model_statistics(
-    model: onnx.ModelProto,
-    verbose: int = 0,
-) -> Dict[str, Any]:
+def model_statistics(model: onnx.ModelProto, verbose: int = 0) -> Dict[str, Any]:
     """
     Computes statistics on an ONNX model.
 
@@ -530,11 +483,7 @@ def model_statistics(
 
     # Run shape inference to collect shapes for all intermediate tensors.
     bs = BasicShapeBuilder(verbose=verbose)
-    try:
-        bs.run_model(model)
-    except Exception:
-        # Shape inference may fail for some models; we continue with partial results.
-        pass
+    bs.run_model(model)
 
     # Build a mapping name → shape tuple (or None for dynamic/unknown).
     # Collect all tensor names from the graph without accessing private attributes.

@@ -41,9 +41,7 @@ def sklearn_normalizer(
     :param name: prefix for added node names
     :return: output tensor name
     """
-    assert isinstance(
-        estimator, Normalizer
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, Normalizer), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
@@ -60,9 +58,7 @@ def sklearn_normalizer(
         abs_X = g.op.Abs(X, name=f"{name}_abs")
         norms = g.op.ReduceMax(abs_X, axes, keepdims=1, name=f"{name}_maxnorm")
     else:
-        raise ValueError(
-            f"Unknown norm={norm!r} for Normalizer, expected 'l1', 'l2', or 'max'."
-        )
+        raise ValueError(f"Unknown norm={norm!r} for Normalizer, expected 'l1', 'l2', or 'max'.")
 
     # Replace zero norms with 1 so that zero rows are left unchanged.
     zero = np.array([0], dtype=dtype)
