@@ -36,6 +36,7 @@ class FusedMatMulDivPattern(PatternOptimization):
 
             class I_Y,I_X,O_Z ioNode
             class FusedMatMul_0,Div_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -151,6 +152,7 @@ class FusedMatMulPattern(PatternOptimization):
 
             class I_X,I_Y,O_Z ioNode
             class Transpose_0,MatMul_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -377,6 +379,7 @@ class FusedMatMulx2Pattern(PatternOptimization):
 
             class I_X,O_x2,O_x1 ioNode
             class Div_0,FusedMatMul_1,FusedMatMul_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -509,6 +512,7 @@ class FusedMatMulTransposePattern(PatternOptimization):
 
             class I_X,I_Y,O_Z ioNode
             class FusedMatMul_0,Transpose_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -622,6 +626,7 @@ class ReshapeGemmPattern(PatternOptimization):
 
             class I_B,I_A,O_Y ioNode
             class Reshape_0,Gemm_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -746,6 +751,7 @@ class ReshapeGemmReshapePattern(PatternOptimization):
 
             class I_B,I_A,I_shapey,O_Y ioNode
             class Reshape_0,Gemm_1,Reshape_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -864,6 +870,7 @@ class TransposeFusedMatMulBPattern(PatternOptimization):
 
             class I_B,I_A,O_Y ioNode
             class Transpose_0,MatMul_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

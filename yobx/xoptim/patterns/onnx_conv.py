@@ -35,6 +35,7 @@ class ConvBiasNullPattern(PatternOptimization):
             class I_X,I_W,O_Y ioNode
             class i_B2 initNode
             class Conv_0 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

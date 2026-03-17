@@ -35,6 +35,7 @@ class NotWherePattern(PatternOptimization):
 
             class I_A,I_X,I_B,O_Y ioNode
             class Not_0,Where_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -127,6 +128,7 @@ class WhereAddPattern(PatternOptimization):
             class I_inf,I_X,I_mask,O_Y ioNode
             class Constant_0 constNode
             class Where_1,Add_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

@@ -47,6 +47,7 @@ class LayerNormalizationPattern(PatternOptimization):
 
             class I_add_1,O__onx_div0 ioNode
             class ReduceMean_0,Sub_1,Pow_2,ReduceMean_3,Add_4,Sqrt_5,Div_6 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -288,6 +289,7 @@ class LayerNormalizationScalePattern(PatternOptimization):
             class I_scale,I_X,I_s0,O_Y ioNode
             class Constant_0,Constant_1 constNode
             class LayerNormalization_2,Mul_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -494,6 +496,7 @@ class CastLayerNormalizationCastPattern(PatternOptimization):
             class I_scale,I_bias,I_X,O_Y ioNode
             class Constant_0,Constant_1 constNode
             class Cast_2,LayerNormalization_3,Cast_4 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -641,6 +644,7 @@ class BatchNormalizationPattern(PatternOptimization):
             class I_X,O_Y ioNode
             class Constant_0,Constant_1,Constant_2,Constant_3 constNode
             class BatchNormalization_4 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -891,6 +895,7 @@ class RMSNormalizationPattern(PatternOptimization):
             class I_X,I_axis,O_Y ioNode
             class Constant_0 constNode
             class Cast_1,Pow_2,ReduceMean_3,Add_4,Sqrt_5,Div_6,Mul_7,Cast_8 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1111,6 +1116,7 @@ class RMSNormalizationMulPattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class RMSNormalization_0,Mul_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

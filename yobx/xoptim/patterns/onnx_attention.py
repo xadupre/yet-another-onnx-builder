@@ -65,7 +65,9 @@ class FunctionAttentionPattern(PatternOptimization):
 
             class I_values,I_keys,I_scale_sqrt,I_mask,I_query,O_Y ioNode
             class Constant_0 constNode
-            class Mul_1,Mul_2,Transpose_3,MatMul_4,Where_5,Add_6,Softmax_7,IsNaN_8,Where_9,MatMul_10 opNode
+            class Mul_1,Mul_2,Transpose_3,MatMul_4,Where_5,Add_6,Softmax_7 opNode
+            class IsNaN_8,Where_9,MatMul_10 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -126,14 +128,14 @@ class FunctionAttentionPattern(PatternOptimization):
             Reshape_7[["Reshape(., .)"]]
             Transpose_8[["Transpose(., perm=[0, 1, 3, 2])"]]
             MatMul_9[["MatMul(., .)"]]
-            Where_10[["Where(., [-inf], .)"]]
-            Softmax_11[["Softmax(., axis=-1)"]]
-            IsNaN_12[["IsNaN(.)"]]
-            Where_13[["Where(., 0.0, .)"]]
+            w10[["Where(., [-inf], .)"]]
+            s11[["Softmax(., axis=-1)"]]
+            nan12[["IsNaN(.)"]]
+            w13[["Where(., 0.0, .)"]]
             Unsqueeze_14[["Unsqueeze(., [2])"]]
             Expand_15[["Expand(., .)"]]
             Reshape_16[["Reshape(., .)"]]
-            MatMul_17[["MatMul(., .)"]]
+            mm17[["MatMul(., .)"]]
 
             I_query -->|"FLOAT(batch, 8, seq_length, 32)"| Mul_3
             Constant_0 -->|"FLOAT(1)"| Mul_3
@@ -146,26 +148,35 @@ class FunctionAttentionPattern(PatternOptimization):
             Reshape_7 -->|"FLOAT(batch, 8, 128*(past_length+seq_length)//256, 32)"| Transpose_8
             Mul_3 -->|"FLOAT(batch, 8, seq_length, 32)"| MatMul_9
             Transpose_8 -->|"FLOAT(batch, 8, 32, 128*(past_length+seq_length)//256)"| MatMul_9
-            I_to -->|"BOOL(seq_length, total_length)"| Where_10
-            MatMul_9 -->|"FLOAT(batch, 8, seq_length, 128*(past_length+seq_length)//256)"| Where_10
-            Where_10 -->|"FLOAT(batch, 8, seq_length, total_length^128*(past_length+seq_length)//256)"| Softmax_11
-            Softmax_11 -->|"FLOAT(batch, 8, seq_length, total_length^128*(past_length+seq_length)//256)"| IsNaN_12
-            IsNaN_12 -->|"BOOL(batch, 8, seq_length, total_length^128*(past_length+seq_length)//256)"| Where_13
-            Softmax_11 -->|"FLOAT(batch, 8, seq_length, total_length^128*(past_length+seq_length)//256)"| Where_13
+            I_to -->|"BOOL(seq_length, total_length)"| w10
+            MatMul_9 -->|"FLOAT(batch, 8, seq_length, 128*(past_length+seq_length)//256)"| w10
+            w10 -->|"FLOAT(batch, 8, seq_length,
+            total_length^128*(past_length+seq_length)//256)"| s11
+            s11 -->|"FLOAT(batch, 8, seq_length,
+            total_length^128*(past_length+seq_length)//256)"| nan12
+            nan12 -->|"BOOL(batch, 8, seq_length,
+            total_length^128*(past_length+seq_length)//256)"| w13
+            s11 -->|"FLOAT(batch, 8, seq_length,
+            total_length^128*(past_length+seq_length)//256)"| w13
             I_cat_1 -->|"FLOAT(batch, 4, past_length+seq_length, 32)"| Unsqueeze_14
             Unsqueeze_14 -->|"FLOAT(batch, 4, 1, past_length+seq_length, 32)"| Expand_15
             Constant_1 -->|"INT64(5)"| Expand_15
             Expand_15 -->|"FLOAT(batch, 4, 2, past_length+seq_length, 32)"| Reshape_16
             Constant_2 -->|"INT64(4)"| Reshape_16
-            Where_13 -->|"FLOAT(batch, 8, seq_length, total_length^128*(past_length+seq_length)//256)"| MatMul_17
-            Reshape_16 -->|"FLOAT(batch, 8, past_length+seq_length, 32)"| MatMul_17
+            w13 -->|"FLOAT(batch, 8, seq_length,
+            total_length^128*(past_length+seq_length)//256)"| mm17
+            Reshape_16 -->|"FLOAT(batch, 8, past_length+seq_length, 32)"| mm17
 
             O_output_0(["output_0 FLOAT(batch, 8, seq_length, 32)"])
-            MatMul_17 --> O_output_0
+            mm17 --> O_output_0
 
-            class I_init1_s___RSh1,I_query,I_cat_1,I_cat,I_to,I_init7_s4_0_8__1_32,I_init7_s5_1_1_2_1_1,O_output_0 ioNode
+            class I_init1_s___RSh1,I_query,I_cat_1,I_cat,I_to ioNode
+            class I_init7_s4_0_8__1_32,I_init7_s5_1_1_2_1_1,O_output_0 ioNode
             class Constant_0,Constant_1,Constant_2 constNode
-            class Mul_3,Unsqueeze_4,Mul_5,Expand_6,Reshape_7,Transpose_8,MatMul_9,Where_10,Softmax_11,IsNaN_12,Where_13,Unsqueeze_14,Expand_15,Reshape_16,MatMul_17 opNode
+            class Mul_3,Unsqueeze_4,Mul_5,Expand_6,Reshape_7,Transpose_8 opNode
+            class MatMul_9,w10,s11,nan12,w13,Unsqueeze_14,Expand_15 opNode
+            class Reshape_16,mm17 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -185,7 +196,8 @@ class FunctionAttentionPattern(PatternOptimization):
             I_init7_s5_1_1_2_1_1(["init7_s5_1_1_2_1_1 INT64(5)"])
             I_init1_s___RSh1(["init1_s_::RSh1 FLOAT(1)"])
 
-            LocalAttentionGQASW_to1_0[["intermediate.LocalAttentionGQASW_to1(., ., ., ., ., ., .)"]]
+            LocalAttentionGQASW_to1_0[["intermediate.LocalAttentionGQASW_to1(
+            ., ., ., ., ., ., .)"]]
 
             I_query -->|"FLOAT(batch, 8, seq_length, 32)"| LocalAttentionGQASW_to1_0
             I_cat -->|"FLOAT(batch, 4, past_length+seq_length, 32)"| LocalAttentionGQASW_to1_0
@@ -198,8 +210,10 @@ class FunctionAttentionPattern(PatternOptimization):
             O_output_0(["output_0 FLOAT(batch, 8, seq_length, 32)"])
             LocalAttentionGQASW_to1_0 --> O_output_0
 
-            class I_query,I_cat_1,I_cat,I_to,I_init7_s4_0_8__1_32,I_init7_s5_1_1_2_1_1,I_init1_s___RSh1,O_output_0 ioNode
+            class I_query,I_cat_1,I_cat,I_to,I_init7_s4_0_8__1_32 ioNode
+            class I_init7_s5_1_1_2_1_1,I_init1_s___RSh1,O_output_0 ioNode
             class LocalAttentionGQASW_to1_0 opNode
+
     3D Pattern
     ++++++++++
 
@@ -230,9 +244,9 @@ class FunctionAttentionPattern(PatternOptimization):
             MatMul_8[["MatMul(., .)"]]
             Where_9[["Where(., [0.0], [-inf])"]]
             Add_10[["Add(., .)"]]
-            Softmax_11[["Softmax(., axis=-1)"]]
-            IsNaN_12[["IsNaN(.)"]]
-            Where_13[["Where(., [0.0], .)"]]
+            s11[["Softmax(., axis=-1)"]]
+            nan12[["IsNaN(.)"]]
+            w13[["Where(., [0.0], .)"]]
             MatMul_14[["MatMul(., .)"]]
 
             I_query -->|"FLOAT(aq, cq, bq*dq)"| Mul_2
@@ -250,11 +264,11 @@ class FunctionAttentionPattern(PatternOptimization):
             I_mask -->|"BOOL(am, bm, cm, dm)"| Where_9
             MatMul_8 --> Add_10
             Where_9 -->|"FLOAT(am, bm, cm, dm)"| Add_10
-            Add_10 --> Softmax_11
-            Softmax_11 --> IsNaN_12
-            IsNaN_12 --> Where_13
-            Softmax_11 --> Where_13
-            Where_13 --> MatMul_14
+            Add_10 --> s11
+            s11 --> nan12
+            nan12 --> w13
+            s11 --> w13
+            w13 --> MatMul_14
             I_values_t -->|"FLOAT(av, 8, cv, 64)"| MatMul_14
 
             O_Y(["Y FLOAT(ay, by, cy, dy)"])
@@ -262,7 +276,9 @@ class FunctionAttentionPattern(PatternOptimization):
 
             class I_values_t,I_keys,I_scale_sqrt,I_shape0,I_mask,I_query,O_Y ioNode
             class Constant_0,Constant_1 constNode
-            class Mul_2,Transpose_3,Reshape_4,Mul_5,Reshape_6,Transpose_7,MatMul_8,Where_9,Add_10,Softmax_11,IsNaN_12,Where_13,MatMul_14 opNode
+            class Mul_2,Transpose_3,Reshape_4,Mul_5,Reshape_6,Transpose_7 opNode
+            class MatMul_8,Where_9,Add_10,s11,nan12,w13,MatMul_14 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -898,9 +914,12 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
             O_output_0(["output_0 FLOAT(batch, 8, seq_length, 32)"])
             LocalAttentionSW_to1_9 --> O_output_0
 
-            class I_cat,I_init1_s___RSh1,I_to,I_init7_s4_0_8__1_32,I_init7_s5_1_1_2_1_1,I_cat_1,I_query,O_output_0 ioNode
+            class I_cat,I_init1_s___RSh1,I_to,I_init7_s4_0_8__1_32 ioNode
+            class I_init7_s5_1_1_2_1_1,I_cat_1,I_query,O_output_0 ioNode
             class Constant_0,Constant_1,Constant_2 constNode
-            class Unsqueeze_3,Expand_4,Reshape_5,Unsqueeze_6,Expand_7,Reshape_8,LocalAttentionSW_to1_9 opNode
+            class Unsqueeze_3,Expand_4,Reshape_5,Unsqueeze_6,Expand_7 opNode
+            class Reshape_8,LocalAttentionSW_to1_9 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -920,7 +939,8 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
             I_cat_1(["cat_1 FLOAT(batch, 4, past_length+seq_length, 32)"])
             I_query(["query FLOAT(batch, 8, seq_length, 32)"])
 
-            LocalAttentionGQASW_to1_0[["intermediate.LocalAttentionGQASW_to1(., ., ., ., ., ., .)"]]
+            LocalAttentionGQASW_to1_0[["intermediate.LocalAttentionGQASW_to1(
+            ., ., ., ., ., ., .)"]]
 
             I_query -->|"FLOAT(batch, 8, seq_length, 32)"| LocalAttentionGQASW_to1_0
             I_cat -->|"FLOAT(batch, 4, past_length+seq_length, 32)"| LocalAttentionGQASW_to1_0
@@ -933,7 +953,8 @@ class FunctionAttentionGQAPattern(FunctionAttentionPattern, _CommonGQAMethods):
             O_output_0(["output_0 FLOAT(batch, 8, seq_length, 32)"])
             LocalAttentionGQASW_to1_0 --> O_output_0
 
-            class I_cat,I_init1_s___RSh1,I_to,I_init7_s4_0_8__1_32,I_init7_s5_1_1_2_1_1,I_cat_1,I_query,O_output_0 ioNode
+            class I_cat,I_init1_s___RSh1,I_to,I_init7_s4_0_8__1_32 ioNode
+            class I_init7_s5_1_1_2_1_1,I_cat_1,I_query,O_output_0 ioNode
             class LocalAttentionGQASW_to1_0 opNode
     """
 
@@ -1088,8 +1109,11 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
             O_Y(["Y FLOAT(a, 4, c_, 8)"])
             Attention_8 --> O_Y
 
-            class I_key,I_mask,I_value,I_past_key,I_query,I_past_value,O_present_value,O_present_key,O_Y ioNode
-            class Concat_0,Concat_1,Unsqueeze_2,Expand_3,Reshape_4,Unsqueeze_5,Expand_6,Reshape_7,Attention_8 opNode
+            class I_key,I_mask,I_value,I_past_key,I_query,I_past_value ioNode
+            class O_present_value,O_present_key,O_Y ioNode
+            class Concat_0,Concat_1,Unsqueeze_2,Expand_3,Reshape_4,Unsqueeze_5 opNode
+            class Expand_6,Reshape_7,Attention_8 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1124,7 +1148,8 @@ class AttentionGQAPattern(PatternOptimization, _CommonGQAMethods):
             O_Y(["Y FLOAT(a, 4, c_, 8)"])
             Attention_0 --> O_Y
 
-            class I_key,I_mask,I_value,I_past_key,I_query,I_past_value,O_present_value,O_present_key,O_Y ioNode
+            class I_key,I_mask,I_value,I_past_key,I_query,I_past_value opNode
+            class O_present_value,O_present_key,O_Y ioNode
             class Attention_0 opNode
     """
 

@@ -42,6 +42,7 @@ class SliceSlicePattern(PatternOptimization):
             class I_X,I_one,I_zero,O_Y ioNode
             class Constant_0,Constant_1 constNode
             class Slice_2,Slice_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

@@ -32,6 +32,7 @@ class CastPattern(PatternOptimization):
 
             class I__onx_mul045,O_mul_34 ioNode
             class Cast_0 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -121,6 +122,7 @@ class CastCastPattern(PatternOptimization):
 
             class I_x1,O_Y ioNode
             class Cast_0,Cast_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -251,6 +253,7 @@ class CastCastBinaryPattern(PatternOptimization):
 
             class I_Y,I_X,O_Z ioNode
             class Cast_0,Cast_1,Add_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -386,6 +389,7 @@ class CastOpCastPattern(PatternOptimization):
 
             class I_Y,I_X,O_Z ioNode
             class Cast_0,Add_1,Cast_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -602,6 +606,7 @@ class ComputationCastOpCastPattern(PatternOptimization):
 
             class I_Y,I_X,O_Z ioNode
             class Cast_0,Add_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

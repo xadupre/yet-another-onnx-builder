@@ -34,6 +34,7 @@ class TreeEnsembleRegressorMulPattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class TreeEnsembleRegressor_0,Mul_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -144,7 +145,9 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
             Concat_0 --> O_Y
 
             class I_X,O_Y ioNode
-            class Concat_0,Sigmoid_1,Sigmoid_2,TreeEnsembleRegressor_3,TreeEnsembleRegressor_4 opNode
+            class Concat_0,Sigmoid_1,Sigmoid_2,TreeEnsembleRegressor_3 opNode
+            class TreeEnsembleRegressor_4 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

@@ -36,6 +36,7 @@ class FusedConvPattern(PatternOptimization):
 
             class I_W,I_X,I_B,O_Y ioNode
             class Conv_0,Relu_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

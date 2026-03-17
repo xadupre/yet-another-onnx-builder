@@ -39,6 +39,7 @@ class ClipClipPattern(PatternOptimization):
             class I_zero,I_X,I_one,O_Y ioNode
             class Constant_0,Constant_1 constNode
             class Clip_2,Clip_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

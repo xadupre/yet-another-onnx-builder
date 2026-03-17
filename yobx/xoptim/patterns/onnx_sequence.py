@@ -39,6 +39,7 @@ class SequenceConstructAtPattern(PatternOptimization):
 
             class I_X1,I_X2,O_Y1,O_Y2 ioNode
             class SequenceConstruct_0,SequenceAt_1,SequenceAt_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

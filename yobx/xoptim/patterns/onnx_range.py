@@ -40,6 +40,7 @@ class SwapRangeAddScalarPattern(PatternOptimization):
             class I_END,I_PLUS,I_one,I_START,O_Y ioNode
             class Constant_0 constNode
             class Range_1,Add_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

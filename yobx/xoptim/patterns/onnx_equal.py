@@ -46,6 +46,7 @@ class UnsqueezeEqualPattern(PatternOptimization):
             class I_Y,I_m_one,I_X,I_axis,O_Y,O_Z ioNode
             class Constant_0,Constant_1 constNode
             class Unsqueeze_2,Equal_3,Unsqueeze_4 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

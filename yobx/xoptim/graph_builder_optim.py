@@ -1032,7 +1032,7 @@ class GraphBuilderPatternOptimization:
         with open(f"{fullname_apply}.py", "w") as f:
             f.write(code2)
 
-        from ..helpers.dot_helper import to_mermaid
+        from ..translate import translate
 
         def _mermaid_block(mermaid_str: str) -> str:
             lines = [".. mermaid::", ""]
@@ -1040,7 +1040,8 @@ class GraphBuilderPatternOptimization:
                 lines.append(f"    {line}" if line.strip() else "")
             return "\n".join(lines)
 
-        rst = textwrap.dedent("""
+        rst = (
+            textwrap.dedent("""
             Model with nodes to be fused:
 
             __MERMAID1__
@@ -1048,8 +1049,9 @@ class GraphBuilderPatternOptimization:
             Outcome of the fusion:
 
             __MERMAID2__
-            """).replace("__MERMAID1__", _mermaid_block(to_mermaid(model))).replace(
-            "__MERMAID2__", _mermaid_block(to_mermaid(model_apply))
+            """)
+            .replace("__MERMAID1__", _mermaid_block(translate(model, api="mermaid")))
+            .replace("__MERMAID2__", _mermaid_block(translate(model_apply, api="mermaid")))
         )
 
         with open(f"{fullname}.rst", "w") as f:

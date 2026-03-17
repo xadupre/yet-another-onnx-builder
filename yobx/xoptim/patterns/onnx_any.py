@@ -39,6 +39,7 @@ class SameChildrenPattern(PatternOptimization):
 
             class I_Y,I_sh1,I_y1,O_y2,O_y1 ioNode
             class Expand_0,Expand_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -345,6 +346,7 @@ class SameChildrenFromInputPattern(SameChildrenPattern):
 
             class I_xy1,I_X,O_xy1,O_xy2 ioNode
             class Cast_0,Cast_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -429,6 +431,7 @@ class ShapeBasedSameChildrenPattern(PatternOptimization):
 
             class I_y1,I_sh1,I_Y,O_y1,O_y2 ioNode
             class Expand_0,Expand_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -548,6 +551,7 @@ class IdentityPattern(PatternOptimization):
 
             class I_x3,O_Y ioNode
             class Transpose_0 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -813,6 +817,7 @@ class ShapeBasedIdentityPattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class Shape_0,Slice_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -913,6 +918,7 @@ class SwapUnaryPattern(PatternOptimization):
             class I_X,I_cst,O_Y ioNode
             class Constant_0 constNode
             class Transpose_1,Mul_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1026,6 +1032,7 @@ class NotNotPattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class Not_0,Not_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

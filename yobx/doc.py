@@ -7,7 +7,7 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from .helpers.dot_helper import to_dot, to_mermaid
+from .helpers.dot_helper import to_dot
 
 
 def get_latest_pypi_version(package_name="yet-another-onnx-builder") -> str:  # pragma: no cover

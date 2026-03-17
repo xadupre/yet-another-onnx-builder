@@ -28,6 +28,7 @@ class ConstantToInitializerPattern(PatternOptimization):
 
             class O_cst ioNode
             class Constant_0 constNode
+
     Outcome of the fusion:
 
     .. mermaid::

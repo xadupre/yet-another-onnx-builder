@@ -33,6 +33,7 @@ class SqueezeUnsqueezePattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class Unsqueeze_0,Squeeze_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -192,6 +193,7 @@ class UnsqueezeUnsqueezePattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class Unsqueeze_0,Unsqueeze_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -344,6 +346,7 @@ class SqueezeAddPattern(PatternOptimization):
 
             class I_S2,I_S1,O_s ioNode
             class Squeeze_0,Squeeze_1,Add_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -481,6 +484,7 @@ class SqueezeBinaryUnsqueezePattern(PatternOptimization):
             class I_zero,I_d,I_two,O_e ioNode
             class Constant_0,Constant_1 constNode
             class Squeeze_2,Div_3,Unsqueeze_4 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

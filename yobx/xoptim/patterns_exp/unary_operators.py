@@ -33,6 +33,7 @@ class TransposeCastPattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class Transpose_0,Cast_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

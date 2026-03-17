@@ -46,6 +46,7 @@ class TriMatrixPattern(PatternOptimization):
             class I_shape,O_Y ioNode
             class Constant_0 constNode
             class Range_1,Add_2,Reshape_3,Less_4,Where_5,ConstantOfShape_6 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -59,7 +60,8 @@ class TriMatrixPattern(PatternOptimization):
 
             I_shape(["shape INT64(2)"])
 
-            TriMatrix_0[["onnx_extended.ortops.optim.cuda.TriMatrix(., [0.0, 0.0, -3.4028235e+38])"]]
+            TriMatrix_0[["onnx_extended.ortops.optim.cuda.TriMatrix(
+            ., [0.0, 0.0, -3.4028235e+38])"]]
 
             I_shape -->|"INT64(2)"| TriMatrix_0
 

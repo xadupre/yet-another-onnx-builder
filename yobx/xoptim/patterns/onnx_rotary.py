@@ -46,7 +46,9 @@ class RotaryConcatPartPattern(PatternOptimization):
             Add_7 --> O_Y
 
             class I_X,O_Y ioNode
-            class ConstantOfShape_0,ConstantOfShape_1,Slice_2,Concat_3,Slice_4,Neg_5,Concat_6,Add_7 opNode
+            class ConstantOfShape_0,ConstantOfShape_1,Slice_2,Concat_3,Slice_4,Neg_5 opNode
+            class Concat_6,Add_7 opNode
+
     Model with nodes to be fused:
 
     .. mermaid::
@@ -101,6 +103,7 @@ class RotaryConcatPartPattern(PatternOptimization):
             class I_X,I_split,I_x1,I_shape,I_nx1,I_x2,O_Y,O_zero,O_x1,O_nx1,O_x2 ioNode
             class Constant_0,Constant_1 constNode
             class ConstantOfShape_2,Split_3,Neg_4,Concat_5,ConstantOfShape_6,Concat_7,Add_8 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -747,6 +750,7 @@ class FunctionHalfRotaryEmbeddingPattern(PatternOptimization):
 
             class I_m2,I_X,I_m1,O_Y ioNode
             class Split_0,Neg_1,Concat_2,Mul_3,Mul_4,Add_5 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -954,6 +958,7 @@ class RotaryEmbeddingPattern(PatternOptimization):
 
             class I_m2,I_X,I_m1,O_Y ioNode
             class Concat_0,Concat_1,Split_2,HalfRotaryEmbedding_3,Concat_4 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1197,7 +1202,9 @@ class FunctionCausalMaskPattern(PatternOptimization):
 
             class I_d1,I_initi,I_d2,O_nd2,O_yc ioNode
             class Constant_0 constNode
-            class Squeeze_1,Squeeze_2,Range_3,Range_4,Unsqueeze_5,Unsqueeze_6,Sub_7,Greater_8 opNode
+            class Squeeze_1,Squeeze_2,Range_3,Range_4,Unsqueeze_5,Unsqueeze_6,Sub_7 opNode
+            class Greater_8 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1448,6 +1455,7 @@ class FunctionCausalMaskMulAddPattern(PatternOptimization):
 
             class I_d1,I_N,I_d2,O_yyc ioNode
             class Squeeze_0,Squeeze_1,Range_2,Range_3,Unsqueeze_4,Unsqueeze_5,Mul_6,Add_7 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1674,7 +1682,9 @@ class FunctionCosSinCachePattern(PatternOptimization):
             Cos_7 --> O__onx_cos_mul_weights
 
             class I_weights,I_dim1,I_dim2,O__onx_sin_mul_weights,O__onx_cos_mul_weights ioNode
-            class Squeeze_0,Squeeze_1,Range_2,Unsqueeze_3,Cast_4,Reshape_5,Mul_6,Cos_7,Sin_8 opNode
+            class Squeeze_0,Squeeze_1,Range_2,Unsqueeze_3,Cast_4,Reshape_5 opNode
+            class Mul_6,Cos_7,Sin_8 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

@@ -30,6 +30,7 @@ class DropoutPattern(PatternOptimization):
 
             class I__onx_add02,O_dropout ioNode
             class Dropout_0 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

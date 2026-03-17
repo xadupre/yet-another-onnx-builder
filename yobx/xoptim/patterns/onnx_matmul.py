@@ -44,6 +44,7 @@ class MatMulAddPattern(PatternOptimization):
 
             class I_B,I_X1,I_X2,O_Z ioNode
             class MatMul_0,Add_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -357,6 +358,7 @@ class GemmTransposePattern(PatternOptimization):
             class I_B,I_X,O_Z ioNode
             class Constant_0 constNode
             class Gemm_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -464,6 +466,7 @@ class MatMulReshape2Of3Pattern(PatternOptimization):
             class I_div_5,I_transpose_23,I_init7_s4_13_4_7_8,O_view_85 ioNode
             class Constant_0 constNode
             class Reshape_1,MatMul_2,Reshape_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -876,6 +879,7 @@ class MulMulMatMulPattern(PatternOptimization):
 
             class I_Y,I_X,O_z ioNode
             class Mul_0,Mul_1,MatMul_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -985,6 +989,7 @@ class ReshapeMatMulReshapePattern(PatternOptimization):
 
             class I_xu2,I_Y,O_Z ioNode
             class Reshape_0,Reshape_1,MatMul_2,Reshape_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1139,6 +1144,7 @@ class TransposeMatMulPattern(PatternOptimization):
 
             class I_Y,I_X,O_Z ioNode
             class Transpose_0,MatMul_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1320,6 +1326,7 @@ class TransposeReshapeMatMulPattern(PatternOptimization):
 
             class I_yts,I_Y,I_X,O_yts,O_Z ioNode
             class MatMul_0,Reshape_1,Transpose_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1524,6 +1531,7 @@ class SwitchReshapeActivationPattern(PatternOptimization):
 
             class I_Y,I_X,O_Z ioNode
             class MatMul_0,Transpose_1,Relu_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1674,6 +1682,7 @@ class ShapeBasedMatMulToMulPattern(PatternOptimization):
 
             class I_Y,I_X,O_Z ioNode
             class MatMul_0,Transpose_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

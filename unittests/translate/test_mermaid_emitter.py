@@ -162,7 +162,6 @@ class TestMermaidEmitter(ExtTestCase):
         self.assertIn("FLOAT", mermaid)
 
     def test_importable_from_translate_package(self):
-        # to_mermaid should be importable directly from yobx.translate
         TFLOAT = onnx.TensorProto.FLOAT
         model = oh.make_model(
             oh.make_graph(

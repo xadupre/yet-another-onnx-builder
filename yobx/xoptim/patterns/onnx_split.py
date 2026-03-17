@@ -36,6 +36,7 @@ class SlicesSplitPattern(PatternOptimization):
 
             class I_transpose_1,O_slice_11,O_slice_12 ioNode
             class Slice_0,Slice_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -222,6 +223,7 @@ class GathersSplitPattern(PatternOptimization):
 
             class I_X,O_x2,O_x1 ioNode
             class Gather_0,Gather_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -379,6 +381,7 @@ class SplitConcatPattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class Split_0,Concat_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

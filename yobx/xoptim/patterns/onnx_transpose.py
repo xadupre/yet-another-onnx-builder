@@ -34,6 +34,7 @@ class TransposeTransposePattern(PatternOptimization):
 
             class I_xs,O_xm1 ioNode
             class Transpose_0,Transpose_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -191,6 +192,7 @@ class TransposeReshapeTransposePattern(PatternOptimization):
 
             class I_xts,I_X,O_xts,O_Y ioNode
             class Transpose_0,Reshape_1,Transpose_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -434,6 +436,7 @@ class TransposeEqualReshapePattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class Transpose_0 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -559,6 +562,7 @@ class TransposeGatherPattern(PatternOptimization):
             class I_X,I_ind,O_Y ioNode
             class Constant_0 constNode
             class Transpose_1,Gather_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -664,6 +668,7 @@ class SwapUnsqueezeTransposePattern(PatternOptimization):
             class I_X,I_axes,O_Y ioNode
             class Constant_0 constNode
             class Unsqueeze_1,Transpose_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

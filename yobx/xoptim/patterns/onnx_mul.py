@@ -39,6 +39,7 @@ class MulMulMulScalarPattern(PatternOptimization):
 
             class I_Y,I_X,O_Z ioNode
             class Mul_0,Div_1,Div_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -182,6 +183,7 @@ class SwitchOrderBinaryPattern(PatternOptimization):
 
             class I_Y,I_X,I_Z,O_F ioNode
             class Add_0,Add_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

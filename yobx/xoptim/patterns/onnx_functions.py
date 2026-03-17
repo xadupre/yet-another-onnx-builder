@@ -51,6 +51,7 @@ class GeluPattern(EasyPatternOptimization):
 
             class I_linear_5,O_mul_4 ioNode
             class Pow_0,Mul_1,Add_2,Mul_3,Tanh_4,Add_5,Mul_6,Mul_7 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -162,6 +163,7 @@ class LeakyReluPattern(EasyPatternOptimization):
 
             class I_X1,O_Y ioNode
             class Greater_0,Mul_1,Where_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -280,7 +282,10 @@ class SoftmaxCrossEntropyLossCastPattern(EasyPatternOptimization):
             Div_15 --> O_Y
 
             class I_I,I_X,O_Y ioNode
-            class Equal_0,Not_1,Where_2,Unsqueeze_3,LogSoftmax_4,GatherElements_5,Squeeze_6,Neg_7,Where_8,Cast_9,ReduceSum_10,Cast_11,Cast_12,ReduceSum_13,Cast_14,Div_15 opNode
+            class Equal_0,Not_1,Where_2,Unsqueeze_3,LogSoftmax_4,GatherElements_5,Squeeze_6 opNode
+            class Neg_7,Where_8,Cast_9,ReduceSum_10,Cast_11,Cast_12,ReduceSum_13 opNode
+            class Cast_14,Div_15 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

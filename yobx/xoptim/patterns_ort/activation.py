@@ -49,6 +49,7 @@ class BiasGeluPattern(PatternOptimization):
             class I_B,I_X,O_Y ioNode
             class Constant_0 constNode
             class Add_1,Div_2,Erf_3,Add_4,Mul_5,Mul_6 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -204,6 +205,7 @@ class GeluOrtPattern(GeluPattern):
 
             class I_linear_73,O_mul_52 ioNode
             class Pow_0,Mul_1,Add_2,Mul_3,Tanh_4,Add_5,Mul_6,Mul_7 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -274,6 +276,7 @@ class GeluErfPattern(EasyPatternOptimization):
 
             class I_X,O_Y ioNode
             class Div_0,Erf_1,Add_2,Mul_3,Mul_4 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -361,6 +364,7 @@ class FastGeluPattern(PatternOptimization):
 
             class I_linear_65,O_mul_44 ioNode
             class Gelu_0 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -438,6 +442,7 @@ class BiasSoftmaxPattern(PatternOptimization):
 
             class I_X,I_Y,O_Z ioNode
             class Add_0,Softmax_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

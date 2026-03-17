@@ -86,6 +86,7 @@ class AddAddMulMulPattern(PatternOptimization, _common):
 
             class I_Z,I_Y,I_X,O_F ioNode
             class Add_0,Add_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -230,6 +231,7 @@ class AddMulPattern(PatternOptimization, _common):
 
             class I_Z,I_Y,I_X,O_F ioNode
             class Add_0,Mul_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -372,6 +374,7 @@ class MulSigmoidPattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class Sigmoid_0,Mul_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -462,6 +465,7 @@ class NegXplus1Pattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class Sub_0 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -555,6 +559,7 @@ class SubMulPattern(PatternOptimization, _common):
 
             class I_Z,I_Y,I_X,O_F ioNode
             class Sub_0,Mul_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -710,6 +715,7 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
 
             class I_Z,I_Y,I_X,O_F1,O_F2 ioNode
             class Add_0,Add_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -879,6 +885,7 @@ class AddMulTransposePattern(PatternOptimization):
 
             class I_Z,I_Y,I_X,O_final ioNode
             class AddMul_0,Transpose_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

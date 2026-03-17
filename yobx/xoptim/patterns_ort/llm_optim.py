@@ -43,6 +43,7 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
 
             class I_X,I_m1,I_m2,O_Y ioNode
             class Concat_0,Concat_1,HalfRotaryEmbedding_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -86,7 +87,8 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
             RotaryEmbedding_8 --> O_Y
 
             class I_X,I_m1,I_m2,O_Y ioNode
-            class Squeeze_0,Squeeze_1,Shape_2,Shape_3,Squeeze_4,Range_5,Concat_6,Expand_7,RotaryEmbedding_8 opNode
+            class Squeeze_0,Squeeze_1,Shape_2,Shape_3,Squeeze_4,Range_5,Concat_6,Expand_7 opNode
+            class RotaryEmbedding_8 opNode
     """
 
     _operator_name = FunctionHalfRotaryEmbeddingPattern._operator_name
@@ -495,9 +497,9 @@ class ContribRotaryEmbedding3DPattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-            I_ContribRotaryEmbeddingPattern__m2x2(["ContribRotaryEmbeddingPattern--m2x2 FLOAT(NEWDIM_range, 2)"])
+            icrote_m2x2(["ContribRotaryEmbeddingPattern--m2x2 FLOAT(NEWDIM_range, 2)"])
             I_position_ids(["position_ids INT64(a, e)"])
-            I_ContribRotaryEmbeddingPattern__m1x2(["ContribRotaryEmbeddingPattern--m1x2 FLOAT(NEWDIM_range, 2)"])
+            icrote_m1x2(["ContribRotaryEmbeddingPattern--m1x2 FLOAT(NEWDIM_range, 2)"])
             I_X(["X FLOAT(a, c, 2, d)"])
 
             Transpose_0[["Transpose(., perm=[0, 2, 1, 3])"]]
@@ -506,14 +508,15 @@ class ContribRotaryEmbedding3DPattern(PatternOptimization):
             I_X -->|"FLOAT(a, c, 2, d)"| Transpose_0
             Transpose_0 -->|"FLOAT(a, 2, c, d)"| RotaryEmbedding_1
             I_position_ids -->|"INT64(a, e)"| RotaryEmbedding_1
-            I_ContribRotaryEmbeddingPattern__m1x2 -->|"FLOAT(NEWDIM_range, 2)"| RotaryEmbedding_1
-            I_ContribRotaryEmbeddingPattern__m2x2 -->|"FLOAT(NEWDIM_range, 2)"| RotaryEmbedding_1
+            icrote_m1x2 -->|"FLOAT(NEWDIM_range, 2)"| RotaryEmbedding_1
+            icrote_m2x2 -->|"FLOAT(NEWDIM_range, 2)"| RotaryEmbedding_1
 
             O_Y(["Y FLOAT(a, b, c, d)"])
             RotaryEmbedding_1 --> O_Y
 
-            class I_ContribRotaryEmbeddingPattern__m2x2,I_position_ids,I_ContribRotaryEmbeddingPattern__m1x2,I_X,O_Y ioNode
+            class icrote_m2x2,I_position_ids,icrote_m1x2,I_X,O_Y ioNode
             class Transpose_0,RotaryEmbedding_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -525,9 +528,9 @@ class ContribRotaryEmbedding3DPattern(PatternOptimization):
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-            I_ContribRotaryEmbeddingPattern__m2x2(["ContribRotaryEmbeddingPattern--m2x2 FLOAT(NEWDIM_range, 2)"])
+            icrote_m2x2(["ContribRotaryEmbeddingPattern--m2x2 FLOAT(NEWDIM_range, 2)"])
             I_position_ids(["position_ids INT64(a, e)"])
-            I_ContribRotaryEmbeddingPattern__m1x2(["ContribRotaryEmbeddingPattern--m1x2 FLOAT(NEWDIM_range, 2)"])
+            icrote_m1x2(["ContribRotaryEmbeddingPattern--m1x2 FLOAT(NEWDIM_range, 2)"])
             I_X(["X FLOAT(a, c, 2, d)"])
 
             Reshape_0[["Reshape(., [0, 0, -1])"]]
@@ -540,8 +543,8 @@ class ContribRotaryEmbedding3DPattern(PatternOptimization):
             I_X -->|"FLOAT(a, c, 2, d)"| Reshape_0
             Reshape_0 -->|"FLOAT(a, c, 2*d)"| RotaryEmbedding_1
             I_position_ids -->|"INT64(a, e)"| RotaryEmbedding_1
-            I_ContribRotaryEmbeddingPattern__m1x2 -->|"FLOAT(NEWDIM_range, 2)"| RotaryEmbedding_1
-            I_ContribRotaryEmbeddingPattern__m2x2 -->|"FLOAT(NEWDIM_range, 2)"| RotaryEmbedding_1
+            icrote_m1x2 -->|"FLOAT(NEWDIM_range, 2)"| RotaryEmbedding_1
+            icrote_m2x2 -->|"FLOAT(NEWDIM_range, 2)"| RotaryEmbedding_1
             I_X -->|"FLOAT(a, c, 2, d)"| Shape_2
             Shape_2 -->|"INT64(1)"| Concat_3
             RotaryEmbedding_1 -->|"FLOAT(a, c, 2*d)"| Reshape_4
@@ -551,7 +554,7 @@ class ContribRotaryEmbedding3DPattern(PatternOptimization):
             O_Y(["Y FLOAT(a, b, c, d)"])
             Transpose_5 --> O_Y
 
-            class I_ContribRotaryEmbeddingPattern__m2x2,I_position_ids,I_ContribRotaryEmbeddingPattern__m1x2,I_X,O_Y ioNode
+            class icrote_m2x2,I_position_ids,icrote_m1x2,I_X,O_Y ioNode
             class Reshape_0,RotaryEmbedding_1,Shape_2,Concat_3,Reshape_4,Transpose_5 opNode
     """
 
@@ -656,8 +659,11 @@ class MultiHeadAttention3DPattern(PatternOptimization):
             O_ct_keys(["ct_keys FLOAT(pak, 8, pck+bk, 64)"])
             Concat_2 --> O_ct_keys
 
-            class I_mask,I_past_values,I_values,I_query,I_past_keys,I_keys,O_ct_values,O_Y,O_ct_keys ioNode
-            class Transpose_0,Transpose_1,Concat_2,Transpose_3,Concat_4,LocalAttention_to1_5,Transpose_6 opNode
+            class I_mask,I_past_values,I_values,I_query,I_past_keys,I_keys ioNode
+            class O_ct_values,O_Y,O_ct_keys ioNode
+            class Transpose_0,Transpose_1,Concat_2,Transpose_3,Concat_4 opNode
+            class LocalAttention_to1_5,Transpose_6 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -702,7 +708,8 @@ class MultiHeadAttention3DPattern(PatternOptimization):
             O_ct_keys(["ct_keys FLOAT(pak, 8, pck+bk, 64)"])
             MultiHeadAttention_4 --> O_ct_keys
 
-            class I_mask,I_past_values,I_values,I_query,I_past_keys,I_keys,O_ct_values,O_Y,O_ct_keys ioNode
+            class I_mask,I_past_values,I_values,I_query,I_past_keys,I_keys ioNode
+            class O_ct_values,O_Y,O_ct_keys ioNode
             class Reshape_0,Reshape_1,Reshape_2,Where_3,MultiHeadAttention_4,Reshape_5 opNode
     """
 
@@ -898,26 +905,29 @@ class GroupQueryAttention3DPattern(PatternOptimization):
 
             Concat_0[["Concat(., ., axis=2)"]]
             Concat_1[["Concat(., ., axis=2)"]]
-            LocalAttentionGQASW_to1_2[["intermediate.LocalAttentionGQASW_to1(., ., ., ., [0.4204482], [1, 1, 2, 1, 1], [0, 8, -1, 32])"]]
+            locatt2[["intermediate.LocalAttentionGQASW_to1(
+            ., ., ., ., [0.4204482], [1, 1, 2, 1, 1], [0, 8, -1, 32])"]]
 
             I_past_key -->|"FLOAT(batch, 4, past_length, 32)"| Concat_0
             I_key -->|"FLOAT(batch, 4, seq_length, 32)"| Concat_0
             I_past_value -->|"FLOAT(batch, 4, past_length, 32)"| Concat_1
             I_value -->|"FLOAT(batch, 4, seq_length, 32)"| Concat_1
-            I_query -->|"FLOAT(batch, 8, seq_length, 32)"| LocalAttentionGQASW_to1_2
-            Concat_0 --> LocalAttentionGQASW_to1_2
-            Concat_1 --> LocalAttentionGQASW_to1_2
-            I_bitwise_not -->|"BOOL(seq_length, total_length)"| LocalAttentionGQASW_to1_2
+            I_query -->|"FLOAT(batch, 8, seq_length, 32)"| locatt2
+            Concat_0 --> locatt2
+            Concat_1 --> locatt2
+            I_bitwise_not -->|"BOOL(seq_length, total_length)"| locatt2
 
             O_output_0(["output_0 FLOAT(batch, 8, seq_length, 32)"])
-            LocalAttentionGQASW_to1_2 --> O_output_0
+            locatt2 --> O_output_0
             O_cat_1(["cat_1 FLOAT(batch, 4, past_length+seq_length, 32)"])
             Concat_1 --> O_cat_1
             O_cat(["cat FLOAT(batch, 4, past_length+seq_length, 32)"])
             Concat_0 --> O_cat
 
-            class I_query,I_past_value,I_key,I_value,I_past_key,I_bitwise_not,O_output_0,O_cat_1,O_cat ioNode
-            class Concat_0,Concat_1,LocalAttentionGQASW_to1_2 opNode
+            class I_query,I_past_value,I_key,I_value,I_past_key,I_bitwise_not ioNode
+            class O_output_0,O_cat_1,O_cat ioNode
+            class Concat_0,Concat_1,locatt2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -949,7 +959,7 @@ class GroupQueryAttention3DPattern(PatternOptimization):
             Reshape_10[["Reshape(., [0, 0, -1])"]]
             Reshape_11[["Reshape(., [0, 0, -1])"]]
             Reshape_12[["Reshape(., [0, 0, -1])"]]
-            GroupQueryAttention_13[["com.microsoft.GroupQueryAttention(., ., ., ., ., ., ., , , , .)"]]
+            gqa13[["com.microsoft.GroupQueryAttention(., ., ., ., ., ., ., , , , .)"]]
             Reshape_14[["Reshape(., [0, 0, -1, 32])"]]
             Transpose_15[["Transpose(., perm=[0, 2, 1, 3])"]]
 
@@ -967,26 +977,29 @@ class GroupQueryAttention3DPattern(PatternOptimization):
             Transpose_7 --> Reshape_10
             Transpose_8 --> Reshape_11
             Transpose_9 --> Reshape_12
-            Reshape_10 --> GroupQueryAttention_13
-            Reshape_11 --> GroupQueryAttention_13
-            Reshape_12 --> GroupQueryAttention_13
-            I_past_key -->|"FLOAT(batch, 4, past_length, 32)"| GroupQueryAttention_13
-            I_past_value -->|"FLOAT(batch, 4, past_length, 32)"| GroupQueryAttention_13
-            Expand_6 --> GroupQueryAttention_13
-            Cast_4 --> GroupQueryAttention_13
-            Unsqueeze_2 --> GroupQueryAttention_13
-            GroupQueryAttention_13 --> Reshape_14
+            Reshape_10 --> gqa13
+            Reshape_11 --> gqa13
+            Reshape_12 --> gqa13
+            I_past_key -->|"FLOAT(batch, 4, past_length, 32)"| gqa13
+            I_past_value -->|"FLOAT(batch, 4, past_length, 32)"| gqa13
+            Expand_6 --> gqa13
+            Cast_4 --> gqa13
+            Unsqueeze_2 --> gqa13
+            gqa13 --> Reshape_14
             Reshape_14 --> Transpose_15
 
             O_output_0(["output_0 FLOAT(batch, 8, seq_length, 32)"])
             Transpose_15 --> O_output_0
             O_cat_1(["cat_1 FLOAT(batch, 4, past_length+seq_length, 32)"])
-            GroupQueryAttention_13 --> O_cat_1
+            gqa13 --> O_cat_1
             O_cat(["cat FLOAT(batch, 4, past_length+seq_length, 32)"])
-            GroupQueryAttention_13 --> O_cat
+            gqa13 --> O_cat
 
-            class I_query,I_past_value,I_key,I_value,I_past_key,I_bitwise_not,O_output_0,O_cat_1,O_cat ioNode
-            class Where_0,Shape_1,Unsqueeze_2,Shape_3,Cast_4,Sub_5,Expand_6,Transpose_7,Transpose_8,Transpose_9,Reshape_10,Reshape_11,Reshape_12,GroupQueryAttention_13,Reshape_14,Transpose_15 opNode
+            class I_query,I_past_value,I_key,I_value,I_past_key,I_bitwise_not ioNode
+            class O_output_0,O_cat_1,O_cat ioNode
+            class Where_0,Shape_1,Unsqueeze_2,Shape_3,Cast_4,Sub_5,Expand_6,Transpose_7 opNode
+            class Transpose_8,Transpose_9,Reshape_10,Reshape_11,Reshape_12 opNode
+            class gqa13,Reshape_14,Transpose_15 opNode
     """
 
     _prefixes_operator_name = (

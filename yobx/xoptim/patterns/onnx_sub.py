@@ -34,6 +34,7 @@ class Sub1MulPattern(PatternOptimization):
 
             class I_input3,O__onx_mul0 ioNode
             class Mul_0,Sub_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

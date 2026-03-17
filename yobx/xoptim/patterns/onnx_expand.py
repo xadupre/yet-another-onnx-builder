@@ -41,6 +41,7 @@ class ExpandPattern(PatternOptimization):
             class I_init7_s4_32_2_10_8,I_mul,O_expand ioNode
             class Constant_0 constNode
             class Expand_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -138,6 +139,7 @@ class ExpandBroadcastPattern(PatternOptimization):
 
             class I_mul_25,I_input66,O_MulMulMulPattern__mul_27 ioNode
             class Expand_0,Mul_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -419,6 +421,7 @@ class ExpandSwapPattern(PatternOptimization):
             class I_p,I_X,I_shape,O_Z ioNode
             class Constant_0,Constant_1 constNode
             class Expand_2,Pow_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -541,6 +544,7 @@ class ShapeBasedStaticExpandPattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class Shape_0,Concat_1,Expand_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -662,6 +666,7 @@ class ShapeBasedExpandSwapPattern(PatternOptimization):
             class I_full_shape,I_Xc,I_one,O_Y ioNode
             class Constant_0 constNode
             class Expand_1,Add_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -954,6 +959,7 @@ class ShapeBasedExpandBroadcastMatMulPattern(PatternOptimization):
 
             class I_Y,I_X,O_Z ioNode
             class Shape_0,Concat_1,Expand_2,MatMul_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1113,6 +1119,7 @@ class ShapeBasedExpandCastWhereSwapPattern(PatternOptimization):
             class I_X,I_exp,I_cst,O_Y ioNode
             class Constant_0 constNode
             class Expand_1,Cast_2,Where_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1280,6 +1287,7 @@ class ShapeBasedConcatExpandPattern(PatternOptimization):
             class I_X,I_two,O_Y ioNode
             class Constant_0 constNode
             class Shape_1,Concat_2,Expand_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1428,6 +1436,7 @@ class SwapExpandReshapePattern(PatternOptimization):
             class I_weight,I_stat,I_shape,O_Y ioNode
             class Constant_0,Constant_1 constNode
             class Expand_2,Reshape_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

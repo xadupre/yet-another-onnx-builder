@@ -36,6 +36,7 @@ class ConcatGatherPattern(PatternOptimization):
 
             class I_D1,I_D2,O_Y ioNode
             class Concat_0,Gather_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -149,6 +150,7 @@ class ConcatEmptyPattern(_CommonConcatPattern):
 
             class I_Y,I_X,O_Z ioNode
             class Concat_0 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -242,6 +244,7 @@ class ConcatTwiceUnaryPattern(_CommonConcatPattern):
 
             class I_X,O_xsin ioNode
             class Concat_0,Sin_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

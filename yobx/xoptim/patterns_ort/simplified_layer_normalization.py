@@ -50,6 +50,7 @@ class SimplifiedLayerNormalizationPattern(PatternOptimization):
             class I_X,I_axis,O_Z,O_Y ioNode
             class Constant_0 constNode
             class Pow_1,ReduceMean_2,Add_3,Sqrt_4,Div_5,Mul_6 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -67,22 +68,22 @@ class SimplifiedLayerNormalizationPattern(PatternOptimization):
             Shape_0[["Shape(.)"]]
             Gather_1[["Gather(., .)"]]
             ConstantOfShape_2[["ConstantOfShape(.)"]]
-            SimplifiedLayerNormalization_3[["SimplifiedLayerNormalization(., ., axis=-1, stash_type=1)"]]
+            skip_layer_norm3[["SimplifiedLayerNormalization(., ., axis=-1, stash_type=1)"]]
 
             I_X -->|"FLOAT(a, D)"| Shape_0
             Shape_0 -->|"INT64(2)"| Gather_1
             I_axis -->|"INT64(1)"| Gather_1
             Gather_1 -->|"INT64(1)"| ConstantOfShape_2
-            I_X -->|"FLOAT(a, D)"| SimplifiedLayerNormalization_3
-            ConstantOfShape_2 --> SimplifiedLayerNormalization_3
+            I_X -->|"FLOAT(a, D)"| skip_layer_norm3
+            ConstantOfShape_2 --> skip_layer_norm3
 
             O_Z(["Z FLOAT(a, 1)"])
-            SimplifiedLayerNormalization_3 --> O_Z
+            skip_layer_norm3 --> O_Z
             O_Y(["Y FLOAT(a, D)"])
-            SimplifiedLayerNormalization_3 --> O_Y
+            skip_layer_norm3 --> O_Y
 
             class I_X,I_axis,O_Z,O_Y ioNode
-            class Shape_0,Gather_1,ConstantOfShape_2,SimplifiedLayerNormalization_3 opNode
+            class Shape_0,Gather_1,ConstantOfShape_2,skip_layer_norm3 opNode
     """
 
     def match(
@@ -260,6 +261,7 @@ class SkipLayerNormalizationPattern(PatternOptimization):
 
             class I_X2,I_X1,I_scale,I_bias,O_add,O_Y ioNode
             class Add_0,LayerNormalization_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -373,21 +375,22 @@ class SkipSimplifiedLayerNormalizationPattern(PatternOptimization):
 
             Constant_0[["Constant() -#gt; scale"]]
             Add_1[["Add(., .)"]]
-            SimplifiedLayerNormalization_2[["SimplifiedLayerNormalization(., ., axis=-1)"]]
+            skip_layer_norm2[["SimplifiedLayerNormalization(., ., axis=-1)"]]
 
             I_X -->|"FLOAT(batch, cache, 192)"| Add_1
             I_skip -->|"FLOAT(batch, cache, 192)"| Add_1
-            Add_1 -->|"FLOAT(batch, cache, 192)"| SimplifiedLayerNormalization_2
-            Constant_0 -->|"FLOAT(192)"| SimplifiedLayerNormalization_2
+            Add_1 -->|"FLOAT(batch, cache, 192)"| skip_layer_norm2
+            Constant_0 -->|"FLOAT(192)"| skip_layer_norm2
 
             O_xs(["xs FLOAT(batch, cache, 192)"])
             Add_1 --> O_xs
             O_ym(["ym FLOAT(batch, cache, 192)"])
-            SimplifiedLayerNormalization_2 --> O_ym
+            skip_layer_norm2 --> O_ym
 
             class I_scale,I_skip,I_X,O_xs,O_ym ioNode
             class Constant_0 constNode
-            class Add_1,SimplifiedLayerNormalization_2 opNode
+            class Add_1,skip_layer_norm2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -403,19 +406,19 @@ class SkipSimplifiedLayerNormalizationPattern(PatternOptimization):
             I_skip(["skip FLOAT(batch, cache, 192)"])
             I_X(["X FLOAT(batch, cache, 192)"])
 
-            SkipSimplifiedLayerNormalization_0[["com.microsoft.SkipSimplifiedLayerNormalization(., ., .)"]]
+            skip_layer_norm[["com.microsoft.SkipSimplifiedLayerNormalization(., ., .)"]]
 
-            I_X -->|"FLOAT(batch, cache, 192)"| SkipSimplifiedLayerNormalization_0
-            I_skip -->|"FLOAT(batch, cache, 192)"| SkipSimplifiedLayerNormalization_0
-            I_scale -->|"FLOAT(192)"| SkipSimplifiedLayerNormalization_0
+            I_X -->|"FLOAT(batch, cache, 192)"| skip_layer_norm
+            I_skip -->|"FLOAT(batch, cache, 192)"| skip_layer_norm
+            I_scale -->|"FLOAT(192)"| skip_layer_norm
 
             O_xs(["xs FLOAT(batch, cache, 192)"])
-            SkipSimplifiedLayerNormalization_0 --> O_xs
+            skip_layer_norm --> O_xs
             O_ym(["ym FLOAT(batch, cache, 192)"])
-            SkipSimplifiedLayerNormalization_0 --> O_ym
+            skip_layer_norm --> O_ym
 
             class I_scale,I_skip,I_X,O_xs,O_ym ioNode
-            class SkipSimplifiedLayerNormalization_0 opNode
+            class skip_layer_norm opNode
     """
 
     def match(
@@ -493,23 +496,24 @@ class SkipSimplifiedLayerNormalizationMulPattern(PatternOptimization):
 
             Constant_0[["Constant() -#gt; scale"]]
             Constant_1[["Constant() -#gt; weights"]]
-            SkipSimplifiedLayerNormalization_2[["com.microsoft.SkipSimplifiedLayerNormalization(., ., .)"]]
+            skip_layer_norm[["com.microsoft.SkipSimplifiedLayerNormalization(., ., .)"]]
             Mul_3[["Mul(., .)"]]
 
-            I_X -->|"FLOAT(batch, cache, 192)"| SkipSimplifiedLayerNormalization_2
-            I_skip -->|"FLOAT(batch, cache, 192)"| SkipSimplifiedLayerNormalization_2
-            Constant_0 -->|"FLOAT(192)"| SkipSimplifiedLayerNormalization_2
-            SkipSimplifiedLayerNormalization_2 -->|"FLOAT(batch, cache, 192)"| Mul_3
+            I_X -->|"FLOAT(batch, cache, 192)"| skip_layer_norm
+            I_skip -->|"FLOAT(batch, cache, 192)"| skip_layer_norm
+            Constant_0 -->|"FLOAT(192)"| skip_layer_norm
+            skip_layer_norm -->|"FLOAT(batch, cache, 192)"| Mul_3
             Constant_1 -->|"FLOAT(192)"| Mul_3
 
             O_a(["a FLOAT(batch, cache, 192)"])
             Mul_3 --> O_a
             O_xs(["xs FLOAT(batch, cache, 192)"])
-            SkipSimplifiedLayerNormalization_2 --> O_xs
+            skip_layer_norm --> O_xs
 
             class I_X,I_skip,I_weights,O_a,O_xs ioNode
             class Constant_0,Constant_1 constNode
-            class SkipSimplifiedLayerNormalization_2,Mul_3 opNode
+            class skip_layer_norm,Mul_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -525,19 +529,19 @@ class SkipSimplifiedLayerNormalizationMulPattern(PatternOptimization):
             I_skip(["skip FLOAT(batch, cache, 192)"])
             I_weights(["weights FLOAT(192)"])
 
-            SkipSimplifiedLayerNormalization_0[["com.microsoft.SkipSimplifiedLayerNormalization(., ., .)"]]
+            layer_norm[["com.microsoft.SkipSimplifiedLayerNormalization(., ., .)"]]
 
-            I_X -->|"FLOAT(batch, cache, 192)"| SkipSimplifiedLayerNormalization_0
-            I_skip -->|"FLOAT(batch, cache, 192)"| SkipSimplifiedLayerNormalization_0
-            I_weights -->|"FLOAT(192)"| SkipSimplifiedLayerNormalization_0
+            I_X -->|"FLOAT(batch, cache, 192)"| layer_norm
+            I_skip -->|"FLOAT(batch, cache, 192)"| layer_norm
+            I_weights -->|"FLOAT(192)"| layer_norm
 
             O_a(["a FLOAT(batch, cache, 192)"])
-            SkipSimplifiedLayerNormalization_0 --> O_a
+            layer_norm --> O_a
             O_xs(["xs FLOAT(batch, cache, 192)"])
-            SkipSimplifiedLayerNormalization_0 --> O_xs
+            layer_norm --> O_xs
 
             class I_X,I_skip,I_weights,O_a,O_xs ioNode
-            class SkipSimplifiedLayerNormalization_0 opNode
+            class layer_norm opNode
     """
 
     def match(
@@ -627,12 +631,12 @@ class SimplifiedLayerNormalizationMulPattern(PatternOptimization):
 
             Constant_0[["Constant() -#gt; scale"]]
             Constant_1[["Constant() -#gt; weights"]]
-            SimplifiedLayerNormalization_2[["SimplifiedLayerNormalization(., ., axis=-1)"]]
+            skip_layer_norm2[["SimplifiedLayerNormalization(., ., axis=-1)"]]
             Mul_3[["Mul(., .)"]]
 
-            I_xs -->|"FLOAT(batch, cache, 192)"| SimplifiedLayerNormalization_2
-            Constant_0 -->|"FLOAT(192)"| SimplifiedLayerNormalization_2
-            SimplifiedLayerNormalization_2 -->|"FLOAT(batch, cache, 192)"| Mul_3
+            I_xs -->|"FLOAT(batch, cache, 192)"| skip_layer_norm2
+            Constant_0 -->|"FLOAT(192)"| skip_layer_norm2
+            skip_layer_norm2 -->|"FLOAT(batch, cache, 192)"| Mul_3
             Constant_1 -->|"FLOAT(192)"| Mul_3
 
             O_a(["a FLOAT()"])
@@ -640,7 +644,8 @@ class SimplifiedLayerNormalizationMulPattern(PatternOptimization):
 
             class I_xs,I_weights,O_a ioNode
             class Constant_0,Constant_1 constNode
-            class SimplifiedLayerNormalization_2,Mul_3 opNode
+            class skip_layer_norm2,Mul_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -655,16 +660,16 @@ class SimplifiedLayerNormalizationMulPattern(PatternOptimization):
             I_xs(["xs FLOAT(batch, cache, 192)"])
             I_weights(["weights FLOAT(192)"])
 
-            SimplifiedLayerNormalization_0[["SimplifiedLayerNormalization(., ., axis=-1)"]]
+            skip_layer_norm0[["SimplifiedLayerNormalization(., ., axis=-1)"]]
 
-            I_xs -->|"FLOAT(batch, cache, 192)"| SimplifiedLayerNormalization_0
-            I_weights -->|"FLOAT(192)"| SimplifiedLayerNormalization_0
+            I_xs -->|"FLOAT(batch, cache, 192)"| skip_layer_norm0
+            I_weights -->|"FLOAT(192)"| skip_layer_norm0
 
             O_a(["a FLOAT()"])
-            SimplifiedLayerNormalization_0 --> O_a
+            skip_layer_norm0 --> O_a
 
             class I_xs,I_weights,O_a ioNode
-            class SimplifiedLayerNormalization_0 opNode
+            class skip_layer_norm0 opNode
     """
 
     def match(

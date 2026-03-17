@@ -46,6 +46,7 @@ class ReduceSumNormalizePattern(PatternOptimization):
             class I_Y,I_X,I_axis,O_Z ioNode
             class Constant_0 constNode
             class Cast_1,ReduceSum_2,Mul_3,Sub_4,Cast_5 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -200,6 +201,7 @@ class ReduceArgTopKPattern(PatternOptimization):
             class I_X,I_one,O_Y2,O_Y1 ioNode
             class Constant_0 constNode
             class ReduceMin_1,ArgMin_2 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

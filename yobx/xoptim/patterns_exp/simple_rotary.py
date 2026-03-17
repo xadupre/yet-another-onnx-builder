@@ -40,6 +40,7 @@ class SimpleRotaryPattern(PatternOptimization):
             class I_splits,I_X,O_Y ioNode
             class Constant_0 constNode
             class Split_1,Neg_2,Concat_3 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

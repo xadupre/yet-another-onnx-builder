@@ -33,6 +33,7 @@ class ReplaceZeroPattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class Cast_0,Where_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::
