@@ -10,80 +10,71 @@ class SwapRangeAddScalarPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['one'],
-                                 value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
-                    oh.make_node('Range', ['START', 'END', 'one'], ['arange']),
-                    oh.make_node('Add', ['arange', 'PLUS'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('END', onnx.TensorProto.INT64, ()),
-                    oh.make_tensor_value_info('PLUS', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('one', onnx.TensorProto.INT64, ()),
-                    oh.make_tensor_value_info('START', onnx.TensorProto.INT64, ()),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.INT64, ('NEWDIM_range',)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_END(["END INT64()"])
+            I_PLUS(["PLUS INT64(1)"])
+            I_one(["one INT64()"])
+            I_START(["START INT64()"])
 
+            Constant_0[["Constant() -#gt; one"]]
+            Range_1[["Range(., ., .)"]]
+            Add_2[["Add(., .)"]]
+
+            I_START -->|"INT64()"| Range_1
+            I_END -->|"INT64()"| Range_1
+            Constant_0 -->|"INT64()"| Range_1
+            Range_1 -->|"INT64(NEWDIM_range_0)"| Add_2
+            I_PLUS -->|"INT64(1)"| Add_2
+
+            O_Y(["Y INT64(NEWDIM_range)"])
+            Add_2 --> O_Y
+
+            class I_END,I_PLUS,I_one,I_START,O_Y ioNode
+            class Constant_0 constNode
+            class Range_1,Add_2 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Squeeze', ['PLUS'], ['SwapRangeAddScalarPattern--PLUS']),
-                    oh.make_node('Add', ['END', 'SwapRangeAddScalarPattern--PLUS'],
-                                 ['SwapRangeAddScalarPattern--END']),
-                    oh.make_node('Add', ['START', 'SwapRangeAddScalarPattern--PLUS'],
-                                 ['SwapRangeAddScalarPattern--START']),
-                    oh.make_node('Range',
-                        ['SwapRangeAddScalarPattern--START',
-                         'SwapRangeAddScalarPattern--END', 'one'],
-                        ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('END', onnx.TensorProto.INT64, ()),
-                    oh.make_tensor_value_info('PLUS', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('one', onnx.TensorProto.INT64, ()),
-                    oh.make_tensor_value_info('START', onnx.TensorProto.INT64, ()),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.INT64, ('NEWDIM_range',)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_END(["END INT64()"])
+            I_PLUS(["PLUS INT64(1)"])
+            I_one(["one INT64()"])
+            I_START(["START INT64()"])
+
+            Squeeze_0[["Squeeze(.)"]]
+            Add_1[["Add(., .)"]]
+            Add_2[["Add(., .)"]]
+            Range_3[["Range(., ., .)"]]
+
+            I_PLUS -->|"INT64(1)"| Squeeze_0
+            I_END -->|"INT64()"| Add_1
+            Squeeze_0 -->|"INT64()"| Add_1
+            I_START -->|"INT64()"| Add_2
+            Squeeze_0 -->|"INT64()"| Add_2
+            Add_2 -->|"INT64()"| Range_3
+            Add_1 -->|"INT64()"| Range_3
+            I_one -->|"INT64()"| Range_3
+
+            O_Y(["Y INT64(NEWDIM_range)"])
+            Range_3 --> O_Y
+
+            class I_END,I_PLUS,I_one,I_START,O_Y ioNode
+            class Squeeze_0,Add_1,Add_2,Range_3 opNode
     """
 
     def match(

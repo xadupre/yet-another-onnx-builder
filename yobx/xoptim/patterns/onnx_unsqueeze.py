@@ -11,70 +11,50 @@ class SqueezeUnsqueezePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['axes1'],
-                                 value=onh.from_array(np.array([1, 2], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['axes2'],
-                                 value=onh.from_array(np.array([1, 2], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Unsqueeze', ['X', 'axes1'], ['mm']),
-                    oh.make_node('Squeeze', ['mm', 'axes2'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 1, 1, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 1, 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, 1, 1, d)"])
 
+            Unsqueeze_0[["Unsqueeze(., [1, 2])"]]
+            Squeeze_1[["Squeeze(., [1, 2])"]]
+
+            I_X -->|"FLOAT(a, 1, 1, d)"| Unsqueeze_0
+            Unsqueeze_0 -->|"FLOAT(a, 1, 1, 1, 1, d)"| Squeeze_1
+
+            O_Y(["Y FLOAT(a, 1, 1, d)"])
+            Squeeze_1 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Unsqueeze_0,Squeeze_1 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Identity', ['X'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 1, 1, 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 1, 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, 1, 1, d)"])
+
+            Identity_0[["Identity(.)"]]
+
+            I_X -->|"FLOAT(a, 1, 1, d)"| Identity_0
+
+            O_Y(["Y FLOAT(a, 1, 1, d)"])
+            Identity_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Identity_0 opNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -190,75 +170,50 @@ class UnsqueezeUnsqueezePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['ii'],
-                                 value=onh.from_array(np.array([2],
-                                 dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['jj'],
-                                 value=onh.from_array(np.array([3],
-                                 dtype=np.int64), name='value')),
-                    oh.make_node('Unsqueeze', ['X', 'ii'], ['x1']),
-                    oh.make_node('Unsqueeze', ['x1', 'jj'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1, 1, 'a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, b)"])
 
+            Unsqueeze_0[["Unsqueeze(., [2])"]]
+            Unsqueeze_1[["Unsqueeze(., [3])"]]
+
+            I_X -->|"FLOAT(a, b)"| Unsqueeze_0
+            Unsqueeze_0 -->|"FLOAT(a, b, 1)"| Unsqueeze_1
+
+            O_Y(["Y FLOAT(1, 1, a, b)"])
+            Unsqueeze_1 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Unsqueeze_0,Unsqueeze_1 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s2_2_3'],
-                                 value=onh.from_array(np.array([2, 3], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Unsqueeze', ['X', 'init7_s2_2_3'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1, 1, 'a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, b)"])
+
+            Unsqueeze_0[["Unsqueeze(., [2, 3])"]]
+
+            I_X -->|"FLOAT(a, b)"| Unsqueeze_0
+
+            O_Y(["Y FLOAT(1, 1, a, b)"])
+            Unsqueeze_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Unsqueeze_0 opNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -363,66 +318,58 @@ class SqueezeAddPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Squeeze', ['S1'], ['s1']),
-                    oh.make_node('Squeeze', ['S2'], ['s2']),
-                    oh.make_node('Add', ['s1', 's2'], ['s']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('S2', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('S1', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('s', onnx.TensorProto.INT64, ()),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_S2(["S2 INT64(1)"])
+            I_S1(["S1 INT64(1)"])
 
+            Squeeze_0[["Squeeze(.)"]]
+            Squeeze_1[["Squeeze(.)"]]
+            Add_2[["Add(., .)"]]
+
+            I_S1 -->|"INT64(1)"| Squeeze_0
+            I_S2 -->|"INT64(1)"| Squeeze_1
+            Squeeze_0 -->|"INT64()"| Add_2
+            Squeeze_1 -->|"INT64()"| Add_2
+
+            O_s(["s INT64()"])
+            Add_2 --> O_s
+
+            class I_S2,I_S1,O_s ioNode
+            class Squeeze_0,Squeeze_1,Add_2 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Add', ['S1', 'S2'], ['SqueezeAddPattern_s']),
-                    oh.make_node('Squeeze', ['SqueezeAddPattern_s'], ['s']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('S2', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('S1', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('s', onnx.TensorProto.INT64, ()),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_S2(["S2 INT64(1)"])
+            I_S1(["S1 INT64(1)"])
+
+            Add_0[["Add(., .)"]]
+            Squeeze_1[["Squeeze(.)"]]
+
+            I_S1 -->|"INT64(1)"| Add_0
+            I_S2 -->|"INT64(1)"| Add_0
+            Add_0 -->|"INT64(1)"| Squeeze_1
+
+            O_s(["s INT64()"])
+            Squeeze_1 --> O_s
+
+            class I_S2,I_S1,O_s ioNode
+            class Add_0,Squeeze_1 opNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -503,76 +450,65 @@ class SqueezeBinaryUnsqueezePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['two'],
-                                 value=onh.from_array(np.array(2, dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['zero'],
-                                 value=onh.from_array(np.array([0], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Squeeze', ['d'], ['d0']),
-                    oh.make_node('Div', ['d0', 'two'], ['d1']),
-                    oh.make_node('Unsqueeze', ['d1', 'zero'], ['e']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('zero', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('d', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('two', onnx.TensorProto.INT64, ()),
-                ],
-                [
-                    oh.make_tensor_value_info('e', onnx.TensorProto.INT64, (1,)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_zero(["zero INT64(1)"])
+            I_d(["d INT64(1)"])
+            I_two(["two INT64()"])
 
+            Constant_0[["Constant() -#gt; two"]]
+            Constant_1[["Constant() -#gt; zero"]]
+            Squeeze_2[["Squeeze(.)"]]
+            Div_3[["Div(., .)"]]
+            Unsqueeze_4[["Unsqueeze(., .)"]]
+
+            I_d -->|"INT64(1)"| Squeeze_2
+            Squeeze_2 -->|"INT64()"| Div_3
+            Constant_0 -->|"INT64()"| Div_3
+            Div_3 -->|"INT64()"| Unsqueeze_4
+            Constant_1 -->|"INT64(1)"| Unsqueeze_4
+
+            O_e(["e INT64(1)"])
+            Unsqueeze_4 --> O_e
+
+            class I_zero,I_d,I_two,O_e ioNode
+            class Constant_0,Constant_1 constNode
+            class Squeeze_2,Div_3,Unsqueeze_4 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Unsqueeze', ['two', 'zero'],
-                                 ['SqueezeBinaryUnsqueezePattern_two']),
-                    oh.make_node('Div', ['d', 'SqueezeBinaryUnsqueezePattern_two'], ['e']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('zero', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('d', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('two', onnx.TensorProto.INT64, ()),
-                ],
-                [
-                    oh.make_tensor_value_info('e', onnx.TensorProto.INT64, (1,)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_zero(["zero INT64(1)"])
+            I_d(["d INT64(1)"])
+            I_two(["two INT64()"])
+
+            Unsqueeze_0[["Unsqueeze(., .)"]]
+            Div_1[["Div(., .)"]]
+
+            I_two -->|"INT64()"| Unsqueeze_0
+            I_zero -->|"INT64(1)"| Unsqueeze_0
+            I_d -->|"INT64(1)"| Div_1
+            Unsqueeze_0 --> Div_1
+
+            O_e(["e INT64(1)"])
+            Div_1 --> O_e
+
+            class I_zero,I_d,I_two,O_e ioNode
+            class Unsqueeze_0,Div_1 opNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):

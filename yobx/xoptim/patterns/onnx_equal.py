@@ -11,80 +11,72 @@ class UnsqueezeEqualPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['axis'],
-                                 value=onh.from_array(np.array([1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['m_one'],
-                                 value=onh.from_array(np.array([-1.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Unsqueeze', ['X', 'axis'], ['Y']),
-                    oh.make_node('Equal', ['X', 'm_one'], ['xe']),
-                    oh.make_node('Unsqueeze', ['xe', 'axis'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 'b')),
-                    oh.make_tensor_value_info('m_one', onnx.TensorProto.FLOAT, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 'b')),
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.BOOL, ('a', 1, 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Y(["Y FLOAT(a, 1, b)"])
+            I_m_one(["m_one FLOAT(1)"])
+            I_X(["X FLOAT(a, b)"])
+            I_axis(["axis INT64(1)"])
 
+            Constant_0[["Constant() -#gt; axis"]]
+            Constant_1[["Constant() -#gt; m_one"]]
+            Unsqueeze_2[["Unsqueeze(., .)"]]
+            Equal_3[["Equal(., .)"]]
+            Unsqueeze_4[["Unsqueeze(., .)"]]
+
+            I_X -->|"FLOAT(a, b)"| Unsqueeze_2
+            Constant_0 -->|"INT64(1)"| Unsqueeze_2
+            I_X -->|"FLOAT(a, b)"| Equal_3
+            Constant_1 -->|"FLOAT(1)"| Equal_3
+            Equal_3 -->|"BOOL(a, b)"| Unsqueeze_4
+            Constant_0 -->|"INT64(1)"| Unsqueeze_4
+
+            O_Y(["Y FLOAT(a, 1, b)"])
+            Unsqueeze_2 --> O_Y
+            O_Z(["Z BOOL(a, 1, b)"])
+            Unsqueeze_4 --> O_Z
+
+            class I_Y,I_m_one,I_X,I_axis,O_Y,O_Z ioNode
+            class Constant_0,Constant_1 constNode
+            class Unsqueeze_2,Equal_3,Unsqueeze_4 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Unsqueeze', ['X', 'axis'], ['Y']),
-                    oh.make_node('Equal', ['Y', 'm_one'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 'b')),
-                    oh.make_tensor_value_info('m_one', onnx.TensorProto.FLOAT, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 'b')),
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.BOOL, ('a', 1, 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Y(["Y FLOAT(a, 1, b)"])
+            I_m_one(["m_one FLOAT(1)"])
+            I_X(["X FLOAT(a, b)"])
+            I_axis(["axis INT64(1)"])
+
+            Unsqueeze_0[["Unsqueeze(., .)"]]
+            Equal_1[["Equal(., .)"]]
+
+            I_X -->|"FLOAT(a, b)"| Unsqueeze_0
+            I_axis -->|"INT64(1)"| Unsqueeze_0
+            Unsqueeze_0 -->|"FLOAT(a, 1, b)"| Equal_1
+            I_m_one -->|"FLOAT(1)"| Equal_1
+
+            O_Y(["Y FLOAT(a, 1, b)"])
+            Unsqueeze_0 --> O_Y
+            O_Z(["Z BOOL(a, 1, b)"])
+            Equal_1 --> O_Z
+
+            class I_Y,I_m_one,I_X,I_axis,O_Y,O_Z ioNode
+            class Unsqueeze_0,Equal_1 opNode
     """
 
     def match(

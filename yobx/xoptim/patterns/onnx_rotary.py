@@ -12,145 +12,138 @@ class RotaryConcatPartPattern(PatternOptimization):
     """
     Optimizes the following pattern
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        import numpy as np
-        from onnx import TensorProto
-        from yobx.doc import to_dot
-        from yobx.builder.light import start
+        graph TD
 
-        def mk(shape):
-            return np.array(shape, dtype=np.int64)
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        model = (
-            start(opset=18, ir_version=9)
-            .cst(mk([2, 2, 1024, 256]), "shape")
-            .cst(mk([0]), "c0")
-            .cst(mk([256]), "c256")
-            .cst(mk([512]), "c512")
-            .cst(mk([3]), "c3")
-            .vin("X", TensorProto.FLOAT, ("a", "b", "c", "d"))
-            .bring("shape")
-            .ConstantOfShape()
-            .rename("C1")
-            .bring("shape")
-            .ConstantOfShape()
-            .rename("C2")
-            .bring("X", "c256", "c512", "c3")
-            .Slice()
-            .rename("S1")
-            .bring("C1", "S1")
-            .Concat(axis=3)
-            .rename("P1")
-            .bring("X", "c0", "c256", "c3")
-            .Slice()
-            .Neg()
-            .rename("S2")
-            .bring("C1", "S2")
-            .Concat(axis=3)
-            .rename("P2")
-            .bring("P1", "P2")
-            .Add()
-            .rename("Y")
-            .vout(TensorProto.FLOAT, ("a", "b", "c", "d"))
-            .to_onnx()
-        )
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, b, c, d)"])
 
+            ConstantOfShape_0[["ConstantOfShape([2, 2, 1024, 256])"]]
+            ConstantOfShape_1[["ConstantOfShape([2, 2, 1024, 256])"]]
+            Slice_2[["Slice(., [256], [512], [3])"]]
+            Concat_3[["Concat(., ., axis=3)"]]
+            Slice_4[["Slice(., [0], [256], [3])"]]
+            Neg_5[["Neg(.)"]]
+            Concat_6[["Concat(., ., axis=3)"]]
+            Add_7[["Add(., .)"]]
+
+            I_X -->|"FLOAT(a, b, c, d)"| Slice_2
+            ConstantOfShape_0 -->|"FLOAT(2, 2, 1024, 256)"| Concat_3
+            Slice_2 -->|"FLOAT(a, b, c, 256)"| Concat_3
+            I_X -->|"FLOAT(a, b, c, d)"| Slice_4
+            Slice_4 -->|"FLOAT(a, b, c, 256)"| Neg_5
+            ConstantOfShape_0 -->|"FLOAT(2, 2, 1024, 256)"| Concat_6
+            Neg_5 -->|"FLOAT(a, b, c, 256)"| Concat_6
+            Concat_3 -->|"FLOAT(2, 2, 1024, 512)"| Add_7
+            Concat_6 -->|"FLOAT(2, 2, 1024, 512)"| Add_7
+
+            O_Y(["Y FLOAT(a, b, c, d)"])
+            Add_7 --> O_Y
+
+            class I_X,O_Y ioNode
+            class ConstantOfShape_0,ConstantOfShape_1,Slice_2,Concat_3,Slice_4,Neg_5,Concat_6,Add_7 opNode
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['shape'],
-                                 value=onh.from_array(np.array([3, 8], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['split'],
-                                 value=onh.from_array(np.array([8, 8], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('ConstantOfShape', ['shape'], ['zero']),
-                    oh.make_node('Split', ['X', 'split'], ['x1', 'x2'], axis=1),
-                    oh.make_node('Neg', ['x1'], ['nx1']),
-                    oh.make_node('Concat', ['nx1', 'zero'], ['c1'], axis=1),
-                    oh.make_node('ConstantOfShape', ['shape'], ['zero']),
-                    oh.make_node('Concat', ['zero', 'x2'], ['c2'], axis=1),
-                    oh.make_node('Add', ['c1', 'c2'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 16)),
-                    oh.make_tensor_value_info('split', onnx.TensorProto.INT64, (2,)),
-                    oh.make_tensor_value_info('x1', onnx.TensorProto.FLOAT, ('a', 8)),
-                    oh.make_tensor_value_info('shape', onnx.TensorProto.INT64, (2,)),
-                    oh.make_tensor_value_info('nx1', onnx.TensorProto.FLOAT, ('a', 8)),
-                    oh.make_tensor_value_info('x2', onnx.TensorProto.FLOAT, ('a', 8)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 16)),
-                    oh.make_tensor_value_info('zero', onnx.TensorProto.FLOAT, (3, 8)),
-                    oh.make_tensor_value_info('x1', onnx.TensorProto.FLOAT, ('a', 8)),
-                    oh.make_tensor_value_info('nx1', onnx.TensorProto.FLOAT, ('a', 8)),
-                    oh.make_tensor_value_info('x2', onnx.TensorProto.FLOAT, ('a', 8)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, 16)"])
+            I_split(["split INT64(2)"])
+            I_x1(["x1 FLOAT(a, 8)"])
+            I_shape(["shape INT64(2)"])
+            I_nx1(["nx1 FLOAT(a, 8)"])
+            I_x2(["x2 FLOAT(a, 8)"])
 
+            Constant_0[["Constant() -#gt; shape"]]
+            Constant_1[["Constant() -#gt; split"]]
+            ConstantOfShape_2[["ConstantOfShape(.)"]]
+            Split_3[["Split(., ., axis=1)"]]
+            Neg_4[["Neg(.)"]]
+            Concat_5[["Concat(., ., axis=1)"]]
+            ConstantOfShape_6[["ConstantOfShape(.)"]]
+            Concat_7[["Concat(., ., axis=1)"]]
+            Add_8[["Add(., .)"]]
+
+            Constant_0 -->|"INT64(2)"| ConstantOfShape_2
+            I_X -->|"FLOAT(a, 16)"| Split_3
+            Constant_1 -->|"INT64(2)"| Split_3
+            Split_3 -->|"FLOAT(a, 8)"| Neg_4
+            Neg_4 -->|"FLOAT(a, 8)"| Concat_5
+            ConstantOfShape_6 -->|"FLOAT(3, 8)"| Concat_5
+            Constant_0 -->|"INT64(2)"| ConstantOfShape_6
+            ConstantOfShape_6 -->|"FLOAT(3, 8)"| Concat_7
+            Split_3 -->|"FLOAT(a, 8)"| Concat_7
+            Concat_5 -->|"FLOAT(a, 16)"| Add_8
+            Concat_7 -->|"FLOAT(3, 16)"| Add_8
+
+            O_Y(["Y FLOAT(a, 16)"])
+            Add_8 --> O_Y
+            O_zero(["zero FLOAT(3, 8)"])
+            ConstantOfShape_6 --> O_zero
+            O_x1(["x1 FLOAT(a, 8)"])
+            Split_3 --> O_x1
+            O_nx1(["nx1 FLOAT(a, 8)"])
+            Neg_4 --> O_nx1
+            O_x2(["x2 FLOAT(a, 8)"])
+            Split_3 --> O_x2
+
+            class I_X,I_split,I_x1,I_shape,I_nx1,I_x2,O_Y,O_zero,O_x1,O_nx1,O_x2 ioNode
+            class Constant_0,Constant_1 constNode
+            class ConstantOfShape_2,Split_3,Neg_4,Concat_5,ConstantOfShape_6,Concat_7,Add_8 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('ConstantOfShape', ['shape'], ['zero']),
-                    oh.make_node('Split', ['X', 'split'], ['x1', 'x2'], axis=1),
-                    oh.make_node('Neg', ['x1'], ['nx1']),
-                    oh.make_node('Concat', ['nx1', 'x2'], ['Y'], axis=1),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 16)),
-                    oh.make_tensor_value_info('split', onnx.TensorProto.INT64, (2,)),
-                    oh.make_tensor_value_info('x1', onnx.TensorProto.FLOAT, ('a', 8)),
-                    oh.make_tensor_value_info('shape', onnx.TensorProto.INT64, (2,)),
-                    oh.make_tensor_value_info('nx1', onnx.TensorProto.FLOAT, ('a', 8)),
-                    oh.make_tensor_value_info('x2', onnx.TensorProto.FLOAT, ('a', 8)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 16)),
-                    oh.make_tensor_value_info('zero', onnx.TensorProto.FLOAT, (3, 8)),
-                    oh.make_tensor_value_info('x1', onnx.TensorProto.FLOAT, ('a', 8)),
-                    oh.make_tensor_value_info('nx1', onnx.TensorProto.FLOAT, ('a', 8)),
-                    oh.make_tensor_value_info('x2', onnx.TensorProto.FLOAT, ('a', 8)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, 16)"])
+            I_split(["split INT64(2)"])
+            I_x1(["x1 FLOAT(a, 8)"])
+            I_shape(["shape INT64(2)"])
+            I_nx1(["nx1 FLOAT(a, 8)"])
+            I_x2(["x2 FLOAT(a, 8)"])
+
+            ConstantOfShape_0[["ConstantOfShape(.)"]]
+            Split_1[["Split(., ., axis=1)"]]
+            Neg_2[["Neg(.)"]]
+            Concat_3[["Concat(., ., axis=1)"]]
+
+            I_shape -->|"INT64(2)"| ConstantOfShape_0
+            I_X -->|"FLOAT(a, 16)"| Split_1
+            I_split -->|"INT64(2)"| Split_1
+            Split_1 -->|"FLOAT(a, 8)"| Neg_2
+            Neg_2 -->|"FLOAT(a, 8)"| Concat_3
+            Split_1 -->|"FLOAT(a, 8)"| Concat_3
+
+            O_Y(["Y FLOAT(a, 16)"])
+            Concat_3 --> O_Y
+            O_zero(["zero FLOAT(3, 8)"])
+            ConstantOfShape_0 --> O_zero
+            O_x1(["x1 FLOAT(a, 8)"])
+            Split_1 --> O_x1
+            O_nx1(["nx1 FLOAT(a, 8)"])
+            Neg_2 --> O_nx1
+            O_x2(["x2 FLOAT(a, 8)"])
+            Split_1 --> O_x2
+
+            class I_X,I_split,I_x1,I_shape,I_nx1,I_x2,O_Y,O_zero,O_x1,O_nx1,O_x2 ioNode
+            class ConstantOfShape_0,Split_1,Neg_2,Concat_3 opNode
     """
 
     def match(
@@ -718,71 +711,68 @@ class FunctionHalfRotaryEmbeddingPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Split', ['X'], ['x1', 'x2'], axis=-1, num_outputs=2),
-                    oh.make_node('Neg', ['x2'], ['nx2']),
-                    oh.make_node('Concat', ['nx2', 'x1'], ['c'], axis=-1),
-                    oh.make_node('Mul', ['c', 'm1'], ['cm1']),
-                    oh.make_node('Mul', ['X', 'm2'], ['cm2']),
-                    oh.make_node('Add', ['cm1', 'cm2'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('m2', onnx.TensorProto.FLOAT, ('c', 'd')),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
-                    oh.make_tensor_value_info('m1', onnx.TensorProto.FLOAT, ('c', 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 22), oh.make_opsetid('intermediate', 1)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_m2(["m2 FLOAT(c, d)"])
+            I_X(["X FLOAT(a, b, c, d)"])
+            I_m1(["m1 FLOAT(c, d)"])
 
+            Split_0[["Split(., axis=-1)"]]
+            Neg_1[["Neg(.)"]]
+            Concat_2[["Concat(., ., axis=-1)"]]
+            Mul_3[["Mul(., .)"]]
+            Mul_4[["Mul(., .)"]]
+            Add_5[["Add(., .)"]]
+
+            I_X -->|"FLOAT(a, b, c, d)"| Split_0
+            Split_0 -->|"FLOAT(a, b, c, d-CeilToInt(d,2))"| Neg_1
+            Neg_1 -->|"FLOAT(a, b, c, d-CeilToInt(d,2))"| Concat_2
+            Split_0 -->|"FLOAT(a, b, c, CeilToInt(d,2))"| Concat_2
+            Concat_2 -->|"FLOAT(a, b, c, d)"| Mul_3
+            I_m1 -->|"FLOAT(c, d)"| Mul_3
+            I_X -->|"FLOAT(a, b, c, d)"| Mul_4
+            I_m2 -->|"FLOAT(c, d)"| Mul_4
+            Mul_3 -->|"FLOAT(a, b, c, d)"| Add_5
+            Mul_4 -->|"FLOAT(a, b, c, d)"| Add_5
+
+            O_Y(["Y FLOAT(a, b, c, d)"])
+            Add_5 --> O_Y
+
+            class I_m2,I_X,I_m1,O_Y ioNode
+            class Split_0,Neg_1,Concat_2,Mul_3,Mul_4,Add_5 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('HalfRotaryEmbedding', ['X', 'm2', 'm1'], ['Y'],
-                                 domain='intermediate'),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('m2', onnx.TensorProto.FLOAT, ('c', 'd')),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
-                    oh.make_tensor_value_info('m1', onnx.TensorProto.FLOAT, ('c', 'd')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 22), oh.make_opsetid('intermediate', 1)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_m2(["m2 FLOAT(c, d)"])
+            I_X(["X FLOAT(a, b, c, d)"])
+            I_m1(["m1 FLOAT(c, d)"])
+
+            HalfRotaryEmbedding_0[["intermediate.HalfRotaryEmbedding(., ., .)"]]
+
+            I_X -->|"FLOAT(a, b, c, d)"| HalfRotaryEmbedding_0
+            I_m2 -->|"FLOAT(c, d)"| HalfRotaryEmbedding_0
+            I_m1 -->|"FLOAT(c, d)"| HalfRotaryEmbedding_0
+
+            O_Y(["Y FLOAT(a, b, c, d)"])
+            HalfRotaryEmbedding_0 --> O_Y
+
+            class I_m2,I_X,I_m1,O_Y ioNode
+            class HalfRotaryEmbedding_0 opNode
     """
 
     _operator_name = "HalfRotaryEmbedding"
@@ -931,99 +921,79 @@ class RotaryEmbeddingPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['split'],
-                                 value=onh.from_array(np.array([4, 6], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Concat', ['m2', 'm2'], ['m2x2'], axis=-1),
-                    oh.make_node('Concat', ['m1', 'm1'], ['m1x2'], axis=-1),
-                    oh.make_node('Split', ['X', 'split'], ['Xh1', 'Xh2'], axis=-1),
-                    oh.make_node('HalfRotaryEmbedding', ['Xh1', 'm2x2', 'm1x2'], ['Yh'],
-                                 domain='intermediate'),
-                    oh.make_node('Concat', ['Yh', 'Xh2'], ['Y'], axis=-1),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('m2', onnx.TensorProto.FLOAT, (1, 1, 'c', 'e')),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 2, 'c', 'd')),
-                    oh.make_tensor_value_info('m1', onnx.TensorProto.FLOAT, (1, 1, 'c', 'e')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 23), oh.make_opsetid('intermediate', 1)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_m2(["m2 FLOAT(1, 1, c, e)"])
+            I_X(["X FLOAT(a, 2, c, d)"])
+            I_m1(["m1 FLOAT(1, 1, c, e)"])
 
+            Concat_0[["Concat(., ., axis=-1)"]]
+            Concat_1[["Concat(., ., axis=-1)"]]
+            Split_2[["Split(., [4, 6], axis=-1)"]]
+            HalfRotaryEmbedding_3[["intermediate.HalfRotaryEmbedding(., ., .)"]]
+            Concat_4[["Concat(., ., axis=-1)"]]
+
+            I_m2 -->|"FLOAT(1, 1, c, e)"| Concat_0
+            I_m1 -->|"FLOAT(1, 1, c, e)"| Concat_1
+            I_X -->|"FLOAT(a, 2, c, d)"| Split_2
+            Split_2 --> HalfRotaryEmbedding_3
+            Concat_0 --> HalfRotaryEmbedding_3
+            Concat_1 --> HalfRotaryEmbedding_3
+            HalfRotaryEmbedding_3 --> Concat_4
+            Split_2 --> Concat_4
+
+            O_Y(["Y FLOAT(a, b, c, d)"])
+            Concat_4 --> O_Y
+
+            class I_m2,I_X,I_m1,O_Y ioNode
+            class Concat_0,Concat_1,Split_2,HalfRotaryEmbedding_3,Concat_4 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s2_1_1'],
-                                 value=onh.from_array(np.array([1, 1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['init7_s1_1'],
-                                 value=onh.from_array(np.array([1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Shape', ['X'], ['RotaryEmbeddingPattern--Xh1--dim'],
-                                 end=1, start=0),
-                    oh.make_node('Concat', ['RotaryEmbeddingPattern--Xh1--dim', 'init7_s2_1_1'],
-                                 ['RotaryEmbeddingPattern--Xh1::Shape'], axis=0),
-                    oh.make_node('Squeeze', ['m2', 'init7_s1_1'],
-                                 ['RotaryEmbeddingPattern--m2x2']),
-                    oh.make_node('Squeeze', ['m1', 'init7_s1_1'],
-                                 ['RotaryEmbeddingPattern--m1x2']),
-                    oh.make_node('Expand',
-                        ['RotaryEmbeddingPattern--m2x2', 'RotaryEmbeddingPattern--Xh1::Shape'],
-                         ['RotaryEmbeddingPattern--m2x22']),
-                    oh.make_node('Expand',
-                        ['RotaryEmbeddingPattern--m1x2', 'RotaryEmbeddingPattern--Xh1::Shape'],
-                         ['RotaryEmbeddingPattern--m1x22']),
-                    oh.make_node('RotaryEmbedding',
-                        ['X', 'RotaryEmbeddingPattern--m2x22', 'RotaryEmbeddingPattern--m1x22'],
-                         ['Y'], num_heads=2, rotary_embedding_dim=4),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('m2', onnx.TensorProto.FLOAT, (1, 1, 'c', 'e')),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 2, 'c', 'd')),
-                    oh.make_tensor_value_info('m1', onnx.TensorProto.FLOAT, (1, 1, 'c', 'e')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b', 'c', 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 23), oh.make_opsetid('intermediate', 1)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_m2(["m2 FLOAT(1, 1, c, e)"])
+            I_X(["X FLOAT(a, 2, c, d)"])
+            I_m1(["m1 FLOAT(1, 1, c, e)"])
+
+            Shape_0[["Shape(., end=1, start=0)"]]
+            Concat_1[["Concat(., [1, 1], axis=0)"]]
+            Squeeze_2[["Squeeze(., [1])"]]
+            Squeeze_3[["Squeeze(., [1])"]]
+            Expand_4[["Expand(., .)"]]
+            Expand_5[["Expand(., .)"]]
+            RotaryEmbedding_6[["RotaryEmbedding(., ., .)"]]
+
+            I_X -->|"FLOAT(a, 2, c, d)"| Shape_0
+            Shape_0 -->|"INT64(1)"| Concat_1
+            I_m2 -->|"FLOAT(1, 1, c, e)"| Squeeze_2
+            I_m1 -->|"FLOAT(1, 1, c, e)"| Squeeze_3
+            Squeeze_2 -->|"FLOAT(1, c, e)"| Expand_4
+            Concat_1 -->|"INT64(3)"| Expand_4
+            Squeeze_3 -->|"FLOAT(1, c, e)"| Expand_5
+            Concat_1 -->|"INT64(3)"| Expand_5
+            I_X -->|"FLOAT(a, 2, c, d)"| RotaryEmbedding_6
+            Expand_4 -->|"FLOAT(a, c, e)"| RotaryEmbedding_6
+            Expand_5 -->|"FLOAT(a, c, e)"| RotaryEmbedding_6
+
+            O_Y(["Y FLOAT(a, b, c, d)"])
+            RotaryEmbedding_6 --> O_Y
+
+            class I_m2,I_X,I_m1,O_Y ioNode
+            class Shape_0,Concat_1,Squeeze_2,Squeeze_3,Expand_4,Expand_5,RotaryEmbedding_6 opNode
     """
 
     _operator_name = FunctionHalfRotaryEmbeddingPattern._operator_name
@@ -1185,91 +1155,79 @@ class FunctionCausalMaskPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['zero'],
-                                 value=onh.from_array(np.array(0, dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['one'],
-                                 value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['a012'],
-                                 value=onh.from_array(np.array([0, 1, 2], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['a013'],
-                                 value=onh.from_array(np.array([0, 1, 3], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['initi'],
-                                 value=onh.from_array(np.array([3], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Squeeze', ['d1'], ['nd1']),
-                    oh.make_node('Squeeze', ['d2'], ['nd2']),
-                    oh.make_node('Range', ['zero', 'nd2', 'one'], ['rg1']),
-                    oh.make_node('Range', ['nd1', 'nd2', 'one'], ['rg2']),
-                    oh.make_node('Unsqueeze', ['rg1', 'a012'], ['m1']),
-                    oh.make_node('Unsqueeze', ['rg2', 'a013'], ['m2']),
-                    oh.make_node('Sub', ['m2', 'initi'], ['m2sub']),
-                    oh.make_node('Greater', ['m1', 'm2sub'], ['yc']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('d1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('initi', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('d2', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('nd2', onnx.TensorProto.INT64, ()),
-                    oh.make_tensor_value_info('yc', onnx.TensorProto.BOOL, (1, 1, 'b-a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_d1(["d1 INT64(1)"])
+            I_initi(["initi INT64(1)"])
+            I_d2(["d2 INT64(1)"])
 
+            Constant_0[["Constant() -#gt; initi"]]
+            Squeeze_1[["Squeeze(.)"]]
+            Squeeze_2[["Squeeze(.)"]]
+            Range_3[["Range(0, ., 1)"]]
+            Range_4[["Range(., ., 1)"]]
+            Unsqueeze_5[["Unsqueeze(., [0, 1, 2])"]]
+            Unsqueeze_6[["Unsqueeze(., [0, 1, 3])"]]
+            Sub_7[["Sub(., .)"]]
+            Greater_8[["Greater(., .)"]]
+
+            I_d1 -->|"INT64(1)"| Squeeze_1
+            I_d2 -->|"INT64(1)"| Squeeze_2
+            Squeeze_2 -->|"INT64()"| Range_3
+            Squeeze_1 -->|"INT64()"| Range_4
+            Squeeze_2 -->|"INT64()"| Range_4
+            Range_3 -->|"INT64(NEWDIM_range_0)"| Unsqueeze_5
+            Range_4 -->|"INT64(NEWDIM_range_1)"| Unsqueeze_6
+            Unsqueeze_6 -->|"INT64(1, 1, NEWDIM_range_1, 1)"| Sub_7
+            Constant_0 -->|"INT64(1)"| Sub_7
+            Unsqueeze_5 -->|"INT64(1, 1, 1, NEWDIM_range_0)"| Greater_8
+            Sub_7 -->|"INT64(1, 1, NEWDIM_range_1, 1)"| Greater_8
+
+            O_nd2(["nd2 INT64()"])
+            Squeeze_2 --> O_nd2
+            O_yc(["yc BOOL(1, 1, b-a, b)"])
+            Greater_8 --> O_yc
+
+            class I_d1,I_initi,I_d2,O_nd2,O_yc ioNode
+            class Constant_0 constNode
+            class Squeeze_1,Squeeze_2,Range_3,Range_4,Unsqueeze_5,Unsqueeze_6,Sub_7,Greater_8 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Squeeze', ['d2'], ['nd2']),
-                    oh.make_node('ShiftedCausalMask', ['d1', 'd2', 'initi'], ['yc'],
-                                 domain='intermediate'),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('d1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('initi', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('d2', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('nd2', onnx.TensorProto.INT64, ()),
-                    oh.make_tensor_value_info('yc', onnx.TensorProto.BOOL, (1, 1, 'b-a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_d1(["d1 INT64(1)"])
+            I_initi(["initi INT64(1)"])
+            I_d2(["d2 INT64(1)"])
+
+            Squeeze_0[["Squeeze(.)"]]
+            ShiftedCausalMask_1[["intermediate.ShiftedCausalMask(., ., .)"]]
+
+            I_d2 -->|"INT64(1)"| Squeeze_0
+            I_d1 -->|"INT64(1)"| ShiftedCausalMask_1
+            I_d2 -->|"INT64(1)"| ShiftedCausalMask_1
+            I_initi -->|"INT64(1)"| ShiftedCausalMask_1
+
+            O_nd2(["nd2 INT64()"])
+            Squeeze_0 --> O_nd2
+            O_yc(["yc BOOL(1, 1, b-a, b)"])
+            ShiftedCausalMask_1 --> O_yc
+
+            class I_d1,I_initi,I_d2,O_nd2,O_yc ioNode
+            class Squeeze_0,ShiftedCausalMask_1 opNode
     """
 
     _operator_names = ["CausalMask", "ShiftedCausalMask"]
@@ -1452,85 +1410,70 @@ class FunctionCausalMaskMulAddPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['zero'],
-                                 value=onh.from_array(np.array(0, dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['one'],
-                                 value=onh.from_array(np.array(1, dtype=np.int64), name='value')),
-                    oh.make_node('Constant', [], ['a012'],
-                                 value=onh.from_array(np.array([0, 1, 2], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['a123'],
-                                 value=onh.from_array(np.array([1, 2, 3], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Squeeze', ['d1'], ['nd1']),
-                    oh.make_node('Squeeze', ['d2'], ['nd2']),
-                    oh.make_node('Range', ['zero', 'nd1', 'one'], ['rg1']),
-                    oh.make_node('Range', ['zero', 'nd2', 'one'], ['rg2']),
-                    oh.make_node('Unsqueeze', ['rg1', 'a012'], ['m1']),
-                    oh.make_node('Unsqueeze', ['rg2', 'a123'], ['m2']),
-                    oh.make_node('Mul', ['m2', 'N'], ['yc']),
-                    oh.make_node('Add', ['m1', 'yc'], ['yyc']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('d1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('N', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('d2', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('yyc', onnx.TensorProto.INT64, ('c', 1, 1, 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_d1(["d1 INT64(1)"])
+            I_N(["N INT64(1)"])
+            I_d2(["d2 INT64(1)"])
 
+            Squeeze_0[["Squeeze(.)"]]
+            Squeeze_1[["Squeeze(.)"]]
+            Range_2[["Range(0, ., 1)"]]
+            Range_3[["Range(0, ., 1)"]]
+            Unsqueeze_4[["Unsqueeze(., [0, 1, 2])"]]
+            Unsqueeze_5[["Unsqueeze(., [1, 2, 3])"]]
+            Mul_6[["Mul(., .)"]]
+            Add_7[["Add(., .)"]]
+
+            I_d1 -->|"INT64(1)"| Squeeze_0
+            I_d2 -->|"INT64(1)"| Squeeze_1
+            Squeeze_0 -->|"INT64()"| Range_2
+            Squeeze_1 -->|"INT64()"| Range_3
+            Range_2 -->|"INT64(NEWDIM_range_0)"| Unsqueeze_4
+            Range_3 -->|"INT64(NEWDIM_range_1)"| Unsqueeze_5
+            Unsqueeze_5 -->|"INT64(NEWDIM_range_1, 1, 1, 1)"| Mul_6
+            I_N -->|"INT64(1)"| Mul_6
+            Unsqueeze_4 -->|"INT64(1, 1, 1, NEWDIM_range_0)"| Add_7
+            Mul_6 -->|"INT64(NEWDIM_range_1, 1, 1, 1)"| Add_7
+
+            O_yyc(["yyc INT64(c, 1, 1, b)"])
+            Add_7 --> O_yyc
+
+            class I_d1,I_N,I_d2,O_yyc ioNode
+            class Squeeze_0,Squeeze_1,Range_2,Range_3,Unsqueeze_4,Unsqueeze_5,Mul_6,Add_7 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('CausalMaskMulAdd', ['d1', 'd2', 'N'], ['yyc'],
-                                 domain='intermediate'),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('d1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('N', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('d2', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('yyc', onnx.TensorProto.INT64, ('c', 1, 1, 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_d1(["d1 INT64(1)"])
+            I_N(["N INT64(1)"])
+            I_d2(["d2 INT64(1)"])
+
+            CausalMaskMulAdd_0[["intermediate.CausalMaskMulAdd(., ., .)"]]
+
+            I_d1 -->|"INT64(1)"| CausalMaskMulAdd_0
+            I_d2 -->|"INT64(1)"| CausalMaskMulAdd_0
+            I_N -->|"INT64(1)"| CausalMaskMulAdd_0
+
+            O_yyc(["yyc INT64(c, 1, 1, b)"])
+            CausalMaskMulAdd_0 --> O_yyc
+
+            class I_d1,I_N,I_d2,O_yyc ioNode
+            class CausalMaskMulAdd_0 opNode
     """
 
     _operator_name = "CausalMaskMulAdd"
@@ -1690,95 +1633,76 @@ class FunctionCosSinCachePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Squeeze', ['dim1'], ['dim1::Sq2']),
-                    oh.make_node('Squeeze', ['dim2'], ['dim2::Sq2']),
-                    oh.make_node('Range', ['dim1::Sq2', 'dim2::Sq2', 'init7_s_12'],
-                                 ['_onx_range_dim1::Sq2']),
-                    oh.make_node('Unsqueeze', ['_onx_range_dim1::Sq2', 'init7_s2_0_12'],
-                                 ['_onx_range_dim1::Sq::UnSq0x12']),
-                    oh.make_node('Cast', ['_onx_range_dim1::Sq::UnSq0x12'],
-                                 ['_onx_range_dim1::Sq::UnSq0x1::C12'], to=1),
-                    oh.make_node('Reshape',
-                                 ['_onx_range_dim1::Sq::UnSq0x1::C12', 'init7_s3_0_-1_12'],
-                                 ['_onx_range_dim1::Sq::UnSq0x1::C1::RSh0x-1x12']),
-                    oh.make_node('Mul',
-                                 ['weights', '_onx_range_dim1::Sq::UnSq0x1::C1::RSh0x-1x12'],
-                                 ['_onx_mul_weights2']),
-                    oh.make_node('Cos', ['_onx_mul_weights2'], ['_onx_cos_mul_weights']),
-                    oh.make_node('Sin', ['_onx_mul_weights2'], ['_onx_sin_mul_weights']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('weights', onnx.TensorProto.FLOAT, (1, 1, 'a')),
-                    oh.make_tensor_value_info('dim1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('dim2', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('_onx_sin_mul_weights', onnx.TensorProto.FLOAT,
-                                              (1, 'dim2-dim1', 'a')),
-                    oh.make_tensor_value_info('_onx_cos_mul_weights', onnx.TensorProto.FLOAT,
-                                              (1, 'dim2-dim1', 'a')),
-                ],
-                [
-                    onh.from_array(np.array(1, dtype=np.int64), name='init7_s_12'),
-                    onh.from_array(np.array([0, 1], dtype=np.int64), name='init7_s2_0_12'),
-                    onh.from_array(np.array([0, -1, 1], dtype=np.int64), name='init7_s3_0_-1_12'),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_weights(["weights FLOAT(1, 1, a)"])
+            I_dim1(["dim1 INT64(1)"])
+            I_dim2(["dim2 INT64(1)"])
 
+            Squeeze_0[["Squeeze(.)"]]
+            Squeeze_1[["Squeeze(.)"]]
+            Range_2[["Range(., ., 1)"]]
+            Unsqueeze_3[["Unsqueeze(., [0, 1])"]]
+            Cast_4[["Cast(., to=FLOAT)"]]
+            Reshape_5[["Reshape(., [0, -1, 1])"]]
+            Mul_6[["Mul(., .)"]]
+            Cos_7[["Cos(.)"]]
+            Sin_8[["Sin(.)"]]
+
+            I_dim1 -->|"INT64(1)"| Squeeze_0
+            I_dim2 -->|"INT64(1)"| Squeeze_1
+            Squeeze_0 -->|"INT64()"| Range_2
+            Squeeze_1 -->|"INT64()"| Range_2
+            Range_2 -->|"INT64(NEWDIM_range_0)"| Unsqueeze_3
+            Unsqueeze_3 -->|"INT64(1, 1, NEWDIM_range_0)"| Cast_4
+            Cast_4 -->|"FLOAT(1, 1, NEWDIM_range_0)"| Reshape_5
+            I_weights -->|"FLOAT(1, 1, a)"| Mul_6
+            Reshape_5 -->|"FLOAT(1, NEWDIM_range_0, 1)"| Mul_6
+            Mul_6 -->|"FLOAT(1, NEWDIM_range_0, a)"| Cos_7
+            Mul_6 -->|"FLOAT(1, NEWDIM_range_0, a)"| Sin_8
+
+            O__onx_sin_mul_weights(["_onx_sin_mul_weights FLOAT(1, dim2-dim1, a)"])
+            Sin_8 --> O__onx_sin_mul_weights
+            O__onx_cos_mul_weights(["_onx_cos_mul_weights FLOAT(1, dim2-dim1, a)"])
+            Cos_7 --> O__onx_cos_mul_weights
+
+            class I_weights,I_dim1,I_dim2,O__onx_sin_mul_weights,O__onx_cos_mul_weights ioNode
+            class Squeeze_0,Squeeze_1,Range_2,Unsqueeze_3,Cast_4,Reshape_5,Mul_6,Cos_7,Sin_8 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('CosSinCacheWithRange', ['dim1', 'dim2', 'weights'],
-                                 ['_onx_cos_mul_weights', '_onx_sin_mul_weights'],
-                                 domain='intermediate'),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('weights', onnx.TensorProto.FLOAT, (1, 1, 'a')),
-                    oh.make_tensor_value_info('dim1', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('dim2', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('_onx_sin_mul_weights', onnx.TensorProto.FLOAT,
-                                              (1, 'dim2-dim1', 'a')),
-                    oh.make_tensor_value_info('_onx_cos_mul_weights', onnx.TensorProto.FLOAT,
-                                              (1, 'dim2-dim1', 'a')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('intermediate', 1)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_weights(["weights FLOAT(1, 1, a)"])
+            I_dim1(["dim1 INT64(1)"])
+            I_dim2(["dim2 INT64(1)"])
+
+            CosSinCacheWithRange_0[["intermediate.CosSinCacheWithRange(., ., .)"]]
+
+            I_dim1 -->|"INT64(1)"| CosSinCacheWithRange_0
+            I_dim2 -->|"INT64(1)"| CosSinCacheWithRange_0
+            I_weights -->|"FLOAT(1, 1, a)"| CosSinCacheWithRange_0
+
+            O__onx_sin_mul_weights(["_onx_sin_mul_weights FLOAT(1, dim2-dim1, a)"])
+            CosSinCacheWithRange_0 --> O__onx_sin_mul_weights
+            O__onx_cos_mul_weights(["_onx_cos_mul_weights FLOAT(1, dim2-dim1, a)"])
+            CosSinCacheWithRange_0 --> O__onx_cos_mul_weights
+
+            class I_weights,I_dim1,I_dim2,O__onx_sin_mul_weights,O__onx_cos_mul_weights ioNode
+            class CosSinCacheWithRange_0 opNode
     """
 
     _operator_name = "CosSinCache"

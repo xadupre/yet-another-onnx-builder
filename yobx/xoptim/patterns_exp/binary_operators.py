@@ -60,79 +60,58 @@ class AddAddMulMulPattern(PatternOptimization, _common):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Add', ['X', 'Y'], ['xy']),
-                    oh.make_node('Add', ['xy', 'Z'], ['F']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-                [
-                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('com.microsoft', 1),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Z(["Z FLOAT(d)"])
+            I_Y(["Y FLOAT(d)"])
+            I_X(["X FLOAT(d)"])
 
+            Add_0[["Add(., .)"]]
+            Add_1[["Add(., .)"]]
+
+            I_X -->|"FLOAT(d)"| Add_0
+            I_Y -->|"FLOAT(d)"| Add_0
+            Add_0 -->|"FLOAT(d)"| Add_1
+            I_Z -->|"FLOAT(d)"| Add_1
+
+            O_F(["F FLOAT(d)"])
+            Add_1 --> O_F
+
+            class I_Z,I_Y,I_X,O_F ioNode
+            class Add_0,Add_1 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'AddAdd',
-                        ['X', 'Y', 'Z'],
-                        ['F'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-                [
-                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('com.microsoft', 1),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Z(["Z FLOAT(d)"])
+            I_Y(["Y FLOAT(d)"])
+            I_X(["X FLOAT(d)"])
+
+            AddAdd_0[["onnx_extended.ortops.optim.cuda.AddAdd(., ., .)"]]
+
+            I_X -->|"FLOAT(d)"| AddAdd_0
+            I_Y -->|"FLOAT(d)"| AddAdd_0
+            I_Z -->|"FLOAT(d)"| AddAdd_0
+
+            O_F(["F FLOAT(d)"])
+            AddAdd_0 --> O_F
+
+            class I_Z,I_Y,I_X,O_F ioNode
+            class AddAdd_0 opNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 3, broadcast: bool = False):
@@ -225,79 +204,58 @@ class AddMulPattern(PatternOptimization, _common):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Add', ['X', 'Y'], ['xy']),
-                    oh.make_node('Mul', ['xy', 'Z'], ['F']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-                [
-                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('com.microsoft', 1),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Z(["Z FLOAT(d)"])
+            I_Y(["Y FLOAT(d)"])
+            I_X(["X FLOAT(d)"])
 
+            Add_0[["Add(., .)"]]
+            Mul_1[["Mul(., .)"]]
+
+            I_X -->|"FLOAT(d)"| Add_0
+            I_Y -->|"FLOAT(d)"| Add_0
+            Add_0 -->|"FLOAT(d)"| Mul_1
+            I_Z -->|"FLOAT(d)"| Mul_1
+
+            O_F(["F FLOAT(d)"])
+            Mul_1 --> O_F
+
+            class I_Z,I_Y,I_X,O_F ioNode
+            class Add_0,Mul_1 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'AddMul',
-                        ['X', 'Y', 'Z'],
-                        ['F'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-                [
-                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('com.microsoft', 1),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Z(["Z FLOAT(d)"])
+            I_Y(["Y FLOAT(d)"])
+            I_X(["X FLOAT(d)"])
+
+            AddMul_0[["onnx_extended.ortops.optim.cuda.AddMul(., ., .)"]]
+
+            I_X -->|"FLOAT(d)"| AddMul_0
+            I_Y -->|"FLOAT(d)"| AddMul_0
+            I_Z -->|"FLOAT(d)"| AddMul_0
+
+            O_F(["F FLOAT(d)"])
+            AddMul_0 --> O_F
+
+            class I_Z,I_Y,I_X,O_F ioNode
+            class AddMul_0 opNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 3, broadcast: bool = False):
@@ -391,89 +349,51 @@ class MulSigmoidPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Sigmoid', ['X'], ['xs']),
-                    oh.make_node('Mul', ['X', 'xs'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
 
+            Sigmoid_0[["Sigmoid(.)"]]
+            Mul_1[["Mul(., .)"]]
+
+            I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| Sigmoid_0
+            I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| Mul_1
+            Sigmoid_0 -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| Mul_1
+
+            O_Y(["Y FLOAT(UNKNOWNDIM2, UNKNOWNDIM3)"])
+            Mul_1 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Sigmoid_0,Mul_1 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'MulSigmoid',
-                        ['X'],
-                        ['Y'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
+
+            MulSigmoid_0[["onnx_extended.ortops.optim.cuda.MulSigmoid(.)"]]
+
+            I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| MulSigmoid_0
+
+            O_Y(["Y FLOAT(UNKNOWNDIM2, UNKNOWNDIM3)"])
+            MulSigmoid_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class MulSigmoid_0 opNode
     """
 
     def match(
@@ -522,94 +442,48 @@ class NegXplus1Pattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['one'],
-                        value=onh.from_array(np.array([1.0], dtype=np.float32), name='value'),
-                    ),
-                    oh.make_node('Sub', ['one', 'X'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
 
+            Sub_0[["Sub([1.0], .)"]]
+
+            I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| Sub_0
+
+            O_Y(["Y FLOAT(UNKNOWNDIM2, UNKNOWNDIM3)"])
+            Sub_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Sub_0 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'NegXplus1',
-                        ['X'],
-                        ['Y'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
+
+            NegXplus1_0[["onnx_extended.ortops.optim.cuda.NegXplus1(.)"]]
+
+            I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| NegXplus1_0
+
+            O_Y(["Y FLOAT(UNKNOWNDIM2, UNKNOWNDIM3)"])
+            NegXplus1_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class NegXplus1_0 opNode
     """
 
     def match(
@@ -655,79 +529,58 @@ class SubMulPattern(PatternOptimization, _common):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Sub', ['X', 'Y'], ['xy']),
-                    oh.make_node('Mul', ['xy', 'Z'], ['F']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-                [
-                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('com.microsoft', 1),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Z(["Z FLOAT(d)"])
+            I_Y(["Y FLOAT(d)"])
+            I_X(["X FLOAT(d)"])
 
+            Sub_0[["Sub(., .)"]]
+            Mul_1[["Mul(., .)"]]
+
+            I_X -->|"FLOAT(d)"| Sub_0
+            I_Y -->|"FLOAT(d)"| Sub_0
+            Sub_0 -->|"FLOAT(d)"| Mul_1
+            I_Z -->|"FLOAT(d)"| Mul_1
+
+            O_F(["F FLOAT(d)"])
+            Mul_1 --> O_F
+
+            class I_Z,I_Y,I_X,O_F ioNode
+            class Sub_0,Mul_1 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'SubMul',
-                        ['X', 'Y', 'Z'],
-                        ['F'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-                [
-                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('com.microsoft', 1),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Z(["Z FLOAT(d)"])
+            I_Y(["Y FLOAT(d)"])
+            I_X(["X FLOAT(d)"])
+
+            SubMul_0[["onnx_extended.ortops.optim.cuda.SubMul(., ., .)"]]
+
+            I_X -->|"FLOAT(d)"| SubMul_0
+            I_Y -->|"FLOAT(d)"| SubMul_0
+            I_Z -->|"FLOAT(d)"| SubMul_0
+
+            O_F(["F FLOAT(d)"])
+            SubMul_0 --> O_F
+
+            class I_Z,I_Y,I_X,O_F ioNode
+            class SubMul_0 opNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 3, broadcast: bool = False):
@@ -829,81 +682,62 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Add', ['X', 'Y'], ['F1']),
-                    oh.make_node('Add', ['X', 'Z'], ['F2']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-                [
-                    oh.make_tensor_value_info('F1', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('F2', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('com.microsoft', 1),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Z(["Z FLOAT(d)"])
+            I_Y(["Y FLOAT(d)"])
+            I_X(["X FLOAT(d)"])
 
+            Add_0[["Add(., .)"]]
+            Add_1[["Add(., .)"]]
+
+            I_X -->|"FLOAT(d)"| Add_0
+            I_Y -->|"FLOAT(d)"| Add_0
+            I_X -->|"FLOAT(d)"| Add_1
+            I_Z -->|"FLOAT(d)"| Add_1
+
+            O_F1(["F1 FLOAT(d)"])
+            Add_0 --> O_F1
+            O_F2(["F2 FLOAT(d)"])
+            Add_1 --> O_F2
+
+            class I_Z,I_Y,I_X,O_F1,O_F2 ioNode
+            class Add_0,Add_1 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'AddSharedInput',
-                        ['X', 'Y', 'Z'],
-                        ['F1', 'F2'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-                [
-                    oh.make_tensor_value_info('F1', onnx.TensorProto.FLOAT, shape=('d',)),
-                    oh.make_tensor_value_info('F2', onnx.TensorProto.FLOAT, shape=('d',)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('com.microsoft', 1),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Z(["Z FLOAT(d)"])
+            I_Y(["Y FLOAT(d)"])
+            I_X(["X FLOAT(d)"])
+
+            AddSharedInput_0[["onnx_extended.ortops.optim.cuda.AddSharedInput(., ., .)"]]
+
+            I_X -->|"FLOAT(d)"| AddSharedInput_0
+            I_Y -->|"FLOAT(d)"| AddSharedInput_0
+            I_Z -->|"FLOAT(d)"| AddSharedInput_0
+
+            O_F1(["F1 FLOAT(d)"])
+            AddSharedInput_0 --> O_F1
+            O_F2(["F2 FLOAT(d)"])
+            AddSharedInput_0 --> O_F2
+
+            class I_Z,I_Y,I_X,O_F1,O_F2 ioNode
+            class AddSharedInput_0 opNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 3, broadcast: bool = False):
@@ -1019,115 +853,58 @@ class AddMulTransposePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'AddMul',
-                        ['X', 'Y', 'Z'],
-                        ['F1'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                    ),
-                    oh.make_node('Transpose', ['F1'], ['final'], perm=[0, 2, 1, 3]),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'Z',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'b', 'c', 'd'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'b', 'c', 'd'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'b', 'c', 'd'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'final',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'b', 'c', 'd'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Z(["Z FLOAT(a, b, c, d)"])
+            I_Y(["Y FLOAT(a, b, c, d)"])
+            I_X(["X FLOAT(a, b, c, d)"])
 
+            AddMul_0[["onnx_extended.ortops.optim.cuda.AddMul(., ., .)"]]
+            Transpose_1[["Transpose(., perm=[0, 2, 1, 3])"]]
+
+            I_X -->|"FLOAT(a, b, c, d)"| AddMul_0
+            I_Y -->|"FLOAT(a, b, c, d)"| AddMul_0
+            I_Z -->|"FLOAT(a, b, c, d)"| AddMul_0
+            AddMul_0 -->|"FLOAT(a, b, c, d)"| Transpose_1
+
+            O_final(["final FLOAT(a, b, c, d)"])
+            Transpose_1 --> O_final
+
+            class I_Z,I_Y,I_X,O_final ioNode
+            class AddMul_0,Transpose_1 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'AddMul',
-                        ['X', 'Y', 'Z'],
-                        ['final'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                        transposeMiddle=1,
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'Z',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'b', 'c', 'd'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'b', 'c', 'd'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'b', 'c', 'd'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'final',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'b', 'c', 'd'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Z(["Z FLOAT(a, b, c, d)"])
+            I_Y(["Y FLOAT(a, b, c, d)"])
+            I_X(["X FLOAT(a, b, c, d)"])
+
+            AddMul_0[["onnx_extended.ortops.optim.cuda.AddMul(., ., .)"]]
+
+            I_X -->|"FLOAT(a, b, c, d)"| AddMul_0
+            I_Y -->|"FLOAT(a, b, c, d)"| AddMul_0
+            I_Z -->|"FLOAT(a, b, c, d)"| AddMul_0
+
+            O_final(["final FLOAT(a, b, c, d)"])
+            AddMul_0 --> O_final
+
+            class I_Z,I_Y,I_X,O_final ioNode
+            class AddMul_0 opNode
     """
 
     def match(

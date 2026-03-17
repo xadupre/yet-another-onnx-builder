@@ -10,74 +10,61 @@ class ClipClipPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['zero'],
-                                 value=onh.from_array(np.array([0.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['one'],
-                                 value=onh.from_array(np.array([1.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Clip', ['X', 'zero'], ['x1']),
-                    oh.make_node('Clip', ['x1', '', 'one'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('zero', onnx.TensorProto.FLOAT, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('one', onnx.TensorProto.FLOAT, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('c', 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_zero(["zero FLOAT(1)"])
+            I_X(["X FLOAT(a, b)"])
+            I_one(["one FLOAT(1)"])
 
+            Constant_0[["Constant() -#gt; zero"]]
+            Constant_1[["Constant() -#gt; one"]]
+            Clip_2[["Clip(., .)"]]
+            Clip_3[["Clip(., , .)"]]
+
+            I_X -->|"FLOAT(a, b)"| Clip_2
+            Constant_0 -->|"FLOAT(1)"| Clip_2
+            Clip_2 -->|"FLOAT(a, b)"| Clip_3
+            Constant_1 -->|"FLOAT(1)"| Clip_3
+
+            O_Y(["Y FLOAT(c, d)"])
+            Clip_3 --> O_Y
+
+            class I_zero,I_X,I_one,O_Y ioNode
+            class Constant_0,Constant_1 constNode
+            class Clip_2,Clip_3 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Clip', ['X', 'zero', 'one'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('zero', onnx.TensorProto.FLOAT, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('one', onnx.TensorProto.FLOAT, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('c', 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_zero(["zero FLOAT(1)"])
+            I_X(["X FLOAT(a, b)"])
+            I_one(["one FLOAT(1)"])
+
+            Clip_0[["Clip(., ., .)"]]
+
+            I_X -->|"FLOAT(a, b)"| Clip_0
+            I_zero -->|"FLOAT(1)"| Clip_0
+            I_one -->|"FLOAT(1)"| Clip_0
+
+            O_Y(["Y FLOAT(c, d)"])
+            Clip_0 --> O_Y
+
+            class I_zero,I_X,I_one,O_Y ioNode
+            class Clip_0 opNode
     """
 
     def match(

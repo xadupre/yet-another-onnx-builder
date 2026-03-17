@@ -10,84 +10,58 @@ class FusedConvPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Conv',
-                        ['X', 'W', 'B'],
-                        ['c'],
-                        dilations=[1, 1],
-                        group=1,
-                        pads=[1, 1, 1, 1],
-                        strides=[1, 1],
-                    ),
-                    oh.make_node('Relu', ['c'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('W', onnx.TensorProto.FLOAT, shape=(8, 8, 3, 3)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=(1, 8, 6, 6)),
-                    oh.make_tensor_value_info('B', onnx.TensorProto.FLOAT, shape=(8,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=(1, 8, 6, 6)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_W(["W FLOAT(8, 8, 3, 3)"])
+            I_X(["X FLOAT(1, 8, 6, 6)"])
+            I_B(["B FLOAT(8)"])
 
+            Conv_0[["Conv(., ., .)"]]
+            Relu_1[["Relu(.)"]]
+
+            I_X -->|"FLOAT(1, 8, 6, 6)"| Conv_0
+            I_W -->|"FLOAT(8, 8, 3, 3)"| Conv_0
+            I_B -->|"FLOAT(8)"| Conv_0
+            Conv_0 -->|"FLOAT(1, 8, 6, 6)"| Relu_1
+
+            O_Y(["Y FLOAT(1, 8, 6, 6)"])
+            Relu_1 --> O_Y
+
+            class I_W,I_X,I_B,O_Y ioNode
+            class Conv_0,Relu_1 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'FusedConv',
-                        ['X', 'W', 'B'],
-                        ['Y'],
-                        domain='com.microsoft',
-                        activation='Relu',
-                        dilations=[1, 1],
-                        group=1,
-                        pads=[1, 1, 1, 1],
-                        strides=[1, 1],
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('W', onnx.TensorProto.FLOAT, shape=(8, 8, 3, 3)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=(1, 8, 6, 6)),
-                    oh.make_tensor_value_info('B', onnx.TensorProto.FLOAT, shape=(8,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=(1, 8, 6, 6)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('com.microsoft', 1)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_W(["W FLOAT(8, 8, 3, 3)"])
+            I_X(["X FLOAT(1, 8, 6, 6)"])
+            I_B(["B FLOAT(8)"])
+
+            FusedConv_0[["com.microsoft.FusedConv(., ., .)"]]
+
+            I_X -->|"FLOAT(1, 8, 6, 6)"| FusedConv_0
+            I_W -->|"FLOAT(8, 8, 3, 3)"| FusedConv_0
+            I_B -->|"FLOAT(8)"| FusedConv_0
+
+            O_Y(["Y FLOAT(1, 8, 6, 6)"])
+            FusedConv_0 --> O_Y
+
+            class I_W,I_X,I_B,O_Y ioNode
+            class FusedConv_0 opNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 2):

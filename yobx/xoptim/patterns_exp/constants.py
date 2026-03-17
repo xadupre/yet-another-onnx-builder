@@ -13,133 +13,61 @@ class TriMatrixPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['zero'],
-                        value=onh.from_array(np.array(0, dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['dim'],
-                        value=onh.from_array(np.array(1024, dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['onei'],
-                        value=onh.from_array(np.array(1, dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['one'],
-                        value=onh.from_array(np.array([1], dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['shape1'],
-                        value=onh.from_array(np.array([1024, 1], dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['zerof'],
-                        value=onh.from_array(np.array([0.0], dtype=np.float32), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['shape'],
-                        value=onh.from_array(
-                            np.array([1024, 1024], dtype=np.int64),
-                            name='value',
-                        ),
-                    ),
-                    oh.make_node('Range', ['zero', 'dim', 'onei'], ['ar']),
-                    oh.make_node('Add', ['ar', 'one'], ['ad']),
-                    oh.make_node('Reshape', ['ad', 'shape1'], ['re']),
-                    oh.make_node('Less', ['ar', 're'], ['le']),
-                    oh.make_node('Where', ['le', 'zerof', 'cst'], ['Y']),
-                    oh.make_node(
-                        'ConstantOfShape', ['shape'], ['cst'],
-                        value=onh.from_array(
-                            np.array([-3.4028234663852886e+38], dtype=np.float32),
-                            name='value',
-                        ),
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('shape', onnx.TensorProto.INT64, shape=(2,)),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_shape(["shape INT64(2)"])
 
+            Constant_0[["Constant() -#gt; shape"]]
+            Range_1[["Range(0, 1024, 1)"]]
+            Add_2[["Add(., [1])"]]
+            Reshape_3[["Reshape(., [1024, 1])"]]
+            Less_4[["Less(., .)"]]
+            Where_5[["Where(., [0.0], .)"]]
+            ConstantOfShape_6[["ConstantOfShape(.)"]]
+
+            Range_1 -->|"INT64(NEWDIM_range_0)"| Add_2
+            Add_2 -->|"INT64(NEWDIM_range_0)"| Reshape_3
+            Range_1 -->|"INT64(NEWDIM_range_0)"| Less_4
+            Reshape_3 -->|"INT64(1024, 1)"| Less_4
+            Less_4 -->|"BOOL(1024, NEWDIM_range_0)"| Where_5
+            ConstantOfShape_6 -->|"FLOAT(1024, 1024)"| Where_5
+            Constant_0 -->|"INT64(2)"| ConstantOfShape_6
+
+            O_Y(["Y FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
+            Where_5 --> O_Y
+
+            class I_shape,O_Y ioNode
+            class Constant_0 constNode
+            class Range_1,Add_2,Reshape_3,Less_4,Where_5,ConstantOfShape_6 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['TriMatrixPattern--'],
-                        value=onh.from_array(
-                            np.array([0.0, 0.0, -3.4028234663852886e+38], dtype=np.float32),
-                            name='value',
-                        ),
-                    ),
-                    oh.make_node(
-                        'TriMatrix',
-                        ['shape', 'TriMatrixPattern--'],
-                        ['Y'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('shape', onnx.TensorProto.INT64, shape=(2,)),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_shape(["shape INT64(2)"])
+
+            TriMatrix_0[["onnx_extended.ortops.optim.cuda.TriMatrix(., [0.0, 0.0, -3.4028235e+38])"]]
+
+            I_shape -->|"INT64(2)"| TriMatrix_0
+
+            O_Y(["Y FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
+            TriMatrix_0 --> O_Y
+
+            class I_shape,O_Y ioNode
+            class TriMatrix_0 opNode
     """
 
     def match(

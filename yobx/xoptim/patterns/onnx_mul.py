@@ -13,79 +13,58 @@ class MulMulMulScalarPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['cst1'],
-                                 value=onh.from_array(np.array([2.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['cst2'],
-                                 value=onh.from_array(np.array([3.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Mul', ['xc', 'yc'], ['Z']),
-                    oh.make_node('Div', ['X', 'cst1'], ['xc']),
-                    oh.make_node('Div', ['Y', 'cst2'], ['yc']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Y(["Y FLOAT(a, b)"])
+            I_X(["X FLOAT(a, b)"])
 
+            Mul_0[["Mul(., .)"]]
+            Div_1[["Div(., [2.0])"]]
+            Div_2[["Div(., [3.0])"]]
+
+            Div_1 --> Mul_0
+            Div_2 --> Mul_0
+            I_X -->|"FLOAT(a, b)"| Div_1
+            I_Y -->|"FLOAT(a, b)"| Div_2
+
+            O_Z(["Z FLOAT(a, b)"])
+            Mul_0 --> O_Z
+
+            class I_Y,I_X,O_Z ioNode
+            class Mul_0,Div_1,Div_2 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init1_s1_'],
-                                 value=onh.from_array(np.array([6.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Mul', ['X', 'Y'], ['MulMulMulScalarPattern--Z']),
-                    oh.make_node('Div', ['MulMulMulScalarPattern--Z', 'init1_s1_'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Y(["Y FLOAT(a, b)"])
+            I_X(["X FLOAT(a, b)"])
+
+            Mul_0[["Mul(., .)"]]
+            Div_1[["Div(., [6.0])"]]
+
+            I_X -->|"FLOAT(a, b)"| Mul_0
+            I_Y -->|"FLOAT(a, b)"| Mul_0
+            Mul_0 -->|"FLOAT(a, b)"| Div_1
+
+            O_Z(["Z FLOAT(a, b)"])
+            Div_1 --> O_Z
+
+            class I_Y,I_X,O_Z ioNode
+            class Mul_0,Div_1 opNode
     """
 
     def match(
@@ -177,67 +156,60 @@ class SwitchOrderBinaryPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Add', ['Z', 'xy'], ['F']),
-                    oh.make_node('Add', ['X', 'Y'], ['xy']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 3, 4)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 1, 3, 4)),
-                ],
-                [
-                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Y(["Y FLOAT(a, 1, 3, 4)"])
+            I_X(["X FLOAT(a, 2, 3, 4)"])
+            I_Z(["Z FLOAT(a, 1, 3, 4)"])
 
+            Add_0[["Add(., .)"]]
+            Add_1[["Add(., .)"]]
+
+            I_Z -->|"FLOAT(a, 1, 3, 4)"| Add_0
+            Add_1 -->|"FLOAT(a, 2, 3, 4)"| Add_0
+            I_X -->|"FLOAT(a, 2, 3, 4)"| Add_1
+            I_Y -->|"FLOAT(a, 1, 3, 4)"| Add_1
+
+            O_F(["F FLOAT(a, 2, 3, 4)"])
+            Add_0 --> O_F
+
+            class I_Y,I_X,I_Z,O_F ioNode
+            class Add_0,Add_1 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Add', ['Y', 'Z'], ['add-Y']),
-                    oh.make_node('Add', ['add-Y', 'X'], ['F']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 1, 3, 4)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT, ('a', 1, 3, 4)),
-                ],
-                [
-                    oh.make_tensor_value_info('F', onnx.TensorProto.FLOAT, ('a', 2, 3, 4)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Y(["Y FLOAT(a, 1, 3, 4)"])
+            I_X(["X FLOAT(a, 2, 3, 4)"])
+            I_Z(["Z FLOAT(a, 1, 3, 4)"])
+
+            Add_0[["Add(., .)"]]
+            Add_1[["Add(., .)"]]
+
+            I_Y -->|"FLOAT(a, 1, 3, 4)"| Add_0
+            I_Z -->|"FLOAT(a, 1, 3, 4)"| Add_0
+            Add_0 -->|"FLOAT(a, 1, 3, 4)"| Add_1
+            I_X -->|"FLOAT(a, 2, 3, 4)"| Add_1
+
+            O_F(["F FLOAT(a, 2, 3, 4)"])
+            Add_1 --> O_F
+
+            class I_Y,I_X,I_Z,O_F ioNode
+            class Add_0,Add_1 opNode
     """
 
     class BroadcastType(IntEnum):

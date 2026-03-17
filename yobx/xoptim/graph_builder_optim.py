@@ -1032,30 +1032,24 @@ class GraphBuilderPatternOptimization:
         with open(f"{fullname_apply}.py", "w") as f:
             f.write(code2)
 
-        rst = (
-            textwrap.dedent("""
+        from ..helpers.dot_helper import to_mermaid
+
+        def _mermaid_block(mermaid_str: str) -> str:
+            lines = [".. mermaid::", ""]
+            for line in mermaid_str.splitlines():
+                lines.append(f"    {line}" if line.strip() else "")
+            return "\n".join(lines)
+
+        rst = textwrap.dedent("""
             Model with nodes to be fused:
 
-            .. gdot::
-                :script: DOT-SECTION
-                :process:
-
-                from yobx.doc import to_dot
-            __CODE1__
-                print("DOT-SECTION", to_dot(model))
+            __MERMAID1__
 
             Outcome of the fusion:
 
-            .. gdot::
-                :script: DOT-SECTION
-                :process:
-
-                from yobx.doc import to_dot
-            __CODE2__
-                print("DOT-SECTION", to_dot(model))
-            """)
-            .replace("__CODE1__", textwrap.indent(code1, "    "))
-            .replace("__CODE2__", textwrap.indent(code2, "    "))
+            __MERMAID2__
+            """).replace("__MERMAID1__", _mermaid_block(to_mermaid(model))).replace(
+            "__MERMAID2__", _mermaid_block(to_mermaid(model_apply))
         )
 
         with open(f"{fullname}.rst", "w") as f:

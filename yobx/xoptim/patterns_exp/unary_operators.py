@@ -11,73 +11,50 @@ class TransposeCastPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Transpose', ['X'], ['xt'], perm=[1, 0]),
-                    oh.make_node('Cast', ['xt'], ['Y'], to=10),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('a', 'b')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, shape=('b', 'a')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, b)"])
 
+            Transpose_0[["Transpose(., perm=[1, 0])"]]
+            Cast_1[["Cast(., to=FLOAT16)"]]
+
+            I_X -->|"FLOAT(a, b)"| Transpose_0
+            Transpose_0 -->|"FLOAT(b, a)"| Cast_1
+
+            O_Y(["Y FLOAT16(b, a)"])
+            Cast_1 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Transpose_0,Cast_1 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Transpose2DCastFP16',
-                        ['X'],
-                        ['Y'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('a', 'b')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, shape=('b', 'a')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, b)"])
+
+            Transpose2DCastFP16_0[["onnx_extended.ortops.optim.cuda.Transpose2DCastFP16(.)"]]
+
+            I_X -->|"FLOAT(a, b)"| Transpose2DCastFP16_0
+
+            O_Y(["Y FLOAT16(b, a)"])
+            Transpose2DCastFP16_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Transpose2DCastFP16_0 opNode
     """
 
     _allowed_types = (TensorProto.FLOAT, TensorProto.FLOAT16)

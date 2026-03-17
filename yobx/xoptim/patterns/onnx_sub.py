@@ -11,68 +11,54 @@ class Sub1MulPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init1_s1_'],
-                                 value=onh.from_array(np.array([1.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Mul', ['input3', '_onx_sub0'], ['_onx_mul0']),
-                    oh.make_node('Sub', ['init1_s1_', 'input3'], ['_onx_sub0']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('input3', onnx.TensorProto.FLOAT, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('_onx_mul0', onnx.TensorProto.FLOAT, (1,)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_input3(["input3 FLOAT(1)"])
 
+            Mul_0[["Mul(., .)"]]
+            Sub_1[["Sub([1.0], .)"]]
+
+            I_input3 -->|"FLOAT(1)"| Mul_0
+            Sub_1 -->|"FLOAT(1)"| Mul_0
+            I_input3 -->|"FLOAT(1)"| Sub_1
+
+            O__onx_mul0(["_onx_mul0 FLOAT(1)"])
+            Mul_0 --> O__onx_mul0
+
+            class I_input3,O__onx_mul0 ioNode
+            class Mul_0,Sub_1 opNode
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Mul', ['input3', 'input3'], ['Sub1MulPattern--_onx_mul0']),
-                    oh.make_node('Sub', ['input3', 'Sub1MulPattern--_onx_mul0'], ['_onx_mul0']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('input3', onnx.TensorProto.FLOAT, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('_onx_mul0', onnx.TensorProto.FLOAT, (1,)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_input3(["input3 FLOAT(1)"])
+
+            Mul_0[["Mul(., .)"]]
+            Sub_1[["Sub(., .)"]]
+
+            I_input3 -->|"FLOAT(1)"| Mul_0
+            I_input3 -->|"FLOAT(1)"| Sub_1
+            Mul_0 -->|"FLOAT(1)"| Sub_1
+
+            O__onx_mul0(["_onx_mul0 FLOAT(1)"])
+            Sub_1 --> O__onx_mul0
+
+            class I_input3,O__onx_mul0 ioNode
+            class Mul_0,Sub_1 opNode
     """
 
     def match(
