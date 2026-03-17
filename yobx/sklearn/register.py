@@ -1,21 +1,48 @@
-from typing import Dict, Callable, Tuple, Union
+from typing import Dict, Callable, Optional, Tuple, Union
 
 SKLEARN_CONVERTERS: Dict[type, Callable] = {}
+VERSION_CONVERTERS: Dict[type, Dict[str, str]] = {}
 
 
-def register_sklearn_converter(cls: Union[type, Tuple[type, ...]]):
+def register_sklearn_converter(
+    cls: Union[type, Tuple[type, ...]],
+    sklearn_version: Optional[str] = None,
+    other_versions: Optional[Dict[str, str]] = None,
+) -> Callable:
+    """
+    Registers a converter for a specific class following :epkg:`scikit-learn` API.
+    If *version* is defined, the converter is register only if the version of
+    `scikit-learn` is equal or more recent to this one.
+
+    :param cls: class to register
+    :param sklearn_version: first version of scikit-learn it can work
+    :param other_versions: same for any particular package the class comes from,
+        example: ``{'xgboost': '3.4'}``
+    :return: Callable
+    """
+    assert not other_versions, f"{other_versions=} and this is not implemented yet for {cls=}"
+    enabled = True
+    if sklearn_version:
+        global VERSION_CONVERTERS
+        from sklearn import __version__
+        from ..pv_version import PvVersion
+
+        enabled = PvVersion(__version__) >= PvVersion(sklearn_version)
+        VERSION_CONVERTERS[cls] = {"sklearn": sklearn_version}
+
     def decorator(fct: Callable):
         """Registers a function to converts a model."""
-        global SKLEARN_CONVERTERS
-        if isinstance(cls, tuple):
-            for c in cls:
-                if c in SKLEARN_CONVERTERS:
-                    raise TypeError(f"A converter is already registered for {c}.")
-                SKLEARN_CONVERTERS[c] = fct
-        else:
-            if cls in SKLEARN_CONVERTERS:
-                raise TypeError(f"A converter is already registered for {cls}.")
-            SKLEARN_CONVERTERS[cls] = fct
+        if enabled:
+            global SKLEARN_CONVERTERS
+            if isinstance(cls, tuple):
+                for c in cls:
+                    if c in SKLEARN_CONVERTERS:
+                        raise TypeError(f"A converter is already registered for {c}.")
+                    SKLEARN_CONVERTERS[c] = fct
+            else:
+                if cls in SKLEARN_CONVERTERS:
+                    raise TypeError(f"A converter is already registered for {cls}.")
+                SKLEARN_CONVERTERS[cls] = fct
         return fct
 
     return decorator
@@ -146,16 +173,19 @@ def get_sklearn_estimator_coverage(
         rows = []
 
         for _name, cls in sorted(all_pairs.items(), key=lambda x: x[0]):
-            rows.append(
-                {
-                    "category": cls.__module__.split(".")[-2].strip("_"),
-                    "name": cls.__name__,
-                    "predictable": any(hasattr(cls, m) for m in methods),
-                    "cls": cls,
-                    "module": _public_module(cls),
-                    "yobx": SKLEARN_CONVERTERS.get(cls, None),
-                }
-            )
+            obs = {
+                "category": cls.__module__.split(".")[-2].strip("_"),
+                "name": cls.__name__,
+                "predictable": any(hasattr(cls, m) for m in methods),
+                "cls": cls,
+                "module": _public_module(cls),
+                "yobx": SKLEARN_CONVERTERS.get(cls, None),
+            }
+            if cls in VERSION_CONVERTERS:
+                since = VERSION_CONVERTERS[cls]
+                if "sklearn" in since:
+                    obs["scikit-learn"] = f"{since['sklearn']}+"
+            rows.append(obs)
         return rows
 
     rows = get_sklearn_estimator_coverage(libraries=libraries, rst=False)
@@ -171,6 +201,7 @@ def get_sklearn_estimator_coverage(
         "      - predictable",
         "      - yobx",
         "      - converter",
+        "      - since",
     ]
 
     n_possible = 0
@@ -186,6 +217,7 @@ def get_sklearn_estimator_coverage(
             cvt = ""
         predictable = "✓" if row["predictable"] else ""
         clss = f":class:`{row['name']} <{row['module']}.{row['name']}>`"
+        since = row.get("scikit-learn", "")
         rst_rows.extend(
             [
                 f"    * - {cat}",
@@ -193,6 +225,7 @@ def get_sklearn_estimator_coverage(
                 f"      - {predictable}",
                 f"      - {yobx_mark}",
                 f"      - {cvt}",
+                f"      - {since}",
             ]
         )
         if yobx_mark:

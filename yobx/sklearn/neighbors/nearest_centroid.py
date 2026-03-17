@@ -66,7 +66,7 @@ def _compute_discriminant_scores(
     return g.op.Add(neg_sq, log_prior, name=f"{name}_scores")
 
 
-@register_sklearn_converter(NearestCentroid)
+@register_sklearn_converter(NearestCentroid, "1.8")
 def sklearn_nearest_centroid(
     g: GraphBuilderExtendedProtocol,
     sts: Dict,
@@ -77,6 +77,8 @@ def sklearn_nearest_centroid(
 ) -> Union[str, Tuple[str, str]]:
     """
     Converts a :class:`sklearn.neighbors.NearestCentroid` into ONNX.
+    The converter is registered only is ``scikit-learn>=1.8``.
+    It is not tested before that version.
 
     Reproduces both :meth:`~sklearn.neighbors.NearestCentroid.predict` and
     :meth:`~sklearn.neighbors.NearestCentroid.predict_proba`.
