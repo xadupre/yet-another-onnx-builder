@@ -5,6 +5,7 @@ yobx.xshape
     :maxdepth: 1
     :caption: modules
 
+    expressions/index
     expressions_torch
     evaluate_expressions
     rename_expressions
