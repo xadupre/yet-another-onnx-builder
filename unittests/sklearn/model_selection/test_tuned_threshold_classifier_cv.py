@@ -19,9 +19,7 @@ from yobx.sklearn import to_onnx
 @requires_sklearn("1.5")
 class TestSklearnTunedThresholdClassifierCV(ExtTestCase):
 
-    _X, _y = make_classification(
-        n_samples=200, n_features=4, random_state=0
-    )
+    _X, _y = make_classification(n_samples=200, n_features=4, random_state=0)
     _X = _X.astype(np.float32)
 
     def _check_classifier(self, clf, X, dtypes=(np.float32, np.float64), atol=1e-5):
@@ -63,17 +61,6 @@ class TestSklearnTunedThresholdClassifierCV(ExtTestCase):
 
     def test_in_pipeline(self):
         """TunedThresholdClassifierCV used inside a Pipeline."""
-        pipe = Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                (
-                    "clf",
-                    TunedThresholdClassifierCV(
-                        LogisticRegression(solver="lbfgs"), cv="prefit", refit=False
-                    ),
-                ),
-            ]
-        )
         # Fit the inner estimator first (needed for cv='prefit').
         base_pipe = Pipeline(
             [("scaler", StandardScaler()), ("clf", LogisticRegression(solver="lbfgs"))]

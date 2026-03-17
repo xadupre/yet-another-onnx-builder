@@ -194,6 +194,7 @@ module = [
     "yobx.sklearn.linear_model.*",
     "yobx.sklearn.lightgbm.*",
     "yobx.sklearn.manifold.*",
+    "yobx.sklearn.model_selection.*",
     "yobx.sklearn.multiclass.*",
     "yobx.sklearn.multioutput.*",
     "yobx.sklearn.naive_bayes.*",

@@ -109,10 +109,7 @@ def sklearn_tuned_threshold_classifier_cv(
 
     # Extract the positive-class probability column → shape (N,).
     y_score = g.op.Gather(
-        probas,
-        np.array(pos_label_idx, dtype=np.int64),
-        axis=1,
-        name=f"{name}_gather_pos",
+        probas, np.array(pos_label_idx, dtype=np.int64), axis=1, name=f"{name}_gather_pos"
     )  # (N,)
 
     # Compare against the tuned threshold → bool (N,).
@@ -136,11 +133,7 @@ def sklearn_tuned_threshold_classifier_cv(
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
-            classes_arr,
-            label_classes_idx,
-            axis=0,
-            name=f"{name}_label_str",
-            outputs=outputs[:1],
+            classes_arr, label_classes_idx, axis=0, name=f"{name}_label_str", outputs=outputs[:1]
         )
         if not sts:
             g.set_type(label, onnx.TensorProto.STRING)
