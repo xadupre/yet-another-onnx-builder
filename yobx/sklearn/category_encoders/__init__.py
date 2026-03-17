@@ -2,7 +2,13 @@ from typing import List, Tuple
 
 
 def register():
-    from . import one_hot_encoder, polynomial_encoder, quantile_encoder, woe_encoder
+    try:
+        import category_encoders  # noqa: F401
+
+        from . import one_hot_encoder, polynomial_encoder, quantile_encoder, woe_encoder
+    except ImportError:
+        # No category_encoders installed.
+        pass
 
 
 def all_estimators() -> List[Tuple[str, type]]:
