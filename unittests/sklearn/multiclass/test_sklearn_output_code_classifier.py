@@ -49,7 +49,6 @@ class TestSklearnOutputCodeClassifier(ExtTestCase):
         self.assertEqualArray(expected_label, ort_results[0])
 
     def test_multiclass_decision_tree_float32(self):
-        """OutputCodeClassifier wrapping multi-class DecisionTreeClassifier (3 classes, float32)."""
         clf = OutputCodeClassifier(
             DecisionTreeClassifier(max_depth=3, random_state=0), code_size=2, random_state=0
         )
