@@ -2,8 +2,10 @@ import unittest
 import onnx
 import onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
-from yobx.translate.mermaid_helper import to_mermaid
 from yobx.translate import to_mermaid as to_mermaid_from_package
+from yobx.translate import translate
+from yobx.translate.mermaid_helper import MermaidEmitter, to_mermaid
+from yobx.translate.translator import Translator
 
 
 class TestMermaidHelper(ExtTestCase):
@@ -178,6 +180,44 @@ class TestMermaidHelper(ExtTestCase):
         )
         mermaid = to_mermaid_from_package(model)
         self.assertIn("flowchart TD", mermaid)
+
+    def test_mermaid_emitter_directly(self):
+        # MermaidEmitter can be used directly with Translator
+        TFLOAT = onnx.TensorProto.FLOAT
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Relu", ["X"], ["Y"])],
+                "relu_graph",
+                [oh.make_tensor_value_info("X", TFLOAT, [3])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [3])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        emitter = MermaidEmitter()
+        tr = Translator(model, emitter=emitter)
+        mermaid = tr.export(as_str=True)
+        self.assertIn("flowchart TD", mermaid)
+        self.assertIn("Relu_", mermaid)
+        self.assertIn(":::input", mermaid)
+        self.assertIn(":::output", mermaid)
+
+    def test_translate_api_mermaid(self):
+        # translate(..., api="mermaid") should work
+        TFLOAT = onnx.TensorProto.FLOAT
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Relu", ["X"], ["Y"])],
+                "relu_graph",
+                [oh.make_tensor_value_info("X", TFLOAT, [3])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [3])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        mermaid = translate(model, api="mermaid")
+        self.assertIn("flowchart TD", mermaid)
+        self.assertIn("Relu_", mermaid)
 
 
 if __name__ == "__main__":

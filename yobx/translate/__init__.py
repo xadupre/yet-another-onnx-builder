@@ -4,7 +4,7 @@ from .translator import Translator
 from .inner_emitter import InnerEmitter, InnerEmitterCompact, InnerEmitterShortInitializer
 from .builder_emitter import BuilderEmitter
 from .light_emitter import LightEmitter
-from .mermaid_helper import to_mermaid
+from .mermaid_helper import MermaidEmitter, to_mermaid
 
 
 def translate_header(api: str = "onnx"):
@@ -61,7 +61,9 @@ def translate(proto: ModelProto, single_line: bool = False, api: str = "onnx") -
         (handled by
         :class:`~yobx.translate.inner_emitter.InnerEmitterCompact`),
         ``"light"`` generates code for the light API,
-        ``"builder"`` generates code for the GraphBuilder
+        ``"builder"`` generates code for the GraphBuilder,
+        ``"mermaid"`` generates a Mermaid flowchart string
+        (handled by :class:`~yobx.translate.mermaid_helper.MermaidEmitter`)
     :return: code as a string
     """
     if api == "onnx":
@@ -78,5 +80,8 @@ def translate(proto: ModelProto, single_line: bool = False, api: str = "onnx") -
         return tr.export(single_line=single_line, as_str=True)
     if api == "builder":
         tr = Translator(proto, emitter=BuilderEmitter())
+        return tr.export(as_str=True)
+    if api == "mermaid":
+        tr = Translator(proto, emitter=MermaidEmitter())
         return tr.export(as_str=True)
     raise ValueError(f"Unexpected value {api!r} for api.")
