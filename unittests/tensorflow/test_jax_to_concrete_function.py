@@ -103,9 +103,7 @@ class TestJaxToConcreteFunction(ExtTestCase):
 
         x = np.random.rand(3, 4).astype(np.float32)
         y = np.random.rand(3, 4).astype(np.float32)
-        cf = jax_to_concrete_function(
-            jax_fn, (x, y), dynamic_shapes=({0: "batch"}, {0: "batch"})
-        )
+        cf = jax_to_concrete_function(jax_fn, (x, y), dynamic_shapes=({0: "batch"}, {0: "batch"}))
         self.assertIsInstance(cf, tf.types.experimental.ConcreteFunction)
 
         result = cf(x, y).numpy()
@@ -134,7 +132,6 @@ class TestJaxToConcreteFunction(ExtTestCase):
         to pre-convert the model.
         """
         import jax.numpy as jnp
-        import tensorflow as tf
         from yobx.tensorflow import to_onnx
 
         def jax_fn(x):
@@ -174,6 +171,6 @@ class TestJaxToConcreteFunction(ExtTestCase):
         with self.assertRaises(ValueError):
             jax_to_concrete_function(jax_fn, (x,), input_names=["a", "b"])
 
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-

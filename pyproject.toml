@@ -71,6 +71,7 @@ spox = [
     "spox>=0.12",
 ]
 tensorflow = [
+    "jax",
     "tensorflow>=2.20",
 ]
 jax = [

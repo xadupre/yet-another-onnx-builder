@@ -90,9 +90,7 @@ def jax_to_concrete_function(
         input_names = ["X"] if len(args) == 1 else [f"X{i}" for i in range(len(args))]
 
     if len(input_names) != len(args):
-        raise ValueError(
-            f"Length mismatch: {len(args)} args but {len(input_names)} input_names"
-        )
+        raise ValueError(f"Length mismatch: {len(args)} args but {len(input_names)} input_names")
 
     specs = []
     polymorphic_shapes = []
@@ -119,8 +117,7 @@ def jax_to_concrete_function(
             polymorphic_shapes.append(None)
         else:
             dims = [
-                str(dyn_axes[ax]) if ax in dyn_axes else str(arr.shape[ax])
-                for ax in range(n)
+                str(dyn_axes[ax]) if ax in dyn_axes else str(arr.shape[ax]) for ax in range(n)
             ]
             polymorphic_shapes.append("(" + ", ".join(dims) + ")")
 
