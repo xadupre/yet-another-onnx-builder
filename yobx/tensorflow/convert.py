@@ -101,35 +101,11 @@ def to_onnx(
         # JAX functions fail here because they cannot accept TF symbolic tensors
         # (the tracer raises a TypeError about "abstract array").  When that
         # happens and JAX is installed, fall back to jax_to_concrete_function.
-        try:
-            fn = tf.function(model)
-            cf = fn.get_concrete_function(*input_specs)
-        except TypeError as e:
-            _is_jax_error = "abstract array" in str(e) and (
-                "tensorflow.python.framework.ops.SymbolicTensor" in str(e)
-                or "jax" in str(e).lower()
-            )
-            if _is_jax_error:
-                try:
-                    from .tensorflow_helper import jax_to_concrete_function
-                except ImportError as ie:
-                    raise ImportError(
-                        "JAX function detected (TF tracing raised: "
-                        f"{e!s}), but 'jax' or 'jax.experimental.jax2tf' "
-                        "could not be imported.  Install JAX with: "
-                        "pip install jax[cpu]"
-                    ) from ie
-                if verbose:
-                    print(
-                        "[yobx.tensorflow.to_onnx] JAX function detected; "
-                        "converting via jax_to_concrete_function"
-                    )
-                cf = jax_to_concrete_function(
-                    model, args, input_names=input_names, dynamic_shapes=dynamic_shapes
-                )
-                input_specs = list(cf.structured_input_signature[0])
-            else:
-                raise
+        from .tensorflow_helper import jax_to_concrete_function
+
+        cf = jax_to_concrete_function(
+            model, args, input_names=input_names, dynamic_shapes=dynamic_shapes
+        )
 
     # Populate an ONNX GraphBuilder by walking the concrete-function graph.
     kwargs = (

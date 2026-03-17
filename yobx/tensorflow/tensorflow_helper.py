@@ -131,9 +131,7 @@ def jax_to_concrete_function(
             polymorphic_shapes.append(f"({', '.join(dims)})")
 
     tf_fn = jax2tf.convert(
-        jax_fn,
-        polymorphic_shapes=polymorphic_shapes,
-        native_serialization=native_serialization,
+        jax_fn, polymorphic_shapes=polymorphic_shapes, native_serialization=native_serialization
     )
     cf = tf.function(tf_fn, autograph=False).get_concrete_function(*specs)
     return cf
