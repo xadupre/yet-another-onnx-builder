@@ -113,9 +113,7 @@ def sklearn_balanced_bagging_classifier(
     )  # (N, C)
 
     label_idx_raw = g.op.ArgMax(avg_proba, axis=1, keepdims=0, name=f"{name}_argmax")
-    label_idx = g.op.Cast(
-        label_idx_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast_idx"
-    )
+    label_idx = g.op.Cast(label_idx_raw, to=onnx.TensorProto.INT64, name=f"{name}_cast_idx")
 
     # Build the label output by gathering from classes_.
     if np.issubdtype(classes.dtype, np.integer):
