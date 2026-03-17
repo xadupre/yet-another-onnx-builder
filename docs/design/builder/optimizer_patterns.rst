@@ -70,31 +70,4 @@ Pattern Optimization Environment Variables
 When the ONNX graph is optimized with the pattern optimizer, additional
 environment variables can help trace which patterns are applied and
 narrow down optimization problems
-(see :ref:`l-design-pattern-optimizer-debugging` for the full documentation):
-
-.. list-table::
-   :header-rows: 1
-   :widths: 30 70
-
-   * - Environment variable
-     - Effect
-   * - ``LOG_PATTERN_OPTIMIZE=10``
-     - Sets the verbosity level for all patterns.  ``10`` gives the most
-       detailed output.
-   * - ``PATTERN=<ClassName>``
-     - Increases the verbosity to ``10`` for one or more specific patterns
-       (comma-separated). Useful to focus on a single pattern.
-   * - ``<ClassName>=10``
-     - Sets the verbosity for a single pattern whose class name matches the
-       variable name (e.g. ``ReshapeReshapePattern=10``).
-   * - ``DROPPATTERN=<ClassName>``
-     - Comma-separated list of pattern class names to exclude from the
-       optimizer. Useful to bisect which pattern is causing a wrong result.
-   * - ``DUMPPATTERNS=<folder>``
-     - When set to a folder path, the optimizer writes every matched subgraph
-       and its replacement to that folder.
-   * - ``PATTERNNOREMOVE=<name>``
-     - Raises an exception if an optimization step removes the named result
-       from the graph.
-   * - ``PATTERNSTEP=1``
-     - Runs one optimization step at a time.
+(see :ref:`l-design-pattern-optimizer-debugging` for the full documentation).
