@@ -45,6 +45,7 @@ def evaluation(
         "export-strict-oblivious",
         "export-nostrict-oblivious",
         "export-nostrict-decall-oblivious",
+        "export-tracing",
     ),
     dynamic: Tuple[bool] = (False, True),
     cases: Optional[Union[str, Dict[str, type]]] = None,
@@ -316,12 +317,12 @@ def _make_exporter_onnx(
     verbose: int = 0,
     quiet: bool = True,
 ) -> Union[Dict, Tuple[onnx.ModelProto, Any]]:
-    if exporter.startswith("custom"):
+    if exporter.startswith(("custom", "yobx", "tracing")):
         from yobx.torch import to_onnx, ExportOptions
 
         opts = {}
         opts["strict"] = "-strict" in exporter
-        opts["tracing"] = "-tracing" in exporter
+        opts["tracing"] = "-tracing" in exporter or exporter == "tracing"
         opts["jit"] = "-jit" in exporter
         if "-dec" in exporter:
             opts["decomposition_table"] = "all" if "-decall" in exporter else "default"
