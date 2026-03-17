@@ -10,7 +10,14 @@ The culprit is almost always a **dtype mismatch**: the model was trained with
 ``float64`` (the NumPy default), but the ONNX graph was exported with
 ``float32`` inputs and weights.
 
-This example uses :class:`sklearn.cross_decomposition.PLSRegression` to
+With ``scikit-learn>=1.8`` and the initiative to follow
+`array API <https://data-apis.org/array-api/latest/>`_,
+the computation type is more consistent and less discrepancies
+are observed between the original `scikit-learn` model
+and its converted ONNX version.
+
+Nevertheless, this shows an example based on
+:class:`sklearn.cross_decomposition.PLSRegression` to
 illustrate the problem step by step and shows how to fix it.
 
 Why does float32 cause discrepancies?
@@ -57,7 +64,7 @@ from yobx.sklearn import to_onnx
 # ``make_regression`` returns ``float64`` arrays by default, which is also
 # what scikit-learn uses internally for all computations.
 
-X, y = make_regression(n_samples=200, n_features=10, n_informative=5, random_state=0)
+X, y = make_regression(n_samples=200, n_features=10, n_informative=3, random_state=0)
 # X and y are float64 here
 print("X dtype :", X.dtype)  # float64
 print("y dtype :", y.dtype)  # float64
