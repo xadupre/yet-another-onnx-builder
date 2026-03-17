@@ -125,6 +125,44 @@ class TestJaxToConcreteFunction(ExtTestCase):
         spec = cf.structured_input_signature[0][0]
         self.assertEqual(spec.name, "my_input")
 
+    def test_to_onnx_auto_detects_jax_function(self):
+        """to_onnx() automatically calls jax_to_concrete_function for JAX callables.
+
+        When a plain JAX function is passed as ``model``, ``to_onnx()`` should
+        detect the JAX-specific TypeError and fall back to
+        ``jax_to_concrete_function`` automatically, without requiring the caller
+        to pre-convert the model.
+        """
+        import jax.numpy as jnp
+        import tensorflow as tf
+        from yobx.tensorflow import to_onnx
+
+        def jax_fn(x):
+            return jnp.sin(x)
+
+        x = np.random.rand(4, 3).astype(np.float32)
+
+        # Pass the raw JAX function – to_onnx() should auto-detect it.
+        # The tracing itself must succeed (produce a ConcreteFunction).
+        # Downstream ONNX conversion may raise RuntimeError for XlaCallModule
+        # (not yet supported), but must NOT raise TypeError.
+        try:
+            onx = to_onnx(jax_fn, (x,), dynamic_shapes=({0: "batch"},))
+            inp = onx.graph.input[0]
+            # A dynamic dimension must have dim_param set (symbolic name like "batch"),
+            # not a fixed dim_value; verify the batch axis is not frozen to 4.
+            batch_dim = inp.type.tensor_type.shape.dim[0]
+            self.assertTrue(
+                batch_dim.dim_param != "" or batch_dim.dim_value != 4,
+                f"Expected dynamic batch dim; got dim_value={batch_dim.dim_value}, "
+                f"dim_param={batch_dim.dim_param!r}",
+            )
+        except RuntimeError as e:
+            # XlaCallModule converter not yet registered – expected gap.
+            self.assertIn("XlaCallModule", str(e), str(e))
+        except TypeError as e:
+            self.fail(f"to_onnx raised TypeError instead of auto-detecting JAX: {e}")
+
     def test_input_names_length_mismatch_raises(self):
         """Mismatched input_names length raises ValueError."""
         import jax.numpy as jnp
