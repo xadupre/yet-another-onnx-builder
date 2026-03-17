@@ -10,100 +10,52 @@ class ReplaceZeroPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['cst'],
-                        value=onh.from_array(
-                            np.array([5.670000076293945], dtype=np.float32),
-                            name='value',
-                        ),
-                    ),
-                    oh.make_node('Cast', ['X'], ['xb'], to=9),
-                    oh.make_node('Where', ['xb', 'cst', 'X'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
+
+            Cast_0[["Cast(., to=BOOL)"]]
+            Where_1[["Where(., [5.67], .)"]]
+
+            I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| Cast_0
+            Cast_0 -->|"BOOL(UNKNOWNDIM, UNKNOWNDIM1)"| Where_1
+            I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| Where_1
+
+            O_Y(["Y FLOAT(UNKNOWNDIM2, UNKNOWNDIM3)"])
+            Where_1 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Cast_0,Where_1 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'ReplaceZero',
-                        ['X'],
-                        ['Y'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                        by=5.670000076293945,
-                        equal=0,
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
+
+            ReplaceZero_0[["onnx_extended.ortops.optim.cuda.ReplaceZero(.)"]]
+
+            I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| ReplaceZero_0
+
+            O_Y(["Y FLOAT(UNKNOWNDIM2, UNKNOWNDIM3)"])
+            ReplaceZero_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class ReplaceZero_0 opNode
     """
 
     def match(

@@ -22,8 +22,8 @@ from yobx.helpers.onnx_helper import _default_OPSET_TO_IR_VERSION
 from yobx.reference import ExtendedReferenceEvaluator
 
 
-@requires_onnxscript()
 @requires_sklearn("1.4")
+@requires_onnxscript()
 class TestOnnxScriptBridgeWithSklearnConverter(ExtTestCase):
     def _make_builder(self, opset: int = 18):
         from yobx.builder.onnxscript import OnnxScriptGraphBuilder

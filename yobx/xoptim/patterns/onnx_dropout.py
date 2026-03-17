@@ -10,72 +10,49 @@ class DropoutPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init10_s_3'],
-                                 value=onh.from_array(np.array(0.0, dtype=np.float16),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['init9_s_'],
-                                 value=onh.from_array(np.array(False, dtype=np.bool_),
-                                 name='value')),
-                    oh.make_node('Dropout', ['_onx_add02', 'init10_s_3', 'init9_s_'],
-                                 ['dropout', '']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('_onx_add02', onnx.TensorProto.FLOAT16,
-                                              (4, 512, 128)),
-                ],
-                [
-                    oh.make_tensor_value_info('dropout', onnx.TensorProto.FLOAT16, (4, 512, 128)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I__onx_add02(["_onx_add02 FLOAT16(4, 512, 128)"])
+
+            Dropout_0[["Dropout(., 0.0, False)"]]
+
+            I__onx_add02 -->|"FLOAT16(4, 512, 128)"| Dropout_0
+
+            O_dropout(["dropout FLOAT16(4, 512, 128)"])
+            Dropout_0 --> O_dropout
+
+            class I__onx_add02,O_dropout ioNode
+            class Dropout_0 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Identity', ['_onx_add02'], ['dropout']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('_onx_add02', onnx.TensorProto.FLOAT16,
-                                              (4, 512, 128)),
-                ],
-                [
-                    oh.make_tensor_value_info('dropout', onnx.TensorProto.FLOAT16, (4, 512, 128)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I__onx_add02(["_onx_add02 FLOAT16(4, 512, 128)"])
+
+            Identity_0[["Identity(.)"]]
+
+            I__onx_add02 -->|"FLOAT16(4, 512, 128)"| Identity_0
+
+            O_dropout(["dropout FLOAT16(4, 512, 128)"])
+            Identity_0 --> O_dropout
+
+            class I__onx_add02,O_dropout ioNode
+            class Identity_0 opNode
     """
 
     def match(

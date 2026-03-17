@@ -11,99 +11,60 @@ class SimpleRotaryPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['splits'],
-                        value=onh.from_array(np.array([4, 4], dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node('Split', ['X', 'splits'], ['s1', 's2'], axis=-1),
-                    oh.make_node('Neg', ['s2'], ['ns2']),
-                    oh.make_node('Concat', ['ns2', 's1'], ['Y'], axis=-1),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('splits', onnx.TensorProto.INT64, shape=(2,)),
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_splits(["splits INT64(2)"])
+            I_X(["X FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
+
+            Constant_0[["Constant() -#gt; splits"]]
+            Split_1[["Split(., ., axis=-1)"]]
+            Neg_2[["Neg(.)"]]
+            Concat_3[["Concat(., ., axis=-1)"]]
+
+            I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| Split_1
+            Constant_0 -->|"INT64(2)"| Split_1
+            Split_1 -->|"FLOAT(UNKNOWNDIM, 4)"| Neg_2
+            Neg_2 -->|"FLOAT(UNKNOWNDIM, 4)"| Concat_3
+            Split_1 -->|"FLOAT(UNKNOWNDIM, 4)"| Concat_3
+
+            O_Y(["Y FLOAT(UNKNOWNDIM2, UNKNOWNDIM3)"])
+            Concat_3 --> O_Y
+
+            class I_splits,I_X,O_Y ioNode
+            class Constant_0 constNode
+            class Split_1,Neg_2,Concat_3 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Rotary',
-                        ['X', 'splits'],
-                        ['Y'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                        side='right',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('splits', onnx.TensorProto.INT64, shape=(2,)),
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM', 'UNKNOWNDIM1'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM2', 'UNKNOWNDIM3'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_splits(["splits INT64(2)"])
+            I_X(["X FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
+
+            Rotary_0[["onnx_extended.ortops.optim.cuda.Rotary(., .)"]]
+
+            I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| Rotary_0
+            I_splits -->|"INT64(2)"| Rotary_0
+
+            O_Y(["Y FLOAT(UNKNOWNDIM2, UNKNOWNDIM3)"])
+            Rotary_0 --> O_Y
+
+            class I_splits,I_X,O_Y ioNode
+            class Rotary_0 opNode
     """
 
     def match(

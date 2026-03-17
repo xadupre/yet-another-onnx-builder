@@ -15,7 +15,7 @@ from yobx.ext_test_case import (
 )
 from yobx.xbuilder import OptimizationOptions
 from yobx.torch import ExportOptions
-from yobx.torch.interpreter import to_onnx, Dispatcher
+from yobx.torch.interpreter import to_onnx, Dispatcher, check_model_weights
 from yobx.helpers.onnx_helper import pretty_onnx
 
 
@@ -232,11 +232,11 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_cuda()
-    @requires_torch("2.12")
+    @requires_torch("2.13")
     def test_simple_export_pool_bfloat16(self):
         import torch
         from onnxruntime import InferenceSession
-        from yobx.torch_bench.export_model_helper import WrapInferenceSessionForTorch
+        from yobx.reference._inference_session_torch import InferenceSessionForTorch
 
         class Neuron(torch.nn.Module):
             def __init__(self):
@@ -253,7 +253,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
         results = []
         for name in names:
             sess = InferenceSession(name, providers=["CUDAExecutionProvider"])
-            ref = WrapInferenceSessionForTorch(sess)
+            ref = InferenceSessionForTorch(sess)
             results.append(ref.run(None, {"input": input_tensor})[0])
 
         def move_to(obj):
@@ -578,6 +578,113 @@ class TestOnnxExportCornerCase(ExtTestCase):
             explicit_options,
             "Explicit options should not be replaced by the auto-detected ort options",
         )
+
+    @requires_torch()
+    @ignore_warnings((UserWarning, DeprecationWarning))
+    def test_check_model_weights_match(self):
+        """check_model_weights returns 'match' for a simple linear model."""
+        import torch
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear = torch.nn.Linear(4, 3, bias=True)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        model = Model()
+        x = torch.randn(2, 4)
+        onx = to_onnx(model, (x,), optimize=False)
+        results = check_model_weights(model, onx)
+        by_name = {name: (status, orig_shape) for name, status, orig_shape in results}
+        self.assertIn("linear.weight", by_name)
+        self.assertIn("linear.bias", by_name)
+        # Without optimization the shapes should be identical.
+        self.assertEqual(by_name["linear.weight"][0], "match")
+        self.assertEqual(by_name["linear.bias"][0], "match")
+        # Results must also be stored in the model metadata_props.
+        meta = {p.key: p.value for p in onx.metadata_props}
+        self.assertNotIn("check_model_weights", meta)
+        for init in onx.graph.initializer:
+            meta = {p.key: p.value for p in init.metadata_props}
+            self.assertIn("status", meta)
+
+    @requires_torch()
+    @ignore_warnings((UserWarning, DeprecationWarning))
+    def test_check_model_weights_transposed(self):
+        """check_model_weights detects a transposed initializer."""
+        import onnx.helper as oh
+        from onnx import TensorProto
+        import torch
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear = torch.nn.Linear(4, 3, bias=False)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        model = Model()
+        x = torch.randn(2, 4)
+        onx = to_onnx(model, (x,), optimize=False)
+
+        # Manually transpose the initializer to simulate a folded Transpose node.
+        weight = dict(model.named_parameters())["linear.weight"].detach().numpy()
+        transposed = weight.T  # shape (4, 3) instead of (3, 4)
+        new_inits = []
+        for init in onx.graph.initializer:
+            if init.name == "linear.weight":
+                t = oh.make_tensor(
+                    "linear.weight",
+                    TensorProto.FLOAT,
+                    list(transposed.shape),
+                    transposed.flatten().tolist(),
+                )
+                new_inits.append(t)
+            else:
+                new_inits.append(init)
+        del onx.graph.initializer[:]
+        onx.graph.initializer.extend(new_inits)
+
+        results = check_model_weights(model, onx)
+        by_name = {name: status for name, status, _ in results}
+        self.assertEqual(by_name["linear.weight"], "transposed")
+
+    @requires_torch()
+    @ignore_warnings((UserWarning, DeprecationWarning))
+    def test_check_model_weights_unknown(self):
+        """check_model_weights flags an initializer whose name is not in the model."""
+        import numpy as np
+        import onnx.helper as oh
+        from onnx import TensorProto
+        import torch
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear = torch.nn.Linear(4, 3, bias=False)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        model = Model()
+        x = torch.randn(2, 4)
+        onx = to_onnx(model, (x,), optimize=False)
+
+        # Rename the initializer to something not in the model.
+        extra = oh.make_tensor(
+            "some_unknown_weight",
+            TensorProto.FLOAT,
+            [2, 2],
+            np.zeros((2, 2), dtype=np.float32).flatten().tolist(),
+        )
+        onx.graph.initializer.append(extra)
+
+        results = check_model_weights(model, onx)
+        by_name = {name: status for name, status, _ in results}
+        self.assertNotIn("some_unknown_weight", by_name)
 
 
 if __name__ == "__main__":

@@ -10,68 +10,45 @@ class ConstantToInitializerPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['cst'],
-                                 value=onh.from_array(np.array([1.0, 2.0], dtype=np.float32),
-                                 name='value')),
-                ],
-                'pattern',
-                [
-                ],
-                [
-                    oh.make_tensor_value_info('cst', onnx.TensorProto.FLOAT, (2,)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+
+            Constant_0[["Constant() -#gt; cst"]]
+
+
+            O_cst(["cst FLOAT(2)"])
+            Constant_0 --> O_cst
+
+            class O_cst ioNode
+            class Constant_0 constNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['cst_cst2init'],
-                                 value=onh.from_array(np.array([1.0, 2.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Identity', ['cst_cst2init'], ['cst']),
-                ],
-                'pattern',
-                [
-                ],
-                [
-                    oh.make_tensor_value_info('cst', onnx.TensorProto.FLOAT, (2,)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+
+            Identity_0[["Identity([1.0, 2.0])"]]
+
+
+            O_cst(["cst FLOAT(2)"])
+            Identity_0 --> O_cst
+
+            class O_cst ioNode
+            class Identity_0 opNode
     """
 
     def match(

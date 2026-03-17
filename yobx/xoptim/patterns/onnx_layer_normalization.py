@@ -13,137 +13,68 @@ class LayerNormalizationPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init7_s1_-1'],
-                                 value=onh.from_array(np.array([-1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['init10_s1_'],
-                                 value=onh.from_array(np.array([2.0], dtype=np.float16),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['init10_s1_2'],
-                                 value=onh.from_array(np.array([0.0], dtype=np.float16),
-                                 name='value')),
-                    oh.make_node('ReduceMean', ['add_1', 'init7_s1_-1'], ['_onx_reducemean0'],
-                                 keepdims=1),
-                    oh.make_node('Sub', ['add_1', '_onx_reducemean0'], ['_onx_sub0']),
-                    oh.make_node('Pow', ['_onx_sub0', 'init10_s1_'], ['_onx_pow0']),
-                    oh.make_node('ReduceMean', ['_onx_pow0', 'init7_s1_-1'],
-                                 ['_onx_reducemean02'], keepdims=1),
-                    oh.make_node('Add', ['_onx_reducemean02', 'init10_s1_2'], ['_onx_add0']),
-                    oh.make_node('Sqrt', ['_onx_add0'], ['_onx_sqrt0']),
-                    oh.make_node('Div', ['_onx_sub0', '_onx_sqrt0'], ['_onx_div0']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('add_1', onnx.TensorProto.FLOAT16, (4, 512, 128)),
-                ],
-                [
-                    oh.make_tensor_value_info('_onx_div0', onnx.TensorProto.FLOAT16,
-                                              (4, 512, 128)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_add_1(["add_1 FLOAT16(4, 512, 128)"])
+
+            ReduceMean_0[["ReduceMean(., [-1])"]]
+            Sub_1[["Sub(., .)"]]
+            Pow_2[["Pow(., [2.0])"]]
+            ReduceMean_3[["ReduceMean(., [-1])"]]
+            Add_4[["Add(., [0.0])"]]
+            Sqrt_5[["Sqrt(.)"]]
+            Div_6[["Div(., .)"]]
+
+            I_add_1 -->|"FLOAT16(4, 512, 128)"| ReduceMean_0
+            I_add_1 -->|"FLOAT16(4, 512, 128)"| Sub_1
+            ReduceMean_0 -->|"FLOAT16(4, 512, 1)"| Sub_1
+            Sub_1 -->|"FLOAT16(4, 512, 128)"| Pow_2
+            Pow_2 -->|"FLOAT16(4, 512, 128)"| ReduceMean_3
+            ReduceMean_3 -->|"FLOAT16(4, 512, 1)"| Add_4
+            Add_4 -->|"FLOAT16(4, 512, 1)"| Sqrt_5
+            Sub_1 -->|"FLOAT16(4, 512, 128)"| Div_6
+            Sqrt_5 -->|"FLOAT16(4, 512, 1)"| Div_6
+
+            O__onx_div0(["_onx_div0 FLOAT16(4, 512, 128)"])
+            Div_6 --> O__onx_div0
+
+            class I_add_1,O__onx_div0 ioNode
+            class ReduceMean_0,Sub_1,Pow_2,ReduceMean_3,Add_4,Sqrt_5,Div_6 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['p_model_albert_embeddings_layernorm_weight'],
-                                 value=onh.from_array(
-                                     np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0], dtype=np.float16),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['p_model_albert_embeddings_layernorm_bias'],
-                                 value=onh.from_array(
-                                     np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0], dtype=np.float16),
-                                 name='value')),
-                    oh.make_node('LayerNormalization',
-                        ['add_1', 'p_model_albert_embeddings_layernorm_weight',
-                         'p_model_albert_embeddings_layernorm_bias'],
-                        ['_onx_div0'], axis=-1, epsilon=0.0, stash_type=1),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('add_1', onnx.TensorProto.FLOAT16, (4, 512, 128)),
-                ],
-                [
-                    oh.make_tensor_value_info('_onx_div0', onnx.TensorProto.FLOAT16,
-                                              (4, 512, 128)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_add_1(["add_1 FLOAT16(4, 512, 128)"])
+
+            Constant_0[["Constant() -#gt; p_model_albert_embeddings_layernorm_weight"]]
+            Constant_1[["Constant() -#gt; p_model_albert_embeddings_layernorm_bias"]]
+            LayerNormalization_2[["LayerNormalization(., ., ., axis=-1, stash_type=1)"]]
+
+            I_add_1 -->|"FLOAT16(4, 512, 128)"| LayerNormalization_2
+            Constant_0 -->|"FLOAT16(128)"| LayerNormalization_2
+            Constant_1 -->|"FLOAT16(128)"| LayerNormalization_2
+
+            O__onx_div0(["_onx_div0 FLOAT16(4, 512, 128)"])
+            LayerNormalization_2 --> O__onx_div0
+
+            class I_add_1,O__onx_div0 ioNode
+            class Constant_0,Constant_1 constNode
+            class LayerNormalization_2 opNode
     """
 
     def match(
@@ -329,80 +260,64 @@ class LayerNormalizationScalePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['s0'],
-                                 value=onh.from_array(
-                                     np.array([-0.10000000149011612,
-                                               -0.009999999776482582,
-                                               -0.05000000074505806], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['scale'],
-                                 value=onh.from_array(np.array([2.0, 3.0, 4.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('LayerNormalization', ['X', 's0'], ['norm'],
-                                 epsilon=0.10000000149011612),
-                    oh.make_node('Mul', ['norm', 'scale'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('scale', onnx.TensorProto.FLOAT, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('s0', onnx.TensorProto.FLOAT, (3,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 20)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_scale(["scale FLOAT(3)"])
+            I_X(["X FLOAT(a, b)"])
+            I_s0(["s0 FLOAT(3)"])
+
+            Constant_0[["Constant() -#gt; s0"]]
+            Constant_1[["Constant() -#gt; scale"]]
+            LayerNormalization_2[["LayerNormalization(., .)"]]
+            Mul_3[["Mul(., .)"]]
+
+            I_X -->|"FLOAT(a, b)"| LayerNormalization_2
+            Constant_0 -->|"FLOAT(3)"| LayerNormalization_2
+            LayerNormalization_2 -->|"FLOAT(a, b)"| Mul_3
+            Constant_1 -->|"FLOAT(3)"| Mul_3
+
+            O_Y(["Y FLOAT(a, b)"])
+            Mul_3 --> O_Y
+
+            class I_scale,I_X,I_s0,O_Y ioNode
+            class Constant_0,Constant_1 constNode
+            class LayerNormalization_2,Mul_3 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Mul', ['s0', 'scale'], ['LayerNormalizationScalePattern_s0']),
-                    oh.make_node('LayerNormalization', ['X', 'LayerNormalizationScalePattern_s0'],
-                                 ['Y'], epsilon=0.10000000149011612),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('scale', onnx.TensorProto.FLOAT, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('s0', onnx.TensorProto.FLOAT, (3,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 20)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_scale(["scale FLOAT(3)"])
+            I_X(["X FLOAT(a, b)"])
+            I_s0(["s0 FLOAT(3)"])
+
+            Mul_0[["Mul(., .)"]]
+            LayerNormalization_1[["LayerNormalization(., .)"]]
+
+            I_s0 -->|"FLOAT(3)"| Mul_0
+            I_scale -->|"FLOAT(3)"| Mul_0
+            I_X -->|"FLOAT(a, b)"| LayerNormalization_1
+            Mul_0 -->|"FLOAT(3)"| LayerNormalization_1
+
+            O_Y(["Y FLOAT(a, b)"])
+            LayerNormalization_1 --> O_Y
+
+            class I_scale,I_X,I_s0,O_Y ioNode
+            class Mul_0,LayerNormalization_1 opNode
     """
 
     def match(
@@ -550,89 +465,68 @@ class CastLayerNormalizationCastPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['scale'],
-                                 value=onh.from_array(
-                                     np.array([0.5,
-                                               0.6000000238418579,
-                                               0.699999988079071], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['bias'],
-                                 value=onh.from_array(
-                                     np.array([-0.5,
-                                               -0.6000000238418579,
-                                               -0.699999988079071], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Cast', ['X'], ['xc'], to=1),
-                    oh.make_node('LayerNormalization', ['xc', 'scale', 'bias'], ['norm'],
-                                 stash_type=1),
-                    oh.make_node('Cast', ['norm'], ['Y'], to=10),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('scale', onnx.TensorProto.FLOAT, (3,)),
-                    oh.make_tensor_value_info('bias', onnx.TensorProto.FLOAT, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, (3, 3)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, (3, 3)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_scale(["scale FLOAT(3)"])
+            I_bias(["bias FLOAT(3)"])
+            I_X(["X FLOAT16(3, 3)"])
+
+            Constant_0[["Constant() -#gt; scale"]]
+            Constant_1[["Constant() -#gt; bias"]]
+            Cast_2[["Cast(., to=FLOAT)"]]
+            LayerNormalization_3[["LayerNormalization(., ., ., stash_type=1)"]]
+            Cast_4[["Cast(., to=FLOAT16)"]]
+
+            I_X -->|"FLOAT16(3, 3)"| Cast_2
+            Cast_2 -->|"FLOAT(3, 3)"| LayerNormalization_3
+            Constant_0 -->|"FLOAT(3)"| LayerNormalization_3
+            Constant_1 -->|"FLOAT(3)"| LayerNormalization_3
+            LayerNormalization_3 -->|"FLOAT(3, 3)"| Cast_4
+
+            O_Y(["Y FLOAT16(3, 3)"])
+            Cast_4 --> O_Y
+
+            class I_scale,I_bias,I_X,O_Y ioNode
+            class Constant_0,Constant_1 constNode
+            class Cast_2,LayerNormalization_3,Cast_4 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Cast', ['scale'],
-                                 ['CastLayerNormalizationCastPattern_scale::C10'], to=10),
-                    oh.make_node('Cast', ['bias'],
-                                 ['CastLayerNormalizationCastPattern_bias::C10'], to=10),
-                    oh.make_node('LayerNormalization',
-                        ['X', 'CastLayerNormalizationCastPattern_scale::C10',
-                         'CastLayerNormalizationCastPattern_bias::C10'],
-                        ['Y'], stash_type=1),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('scale', onnx.TensorProto.FLOAT, (3,)),
-                    oh.make_tensor_value_info('bias', onnx.TensorProto.FLOAT, (3,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, (3, 3)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, (3, 3)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_scale(["scale FLOAT(3)"])
+            I_bias(["bias FLOAT(3)"])
+            I_X(["X FLOAT16(3, 3)"])
+
+            Cast_0[["Cast(., to=FLOAT16)"]]
+            Cast_1[["Cast(., to=FLOAT16)"]]
+            LayerNormalization_2[["LayerNormalization(., ., ., stash_type=1)"]]
+
+            I_scale -->|"FLOAT(3)"| Cast_0
+            I_bias -->|"FLOAT(3)"| Cast_1
+            I_X -->|"FLOAT16(3, 3)"| LayerNormalization_2
+            Cast_0 -->|"FLOAT16(3)"| LayerNormalization_2
+            Cast_1 -->|"FLOAT16(3)"| LayerNormalization_2
+
+            O_Y(["Y FLOAT16(3, 3)"])
+            LayerNormalization_2 --> O_Y
+
+            class I_scale,I_bias,I_X,O_Y ioNode
+            class Cast_0,Cast_1,LayerNormalization_2 opNode
     """
 
     def match(
@@ -721,89 +615,58 @@ class BatchNormalizationPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['scale'],
-                                 value=onh.from_array(
-                                     np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['B'],
-                                 value=onh.from_array(
-                                     np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['input_mean'],
-                                 value=onh.from_array(
-                                     np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                               0.0, 0.0, 0.0, 0.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['input_var'],
-                                 value=onh.from_array(
-                                     np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                               1.0, 1.0, 1.0, 1.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('BatchNormalization',
-                                 ['X', 'scale', 'B', 'input_mean', 'input_var'], ['Y'],
-                                 epsilon=0.0),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (1024, 16)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1024, 16)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(1024, 16)"])
+
+            Constant_0[["Constant() -#gt; scale"]]
+            Constant_1[["Constant() -#gt; B"]]
+            Constant_2[["Constant() -#gt; input_mean"]]
+            Constant_3[["Constant() -#gt; input_var"]]
+            BatchNormalization_4[["BatchNormalization(., ., ., ., .)"]]
+
+            I_X -->|"FLOAT(1024, 16)"| BatchNormalization_4
+            Constant_0 -->|"FLOAT(16)"| BatchNormalization_4
+            Constant_1 -->|"FLOAT(16)"| BatchNormalization_4
+            Constant_2 -->|"FLOAT(16)"| BatchNormalization_4
+            Constant_3 -->|"FLOAT(16)"| BatchNormalization_4
+
+            O_Y(["Y FLOAT(1024, 16)"])
+            BatchNormalization_4 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Constant_0,Constant_1,Constant_2,Constant_3 constNode
+            class BatchNormalization_4 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Identity', ['X'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, (1024, 16)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, (1024, 16)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(1024, 16)"])
+
+            Identity_0[["Identity(.)"]]
+
+            I_X -->|"FLOAT(1024, 16)"| Identity_0
+
+            O_Y(["Y FLOAT(1024, 16)"])
+            Identity_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Identity_0 opNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -993,94 +856,77 @@ class RMSNormalizationPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['exp'],
-                                 value=onh.from_array(np.array([2.0], dtype=np.float16),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['axis'],
-                                 value=onh.from_array(np.array([-1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['eps'],
-                                 value=onh.from_array(
-                                     np.array([9.999999974752427e-07], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['one'],
-                                 value=onh.from_array(np.array([1.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Cast', ['X'], ['Xc'], to=1),
-                    oh.make_node('Pow', ['Xc', 'exp'], ['x2']),
-                    oh.make_node('ReduceMean', ['x2', 'axis'], ['xr']),
-                    oh.make_node('Add', ['xr', 'eps'], ['xa']),
-                    oh.make_node('Sqrt', ['xa'], ['xq']),
-                    oh.make_node('Div', ['one', 'xq'], ['Z']),
-                    oh.make_node('Mul', ['Z', 'Xc'], ['Yc']),
-                    oh.make_node('Cast', ['Yc'], ['Y'], to=10),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, ('a', 'D')),
-                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, ('a', 'D')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 23)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT16(a, D)"])
+            I_axis(["axis INT64(1)"])
+
+            Constant_0[["Constant() -#gt; axis"]]
+            Cast_1[["Cast(., to=FLOAT)"]]
+            Pow_2[["Pow(., [2.0])"]]
+            ReduceMean_3[["ReduceMean(., .)"]]
+            Add_4[["Add(., [1e-06])"]]
+            Sqrt_5[["Sqrt(.)"]]
+            Div_6[["Div([1.0], .)"]]
+            Mul_7[["Mul(., .)"]]
+            Cast_8[["Cast(., to=FLOAT16)"]]
+
+            I_X -->|"FLOAT16(a, D)"| Cast_1
+            Cast_1 -->|"FLOAT(a, D)"| Pow_2
+            Pow_2 -->|"FLOAT(a, D)"| ReduceMean_3
+            Constant_0 -->|"INT64(1)"| ReduceMean_3
+            ReduceMean_3 -->|"FLOAT(a, 1)"| Add_4
+            Add_4 -->|"FLOAT(a, 1)"| Sqrt_5
+            Sqrt_5 -->|"FLOAT(a, 1)"| Div_6
+            Div_6 -->|"FLOAT(a, 1)"| Mul_7
+            Cast_1 -->|"FLOAT(a, D)"| Mul_7
+            Mul_7 -->|"FLOAT(a, D)"| Cast_8
+
+            O_Y(["Y FLOAT16(a, D)"])
+            Cast_8 --> O_Y
+
+            class I_X,I_axis,O_Y ioNode
+            class Constant_0 constNode
+            class Cast_1,Pow_2,ReduceMean_3,Add_4,Sqrt_5,Div_6,Mul_7,Cast_8 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Shape', ['X'], ['shape-X']),
-                    oh.make_node('Gather', ['shape-X', 'axis'], ['gather-shape-X']),
-                    oh.make_node('ConstantOfShape', ['gather-shape-X'],
-                                 ['constantofshape-gather-shape-X'], value=onh.from_array(
-                                     np.array([1.0], dtype=np.float16),
-                                 name='value')),
-                    oh.make_node('RMSNormalization', ['X', 'constantofshape-gather-shape-X'],
-                                 ['Y'], axis=-1, epsilon=9.999999974752427e-07, stash_type=1),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, ('a', 'D')),
-                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT16, ('a', 'D')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 23)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT16(a, D)"])
+            I_axis(["axis INT64(1)"])
+
+            Shape_0[["Shape(.)"]]
+            Gather_1[["Gather(., .)"]]
+            ConstantOfShape_2[["ConstantOfShape(.)"]]
+            RMSNormalization_3[["RMSNormalization(., ., axis=-1, stash_type=1)"]]
+
+            I_X -->|"FLOAT16(a, D)"| Shape_0
+            Shape_0 -->|"INT64(2)"| Gather_1
+            I_axis -->|"INT64(1)"| Gather_1
+            Gather_1 -->|"INT64(1)"| ConstantOfShape_2
+            I_X -->|"FLOAT16(a, D)"| RMSNormalization_3
+            ConstantOfShape_2 --> RMSNormalization_3
+
+            O_Y(["Y FLOAT16(a, D)"])
+            RMSNormalization_3 --> O_Y
+
+            class I_X,I_axis,O_Y ioNode
+            class Shape_0,Gather_1,ConstantOfShape_2,RMSNormalization_3 opNode
     """
 
     def match(
@@ -1248,75 +1094,51 @@ class RMSNormalizationMulPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['scale'],
-                                 value=onh.from_array(np.array([3.0, 4.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['scale2'],
-                                 value=onh.from_array(np.array([3.0, 4.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('RMSNormalization', ['X', 'scale'], ['xs']),
-                    oh.make_node('Mul', ['xs', 'scale2'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 2)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 2)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 23)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, 2)"])
+
+            RMSNormalization_0[["RMSNormalization(., [3.0, 4.0])"]]
+            Mul_1[["Mul(., [3.0, 4.0])"]]
+
+            I_X -->|"FLOAT(a, 2)"| RMSNormalization_0
+            RMSNormalization_0 -->|"FLOAT(a, 2)"| Mul_1
+
+            O_Y(["Y FLOAT(a, 2)"])
+            Mul_1 --> O_Y
+
+            class I_X,O_Y ioNode
+            class RMSNormalization_0,Mul_1 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['init1_s2_'],
-                                 value=onh.from_array(np.array([9.0, 16.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('RMSNormalization', ['X', 'init1_s2_'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 2)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 2)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 23)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, 2)"])
+
+            RMSNormalization_0[["RMSNormalization(., [9.0, 16.0])"]]
+
+            I_X -->|"FLOAT(a, 2)"| RMSNormalization_0
+
+            O_Y(["Y FLOAT(a, 2)"])
+            RMSNormalization_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class RMSNormalization_0 opNode
     """
 
     def match(

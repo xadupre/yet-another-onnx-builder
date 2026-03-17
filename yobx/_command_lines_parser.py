@@ -427,7 +427,7 @@ def get_parser_print() -> ArgumentParser:
     )
     parser.add_argument(
         "fmt",
-        choices=["dot", "onnx-compact", "pretty", "printer", "raw", "shape"],
+        choices=["dot", "onnx-compact", "mermaid", "pretty", "printer", "raw", "shape"],
         default="pretty",
         help=textwrap.dedent("""
             Prints out a model on the standard output.
@@ -467,6 +467,10 @@ def _cmd_print(argv: List[Any]):
         bs = BasicShapeBuilder()
         bs.run_model(onx)
         print(bs.get_debug_msg())
+    elif args.fmt == "mermaid":
+        from .translate import translate
+
+        print(translate(onx, api="mermaid"))
     elif args.fmt == "dot":
         from .helpers.dot_helper import to_dot
 

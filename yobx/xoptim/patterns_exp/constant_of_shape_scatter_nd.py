@@ -11,129 +11,59 @@ class ConstantOfShapeScatterNDPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'ConstantOfShape', ['shape'], ['data'],
-                        value=onh.from_array(np.array([0.0], dtype=np.float32), name='value'),
-                    ),
-                    oh.make_node(
-                        'ScatterND',
-                        ['data', 'indices', 'masked_updates'],
-                        ['y'],
-                        reduction='add',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'indices',
-                        onnx.TensorProto.INT64,
-                        shape=('UNKNOWNDIM1', 'UNKNOWNDIM2', 1),
-                    ),
-                    oh.make_tensor_value_info(
-                        'shape',
-                        onnx.TensorProto.INT64,
-                        shape=('UNKNOWNDIM',),
-                    ),
-                    oh.make_tensor_value_info(
-                        'masked_updates',
-                        onnx.TensorProto.FLOAT,
-                        shape=(
-                            'UNKNOWNDIM1^UNKNOWNDIM3',
-                            'UNKNOWNDIM2^UNKNOWNDIM4',
-                            'UNKNOWNDIM5',
-                        ),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM6', 'UNKNOWNDIM7'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_indices(["indices INT64(DIM1, DIM2, 1)"])
+            I_shape(["shape INT64(DIM)"])
+            I_masked_updates(["masked_updates FLOAT(DIM1^DIM3, DIM2^DIM4, DIM5)"])
+
+            ConstantOfShape_0[["ConstantOfShape(.)"]]
+            ScatterND_1[["ScatterND(., ., .)"]]
+
+            I_shape -->|"INT64(DIM)"| ConstantOfShape_0
+            ConstantOfShape_0 --> ScatterND_1
+            I_indices -->|"INT64(DIM1, DIM2, 1)"| ScatterND_1
+            I_masked_updates -->|"FLOAT(DIM1^DIM3, DIM2^DIM4, DIM5)"| ScatterND_1
+
+            O_y(["y FLOAT(DIM6, DIM7)"])
+            ScatterND_1 --> O_y
+
+            class I_indices,I_shape,I_masked_updates,O_y ioNode
+            class ConstantOfShape_0,ScatterND_1 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'ScatterNDOfShape',
-                        ['shape', 'indices', 'masked_updates'],
-                        ['y'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                        strategy='optimize',
-                        reduction='add',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'indices',
-                        onnx.TensorProto.INT64,
-                        shape=('UNKNOWNDIM1', 'UNKNOWNDIM2', 1),
-                    ),
-                    oh.make_tensor_value_info(
-                        'shape',
-                        onnx.TensorProto.INT64,
-                        shape=('UNKNOWNDIM',),
-                    ),
-                    oh.make_tensor_value_info(
-                        'masked_updates',
-                        onnx.TensorProto.FLOAT,
-                        shape=(
-                            'UNKNOWNDIM1^UNKNOWNDIM3',
-                            'UNKNOWNDIM2^UNKNOWNDIM4',
-                            'UNKNOWNDIM5',
-                        ),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM6', 'UNKNOWNDIM7'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_indices(["indices INT64(DIM1, DIM2, 1)"])
+            I_shape(["shape INT64(DIM)"])
+            I_masked_updates(["masked_updates FLOAT(DIM1^DIM3, DIM2^DIM4, DIM5)"])
+
+            ScatterNDOfShape_0[["onnx_extended.ortops.optim.cuda.ScatterNDOfShape(., ., .)"]]
+
+            I_shape -->|"INT64(DIM)"| ScatterNDOfShape_0
+            I_indices -->|"INT64(DIM1, DIM2, 1)"| ScatterNDOfShape_0
+            I_masked_updates -->|"FLOAT(DIM1^DIM3, DIM2^DIM4, DIM5)"| ScatterNDOfShape_0
+
+            O_y(["y FLOAT(DIM6, DIM7)"])
+            ScatterNDOfShape_0 --> O_y
+
+            class I_indices,I_shape,I_masked_updates,O_y ioNode
+            class ScatterNDOfShape_0 opNode
     """
 
     def match(
@@ -192,133 +122,63 @@ class MaskedShapeScatterNDPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['zero'],
-                        value=onh.from_array(np.array([0.0], dtype=np.float32), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['m_one'],
-                        value=onh.from_array(np.array([-1], dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'ScatterNDOfShape',
-                        ['shape', 'indices', 'masked_updates'],
-                        ['y'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                        strategy='optimize',
-                        reduction='add',
-                    ),
-                    oh.make_node(
-                        'Where',
-                        ['masked_indices', 'zero', 'updates'],
-                        ['masked_updates'],
-                    ),
-                    oh.make_node('Equal', ['indices', 'm_one'], ['masked_indices']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'updates',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM3', 'UNKNOWNDIM4', 'UNKNOWNDIM5'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'indices',
-                        onnx.TensorProto.INT64,
-                        shape=('UNKNOWNDIM1', 'UNKNOWNDIM2', 1),
-                    ),
-                    oh.make_tensor_value_info(
-                        'shape',
-                        onnx.TensorProto.INT64,
-                        shape=('UNKNOWNDIM',),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM6', 'UNKNOWNDIM7'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_updates(["updates FLOAT(DIM3, DIM4, DIM5)"])
+            I_indices(["indices INT64(DIM1, DIM2, 1)"])
+            I_shape(["shape INT64(DIM)"])
+
+            ScatterNDOfShape_0[["onnx_extended.ortops.optim.cuda.ScatterNDOfShape(., ., .)"]]
+            Where_1[["Where(., [0.0], .)"]]
+            Equal_2[["Equal(., [-1])"]]
+
+            I_shape -->|"INT64(DIM)"| ScatterNDOfShape_0
+            I_indices -->|"INT64(DIM1, DIM2, 1)"| ScatterNDOfShape_0
+            Where_1 --> ScatterNDOfShape_0
+            Equal_2 -->|"BOOL(DIM1, DIM2, 1)"| Where_1
+            I_updates -->|"FLOAT(DIM3, DIM4, DIM5)"| Where_1
+            I_indices -->|"INT64(DIM1, DIM2, 1)"| Equal_2
+
+            O_y(["y FLOAT(DIM6, DIM7)"])
+            ScatterNDOfShape_0 --> O_y
+
+            class I_updates,I_indices,I_shape,O_y ioNode
+            class ScatterNDOfShape_0,Where_1,Equal_2 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'MaskedScatterNDOfShape',
-                        ['shape', 'indices', 'updates'],
-                        ['y'],
-                        domain='onnx_extended.ortops.optim.cuda',
-                        maskedValue=-1,
-                        reduction='add',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'updates',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM3', 'UNKNOWNDIM4', 'UNKNOWNDIM5'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'indices',
-                        onnx.TensorProto.INT64,
-                        shape=('UNKNOWNDIM1', 'UNKNOWNDIM2', 1),
-                    ),
-                    oh.make_tensor_value_info(
-                        'shape',
-                        onnx.TensorProto.INT64,
-                        shape=('UNKNOWNDIM',),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('UNKNOWNDIM6', 'UNKNOWNDIM7'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('onnx_extended.ortops.optim.cuda', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_updates(["updates FLOAT(DIM3, DIM4, DIM5)"])
+            I_indices(["indices INT64(DIM1, DIM2, 1)"])
+            I_shape(["shape INT64(DIM)"])
+
+            MaskedScatterNDOfShape_0[["onnx_extended.ortops.optim.cuda.MaskedScatterNDOfShape(
+            ., ., .)"]]
+
+            I_shape -->|"INT64(DIM)"| MaskedScatterNDOfShape_0
+            I_indices -->|"INT64(DIM1, DIM2, 1)"| MaskedScatterNDOfShape_0
+            I_updates -->|"FLOAT(DIM3, DIM4, DIM5)"| MaskedScatterNDOfShape_0
+
+            O_y(["y FLOAT(DIM6, DIM7)"])
+            MaskedScatterNDOfShape_0 --> O_y
+
+            class I_updates,I_indices,I_shape,O_y ioNode
+            class MaskedScatterNDOfShape_0 opNode
     """
 
     def match(

@@ -1358,7 +1358,7 @@ def pattern_table_doc(
     data = []
     for pat in pattern_list:
         doc = pat.__class__.__doc__.split("::", maxsplit=1)[0].replace("\n", " ")
-        for end in [".. gdot", ".. runpython", ".. math"]:
+        for end in [".. gdot", ".. mermaid", ".. runpython", ".. math"]:
             if doc.endswith(end):
                 doc = doc[: -len(end)]
         doc = doc.strip()
