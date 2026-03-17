@@ -5,7 +5,13 @@ def register():
     try:
         import category_encoders  # noqa: F401
 
-        from . import binary_encoder, one_hot_encoder, polynomial_encoder, quantile_encoder, woe_encoder
+        from . import (
+            binary_encoder,
+            one_hot_encoder,
+            polynomial_encoder,
+            quantile_encoder,
+            woe_encoder,
+        )
     except ImportError:
         # No category_encoders installed.
         pass

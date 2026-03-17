@@ -103,10 +103,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         X_df = pd.DataFrame(
-            {
-                "cat": [0.0, 1.0, 2.0, 3.0, 0.0, 1.0],
-                "num": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-            }
+            {"cat": [0.0, 1.0, 2.0, 3.0, 0.0, 1.0], "num": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}
         )
         y = [0, 1, 0, 1, 0, 1]
         enc = BinaryEncoder(cols=["cat"], handle_unknown="value")
@@ -128,10 +125,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         X_df = pd.DataFrame(
-            {
-                "cat": [0.0, 1.0, 2.0, 3.0, 0.0, 1.0],
-                "num": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-            }
+            {"cat": [0.0, 1.0, 2.0, 3.0, 0.0, 1.0], "num": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}
         )
         y = [0, 1, 0, 1, 0, 1]
         enc = BinaryEncoder(cols=["cat"], handle_unknown="return_nan")
@@ -155,10 +149,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         X_df = pd.DataFrame(
-            {
-                "cat": [0.0, 1.0, 2.0, 3.0, 0.0, 1.0],
-                "num": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-            }
+            {"cat": [0.0, 1.0, 2.0, 3.0, 0.0, 1.0], "num": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}
         )
         y = [0, 1, 0, 1, 0, 1]
         enc = BinaryEncoder(cols=["cat"], handle_missing="value")
@@ -180,10 +171,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         X_df = pd.DataFrame(
-            {
-                "cat": [0.0, 1.0, 2.0, 3.0, 0.0, 1.0],
-                "num": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-            }
+            {"cat": [0.0, 1.0, 2.0, 3.0, 0.0, 1.0], "num": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}
         )
         y = [0, 1, 0, 1, 0, 1]
         enc = BinaryEncoder(cols=["cat"], handle_missing="return_nan")

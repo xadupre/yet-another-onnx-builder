@@ -3802,7 +3802,6 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
-
     def test_aten_div_tensor_mode_trunc_float(self):
         import torch
 
