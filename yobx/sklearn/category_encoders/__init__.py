@@ -6,6 +6,7 @@ def register():
         import category_encoders  # noqa: F401
 
         from . import (
+            binary_encoder,
             one_hot_encoder,
             ordinal_encoder,
             polynomial_encoder,
