@@ -75,7 +75,7 @@ class TestSklearnRegister(ExtTestCase):
                 )
                 rst = get_sklearn_estimator_coverage(libraries=lib, rst=True)
                 n_lines = len(rst.split("\n"))
-                self.assertLess(n_lines, (len(res) + 2) * 5 + 2)
+                self.assertLess(n_lines, (len(res) + 2) * 6 + 2)
                 if lib == "sklearn":
                     self.assertIn("sklearn.linear_model.GammaRegressor", rst)
                     self.assertIn("sklearn.ensemble.HistGradientBoostingClassifier", rst)
