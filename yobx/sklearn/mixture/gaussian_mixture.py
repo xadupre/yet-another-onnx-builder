@@ -1,32 +1,36 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import onnx
 from sklearn.mixture import GaussianMixture
+from sklearn.mixture._base import BaseMixture
 
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
 
-@register_sklearn_converter(GaussianMixture)
-def sklearn_gaussian_mixture(
+def _sklearn_mixture_core(
     g: GraphBuilderExtendedProtocol,
     sts: Dict,
     outputs: List[str],
-    estimator: GaussianMixture,
+    estimator: BaseMixture,
     X: str,
-    name: str = "gaussian_mixture",
+    name: str,
+    log_weights: Union[None, "np.ndarray"] = None,
 ) -> Tuple[str, str]:
     """
-    Converts a :class:`sklearn.mixture.GaussianMixture` into ONNX.
+    Shared implementation for Gaussian mixture model converters.
 
-    The converter supports all four covariance types supported by
-    :class:`~sklearn.mixture.GaussianMixture`:
-    ``'full'``, ``'tied'``, ``'diag'``, and ``'spherical'``.
+    Computes the weighted log-probability for each component and returns
+    the predicted label (``ArgMax``) and posterior probabilities
+    (``Softmax``).  The computation is identical for
+    :class:`~sklearn.mixture.GaussianMixture` and
+    :class:`~sklearn.mixture.BayesianGaussianMixture` because both expose
+    the same fitted attributes used during inference (``means_``,
+    ``weights_``, ``precisions_cholesky_``, ``covariance_type``).
 
-    In each case the weighted log-probability for sample *n* under component *k*
-    is computed as:
+    The weighted log-probability for sample *n* under component *k* is:
 
     .. code-block:: text
 
@@ -35,8 +39,7 @@ def sklearn_gaussian_mixture(
                       - 0.5 * quad[n, k]
 
     where ``quad[n, k]`` is the Mahalanobis distance squared, computed
-    differently depending on ``covariance_type``.  ``label`` is the
-    ``ArgMax`` of ``log_p`` and ``proba`` is its ``Softmax``.
+    differently depending on ``covariance_type``.
 
     **'full'** — per-component Cholesky of the precision matrix
     ``L_k`` (shape ``(K, F, F)``):
@@ -77,17 +80,19 @@ def sklearn_gaussian_mixture(
 
     :param g: the graph builder to add nodes to
     :param sts: shapes defined by :epkg:`scikit-learn`
-    :param outputs: desired output names; ``outputs[0]`` receives the predicted
-        component labels and ``outputs[1]`` receives the posterior probabilities
-    :param estimator: a fitted ``GaussianMixture``
+    :param outputs: desired output names
+    :param estimator: a fitted mixture model (``GaussianMixture`` or
+        ``BayesianGaussianMixture``)
     :param X: input tensor name
     :param name: prefix for added node names
+    :param log_weights: precomputed log-weights of shape ``(K,)``; when
+        *None* the default ``np.log(estimator.weights_)`` is used.
+        Pass ``estimator._estimate_log_weights()`` for
+        ``BayesianGaussianMixture`` which uses digamma-based variational
+        log-weights instead.
     :return: tuple ``(label_result_name, proba_result_name)``
     :raises NotImplementedError: for unsupported ``covariance_type`` values
     """
-    assert isinstance(
-        estimator, GaussianMixture
-    ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
@@ -96,7 +101,10 @@ def sklearn_gaussian_mixture(
     K = estimator.n_components
     F = estimator.means_.shape[1]
     means = estimator.means_.astype(dtype)  # (K, F)
-    log_weights = np.log(estimator.weights_).astype(dtype)  # (K,)
+    if log_weights is None:
+        log_weights = np.log(estimator.weights_).astype(dtype)  # (K,)
+    else:
+        log_weights = np.asarray(log_weights).astype(dtype)  # (K,)
     cov_type = estimator.covariance_type
     prec_chol = estimator.precisions_cholesky_
     half = np.array([0.5], dtype=dtype)
@@ -199,7 +207,7 @@ def sklearn_gaussian_mixture(
 
     else:
         raise NotImplementedError(
-            f"GaussianMixture converter: unsupported covariance_type={cov_type!r}."
+            f"{type(estimator).__name__} converter: unsupported covariance_type={cov_type!r}."
         )
 
     proba = g.op.Softmax(log_p, axis=1, name=f"{name}_proba", outputs=outputs[1:])
@@ -213,3 +221,85 @@ def sklearn_gaussian_mixture(
         g.set_type(label, onnx.TensorProto.INT64)
         g.set_type(proba, itype)
     return label, proba
+
+
+@register_sklearn_converter(GaussianMixture)
+def sklearn_gaussian_mixture(
+    g: GraphBuilderExtendedProtocol,
+    sts: Dict,
+    outputs: List[str],
+    estimator: GaussianMixture,
+    X: str,
+    name: str = "gaussian_mixture",
+) -> Tuple[str, str]:
+    """
+    Converts a :class:`sklearn.mixture.GaussianMixture` into ONNX.
+
+    The converter supports all four covariance types supported by
+    :class:`~sklearn.mixture.GaussianMixture`:
+    ``'full'``, ``'tied'``, ``'diag'``, and ``'spherical'``.
+
+    In each case the weighted log-probability for sample *n* under component *k*
+    is computed as:
+
+    .. code-block:: text
+
+        log_p[n, k] = log(weight_k) + log_det_k
+                      - 0.5 * n_features * log(2π)
+                      - 0.5 * quad[n, k]
+
+    where ``quad[n, k]`` is the Mahalanobis distance squared, computed
+    differently depending on ``covariance_type``.  ``label`` is the
+    ``ArgMax`` of ``log_p`` and ``proba`` is its ``Softmax``.
+
+    **'full'** — per-component Cholesky of the precision matrix
+    ``L_k`` (shape ``(K, F, F)``):
+
+    .. code-block:: text
+
+        L_2d  = L.transpose(1,0,2).reshape(F, K*F)          # (F, K*F) constant
+        b     = einsum('ki,kij->kj', means_, L)              # (K, F)   constant
+        XL    = MatMul(X, L_2d)                              # (N, K*F)
+        Y     = Reshape(XL - b, [-1, K, F])                  # (N, K, F)
+        quad  = ReduceSum(Y * Y, axis=2)                     # (N, K)
+
+    **'tied'** — single shared Cholesky ``L`` (shape ``(F, F)``):
+
+    .. code-block:: text
+
+        means_L = means_ @ L                                 # (K, F)  constant
+        XL      = MatMul(X, L)                               # (N, F)
+        Y       = Reshape(XL, [-1, 1, F]) - means_L          # (N, K, F)
+        quad    = ReduceSum(Y * Y, axis=2)                   # (N, K)
+
+    **'diag'** — per-component diagonal precision ``A = prec_chol**2``
+    (shape ``(K, F)``):
+
+    .. code-block:: text
+
+        B     = means_ * A                                   # (K, F)  constant
+        log_p = -0.5 * MatMul(X², Aᵀ) + MatMul(X, Bᵀ) + c  # (N, K)
+
+    **'spherical'** — scalar precision ``prec = prec_chol**2`` per component
+    (shape ``(K,)``):
+
+    .. code-block:: text
+
+        x_sq  = ReduceSum(X * X, axis=1, keepdims=1)        # (N, 1)
+        cross = MatMul(X, means_ᵀ)                          # (N, K)
+        log_p = prec * cross - 0.5 * prec * x_sq + c        # (N, K)
+
+    :param g: the graph builder to add nodes to
+    :param sts: shapes defined by :epkg:`scikit-learn`
+    :param outputs: desired output names; ``outputs[0]`` receives the predicted
+        component labels and ``outputs[1]`` receives the posterior probabilities
+    :param estimator: a fitted ``GaussianMixture``
+    :param X: input tensor name
+    :param name: prefix for added node names
+    :return: tuple ``(label_result_name, proba_result_name)``
+    :raises NotImplementedError: for unsupported ``covariance_type`` values
+    """
+    assert isinstance(
+        estimator, GaussianMixture
+    ), f"Unexpected type {type(estimator)} for estimator."
+    return _sklearn_mixture_core(g, sts, outputs, estimator, X, name)

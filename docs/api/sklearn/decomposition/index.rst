@@ -11,7 +11,9 @@ yobx.sklearn.decomposition
     incremental_pca
     kernel_pca
     latent_dirichlet_allocation
+    nmf
     pca
     pls_regression
     pls_svd
+    sparse_pca
     truncated_svd

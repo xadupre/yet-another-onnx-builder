@@ -1,2 +1,2 @@
 def register():
-    from . import nystroem
+    from . import additive_chi2_sampler, nystroem
