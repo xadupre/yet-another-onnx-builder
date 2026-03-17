@@ -6,3 +6,4 @@ yobx.sklearn.category_encoders
     :caption: modules
 
     quantile_encoder
+    woe_encoder
