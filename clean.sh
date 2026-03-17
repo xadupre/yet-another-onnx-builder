@@ -4,6 +4,7 @@ rm plot*.onnx
 rm plot*.png
 rm temp*.onnx
 rm test*.onnx
+rm dummy*.onnx
 rm *.ep
 rm *.ep.graph
 
