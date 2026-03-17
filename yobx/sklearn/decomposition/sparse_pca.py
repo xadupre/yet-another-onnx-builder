@@ -61,11 +61,14 @@ def sklearn_sparse_pca(
     mean = estimator.mean_.astype(dtype)
     centered = g.op.Sub(X, mean, name=name)
 
-    # Pre-compute the projection matrix W = components_.T @ inv(components_ @ components_.T + ridge_alpha * I).
+    # Pre-compute the projection matrix
+    # W = components_.T @ inv(components_ @ components_.T + ridge_alpha * I).
     # At inference this reduces the transform to a single MatMul.
     C = estimator.components_  # (n_components, n_features)
     n_components = C.shape[0]
-    M = C @ C.T + estimator.ridge_alpha * np.eye(n_components, dtype=C.dtype)  # (n_components, n_components)
+    M = C @ C.T + estimator.ridge_alpha * np.eye(
+        n_components, dtype=C.dtype
+    )  # (n_components, n_components)
     W = C.T @ np.linalg.inv(M)  # (n_features, n_components)
     W = W.astype(dtype)
 
