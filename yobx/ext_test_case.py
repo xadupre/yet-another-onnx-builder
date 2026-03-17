@@ -558,7 +558,7 @@ def requires_tensorflow(version: str = "", msg: str = "") -> Callable:
 
 
 def has_jax(version: str = "") -> bool:
-    "Returns True if transformers version is higher."
+    "Returns True if JAX is installed and the installed version is >= the given version (if specified)."
     try:
         import jax  # noqa: F401
     except (ImportError, AttributeError):
