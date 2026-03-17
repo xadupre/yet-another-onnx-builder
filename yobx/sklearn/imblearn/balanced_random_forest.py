@@ -1,7 +1,6 @@
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
-import onnx
 from imblearn.ensemble import BalancedRandomForestClassifier
 
 from ...typing import GraphBuilderExtendedProtocol
