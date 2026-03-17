@@ -317,7 +317,7 @@ def _make_exporter_onnx(
     verbose: int = 0,
     quiet: bool = True,
 ) -> Union[Dict, Tuple[onnx.ModelProto, Any]]:
-    if exporter.startswith("custom"):
+    if exporter.startswith("custom") or exporter.startswith("yobx"):
         from yobx.torch import to_onnx, ExportOptions
 
         opts = {}
