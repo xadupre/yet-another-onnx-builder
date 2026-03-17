@@ -6,3 +6,5 @@ yobx.sklearn.model_selection
     :caption: modules
 
     grid_search
+    halving_search
+    random_search
