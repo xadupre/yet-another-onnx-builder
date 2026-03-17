@@ -7,3 +7,4 @@ yobx.sklearn.kernel_approximation
 
     additive_chi2_sampler
     nystroem
+    rbf_sampler
