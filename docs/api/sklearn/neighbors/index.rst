@@ -9,4 +9,5 @@ yobx.sklearn.neighbors
     kneighbors_transformer
     kernel_density
     local_outlier_factor
+    nearest_centroid
     radiusneighbors
