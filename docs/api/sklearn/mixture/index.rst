@@ -5,4 +5,5 @@ yobx.sklearn.mixture
     :maxdepth: 1
     :caption: modules
 
+    bayesian_gaussian_mixture
     gaussian_mixture

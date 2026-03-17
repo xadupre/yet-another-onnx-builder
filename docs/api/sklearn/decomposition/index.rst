@@ -14,4 +14,5 @@ yobx.sklearn.decomposition
     pca
     pls_regression
     pls_svd
+    sparse_pca
     truncated_svd

@@ -5,4 +5,5 @@ yobx.sklearn.kernel_approximation
     :maxdepth: 1
     :caption: modules
 
+    additive_chi2_sampler
     nystroem
