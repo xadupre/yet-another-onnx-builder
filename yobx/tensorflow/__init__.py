@@ -1,4 +1,5 @@
 from .convert import to_onnx
+from .tensorflow_helper import jax_to_concrete_function
 
 
 def register_tensorflow_converters():

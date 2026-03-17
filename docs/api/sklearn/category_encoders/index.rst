@@ -6,5 +6,6 @@ yobx.sklearn.category_encoders
     :caption: modules
 
     ce_one_hot_encoder
+    polynomial_encoder
     quantile_encoder
     woe_encoder

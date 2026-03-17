@@ -87,11 +87,49 @@ def to_onnx(
     input_specs = _build_input_specs(input_names, args, dynamic_shapes)
 
     # Trace the model to obtain a concrete TF computation graph.
-    if hasattr(model, "get_concrete_function"):
+    if isinstance(model, tf.types.experimental.ConcreteFunction):
+        # Model is already a ConcreteFunction (e.g. from jax_to_concrete_function).
+        # Use it directly and take the input specs from its signature so the
+        # placeholder tensor names in the graph match the lookup in
+        # _convert_concrete_function.
+        cf = model
+        input_specs = list(cf.structured_input_signature[0])
+    elif hasattr(model, "get_concrete_function"):
         cf = model.get_concrete_function(*input_specs)
     else:
-        fn = tf.function(model)
-        cf = fn.get_concrete_function(*input_specs)
+        # For plain Python callables: try the standard tf.function path first.
+        # JAX functions fail here because they cannot accept TF symbolic tensors
+        # (the tracer raises a TypeError about "abstract array").  When that
+        # happens and JAX is installed, fall back to jax_to_concrete_function.
+        try:
+            fn = tf.function(model)
+            cf = fn.get_concrete_function(*input_specs)
+        except TypeError as e:
+            _is_jax_error = "abstract array" in str(e) and (
+                "tensorflow.python.framework.ops.SymbolicTensor" in str(e)
+                or "jax" in str(e).lower()
+            )
+            if _is_jax_error:
+                try:
+                    from .tensorflow_helper import jax_to_concrete_function
+                except ImportError as ie:
+                    raise ImportError(
+                        "JAX function detected (TF tracing raised: "
+                        f"{e!s}), but 'jax' or 'jax.experimental.jax2tf' "
+                        "could not be imported.  Install JAX with: "
+                        "pip install jax[cpu]"
+                    ) from ie
+                if verbose:
+                    print(
+                        "[yobx.tensorflow.to_onnx] JAX function detected; "
+                        "converting via jax_to_concrete_function"
+                    )
+                cf = jax_to_concrete_function(
+                    model, args, input_names=input_names, dynamic_shapes=dynamic_shapes
+                )
+                input_specs = list(cf.structured_input_signature[0])
+            else:
+                raise
 
     # Populate an ONNX GraphBuilder by walking the concrete-function graph.
     kwargs = (

@@ -486,6 +486,10 @@ def requires_sklearn(version: str = "", msg: str = "") -> Callable:
     except (AttributeError, ImportError):
         return unittest.skip(msg or "scikit-learn not installed")
 
+    if not hasattr(sklearn, "__version__"):
+        return False
+    if not version:
+        return True
     if PvVersion(sklearn.__version__) < PvVersion(version):
         msg = f"scikit-learn version {sklearn.__version__} < {version}: {msg}"
         return unittest.skip(msg)
@@ -549,6 +553,28 @@ def requires_tensorflow(version: str = "", msg: str = "") -> Callable:
 
     if PvVersion(tensorflow.__version__) < PvVersion(version):
         msg = f"tensorflow version {tensorflow.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
+def requires_jax(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`jax` or :mod:`jax.experimental.jax2tf` is not available."""
+    try:
+        import jax
+        from jax.experimental import jax2tf  # noqa: F401
+    except (ImportError, AttributeError):
+        return unittest.skip(msg or "jax[tensorflow] not installed")
+
+    try:
+        import tensorflow  # noqa: F401
+    except (ImportError, AttributeError):
+        return unittest.skip(msg or "tensorflow not installed (required for jax2tf)")
+
+    if not version:
+        return lambda x: x
+
+    if PvVersion(jax.__version__) < PvVersion(version):
+        msg = f"jax version {jax.__version__} < {version}: {msg}"
         return unittest.skip(msg)
     return lambda x: x
 

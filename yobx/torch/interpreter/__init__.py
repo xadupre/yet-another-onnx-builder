@@ -2,6 +2,7 @@ from ._exceptions import FunctionNotFoundError
 from .onnx_export import (
     to_onnx,
     match_input_parameters,
+    check_model_weights,
     FunctionOptions,
     get_default_aten_as_function,
 )
