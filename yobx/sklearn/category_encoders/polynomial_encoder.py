@@ -115,7 +115,7 @@ def category_encoders_polynomial_encoder(
     assert isinstance(
         estimator, PolynomialEncoder
     ), f"Unexpected type {type(estimator)} for estimator."
-    assert estimator.mapping, f"Estimator not fitted, {estimator=}"
+    assert estimator.mapping is not None, f"estimator properly set up, {estimator=}"
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
