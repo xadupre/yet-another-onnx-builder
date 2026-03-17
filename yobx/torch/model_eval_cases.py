@@ -45,6 +45,7 @@ def evaluation(
         "export-strict-oblivious",
         "export-nostrict-oblivious",
         "export-nostrict-decall-oblivious",
+        "export-tracing",
     ),
     dynamic: Tuple[bool] = (False, True),
     cases: Optional[Union[str, Dict[str, type]]] = None,
