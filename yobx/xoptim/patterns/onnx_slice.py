@@ -11,82 +11,72 @@ class SliceSlicePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['zero'],
-                                 value=onh.from_array(np.array([0], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['one'],
-                                 value=onh.from_array(np.array([1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Slice', ['X', 'zero', 'one', 'zero'], ['x1']),
-                    oh.make_node('Slice', ['x1', 'zero', 'one', 'one'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('one', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('zero', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('c', 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, b)"])
+            I_one(["one INT64(1)"])
+            I_zero(["zero INT64(1)"])
+
+            Constant_0[["Constant() -#gt; zero"]]
+            Constant_1[["Constant() -#gt; one"]]
+            Slice_2[["Slice(., ., ., .)"]]
+            Slice_3[["Slice(., ., ., .)"]]
+
+            I_X -->|"FLOAT(a, b)"| Slice_2
+            Constant_0 -->|"INT64(1)"| Slice_2
+            Constant_1 -->|"INT64(1)"| Slice_2
+            Slice_2 -->|"FLOAT(1, b)"| Slice_3
+            Constant_0 -->|"INT64(1)"| Slice_3
+            Constant_1 -->|"INT64(1)"| Slice_3
+
+            O_Y(["Y FLOAT(c, d)"])
+            Slice_3 --> O_Y
+
+            class I_X,I_one,I_zero,O_Y ioNode
+            class Constant_0,Constant_1 constNode
+            class Slice_2,Slice_3 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Concat', ['zero', 'zero'], ['SliceSlicePattern_zero_start'],
-                                 axis=0),
-                    oh.make_node('Concat', ['one', 'one'], ['SliceSlicePattern_one_end'], axis=0),
-                    oh.make_node('Concat', ['zero', 'one'], ['SliceSlicePattern_one_axis'],
-                                 axis=0),
-                    oh.make_node('Slice',
-                        ['X', 'SliceSlicePattern_zero_start', 'SliceSlicePattern_one_end',
-                         'SliceSlicePattern_one_axis'],
-                        ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('one', onnx.TensorProto.INT64, (1,)),
-                    oh.make_tensor_value_info('zero', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('c', 'd')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, b)"])
+            I_one(["one INT64(1)"])
+            I_zero(["zero INT64(1)"])
+
+            Concat_0[["Concat(., ., axis=0)"]]
+            Concat_1[["Concat(., ., axis=0)"]]
+            Concat_2[["Concat(., ., axis=0)"]]
+            Slice_3[["Slice(., ., ., .)"]]
+
+            I_zero -->|"INT64(1)"| Concat_0
+            I_one -->|"INT64(1)"| Concat_1
+            I_zero -->|"INT64(1)"| Concat_2
+            I_one -->|"INT64(1)"| Concat_2
+            I_X -->|"FLOAT(a, b)"| Slice_3
+            Concat_0 -->|"INT64(2)"| Slice_3
+            Concat_1 -->|"INT64(2)"| Slice_3
+            Concat_2 -->|"INT64(2)"| Slice_3
+
+            O_Y(["Y FLOAT(c, d)"])
+            Slice_3 --> O_Y
+
+            class I_X,I_one,I_zero,O_Y ioNode
+            class Concat_0,Concat_1,Concat_2,Slice_3 opNode
     """
 
     def match(

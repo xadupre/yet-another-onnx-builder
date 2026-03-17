@@ -11,80 +11,75 @@ class ReduceSumNormalizePattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['axis'],
-                                 value=onh.from_array(np.array(-1, dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('Cast', ['X'], ['xc'], to=1),
-                    oh.make_node('ReduceSum', ['xc', 'axis'], ['red'], keepdims=1),
-                    oh.make_node('Mul', ['red', 'Y'], ['mul']),
-                    oh.make_node('Sub', ['xc', 'mul'], ['subc']),
-                    oh.make_node('Cast', ['subc'], ['Z'], to=10),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, ('a', 'b')),
-                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, ()),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT16, ('a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Y(["Y FLOAT(a, b)"])
+            I_X(["X FLOAT16(a, b)"])
+            I_axis(["axis INT64()"])
+
+            Constant_0[["Constant() -#gt; axis"]]
+            Cast_1[["Cast(., to=FLOAT)"]]
+            ReduceSum_2[["ReduceSum(., .)"]]
+            Mul_3[["Mul(., .)"]]
+            Sub_4[["Sub(., .)"]]
+            Cast_5[["Cast(., to=FLOAT16)"]]
+
+            I_X -->|"FLOAT16(a, b)"| Cast_1
+            Cast_1 -->|"FLOAT(a, b)"| ReduceSum_2
+            Constant_0 -->|"INT64()"| ReduceSum_2
+            ReduceSum_2 -->|"FLOAT(a, 1)"| Mul_3
+            I_Y -->|"FLOAT(a, b)"| Mul_3
+            Cast_1 -->|"FLOAT(a, b)"| Sub_4
+            Mul_3 -->|"FLOAT(a, b)"| Sub_4
+            Sub_4 -->|"FLOAT(a, b)"| Cast_5
+
+            O_Z(["Z FLOAT16(a, b)"])
+            Cast_5 --> O_Z
+
+            class I_Y,I_X,I_axis,O_Z ioNode
+            class Constant_0 constNode
+            class Cast_1,ReduceSum_2,Mul_3,Sub_4,Cast_5 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('ReduceSum', ['X', 'axis'], ['ReduceSumNormalizePattern_red'],
-                                 keepdims=1),
-                    oh.make_node('Cast', ['Y'], ['ReduceSumNormalizePattern_Y'], to=10),
-                    oh.make_node('Mul',
-                                 ['ReduceSumNormalizePattern_red', 'ReduceSumNormalizePattern_Y'],
-                                 ['ReduceSumNormalizePattern_mul']),
-                    oh.make_node('Sub', ['X', 'ReduceSumNormalizePattern_mul'], ['Z']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT16, ('a', 'b')),
-                    oh.make_tensor_value_info('axis', onnx.TensorProto.INT64, ()),
-                ],
-                [
-                    oh.make_tensor_value_info('Z', onnx.TensorProto.FLOAT16, ('a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_Y(["Y FLOAT(a, b)"])
+            I_X(["X FLOAT16(a, b)"])
+            I_axis(["axis INT64()"])
+
+            ReduceSum_0[["ReduceSum(., .)"]]
+            Cast_1[["Cast(., to=FLOAT16)"]]
+            Mul_2[["Mul(., .)"]]
+            Sub_3[["Sub(., .)"]]
+
+            I_X -->|"FLOAT16(a, b)"| ReduceSum_0
+            I_axis -->|"INT64()"| ReduceSum_0
+            I_Y -->|"FLOAT(a, b)"| Cast_1
+            ReduceSum_0 --> Mul_2
+            Cast_1 -->|"FLOAT16(a, b)"| Mul_2
+            I_X -->|"FLOAT16(a, b)"| Sub_3
+            Mul_2 --> Sub_3
+
+            O_Z(["Z FLOAT16(a, b)"])
+            Sub_3 --> O_Z
+
+            class I_Y,I_X,I_axis,O_Z ioNode
+            class ReduceSum_0,Cast_1,Mul_2,Sub_3 opNode
     """
 
     def match(
@@ -178,75 +173,67 @@ class ReduceArgTopKPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['one'],
-                                 value=onh.from_array(np.array([1], dtype=np.int64),
-                                 name='value')),
-                    oh.make_node('ReduceMin', ['X', 'one'], ['Y1'], keepdims=0),
-                    oh.make_node('ArgMin', ['X'], ['Y2'], axis=1, keepdims=0),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('one', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y2', onnx.TensorProto.INT64, ('a',)),
-                    oh.make_tensor_value_info('Y1', onnx.TensorProto.FLOAT, ('a',)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 22)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, b)"])
+            I_one(["one INT64(1)"])
+
+            Constant_0[["Constant() -#gt; one"]]
+            ReduceMin_1[["ReduceMin(., .)"]]
+            ArgMin_2[["ArgMin(., axis=1)"]]
+
+            I_X -->|"FLOAT(a, b)"| ReduceMin_1
+            Constant_0 -->|"INT64(1)"| ReduceMin_1
+            I_X -->|"FLOAT(a, b)"| ArgMin_2
+
+            O_Y2(["Y2 INT64(a)"])
+            ArgMin_2 --> O_Y2
+            O_Y1(["Y1 FLOAT(a)"])
+            ReduceMin_1 --> O_Y1
+
+            class I_X,I_one,O_Y2,O_Y1 ioNode
+            class Constant_0 constNode
+            class ReduceMin_1,ArgMin_2 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('TopK', ['X', 'one'],
-                                 ['ReduceArgTopKPattern_Y1', 'ReduceArgTopKPattern_Y2'], axis=1,
-                                 largest=0),
-                    oh.make_node('Squeeze', ['ReduceArgTopKPattern_Y1', 'one'], ['Y1']),
-                    oh.make_node('Squeeze', ['ReduceArgTopKPattern_Y2', 'one'], ['Y2']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('one', onnx.TensorProto.INT64, (1,)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y2', onnx.TensorProto.INT64, ('a',)),
-                    oh.make_tensor_value_info('Y1', onnx.TensorProto.FLOAT, ('a',)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 22)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, b)"])
+            I_one(["one INT64(1)"])
+
+            TopK_0[["TopK(., ., axis=1)"]]
+            Squeeze_1[["Squeeze(., .)"]]
+            Squeeze_2[["Squeeze(., .)"]]
+
+            I_X -->|"FLOAT(a, b)"| TopK_0
+            I_one -->|"INT64(1)"| TopK_0
+            TopK_0 --> Squeeze_1
+            I_one -->|"INT64(1)"| Squeeze_1
+            TopK_0 --> Squeeze_2
+            I_one -->|"INT64(1)"| Squeeze_2
+
+            O_Y2(["Y2 INT64(a)"])
+            Squeeze_2 --> O_Y2
+            O_Y1(["Y1 FLOAT(a)"])
+            Squeeze_1 --> O_Y1
+
+            class I_X,I_one,O_Y2,O_Y1 ioNode
+            class TopK_0,Squeeze_1,Squeeze_2 opNode
     """
 
     def match(

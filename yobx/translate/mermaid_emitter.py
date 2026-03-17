@@ -37,9 +37,6 @@ class MermaidEmitter(BaseEmitter):
         tr = Translator(model, emitter=emitter)
         print(tr.export(as_str=True))
 
-    Or use the convenience wrapper :func:`to_mermaid` which additionally
-    pre-computes edge-shape labels via ``BasicShapeBuilder`` when available.
-
     Node colour legend:
 
     * **green** (``classDef input``) – graph inputs

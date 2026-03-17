@@ -78,6 +78,7 @@ class ShapedBasedReshapePattern(ReshapePattern):
             class X ioNode
             class xrr ioNode
 
+
     Outcome of the fusion:
 
     .. mermaid::
@@ -1840,6 +1841,7 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
             class X ioNode
             class S3 ioNode
             class Z ioNode
+
 
     Outcome of the fusion:
 

@@ -15,189 +15,80 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Concat', ['m2', 'm2'], ['m2x2'], axis=-1),
-                    oh.make_node('Concat', ['m1', 'm1'], ['m1x2'], axis=-1),
-                    oh.make_node(
-                        'HalfRotaryEmbedding',
-                        ['X', 'm2x2', 'm1x2'],
-                        ['Y'],
-                        domain='intermediate',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 2, 'c', '2*e'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'm1',
-                        onnx.TensorProto.FLOAT,
-                        shape=(1, 1, 'c', 'e'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'm2',
-                        onnx.TensorProto.FLOAT,
-                        shape=(1, 1, 'c', 'e'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'b', 'c', '2*e'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 20),
-                oh.make_opsetid('intermediate', 1),
-                oh.make_opsetid('com.microsoft', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, 2, c, 2*e)"])
+            I_m1(["m1 FLOAT(1, 1, c, e)"])
+            I_m2(["m2 FLOAT(1, 1, c, e)"])
+
+            Concat_0[["Concat(., ., axis=-1)"]]
+            Concat_1[["Concat(., ., axis=-1)"]]
+            HalfRotaryEmbedding_2[["intermediate.HalfRotaryEmbedding(., ., .)"]]
+
+            I_m2 -->|"FLOAT(1, 1, c, e)"| Concat_0
+            I_m1 -->|"FLOAT(1, 1, c, e)"| Concat_1
+            I_X -->|"FLOAT(a, 2, c, 2*e)"| HalfRotaryEmbedding_2
+            Concat_0 --> HalfRotaryEmbedding_2
+            Concat_1 --> HalfRotaryEmbedding_2
+
+            O_Y(["Y FLOAT(a, b, c, 2*e)"])
+            HalfRotaryEmbedding_2 --> O_Y
+
+            class I_X,I_m1,I_m2,O_Y ioNode
+            class Concat_0,Concat_1,HalfRotaryEmbedding_2 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['init7_s2_0_1'],
-                        value=onh.from_array(np.array([0, 1], dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init7_s_0'],
-                        value=onh.from_array(np.array(0, dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init7_s_1'],
-                        value=onh.from_array(np.array(1, dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init7_s1_1'],
-                        value=onh.from_array(np.array([1], dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'Squeeze',
-                        ['m2', 'init7_s2_0_1'],
-                        ['ContribRotaryEmbeddingPattern--m2x2'],
-                    ),
-                    oh.make_node(
-                        'Squeeze',
-                        ['m1', 'init7_s2_0_1'],
-                        ['ContribRotaryEmbeddingPattern--m1x2'],
-                    ),
-                    oh.make_node(
-                        'Shape',
-                        ['X'],
-                        ['ContribRotaryEmbeddingPattern--X--batch'],
-                        end=1,
-                        start=0,
-                    ),
-                    oh.make_node(
-                        'Shape',
-                        ['X'],
-                        ['ContribRotaryEmbeddingPattern--X--seq_length'],
-                        end=3,
-                        start=2,
-                    ),
-                    oh.make_node(
-                        'Squeeze',
-                        ['ContribRotaryEmbeddingPattern--X--seq_length'],
-                        ['ContribRotaryEmbeddingPattern--X--seqsq'],
-                    ),
-                    oh.make_node(
-                        'Range',
-                        ['init7_s_0', 'ContribRotaryEmbeddingPattern--X--seqsq', 'init7_s_1'],
-                        ['ContribRotaryEmbeddingPattern--X_flat_pids'],
-                    ),
-                    oh.make_node(
-                        'Concat',
-                        ['ContribRotaryEmbeddingPattern--X--batch', 'init7_s1_1'],
-                        ['ContribRotaryEmbeddingPattern--X_pshape'],
-                        axis=0,
-                    ),
-                    oh.make_node(
-                        'Expand',
-                        [
-                            'ContribRotaryEmbeddingPattern--X_flat_pids',
-                            'ContribRotaryEmbeddingPattern--X_pshape',
-                        ],
-                        ['ContribRotaryEmbeddingPattern--X_position_ids'],
-                    ),
-                    oh.make_node(
-                        'RotaryEmbedding',
-                        [
-                            'X',
-                            'ContribRotaryEmbeddingPattern--X_position_ids',
-                            'ContribRotaryEmbeddingPattern--m2x2',
-                            'ContribRotaryEmbeddingPattern--m1x2',
-                        ],
-                        ['Y'],
-                        domain='com.microsoft',
-                        num_heads=2,
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 2, 'c', '2*e'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'm1',
-                        onnx.TensorProto.FLOAT,
-                        shape=(1, 1, 'c', 'e'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'm2',
-                        onnx.TensorProto.FLOAT,
-                        shape=(1, 1, 'c', 'e'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'b', 'c', '2*e'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 20),
-                oh.make_opsetid('intermediate', 1),
-                oh.make_opsetid('com.microsoft', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(a, 2, c, 2*e)"])
+            I_m1(["m1 FLOAT(1, 1, c, e)"])
+            I_m2(["m2 FLOAT(1, 1, c, e)"])
+
+            Squeeze_0[["Squeeze(., [0, 1])"]]
+            Squeeze_1[["Squeeze(., [0, 1])"]]
+            Shape_2[["Shape(., end=1, start=0)"]]
+            Shape_3[["Shape(., end=3, start=2)"]]
+            Squeeze_4[["Squeeze(.)"]]
+            Range_5[["Range(0, ., 1)"]]
+            Concat_6[["Concat(., [1], axis=0)"]]
+            Expand_7[["Expand(., .)"]]
+            RotaryEmbedding_8[["com.microsoft.RotaryEmbedding(., ., ., .)"]]
+
+            I_m2 -->|"FLOAT(1, 1, c, e)"| Squeeze_0
+            I_m1 -->|"FLOAT(1, 1, c, e)"| Squeeze_1
+            I_X -->|"FLOAT(a, 2, c, 2*e)"| Shape_2
+            I_X -->|"FLOAT(a, 2, c, 2*e)"| Shape_3
+            Shape_3 -->|"INT64(1)"| Squeeze_4
+            Squeeze_4 -->|"INT64()"| Range_5
+            Shape_2 -->|"INT64(1)"| Concat_6
+            Range_5 -->|"INT64(NEWDIM_range_0)"| Expand_7
+            Concat_6 -->|"INT64(2)"| Expand_7
+            I_X -->|"FLOAT(a, 2, c, 2*e)"| RotaryEmbedding_8
+            Expand_7 -->|"INT64(a, NEWDIM_range_0)"| RotaryEmbedding_8
+            Squeeze_0 -->|"FLOAT(c, e)"| RotaryEmbedding_8
+            Squeeze_1 -->|"FLOAT(c, e)"| RotaryEmbedding_8
+
+            O_Y(["Y FLOAT(a, b, c, 2*e)"])
+            RotaryEmbedding_8 --> O_Y
+
+            class I_X,I_m1,I_m2,O_Y ioNode
+            class Squeeze_0,Squeeze_1,Shape_2,Shape_3,Squeeze_4,Range_5,Concat_6,Expand_7 opNode
+            class RotaryEmbedding_8 opNode
     """
 
     _operator_name = FunctionHalfRotaryEmbeddingPattern._operator_name
@@ -597,156 +488,74 @@ class ContribRotaryEmbedding3DPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Transpose', ['X'], ['Xt'], perm=[0, 2, 1, 3]),
-                    oh.make_node(
-                        'RotaryEmbedding',
-                        [
-                            'Xt',
-                            'position_ids',
-                            'ContribRotaryEmbeddingPattern--m1x2',
-                            'ContribRotaryEmbeddingPattern--m2x2',
-                        ],
-                        ['Y'],
-                        domain='com.microsoft',
-                        num_heads=2,
-                        rotary_embedding_dim=4,
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'ContribRotaryEmbeddingPattern--m2x2',
-                        onnx.TensorProto.FLOAT,
-                        shape=('NEWDIM_range', 2),
-                    ),
-                    oh.make_tensor_value_info(
-                        'position_ids',
-                        onnx.TensorProto.INT64,
-                        shape=('a', 'e'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'ContribRotaryEmbeddingPattern--m1x2',
-                        onnx.TensorProto.FLOAT,
-                        shape=('NEWDIM_range', 2),
-                    ),
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'c', 2, 'd'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'b', 'c', 'd'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 20),
-                oh.make_opsetid('intermediate', 1),
-                oh.make_opsetid('com.microsoft', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            icrote_m2x2(["ContribRotaryEmbeddingPattern--m2x2 FLOAT(NEWDIM_range, 2)"])
+            I_position_ids(["position_ids INT64(a, e)"])
+            icrote_m1x2(["ContribRotaryEmbeddingPattern--m1x2 FLOAT(NEWDIM_range, 2)"])
+            I_X(["X FLOAT(a, c, 2, d)"])
+
+            Transpose_0[["Transpose(., perm=[0, 2, 1, 3])"]]
+            RotaryEmbedding_1[["com.microsoft.RotaryEmbedding(., ., ., .)"]]
+
+            I_X -->|"FLOAT(a, c, 2, d)"| Transpose_0
+            Transpose_0 -->|"FLOAT(a, 2, c, d)"| RotaryEmbedding_1
+            I_position_ids -->|"INT64(a, e)"| RotaryEmbedding_1
+            icrote_m1x2 -->|"FLOAT(NEWDIM_range, 2)"| RotaryEmbedding_1
+            icrote_m2x2 -->|"FLOAT(NEWDIM_range, 2)"| RotaryEmbedding_1
+
+            O_Y(["Y FLOAT(a, b, c, d)"])
+            RotaryEmbedding_1 --> O_Y
+
+            class icrote_m2x2,I_position_ids,icrote_m1x2,I_X,O_Y ioNode
+            class Transpose_0,RotaryEmbedding_1 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['init7_s3_0_0_-1'],
-                        value=onh.from_array(np.array([0, 0, -1], dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node('Reshape', ['X', 'init7_s3_0_0_-1'], ['X::3D']),
-                    oh.make_node(
-                        'RotaryEmbedding',
-                        [
-                            'X::3D',
-                            'position_ids',
-                            'ContribRotaryEmbeddingPattern--m1x2',
-                            'ContribRotaryEmbeddingPattern--m2x2',
-                        ],
-                        ['X::3Dr'],
-                        domain='com.microsoft',
-                        num_heads=2,
-                        rotary_embedding_dim=4,
-                    ),
-                    oh.make_node('Shape', ['X'], ['X::Shape3'], start=3),
-                    oh.make_node(
-                        'Concat',
-                        ['init7_s3_0_0_-1', 'X::Shape3'],
-                        ['X::Shape+1'],
-                        axis=0,
-                    ),
-                    oh.make_node('Reshape', ['X::3Dr', 'X::Shape+1'], ['X::4D']),
-                    oh.make_node('Transpose', ['X::4D'], ['Y'], perm=[0, 2, 1, 3]),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'ContribRotaryEmbeddingPattern--m2x2',
-                        onnx.TensorProto.FLOAT,
-                        shape=('NEWDIM_range', 2),
-                    ),
-                    oh.make_tensor_value_info(
-                        'position_ids',
-                        onnx.TensorProto.INT64,
-                        shape=('a', 'e'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'ContribRotaryEmbeddingPattern--m1x2',
-                        onnx.TensorProto.FLOAT,
-                        shape=('NEWDIM_range', 2),
-                    ),
-                    oh.make_tensor_value_info(
-                        'X',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'c', 2, 'd'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('a', 'b', 'c', 'd'),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 20),
-                oh.make_opsetid('intermediate', 1),
-                oh.make_opsetid('com.microsoft', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            icrote_m2x2(["ContribRotaryEmbeddingPattern--m2x2 FLOAT(NEWDIM_range, 2)"])
+            I_position_ids(["position_ids INT64(a, e)"])
+            icrote_m1x2(["ContribRotaryEmbeddingPattern--m1x2 FLOAT(NEWDIM_range, 2)"])
+            I_X(["X FLOAT(a, c, 2, d)"])
+
+            Reshape_0[["Reshape(., [0, 0, -1])"]]
+            RotaryEmbedding_1[["com.microsoft.RotaryEmbedding(., ., ., .)"]]
+            Shape_2[["Shape(., start=3)"]]
+            Concat_3[["Concat([0, 0, -1], ., axis=0)"]]
+            Reshape_4[["Reshape(., .)"]]
+            Transpose_5[["Transpose(., perm=[0, 2, 1, 3])"]]
+
+            I_X -->|"FLOAT(a, c, 2, d)"| Reshape_0
+            Reshape_0 -->|"FLOAT(a, c, 2*d)"| RotaryEmbedding_1
+            I_position_ids -->|"INT64(a, e)"| RotaryEmbedding_1
+            icrote_m1x2 -->|"FLOAT(NEWDIM_range, 2)"| RotaryEmbedding_1
+            icrote_m2x2 -->|"FLOAT(NEWDIM_range, 2)"| RotaryEmbedding_1
+            I_X -->|"FLOAT(a, c, 2, d)"| Shape_2
+            Shape_2 -->|"INT64(1)"| Concat_3
+            RotaryEmbedding_1 -->|"FLOAT(a, c, 2*d)"| Reshape_4
+            Concat_3 -->|"INT64(4)"| Reshape_4
+            Reshape_4 -->|"FLOAT(a, c, 2, d)"| Transpose_5
+
+            O_Y(["Y FLOAT(a, b, c, d)"])
+            Transpose_5 --> O_Y
+
+            class icrote_m2x2,I_position_ids,icrote_m1x2,I_X,O_Y ioNode
+            class Reshape_0,RotaryEmbedding_1,Shape_2,Concat_3,Reshape_4,Transpose_5 opNode
     """
 
     def match(
@@ -806,237 +615,102 @@ class MultiHeadAttention3DPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['scale_sqrt'],
-                        value=onh.from_array(
-                            np.array([0.3162277638912201], dtype=np.float32),
-                            name='value',
-                        ),
-                    ),
-                    oh.make_node('Transpose', ['query'], ['t_query'], perm=[0, 2, 1, 3]),
-                    oh.make_node('Transpose', ['keys'], ['t_keys'], perm=[0, 2, 1, 3]),
-                    oh.make_node('Concat', ['past_keys', 't_keys'], ['ct_keys'], axis=-2),
-                    oh.make_node('Transpose', ['values'], ['t_values'], perm=[0, 2, 1, 3]),
-                    oh.make_node('Concat', ['past_values', 't_values'], ['ct_values'], axis=-2),
-                    oh.make_node(
-                        'LocalAttention_to1',
-                        ['t_query', 'ct_keys', 'ct_values', 'mask', 'scale_sqrt'],
-                        ['prob'],
-                        domain='intermediate',
-                    ),
-                    oh.make_node('Transpose', ['prob'], ['Y'], perm=[0, 2, 1, 3]),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'mask',
-                        onnx.TensorProto.BOOL,
-                        shape=('am', 1, 'cm', 'dm'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'past_values',
-                        onnx.TensorProto.FLOAT,
-                        shape=('pav', 8, 'pcv', 64),
-                    ),
-                    oh.make_tensor_value_info(
-                        'values',
-                        onnx.TensorProto.FLOAT,
-                        shape=('av', 'bv', 8, 64),
-                    ),
-                    oh.make_tensor_value_info(
-                        'query',
-                        onnx.TensorProto.FLOAT,
-                        shape=('aq', 'bq', 8, 64),
-                    ),
-                    oh.make_tensor_value_info(
-                        'past_keys',
-                        onnx.TensorProto.FLOAT,
-                        shape=('pak', 8, 'pck', 64),
-                    ),
-                    oh.make_tensor_value_info(
-                        'keys',
-                        onnx.TensorProto.FLOAT,
-                        shape=('ak', 'bk', 8, 64),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'ct_values',
-                        onnx.TensorProto.FLOAT,
-                        shape=('pav', 8, 'pcv+bv', 64),
-                    ),
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('ay', 'by', 'cy', 'dy'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'ct_keys',
-                        onnx.TensorProto.FLOAT,
-                        shape=('pak', 8, 'pck+bk', 64),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('intermediate', 1),
-                oh.make_opsetid('com.microsoft', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_mask(["mask BOOL(am, 1, cm, dm)"])
+            I_past_values(["past_values FLOAT(pav, 8, pcv, 64)"])
+            I_values(["values FLOAT(av, bv, 8, 64)"])
+            I_query(["query FLOAT(aq, bq, 8, 64)"])
+            I_past_keys(["past_keys FLOAT(pak, 8, pck, 64)"])
+            I_keys(["keys FLOAT(ak, bk, 8, 64)"])
+
+            Transpose_0[["Transpose(., perm=[0, 2, 1, 3])"]]
+            Transpose_1[["Transpose(., perm=[0, 2, 1, 3])"]]
+            Concat_2[["Concat(., ., axis=-2)"]]
+            Transpose_3[["Transpose(., perm=[0, 2, 1, 3])"]]
+            Concat_4[["Concat(., ., axis=-2)"]]
+            LocalAttention_to1_5[["intermediate.LocalAttention_to1(., ., ., ., [0.31622776])"]]
+            Transpose_6[["Transpose(., perm=[0, 2, 1, 3])"]]
+
+            I_query -->|"FLOAT(aq, bq, 8, 64)"| Transpose_0
+            I_keys -->|"FLOAT(ak, bk, 8, 64)"| Transpose_1
+            I_past_keys -->|"FLOAT(pak, 8, pck, 64)"| Concat_2
+            Transpose_1 --> Concat_2
+            I_values -->|"FLOAT(av, bv, 8, 64)"| Transpose_3
+            I_past_values -->|"FLOAT(pav, 8, pcv, 64)"| Concat_4
+            Transpose_3 --> Concat_4
+            Transpose_0 --> LocalAttention_to1_5
+            Concat_2 --> LocalAttention_to1_5
+            Concat_4 --> LocalAttention_to1_5
+            I_mask -->|"BOOL(am, 1, cm, dm)"| LocalAttention_to1_5
+            LocalAttention_to1_5 --> Transpose_6
+
+            O_ct_values(["ct_values FLOAT(pav, 8, pcv+bv, 64)"])
+            Concat_4 --> O_ct_values
+            O_Y(["Y FLOAT(ay, by, cy, dy)"])
+            Transpose_6 --> O_Y
+            O_ct_keys(["ct_keys FLOAT(pak, 8, pck+bk, 64)"])
+            Concat_2 --> O_ct_keys
+
+            class I_mask,I_past_values,I_values,I_query,I_past_keys,I_keys ioNode
+            class O_ct_values,O_Y,O_ct_keys ioNode
+            class Transpose_0,Transpose_1,Concat_2,Transpose_3,Concat_4 opNode
+            class LocalAttention_to1_5,Transpose_6 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['init7_s3_0_0_-1'],
-                        value=onh.from_array(np.array([0, 0, -1], dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init1_s1_'],
-                        value=onh.from_array(np.array([0.0], dtype=np.float32), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init1_s1_2'],
-                        value=onh.from_array(np.array([-np.inf], dtype=np.float32), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init7_s4_0_0_-1_64'],
-                        value=onh.from_array(
-                            np.array([0, 0, -1, 64], dtype=np.int64),
-                            name='value',
-                        ),
-                    ),
-                    oh.make_node(
-                        'Reshape',
-                        ['query', 'init7_s3_0_0_-1'],
-                        ['MultiHeadAttention3DPattern--query'],
-                    ),
-                    oh.make_node(
-                        'Reshape',
-                        ['keys', 'init7_s3_0_0_-1'],
-                        ['MultiHeadAttention3DPattern--keys'],
-                    ),
-                    oh.make_node(
-                        'Reshape',
-                        ['values', 'init7_s3_0_0_-1'],
-                        ['MultiHeadAttention3DPattern--values'],
-                    ),
-                    oh.make_node(
-                        'Where',
-                        ['mask', 'init1_s1_', 'init1_s1_2'],
-                        ['MultiHeadAttention3DPattern--mask'],
-                    ),
-                    oh.make_node(
-                        'MultiHeadAttention',
-                        [
-                            'MultiHeadAttention3DPattern--query',
-                            'MultiHeadAttention3DPattern--keys',
-                            'MultiHeadAttention3DPattern--values',
-                            '',
-                            '',
-                            'MultiHeadAttention3DPattern--mask',
-                            'past_keys',
-                            'past_values',
-                        ],
-                        ['MultiHeadAttention3DPattern--Y', 'ct_keys', 'ct_values'],
-                        domain='com.microsoft',
-                        num_heads=8,
-                        scale=0.10000000149011612,
-                    ),
-                    oh.make_node(
-                        'Reshape',
-                        ['MultiHeadAttention3DPattern--Y', 'init7_s4_0_0_-1_64'],
-                        ['Y'],
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'mask',
-                        onnx.TensorProto.BOOL,
-                        shape=('am', 1, 'cm', 'dm'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'past_values',
-                        onnx.TensorProto.FLOAT,
-                        shape=('pav', 8, 'pcv', 64),
-                    ),
-                    oh.make_tensor_value_info(
-                        'values',
-                        onnx.TensorProto.FLOAT,
-                        shape=('av', 'bv', 8, 64),
-                    ),
-                    oh.make_tensor_value_info(
-                        'query',
-                        onnx.TensorProto.FLOAT,
-                        shape=('aq', 'bq', 8, 64),
-                    ),
-                    oh.make_tensor_value_info(
-                        'past_keys',
-                        onnx.TensorProto.FLOAT,
-                        shape=('pak', 8, 'pck', 64),
-                    ),
-                    oh.make_tensor_value_info(
-                        'keys',
-                        onnx.TensorProto.FLOAT,
-                        shape=('ak', 'bk', 8, 64),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'ct_values',
-                        onnx.TensorProto.FLOAT,
-                        shape=('pav', 8, 'pcv+bv', 64),
-                    ),
-                    oh.make_tensor_value_info(
-                        'Y',
-                        onnx.TensorProto.FLOAT,
-                        shape=('ay', 'by', 'cy', 'dy'),
-                    ),
-                    oh.make_tensor_value_info(
-                        'ct_keys',
-                        onnx.TensorProto.FLOAT,
-                        shape=('pak', 8, 'pck+bk', 64),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 18),
-                oh.make_opsetid('intermediate', 1),
-                oh.make_opsetid('com.microsoft', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_mask(["mask BOOL(am, 1, cm, dm)"])
+            I_past_values(["past_values FLOAT(pav, 8, pcv, 64)"])
+            I_values(["values FLOAT(av, bv, 8, 64)"])
+            I_query(["query FLOAT(aq, bq, 8, 64)"])
+            I_past_keys(["past_keys FLOAT(pak, 8, pck, 64)"])
+            I_keys(["keys FLOAT(ak, bk, 8, 64)"])
+
+            Reshape_0[["Reshape(., [0, 0, -1])"]]
+            Reshape_1[["Reshape(., [0, 0, -1])"]]
+            Reshape_2[["Reshape(., [0, 0, -1])"]]
+            Where_3[["Where(., [0.0], [-inf])"]]
+            MultiHeadAttention_4[["com.microsoft.MultiHeadAttention(., ., ., , , ., ., .)"]]
+            Reshape_5[["Reshape(., [0, 0, -1, 64])"]]
+
+            I_query -->|"FLOAT(aq, bq, 8, 64)"| Reshape_0
+            I_keys -->|"FLOAT(ak, bk, 8, 64)"| Reshape_1
+            I_values -->|"FLOAT(av, bv, 8, 64)"| Reshape_2
+            I_mask -->|"BOOL(am, 1, cm, dm)"| Where_3
+            Reshape_0 -->|"FLOAT(aq, bq, 512)"| MultiHeadAttention_4
+            Reshape_1 -->|"FLOAT(ak, bk, 512)"| MultiHeadAttention_4
+            Reshape_2 -->|"FLOAT(av, bv, 512)"| MultiHeadAttention_4
+            Where_3 -->|"FLOAT(am, 1, cm, dm)"| MultiHeadAttention_4
+            I_past_keys -->|"FLOAT(pak, 8, pck, 64)"| MultiHeadAttention_4
+            I_past_values -->|"FLOAT(pav, 8, pcv, 64)"| MultiHeadAttention_4
+            MultiHeadAttention_4 -->|"FLOAT(aq, bq, 512)"| Reshape_5
+
+            O_ct_values(["ct_values FLOAT(pav, 8, pcv+bv, 64)"])
+            MultiHeadAttention_4 --> O_ct_values
+            O_Y(["Y FLOAT(ay, by, cy, dy)"])
+            Reshape_5 --> O_Y
+            O_ct_keys(["ct_keys FLOAT(pak, 8, pck+bk, 64)"])
+            MultiHeadAttention_4 --> O_ct_keys
+
+            class I_mask,I_past_values,I_values,I_query,I_past_keys,I_keys ioNode
+            class O_ct_values,O_Y,O_ct_keys ioNode
+            class Reshape_0,Reshape_1,Reshape_2,Where_3,MultiHeadAttention_4,Reshape_5 opNode
     """
 
     _prefixes_operator_name = (
@@ -1213,333 +887,119 @@ class GroupQueryAttention3DPattern(PatternOptimization):
     Fuse LocalAttention into GroupQueryAttention.
     ``bias`` is not supported by this kernel on CUDA.
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['init1_s_::RSh1'],
-                        value=onh.from_array(
-                            np.array([0.4204482138156891], dtype=np.float32),
-                            name='value',
-                        ),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init7_s5_1_1_2_1_1'],
-                        value=onh.from_array(
-                            np.array([1, 1, 2, 1, 1], dtype=np.int64),
-                            name='value',
-                        ),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init7_s4_0_8_-1_32'],
-                        value=onh.from_array(
-                            np.array([0, 8, -1, 32], dtype=np.int64),
-                            name='value',
-                        ),
-                    ),
-                    oh.make_node('Concat', ['past_key', 'key'], ['cat'], axis=2),
-                    oh.make_node('Concat', ['past_value', 'value'], ['cat_1'], axis=2),
-                    oh.make_node(
-                        'LocalAttentionGQASW_to1',
-                        [
-                            'query',
-                            'cat',
-                            'cat_1',
-                            'bitwise_not',
-                            'init1_s_::RSh1',
-                            'init7_s5_1_1_2_1_1',
-                            'init7_s4_0_8_-1_32',
-                        ],
-                        ['output_0'],
-                        domain='intermediate',
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'query',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 8, 'seq_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'past_value',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 4, 'past_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'key',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 4, 'seq_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'value',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 4, 'seq_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'past_key',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 4, 'past_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'bitwise_not',
-                        onnx.TensorProto.BOOL,
-                        shape=('seq_length', 'total_length'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'output_0',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 8, 'seq_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'cat_1',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 4, 'past_length+seq_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'cat',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 4, 'past_length+seq_length', 32),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 24),
-                oh.make_opsetid('intermediate', 1),
-                oh.make_opsetid('com.microsoft', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_query(["query FLOAT(batch, 8, seq_length, 32)"])
+            I_past_value(["past_value FLOAT(batch, 4, past_length, 32)"])
+            I_key(["key FLOAT(batch, 4, seq_length, 32)"])
+            I_value(["value FLOAT(batch, 4, seq_length, 32)"])
+            I_past_key(["past_key FLOAT(batch, 4, past_length, 32)"])
+            I_bitwise_not(["bitwise_not BOOL(seq_length, total_length)"])
+
+            Concat_0[["Concat(., ., axis=2)"]]
+            Concat_1[["Concat(., ., axis=2)"]]
+            locatt2[["intermediate.LocalAttentionGQASW_to1(
+            ., ., ., ., [0.4204482], [1, 1, 2, 1, 1], [0, 8, -1, 32])"]]
+
+            I_past_key -->|"FLOAT(batch, 4, past_length, 32)"| Concat_0
+            I_key -->|"FLOAT(batch, 4, seq_length, 32)"| Concat_0
+            I_past_value -->|"FLOAT(batch, 4, past_length, 32)"| Concat_1
+            I_value -->|"FLOAT(batch, 4, seq_length, 32)"| Concat_1
+            I_query -->|"FLOAT(batch, 8, seq_length, 32)"| locatt2
+            Concat_0 --> locatt2
+            Concat_1 --> locatt2
+            I_bitwise_not -->|"BOOL(seq_length, total_length)"| locatt2
+
+            O_output_0(["output_0 FLOAT(batch, 8, seq_length, 32)"])
+            locatt2 --> O_output_0
+            O_cat_1(["cat_1 FLOAT(batch, 4, past_length+seq_length, 32)"])
+            Concat_1 --> O_cat_1
+            O_cat(["cat FLOAT(batch, 4, past_length+seq_length, 32)"])
+            Concat_0 --> O_cat
+
+            class I_query,I_past_value,I_key,I_value,I_past_key,I_bitwise_not ioNode
+            class O_output_0,O_cat_1,O_cat ioNode
+            class Concat_0,Concat_1,locatt2 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['init1_s1_3'],
-                        value=onh.from_array(
-                            np.array([-3.4028234663852886e+38], dtype=np.float32),
-                            name='value',
-                        ),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init1_s1_2'],
-                        value=onh.from_array(np.array([0.0], dtype=np.float32), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init7_s2_0_1'],
-                        value=onh.from_array(np.array([0, 1], dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init6_s1_'],
-                        value=onh.from_array(np.array([1], dtype=np.int32), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init7_s3_0_0_-1'],
-                        value=onh.from_array(np.array([0, 0, -1], dtype=np.int64), name='value'),
-                    ),
-                    oh.make_node(
-                        'Constant', [], ['init7_s4_0_0_-1_32'],
-                        value=onh.from_array(
-                            np.array([0, 0, -1, 32], dtype=np.int64),
-                            name='value',
-                        ),
-                    ),
-                    oh.make_node(
-                        'Where',
-                        ['bitwise_not', 'init1_s1_3', 'init1_s1_2'],
-                        ['GroupQueryAttention3DPattern--bitwise_not2'],
-                    ),
-                    oh.make_node(
-                        'Shape',
-                        ['query'],
-                        ['GroupQueryAttention3DPattern--query3'],
-                        end=1,
-                        start=0,
-                    ),
-                    oh.make_node(
-                        'Unsqueeze',
-                        ['GroupQueryAttention3DPattern--bitwise_not2', 'init7_s2_0_1'],
-                        ['GroupQueryAttention3DPattern--bitwise_not'],
-                    ),
-                    oh.make_node(
-                        'Shape',
-                        ['GroupQueryAttention3DPattern--bitwise_not2'],
-                        ['GroupQueryAttention3DPattern--tl'],
-                        start=-1,
-                    ),
-                    oh.make_node(
-                        'Cast',
-                        ['GroupQueryAttention3DPattern--tl'],
-                        ['GroupQueryAttention3DPattern--tl2'],
-                        to=6,
-                    ),
-                    oh.make_node(
-                        'Sub',
-                        ['GroupQueryAttention3DPattern--tl2', 'init6_s1_'],
-                        ['GroupQueryAttention3DPattern--tl_1'],
-                    ),
-                    oh.make_node(
-                        'Expand',
-                        [
-                            'GroupQueryAttention3DPattern--tl_1',
-                            'GroupQueryAttention3DPattern--query3',
-                        ],
-                        ['GroupQueryAttention3DPattern--sl'],
-                    ),
-                    oh.make_node(
-                        'Transpose',
-                        ['query'],
-                        ['GroupQueryAttention3DPattern--query2'],
-                        perm=[0, 2, 1, 3],
-                    ),
-                    oh.make_node(
-                        'Transpose',
-                        ['key'],
-                        ['GroupQueryAttention3DPattern--cat2'],
-                        perm=[0, 2, 1, 3],
-                    ),
-                    oh.make_node(
-                        'Transpose',
-                        ['value'],
-                        ['GroupQueryAttention3DPattern--cat_12'],
-                        perm=[0, 2, 1, 3],
-                    ),
-                    oh.make_node(
-                        'Reshape',
-                        ['GroupQueryAttention3DPattern--query2', 'init7_s3_0_0_-1'],
-                        ['GroupQueryAttention3DPattern--query'],
-                    ),
-                    oh.make_node(
-                        'Reshape',
-                        ['GroupQueryAttention3DPattern--cat2', 'init7_s3_0_0_-1'],
-                        ['GroupQueryAttention3DPattern--cat'],
-                    ),
-                    oh.make_node(
-                        'Reshape',
-                        ['GroupQueryAttention3DPattern--cat_12', 'init7_s3_0_0_-1'],
-                        ['GroupQueryAttention3DPattern--cat_1'],
-                    ),
-                    oh.make_node(
-                        'GroupQueryAttention',
-                        [
-                            'GroupQueryAttention3DPattern--query',
-                            'GroupQueryAttention3DPattern--cat',
-                            'GroupQueryAttention3DPattern--cat_1',
-                            'past_key',
-                            'past_value',
-                            'GroupQueryAttention3DPattern--sl',
-                            'GroupQueryAttention3DPattern--tl2',
-                            '',
-                            '',
-                            '',
-                            'GroupQueryAttention3DPattern--bitwise_not',
-                        ],
-                        ['GroupQueryAttention3DPattern--output_0', 'cat', 'cat_1'],
-                        domain='com.microsoft',
-                        do_rotary=0,
-                        kv_num_heads=4,
-                        num_heads=8,
-                        rotary_interleaved=0,
-                        scale=0.1767767071723938,
-                    ),
-                    oh.make_node(
-                        'Reshape',
-                        ['GroupQueryAttention3DPattern--output_0', 'init7_s4_0_0_-1_32'],
-                        ['GroupQueryAttention3DPattern--output_02'],
-                    ),
-                    oh.make_node(
-                        'Transpose',
-                        ['GroupQueryAttention3DPattern--output_02'],
-                        ['output_0'],
-                        perm=[0, 2, 1, 3],
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info(
-                        'query',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 8, 'seq_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'past_value',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 4, 'past_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'key',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 4, 'seq_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'value',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 4, 'seq_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'past_key',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 4, 'past_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'bitwise_not',
-                        onnx.TensorProto.BOOL,
-                        shape=('seq_length', 'total_length'),
-                    ),
-                ],
-                [
-                    oh.make_tensor_value_info(
-                        'output_0',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 8, 'seq_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'cat_1',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 4, 'past_length+seq_length', 32),
-                    ),
-                    oh.make_tensor_value_info(
-                        'cat',
-                        onnx.TensorProto.FLOAT,
-                        shape=('batch', 4, 'past_length+seq_length', 32),
-                    ),
-                ],
-            ),
-            functions=[],
-            opset_imports=[
-                oh.make_opsetid('', 24),
-                oh.make_opsetid('intermediate', 1),
-                oh.make_opsetid('com.microsoft', 1),
-            ],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_query(["query FLOAT(batch, 8, seq_length, 32)"])
+            I_past_value(["past_value FLOAT(batch, 4, past_length, 32)"])
+            I_key(["key FLOAT(batch, 4, seq_length, 32)"])
+            I_value(["value FLOAT(batch, 4, seq_length, 32)"])
+            I_past_key(["past_key FLOAT(batch, 4, past_length, 32)"])
+            I_bitwise_not(["bitwise_not BOOL(seq_length, total_length)"])
+
+            Where_0[["Where(., [-3.4028235e+38], [0.0])"]]
+            Shape_1[["Shape(., end=1, start=0)"]]
+            Unsqueeze_2[["Unsqueeze(., [0, 1])"]]
+            Shape_3[["Shape(., start=-1)"]]
+            Cast_4[["Cast(., to=INT32)"]]
+            Sub_5[["Sub(., [1])"]]
+            Expand_6[["Expand(., .)"]]
+            Transpose_7[["Transpose(., perm=[0, 2, 1, 3])"]]
+            Transpose_8[["Transpose(., perm=[0, 2, 1, 3])"]]
+            Transpose_9[["Transpose(., perm=[0, 2, 1, 3])"]]
+            Reshape_10[["Reshape(., [0, 0, -1])"]]
+            Reshape_11[["Reshape(., [0, 0, -1])"]]
+            Reshape_12[["Reshape(., [0, 0, -1])"]]
+            gqa13[["com.microsoft.GroupQueryAttention(., ., ., ., ., ., ., , , , .)"]]
+            Reshape_14[["Reshape(., [0, 0, -1, 32])"]]
+            Transpose_15[["Transpose(., perm=[0, 2, 1, 3])"]]
+
+            I_bitwise_not -->|"BOOL(seq_length, total_length)"| Where_0
+            I_query -->|"FLOAT(batch, 8, seq_length, 32)"| Shape_1
+            Where_0 --> Unsqueeze_2
+            Where_0 --> Shape_3
+            Shape_3 --> Cast_4
+            Cast_4 --> Sub_5
+            Sub_5 --> Expand_6
+            Shape_1 --> Expand_6
+            I_query -->|"FLOAT(batch, 8, seq_length, 32)"| Transpose_7
+            I_key -->|"FLOAT(batch, 4, seq_length, 32)"| Transpose_8
+            I_value -->|"FLOAT(batch, 4, seq_length, 32)"| Transpose_9
+            Transpose_7 --> Reshape_10
+            Transpose_8 --> Reshape_11
+            Transpose_9 --> Reshape_12
+            Reshape_10 --> gqa13
+            Reshape_11 --> gqa13
+            Reshape_12 --> gqa13
+            I_past_key -->|"FLOAT(batch, 4, past_length, 32)"| gqa13
+            I_past_value -->|"FLOAT(batch, 4, past_length, 32)"| gqa13
+            Expand_6 --> gqa13
+            Cast_4 --> gqa13
+            Unsqueeze_2 --> gqa13
+            gqa13 --> Reshape_14
+            Reshape_14 --> Transpose_15
+
+            O_output_0(["output_0 FLOAT(batch, 8, seq_length, 32)"])
+            Transpose_15 --> O_output_0
+            O_cat_1(["cat_1 FLOAT(batch, 4, past_length+seq_length, 32)"])
+            gqa13 --> O_cat_1
+            O_cat(["cat FLOAT(batch, 4, past_length+seq_length, 32)"])
+            gqa13 --> O_cat
+
+            class I_query,I_past_value,I_key,I_value,I_past_key,I_bitwise_not ioNode
+            class O_output_0,O_cat_1,O_cat ioNode
+            class Where_0,Shape_1,Unsqueeze_2,Shape_3,Cast_4,Sub_5,Expand_6,Transpose_7 opNode
+            class Transpose_8,Transpose_9,Reshape_10,Reshape_11,Reshape_12 opNode
+            class gqa13,Reshape_14,Transpose_15 opNode
     """
 
     _prefixes_operator_name = (

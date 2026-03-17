@@ -12,168 +12,51 @@ class TreeEnsembleRegressorMulPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'Constant', [], ['cst'],
-                        value=onh.from_array(
-                            np.array([0.4000000059604645], dtype=np.float32),
-                            name='value',
-                        ),
-                    ),
-                    oh.make_node(
-                        'TreeEnsembleRegressor',
-                        ['X'],
-                        ['Ym'],
-                        domain='ai.onnx.ml',
-                        aggregate_function='SUM',
-                        n_targets=1,
-                        nodes_falsenodeids=[4, 3, 0, 0, 0, 2, 0, 4, 0, 0],
-                        nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
-                        nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                        nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        nodes_modes=[
-                            'BRANCH_LEQ',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'LEAF',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'LEAF',
-                        ],
-                        nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
-                        nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-                        nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
-                        nodes_values=[
-                            0.26645058393478394,
-                            0.6214364767074585,
-                            0.0,
-                            0.0,
-                            0.0,
-                            -0.7208403944969177,
-                            0.0,
-                            -0.5592705607414246,
-                            0.0,
-                            0.0,
-                        ],
-                        post_transform='NONE',
-                        target_ids=[0, 0, 0, 0, 0, 0],
-                        target_nodeids=[2, 3, 4, 1, 3, 4],
-                        target_treeids=[0, 0, 0, 1, 1, 1],
-                        target_weights_as_tensor=onh.from_array(
-                            np.array([1.0, 2.0, 4.0, 8.0, 16.0, 32.0], dtype=np.float32),
-                            name='target_weights_as_tensor',
-                        ),
-                    ),
-                    oh.make_node('Mul', ['Ym', 'cst'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('batch', 3)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('batch', 1)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('ai.onnx.ml', 4)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(batch, 3)"])
+
+            TreeEnsembleRegressor_0[["ai.onnx.ml.TreeEnsembleRegressor(.)"]]
+            Mul_1[["Mul(., [0.4])"]]
+
+            I_X -->|"FLOAT(batch, 3)"| TreeEnsembleRegressor_0
+            TreeEnsembleRegressor_0 -->|"FLOAT(batch, 1)"| Mul_1
+
+            O_Y(["Y FLOAT(batch, 1)"])
+            Mul_1 --> O_Y
+
+            class I_X,O_Y ioNode
+            class TreeEnsembleRegressor_0,Mul_1 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'TreeEnsembleRegressor',
-                        ['X'],
-                        ['Y'],
-                        domain='ai.onnx.ml',
-                        target_weights_as_tensor=onh.from_array(
-                            np.array([
-                                0.4000000059604645, 0.800000011920929, 1.600000023841858,
-                                3.200000047683716, 6.400000095367432, 12.800000190734863,
-                            ], dtype=np.float32),
-                            name='target_weights_as_tensor',
-                        ),
-                        aggregate_function='SUM',
-                        n_targets=1,
-                        nodes_falsenodeids=[4, 3, 0, 0, 0, 2, 0, 4, 0, 0],
-                        nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
-                        nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                        nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        nodes_modes=[
-                            'BRANCH_LEQ',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'LEAF',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'LEAF',
-                        ],
-                        nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
-                        nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-                        nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
-                        nodes_values=[
-                            0.26645058393478394,
-                            0.6214364767074585,
-                            0.0,
-                            0.0,
-                            0.0,
-                            -0.7208403944969177,
-                            0.0,
-                            -0.5592705607414246,
-                            0.0,
-                            0.0,
-                        ],
-                        post_transform='NONE',
-                        target_ids=[0, 0, 0, 0, 0, 0],
-                        target_nodeids=[2, 3, 4, 1, 3, 4],
-                        target_treeids=[0, 0, 0, 1, 1, 1],
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('batch', 3)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('batch', 1)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('ai.onnx.ml', 4)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(batch, 3)"])
+
+            TreeEnsembleRegressor_0[["ai.onnx.ml.TreeEnsembleRegressor(.)"]]
+
+            I_X -->|"FLOAT(batch, 3)"| TreeEnsembleRegressor_0
+
+            O_Y(["Y FLOAT(batch, 1)"])
+            TreeEnsembleRegressor_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class TreeEnsembleRegressor_0 opNode
     """
 
     def match(
@@ -234,341 +117,61 @@ class TreeEnsembleRegressorConcatPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Concat', ['Ys1', 'Ys2'], ['Y'], axis=1),
-                    oh.make_node('Sigmoid', ['Ym1'], ['Ys1']),
-                    oh.make_node('Sigmoid', ['Ym2'], ['Ys2']),
-                    oh.make_node(
-                        'TreeEnsembleRegressor',
-                        ['X'],
-                        ['Ym1'],
-                        domain='ai.onnx.ml',
-                        aggregate_function='SUM',
-                        n_targets=1,
-                        nodes_falsenodeids=[4, 3, 0, 0, 0, 2, 0, 4, 0, 0],
-                        nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
-                        nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                        nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        nodes_modes=[
-                            'BRANCH_LEQ',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'LEAF',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'LEAF',
-                        ],
-                        nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
-                        nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-                        nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
-                        nodes_values=[
-                            0.26645058393478394,
-                            0.6214364767074585,
-                            0.0,
-                            0.0,
-                            0.0,
-                            -0.7208403944969177,
-                            0.0,
-                            -0.5592705607414246,
-                            0.0,
-                            0.0,
-                        ],
-                        post_transform='NONE',
-                        target_ids=[0, 0, 0, 0, 0, 0],
-                        target_nodeids=[2, 3, 4, 1, 3, 4],
-                        target_treeids=[0, 0, 0, 1, 1, 1],
-                        target_weights=[1.0, 2.0, 4.0, 8.0, 16.0, 32.0],
-                    ),
-                    oh.make_node(
-                        'TreeEnsembleRegressor',
-                        ['X'],
-                        ['Ym2'],
-                        domain='ai.onnx.ml',
-                        aggregate_function='SUM',
-                        n_targets=1,
-                        nodes_falsenodeids=[4, 3, 0, 0, 0, 2, 0, 4, 0, 0],
-                        nodes_featureids=[0, 2, 0, 0, 0, 0, 0, 2, 0, 0],
-                        nodes_hitrates=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                        nodes_missing_value_tracks_true=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        nodes_modes=[
-                            'BRANCH_LEQ',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'LEAF',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'LEAF',
-                        ],
-                        nodes_nodeids=[0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
-                        nodes_treeids=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-                        nodes_truenodeids=[1, 2, 0, 0, 0, 1, 0, 3, 0, 0],
-                        nodes_values=[
-                            0.26645058393478394,
-                            0.6214364767074585,
-                            0.0,
-                            0.0,
-                            0.0,
-                            -0.7208403944969177,
-                            0.0,
-                            -0.5592705607414246,
-                            0.0,
-                            0.0,
-                        ],
-                        post_transform='NONE',
-                        target_ids=[0, 0, 0, 0, 0, 0],
-                        target_nodeids=[2, 3, 4, 1, 3, 4],
-                        target_treeids=[0, 0, 0, 1, 1, 1],
-                        target_weights=[1.0, 2.0, 4.0, 8.0, 16.0, 32.0],
-                    ),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('batch', 3)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('batch', 2)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('ai.onnx.ml', 4)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(batch, 3)"])
+
+            Concat_0[["Concat(., ., axis=1)"]]
+            Sigmoid_1[["Sigmoid(.)"]]
+            Sigmoid_2[["Sigmoid(.)"]]
+            TreeEnsembleRegressor_3[["ai.onnx.ml.TreeEnsembleRegressor(.)"]]
+            TreeEnsembleRegressor_4[["ai.onnx.ml.TreeEnsembleRegressor(.)"]]
+
+            Sigmoid_1 --> Concat_0
+            Sigmoid_2 --> Concat_0
+            TreeEnsembleRegressor_3 -->|"FLOAT(batch, 1)"| Sigmoid_1
+            TreeEnsembleRegressor_4 -->|"FLOAT(batch, 1)"| Sigmoid_2
+            I_X -->|"FLOAT(batch, 3)"| TreeEnsembleRegressor_3
+            I_X -->|"FLOAT(batch, 3)"| TreeEnsembleRegressor_4
+
+            O_Y(["Y FLOAT(batch, 2)"])
+            Concat_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Concat_0,Sigmoid_1,Sigmoid_2,TreeEnsembleRegressor_3 opNode
+            class TreeEnsembleRegressor_4 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
-        import numpy as np
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node(
-                        'TreeEnsembleRegressor',
-                        ['X'],
-                        ['TreeEnsembleRegressorConcatPattern_Y'],
-                        domain='ai.onnx.ml',
-                        aggregate_function='SUM',
-                        n_targets=2,
-                        nodes_falsenodeids=[
-                            4,
-                            3,
-                            0,
-                            0,
-                            0,
-                            2,
-                            0,
-                            4,
-                            0,
-                            0,
-                            4,
-                            3,
-                            0,
-                            0,
-                            0,
-                            2,
-                            0,
-                            4,
-                            0,
-                            0,
-                        ],
-                        nodes_featureids=[
-                            0,
-                            2,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            2,
-                            0,
-                            0,
-                            0,
-                            2,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            2,
-                            0,
-                            0,
-                        ],
-                        nodes_hitrates_as_tensor=onh.from_array(
-                            np.array([
-                                1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                                1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                            ], dtype=np.float32),
-                            name='nodes_hitrates_as_tensor',
-                        ),
-                        nodes_missing_value_tracks_true=[
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                        ],
-                        nodes_modes=[
-                            'BRANCH_LEQ',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'LEAF',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'LEAF',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'BRANCH_LEQ',
-                            'LEAF',
-                            'LEAF',
-                        ],
-                        nodes_nodeids=[
-                            0,
-                            1,
-                            2,
-                            3,
-                            4,
-                            0,
-                            1,
-                            2,
-                            3,
-                            4,
-                            0,
-                            1,
-                            2,
-                            3,
-                            4,
-                            0,
-                            1,
-                            2,
-                            3,
-                            4,
-                        ],
-                        nodes_treeids=[
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            1,
-                            1,
-                            1,
-                            1,
-                            1,
-                            2,
-                            2,
-                            2,
-                            2,
-                            2,
-                            3,
-                            3,
-                            3,
-                            3,
-                            3,
-                        ],
-                        nodes_truenodeids=[
-                            1,
-                            2,
-                            0,
-                            0,
-                            0,
-                            1,
-                            0,
-                            3,
-                            0,
-                            0,
-                            1,
-                            2,
-                            0,
-                            0,
-                            0,
-                            1,
-                            0,
-                            3,
-                            0,
-                            0,
-                        ],
-                        nodes_values_as_tensor=onh.from_array(
-                            np.array([
-                                0.26645058393478394, 0.6214364767074585, 0.0, 0.0, 0.0,
-                                -0.7208403944969177, 0.0, -0.5592705607414246, 0.0, 0.0,
-                                0.26645058393478394, 0.6214364767074585, 0.0, 0.0, 0.0,
-                                -0.7208403944969177, 0.0, -0.5592705607414246, 0.0, 0.0,
-                            ], dtype=np.float32),
-                            name='nodes_values_as_tensor',
-                        ),
-                        post_transform='NONE',
-                        target_ids=[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
-                        target_nodeids=[2, 3, 4, 1, 3, 4, 2, 3, 4, 1, 3, 4],
-                        target_treeids=[0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3],
-                        target_weights_as_tensor=onh.from_array(
-                            np.array([
-                                1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0,
-                            ], dtype=np.float32),
-                            name='target_weights_as_tensor',
-                        ),
-                    ),
-                    oh.make_node('Sigmoid', ['TreeEnsembleRegressorConcatPattern_Y'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, shape=('batch', 3)),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, shape=('batch', 2)),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18), oh.make_opsetid('ai.onnx.ml', 4)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_X(["X FLOAT(batch, 3)"])
+
+            TreeEnsembleRegressor_0[["ai.onnx.ml.TreeEnsembleRegressor(.)"]]
+            Sigmoid_1[["Sigmoid(.)"]]
+
+            I_X -->|"FLOAT(batch, 3)"| TreeEnsembleRegressor_0
+            TreeEnsembleRegressor_0 -->|"FLOAT(batch, 2)"| Sigmoid_1
+
+            O_Y(["Y FLOAT(batch, 2)"])
+            Sigmoid_1 --> O_Y
+
+            class I_X,O_Y ioNode
+            class TreeEnsembleRegressor_0,Sigmoid_1 opNode
     """
 
     def match(

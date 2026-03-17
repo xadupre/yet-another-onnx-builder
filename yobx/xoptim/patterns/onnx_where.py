@@ -9,66 +9,59 @@ class NotWherePattern(PatternOptimization):
     """
     Replaces the sequence Where(Not(cond), X, Y) -> Where(cond, Y, X).
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Not', ['X'], ['nx']),
-                    oh.make_node('Where', ['nx', 'A', 'B'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('A', onnx.TensorProto.INT64, ('a', 'b')),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.BOOL, ('a', 'b')),
-                    oh.make_tensor_value_info('B', onnx.TensorProto.INT64, ('a', 'b')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.INT64, ('a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_A(["A INT64(a, b)"])
+            I_X(["X BOOL(a, b)"])
+            I_B(["B INT64(a, b)"])
+
+            Not_0[["Not(.)"]]
+            Where_1[["Where(., ., .)"]]
+
+            I_X -->|"BOOL(a, b)"| Not_0
+            Not_0 -->|"BOOL(a, b)"| Where_1
+            I_A -->|"INT64(a, b)"| Where_1
+            I_B -->|"INT64(a, b)"| Where_1
+
+            O_Y(["Y INT64(a, b)"])
+            Where_1 --> O_Y
+
+            class I_A,I_X,I_B,O_Y ioNode
+            class Not_0,Where_1 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Where', ['X', 'B', 'A'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('A', onnx.TensorProto.INT64, ('a', 'b')),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.BOOL, ('a', 'b')),
-                    oh.make_tensor_value_info('B', onnx.TensorProto.INT64, ('a', 'b')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.INT64, ('a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 18)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_A(["A INT64(a, b)"])
+            I_X(["X BOOL(a, b)"])
+            I_B(["B INT64(a, b)"])
+
+            Where_0[["Where(., ., .)"]]
+
+            I_X -->|"BOOL(a, b)"| Where_0
+            I_B -->|"INT64(a, b)"| Where_0
+            I_A -->|"INT64(a, b)"| Where_0
+
+            O_Y(["Y INT64(a, b)"])
+            Where_0 --> O_Y
+
+            class I_A,I_X,I_B,O_Y ioNode
+            class Where_0 opNode
     """
 
     def match(
@@ -107,74 +100,61 @@ class WhereAddPattern(PatternOptimization):
 
     Model with nodes to be fused:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Constant', [], ['zero'],
-                                 value=onh.from_array(np.array([0.0], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Constant', [], ['inf'],
-                                 value=onh.from_array(np.array([-float('inf')], dtype=np.float32),
-                                 name='value')),
-                    oh.make_node('Where', ['mask', 'zero', 'inf'], ['fmask']),
-                    oh.make_node('Add', ['fmask', 'X'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('inf', onnx.TensorProto.FLOAT, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('mask', onnx.TensorProto.BOOL, ('a', 'b')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_inf(["inf FLOAT(1)"])
+            I_X(["X FLOAT(a, b)"])
+            I_mask(["mask BOOL(a, b)"])
+
+            Constant_0[["Constant() -#gt; inf"]]
+            Where_1[["Where(., [0.0], .)"]]
+            Add_2[["Add(., .)"]]
+
+            I_mask -->|"BOOL(a, b)"| Where_1
+            Constant_0 -->|"FLOAT(1)"| Where_1
+            Where_1 -->|"FLOAT(a, b)"| Add_2
+            I_X -->|"FLOAT(a, b)"| Add_2
+
+            O_Y(["Y FLOAT(a, b)"])
+            Add_2 --> O_Y
+
+            class I_inf,I_X,I_mask,O_Y ioNode
+            class Constant_0 constNode
+            class Where_1,Add_2 opNode
 
     Outcome of the fusion:
 
-    .. gdot::
-        :script: DOT-SECTION
-        :process:
+    .. mermaid::
 
-        from yobx.doc import to_dot
-        import onnx
-        import onnx.helper as oh
+        graph TD
 
-        model = oh.make_model(
-            oh.make_graph(
-                [
-                    oh.make_node('Where', ['mask', 'X', 'inf'], ['Y']),
-                ],
-                'pattern',
-                [
-                    oh.make_tensor_value_info('inf', onnx.TensorProto.FLOAT, (1,)),
-                    oh.make_tensor_value_info('X', onnx.TensorProto.FLOAT, ('a', 'b')),
-                    oh.make_tensor_value_info('mask', onnx.TensorProto.BOOL, ('a', 'b')),
-                ],
-                [
-                    oh.make_tensor_value_info('Y', onnx.TensorProto.FLOAT, ('a', 'b')),
-                ],
-            ),
-            functions=[],
-            opset_imports=[oh.make_opsetid('', 26)],
-        )
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
-        print("DOT-SECTION", to_dot(model))
+            I_inf(["inf FLOAT(1)"])
+            I_X(["X FLOAT(a, b)"])
+            I_mask(["mask BOOL(a, b)"])
+
+            Where_0[["Where(., ., .)"]]
+
+            I_mask -->|"BOOL(a, b)"| Where_0
+            I_X -->|"FLOAT(a, b)"| Where_0
+            I_inf -->|"FLOAT(1)"| Where_0
+
+            O_Y(["Y FLOAT(a, b)"])
+            Where_0 --> O_Y
+
+            class I_inf,I_X,I_mask,O_Y ioNode
+            class Where_0 opNode
     """
 
     def match(
