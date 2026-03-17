@@ -55,6 +55,8 @@ It can export from many libraries:
 **deeplearning**
 
 +---------------------------------------+----------------------------------------+
+| :epkg:`jax`                           | :ref:`l-design-tensorflow-converter`   |
++---------------------------------------+----------------------------------------+
 | :epkg:`tensorflow`                    | :ref:`l-design-tensorflow-converter`   |
 +---------------------------------------+----------------------------------------+
 | :epkg:`torch`                         | :ref:`l-torch-converter`               |
