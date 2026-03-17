@@ -1,4 +1,5 @@
 import inspect
+import json
 import operator
 import os
 import pprint
@@ -8,6 +9,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Un
 from onnx import ModelProto, save_model
 from onnx.defs import onnx_opset_version
 from onnx.model_container import ModelContainer
+import onnx.helper as oh
 from ...helpers import string_type
 from ...xbuilder.graph_builder import GraphBuilder, OptimizationOptions, FunctionOptions
 from ..export_options import ExportOptions
@@ -1180,7 +1182,9 @@ def check_model_weights(
     ``"transposed"`` rather than ``"unknown"``.
 
     :param model: original torch model
-    :param proto: exported ONNX model (``ModelProto`` or ``ModelContainer``)
+    :param proto: exported ONNX model (``ModelProto`` or ``ModelContainer``);
+        the check results are also written to ``proto.metadata_props`` under
+        the key ``"check_model_weights"`` as a JSON string
     :param verbose: verbosity level; when > 0 a summary is printed
     :return: list of 4-tuples
         ``(initializer_name, status, onnx_shape, original_shape)`` where
@@ -1249,6 +1253,23 @@ def check_model_weights(
                 status = "shape_mismatch"
 
         results.append((init_name, status, onnx_shape, orig_shape))
+
+    # Store the check results in the model metadata_props so they travel with the file.
+    meta_value = json.dumps(
+        [
+            {
+                "name": name,
+                "status": status,
+                "onnx_shape": list(onnx_shape),
+                "original_shape": list(orig_shape) if orig_shape is not None else None,
+            }
+            for name, status, onnx_shape, orig_shape in results
+        ]
+    )
+    oh.set_metadata_props(
+        proto if isinstance(proto, ModelProto) else proto.model_proto,
+        {"check_model_weights": meta_value},
+    )
 
     if verbose:
         n_match = sum(1 for _, s, _, _ in results if s == "match")

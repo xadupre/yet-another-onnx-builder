@@ -583,6 +583,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @ignore_warnings((UserWarning, DeprecationWarning))
     def test_check_model_weights_match(self):
         """check_model_weights returns 'match' for a simple linear model."""
+        import json
         import torch
 
         class Model(torch.nn.Module):
@@ -603,6 +604,13 @@ class TestOnnxExportCornerCase(ExtTestCase):
         # Without optimization the shapes should be identical.
         self.assertEqual(by_name["linear.weight"][0], "match")
         self.assertEqual(by_name["linear.bias"][0], "match")
+        # Results must also be stored in the model metadata_props.
+        meta = {p.key: p.value for p in onx.metadata_props}
+        self.assertIn("check_model_weights", meta)
+        stored = json.loads(meta["check_model_weights"])
+        stored_by_name = {entry["name"]: entry["status"] for entry in stored}
+        self.assertEqual(stored_by_name.get("linear.weight"), "match")
+        self.assertEqual(stored_by_name.get("linear.bias"), "match")
 
     @requires_torch()
     @ignore_warnings((UserWarning, DeprecationWarning))
