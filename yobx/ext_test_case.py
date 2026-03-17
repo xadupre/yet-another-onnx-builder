@@ -553,6 +553,28 @@ def requires_tensorflow(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
+def requires_jax(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`jax` or :mod:`jax.experimental.jax2tf` is not available."""
+    try:
+        import jax
+        from jax.experimental import jax2tf  # noqa: F401
+    except (ImportError, AttributeError):
+        return unittest.skip(msg or "jax[tensorflow] not installed")
+
+    try:
+        import tensorflow  # noqa: F401
+    except (ImportError, AttributeError):
+        return unittest.skip(msg or "tensorflow not installed (required for jax2tf)")
+
+    if not version:
+        return lambda x: x
+
+    if PvVersion(jax.__version__) < PvVersion(version):
+        msg = f"jax version {jax.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def has_xgboost(version: str = "") -> bool:
     "Returns True if XGBoost is installed and its version is high enough."
     try:

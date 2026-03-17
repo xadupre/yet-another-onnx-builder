@@ -87,7 +87,14 @@ def to_onnx(
     input_specs = _build_input_specs(input_names, args, dynamic_shapes)
 
     # Trace the model to obtain a concrete TF computation graph.
-    if hasattr(model, "get_concrete_function"):
+    if isinstance(model, tf.types.experimental.ConcreteFunction):
+        # Model is already a ConcreteFunction (e.g. from jax_to_concrete_function).
+        # Use it directly and take the input specs from its signature so the
+        # placeholder tensor names in the graph match the lookup in
+        # _convert_concrete_function.
+        cf = model
+        input_specs = list(cf.structured_input_signature[0])
+    elif hasattr(model, "get_concrete_function"):
         cf = model.get_concrete_function(*input_specs)
     else:
         fn = tf.function(model)

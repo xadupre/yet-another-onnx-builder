@@ -73,6 +73,10 @@ spox = [
 tensorflow = [
     "tensorflow>=2.20",
 ]
+jax = [
+    "jax[cpu]>=0.4",
+    "tensorflow>=2.20",
+]
 torch = [
     "accelerate",
     "onnxscript @ git+https://github.com/microsoft/onnxscript.git",
