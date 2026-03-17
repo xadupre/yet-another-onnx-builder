@@ -1,7 +1,10 @@
 def register():
-    from . import elliptic_envelope  # noqa: F401
-    from . import graphical_lasso  # noqa: F401
-    from . import ledoit_wolf  # noqa: F401
-    from . import min_cov_det  # noqa: F401
-    from . import oas  # noqa: F401
-    from . import shrunk_covariance  # noqa: F401
+    from . import (
+        elliptic_envelope,
+        empirical_covariance,
+        graphical_lasso,
+        ledoit_wolf,
+        min_cov_det,
+        oas,
+        shrunk_covariance,
+    )
