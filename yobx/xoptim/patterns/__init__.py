@@ -102,6 +102,7 @@ from .onnx_transpose import (
     TransposeTransposePattern,
 )
 from .onnx_unsqueeze import (
+    MulUnsqueezeUnsqueezePattern,
     SqueezeAddPattern,
     SqueezeBinaryUnsqueezePattern,
     SqueezeUnsqueezePattern,
@@ -181,6 +182,7 @@ def get_default_patterns(verbose: int = 0) -> List[PatternOptimization]:
         LayerNormalizationScalePattern(verbose=verbose),
         LeakyReluPattern(verbose=verbose),
         MulMulMulScalarPattern(verbose=verbose),
+        MulUnsqueezeUnsqueezePattern(verbose=verbose),
         NotNotPattern(verbose=verbose),
         NotWherePattern(verbose=verbose),
         ReduceArgTopKPattern(verbose=verbose),
