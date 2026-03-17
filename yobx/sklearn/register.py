@@ -28,7 +28,11 @@ def register_sklearn_converter(
         from ..pv_version import PvVersion
 
         enabled = PvVersion(__version__) >= PvVersion(sklearn_version)
-        VERSION_CONVERTERS[cls] = {"sklearn": sklearn_version}
+        if isinstance(cls, tuple):
+            for c in cls:
+                VERSION_CONVERTERS[c] = {"sklearn": sklearn_version}
+        else:
+            VERSION_CONVERTERS[cls] = {"sklearn": sklearn_version}
 
     def decorator(fct: Callable):
         """Registers a function to converts a model."""
