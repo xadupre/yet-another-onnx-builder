@@ -2574,12 +2574,29 @@ def aten_div_Tensor_mode(
         f"aten_div_Tensor_mode: nexpected value for round_mode={rounding_mode!r}"
         f"{g.get_debug_msg()}"
     )
-    assert rounding_mode == "floor", (
-        f"aten_div_Tensor_mode not yet implemented for "
-        f"round_mode={rounding_mode!r}{g.get_debug_msg()}"
-    )
     # Div does not support int64...
     itype = g.get_type(x) if g.has_type(x) else g.get_type(y)
+    if rounding_mode == "trunc":
+        if itype in {TensorProto.INT64, TensorProto.INT32}:
+            name = f"{name}_{rounding_mode}_int"
+            x, y = prepare_inputs_homogeneous_operator(g, x, y, force_type=TensorProto.FLOAT)
+            div = g.op.Div(x, y, name=name)
+            trunc = g.op.Mul(
+                g.op.Floor(g.op.Abs(div, name=name), name=name),
+                g.op.Sign(div, name=name),
+                name=name,
+            )
+            return g.op.Cast(trunc, to=itype, name=name, outputs=outputs)
+        name = f"{name}_{rounding_mode}_float"
+        x, y = prepare_inputs_homogeneous_operator(g, x, y)
+        div = g.op.Div(x, y, name=name)
+        return g.op.Mul(
+            g.op.Floor(g.op.Abs(div, name=name), name=name),
+            g.op.Sign(div, name=name),
+            name=name,
+            outputs=outputs,
+        )
+    # rounding_mode == "floor"
     if itype in {TensorProto.INT64, TensorProto.INT32}:
         name = f"{name}_{rounding_mode}_int"
         x, y = prepare_inputs_homogeneous_operator(g, x, y, force_type=TensorProto.FLOAT)
