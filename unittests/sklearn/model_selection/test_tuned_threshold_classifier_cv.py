@@ -7,7 +7,6 @@ import unittest
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import TunedThresholdClassifierCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -48,6 +47,8 @@ class TestSklearnTunedThresholdClassifierCV(ExtTestCase):
 
     def test_prefit_logistic_regression(self):
         """TunedThresholdClassifierCV with cv='prefit' wrapping LogisticRegression."""
+        from sklearn.model_selection import TunedThresholdClassifierCV
+
         base = LogisticRegression(solver="lbfgs").fit(self._X, self._y)
         clf = TunedThresholdClassifierCV(base, cv="prefit", refit=False)
         clf.fit(self._X, self._y)
@@ -55,6 +56,8 @@ class TestSklearnTunedThresholdClassifierCV(ExtTestCase):
 
     def test_cv_logistic_regression(self):
         """TunedThresholdClassifierCV with default CV wrapping LogisticRegression."""
+        from sklearn.model_selection import TunedThresholdClassifierCV
+
         clf = TunedThresholdClassifierCV(LogisticRegression(solver="lbfgs"))
         clf.fit(self._X, self._y)
         self._check_classifier(clf, self._X)
@@ -62,6 +65,8 @@ class TestSklearnTunedThresholdClassifierCV(ExtTestCase):
     def test_in_pipeline(self):
         """TunedThresholdClassifierCV used inside a Pipeline."""
         # Fit the inner estimator first (needed for cv='prefit').
+        from sklearn.model_selection import TunedThresholdClassifierCV
+
         base_pipe = Pipeline(
             [("scaler", StandardScaler()), ("clf", LogisticRegression(solver="lbfgs"))]
         ).fit(self._X, self._y)
@@ -81,6 +86,8 @@ class TestSklearnTunedThresholdClassifierCV(ExtTestCase):
 
     def test_float64_input(self):
         """Converter works with float64 inputs."""
+        from sklearn.model_selection import TunedThresholdClassifierCV
+
         X64 = self._X.astype(np.float64)
         base = LogisticRegression(solver="lbfgs").fit(X64, self._y)
         clf = TunedThresholdClassifierCV(base, cv="prefit", refit=False)
