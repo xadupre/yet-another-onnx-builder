@@ -396,11 +396,33 @@ def model_statistics(
         pass
 
     # Build a mapping name → shape tuple (or None for dynamic/unknown).
+    # Collect all tensor names from the graph without accessing private attributes.
     shape_map: Dict[str, Optional[Tuple]] = {}
-    for name in list(bs._known_shapes.keys()):  # type: ignore[attr-defined]
+
+    def _collect_names(graph: onnx.GraphProto) -> None:
+        for vi in list(graph.input) + list(graph.output):
+            all_names.add(vi.name)
+        for init in graph.initializer:
+            all_names.add(init.name)
+        for node in graph.node:
+            for n in list(node.input) + list(node.output):
+                if n:
+                    all_names.add(n)
+            for att in node.attribute:
+                if att.type == onnx.AttributeProto.GRAPH:
+                    _collect_names(att.g)
+                elif att.type == onnx.AttributeProto.GRAPHS:
+                    for g in att.graphs:
+                        _collect_names(g)
+
+    all_names: set = set()
+    _collect_names(model.graph)
+
+    for name in all_names:
+        if not bs.has_shape(name):
+            continue
         try:
             sh = bs.get_shape(name)
-            # Convert any non-int symbolic dim to None to mark as dynamic
             if all(isinstance(d, int) for d in sh):
                 shape_map[name] = tuple(int(d) for d in sh)
             else:

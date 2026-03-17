@@ -856,7 +856,7 @@ def get_parser_stats() -> ArgumentParser:
             """),
         formatter_class=RawTextHelpFormatter,
     )
-    parser.add_argument("input", type=str, help="onnx model to analyse")
+    parser.add_argument("input", type=str, help="onnx model to analyze")
     parser.add_argument(
         "-o",
         "--output",
