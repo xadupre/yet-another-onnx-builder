@@ -121,6 +121,25 @@ class TestStatsHelper(ExtTestCase):
         expected = 2 * M * K * N + M * N
         self.assertEqual(stats["flops_per_op_type"]["Gemm"], expected)
 
+    def test_literal_fn_used_for_matmul_output(self):
+        """MatMul where the output shape comes from a Reshape whose shape is a literal."""
+        # X [4,8] → Reshape(X, [1,32]) → Y [1,32] → MatMul(Y, W) → Z [1,16]
+        X = oh.make_tensor_value_info("X", TFLOAT, [4, 8])
+        Z = oh.make_tensor_value_info("Z", TFLOAT, [1, 16])
+        # Shape literal for Reshape: [1, 32]
+        reshape_shape = onh.from_array(np.array([1, 32], dtype=np.int64), name="rshape")
+        W = onh.from_array(np.ones((32, 16), dtype=np.float32), name="W")
+        nodes = [
+            oh.make_node("Reshape", ["X", "rshape"], ["Y"]),
+            oh.make_node("MatMul", ["Y", "W"], ["Z"]),
+        ]
+        graph = oh.make_graph(nodes, "literal_test", [X], [Z], [reshape_shape, W])
+        model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 17)])
+        stats = model_statistics(model)
+        # Reshape is zero-cost; MatMul [1,32] @ [32,16] → 2*1*32*16 = 1024
+        self.assertEqual(stats["flops_per_op_type"]["Reshape"], 0)
+        self.assertEqual(stats["flops_per_op_type"]["MatMul"], 2 * 1 * 32 * 16)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
