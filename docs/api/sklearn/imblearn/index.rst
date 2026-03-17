@@ -6,3 +6,4 @@ yobx.sklearn.imblearn
     :caption: modules
 
     easy_ensemble
+    balanced_bagging
