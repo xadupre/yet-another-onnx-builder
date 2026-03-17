@@ -1401,6 +1401,159 @@ class ShapeBasedConcatExpandPattern(PatternOptimization):
         ]
 
 
+class ExpandUnsqueezeExpandPattern(PatternOptimization):
+    """
+    Fuses the sequence Expand + Unsqueeze + Expand into Unsqueeze + Expand.
+    Since Expand does not change the rank of a tensor, the Unsqueeze axes are
+    valid for the original tensor as well, and the final Expand can handle
+    both the broadcasting of the first Expand and the new dimension added by
+    Unsqueeze.
+
+    Model with nodes to be fused:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(1, a, b)"])
+            I_shape1(["shape1 INT64(3)"])
+            I_axes(["axes INT64(1)"])
+            I_shape2(["shape2 INT64(4)"])
+
+            Constant_0[["Constant() -#gt; shape1"]]
+            Constant_1[["Constant() -#gt; axes"]]
+            Constant_2[["Constant() -#gt; shape2"]]
+            Expand_3[["Expand(., .)"]]
+            Unsqueeze_4[["Unsqueeze(., .)"]]
+            Expand_5[["Expand(., .)"]]
+
+            I_X -->|"FLOAT(1, a, b)"| Expand_3
+            Constant_0 -->|"INT64(3)"| Expand_3
+            Expand_3 -->|"FLOAT(c, a, b)"| Unsqueeze_4
+            Constant_1 -->|"INT64(1)"| Unsqueeze_4
+            Unsqueeze_4 -->|"FLOAT(c, 1, a, b)"| Expand_5
+            Constant_2 -->|"INT64(4)"| Expand_5
+
+            O_Y(["Y FLOAT(c, d, a, b)"])
+            Expand_5 --> O_Y
+
+            class I_X,I_shape1,I_axes,I_shape2,O_Y ioNode
+            class Constant_0,Constant_1,Constant_2 constNode
+            class Expand_3,Unsqueeze_4,Expand_5 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(1, a, b)"])
+            I_axes(["axes INT64(1)"])
+            I_shape2(["shape2 INT64(4)"])
+
+            Constant_0[["Constant() -#gt; axes"]]
+            Constant_1[["Constant() -#gt; shape2"]]
+            Unsqueeze_2[["Unsqueeze(., .)"]]
+            Expand_3[["Expand(., .)"]]
+
+            I_X -->|"FLOAT(1, a, b)"| Unsqueeze_2
+            Constant_0 -->|"INT64(1)"| Unsqueeze_2
+            Unsqueeze_2 -->|"FLOAT(1, 1, a, b)"| Expand_3
+            Constant_1 -->|"INT64(4)"| Expand_3
+
+            O_Y(["Y FLOAT(c, d, a, b)"])
+            Expand_3 --> O_Y
+
+            class I_X,I_axes,I_shape2,O_Y ioNode
+            class Constant_0,Constant_1 constNode
+            class Unsqueeze_2,Expand_3 opNode
+    """
+
+    def __init__(self, verbose: int = 0, priority: int = 0):
+        super().__init__(verbose, priority)
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        if node.op_type != "Expand" or node.domain != "":
+            return self.none()
+
+        # The first Expand output must be used only by the Unsqueeze.
+        if g.is_used_more_than_once(node.output[0]):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        next_nodes = g.next_nodes(node.output[0])
+        assert len(next_nodes) == 1, "The previous test should have cleared out this case."
+        unsq_node = next_nodes[0]
+
+        if unsq_node.op_type != "Unsqueeze" or unsq_node.domain != "":
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # The Unsqueeze must use the Expand output as its data input (not axes).
+        if unsq_node.input[0] != node.output[0]:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # The Unsqueeze axes must be provided as an input (opset >= 13).
+        if len(unsq_node.input) < 2 or not g.is_constant(unsq_node.input[1]):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # The Unsqueeze output must be used only by the second Expand.
+        if g.is_used_more_than_once(unsq_node.output[0]):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        next_next_nodes = g.next_nodes(unsq_node.output[0])
+        assert len(next_next_nodes) == 1, "The previous test should have cleared out this case."
+        expand2_node = next_next_nodes[0]
+
+        if expand2_node.op_type != "Expand" or expand2_node.domain != "":
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # The second Expand must use the Unsqueeze output as its data input.
+        if expand2_node.input[0] != unsq_node.output[0]:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        return MatchResult(self, [node, unsq_node, expand2_node], self.apply, insert_at=node)
+
+    def apply(
+        self,
+        g: "GraphBuilder",  # noqa: F821
+        expand_node: NodeProto,
+        unsq_node: NodeProto,
+        expand2_node: NodeProto,
+    ) -> List[NodeProto]:
+        # Apply Unsqueeze directly to the original tensor (before first Expand).
+        new_unsq_name = g.unique_name(f"{self.__class__.__name__}_{unsq_node.output[0]}")
+        new_unsq = g.make_node(
+            "Unsqueeze",
+            [expand_node.input[0], unsq_node.input[1]],
+            [new_unsq_name],
+            name=f"{self.__class__.__name__}--{unsq_node.name}",
+            doc_string=unsq_node.doc_string,
+        )
+        # The second Expand broadcasts the unsqueezed original tensor to the final shape.
+        new_expand2 = g.make_node(
+            "Expand",
+            [new_unsq_name, expand2_node.input[1]],
+            expand2_node.output,
+            name=f"{self.__class__.__name__}--{expand2_node.name}",
+            doc_string=expand2_node.doc_string,
+        )
+        return [new_unsq, new_expand2]
+
+
 class SwapExpandReshapePattern(PatternOptimization):
     """
     Checks if Expand + Reshape can be swapped.
