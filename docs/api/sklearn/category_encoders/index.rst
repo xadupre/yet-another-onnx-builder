@@ -5,6 +5,7 @@ yobx.sklearn.category_encoders
     :maxdepth: 1
     :caption: modules
 
+    ce_binary_encoder
     ce_one_hot_encoder
     polynomial_encoder
     quantile_encoder
