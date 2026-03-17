@@ -35,6 +35,8 @@ class TestModelEvalCases(ExtTestCase):
                 "dynamo",
                 "dynamo-ir",
                 "export-tracing",
+                "yobx",
+                "yobx-tracing",
             ),
         )
         self.assertIsInstance(ev, list)

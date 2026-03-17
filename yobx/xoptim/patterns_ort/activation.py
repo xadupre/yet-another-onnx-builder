@@ -535,6 +535,7 @@ class QuickGeluPattern(PatternOptimization):
 
             class I_X,O_Y ioNode
             class Sigmoid_0,Mul_1 opNode
+
     Outcome of the fusion:
 
     .. mermaid::

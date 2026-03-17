@@ -3,6 +3,7 @@ rm onnxruntime_profile*
 rm plot*.onnx
 rm plot*.png
 rm temp*.onnx
+rm test*.data
 rm test*.onnx
 rm dummy*.onnx
 rm *.ep
