@@ -132,9 +132,7 @@ class TestWOEEncoder(ExtTestCase):
 
         X_df, y, _dtype = self._make_data(np.float32)
         y_f = y.astype(np.float32)
-        pipe = Pipeline(
-            [("enc", WOEEncoder(cols=["cat1", "cat2"])), ("reg", LinearRegression())]
-        )
+        pipe = Pipeline([("enc", WOEEncoder(cols=["cat1", "cat2"])), ("reg", LinearRegression())])
         pipe.fit(X_df, y_f)
 
         X_np = X_df[:8].values.astype(np.float32)

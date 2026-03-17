@@ -76,11 +76,7 @@ def category_encoders_one_hot_encoder(
     float_onnx_type = int(itype)
 
     # Detect floating-point input (required for IsNaN handling).
-    _FLOAT_TYPES = {
-        onnx.TensorProto.FLOAT,
-        onnx.TensorProto.FLOAT16,
-        onnx.TensorProto.DOUBLE,
-    }
+    _FLOAT_TYPES = {onnx.TensorProto.FLOAT, onnx.TensorProto.FLOAT16, onnx.TensorProto.DOUBLE}
     is_float_input = itype in _FLOAT_TYPES
 
     handle_return_nan = estimator.handle_unknown == "return_nan"
@@ -113,8 +109,8 @@ def category_encoders_one_hot_encoder(
         # the output columns match the order expected by the encoder.
         known_cats = [
             (orig_val, int(ordinal))
-            for orig_val, ordinal in ord_map.items()
-            if not pd.isna(orig_val)
+            for orig_val, ordinal in ord_map.items()  # type: ignore
+            if not pd.isna(orig_val)  # type: ignore
         ]
         known_cats.sort(key=lambda x: x[1])
 
@@ -141,10 +137,7 @@ def category_encoders_one_hot_encoder(
 
             # ReduceMax over indicators: 1.0 if any category matched, else 0.0.
             any_match_val = g.op.ReduceMax(
-                stacked,
-                np.array([1], dtype=np.int64),
-                keepdims=1,
-                name=f"{name}_anymax{col_i}",
+                stacked, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_anymax{col_i}"
             )  # (N, 1)
             # Threshold at 0.5 to convert from float indicator (0.0 or 1.0) to bool.
             half = np.array([[0.5]], dtype=dtype)

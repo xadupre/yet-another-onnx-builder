@@ -84,12 +84,7 @@ class TestCEOneHotEncoder(ExtTestCase):
         from category_encoders import OneHotEncoder
         from yobx.sklearn import to_onnx
 
-        X_df = pd.DataFrame(
-            {
-                "cat": [0.0, 1.0, 2.0, 0.0, 1.0],
-                "num": [1.0, 2.0, 3.0, 4.0, 5.0],
-            }
-        )
+        X_df = pd.DataFrame({"cat": [0.0, 1.0, 2.0, 0.0, 1.0], "num": [1.0, 2.0, 3.0, 4.0, 5.0]})
         enc = OneHotEncoder(cols=["cat"], handle_unknown="value")
         enc.fit(X_df)
 
@@ -108,12 +103,7 @@ class TestCEOneHotEncoder(ExtTestCase):
         from category_encoders import OneHotEncoder
         from yobx.sklearn import to_onnx
 
-        X_df = pd.DataFrame(
-            {
-                "cat": [0.0, 1.0, 2.0, 0.0, 1.0],
-                "num": [1.0, 2.0, 3.0, 4.0, 5.0],
-            }
-        )
+        X_df = pd.DataFrame({"cat": [0.0, 1.0, 2.0, 0.0, 1.0], "num": [1.0, 2.0, 3.0, 4.0, 5.0]})
         enc = OneHotEncoder(cols=["cat"], handle_unknown="return_nan")
         enc.fit(X_df)
 
@@ -128,9 +118,7 @@ class TestCEOneHotEncoder(ExtTestCase):
         # Compare NaN positions separately
         nan_mask = np.isnan(expected)
         self.assertEqualArray(nan_mask, np.isnan(ort_result))
-        self.assertEqualArray(
-            expected[~nan_mask], ort_result[~nan_mask], atol=1e-6
-        )
+        self.assertEqualArray(expected[~nan_mask], ort_result[~nan_mask], atol=1e-6)
 
     def test_nan_input_produces_zeros(self):
         """NaN input always produces all-zero indicator block."""
@@ -168,10 +156,7 @@ class TestCEOneHotEncoder(ExtTestCase):
         y = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype=np.float32)
 
         pipe = Pipeline(
-            [
-                ("enc", OneHotEncoder(cols=["cat1", "cat2"])),
-                ("reg", LinearRegression()),
-            ]
+            [("enc", OneHotEncoder(cols=["cat1", "cat2"])), ("reg", LinearRegression())]
         )
         pipe.fit(X_df, y)
 

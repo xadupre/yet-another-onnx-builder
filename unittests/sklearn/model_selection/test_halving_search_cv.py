@@ -81,11 +81,7 @@ class TestSklearnHalvingSearchCV(ExtTestCase):
 
     def test_halving_grid_search_regressor(self):
         reg = HalvingGridSearchCV(
-            Ridge(),
-            {"alpha": [0.1, 1.0, 10.0]},
-            cv=2,
-            random_state=0,
-            min_resources="exhaust",
+            Ridge(), {"alpha": [0.1, 1.0, 10.0]}, cv=2, random_state=0, min_resources="exhaust"
         ).fit(self._X, self._y_reg)
         self._check_regressor(reg, self._X)
 
@@ -101,11 +97,7 @@ class TestSklearnHalvingSearchCV(ExtTestCase):
 
     def test_halving_random_search_regressor(self):
         reg = HalvingRandomSearchCV(
-            Ridge(),
-            {"alpha": [0.1, 1.0, 10.0]},
-            cv=2,
-            random_state=0,
-            n_candidates=3,
+            Ridge(), {"alpha": [0.1, 1.0, 10.0]}, cv=2, random_state=0, n_candidates=3
         ).fit(self._X, self._y_reg)
         self._check_regressor(reg, self._X)
 
