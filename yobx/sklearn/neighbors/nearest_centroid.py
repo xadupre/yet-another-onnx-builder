@@ -57,9 +57,7 @@ def _compute_discriminant_scores(
         centroids_norm = centroids.astype(dtype)
 
     # Pairwise distances on normalised data, then square them: (N, C)
-    dists = _compute_pairwise_distances(
-        g, X_norm, centroids_norm, itype, metric, f"{name}_dist"
-    )
+    dists = _compute_pairwise_distances(g, X_norm, centroids_norm, itype, metric, f"{name}_dist")
     sq_dists = g.op.Mul(dists, dists, name=f"{name}_sq_dists")
 
     # Discriminant score: -sq_dist + 2 * log(prior)  → (N, C)
@@ -68,7 +66,7 @@ def _compute_discriminant_scores(
     return g.op.Add(neg_sq, log_prior, name=f"{name}_scores")
 
 
-@register_sklearn_converter(NearestCentroid)
+@register_sklearn_converter(NearestCentroid, "1.8")
 def sklearn_nearest_centroid(
     g: GraphBuilderExtendedProtocol,
     sts: Dict,
@@ -79,6 +77,8 @@ def sklearn_nearest_centroid(
 ) -> Union[str, Tuple[str, str]]:
     """
     Converts a :class:`sklearn.neighbors.NearestCentroid` into ONNX.
+    The converter is registered only is ``scikit-learn>=1.8``.
+    It is not tested before that version.
 
     Reproduces both :meth:`~sklearn.neighbors.NearestCentroid.predict` and
     :meth:`~sklearn.neighbors.NearestCentroid.predict_proba`.
@@ -215,17 +215,11 @@ def sklearn_nearest_centroid(
     )
 
     # Numerically-stable softmax: proba = exp(s - max(s)) / sum(exp(s - max(s)))
-    s_max = g.op.ReduceMax(
-        scores, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_smax"
-    )
+    s_max = g.op.ReduceMax(scores, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_smax")
     s_shifted = g.op.Sub(scores, s_max, name=f"{name}_sshift")
     s_exp = g.op.Exp(s_shifted, name=f"{name}_sexp")
-    s_sum = g.op.ReduceSum(
-        s_exp, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_ssum"
-    )
-    probabilities = g.op.Div(
-        s_exp, s_sum, name=f"{name}_proba_out", outputs=outputs[1:2]
-    )
+    s_sum = g.op.ReduceSum(s_exp, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_ssum")
+    probabilities = g.op.Div(s_exp, s_sum, name=f"{name}_proba_out", outputs=outputs[1:2])
     assert isinstance(probabilities, str)
     if not sts:
         g.set_type(probabilities, itype)

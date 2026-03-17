@@ -61,9 +61,7 @@ class TestBayesianGaussianMixture(ExtTestCase):
 
         rng = np.random.default_rng(3)
         X = rng.standard_normal((50, 4)).astype(np.float32)
-        bgm = BayesianGaussianMixture(
-            n_components=3, covariance_type="spherical", random_state=0
-        )
+        bgm = BayesianGaussianMixture(n_components=3, covariance_type="spherical", random_state=0)
         bgm.fit(X)
         self._check_bayesian_gaussian_mixture(bgm, X)
 

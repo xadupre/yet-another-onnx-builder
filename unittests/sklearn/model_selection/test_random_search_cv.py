@@ -80,11 +80,7 @@ class TestSklearnRandomizedSearchCV(ExtTestCase):
 
     def test_regressor(self):
         reg = RandomizedSearchCV(
-            Ridge(),
-            {"alpha": [0.1, 1.0, 10.0]},
-            n_iter=3,
-            cv=2,
-            random_state=0,
+            Ridge(), {"alpha": [0.1, 1.0, 10.0]}, n_iter=3, cv=2, random_state=0
         ).fit(self._X, self._y_reg)
         self._check_regressor(reg, self._X)
 
@@ -95,11 +91,7 @@ class TestSklearnRandomizedSearchCV(ExtTestCase):
                 (
                     "clf",
                     RandomizedSearchCV(
-                        LogisticRegression(),
-                        {"C": [0.1, 1.0]},
-                        n_iter=2,
-                        cv=2,
-                        random_state=0,
+                        LogisticRegression(), {"C": [0.1, 1.0]}, n_iter=2, cv=2, random_state=0
                     ),
                 ),
             ]

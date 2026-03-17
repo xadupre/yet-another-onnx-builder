@@ -95,9 +95,7 @@ def category_encoders_woe_encoder(
     :param name: prefix name for the added nodes
     :return: output name
     """
-    assert isinstance(
-        estimator, WOEEncoder
-    ), f"Unexpected type {type(estimator)} for estimator."
+    assert isinstance(estimator, WOEEncoder), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
     assert (
         estimator.mapping is not None
