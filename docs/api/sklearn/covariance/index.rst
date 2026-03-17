@@ -6,4 +6,5 @@ yobx.sklearn.covariance
     :caption: modules
 
     elliptic_envelope
+    empirical_covariance
     ledoit_wolf
