@@ -8,4 +8,5 @@ def register():
     from . import pca
     from . import pls_regression
     from . import pls_svd
+    from . import sparse_pca
     from . import truncated_svd
