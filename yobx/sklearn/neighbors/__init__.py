@@ -5,3 +5,4 @@ def register():
     from . import local_outlier_factor  # noqa: F401
     from . import nearest_centroid  # noqa: F401
     from . import radiusneighbors  # noqa: F401
+    from . import radiusneighbors_transformer  # noqa: F401
