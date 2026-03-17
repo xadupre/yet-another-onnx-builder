@@ -171,7 +171,7 @@ def sklearn_nearest_centroid(
     else:
         classes_init = classes_arr
 
-    uniform_prior = np.allclose(class_prior, class_prior[0] * np.ones_like(class_prior))
+    uniform_prior = np.allclose(class_prior, class_prior[0])
     metric = estimator.metric  # "euclidean" or "manhattan"
     n_out = len(outputs)
 
