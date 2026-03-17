@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
 def get_output_names(model) -> Sequence[str]:
@@ -93,7 +93,7 @@ def jax_to_concrete_function(
         raise ValueError(f"Length mismatch: {len(args)} args but {len(input_names)} input_names")
 
     specs = []
-    polymorphic_shapes = []
+    polymorphic_shapes: List[Optional[str]] = []
     for i, (name, arg) in enumerate(zip(input_names, args)):
         arr = np.asarray(arg)
         shape = list(arr.shape)
@@ -119,7 +119,7 @@ def jax_to_concrete_function(
             dims = [
                 str(dyn_axes[ax]) if ax in dyn_axes else str(arr.shape[ax]) for ax in range(n)
             ]
-            polymorphic_shapes.append("(" + ", ".join(dims) + ")")
+            polymorphic_shapes.append(f"({', '.join(dims)})")
 
     tf_fn = jax2tf.convert(jax_fn, polymorphic_shapes=polymorphic_shapes)
     cf = tf.function(tf_fn, autograph=False).get_concrete_function(*specs)
