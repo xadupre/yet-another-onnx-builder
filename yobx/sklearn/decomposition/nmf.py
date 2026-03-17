@@ -1,6 +1,11 @@
 import numpy as np
 from typing import Dict, List, Union
 
+import onnx
+from onnx import TensorProto
+from onnx.helper import make_graph, make_node, make_tensor_value_info
+import onnx.numpy_helper as onh
+
 from sklearn.decomposition import NMF, MiniBatchNMF
 
 from ..register import register_sklearn_converter
@@ -28,8 +33,8 @@ def sklearn_nmf(
 
     Starting from a uniform initialization
     ``W₀ = sqrt(mean(X) / n_components)`` (matching sklearn's MU
-    initialization), the update rule is unrolled for ``max_iter``
-    steps:
+    initialization), the update rule is implemented as an ONNX ``Loop``
+    running for ``max_iter`` steps:
 
     .. code-block:: text
 
@@ -130,38 +135,113 @@ def sklearn_nmf(
     )  # 1-D int64 tensor [N]
     n_k_arr = np.array([n_k], dtype=np.int64)
     w_shape = g.op.Concat(batch_size, n_k_arr, axis=0, name=f"{name}_wshape")
-    W = g.op.Expand(w_11, w_shape, name=f"{name}_W0")  # (N, k)
+    W0 = g.op.Expand(w_11, w_shape, name=f"{name}_W0")  # (N, k)
 
-    # --- unrolled MU iterations ---
-    eps_arr = np.array(eps, dtype=dtype)
-    for i in range(max_iter):
-        iname = f"{name}_it{i}"
+    # --- ONNX Loop body: one MU update step ---
+    # Body-internal names (prefixed to keep them unique across converters)
+    bp = f"{name}_b"  # body prefix
+    b_iter = f"{bp}_iter"
+    b_cond_in = f"{bp}_cond_in"
+    b_cond_out = f"{bp}_cond_out"
+    b_W_in = f"{bp}_W_in"
+    b_W_out = f"{bp}_W_out"
+    b_denom = f"{bp}_denom"
+    b_denom_l1 = f"{bp}_denom_l1"
+    b_denom_l2 = f"{bp}_denom_l2"
+    b_l2_term = f"{bp}_l2_term"
+    b_denom_safe = f"{bp}_denom_safe"
+    b_ratio = f"{bp}_ratio"
 
-        # denom = W @ HHt  (N, k)
-        denom = g.op.MatMul(W, HHt, name=f"{iname}_denom")
+    # Constants embedded as body initializers
+    body_inits = [
+        onh.from_array(HHt, name=f"{bp}_HHt"),
+        onh.from_array(np.array(eps, dtype=dtype), name=f"{bp}_eps"),  # machine epsilon scalar
+    ]
+    if l1_reg_W > 0:
+        body_inits.append(onh.from_array(np.array(l1_reg_W, dtype=dtype), name=f"{bp}_l1"))
+    if l2_reg_W > 0:
+        body_inits.append(onh.from_array(np.array(l2_reg_W, dtype=dtype), name=f"{bp}_l2c"))
 
-        # add L1 regularisation (constant)
-        if l1_reg_W > 0:
-            denom = g.op.Add(
-                denom, np.array(l1_reg_W, dtype=dtype), name=f"{iname}_l1"
-            )
+    # Build body nodes
+    body_nodes = []
 
-        # add L2 regularisation (W-dependent)
-        if l2_reg_W > 0:
-            denom = g.op.Add(
-                denom,
-                g.op.Mul(W, np.array(l2_reg_W, dtype=dtype), name=f"{iname}_l2w"),
-                name=f"{iname}_l2",
-            )
+    # denom = W_in @ HHt
+    body_nodes.append(
+        make_node("MatMul", [b_W_in, f"{bp}_HHt"], [b_denom], name=f"{bp}_mm")
+    )
 
-        # clip denominator to avoid division by zero
-        denom = g.op.Max(denom, eps_arr, name=f"{iname}_denom_safe")
+    denom_cur = b_denom
 
-        # W = W * (XHt / denom)
-        W = g.op.Mul(W, g.op.Div(XHt, denom, name=f"{iname}_ratio"), name=f"{iname}_W")
+    # optional L1 regularisation: denom += l1
+    if l1_reg_W > 0:
+        body_nodes.append(
+            make_node("Add", [denom_cur, f"{bp}_l1"], [b_denom_l1], name=f"{bp}_l1_add")
+        )
+        denom_cur = b_denom_l1
 
-    # assign output names
-    res = g.op.Identity(W, name=name, outputs=outputs)
+    # optional L2 regularisation: denom += l2 * W_in
+    if l2_reg_W > 0:
+        body_nodes.append(
+            make_node("Mul", [b_W_in, f"{bp}_l2c"], [b_l2_term], name=f"{bp}_l2_mul")
+        )
+        body_nodes.append(
+            make_node("Add", [denom_cur, b_l2_term], [b_denom_l2], name=f"{bp}_l2_add")
+        )
+        denom_cur = b_denom_l2
+
+    # denom_safe = Max(denom, eps)
+    body_nodes.append(
+        make_node("Max", [denom_cur, f"{bp}_eps"], [b_denom_safe], name=f"{bp}_max")
+    )
+
+    # ratio = XHt / denom_safe  (XHt is an outer-scope tensor)
+    body_nodes.append(
+        make_node("Div", [XHt, b_denom_safe], [b_ratio], name=f"{bp}_div")
+    )
+
+    # W_out = W_in * ratio
+    body_nodes.append(
+        make_node("Mul", [b_W_in, b_ratio], [b_W_out], name=f"{bp}_mul")
+    )
+
+    # cond_out = cond_in  (always continue; Loop exits after max_iter steps)
+    body_nodes.append(
+        make_node("Identity", [b_cond_in], [b_cond_out], name=f"{bp}_cond_pass")
+    )
+
+    loop_body = make_graph(
+        body_nodes,
+        f"{name}_loop_body",
+        [
+            make_tensor_value_info(b_iter, TensorProto.INT64, []),
+            make_tensor_value_info(b_cond_in, TensorProto.BOOL, []),
+            # W has shape (N, k) where N is dynamic at inference time
+            make_tensor_value_info(b_W_in, itype, None),
+        ],
+        [
+            make_tensor_value_info(b_cond_out, TensorProto.BOOL, []),
+            # W output has the same dynamic shape as the input
+            make_tensor_value_info(b_W_out, itype, None),
+        ],
+        body_inits,
+    )
+
+    # Loop control scalars: M = max_iter, initial cond = True
+    M_name = g.make_initializer(f"{name}_M", np.array(max_iter, dtype=np.int64))
+    cond_init = g.make_initializer(f"{name}_cond", np.array(True, dtype=np.bool_))
+
+    # Create the Loop node; W0 is the initial loop-carried state
+    W_final = g.unique_name(f"{name}_W_final")
+    g.make_node(
+        "Loop",
+        [M_name, cond_init, W0],
+        [W_final],
+        body=loop_body,
+        name=f"{name}_loop",
+    )
+    g.set_type(W_final, itype)
+
+    res = g.op.Identity(W_final, name=name, outputs=outputs)
     assert isinstance(res, str)
     if not sts:
         g.set_type(res, itype)

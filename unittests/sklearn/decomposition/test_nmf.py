@@ -30,6 +30,7 @@ class TestNMF(ExtTestCase):
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
+        self.assertIn("Loop", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
