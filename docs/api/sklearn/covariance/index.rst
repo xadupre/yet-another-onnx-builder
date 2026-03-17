@@ -7,3 +7,6 @@ yobx.sklearn.covariance
 
     elliptic_envelope
     ledoit_wolf
+    min_cov_det
+    oas
+    shrunk_covariance
