@@ -486,6 +486,10 @@ def requires_sklearn(version: str = "", msg: str = "") -> Callable:
     except (AttributeError, ImportError):
         return unittest.skip(msg or "scikit-learn not installed")
 
+    if not hasattr(sklearn, "__version__"):
+        return False
+    if not version:
+        return True
     if PvVersion(sklearn.__version__) < PvVersion(version):
         msg = f"scikit-learn version {sklearn.__version__} < {version}: {msg}"
         return unittest.skip(msg)
