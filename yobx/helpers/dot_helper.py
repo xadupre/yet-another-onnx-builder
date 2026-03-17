@@ -54,35 +54,41 @@ def to_dot(model: onnx.ModelProto) -> str:
     Converts a model into a dot graph.
     Here is an example:
 
-    .. mermaid::
+    .. gdot::
+        :script: DOT-SECTION
 
-        graph TD
+        import numpy as np
+        import onnx
+        import onnx.helper as oh
+        import onnx.numpy_helper as onh
+        from yobx.helpers.dot_helper import to_dot
 
-            classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef initNode fill:#cccc00,stroke:#333,color:#333
-            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
-            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
-
-            I_X(["X FLOAT(batch, seq, 4)"])
-            I_Y(["Y FLOAT(batch, seq, 4)"])
-            i_W["W FLOAT(4, 2)"]
-
-            Add_0[["Add(., .)"]]
-            MatMul_1[["MatMul(., .)"]]
-            Relu_2[["Relu(.)"]]
-
-            I_X -->|"FLOAT(batch, seq, 4)"| Add_0
-            I_Y -->|"FLOAT(batch, seq, 4)"| Add_0
-            Add_0 -->|"FLOAT(batch, seq, 4)"| MatMul_1
-            i_W -->|"FLOAT(4, 2)"| MatMul_1
-            MatMul_1 -->|"FLOAT(batch, seq, 2)"| Relu_2
-
-            O_Z(["Z FLOAT(batch, seq, 2)"])
-            Relu_2 --> O_Z
-
-            class I_X,I_Y,O_Z ioNode
-            class i_W initNode
-            class Add_0,MatMul_1,Relu_2 opNode
+        TFLOAT = onnx.TensorProto.FLOAT
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Add", ["X", "Y"], ["added"]),
+                    oh.make_node("MatMul", ["added", "W"], ["mm"]),
+                    oh.make_node("Relu", ["mm"], ["Z"]),
+                ],
+                "add_matmul_relu",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq", 4]),
+                    oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq", 4]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, ["batch", "seq", 2])],
+                [
+                    onh.from_array(
+                        np.zeros((4, 2), dtype=np.float32),
+                        name="W",
+                    )
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        dot = to_dot(model)
+        print("DOT-SECTION", dot)
     """
     _unique: Dict[int, int] = {}
 
