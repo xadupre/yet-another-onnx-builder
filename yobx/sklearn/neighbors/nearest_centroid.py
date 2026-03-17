@@ -66,7 +66,7 @@ def _compute_discriminant_scores(
     return g.op.Add(neg_sq, log_prior, name=f"{name}_scores")
 
 
-@register_sklearn_converter(NearestCentroid)
+@register_sklearn_converter(NearestCentroid, "1.8")
 def sklearn_nearest_centroid(
     g: GraphBuilderExtendedProtocol,
     sts: Dict,

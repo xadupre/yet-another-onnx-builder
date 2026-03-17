@@ -8,7 +8,7 @@ from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
 
 
-@requires_sklearn("1.4")
+@requires_sklearn("1.8")
 class TestNearestCentroid(ExtTestCase):
     def test_nearest_centroid_basic(self):
         from sklearn.neighbors import NearestCentroid
