@@ -886,39 +886,65 @@ def _cmd_stats(argv: List[Any]):
     if args.output:
         outname = process_outputname(args.output, args.input)
         if outname.endswith(".csv"):
-            # Write node_count_per_op_type and flops_per_op_type as CSV
-            rows = []
-            for op, count in sorted(stats["node_count_per_op_type"].items()):
-                flops = stats["flops_per_op_type"].get(op)
-                rows.append({"op_type": op, "count": count, "estimated_flops": flops})
             import csv
+            import os
 
-            with open(outname, "w", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=["op_type", "count", "estimated_flops"])
+            # Produce two separate CSV files:
+            #   <stem>_counts.csv  — op_type / count
+            #   <stem>_flops.csv   — op_type / estimated_flops
+            stem, ext = os.path.splitext(outname)
+            counts_file = f"{stem}_counts{ext}"
+            flops_file = f"{stem}_flops{ext}"
+
+            with open(counts_file, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=["op_type", "count"])
                 writer.writeheader()
-                writer.writerows(rows)
+                for op, count in sorted(stats["node_count_per_op_type"].items()):
+                    writer.writerow({"op_type": op, "count": count})
+
+            with open(flops_file, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=["op_type", "estimated_flops"])
+                writer.writeheader()
+                for op, flops in sorted(stats["flops_per_op_type"].items()):
+                    writer.writerow({"op_type": op, "estimated_flops": flops})
+
+            if args.verbose:
+                print(f"-- saved counts into {counts_file!r}")
+                print(f"-- saved flops  into {flops_file!r}")
         else:
-            # Default: JSON (strip node_stats for brevity unless verbose)
-            out = dict(stats)
-            if not args.verbose:
-                out.pop("node_stats", None)
+            # Default: JSON — store both reports under separate keys
+            out: Dict[str, Any] = {
+                "n_nodes": stats["n_nodes"],
+                "node_count_per_op_type": stats["node_count_per_op_type"],
+                "flops_per_op_type": stats["flops_per_op_type"],
+                "total_estimated_flops": stats["total_estimated_flops"],
+            }
+            if args.verbose:
+                out["node_stats"] = stats["node_stats"]
             with open(outname, "w") as f:
                 json.dump(out, f, indent=2, default=str)
-        if args.verbose:
-            print(f"-- saved into {outname!r}")
+            if args.verbose:
+                print(f"-- saved into {outname!r}")
     else:
         _print_model_statistics(stats)
 
 
 def _print_model_statistics(stats: Dict[str, Any]) -> None:
-    """Prints model statistics on standard output."""
+    """Prints two model-statistics reports on standard output."""
+    # Report 1: node counts per op_type
     print(f"Number of nodes: {stats['n_nodes']}")
     print("")
-    print("Nodes per op_type:")
+    print("Report 1 — Node counts per op_type:")
     for op, count in sorted(stats["node_count_per_op_type"].items()):
-        flops = stats["flops_per_op_type"].get(op)
-        flops_str = f"  estimated_flops={flops}" if flops is not None else ""
-        print(f"  {op}: {count}{flops_str}")
+        print(f"  {op}: {count}")
+
+    print("")
+
+    # Report 2: estimated FLOPs per op_type
+    print("Report 2 — Estimated FLOPs per op_type:")
+    for op, flops in sorted(stats["flops_per_op_type"].items()):
+        flops_str = str(flops) if flops is not None else "n/a"
+        print(f"  {op}: {flops_str}")
     print("")
     total = stats["total_estimated_flops"]
     if total is not None:
