@@ -19,3 +19,4 @@ API Reference
    xbuilder/index
    xoptim/index
    xshape/index
+   xtracing/index

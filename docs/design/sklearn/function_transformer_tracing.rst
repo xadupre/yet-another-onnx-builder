@@ -1,0 +1,152 @@
+.. _l-design-function-transformer-tracing:
+
+==========================================
+Numpy-Tracing and FunctionTransformer
+==========================================
+
+``yobx`` can export a :class:`~sklearn.preprocessing.FunctionTransformer`
+to ONNX by *tracing* its ``func`` attribute: the function is re-executed with
+lightweight proxy objects instead of real numpy arrays.  Every numpy operation
+performed on those proxies is recorded as an ONNX node, so the resulting ONNX
+graph exactly mirrors the Python code — without any manual operator mapping.
+
+Overview
+========
+
+The mechanism consists of two layers:
+
+1. **:class:`~yobx.xtracing.NumpyArray`** — a proxy that wraps an ONNX tensor
+   name and an active :class:`~yobx.xbuilder.GraphBuilder`.  It overloads all
+   Python arithmetic operators and registers itself as an implementation for
+   both the ``__array_ufunc__`` and ``__array_function__`` numpy protocols.
+   Whenever numpy (or user code) calls an operation on a
+   :class:`~yobx.xtracing.NumpyArray`, the proxy emits the equivalent ONNX
+   node into the graph and returns a new :class:`~yobx.xtracing.NumpyArray`
+   wrapping the result tensor name.
+
+2. **:func:`~yobx.xtracing.trace_numpy_function`** — the converter-API
+   function.  It receives an existing :class:`~yobx.xbuilder.GraphBuilder`,
+   the desired output names, the callable to trace, and the names of the
+   input tensors already registered in that graph.  It wraps those tensors
+   as :class:`~yobx.xtracing.NumpyArray` proxies, calls the function, and
+   collects the resulting output tensors.
+
+The high-level helper :func:`~yobx.xtracing.trace_numpy_to_onnx` creates a
+standalone :class:`onnx.ModelProto` by building a fresh graph, registering
+sample-array-derived inputs, and delegating to
+:func:`~yobx.xtracing.trace_numpy_function`.
+
+Converter API signature
+=======================
+
+:func:`~yobx.xtracing.trace_numpy_function` follows the same convention as
+every other converter in this package:
+
+.. code-block:: python
+
+    def trace_numpy_function(
+        g: GraphBuilderExtendedProtocol,
+        sts: Dict,
+        outputs: List[str],
+        func: Callable,
+        inputs: List[str],
+        name: str = "trace",
+        kw_args: Optional[Dict[str, Any]] = None,
+    ) -> str: ...
+
+===========  ================================================================
+Parameter    Description
+===========  ================================================================
+``g``        :class:`~yobx.xbuilder.GraphBuilder` — call ``g.op.<Op>(…)``
+             to emit ONNX nodes.
+``sts``      ``Dict`` of metadata (empty ``{}`` in most call sites).
+``outputs``  Pre-allocated output tensor names the tracer must write to.
+``func``     Python callable that uses numpy operations.
+``inputs``   Names of tensors already registered in *g*.
+``name``     Node-name prefix.
+``kw_args``  Optional keyword arguments forwarded to *func*.
+===========  ================================================================
+
+FunctionTransformer converter
+==============================
+
+The built-in converter for
+:class:`~sklearn.preprocessing.FunctionTransformer` lives in
+:mod:`yobx.sklearn.preprocessing.function_transformer`.  It delegates
+directly to :func:`~yobx.xtracing.trace_numpy_function`, so all numpy ops
+land in the surrounding graph with no sub-model inlining:
+
+.. code-block:: python
+
+    from sklearn.preprocessing import FunctionTransformer
+    import numpy as np
+    from yobx.sklearn import to_onnx
+
+    def my_func(X):
+        return np.log1p(np.abs(X))
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((10, 4)).astype(np.float32)
+
+    transformer = FunctionTransformer(func=my_func).fit(X)
+    onx = to_onnx(transformer, (X,))
+
+When ``func=None`` (the identity transformer) a single ``Identity`` node is
+emitted instead of tracing.
+
+Supported numpy operations
+==========================
+
+The :class:`~yobx.xtracing.NumpyArray` proxy supports:
+
+* **Arithmetic operators**: ``+``, ``-``, ``*``, ``/``, ``//``, ``**``,
+  ``%``, ``@`` (matmul), unary ``-``.
+* **Comparison operators**: ``==``, ``!=``, ``<``, ``<=``, ``>``, ``>=``.
+* **Ufuncs** (via ``__array_ufunc__``): ``np.sqrt``, ``np.abs``, ``np.exp``,
+  ``np.log``, ``np.log1p``, ``np.sin``, ``np.cos``, ``np.tanh``, and others.
+* **Array functions** (via ``__array_function__``): ``np.sum``, ``np.mean``,
+  ``np.max``, ``np.min``, ``np.prod``, ``np.where``, ``np.concatenate``,
+  ``np.stack``, ``np.reshape``, ``np.transpose``, ``np.squeeze``,
+  ``np.expand_dims``, ``np.clip``.
+
+Standalone usage
+================
+
+You can also use the tracing machinery outside of scikit-learn pipelines via
+:func:`~yobx.xtracing.trace_numpy_to_onnx`:
+
+.. code-block:: python
+
+    import numpy as np
+    from yobx.xtracing import trace_numpy_to_onnx
+
+    def my_func(X):
+        return np.sqrt(np.abs(X) + np.float32(1))
+
+    X_sample = np.zeros((4, 3), dtype=np.float32)
+    onx = trace_numpy_to_onnx(my_func, X_sample)
+
+Or embedded into a larger graph using
+:func:`~yobx.xtracing.trace_numpy_function` directly:
+
+.. code-block:: python
+
+    from onnx import TensorProto
+    from yobx.xbuilder import GraphBuilder
+    from yobx.xtracing import trace_numpy_function
+    import numpy as np
+
+    g = GraphBuilder({"": 21, "ai.onnx.ml": 1})
+    g.make_tensor_input("X", TensorProto.FLOAT, ("batch", 3))
+
+    def my_func(X):
+        return np.sqrt(np.abs(X) + np.float32(1))
+
+    trace_numpy_function(g, {}, ["output_0"], my_func, ["X"])
+    g.make_tensor_output("output_0", indexed=False, allow_untyped_output=True)
+    onx, _ = g.to_onnx(return_optimize_report=True)
+
+.. seealso::
+
+    :ref:`l-design-sklearn-custom-converter` — how to write and register a
+    custom converter for any scikit-learn estimator.
