@@ -138,9 +138,7 @@ dtypes_a = {"a": np.float32}
 a3 = np.array([4.0, -1.0, 9.0, 0.0], dtype=np.float32)
 
 onx_func = sql_to_onnx(
-    "SELECT clip_sqrt(a) AS r FROM t",
-    dtypes_a,
-    custom_functions={"clip_sqrt": clip_sqrt},
+    "SELECT clip_sqrt(a) AS r FROM t", dtypes_a, custom_functions={"clip_sqrt": clip_sqrt}
 )
 
 (r,) = run(onx_func, {"a": a3})
@@ -156,9 +154,7 @@ print("clip_sqrt ✓")
 # Custom functions also work in ``WHERE`` predicates.
 
 onx_where_func = sql_to_onnx(
-    "SELECT a FROM t WHERE clip_sqrt(a) > 1",
-    dtypes_a,
-    custom_functions={"clip_sqrt": clip_sqrt},
+    "SELECT a FROM t WHERE clip_sqrt(a) > 1", dtypes_a, custom_functions={"clip_sqrt": clip_sqrt}
 )
 
 (a_filt2,) = run(onx_where_func, {"a": a3})
@@ -173,16 +169,14 @@ print("WHERE custom function ✓")
 # Functions with more than one argument receive one tensor per argument.
 
 
-def weighted_sum(x, y, alpha=np.float32(0.5)):
+def weighted_sum(x, y, alpha=0.5):
     """Compute alpha * x + (1 - alpha) * y."""
-    return alpha * x + (np.float32(1) - alpha) * y
+    return alpha * x + (np.float32(1) - np.float32(alpha)) * y
 
 
 dtypes_ab = {"a": np.float32, "b": np.float32}
 onx_ws = sql_to_onnx(
-    "SELECT wsum(a, b) AS ws FROM t",
-    dtypes_ab,
-    custom_functions={"wsum": weighted_sum},
+    "SELECT wsum(a, b) AS ws FROM t", dtypes_ab, custom_functions={"wsum": weighted_sum}
 )
 
 (ws,) = run(onx_ws, {"a": a, "b": b})
