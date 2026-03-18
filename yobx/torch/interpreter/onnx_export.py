@@ -1068,6 +1068,10 @@ def to_onnx(
             print(builder.get_debug_msg())
 
     if filename:
+        from ...xbuilder.builder_stats_helper import builder_stats_to_dataframe
+
+        df = builder_stats_to_dataframe(stats)
+        df.to_excel(f"{os.path.splitext(filename)[0]}.xlsx")
         if isinstance(onx, ModelProto):
             save_model(onx, filename)
         else:
