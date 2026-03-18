@@ -2514,6 +2514,17 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             self.set_rank(node.output[0], self.get_rank(node.input[0]))
         return None
 
+    # MurmurHash3: hashes a string (or int) tensor to INT32 with the same shape.
+    if node.op_type == "MurmurHash3" and node.domain == "com.microsoft":
+        self.set_type(node.output[0], 6)  # INT32
+        if self.has_device(node.input[0]):
+            self.set_device(node.output[0], self.get_device(node.input[0]))
+        if self.has_shape(node.input[0]):
+            self.set_shape(node.output[0], self.get_shape(node.input[0]))
+        elif self.has_rank(node.input[0]):
+            self.set_rank(node.output[0], self.get_rank(node.input[0]))
+        return None
+
     # CDist: computes pairwise distances between two sets of vectors.
     # Input A: (N, D), Input B: (M, D) → Output: (N, M)
     if node.op_type == "CDist" and node.domain == "com.microsoft":
