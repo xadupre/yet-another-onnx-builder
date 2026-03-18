@@ -82,8 +82,11 @@ def litert_dtype_to_np_dtype(dtype_int: int) -> np.dtype:
 # Minimal FlatBuffer reader (pure Python, no external deps)
 # ---------------------------------------------------------------------------
 
-# All TFLite FlatBuffers start with this 4-byte file identifier at bytes 4–7.
+# TFLite file identifiers used across schema versions.
 _TFLITE_IDENTIFIER = b"TFL3"
+# Four-space placeholder used by some early / custom serialisation tools that
+# write a blank file identifier rather than the version-specific string.
+_TFLITE_BLANK_IDENTIFIER = b"    "
 
 
 class _FlatBuf:
@@ -645,7 +648,12 @@ def parse_tflite_model(model: "str | os.PathLike | bytes") -> TFLiteModel:
     root = fb.root()
 
     # Validate file identifier (optional but helps catch wrong inputs).
-    if len(raw) >= 8 and raw[4:8] not in (_TFLITE_IDENTIFIER, b"TFL2", b"TFL1", b"    "):
+    if len(raw) >= 8 and raw[4:8] not in (
+        _TFLITE_IDENTIFIER,
+        b"TFL2",
+        b"TFL1",
+        _TFLITE_BLANK_IDENTIFIER,
+    ):
         import warnings
 
         warnings.warn(

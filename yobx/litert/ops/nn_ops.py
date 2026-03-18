@@ -134,15 +134,21 @@ def convert_depthwise_conv2d(
     w_oikk = g.op.Transpose(op.inputs[1], perm=[3, 0, 1, 2], name="litert_dw_w_oihw")
 
     # The number of groups is the number of input channels.  We derive it
-    # from the shape of the transposed input.
-    try:
-        x_shape = g.get_shape(x_nchw) if g.has_name(x_nchw) and x_nchw in getattr(g, "_known_shapes", {}) else None
-    except (AssertionError, AttributeError):
-        x_shape = None
-    if x_shape is not None and len(x_shape) >= 2 and isinstance(x_shape[1], int):
-        groups = int(x_shape[1])
+    # from the shape of the *original* (pre-transpose) input tensor, which
+    # the GraphBuilder registers before we emit the Transpose node.
+    in_shape = g.get_shape(op.inputs[0]) if g.has_name(op.inputs[0]) else None
+    if in_shape is not None and len(in_shape) >= 4 and isinstance(in_shape[3], int):
+        # Input is NHWC: channel count is the last dimension.
+        groups = int(in_shape[3])
     else:
-        # Fall back to 1 (incorrect but allows the graph to be built).
+        import warnings
+
+        warnings.warn(
+            "DEPTHWISE_CONV_2D: cannot determine the number of input channels from "
+            f"the shape {in_shape!r}.  Falling back to groups=1, which produces "
+            "incorrect output.  Ensure the input tensor shape is fully specified.",
+            stacklevel=2,
+        )
         groups = 1
 
     conv_kwargs: Dict[str, Any] = dict(
@@ -177,7 +183,7 @@ def convert_avg_pool2d(
         x_nchw,
         kernel_shape=[opts.get("filter_height", 1), opts.get("filter_width", 1)],
         strides=[opts.get("stride_h", 1), opts.get("stride_w", 1)],
-        auto_pad=_padding_to_auto_pad(opts.get("padding", 1)),
+        auto_pad=_padding_to_auto_pad(opts.get("padding", Padding.VALID)),
         name="litert_avgpool",
     )
     # NCHW → NHWC
@@ -199,7 +205,7 @@ def convert_max_pool2d(
         x_nchw,
         kernel_shape=[opts.get("filter_height", 1), opts.get("filter_width", 1)],
         strides=[opts.get("stride_h", 1), opts.get("stride_w", 1)],
-        auto_pad=_padding_to_auto_pad(opts.get("padding", 1)),
+        auto_pad=_padding_to_auto_pad(opts.get("padding", Padding.VALID)),
         name="litert_maxpool",
     )
     # NCHW → NHWC
