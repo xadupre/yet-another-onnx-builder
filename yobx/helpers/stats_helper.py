@@ -6,7 +6,7 @@ per op_type and estimation of computational cost.
 from typing import Any, Callable, Dict, List, Optional, Tuple
 import numpy as np
 import onnx
-from ..xshape.expressions.operations import dim_add, dim_div, dim_mul, dim_multi_mul, DIM_TYPE
+from ..xexpressions.operations import dim_add, dim_div, dim_mul, dim_multi_mul, DIM_TYPE
 
 # Type aliases for the shape and literal lookup functions passed to per-op helpers.
 #

@@ -1,6 +1,6 @@
 import unittest
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape.expressions.operations import (
+from yobx.xexpressions.operations import (
     dim_add,
     dim_div,
     dim_max,
