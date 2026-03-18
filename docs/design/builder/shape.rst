@@ -88,7 +88,7 @@ rewrites the expression to its simplest equivalent form:
 .. runpython::
     :showcode:
 
-    from yobx.xshape.simplify_expressions import simplify_expression
+    from yobx.xexpressions import simplify_expression
 
     print(simplify_expression("d + f - f"))       # d
     print(simplify_expression("2 * seq // 2"))    # seq
@@ -109,8 +109,8 @@ to a whole shape at once.
 
     import onnx
     import onnx.helper as oh
+    from yobx.xexpressions import evaluate_expression
     from yobx.xshape import BasicShapeBuilder
-    from yobx.xshape.evaluate_expressions import evaluate_expression
 
     TFLOAT = onnx.TensorProto.FLOAT
 

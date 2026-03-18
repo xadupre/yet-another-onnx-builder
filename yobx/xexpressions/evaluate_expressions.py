@@ -78,7 +78,7 @@ def evaluate_expression(expression: str, context: Dict[str, int]) -> int:
     .. runpython::
         :showcode:
 
-        from yobx.xshape.expressions.evaluate_expressions import (
+        from yobx.xexpressions.evaluate_expressions import (
             evaluate_expression,
         )
 

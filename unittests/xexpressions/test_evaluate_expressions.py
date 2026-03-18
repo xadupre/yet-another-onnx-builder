@@ -1,6 +1,6 @@
 import unittest
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape.expressions.evaluate_expressions import evaluate_expression
+from yobx.xexpressions.evaluate_expressions import evaluate_expression
 
 
 class TestEvaluateExpressions(ExtTestCase):
