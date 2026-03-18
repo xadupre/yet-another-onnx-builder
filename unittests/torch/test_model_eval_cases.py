@@ -47,6 +47,9 @@ class TestModelEvalCases(ExtTestCase):
             cases="SignatureListFixedLength", exporters="custom", quiet=False, dynamic=False
         )
 
+    def test_run_exporter_yobx(self):
+        evaluation(cases="SignatureListFixedLength", exporters="yobx", quiet=False, dynamic=False)
+
     def test_run_exporter_dynamo(self):
         evaluation(
             cases="SignatureListFixedLength", exporters="dynamo", quiet=False, dynamic=False
@@ -71,6 +74,11 @@ class TestModelEvalCases(ExtTestCase):
             exporters="export-tracing",
             quiet=False,
             dynamic=False,
+        )
+
+    def test_run_exporter_yobx_tracing(self):
+        evaluation(
+            cases="SignatureListFixedLength", exporters="yobx-tracing", quiet=False, dynamic=True
         )
 
     def test_run_exporter_regex(self):

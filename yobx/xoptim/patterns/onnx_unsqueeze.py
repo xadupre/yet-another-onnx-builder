@@ -447,6 +447,137 @@ class SqueezeAddPattern(PatternOptimization):
         return new_nodes
 
 
+class MulUnsqueezeUnsqueezePattern(PatternOptimization):
+    """
+    Replaces ``Mul(Unsqueeze(x, axes), Unsqueeze(y, axes))`` by
+    ``Unsqueeze(Mul(x, y), axes)`` when both inputs are unsqueezed
+    with the same axes.
+
+    Model with nodes to be fused:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(a, b)"])
+            I_Y(["Y FLOAT(a, b)"])
+
+            Unsqueeze_0[["Unsqueeze(., [2])"]]
+            Unsqueeze_1[["Unsqueeze(., [2])"]]
+            Mul_2[["Mul(., .)"]]
+
+            I_X -->|"FLOAT(a, b)"| Unsqueeze_0
+            I_Y -->|"FLOAT(a, b)"| Unsqueeze_1
+            Unsqueeze_0 -->|"FLOAT(a, b, 1)"| Mul_2
+            Unsqueeze_1 -->|"FLOAT(a, b, 1)"| Mul_2
+
+            O_Z(["Z FLOAT(a, b, 1)"])
+            Mul_2 --> O_Z
+
+            class I_X,I_Y,O_Z ioNode
+            class Unsqueeze_0,Unsqueeze_1,Mul_2 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(a, b)"])
+            I_Y(["Y FLOAT(a, b)"])
+
+            Mul_0[["Mul(., .)"]]
+            Unsqueeze_1[["Unsqueeze(., [2])"]]
+
+            I_X -->|"FLOAT(a, b)"| Mul_0
+            I_Y -->|"FLOAT(a, b)"| Mul_0
+            Mul_0 -->|"FLOAT(a, b)"| Unsqueeze_1
+
+            O_Z(["Z FLOAT(a, b, 1)"])
+            Unsqueeze_1 --> O_Z
+
+            class I_X,I_Y,O_Z ioNode
+            class Mul_0,Unsqueeze_1 opNode
+    """
+
+    def __init__(self, verbose: int = 0, priority: int = 0):
+        super().__init__(verbose, priority)
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        if node.op_type != "Mul" or node.domain != "" or g.builder.main_opset < 13:
+            return self.none()
+        node_before = [g.node_before(node.input[0]), g.node_before(node.input[1])]
+        if (
+            not node_before[0]
+            or not node_before[1]
+            or node_before[0].op_type != "Unsqueeze"
+            or node_before[1].op_type != "Unsqueeze"
+        ):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Both Unsqueeze nodes must have a constant axes input (second input).
+        if len(node_before[0].input) < 2 or len(node_before[1].input) < 2:
+            return self.none(node, inspect.currentframe().f_lineno)
+        if not g.is_constant(node_before[0].input[1]) or not g.is_constant(
+            node_before[1].input[1]
+        ):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        axes0 = g.get_constant_or_attribute(node_before[0], "axis", 1)
+        axes1 = g.get_constant_or_attribute(node_before[1], "axis", 1)
+        if axes0 is None or axes1 is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+        if list(axes0) != list(axes1):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # The unsqueezed outputs must not be used elsewhere.
+        if g.is_used_more_than_once(node.input[0]) or g.is_used_more_than_once(node.input[1]):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        return MatchResult(self, [*node_before, node], self.apply)
+
+    def apply(
+        self,
+        g: "GraphBuilder",  # noqa: F821
+        unsqueeze1: NodeProto,
+        unsqueeze2: NodeProto,
+        mul: NodeProto,
+    ) -> List[NodeProto]:
+        new_name = g.unique_name(f"{self.__class__.__name__}_{mul.output[0]}")
+        new_nodes = [
+            g.make_node(
+                "Mul",
+                [unsqueeze1.input[0], unsqueeze2.input[0]],
+                [new_name],
+                name=f"{self.__class__.__name__}--{mul.name}",
+                doc_string=mul.doc_string,
+            ),
+            g.make_node(
+                "Unsqueeze",
+                [new_name, *unsqueeze1.input[1:]],
+                mul.output,
+                name=f"{self.__class__.__name__}--{unsqueeze1.name}",
+                doc_string=unsqueeze1.doc_string,
+            ),
+        ]
+        return new_nodes
+
+
 class SqueezeBinaryUnsqueezePattern(PatternOptimization):
     """
     Replaces the sequence Squeeze Binary Unsqueeze) by Binary.

@@ -219,5 +219,7 @@ dump_test*
 onnxruntime_profile*
 *.data
 *.onnx
+*.pb
+*.proto
 *.ep
 *.ep.graph
