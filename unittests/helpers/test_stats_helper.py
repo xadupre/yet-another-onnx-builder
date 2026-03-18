@@ -176,5 +176,27 @@ class TestStatsHelper(ExtTestCase):
         self.assertEqual(ms.literal_fn("shape"), (32,))
 
 
+    def test_model_statistics_from_graph_builder(self):
+        """ModelStatistics accepts a GraphBuilderExtendedProtocol directly."""
+        try:
+            from yobx.xbuilder import GraphBuilder
+        except ImportError:
+            self.skipTest("yobx.xbuilder not available")
+
+        gb = GraphBuilder(17)
+        gb.make_tensor_input("X", TFLOAT, (4, 8))
+        gb.make_initializer("W", np.ones((8, 16), dtype=np.float32))
+        out = gb.make_node("MatMul", ["X", "W"], name="mm0")
+        gb.make_tensor_output(out, TFLOAT, (4, 16))
+
+        ms = ModelStatistics(gb)
+        stats = ms.compute()
+        self.assertEqual(stats["n_nodes"], 1)
+        self.assertEqual(stats["node_count_per_op_type"]["MatMul"], 1)
+        # MatMul [4,8] @ [8,16] → 2*4*8*16 = 1024
+        self.assertEqual(stats["flops_per_op_type"]["MatMul"], 2 * 4 * 8 * 16)
+        self.assertEqual(stats["total_estimated_flops"], 2 * 4 * 8 * 16)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

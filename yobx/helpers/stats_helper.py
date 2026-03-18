@@ -3,10 +3,11 @@ Functions to compute statistics on an ONNX model such as number of nodes
 per op_type and estimation of computational cost.
 """
 
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import onnx
 from ..xexpressions.operations import dim_add, dim_div, dim_mul, dim_multi_mul, DIM_TYPE
+from ..typing import GraphBuilderExtendedProtocol
 
 # Type aliases for the shape and literal lookup functions passed to per-op helpers.
 #
@@ -468,8 +469,15 @@ class ModelStatistics:
     Computes statistics on an ONNX model, including node counts per op_type
     and estimated FLOPs.
 
-    :param model: ONNX model
+    *model* may be either an :class:`onnx.ModelProto` or a
+    :class:`~yobx.typing.GraphBuilderExtendedProtocol` instance.  When a graph
+    builder is provided its already-computed shape information is used directly
+    (no second shape-inference pass is run) and the ONNX model is obtained via
+    :meth:`~yobx.typing.GraphBuilderProtocol.to_onnx`.
+
+    :param model: ONNX model or graph builder
     :param verbose: verbosity level passed to :class:`BasicShapeBuilder`
+        (ignored when *model* is a graph builder)
 
     Usage::
 
@@ -483,8 +491,23 @@ class ModelStatistics:
         # }
     """
 
-    def __init__(self, model: onnx.ModelProto, verbose: int = 0) -> None:
-        self.model = model
+    def __init__(
+        self,
+        model: Union[onnx.ModelProto, GraphBuilderExtendedProtocol],
+        verbose: int = 0,
+    ) -> None:
+        if isinstance(model, GraphBuilderExtendedProtocol):
+            self._builder: Any = model
+            onnx_model = model.to_onnx()
+            if not isinstance(onnx_model, onnx.ModelProto):
+                raise TypeError(
+                    f"GraphBuilderExtendedProtocol.to_onnx() returned "
+                    f"{type(onnx_model).__name__!r}, expected ModelProto"
+                )
+            self.model: onnx.ModelProto = onnx_model
+        else:
+            self._builder = None
+            self.model = model
         self.verbose = verbose
         self._bs: Any = None
         self._shape_map: Dict[str, Optional[Tuple]] = {}
@@ -514,23 +537,35 @@ class ModelStatistics:
                         self._collect_names(g, all_names)
 
     def _build_shape_map(self) -> None:
-        """Runs shape inference and populates :attr:`_shape_map`."""
-        from ..xshape import BasicShapeBuilder
-
-        self._bs = BasicShapeBuilder(verbose=self.verbose)
-        self._bs.run_model(self.model)
-
+        """Populates :attr:`_shape_map` from the builder (if provided) or by
+        running :class:`BasicShapeBuilder` on the stored model."""
         all_names: set = set()
         self._collect_names(self.model.graph, all_names)
 
-        for name in all_names:
-            if not self._bs.has_shape(name):
-                continue
-            sh = self._bs.get_shape(name)
-            if all(isinstance(d, int) for d in sh):
-                self._shape_map[name] = tuple(int(d) for d in sh)
-            else:
-                self._shape_map[name] = sh
+        if self._builder is not None:
+            # Use shape information already computed by the graph builder.
+            for name in all_names:
+                if not self._builder.has_shape(name):
+                    continue
+                sh = self._builder.get_shape(name)
+                if all(isinstance(d, int) for d in sh):
+                    self._shape_map[name] = tuple(int(d) for d in sh)
+                else:
+                    self._shape_map[name] = sh
+        else:
+            from ..xshape import BasicShapeBuilder
+
+            self._bs = BasicShapeBuilder(verbose=self.verbose)
+            self._bs.run_model(self.model)
+
+            for name in all_names:
+                if not self._bs.has_shape(name):
+                    continue
+                sh = self._bs.get_shape(name)
+                if all(isinstance(d, int) for d in sh):
+                    self._shape_map[name] = tuple(int(d) for d in sh)
+                else:
+                    self._shape_map[name] = sh
 
     def shape_fn(self, name: str) -> Optional[Tuple]:
         """Returns the inferred shape of *name*, or ``None`` if unknown."""
@@ -542,7 +577,23 @@ class ModelStatistics:
         (e.g. the ``shape`` input of a Reshape node), or ``None`` when *name*
         is not a known constant.
         """
-        if not name or not self._bs.is_constant(name):
+        if not name:
+            return None
+        if self._builder is not None:
+            # Use the builder's constant API via duck typing.
+            is_const_fn = getattr(self._builder, "is_constant", None)
+            if is_const_fn is not None and not is_const_fn(name):
+                return None
+            get_fn = getattr(self._builder, "get_computed_constant", None)
+            if get_fn is not None:
+                try:
+                    val = get_fn(name)
+                    if val is not None:
+                        return tuple(int(v) for v in np.asarray(val).flat)
+                except Exception:
+                    pass
+            return None
+        if not self._bs.is_constant(name):
             return None
         val = self._bs.get_constant(name, exc=False, computed_value=True, as_shape=True)
         if val is None:
@@ -629,13 +680,15 @@ class ModelStatistics:
         }
 
 
-def model_statistics(model: onnx.ModelProto, verbose: int = 0) -> Dict[str, Any]:
+def model_statistics(
+    model: Union[onnx.ModelProto, GraphBuilderExtendedProtocol], verbose: int = 0
+) -> Dict[str, Any]:
     """
     Computes statistics on an ONNX model.
 
     This is a convenience wrapper around :class:`ModelStatistics`.
 
-    :param model: ONNX model
+    :param model: ONNX model or graph builder
     :param verbose: verbosity level
     :return: statistics dictionary — see :meth:`ModelStatistics.compute` for details
     """
