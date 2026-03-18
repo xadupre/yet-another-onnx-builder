@@ -2,8 +2,8 @@ from collections import Counter
 from typing import List, Optional, Sequence, Tuple
 import numpy as np
 from onnx import NodeProto, TensorProto
+from ..xexpressions import simplify_expression
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape, all_int, all_int_or_str
-from .simplify_expressions import simplify_expression
 from .shape_builder import ShapeBuilder
 
 

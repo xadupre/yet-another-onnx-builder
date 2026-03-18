@@ -1,8 +1,8 @@
 from typing import Any, List
 import numpy as np
 import onnx
+from ..xexpressions import simplify_expression
 from ._shape_helper import all_int
-from .simplify_expressions import simplify_expression
 
 
 class _ShapeRuntime:
