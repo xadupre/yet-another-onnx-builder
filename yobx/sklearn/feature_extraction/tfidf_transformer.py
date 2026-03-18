@@ -77,6 +77,13 @@ def sklearn_tfidf_transformer(
     axes = np.array([1], dtype=np.int64)
 
     if norm in ("l2", "l1"):
+        opset = g.get_opset("")
+        if opset < 18:
+            raise NotImplementedError(
+                f"TfidfTransformer converter with norm={norm!r} requires opset >= 18 "
+                f"(ReduceL1/ReduceL2 with axes as input was added in opset 18), "
+                f"but the graph builder has opset {opset}."
+            )
         if norm == "l2":
             norms = g.op.ReduceL2(tf, axes, keepdims=1, name=f"{name}_l2norm")
         else:

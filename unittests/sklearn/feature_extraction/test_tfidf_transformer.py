@@ -211,5 +211,18 @@ class TestTfidfTransformer(ExtTestCase):
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
 
+    def test_tfidf_low_opset_raises(self):
+        """norm='l1' or 'l2' with opset < 18 must raise NotImplementedError."""
+        from sklearn.feature_extraction.text import TfidfTransformer
+        from yobx.sklearn import to_onnx
+
+        X = self._make_count_matrix(np.float32)
+        for norm in ("l1", "l2"):
+            tt = TfidfTransformer(use_idf=True, norm=norm)
+            tt.fit(X)
+            with self.assertRaises(NotImplementedError):
+                to_onnx(tt, (X,), target_opset={"": 17})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
