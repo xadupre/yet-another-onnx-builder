@@ -10,3 +10,4 @@ yobx.sklearn.feature_extraction
     patch_extractor
     tfidf_transformer
     tfidf_vectorizer
+    traceable_vectorizers
