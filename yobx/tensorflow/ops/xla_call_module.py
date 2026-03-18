@@ -187,7 +187,43 @@ def parse_mlir(mlir_string):
         r"\s*:\s*(?:.*?->\s*)?(tensor<[^>]+>).*?loc\((.*?)\)"
     )
 
+    # Special pattern for stablehlo.compare whose MLIR textual format puts
+    # the comparison direction *before* the operands:
+    #   %0 = stablehlo.compare  GT, %arg0, %arg1,  FLOAT : (...) -> tensor<i1> loc(...)
+    # Group 1: result id (%0)
+    # Group 2: direction (GT / LT / GE / LE / EQ / NE)
+    # Group 3: first operand (%arg0)
+    # Group 4: second operand (%arg1)
+    # Group 5: output tensor type (tensor<...>)
+    # Group 6: location
+    compare_pattern = (
+        r"(%\w+)\s*=\s*stablehlo\.compare\s+(\w+)\s*,\s*(%\w+)\s*,\s*(%\w+)"
+        r"[^:]*:\s*(?:.*?->\s*)?(tensor<[^>]+>).*?loc\((.*?)\)"
+    )
+
+    # Build an ordered set of character offsets for already-matched spans so
+    # that the general op_pattern does not re-process compare lines.
+    compare_spans: set[int] = set()
+
+    for match in re.finditer(compare_pattern, scan_text):
+        res_id, direction, op1, op2, shape, location = match.groups()
+        compare_spans.update(range(match.start(), match.end()))
+        op1 = arg_alias.get(op1, op1)
+        op2 = arg_alias.get(op2, op2)
+        obs = {
+            "id": res_id,
+            "op": f"compare_{direction}",
+            "operands": [op1, op2],
+            "shape": shape,
+            "loc": location,
+        }
+        results.append(obs)
+
     for match in re.finditer(op_pattern, scan_text):
+        # Skip ranges already handled by the compare_pattern pass.
+        if match.start() in compare_spans:
+            continue
+
         res_id, op_name, operands, shape, location = match.groups()
 
         # Clean up operands (remove extra whitespace/newlines) and apply the
@@ -212,4 +248,23 @@ def parse_mlir(mlir_string):
         if op_name == "return":
             break
 
-    return results
+    # Sort all non-Input, non-return layers by their position in scan_text so
+    # that compare and regular ops are interleaved in the correct execution
+    # order.  Input layers captured from the header are always first.
+    input_layers = [la for la in results if la["op"] == "Input"]
+    compute_layers = [la for la in results if la["op"] not in ("Input", "return")]
+    return_layers = [la for la in results if la["op"] == "return"]
+
+    def _layer_pos(layer: dict) -> int:
+        """Return the character offset of this layer's result id in scan_text."""
+        rid = layer.get("id", "")
+        if rid and rid != "?":
+            # Search for the result id followed by any non-word character
+            # (space, newline, colon, comma) to avoid partial matches.
+            m = re.search(re.escape(rid) + r"\b", scan_text)
+            if m:
+                return m.start()
+        return len(scan_text)
+
+    compute_layers.sort(key=_layer_pos)
+    return input_layers + compute_layers + return_layers
