@@ -4,7 +4,7 @@ import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
-from yobx.helpers.stats_helper import model_statistics
+from yobx.helpers.stats_helper import ModelStatistics, model_statistics
 
 TFLOAT = onnx.TensorProto.FLOAT
 
@@ -139,6 +139,41 @@ class TestStatsHelper(ExtTestCase):
         # Reshape is zero-cost; MatMul [1,32] @ [32,16] → 2*1*32*16 = 1024
         self.assertEqual(stats["flops_per_op_type"]["Reshape"], 0)
         self.assertEqual(stats["flops_per_op_type"]["MatMul"], 2 * 1 * 32 * 16)
+
+    def test_model_statistics_class_node_count(self):
+        """ModelStatistics.compute() returns the same node counts as model_statistics()."""
+        model = _make_mlp_model()
+        ms = ModelStatistics(model)
+        stats = ms.compute()
+        self.assertEqual(stats["n_nodes"], 3)
+        self.assertEqual(stats["node_count_per_op_type"]["MatMul"], 1)
+
+    def test_model_statistics_class_flops(self):
+        """ModelStatistics.compute() returns the same FLOPs as model_statistics()."""
+        model = _make_mlp_model()
+        stats = ModelStatistics(model).compute()
+        expected = 2 * 4 * 8 * 16 + 4 * 16 + 4 * 16
+        self.assertEqual(stats["total_estimated_flops"], expected)
+
+    def test_model_statistics_class_shape_fn(self):
+        """After compute(), shape_fn is accessible on the instance."""
+        model = _make_mlp_model()
+        ms = ModelStatistics(model)
+        ms.compute()
+        # W is a known initializer → shape should be (8, 16)
+        self.assertEqual(ms.shape_fn("W"), (8, 16))
+
+    def test_model_statistics_class_literal_fn(self):
+        """After compute(), literal_fn resolves int-constant tensors."""
+        X = oh.make_tensor_value_info("X", TFLOAT, [4, 8])
+        Z = oh.make_tensor_value_info("Z", TFLOAT, [32])
+        shape = onh.from_array(np.array([32], dtype=np.int64), name="shape")
+        nodes = [oh.make_node("Reshape", ["X", "shape"], ["Z"])]
+        graph = oh.make_graph(nodes, "lit_fn_test", [X], [Z], [shape])
+        model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 17)])
+        ms = ModelStatistics(model)
+        ms.compute()
+        self.assertEqual(ms.literal_fn("shape"), (32,))
 
 
 if __name__ == "__main__":

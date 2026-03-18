@@ -463,33 +463,41 @@ def _estimate_node_flops(
     return handler(node, shape_fn, literal_fn)
 
 
-def model_statistics(model: onnx.ModelProto, verbose: int = 0) -> Dict[str, Any]:
+class ModelStatistics:
     """
-    Computes statistics on an ONNX model.
+    Computes statistics on an ONNX model, including node counts per op_type
+    and estimated FLOPs.
 
     :param model: ONNX model
-    :param verbose: verbosity level
-    :return: dictionary with the following keys:
+    :param verbose: verbosity level passed to :class:`BasicShapeBuilder`
 
-        - ``"n_nodes"`` – total number of nodes
-        - ``"node_count_per_op_type"`` – dict mapping op_type → count
-        - ``"total_estimated_flops"`` – total estimated FLOPs (int or None)
-        - ``"flops_per_op_type"`` – dict mapping op_type → estimated FLOPs
-          (None means the cost could not be estimated for some nodes)
-        - ``"node_stats"`` – list of per-node dicts with keys
-          ``op_type``, ``name``, ``inputs``, ``outputs``, ``estimated_flops``
+    Usage::
+
+        stats = ModelStatistics(model).compute()
+        # {
+        #   "n_nodes": 3,
+        #   "node_count_per_op_type": {"MatMul": 1, "Add": 1, "Relu": 1},
+        #   "flops_per_op_type":      {"MatMul": 1024, "Add": 64, "Relu": 64},
+        #   "total_estimated_flops":  1152,
+        #   "node_stats": [...]
+        # }
     """
-    from ..xshape import BasicShapeBuilder
 
-    # Run shape inference to collect shapes for all intermediate tensors.
-    bs = BasicShapeBuilder(verbose=verbose)
-    bs.run_model(model)
+    def __init__(self, model: onnx.ModelProto, verbose: int = 0) -> None:
+        self.model = model
+        self.verbose = verbose
+        self._bs: Any = None
+        self._shape_map: Dict[str, Optional[Tuple]] = {}
+        self._node_count: Dict[str, int] = {}
+        self._flops_by_op: Dict[str, List[Optional[DIM_TYPE]]] = {}
+        self._node_stats: List[Dict[str, Any]] = []
 
-    # Build a mapping name → shape tuple (or None for dynamic/unknown).
-    # Collect all tensor names from the graph without accessing private attributes.
-    shape_map: Dict[str, Optional[Tuple]] = {}
+    # ------------------------------------------------------------------
+    # Shape-inference helpers
+    # ------------------------------------------------------------------
 
-    def _collect_names(graph: onnx.GraphProto) -> None:
+    def _collect_names(self, graph: onnx.GraphProto, all_names: set) -> None:
+        """Recursively gathers every tensor name referenced in *graph*."""
         for vi in list(graph.input) + list(graph.output):
             all_names.add(vi.name)
         for init in graph.initializer:
@@ -500,58 +508,65 @@ def model_statistics(model: onnx.ModelProto, verbose: int = 0) -> Dict[str, Any]
                     all_names.add(n)
             for att in node.attribute:
                 if att.type == onnx.AttributeProto.GRAPH:
-                    _collect_names(att.g)
+                    self._collect_names(att.g, all_names)
                 elif att.type == onnx.AttributeProto.GRAPHS:
                     for g in att.graphs:
-                        _collect_names(g)
+                        self._collect_names(g, all_names)
 
-    all_names: set = set()
-    _collect_names(model.graph)
+    def _build_shape_map(self) -> None:
+        """Runs shape inference and populates :attr:`_shape_map`."""
+        from ..xshape import BasicShapeBuilder
 
-    for name in all_names:
-        if not bs.has_shape(name):
-            continue
-        sh = bs.get_shape(name)
-        if all(isinstance(d, int) for d in sh):
-            shape_map[name] = tuple(int(d) for d in sh)
-        else:
-            shape_map[name] = sh
+        self._bs = BasicShapeBuilder(verbose=self.verbose)
+        self._bs.run_model(self.model)
 
-    def shape_fn(name: str) -> Optional[Tuple]:
-        """Returns the inferred shape of a tensor, or None."""
-        return shape_map.get(name)
+        all_names: set = set()
+        self._collect_names(self.model.graph, all_names)
 
-    def literal_fn(name: str) -> Optional[Tuple[int, ...]]:
+        for name in all_names:
+            if not self._bs.has_shape(name):
+                continue
+            sh = self._bs.get_shape(name)
+            if all(isinstance(d, int) for d in sh):
+                self._shape_map[name] = tuple(int(d) for d in sh)
+            else:
+                self._shape_map[name] = sh
+
+    def shape_fn(self, name: str) -> Optional[Tuple]:
+        """Returns the inferred shape of *name*, or ``None`` if unknown."""
+        return self._shape_map.get(name)
+
+    def literal_fn(self, name: str) -> Optional[Tuple[int, ...]]:
         """
-        Returns the integer values of a 1-D integer constant tensor (a shape
-        specification literal such as the second input of a Reshape node), or
-        None when *name* is not a constant or its values cannot be read.
+        Returns the integer values stored in a 1-D integer constant tensor
+        (e.g. the ``shape`` input of a Reshape node), or ``None`` when *name*
+        is not a known constant.
         """
-        if not name or not bs.is_constant(name):
+        if not name or not self._bs.is_constant(name):
             return None
-        val = bs.get_constant(name, exc=False, computed_value=True, as_shape=True)
+        val = self._bs.get_constant(name, exc=False, computed_value=True, as_shape=True)
         if val is None:
             return None
         return tuple(int(v) for v in val)  # type: ignore
 
-    # Collect per-node stats
-    node_count: Dict[str, int] = {}
-    flops_by_op: Dict[str, List[Optional[DIM_TYPE]]] = {}
-    node_stats: List[Dict[str, Any]] = []
+    # ------------------------------------------------------------------
+    # Node-collection helpers
+    # ------------------------------------------------------------------
 
-    def _collect_nodes(graph: onnx.GraphProto) -> None:
+    def _collect_nodes(self, graph: onnx.GraphProto) -> None:
+        """Recursively visits all nodes in *graph* and accumulates statistics."""
         for node in graph.node:
             op = node.op_type
-            node_count[op] = node_count.get(op, 0) + 1
+            self._node_count[op] = self._node_count.get(op, 0) + 1
 
-            f = _estimate_node_flops(node, shape_fn, literal_fn)
-            if op not in flops_by_op:
-                flops_by_op[op] = []
-            flops_by_op[op].append(f)
+            f = _estimate_node_flops(node, self.shape_fn, self.literal_fn)
+            if op not in self._flops_by_op:
+                self._flops_by_op[op] = []
+            self._flops_by_op[op].append(f)
 
-            input_shapes = [(n, shape_map.get(n)) for n in node.input if n]
-            output_shapes = [(n, shape_map.get(n)) for n in node.output if n]
-            node_stats.append(
+            input_shapes = [(n, self._shape_map.get(n)) for n in node.input if n]
+            output_shapes = [(n, self._shape_map.get(n)) for n in node.output if n]
+            self._node_stats.append(
                 {
                     "op_type": op,
                     "name": node.name,
@@ -563,33 +578,65 @@ def model_statistics(model: onnx.ModelProto, verbose: int = 0) -> Dict[str, Any]
             # Recurse into subgraphs (e.g. inside If / Loop / Scan)
             for att in node.attribute:
                 if att.type == onnx.AttributeProto.GRAPH:
-                    _collect_nodes(att.g)
+                    self._collect_nodes(att.g)
                 elif att.type == onnx.AttributeProto.GRAPHS:
                     for g in att.graphs:
-                        _collect_nodes(g)
+                        self._collect_nodes(g)
 
-    _collect_nodes(model.graph)
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
-    # Aggregate FLOPs per op_type
-    flops_per_op: Dict[str, Optional[int]] = {}
-    total: Optional[int] = 0
-    for op, values in flops_by_op.items():
-        op_total: Optional[int] = 0
-        for v in values:
-            if v is None or not isinstance(v, int):
-                op_total = None
-                break
-            op_total += v  # type: ignore
-        flops_per_op[op] = op_total
-        if op_total is None:
-            total = None
-        elif total is not None:
-            total += op_total
+    def compute(self) -> Dict[str, Any]:
+        """
+        Runs the full analysis and returns a statistics dictionary.
 
-    return {
-        "n_nodes": sum(node_count.values()),
-        "node_count_per_op_type": node_count,
-        "total_estimated_flops": total,
-        "flops_per_op_type": flops_per_op,
-        "node_stats": node_stats,
-    }
+        :return: dictionary with the following keys:
+
+            - ``"n_nodes"`` – total number of nodes
+            - ``"node_count_per_op_type"`` – dict mapping op_type → count
+            - ``"total_estimated_flops"`` – total estimated FLOPs (int or None)
+            - ``"flops_per_op_type"`` – dict mapping op_type → estimated FLOPs
+              (None means the cost could not be estimated for some nodes)
+            - ``"node_stats"`` – list of per-node dicts with keys
+              ``op_type``, ``name``, ``inputs``, ``outputs``, ``estimated_flops``
+        """
+        self._build_shape_map()
+        self._collect_nodes(self.model.graph)
+
+        # Aggregate FLOPs per op_type
+        flops_per_op: Dict[str, Optional[int]] = {}
+        total: Optional[int] = 0
+        for op, values in self._flops_by_op.items():
+            op_total: Optional[int] = 0
+            for v in values:
+                if v is None or not isinstance(v, int):
+                    op_total = None
+                    break
+                op_total += v  # type: ignore
+            flops_per_op[op] = op_total
+            if op_total is None:
+                total = None
+            elif total is not None:
+                total += op_total
+
+        return {
+            "n_nodes": sum(self._node_count.values()),
+            "node_count_per_op_type": self._node_count,
+            "total_estimated_flops": total,
+            "flops_per_op_type": flops_per_op,
+            "node_stats": self._node_stats,
+        }
+
+
+def model_statistics(model: onnx.ModelProto, verbose: int = 0) -> Dict[str, Any]:
+    """
+    Computes statistics on an ONNX model.
+
+    This is a convenience wrapper around :class:`ModelStatistics`.
+
+    :param model: ONNX model
+    :param verbose: verbosity level
+    :return: statistics dictionary — see :meth:`ModelStatistics.compute` for details
+    """
+    return ModelStatistics(model, verbose=verbose).compute()

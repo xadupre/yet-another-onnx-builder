@@ -8,4 +8,4 @@ from .helper import (
     string_sig,
     string_signature,
 )
-from .stats_helper import model_statistics
+from .stats_helper import ModelStatistics, model_statistics
