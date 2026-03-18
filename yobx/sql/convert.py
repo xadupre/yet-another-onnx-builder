@@ -189,25 +189,24 @@ def _build_onnx(
     right_col_map: Dict[str, str] = {name: name for name, _, _ in right_inputs}
 
     select_op: Optional[SelectOp] = None
-    group_op: Optional[GroupByOp] = None
+    _group_op: Optional[GroupByOp] = None
 
     for op in pq.operations:
         converter = get_sql_op_converter(type(op))
         if converter is not None:
             col_map = converter(g, {}, list(col_map.keys()), op, col_map, right_col_map)
         elif isinstance(op, GroupByOp):
-            group_op = op  # retained for SelectOp aggregation
+            _group_op = op  # retained for SelectOp aggregation
         elif isinstance(op, SelectOp):
             select_op = op
 
     if select_op is None:
         raise ValueError("No SELECT clause found in the query.")
 
-    if group_op is None:
-        raise ValueError("GROUP bY does not seem implemented.")
-
     if select_op.distinct:
-        raise NotImplementedError("SELECT DISTINCT is not yet supported by the ONNX converter.")
+        raise NotImplementedError(
+            f"SELECT DISTINCT is not yet supported by the ONNX converter, {select_op=}"
+        )
 
     # Emit SELECT expressions
     emitter = _ExprEmitter(g, col_map)
