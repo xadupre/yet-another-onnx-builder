@@ -1586,6 +1586,250 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
         return [*extra_nodes, new_unsq, new_expand2]
 
 
+class MulUnsqueezeExpandPattern(PatternOptimization):
+    """
+    Removes an unnecessary ``Expand`` inside ``Mul(x, Unsqueeze(Expand(y, shape), axes))``.
+    Since ``Mul`` supports broadcasting, the ``Expand`` is redundant when ``x`` already
+    has the dimensions that ``Expand`` was introducing.
+
+    Pattern: ``Mul(x, Unsqueeze(Expand(y, shape), axes))``
+
+    Valid when, for every dimension ``i`` where ``Expand`` actually expanded (i.e.
+    ``y.shape[i] == 1`` and ``shape[i] > 1``), the corresponding dimension of ``x``
+    (aligned from the right) equals ``shape[i]``.  In that case broadcasting in
+    ``Mul`` reproduces the same result without the intermediate ``Expand``.
+
+    Model with nodes to be fused:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(c, d, a, b)"])
+            I_Y(["Y FLOAT(1, a, b)"])
+            I_shape(["shape INT64(3)"])
+            I_axes(["axes INT64(1)"])
+
+            Constant_0[["Constant() -#gt; shape"]]
+            Constant_1[["Constant() -#gt; axes"]]
+            Expand_2[["Expand(., .)"]]
+            Unsqueeze_3[["Unsqueeze(., .)"]]
+            Mul_4[["Mul(., .)"]]
+
+            I_Y -->|"FLOAT(1, a, b)"| Expand_2
+            Constant_0 -->|"INT64(3)"| Expand_2
+            Expand_2 -->|"FLOAT(c, a, b)"| Unsqueeze_3
+            Constant_1 -->|"INT64(1)"| Unsqueeze_3
+            Unsqueeze_3 -->|"FLOAT(c, 1, a, b)"| Mul_4
+            I_X -->|"FLOAT(c, d, a, b)"| Mul_4
+
+            O_Z(["Z FLOAT(c, d, a, b)"])
+            Mul_4 --> O_Z
+
+            class I_X,I_Y,I_shape,I_axes,O_Z ioNode
+            class Constant_0,Constant_1 constNode
+            class Expand_2,Unsqueeze_3,Mul_4 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(c, d, a, b)"])
+            I_Y(["Y FLOAT(1, a, b)"])
+            I_axes(["axes INT64(1)"])
+
+            Constant_0[["Constant() -#gt; axes"]]
+            Unsqueeze_1[["Unsqueeze(., .)"]]
+            Mul_2[["Mul(., .)"]]
+
+            I_Y -->|"FLOAT(1, a, b)"| Unsqueeze_1
+            Constant_0 -->|"INT64(1)"| Unsqueeze_1
+            Unsqueeze_1 -->|"FLOAT(1, 1, a, b)"| Mul_2
+            I_X -->|"FLOAT(c, d, a, b)"| Mul_2
+
+            O_Z(["Z FLOAT(c, d, a, b)"])
+            Mul_2 --> O_Z
+
+            class I_X,I_Y,I_axes,O_Z ioNode
+            class Constant_0 constNode
+            class Unsqueeze_1,Mul_2 opNode
+    """
+
+    def __init__(self, verbose: int = 0, priority: int = 0):
+        super().__init__(verbose, priority)
+
+    @classmethod
+    def _is_expand_redundant_for_mul(
+        cls,
+        y_shape: Tuple[int, ...],
+        expand_shape: Tuple[int, ...],
+        axes: List[int],
+        x_shape: Tuple[int, ...],
+    ) -> bool:
+        """
+        Returns True if ``Expand(y, expand_shape)`` followed by
+        ``Unsqueeze(..., axes)`` is redundant given that ``Mul(x, ...)``
+        follows, i.e. broadcasting in ``Mul`` produces the same result.
+
+        Condition: for every position ``j`` in the aligned shapes where
+        ``unsq_y_shape[j] == 1`` but ``unsq_exp_shape[j] > 1`` (meaning
+        Expand would have replicated data along that dimension), the
+        corresponding aligned dimension of ``x`` must equal
+        ``unsq_exp_shape[j]``.
+        """
+        # Normalize negative axes.  The axes refer to positions in the OUTPUT
+        # tensor whose rank is ``len(expand_shape) + len(axes)``.
+        output_rank = len(expand_shape) + len(axes)
+        norm_axes = sorted(a if a >= 0 else a + output_rank for a in axes)
+
+        # Build shape of Unsqueeze(Expand(y, expand_shape), axes).
+        unsq_exp_shape = list(expand_shape)
+        for ax in norm_axes:
+            unsq_exp_shape.insert(ax, 1)
+
+        # Build shape of Unsqueeze(y, axes) – the candidate after removing Expand.
+        unsq_y_shape = list(y_shape)
+        for ax in norm_axes:
+            unsq_y_shape.insert(ax, 1)
+
+        n = len(unsq_exp_shape)
+        # Align x from the right (pad with 1s on the left if shorter).
+        if len(x_shape) < n:
+            x_aligned = (1,) * (n - len(x_shape)) + tuple(x_shape)
+        elif len(x_shape) > n:
+            # x has more dimensions than unsq_exp_shape; pad unsq shapes on the left.
+            extra = len(x_shape) - n
+            unsq_exp_shape = [1] * extra + unsq_exp_shape
+            unsq_y_shape = [1] * extra + unsq_y_shape
+            x_aligned = tuple(x_shape)
+        else:
+            x_aligned = tuple(x_shape)
+
+        for xs, ys, es in zip(x_aligned, unsq_y_shape, unsq_exp_shape):
+            if ys != es:
+                # ys == 1 and es > 1: Expand expanded this dimension.
+                # For the simplified Mul to broadcast correctly, x must be es.
+                if xs != es:
+                    return False
+        return True
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        if node.op_type != "Expand" or node.domain != "" or g.main_opset < 13:
+            return self.none()
+
+        # Expand output must be used only by Unsqueeze.
+        if g.is_used_more_than_once(node.output[0]):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        next_nodes = g.next_nodes(node.output[0])
+        if len(next_nodes) != 1:
+            return self.none(node, inspect.currentframe().f_lineno)
+        unsq_node = next_nodes[0]
+
+        if unsq_node.op_type != "Unsqueeze" or unsq_node.domain != "":
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Unsqueeze must have a constant axes input (opset >= 13).
+        if len(unsq_node.input) < 2 or not g.is_constant(unsq_node.input[1]):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Unsqueeze output must be used only by Mul.
+        if g.is_used_more_than_once(unsq_node.output[0]):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        next_next_nodes = g.next_nodes(unsq_node.output[0])
+        if len(next_next_nodes) != 1:
+            return self.none(node, inspect.currentframe().f_lineno)
+        mul_node = next_next_nodes[0]
+
+        if mul_node.op_type != "Mul" or mul_node.domain != "":
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Identify x (the other Mul input, not the Unsqueeze output).
+        if mul_node.input[0] == unsq_node.output[0]:
+            x_name = mul_node.input[1]
+        else:
+            x_name = mul_node.input[0]
+
+        y_name = node.input[0]  # input to Expand
+
+        # Need static shapes for both y and x.
+        if not g.has_shape(y_name) or not g.has_shape(x_name):
+            return self.none(node, inspect.currentframe().f_lineno)
+        y_shape = g.get_shape(y_name)
+        x_shape = g.get_shape(x_name)
+        if not all_int(y_shape) or not all_int(x_shape):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Expand target shape must be a known constant.
+        if not g.is_constant(node.input[1]):
+            return self.none(node, inspect.currentframe().f_lineno)
+        expand_shape_val = g.get_computed_constant(node.input[1])
+        if expand_shape_val is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+        with g.builder.maybe_disable_fake_tensor_mode():
+            expand_shape = tuple(int(v) for v in expand_shape_val)
+
+        # Unsqueeze axes must be a known constant.
+        axes_val = g.get_computed_constant(unsq_node.input[1])
+        if axes_val is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+        with g.builder.maybe_disable_fake_tensor_mode():
+            axes = [int(a) for a in axes_val]
+
+        if not self._is_expand_redundant_for_mul(y_shape, expand_shape, axes, x_shape):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        return MatchResult(self, [node, unsq_node, mul_node], self.apply, insert_at=node)
+
+    def apply(
+        self,
+        g: "GraphBuilder",  # noqa: F821
+        expand_node: NodeProto,
+        unsq_node: NodeProto,
+        mul_node: NodeProto,
+    ) -> List[NodeProto]:
+        # Replace Mul(x, Unsqueeze(Expand(y, shape), axes))
+        #      -> Mul(x, Unsqueeze(y, axes))
+        new_unsq_name = g.unique_name(f"{self.__class__.__name__}_{unsq_node.output[0]}")
+        new_unsq = g.make_node(
+            "Unsqueeze",
+            [expand_node.input[0], unsq_node.input[1]],
+            [new_unsq_name],
+            name=f"{self.__class__.__name__}--{unsq_node.name}",
+            doc_string=unsq_node.doc_string,
+        )
+        if mul_node.input[0] == unsq_node.output[0]:
+            new_mul_inputs = [new_unsq_name, mul_node.input[1]]
+        else:
+            new_mul_inputs = [mul_node.input[0], new_unsq_name]
+        new_mul = g.make_node(
+            "Mul",
+            new_mul_inputs,
+            mul_node.output,
+            name=f"{self.__class__.__name__}--{mul_node.name}",
+            doc_string=mul_node.doc_string,
+        )
+        return [new_unsq, new_mul]
+
+
 class SwapExpandReshapePattern(PatternOptimization):
     """
     Checks if Expand + Reshape can be swapped.

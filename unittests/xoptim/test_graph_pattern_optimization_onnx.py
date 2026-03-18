@@ -1826,6 +1826,149 @@ class TestGraphPatternOptimization(ExtTestCase):
         self.assertEqualArray(expected_y, got_y)
         self.assertEqualArray(expected_z, got_z)
 
+    def test_mul_unsqueeze_expand(self):
+        # Mul(x, Unsqueeze(Expand(y, shape), axis)) where x covers the expanded dims.
+        # y: (1, a, b), Expand to (c, a, b), Unsqueeze at 1 -> (c, 1, a, b)
+        # x: (c, d, a, b)  -- x.dim[0]==c, so Expand is redundant.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Expand", ["Y", "shape"], ["ye"]),
+                    oh.make_node("Unsqueeze", ["ye", "axes"], ["yu"]),
+                    oh.make_node("Mul", ["X", "yu"], ["Z"]),
+                ],
+                "dummy",
+                [
+                    _mkv_("X", TFLOAT, [3, 4, 5, 7]),
+                    _mkv_("Y", TFLOAT, [1, 5, 7]),
+                ],
+                [_mkv_("Z", TFLOAT, [3, 4, 5, 7])],
+                [
+                    onh.from_array(np.array([3, 5, 7], dtype=np.int64), name="shape"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="axes"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {
+            "X": self._range(3, 4, 5, 7),
+            "Y": self._range(1, 5, 7),
+        }
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["MulUnsqueezeExpand"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Unsqueeze", "Mul"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_mul_unsqueeze_expand_no_match_x_dim_one(self):
+        # Expand is NOT redundant: x.dim[0]==1 so broadcasting in Mul would not
+        # replicate the dimension that Expand introduced (c).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Expand", ["Y", "shape"], ["ye"]),
+                    oh.make_node("Unsqueeze", ["ye", "axes"], ["yu"]),
+                    oh.make_node("Mul", ["X", "yu"], ["Z"]),
+                ],
+                "dummy",
+                [
+                    _mkv_("X", TFLOAT, [1, 4, 5, 7]),
+                    _mkv_("Y", TFLOAT, [1, 5, 7]),
+                ],
+                [_mkv_("Z", TFLOAT, [3, 4, 5, 7])],
+                [
+                    onh.from_array(np.array([3, 5, 7], dtype=np.int64), name="shape"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="axes"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {
+            "X": self._range(1, 4, 5, 7),
+            "Y": self._range(1, 5, 7),
+        }
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["MulUnsqueezeExpand"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Pattern should NOT fire because x.dim[0]==1 != shape[0]==3.
+        self.assertEqual(
+            ["Expand", "Unsqueeze", "Mul"], [n.op_type for n in opt_onx.graph.node]
+        )
+        ref2 = ExtendedReferenceEvaluator(opt_onx)
+        got = ref2.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_mul_unsqueeze_expand_no_match_expand_shared(self):
+        # Pattern should NOT fire: Expand output is used by both Unsqueeze and Relu.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Expand", ["Y", "shape"], ["ye"]),
+                    oh.make_node("Unsqueeze", ["ye", "axes"], ["yu"]),
+                    oh.make_node("Mul", ["X", "yu"], ["Z"]),
+                    oh.make_node("Relu", ["ye"], ["W"]),
+                ],
+                "dummy",
+                [
+                    _mkv_("X", TFLOAT, [3, 4, 5, 7]),
+                    _mkv_("Y", TFLOAT, [1, 5, 7]),
+                ],
+                [_mkv_("Z", TFLOAT, [3, 4, 5, 7]), _mkv_("W", TFLOAT, [3, 5, 7])],
+                [
+                    onh.from_array(np.array([3, 5, 7], dtype=np.int64), name="shape"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="axes"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {
+            "X": self._range(3, 4, 5, 7),
+            "Y": self._range(1, 5, 7),
+        }
+        ref = ExtendedReferenceEvaluator(model)
+        expected_z, expected_w = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["MulUnsqueezeExpand"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Should still have all 4 nodes.
+        self.assertEqual(4, len(opt_onx.graph.node))
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got_z, got_w = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected_z, got_z)
+        self.assertEqualArray(expected_w, got_w)
+
     def test_slices_split(self):
         model = oh.make_model(
             oh.make_graph(
