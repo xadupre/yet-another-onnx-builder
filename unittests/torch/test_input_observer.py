@@ -13,6 +13,18 @@ class TestInputObserver(ExtTestCase):
         self.assertEqual([2], _infer_dynamic_dimensions([(1, 2, 3), (1, 2, 4)]))
         self.assertEqual([0, 2], _infer_dynamic_dimensions([(1, 2, 3), (2, 2, 4)]))
 
+    def test_is_empty(self):
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        model = Model()
+        observer = InputObserver()
+        self.assertTrue(observer.is_empty())
+        with observer(model):
+            model(torch.randn((3, 4)))
+        self.assertFalse(observer.is_empty())
+
     def test_io_captured_args(self):
         class Model(torch.nn.Module):
             def forward(self, x, y):

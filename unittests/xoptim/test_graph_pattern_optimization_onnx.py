@@ -5323,6 +5323,85 @@ class TestGraphPatternOptimization(ExtTestCase):
         zz = ref.run(None, feeds)[0]
         self.assertEqualArray(z, zz)
 
+    def test_mul_unsqueeze_unsqueeze_1(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                    oh.make_node("Unsqueeze", ["Y", "axes"], ["yu"]),
+                    oh.make_node("Mul", ["xu", "yu"], ["Z"]),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("X", TensorProto.FLOAT, [3, 4]),
+                    oh.make_tensor_value_info("Y", TensorProto.FLOAT, [3, 4]),
+                ],
+                [oh.make_tensor_value_info("Z", TensorProto.FLOAT, [3, 4, 1])],
+                [onh.from_array(np.array([2], dtype=np.int64), name="axes")],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+
+        feeds = {
+            "X": np.arange(12).reshape(3, 4).astype(np.float32),
+            "Y": np.arange(12).reshape(3, 4).astype(np.float32) + 1,
+        }
+        ref = ExtendedReferenceEvaluator(model)
+        z = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=False,
+            optimization_options=OptimizationOptions(patterns="MulUnsqueezeUnsqueeze", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Mul", "Unsqueeze"], [n.op_type for n in opt_onx.graph.node])
+        ref2 = ExtendedReferenceEvaluator(opt_onx)
+        zz = ref2.run(None, feeds)[0]
+        self.assertEqualArray(z, zz)
+
+    def test_mul_unsqueeze_unsqueeze_no_match_different_axes(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "axes0"], ["xu"]),
+                    oh.make_node("Unsqueeze", ["Y", "axes1"], ["yu"]),
+                    oh.make_node("Mul", ["xu", "yu"], ["Z"]),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("X", TensorProto.FLOAT, [3]),
+                    oh.make_tensor_value_info("Y", TensorProto.FLOAT, [3]),
+                ],
+                [oh.make_tensor_value_info("Z", TensorProto.FLOAT, [3, 3])],
+                [
+                    onh.from_array(np.array([0], dtype=np.int64), name="axes0"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="axes1"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+
+        feeds = {"X": np.arange(3).astype(np.float32), "Y": np.arange(3).astype(np.float32) + 1}
+        ref = ExtendedReferenceEvaluator(model)
+        z = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=False,
+            optimization_options=OptimizationOptions(patterns="MulUnsqueezeUnsqueeze", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Pattern should NOT fire because axes differ.
+        self.assertEqual(
+            ["Unsqueeze", "Unsqueeze", "Mul"], [n.op_type for n in opt_onx.graph.node]
+        )
+        ref2 = ExtendedReferenceEvaluator(opt_onx)
+        zz = ref2.run(None, feeds)[0]
+        self.assertEqualArray(z, zz)
+
     def test_concat_gather(self):
         model = oh.make_model(
             oh.make_graph(

@@ -8,14 +8,13 @@ import onnx.numpy_helper as onh
 from onnx.external_data_helper import uses_external_data
 from onnx.reference import ReferenceEvaluator
 from ..helpers import string_type
-from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
+from ..helpers.onnx_helper import np_dtype_to_tensor_dtype, str_tensor_proto_type
+from ..xexpressions import simplify_expression
+from ..xexpressions.rename_expressions import parse_expression_tokens
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape
 from ._builder_runtime import _BuilderRuntime
 from ._shape_runtime import _ShapeRuntime
 from ._inference_runtime import _InferenceRuntime, _OptimizationOptions
-from .rename_expressions import parse_expression_tokens
-from .simplify_expressions import simplify_expression
-from ..helpers.onnx_helper import str_tensor_proto_type
 from .shape_builder import ShapeBuilder
 
 

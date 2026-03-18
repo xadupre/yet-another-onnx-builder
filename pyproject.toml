@@ -251,6 +251,8 @@ project-excludes = [
     "yobx/torch/torch_helper.py",
     "yobx/torch/tracing.py",
     "yobx/translate/*",
+    "yobx/xexpressions/evaluate_expressions.py",
+    "yobx/xexpressions/simplify_expressions.py",
     "yobx/xoptim/*",
     "yobx/xshape/_builder_runtime.py",
     "yobx/xshape/_inference_runtime.py",
@@ -258,8 +260,6 @@ project-excludes = [
     "yobx/xshape/shape_builder.py",
     "yobx/xshape/shape_builder_impl.py",
     "yobx/xshape/shape_type_compute.py",
-    "yobx/xshape/expressions/evaluate_expressions.py",
-    "yobx/xshape/expressions/simplify_expressions.py",
 ]
 
 [tool.pyrefly.errors]
