@@ -30,11 +30,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install tensorflow==${{ matrix.tensorflow-version }}
+        run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*"
+
       - name: Install dependencies
         run: pip install -e ".[dev,tensorflow]"
 
-      - name: pip freeze
-        run: pip freeze
+      - name: Install tensorflow==${{ matrix.tensorflow-version }} again
+        run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" && pip freeze
 
       - name: Run tensorflow tests with coverage
         run: |
