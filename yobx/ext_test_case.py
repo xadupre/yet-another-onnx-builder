@@ -467,7 +467,7 @@ def requires_onnxir(version: str, msg: str = "") -> Callable:
 
 
 def has_sklearn(version: str = "") -> bool:
-    "Returns True if torch transformers is higher."
+    "Returns True if torch transformers is available and recent enough."
     try:
         import sklearn
     except (ImportError, AttributeError):
@@ -497,7 +497,7 @@ def requires_sklearn(version: str = "", msg: str = "") -> Callable:
 
 
 def has_torch(version: str = "") -> bool:
-    "Returns True if torch transformers is higher."
+    "Returns True if torch transformers is available and recent enough."
     try:
         import torch
     except (ImportError, AttributeError):
@@ -510,7 +510,7 @@ def has_torch(version: str = "") -> bool:
 
 
 def has_transformers(version: str = "") -> bool:
-    "Returns True if transformers version is higher."
+    "Returns True if transformers version is available and recent enough."
     try:
         import torch  # noqa: F401
         import transformers
@@ -673,6 +673,19 @@ def requires_lightgbm(version: str = "", msg: str = "") -> Callable:
         msg = f"lightgbm version {lightgbm.__version__} < {version}: {msg}"
         return unittest.skip(msg)
     return lambda x: x
+
+
+def has_sksurv(version: str = "") -> bool:
+    "Returns True if :epkg:`scikit-survival` is available and recent enough."
+    try:
+        import sksurv
+    except (ImportError, AttributeError):
+        return False
+    if not hasattr(sksurv, "__version__"):
+        return False
+    if not version:
+        return True
+    return PvVersion(sksurv.__version__) >= PvVersion(version)
 
 
 def requires_sksurv(version: str = "", msg: str = "") -> Callable:
