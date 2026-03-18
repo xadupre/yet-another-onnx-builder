@@ -86,14 +86,22 @@ with the parsed data-classes
 :class:`~yobx.litert.litert_helper.TFLiteOperator`) and the
 :class:`~yobx.litert.litert_helper.BuiltinOperator` enum.
 
-.. code-block:: python
+.. runpython::
+    :showcode:
 
-    from yobx.litert.litert_helper import parse_tflite_model
+    from yobx.litert.litert_helper import (
+        _make_sample_tflite_model,
+        parse_tflite_model,
+    )
 
-    model = parse_tflite_model("model.tflite")
+    model = parse_tflite_model(_make_sample_tflite_model())
     sg = model.subgraphs[0]
+    print(f"subgraphs : {len(model.subgraphs)}")
+    print(f"tensors   : {[t.name for t in sg.tensors]}")
+    print(f"inputs    : {sg.inputs}")
+    print(f"outputs   : {sg.outputs}")
     for op in sg.operators:
-        print(op.name, op.inputs, op.outputs)
+        print(f"operator  : {op.name}  inputs={op.inputs}  outputs={op.outputs}")
 
 
 Converter registry

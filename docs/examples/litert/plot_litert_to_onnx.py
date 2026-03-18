@@ -22,153 +22,24 @@ model so that no external TFLite dependencies are needed to run the gallery.
 """
 
 # %%
-import struct
-
 import numpy as np
 import onnxruntime
 from yobx.doc import plot_dot
 from yobx.litert import to_onnx
+from yobx.litert.litert_helper import _make_sample_tflite_model, parse_tflite_model
 
 
 # %%
 # Build a minimal TFLite FlatBuffer
 # -----------------------------------
 #
-# We create a tiny model with a single RELU operator
-# (input: float32 [1, 4], output: float32 [1, 4]) using a minimal FlatBuffer
-# builder.  In a real workflow you would simply pass the path to a ``.tflite``
-# file produced by the TFLite converter or downloaded from a model hub.
+# :func:`~yobx.litert.litert_helper._make_sample_tflite_model` returns the
+# bytes of a minimal TFLite model with a single RELU operator
+# (input: float32 [1, 4], output: float32 [1, 4]).  In a real workflow you
+# would pass the path to a ``.tflite`` file produced by the TFLite converter
+# or downloaded from a model hub.
 
-
-class _FlatBuilder:
-    """Minimal left-to-right FlatBuffer writer with deferred forward refs."""
-
-    def __init__(self):
-        self._buf = bytearray()
-        self._refs = []
-        self._positions = {}
-
-    def pos(self):
-        return len(self._buf)
-
-    def align(self, n=4):
-        r = self.pos() % n
-        if r:
-            self._buf.extend(b"\x00" * (n - r))
-
-    def write(self, data):
-        p = self.pos()
-        self._buf.extend(data)
-        return p
-
-    def u8(self, v):   return self.write(struct.pack("<B", v))
-    def i8(self, v):   return self.write(struct.pack("<b", v))
-    def u16(self, v):  return self.write(struct.pack("<H", v))
-    def i32(self, v):  return self.write(struct.pack("<i", v))
-    def u32(self, v):  return self.write(struct.pack("<I", v))
-
-    def patch_i32(self, pos, v): struct.pack_into("<i", self._buf, pos, v)
-    def patch_u32(self, pos, v): struct.pack_into("<I", self._buf, pos, v)
-
-    def reserve(self, target_id):
-        p = self.pos()
-        self._refs.append((p, target_id))
-        self.write(b"\x00\x00\x00\x00")
-        return p
-
-    def mark(self, target_id):
-        p = self.pos()
-        self._positions[target_id] = p
-        return p
-
-    def finalize(self):
-        for field_pos, tid in self._refs:
-            self.patch_u32(field_pos, self._positions[tid] - field_pos)
-        return bytes(self._buf)
-
-    def begin_table(self):
-        self.align(4)
-        p = self.pos()
-        self.i32(0)
-        return p
-
-    def end_table_with_vtable(self, soffset_pos, field_positions):
-        vtable_start = self.pos()
-        n = len(field_positions)
-        self.u16(4 + 2 * n)
-        self.u16(vtable_start - soffset_pos)
-        for fp in field_positions:
-            self.u16(fp - soffset_pos if fp is not None else 0)
-        self.patch_i32(soffset_pos, soffset_pos - vtable_start)
-
-
-def _build_relu_tflite():
-    b = _FlatBuilder()
-    b.reserve("model")      # root offset placeholder
-    b.write(b"TFL3")        # file identifier
-
-    # Model
-    b.mark("model"); sp = b.begin_table()
-    f0 = b.pos(); b.u32(3)
-    f1 = b.pos(); b.reserve("opcodes_vec")
-    f2 = b.pos(); b.reserve("subgraphs_vec")
-    f4 = b.pos(); b.reserve("buffers_vec")
-    b.end_table_with_vtable(sp, [f0, f1, f2, None, f4])
-
-    # OperatorCode: RELU = 19
-    b.align(4); b.mark("opcodes_vec"); b.u32(1); b.reserve("opcode0")
-    b.align(4); b.mark("opcode0"); sp = b.begin_table()
-    f0 = b.pos(); b.i8(19); b.align(4)
-    f4 = b.pos(); b.i32(19)
-    b.end_table_with_vtable(sp, [f0, None, None, None, f4])
-
-    # SubGraph
-    b.align(4); b.mark("subgraphs_vec"); b.u32(1); b.reserve("sg0")
-    b.align(4); b.mark("sg0"); sp = b.begin_table()
-    f0 = b.pos(); b.reserve("tensors_vec")
-    f1 = b.pos(); b.reserve("sg_in")
-    f2 = b.pos(); b.reserve("sg_out")
-    f3 = b.pos(); b.reserve("ops_vec")
-    b.end_table_with_vtable(sp, [f0, f1, f2, f3])
-
-    # Tensors
-    b.align(4); b.mark("tensors_vec"); b.u32(2); b.reserve("t0"); b.reserve("t1")
-
-    for tname_id, name, buf_idx in [("t0", "input", 1), ("t1", "relu", 2)]:
-        b.align(4); b.mark(tname_id); sp = b.begin_table()
-        fa = b.pos(); b.reserve(tname_id + "_shape")
-        fb = b.pos(); b.i8(0); b.align(4)
-        fc = b.pos(); b.u32(buf_idx)
-        fd = b.pos(); b.reserve(tname_id + "_name")
-        b.end_table_with_vtable(sp, [fa, fb, fc, fd])
-        b.align(4); b.mark(tname_id + "_shape"); b.u32(2); b.i32(1); b.i32(4)
-        enc = name.encode("utf-8")
-        b.align(4); b.mark(tname_id + "_name"); b.u32(len(enc)); b.write(enc + b"\x00")
-
-    b.align(4); b.mark("sg_in"); b.u32(1); b.i32(0)
-    b.align(4); b.mark("sg_out"); b.u32(1); b.i32(1)
-
-    # Operator
-    b.align(4); b.mark("ops_vec"); b.u32(1); b.reserve("op0")
-    b.align(4); b.mark("op0"); sp = b.begin_table()
-    f0 = b.pos(); b.u32(0)
-    f1 = b.pos(); b.reserve("op_in")
-    f2 = b.pos(); b.reserve("op_out")
-    b.end_table_with_vtable(sp, [f0, f1, f2])
-    b.align(4); b.mark("op_in"); b.u32(1); b.i32(0)
-    b.align(4); b.mark("op_out"); b.u32(1); b.i32(1)
-
-    # Buffers (3 empty)
-    b.align(4); b.mark("buffers_vec"); b.u32(3)
-    b.reserve("buf0"); b.reserve("buf1"); b.reserve("buf2")
-    for bid in ("buf0", "buf1", "buf2"):
-        b.align(4); b.mark(bid); sp = b.begin_table()
-        b.end_table_with_vtable(sp, [])
-
-    return b.finalize()
-
-
-model_bytes = _build_relu_tflite()
+model_bytes = _make_sample_tflite_model()
 print(f"Minimal TFLite model size: {len(model_bytes)} bytes")
 
 # %%
@@ -177,8 +48,6 @@ print(f"Minimal TFLite model size: {len(model_bytes)} bytes")
 #
 # :func:`~yobx.litert.litert_helper.parse_tflite_model` returns a plain
 # Python :class:`~yobx.litert.litert_helper.TFLiteModel` object.
-
-from yobx.litert.litert_helper import parse_tflite_model
 
 tflite_model = parse_tflite_model(model_bytes)
 sg = tflite_model.subgraphs[0]
