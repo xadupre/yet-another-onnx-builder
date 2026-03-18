@@ -34,7 +34,7 @@ Limitations
   true SQL group-by semantics (unique key extraction) are not yet implemented
   as ONNX lacks a native GroupBy node.
 * ``COUNT(*)`` emits the total row count as a scalar ``int64`` tensor.
-* ``SELECT DISTINCT`` is not yet converted (it is parsed but ignored).
+* ``SELECT DISTINCT`` is not yet supported and raises :class:`NotImplementedError`.
 """
 
 from __future__ import annotations
@@ -405,6 +405,11 @@ def _build_onnx(
 
     if select_op is None:
         raise ValueError("No SELECT clause found in the query.")
+
+    if select_op.distinct:
+        raise NotImplementedError(
+            "SELECT DISTINCT is not yet supported by the ONNX converter."
+        )
 
     # Emit SELECT expressions
     emitter = _ExprEmitter(g, col_map)

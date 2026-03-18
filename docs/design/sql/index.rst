@@ -161,7 +161,7 @@ Limitations and future work
 * ``GROUP BY`` uses a whole-dataset aggregation (``ReduceSum`` etc.) rather
   than true per-group aggregation.  True per-group semantics require an ONNX
   ``Loop`` or a custom kernel.
-* ``SELECT DISTINCT`` is parsed but not enforced at runtime.
+* ``SELECT DISTINCT`` is parsed but raises :class:`NotImplementedError` during conversion.
 * Only equi-joins on a single key column are supported for ``JOIN``.
 * ``HAVING``, ``ORDER BY``, ``LIMIT``, and subqueries are not yet supported.
 * String equality (``WHERE name = 'alice'``) is not yet supported
