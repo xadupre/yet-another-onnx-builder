@@ -29,28 +29,24 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: pip install -e ".[category_encoders,dev,imblearn,lightgbm,sklearn,xgboost]"
-
       - name: Install scikit-learn==${{ matrix.sklearn-version }}
+        run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*"
+
+      - name: Install dependencies
+        run: pip install -e ".[category_encoders,dev,imblearn,lightgbm,sklearn,sksurv,xgboost]"
+
+      - name: Install scikit-learn==${{ matrix.sklearn-version }} again
         run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*" && pip freeze
 
-      - name: pip freeze
-        run: pip freeze
-
-      - name: Run sklearn tests with no coverage
+      - name: Run sklearn files with coverage, not pytest
         if: matrix.sklearn-version != '1.8'
         run: |
-          PYTHONWARNINGS="ignore::FutureWarning,ignore::RuntimeWarning" pytest --durations=10 \
-            --ignore=unittests/sklearn/sksurv \
-            unittests/sklearn
+          PYTHONWARNINGS="ignore::FutureWarning,ignore::RuntimeWarning" python -m unittest discover -s unittests/sklearn
 
-      - name: Run sklearn tests with coverage
+      - name: Run sklearn files with coverage, not pytest
         if: matrix.sklearn-version == '1.8'
         run: |
-          PYTHONWARNINGS="ignore::FutureWarning,ignore::RuntimeWarning" coverage run -m pytest \
-            --ignore=unittests/sklearn/sksurv \
-            unittests/sklearn
+          PYTHONWARNINGS="ignore::FutureWarning,ignore::RuntimeWarning" coverage run -m unittest discover -s unittests/sklearn
           coverage xml
 
       - name: Parity with sklearn-onnx
