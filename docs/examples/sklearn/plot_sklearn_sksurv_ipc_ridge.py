@@ -46,8 +46,7 @@ X_train = rng.standard_normal((n_samples, n_features)).astype(np.float32)
 time_train = rng.exponential(scale=10, size=n_samples)
 event_train = rng.choice([True, False], size=n_samples)
 y_train = np.array(
-    [(e, t) for e, t in zip(event_train, time_train)],
-    dtype=[("event", "?"), ("time", "f8")],
+    [(e, t) for e, t in zip(event_train, time_train)], dtype=[("event", "?"), ("time", "f8")]
 )
 
 print(f"Training samples : {n_samples}")

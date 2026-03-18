@@ -18,10 +18,7 @@ def _make_survival_data(n=50, n_features=5, seed=0):
     X = rng.standard_normal((n, n_features)).astype(np.float32)
     time = rng.exponential(scale=10, size=n)
     event = rng.choice([True, False], size=n)
-    y = np.array(
-        [(e, t) for e, t in zip(event, time)],
-        dtype=[("event", "?"), ("time", "f8")],
-    )
+    y = np.array([(e, t) for e, t in zip(event, time)], dtype=[("event", "?"), ("time", "f8")])
     return X, y
 
 

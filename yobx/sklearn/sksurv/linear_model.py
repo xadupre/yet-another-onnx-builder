@@ -1,4 +1,4 @@
-from typing import Dict, List, Union
+from typing import Dict, List
 
 import numpy as np
 from sksurv.linear_model import IPCRidge
