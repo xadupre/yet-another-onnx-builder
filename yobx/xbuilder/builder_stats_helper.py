@@ -1,7 +1,7 @@
 from typing import Any, Dict, List
 
 
-def builder_stats_to_dataframe(stats: List[Dict[str, Any]]) -> "pandas.DataFrame":  # noqa: F821
+def builder_stats_to_dataframe(stats: List[Dict[str, Any]]) -> "pandas.DataFrame":  # type: ignore # noqa: F821
     """
     Processes the statistics produced by a builder.
 
