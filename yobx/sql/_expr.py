@@ -3,7 +3,7 @@ ONNX expression emitter for SQL AST nodes.
 
 :class:`_ExprEmitter` translates parsed SQL expression trees (column
 references, literals, binary operators, aggregate functions) into ONNX nodes
-inside a :class:`~yobx.xbuilder.GraphBuilder`.
+inside a :class:`~yobx.typing.GraphBuilderExtendedProtocol`.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import Callable, Dict, Optional
 
 import numpy as np
 
-from ..xbuilder import GraphBuilder
+from ..typing import GraphBuilderExtendedProtocol
 from ..xtracing.tracing import trace_numpy_function
 from .parse import AggExpr, BinaryExpr, ColumnRef, Condition, FuncCallExpr, Literal
 
@@ -22,7 +22,7 @@ class _ExprEmitter:
 
     def __init__(
         self,
-        g: GraphBuilder,
+        g: GraphBuilderExtendedProtocol,
         col_map: Dict[str, str],
         custom_functions: Optional[Dict[str, Callable]] = None,
     ):

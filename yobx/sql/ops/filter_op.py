@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from ...xbuilder import GraphBuilder
+from ...typing import GraphBuilderExtendedProtocol
 from ..parse import FilterOp
 from .._expr import _ExprEmitter
 from .register import register_sql_op_converter
@@ -14,7 +14,7 @@ from .register import register_sql_op_converter
 
 @register_sql_op_converter(FilterOp)
 def convert_filter_op(
-    g: GraphBuilder,
+    g: GraphBuilderExtendedProtocol,
     sts: Optional[Dict],
     outputs: List[str],
     op: FilterOp,
