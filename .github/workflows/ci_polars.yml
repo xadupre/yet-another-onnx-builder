@@ -1,4 +1,4 @@
-name: ci-polars
+name: ci-8-polars
 
 on:
   push:

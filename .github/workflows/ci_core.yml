@@ -52,7 +52,8 @@ jobs:
             --ignore=unittests/parity \
             --ignore=unittests/sklearn \
             --ignore=unittests/tensorflow \
-            --ignore=unittests/torch
+            --ignore=unittests/torch \
+            --ignore=unittests/polars
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

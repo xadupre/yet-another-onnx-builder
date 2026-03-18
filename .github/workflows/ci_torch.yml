@@ -37,7 +37,8 @@ jobs:
           pytest --cov=yobx --cov-report=xml --durations=10 \
             --ignore=unittests/parity \
             --ignore=unittests/tensorflow \
-            --ignore=unittests/sklearn
+            --ignore=unittests/sklearn \
+            --ignore=unittests/polars
 
       - name: Upload coverage to Codecov
         # Codecov automatically merges all uploads that share the same commit SHA.
