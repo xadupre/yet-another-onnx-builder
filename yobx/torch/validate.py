@@ -17,6 +17,7 @@ DEFAULT_PROMPT = "Continue: it rains, what should I do?"
 """Default text prompt used when validating text-generation models."""
 
 
+@dataclass(init=False)
 class ValidateSummary:
     """
     Flat summary dictionary returned by :func:`validate_model`.
@@ -44,6 +45,23 @@ class ValidateSummary:
         discrepancies: ``"OK"`` or ``"FAILED"`` for the overall discrepancy check.
         error_discrepancies: Error message if the discrepancy check raised an exception.
     """
+
+    model_id: str
+    prompt: str
+    config_from_cache: Optional[Union[str, bool]] = None
+    config_overrides: Optional[str] = None
+    error_config: Optional[str] = None
+    error_tokenizer: Optional[str] = None
+    model_from_cache: Optional[bool] = None
+    error_model: Optional[str] = None
+    n_captured: Optional[int] = None
+    error_observer: Optional[str] = None
+    export: Optional[str] = None
+    error_export: Optional[str] = None
+    discrepancies_ok: Optional[int] = None
+    discrepancies_total: Optional[int] = None
+    discrepancies: Optional[str] = None
+    error_discrepancies: Optional[str] = None
 
     def __init__(
         self,
@@ -92,6 +110,24 @@ class ValidateSummary:
             v = getattr(self, f.name)
             if v is not None:
                 yield f.name, v
+
+    def keys(self):
+        """Return an iterator over field names, mirroring ``dict.keys()``."""
+        for f in fields(self):
+            yield f.name
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Return the value for *key* if present; otherwise *default*."""
+        if any(f.name == key for f in fields(self)):
+            return getattr(self, key, default)
+        return default
+
+    def __getitem__(self, key: str) -> Any:
+        """Provide dict-style access to fields by name."""
+        for f in fields(self):
+            if f.name == key:
+                return getattr(self, key)
+        raise KeyError(key)
 
     def __contains__(self, key: str) -> bool:
         """Return ``True`` when *key* names a field that has been set (non-``None``)."""
