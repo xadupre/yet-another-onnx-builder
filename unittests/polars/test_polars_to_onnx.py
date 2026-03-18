@@ -6,6 +6,8 @@ import unittest
 import numpy as np
 import onnx
 from onnx import TensorProto
+from yobx.ext_test_case import ExtTestCase, requires_polars
+from yobx.reference import ExtendedReferenceEvaluator
 
 try:
     import polars as pl
@@ -16,8 +18,8 @@ except ImportError:
     HAS_POLARS = False
 
 
-@unittest.skipUnless(HAS_POLARS, "polars not installed")
-class TestPolarsToOnnx(unittest.TestCase):
+@requires_polars()
+class TestPolarsToOnnx(ExtTestCase):
     """Tests for :func:`yobx.polars.to_onnx`."""
 
     def _get_to_onnx(self):
@@ -255,9 +257,6 @@ class TestPolarsToOnnx(unittest.TestCase):
         shape = out.type.tensor_type.shape
         self.assertEqual(shape.dim[0].dim_param, "K")
 
-
-@unittest.skipUnless(HAS_POLARS, "polars not installed")
-class TestPolarsHelpers(unittest.TestCase):
     """Tests for helper functions in yobx.polars.convert."""
 
     def test_polars_dtype_to_onnx_element_type(self):
@@ -298,6 +297,22 @@ class TestPolarsHelpers(unittest.TestCase):
         lf = pl.DataFrame({"x": pl.Series([1.0], dtype=pl.Float32)}).lazy()
         dtypes = schema_to_numpy_dtypes(lf)
         self.assertEqual(dtypes["x"], np.dtype("float32"))
+
+    def test_filter_numerical(self):
+        import polars as pl
+
+        # Create a DataFrame with only numbers
+        df = pl.DataFrame({"a": [1, 5, 10, 15], "b": [10, 20, 30, 40]})
+        result = df.filter(pl.col("a") > 5)
+        result = df.lazy().filter(pl.col("a") > 5)
+        expected = result.collect().to_pandas()
+        to_onnx = self._get_to_onnx()
+        onx = to_onnx(result)
+        self.assertEqual(["Equal", "Compress", "Compress"], [n.op_type for n in onx.graph.node])
+        ref = ExtendedReferenceEvaluator(onx)
+        feeds = {"a": df["a"].to_pandas().values, "b": df["b"].to_pandas().values}
+        got = ref.run(None, feeds)
+        self.assertEqualArray(expected.values, got[0])
 
 
 if __name__ == "__main__":

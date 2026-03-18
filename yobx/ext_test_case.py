@@ -487,11 +487,41 @@ def requires_sklearn(version: str = "", msg: str = "") -> Callable:
         return unittest.skip(msg or "scikit-learn not installed")
 
     if not hasattr(sklearn, "__version__"):
+        return unittest.skip(msg or "scikit-learn not installed")
+    if not version:
+        return lambda x: x
+    if PvVersion(sklearn.__version__) < PvVersion(version):
+        msg = f"scikit-learn version {sklearn.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
+def has_polars(version: str = "") -> bool:
+    "Returns True if polars is available and recent enough."
+    try:
+        import polars
+    except (ImportError, AttributeError):
+        return False
+    if not hasattr(polars, "__version__"):
         return False
     if not version:
         return True
-    if PvVersion(sklearn.__version__) < PvVersion(version):
-        msg = f"scikit-learn version {sklearn.__version__} < {version}: {msg}"
+    return PvVersion(polars.__version__) >= PvVersion(version)
+
+
+def requires_polars(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`polars` is not recent enough."""
+    try:
+        import polars
+    except (AttributeError, ImportError):
+        return unittest.skip(msg or "scikit-learn not installed")
+
+    if not hasattr(polars, "__version__"):
+        return unittest.skip(msg or "polars not installed")
+    if not version:
+        return lambda x: x
+    if PvVersion(polars.__version__) < PvVersion(version):
+        msg = f"polars version {polars.__version__} < {version}: {msg}"
         return unittest.skip(msg)
     return lambda x: x
 

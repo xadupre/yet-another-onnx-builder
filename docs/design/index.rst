@@ -1,5 +1,5 @@
-Elements of Design
-==================
+GraphBuilder, Optimization and Other Tools
+==========================================
 
 This section documents the architecture and design of **yet-another-onnx-builder** (*yobx*),
 a toolkit for converting machine learning models from multiple frameworks to ONNX format.

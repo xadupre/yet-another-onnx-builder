@@ -28,6 +28,10 @@ to [ONNX](https://onnx.ai) format from many libraries:
 * [scikit-survival](https://scikit-survival.readthedocs.io)
 * [xgboost](https://xgboost.readthedocs.io)
 
+**Data Manipulation**
+
+* [polars](https://pola.rs/)
+
 **deeplearning**
 
 * [jax](https://jax.readthedocs.io/en/latest/) *in progress*

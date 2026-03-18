@@ -54,6 +54,12 @@ It can export from many libraries:
 | :epkg:`xgboost`                       | :ref:`l-sklearn-converter`   |
 +---------------------------------------+------------------------------+
 
+**data manipulation**
+
++---------------------------------------+----------------------------------------+
+| :epkg:`polars` *in progress*          | :ref:`l-design-data-manipulations`     |
++---------------------------------------+----------------------------------------+
+
 **deeplearning**
 
 +---------------------------------------+----------------------------------------+
@@ -89,6 +95,7 @@ Its unique API:
    :maxdepth: 1
    :caption: Contents
 
+   design/polars/index
    design/sklearn/index
    design/tensorflow/index
    design/torch/index
