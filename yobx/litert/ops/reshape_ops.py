@@ -13,10 +13,7 @@ from ...typing import GraphBuilderExtendedProtocol
 
 @register_litert_op_converter(BuiltinOperator.RESHAPE)
 def convert_reshape(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``RESHAPE`` → ONNX ``Reshape``.
 
@@ -33,10 +30,7 @@ def convert_reshape(
 
 @register_litert_op_converter(BuiltinOperator.SQUEEZE)
 def convert_squeeze(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``SQUEEZE`` → ONNX ``Squeeze``.
 
@@ -52,10 +46,7 @@ def convert_squeeze(
 
 @register_litert_op_converter(BuiltinOperator.EXPAND_DIMS)
 def convert_expand_dims(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``EXPAND_DIMS`` → ONNX ``Unsqueeze``.
 
@@ -69,10 +60,7 @@ def convert_expand_dims(
 
 @register_litert_op_converter(BuiltinOperator.TRANSPOSE)
 def convert_transpose(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``TRANSPOSE`` → ONNX ``Transpose``.
 
@@ -91,10 +79,7 @@ def convert_transpose(
 
 @register_litert_op_converter(BuiltinOperator.CONCATENATION)
 def convert_concatenation(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``CONCATENATION`` → ONNX ``Concat``."""
     axis = op.builtin_options.get("axis", 0)
@@ -103,10 +88,7 @@ def convert_concatenation(
 
 @register_litert_op_converter(BuiltinOperator.MEAN)
 def convert_mean(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``MEAN`` → ONNX ``ReduceMean``."""
     from onnx import TensorProto
@@ -120,10 +102,7 @@ def convert_mean(
 
 @register_litert_op_converter(BuiltinOperator.SUM)
 def convert_sum(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``SUM`` → ONNX ``ReduceSum``."""
     from onnx import TensorProto
@@ -137,10 +116,7 @@ def convert_sum(
 
 @register_litert_op_converter(BuiltinOperator.REDUCE_MAX)
 def convert_reduce_max(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``REDUCE_MAX`` → ONNX ``ReduceMax``."""
     from onnx import TensorProto
@@ -154,10 +130,7 @@ def convert_reduce_max(
 
 @register_litert_op_converter(BuiltinOperator.REDUCE_MIN)
 def convert_reduce_min(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``REDUCE_MIN`` → ONNX ``ReduceMin``."""
     from onnx import TensorProto

@@ -19,7 +19,6 @@ from yobx.ext_test_case import ExtTestCase
 from yobx.litert.litert_helper import _make_sample_tflite_model
 from yobx.xbuilder import GraphBuilder, OptimizationOptions
 
-
 # ---------------------------------------------------------------------------
 # 1. Helper utilities — no external deps
 # ---------------------------------------------------------------------------
@@ -264,9 +263,7 @@ class TestLiteRTConverterUnits(ExtTestCase):
         g.make_tensor_input("X", TensorProto.FLOAT, (2, 3))
         g.make_tensor_input("shape", TensorProto.INT32, (2,))
         proxy = self._proxy(
-            self._op(BuiltinOperator.RESHAPE, inputs=(0, 1), outputs=(0,)),
-            ["X", "shape"],
-            ["Y"],
+            self._op(BuiltinOperator.RESHAPE, inputs=(0, 1), outputs=(0,)), ["X", "shape"], ["Y"]
         )
         convert_reshape(g, {}, ["Y"], proxy)
         g.make_tensor_output("Y", indexed=False, allow_untyped_output=True)
@@ -298,9 +295,7 @@ class TestLiteRTEndToEnd(ExtTestCase):
         # Output is numerically correct.
         from onnxruntime import InferenceSession
 
-        sess = InferenceSession(
-            onx.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
         feeds = {onx.graph.input[0].name: X}
         (result,) = sess.run(None, feeds)
         self.assertEqualArray(np.maximum(X, 0), result)

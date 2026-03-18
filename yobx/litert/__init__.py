@@ -33,7 +33,4 @@ def register_litert_converters() -> None:
     _register_ops()
 
 
-__all__ = [
-    "register_litert_converters",
-    "to_onnx",
-]
+__all__ = ["register_litert_converters", "to_onnx"]

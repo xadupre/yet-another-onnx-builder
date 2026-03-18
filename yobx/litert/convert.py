@@ -1,24 +1,15 @@
 """Main entry point for the LiteRT/TFLite → ONNX converter."""
 
-from __future__ import annotations
-
 import os
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
-from onnx import ModelProto, TensorProto, ValueInfoProto
+import onnx
 
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExtendedModelContainer
 from ..xbuilder import GraphBuilder, OptimizationOptions
-from .litert_helper import (
-    BuiltinOperator,
-    TFLiteModel,
-    TFLiteOperator,
-    TFLiteSubgraph,
-    litert_dtype_to_np_dtype,
-    parse_tflite_model,
-)
+from .litert_helper import BuiltinOperator, TFLiteOperator, TFLiteSubgraph, parse_tflite_model
 from .register import get_litert_op_converter
 
 
@@ -34,7 +25,7 @@ def to_onnx(
     large_model: bool = False,
     external_threshold: int = 1024,
     subgraph_index: int = 0,
-) -> Union[ModelProto, ExtendedModelContainer]:
+) -> Union[onnx.ModelProto, ExtendedModelContainer]:
     """Convert a :epkg:`TFLite`/:epkg:`LiteRT` model to ONNX.
 
     The function parses the binary FlatBuffer that every ``.tflite`` file
@@ -85,9 +76,7 @@ def to_onnx(
         dict_target_opset: Dict[str, int] = {"": target_opset}
     else:
         if not isinstance(target_opset, dict):
-            raise TypeError(
-                f"target_opset must be an int or a dict, not {type(target_opset)}"
-            )
+            raise TypeError(f"target_opset must be an int or a dict, not {type(target_opset)}")
         dict_target_opset = target_opset.copy()
         if "" not in dict_target_opset:
             dict_target_opset[""] = DEFAULT_TARGET_OPSET
@@ -111,10 +100,8 @@ def to_onnx(
 
     kwargs: Dict[str, Any] = {}
     if "com.microsoft" in dict_target_opset:
-        kwargs["optimization_options"] = OptimizationOptions(
-            patterns="default+onnxruntime"
-        )
-    if verbose and issubclass(builder_cls, GraphBuilder):
+        kwargs["optimization_options"] = OptimizationOptions(patterns="default+onnxruntime")
+    if verbose and issubclass(builder_cls, GraphBuilder):  # type: ignore
         kwargs["verbose"] = verbose
 
     g = builder_cls(dict_target_opset, **kwargs)
@@ -130,7 +117,7 @@ def to_onnx(
     )
 
     if isinstance(g, GraphBuilder):
-        onx, stats = g.to_onnx(
+        onx, stats = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,
             return_optimize_report=True,
@@ -147,7 +134,7 @@ def to_onnx(
             )
             if agg.shape[0]:
                 print(agg.to_string())
-        return onx
+        return onx  # type: ignore
     return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
 
 
@@ -158,7 +145,7 @@ def to_onnx(
 
 def _onnx_dtype_from_arg(arg: Any) -> int:
     """Return the ONNX ``TensorProto`` dtype integer for a numpy array or VIP."""
-    if isinstance(arg, ValueInfoProto):
+    if isinstance(arg, onnx.ValueInfoProto):
         return arg.type.tensor_type.elem_type
     arr = np.asarray(arg)
     return _onnx_elem_type_from_np(arr.dtype)
@@ -166,12 +153,10 @@ def _onnx_dtype_from_arg(arg: Any) -> int:
 
 def _shape_from_arg(arg: Any) -> Tuple[Union[int, str], ...]:
     """Return the shape of a numpy array or ValueInfoProto."""
-    if isinstance(arg, ValueInfoProto):
+    if isinstance(arg, onnx.ValueInfoProto):
         tt = arg.type.tensor_type
         if tt.HasField("shape"):
-            return tuple(
-                d.dim_param if d.dim_param else (d.dim_value or 0) for d in tt.shape.dim
-            )
+            return tuple(d.dim_param if d.dim_param else (d.dim_value or 0) for d in tt.shape.dim)
         return (0,)
     return tuple(np.asarray(arg).shape)
 
@@ -203,7 +188,7 @@ def _convert_subgraph(
     #    treated as constant initializers.                                 #
     # ------------------------------------------------------------------ #
     input_set = set(subgraph.inputs)
-    output_set = set(subgraph.outputs)
+    _output_set = set(subgraph.outputs)
 
     for t in tensors:
         if t.data is not None and t.index not in input_set:
@@ -225,7 +210,7 @@ def _convert_subgraph(
         # Determine dtype.
         if arg_pos < len(args):
             arg = args[arg_pos]
-            if isinstance(arg, ValueInfoProto):
+            if isinstance(arg, onnx.ValueInfoProto):
                 elem_type = arg.type.tensor_type.elem_type
             else:
                 elem_type = _onnx_elem_type_from_np(np.asarray(arg).dtype)
@@ -237,10 +222,10 @@ def _convert_subgraph(
         if dynamic_shapes and arg_pos < len(dynamic_shapes):
             for axis, dim_name in dynamic_shapes[arg_pos].items():
                 if axis < len(shape_list):
-                    shape_list[axis] = dim_name
+                    shape_list[axis] = dim_name  # type: ignore
         elif shape_list:
             # Default: make axis 0 dynamic.
-            shape_list[0] = "batch"
+            shape_list[0] = "batch"  # type: ignore
 
         shape_tuple: Tuple[Union[int, str], ...] = tuple(shape_list)
 
@@ -257,15 +242,13 @@ def _convert_subgraph(
     # ------------------------------------------------------------------ #
     for op in subgraph.operators:
         # Build input names: skip tensors with index -1 (optional absent).
-        op_input_names = [
-            tensors[i].name if i >= 0 else "" for i in op.inputs
-        ]
+        op_input_names = [tensors[i].name if i >= 0 else "" for i in op.inputs]
         op_output_names = [tensors[i].name for i in op.outputs if i >= 0]
 
         # Resolve converter: extra_converters > registry.
         fct = extra_converters.get(op.opcode)
         if fct is None and op.opcode == BuiltinOperator.CUSTOM:
-            fct = extra_converters.get(op.custom_code)
+            fct = extra_converters.get(op.custom_code)  # type: ignore
         if fct is None:
             fct = get_litert_op_converter(op.opcode)
         if fct is None and op.opcode == BuiltinOperator.CUSTOM:
@@ -309,13 +292,10 @@ class _OpProxy:
     so converter functions can access inputs/outputs as **string names**
     (consistent with the TF converter style)."""
 
-    __slots__ = ("_op", "inputs", "outputs", "builtin_options", "opcode", "custom_code")
+    __slots__ = "_op", "builtin_options", "custom_code", "inputs", "opcode", "outputs"
 
     def __init__(
-        self,
-        op: TFLiteOperator,
-        input_names: List[str],
-        output_names: List[str],
+        self, op: TFLiteOperator, input_names: List[str], output_names: List[str]
     ) -> None:
         self._op = op
         self.inputs: Tuple[str, ...] = tuple(input_names)
@@ -333,43 +313,41 @@ class _OpProxy:
 # dtype helpers
 # ---------------------------------------------------------------------------
 
-from onnx import TensorProto as _TP
-
 _NP_DTYPE_TO_ONNX: Dict[np.dtype, int] = {
-    np.dtype("float32"): _TP.FLOAT,
-    np.dtype("float64"): _TP.DOUBLE,
-    np.dtype("float16"): _TP.FLOAT16,
-    np.dtype("int8"): _TP.INT8,
-    np.dtype("int16"): _TP.INT16,
-    np.dtype("int32"): _TP.INT32,
-    np.dtype("int64"): _TP.INT64,
-    np.dtype("uint8"): _TP.UINT8,
-    np.dtype("uint16"): _TP.UINT16,
-    np.dtype("uint32"): _TP.UINT32,
-    np.dtype("uint64"): _TP.UINT64,
-    np.dtype("bool"): _TP.BOOL,
+    np.dtype("float32"): onnx.TensorProto.FLOAT,
+    np.dtype("float64"): onnx.TensorProto.DOUBLE,
+    np.dtype("float16"): onnx.TensorProto.FLOAT16,
+    np.dtype("int8"): onnx.TensorProto.INT8,
+    np.dtype("int16"): onnx.TensorProto.INT16,
+    np.dtype("int32"): onnx.TensorProto.INT32,
+    np.dtype("int64"): onnx.TensorProto.INT64,
+    np.dtype("uint8"): onnx.TensorProto.UINT8,
+    np.dtype("uint16"): onnx.TensorProto.UINT16,
+    np.dtype("uint32"): onnx.TensorProto.UINT32,
+    np.dtype("uint64"): onnx.TensorProto.UINT64,
+    np.dtype("bool"): onnx.TensorProto.BOOL,
 }
 
 
 def _onnx_elem_type_from_np(dtype: np.dtype) -> int:
-    return _NP_DTYPE_TO_ONNX.get(dtype, _TP.FLOAT)
+    return _NP_DTYPE_TO_ONNX.get(dtype, onnx.TensorProto.FLOAT)
 
 
 _TFLITE_TO_ONNX_DTYPE: Dict[int, int] = {
-    0: _TP.FLOAT,   # FLOAT32
-    1: _TP.FLOAT16, # FLOAT16
-    2: _TP.INT32,   # INT32
-    3: _TP.UINT8,   # UINT8
-    4: _TP.INT64,   # INT64
-    6: _TP.BOOL,    # BOOL
-    7: _TP.INT16,   # INT16
-    9: _TP.INT8,    # INT8
-    10: _TP.DOUBLE, # FLOAT64
-    12: _TP.UINT64, # UINT64
-    14: _TP.UINT32, # UINT32
-    15: _TP.UINT16, # UINT16
+    0: onnx.TensorProto.FLOAT,  # FLOAT32
+    1: onnx.TensorProto.FLOAT16,  # FLOAT16
+    2: onnx.TensorProto.INT32,  # INT32
+    3: onnx.TensorProto.UINT8,  # UINT8
+    4: onnx.TensorProto.INT64,  # INT64
+    6: onnx.TensorProto.BOOL,  # BOOL
+    7: onnx.TensorProto.INT16,  # INT16
+    9: onnx.TensorProto.INT8,  # INT8
+    10: onnx.TensorProto.DOUBLE,  # FLOAT64
+    12: onnx.TensorProto.UINT64,  # UINT64
+    14: onnx.TensorProto.UINT32,  # UINT32
+    15: onnx.TensorProto.UINT16,  # UINT16
 }
 
 
 def _tflite_dtype_to_onnx_elem_type(dtype_int: int) -> int:
-    return _TFLITE_TO_ONNX_DTYPE.get(dtype_int, _TP.FLOAT)
+    return _TFLITE_TO_ONNX_DTYPE.get(dtype_int, onnx.TensorProto.FLOAT)

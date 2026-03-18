@@ -3,8 +3,6 @@ DEPTHWISE_CONV_2D, AVERAGE_POOL_2D, MAX_POOL_2D, BATCH_MATMUL."""
 
 from typing import Any, Dict, List
 
-import numpy as np
-
 from ..litert_helper import BuiltinOperator, Padding, TFLiteOperator
 from ..register import register_litert_op_converter
 from ...typing import GraphBuilderExtendedProtocol
@@ -19,10 +17,7 @@ def _padding_to_auto_pad(padding: int) -> str:
 
 @register_litert_op_converter(BuiltinOperator.FULLY_CONNECTED)
 def convert_fully_connected(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``FULLY_CONNECTED`` → ONNX ``MatMul`` (+ optional ``Add`` bias).
 
@@ -46,10 +41,7 @@ def convert_fully_connected(
 
 @register_litert_op_converter(BuiltinOperator.BATCH_MATMUL)
 def convert_batch_matmul(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``BATCH_MATMUL`` → ONNX ``MatMul`` with optional transposes."""
     x = op.inputs[0]
@@ -67,10 +59,7 @@ def convert_batch_matmul(
 
 @register_litert_op_converter(BuiltinOperator.CONV_2D)
 def convert_conv2d(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``CONV_2D`` → ONNX ``Conv``.
 
@@ -109,10 +98,7 @@ def convert_conv2d(
 
 @register_litert_op_converter(BuiltinOperator.DEPTHWISE_CONV_2D)
 def convert_depthwise_conv2d(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``DEPTHWISE_CONV_2D`` → ONNX ``Conv`` with ``group=in_channels``.
 
@@ -170,10 +156,7 @@ def convert_depthwise_conv2d(
 
 @register_litert_op_converter(BuiltinOperator.AVERAGE_POOL_2D)
 def convert_avg_pool2d(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``AVERAGE_POOL_2D`` → ONNX ``AveragePool``."""
     opts = op.builtin_options
@@ -192,10 +175,7 @@ def convert_avg_pool2d(
 
 @register_litert_op_converter(BuiltinOperator.MAX_POOL_2D)
 def convert_max_pool2d(
-    g: GraphBuilderExtendedProtocol,
-    sts: Dict[str, Any],
-    outputs: List[str],
-    op: TFLiteOperator,
+    g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``MAX_POOL_2D`` → ONNX ``MaxPool``."""
     opts = op.builtin_options

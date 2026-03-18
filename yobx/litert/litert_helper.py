@@ -422,7 +422,9 @@ def _read_int32_vec(fb: _FlatBuf, vec_pos: int) -> Tuple[int, ...]:
     return tuple(fb.vec_i32(vec_pos, i) for i in range(fb.vec_len(vec_pos)))
 
 
-def _parse_tensor(fb: _FlatBuf, buffers: List[Optional[bytes]], tp: int, idx: int) -> TFLiteTensor:
+def _parse_tensor(
+    fb: _FlatBuf, buffers: List[Optional[bytes]], tp: int, idx: int
+) -> TFLiteTensor:
     """Parse a single TFLite Tensor table at *tp*."""
     # field 0: shape ([int32])
     shape_vec = fb.field_vector(tp, 0)
@@ -449,8 +451,10 @@ def _parse_tensor(fb: _FlatBuf, buffers: List[Optional[bytes]], tp: int, idx: in
         assert raw is not None
         try:
             np_dtype = litert_dtype_to_np_dtype(dtype_int)
-            data = np.frombuffer(raw, dtype=np_dtype).reshape(shape) if shape else np.frombuffer(
-                raw, dtype=np_dtype
+            data = (
+                np.frombuffer(raw, dtype=np_dtype).reshape(shape)
+                if shape
+                else np.frombuffer(raw, dtype=np_dtype)
             )
         except (ValueError, TypeError):
             # Unsupported dtype or reshape mismatch — leave data as None.
@@ -549,10 +553,7 @@ def _decode_leaky_relu_options(fb: _FlatBuf, opts_tp: int) -> Dict:
 
 
 def _decode_concatenation_options(fb: _FlatBuf, opts_tp: int) -> Dict:
-    return {
-        "axis": fb.field_i32(opts_tp, 0, 0),
-        "fused_activation": fb.field_i8(opts_tp, 1, 0),
-    }
+    return {"axis": fb.field_i32(opts_tp, 0, 0), "fused_activation": fb.field_i8(opts_tp, 1, 0)}
 
 
 def _decode_transpose_conv_options(fb: _FlatBuf, opts_tp: int) -> Dict:
@@ -565,10 +566,7 @@ def _decode_transpose_conv_options(fb: _FlatBuf, opts_tp: int) -> Dict:
 
 
 def _decode_batch_matmul_options(fb: _FlatBuf, opts_tp: int) -> Dict:
-    return {
-        "adj_x": fb.field_bool(opts_tp, 0, False),
-        "adj_y": fb.field_bool(opts_tp, 1, False),
-    }
+    return {"adj_x": fb.field_bool(opts_tp, 0, False), "adj_y": fb.field_bool(opts_tp, 1, False)}
 
 
 # Maps BuiltinOperator code → (builtin_options_type, decoder_function)
@@ -596,11 +594,7 @@ _OPTION_DECODERS = {
 }
 
 
-def _parse_operator(
-    fb: _FlatBuf,
-    op_codes: List[Tuple[int, str]],
-    tp: int,
-) -> TFLiteOperator:
+def _parse_operator(fb: _FlatBuf, op_codes: List[Tuple[int, str]], tp: int) -> TFLiteOperator:
     """Parse a single TFLite Operator table at *tp*."""
     # field 0: opcode_index (uint32)
     opcode_idx = fb.field_u32(tp, 0, 0)
@@ -632,7 +626,7 @@ def _parse_operator(
     )
 
 
-def parse_tflite_model(model: "str | os.PathLike | bytes") -> TFLiteModel:
+def parse_tflite_model(model: str | os.PathLike | bytes) -> TFLiteModel:
     """Parse a ``.tflite`` file (or raw bytes) and return a :class:`TFLiteModel`.
 
     :param model: path to a ``.tflite`` file or its raw bytes
@@ -765,7 +759,7 @@ class _MinimalFlatBuilder:
 
     def __init__(self) -> None:
         self._buf: bytearray = bytearray()
-        self._refs: list = []       # (field_pos, target_id)
+        self._refs: list = []  # (field_pos, target_id)
         self._positions: dict = {}  # target_id → absolute position
 
     def pos(self) -> int:
@@ -782,11 +776,20 @@ class _MinimalFlatBuilder:
         return p
 
     # scalar writers
-    def u8(self, v: int) -> int:  return self.write(struct.pack("<B", v))
-    def i8(self, v: int) -> int:  return self.write(struct.pack("<b", v))
-    def u16(self, v: int) -> int: return self.write(struct.pack("<H", v))
-    def i32(self, v: int) -> int: return self.write(struct.pack("<i", v))
-    def u32(self, v: int) -> int: return self.write(struct.pack("<I", v))
+    def u8(self, v: int) -> int:
+        return self.write(struct.pack("<B", v))
+
+    def i8(self, v: int) -> int:
+        return self.write(struct.pack("<b", v))
+
+    def u16(self, v: int) -> int:
+        return self.write(struct.pack("<H", v))
+
+    def i32(self, v: int) -> int:
+        return self.write(struct.pack("<i", v))
+
+    def u32(self, v: int) -> int:
+        return self.write(struct.pack("<I", v))
 
     def patch_i32(self, pos: int, v: int) -> None:
         struct.pack_into("<i", self._buf, pos, v)
@@ -869,67 +872,131 @@ def _make_sample_tflite_model() -> bytes:
     # ── MODEL TABLE ─────────────────────────────────────────────────────────
     b.mark("model")
     sp = b.begin_table()
-    f0 = b.pos(); b.u32(3)                   # version = 3
-    f1 = b.pos(); b.reserve("opcodes_vec")   # operator_codes
-    f2 = b.pos(); b.reserve("subgraphs_vec") # subgraphs
-    f4 = b.pos(); b.reserve("buffers_vec")   # buffers
+    f0 = b.pos()
+    b.u32(3)  # version = 3
+    f1 = b.pos()
+    b.reserve("opcodes_vec")  # operator_codes
+    f2 = b.pos()
+    b.reserve("subgraphs_vec")  # subgraphs
+    f4 = b.pos()
+    b.reserve("buffers_vec")  # buffers
     b.end_table_with_vtable(sp, [f0, f1, f2, None, f4])
 
     # ── OPERATOR CODES VECTOR ────────────────────────────────────────────────
-    b.align(4); b.mark("opcodes_vec"); b.u32(1); b.reserve("opcode0")
+    b.align(4)
+    b.mark("opcodes_vec")
+    b.u32(1)
+    b.reserve("opcode0")
 
     # ── OPCODE 0 TABLE: RELU = 19 ────────────────────────────────────────────
-    b.align(4); b.mark("opcode0"); sp = b.begin_table()
-    f0 = b.pos(); b.i8(19)   # builtin_code (int8)
     b.align(4)
-    f4 = b.pos(); b.i32(19)  # extended_builtin_code (int32)
+    b.mark("opcode0")
+    sp = b.begin_table()
+    f0 = b.pos()
+    b.i8(19)  # builtin_code (int8)
+    b.align(4)
+    f4 = b.pos()
+    b.i32(19)  # extended_builtin_code (int32)
     b.end_table_with_vtable(sp, [f0, None, None, None, f4])
 
     # ── SUBGRAPHS VECTOR ─────────────────────────────────────────────────────
-    b.align(4); b.mark("subgraphs_vec"); b.u32(1); b.reserve("sg0")
+    b.align(4)
+    b.mark("subgraphs_vec")
+    b.u32(1)
+    b.reserve("sg0")
 
     # ── SUBGRAPH 0 TABLE ─────────────────────────────────────────────────────
-    b.align(4); b.mark("sg0"); sp = b.begin_table()
-    f0 = b.pos(); b.reserve("tensors_vec")   # tensors
-    f1 = b.pos(); b.reserve("sg_in")         # inputs
-    f2 = b.pos(); b.reserve("sg_out")        # outputs
-    f3 = b.pos(); b.reserve("ops_vec")       # operators
+    b.align(4)
+    b.mark("sg0")
+    sp = b.begin_table()
+    f0 = b.pos()
+    b.reserve("tensors_vec")  # tensors
+    f1 = b.pos()
+    b.reserve("sg_in")  # inputs
+    f2 = b.pos()
+    b.reserve("sg_out")  # outputs
+    f3 = b.pos()
+    b.reserve("ops_vec")  # operators
     b.end_table_with_vtable(sp, [f0, f1, f2, f3])
 
     # ── TENSORS VECTOR ───────────────────────────────────────────────────────
-    b.align(4); b.mark("tensors_vec"); b.u32(2); b.reserve("t0"); b.reserve("t1")
+    b.align(4)
+    b.mark("tensors_vec")
+    b.u32(2)
+    b.reserve("t0")
+    b.reserve("t1")
 
     for tid, name, buf_idx in [("t0", "input", 1), ("t1", "relu", 2)]:
-        b.align(4); b.mark(tid); sp = b.begin_table()
-        fa = b.pos(); b.reserve(tid + "_shape")
-        fb_ = b.pos(); b.i8(0); b.align(4)   # type = FLOAT32
-        fc = b.pos(); b.u32(buf_idx)
-        fd = b.pos(); b.reserve(tid + "_name")
+        b.align(4)
+        b.mark(tid)
+        sp = b.begin_table()
+        fa = b.pos()
+        b.reserve(tid + "_shape")
+        fb_ = b.pos()
+        b.i8(0)
+        b.align(4)  # type = FLOAT32
+        fc = b.pos()
+        b.u32(buf_idx)
+        fd = b.pos()
+        b.reserve(tid + "_name")
         b.end_table_with_vtable(sp, [fa, fb_, fc, fd])
-        b.align(4); b.mark(tid + "_shape"); b.u32(2); b.i32(1); b.i32(4)
+        b.align(4)
+        b.mark(tid + "_shape")
+        b.u32(2)
+        b.i32(1)
+        b.i32(4)
         enc = name.encode("utf-8")
-        b.align(4); b.mark(tid + "_name"); b.u32(len(enc)); b.write(enc + b"\x00")
+        b.align(4)
+        b.mark(tid + "_name")
+        b.u32(len(enc))
+        b.write(enc + b"\x00")
 
-    b.align(4); b.mark("sg_in"); b.u32(1); b.i32(0)
-    b.align(4); b.mark("sg_out"); b.u32(1); b.i32(1)
+    b.align(4)
+    b.mark("sg_in")
+    b.u32(1)
+    b.i32(0)
+    b.align(4)
+    b.mark("sg_out")
+    b.u32(1)
+    b.i32(1)
 
     # ── OPERATORS VECTOR ─────────────────────────────────────────────────────
-    b.align(4); b.mark("ops_vec"); b.u32(1); b.reserve("op0")
+    b.align(4)
+    b.mark("ops_vec")
+    b.u32(1)
+    b.reserve("op0")
 
-    b.align(4); b.mark("op0"); sp = b.begin_table()
-    f0 = b.pos(); b.u32(0)               # opcode_index = 0
-    f1 = b.pos(); b.reserve("op_in")
-    f2 = b.pos(); b.reserve("op_out")
+    b.align(4)
+    b.mark("op0")
+    sp = b.begin_table()
+    f0 = b.pos()
+    b.u32(0)  # opcode_index = 0
+    f1 = b.pos()
+    b.reserve("op_in")
+    f2 = b.pos()
+    b.reserve("op_out")
     b.end_table_with_vtable(sp, [f0, f1, f2])
 
-    b.align(4); b.mark("op_in"); b.u32(1); b.i32(0)
-    b.align(4); b.mark("op_out"); b.u32(1); b.i32(1)
+    b.align(4)
+    b.mark("op_in")
+    b.u32(1)
+    b.i32(0)
+    b.align(4)
+    b.mark("op_out")
+    b.u32(1)
+    b.i32(1)
 
     # ── BUFFERS VECTOR ───────────────────────────────────────────────────────
-    b.align(4); b.mark("buffers_vec"); b.u32(3)
-    b.reserve("buf0"); b.reserve("buf1"); b.reserve("buf2")
+    b.align(4)
+    b.mark("buffers_vec")
+    b.u32(3)
+    b.reserve("buf0")
+    b.reserve("buf1")
+    b.reserve("buf2")
     for bid in ("buf0", "buf1", "buf2"):
-        b.align(4); b.mark(bid); sp = b.begin_table()
+        b.align(4)
+        b.mark(bid)
+        sp = b.begin_table()
         b.end_table_with_vtable(sp, [])
 
     return b.finalize()

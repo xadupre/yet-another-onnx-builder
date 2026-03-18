@@ -30,14 +30,10 @@ def register_litert_op_converter(op_code: Union[int, str, Tuple[Union[int, str],
 
     def decorator(fct: Callable) -> Callable:
         global LITERT_OP_CONVERTERS
-        codes: Tuple[Union[int, str], ...] = (
-            op_code if isinstance(op_code, tuple) else (op_code,)
-        )
+        codes: Tuple[Union[int, str], ...] = op_code if isinstance(op_code, tuple) else (op_code,)
         for code in codes:
             if code in LITERT_OP_CONVERTERS:
-                raise TypeError(
-                    f"A converter is already registered for LiteRT op code {code!r}."
-                )
+                raise TypeError(f"A converter is already registered for LiteRT op code {code!r}.")
             LITERT_OP_CONVERTERS[code] = fct
         return fct
 

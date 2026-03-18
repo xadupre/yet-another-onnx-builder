@@ -26,8 +26,11 @@ import numpy as np
 import onnxruntime
 from yobx.doc import plot_dot
 from yobx.litert import to_onnx
-from yobx.litert.litert_helper import _make_sample_tflite_model, parse_tflite_model
-
+from yobx.litert.litert_helper import (
+    _make_sample_tflite_model,
+    parse_tflite_model,
+    BuiltinOperator,
+)
 
 # %%
 # Build a minimal TFLite FlatBuffer
@@ -85,9 +88,7 @@ print(f"Graph output name  : {onx.graph.output[0].name}")
 #
 # The ONNX model produces the same output as a manual ``np.maximum(X, 0)``.
 
-sess = onnxruntime.InferenceSession(
-    onx.SerializeToString(), providers=["CPUExecutionProvider"]
-)
+sess = onnxruntime.InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
 (result,) = sess.run(None, {onx.graph.input[0].name: X})
 
 expected = np.maximum(X, 0.0)
@@ -122,8 +123,6 @@ print("Dynamic batch verified for batch sizes 1, 3, 7 ✓")
 #
 # Use ``extra_converters`` to override or extend the built-in converters.
 # Here we replace ``RELU`` with ``Clip(0, 6)`` (i.e. ``Relu6``).
-
-from yobx.litert.litert_helper import BuiltinOperator
 
 
 def custom_relu6(g, sts, outputs, op):

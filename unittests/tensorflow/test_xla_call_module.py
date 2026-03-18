@@ -14,7 +14,6 @@ import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_jax
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -82,9 +81,16 @@ class TestMappingJaxOnnx(ExtTestCase):
     def test_all_common_unary_ops_present(self):
         """All commonly-used StableHLO unary ops must be mapped."""
         expected = {
-            "abs", "ceil", "floor", "negate", "round_nearest_even", "sign",
-            "exponential", "log",
-            "cosine", "sine",
+            "abs",
+            "ceil",
+            "floor",
+            "negate",
+            "round_nearest_even",
+            "sign",
+            "exponential",
+            "log",
+            "cosine",
+            "sine",
             "tanh",
             "logistic",
             "sqrt",
@@ -169,9 +175,7 @@ class TestJaxUnaryOpsEndToEnd(ExtTestCase):
         from yobx.tensorflow import to_onnx
 
         onx = to_onnx(jax_fn, (x,), dynamic_shapes=({0: "batch"},))
-        sess = InferenceSession(
-            onx.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
         input_name = onx.graph.input[0].name
         result = sess.run(None, {input_name: x})[0]
         expected = jax_fn(x)

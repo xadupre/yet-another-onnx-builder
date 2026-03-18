@@ -54,7 +54,7 @@ It can export from many libraries:
 | :epkg:`xgboost`                       | :ref:`l-sklearn-converter`   |
 +---------------------------------------+------------------------------+
 
-**deeplearning**
+**deep learning**
 
 +---------------------------------------+----------------------------------------+
 | :epkg:`jax` *in progress*             | :ref:`l-plot-jax-to-onnx`              |
@@ -63,7 +63,7 @@ It can export from many libraries:
 +---------------------------------------+----------------------------------------+
 | :epkg:`torch`                         | :ref:`l-torch-converter`               |
 +---------------------------------------+----------------------------------------+
-| TFLite / LiteRT                       | :ref:`l-design-litert-converter`       |
+| TFLite / :epkg:`LiteRT`               | :ref:`l-design-litert-converter`       |
 +---------------------------------------+----------------------------------------+
 
 It also provides:
