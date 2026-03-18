@@ -9,7 +9,6 @@ inferred dynamic shapes are then used for the ONNX export.
 """
 
 import contextlib
-from dataclasses import dataclass, fields
 from typing import Any, Dict, List, Optional, Tuple, Union
 import os
 
@@ -88,42 +87,55 @@ class ValidateSummary:
         ``for k, v in sorted(summary.items())`` keeps working without
         modification.
         """
-        for f in fields(self):
-            v = getattr(self, f.name)
+        for k, v in vars(self).items():
             if v is not None:
-                yield f.name, v
+                yield k, v
 
     def __contains__(self, key: str) -> bool:
         """Return ``True`` when *key* names a field that has been set (non-``None``)."""
         return getattr(self, key, None) is not None
 
 
-@dataclass
 class ValidateData:
     """Intermediate artefacts collected by :func:`validate_model`.
 
     All fields default to ``None`` and are populated progressively as
     validation proceeds.
+
+    Args:
+        config: Loaded ``transformers`` config object.
+        model: Loaded (or randomly-initialised) PyTorch model.
+        input_ids: Input token ids tensor used during capture.
+        attention_mask: Attention mask tensor used during capture.
+        observer: :class:`InputObserver` instance after capture.
+        kwargs: Inferred export keyword arguments.
+        dynamic_shapes: Inferred dynamic shapes passed to the exporter.
+        filename: Path to the exported ``.onnx`` file.
+        discrepancies: Per-input-set discrepancy records from
+            :meth:`InputObserver.check_discrepancies`.
     """
 
-    config: Optional[Any] = None
-    """Loaded ``transformers`` config object."""
-    model: Optional[Any] = None
-    """Loaded (or randomly-initialised) PyTorch model."""
-    input_ids: Optional[Any] = None
-    """Input token ids tensor used during capture."""
-    attention_mask: Optional[Any] = None
-    """Attention mask tensor used during capture."""
-    observer: Optional[Any] = None
-    """:class:`InputObserver` instance after capture."""
-    kwargs: Optional[Dict[str, Any]] = None
-    """Inferred export keyword arguments."""
-    dynamic_shapes: Optional[Any] = None
-    """Inferred dynamic shapes passed to the exporter."""
-    filename: Optional[str] = None
-    """Path to the exported ``.onnx`` file."""
-    discrepancies: Optional[List[Dict[str, Any]]] = None
-    """Per-input-set discrepancy records from :meth:`InputObserver.check_discrepancies`."""
+    def __init__(
+        self,
+        config: Optional[Any] = None,
+        model: Optional[Any] = None,
+        input_ids: Optional[Any] = None,
+        attention_mask: Optional[Any] = None,
+        observer: Optional[Any] = None,
+        kwargs: Optional[Dict[str, Any]] = None,
+        dynamic_shapes: Optional[Any] = None,
+        filename: Optional[str] = None,
+        discrepancies: Optional[List[Dict[str, Any]]] = None,
+    ):
+        self.config = config
+        self.model = model
+        self.input_ids = input_ids
+        self.attention_mask = attention_mask
+        self.observer = observer
+        self.kwargs = kwargs
+        self.dynamic_shapes = dynamic_shapes
+        self.filename = filename
+        self.discrepancies = discrepancies
 
     def items(self):
         """Yield ``(field_name, value)`` pairs for every non-``None`` field.
@@ -132,10 +144,9 @@ class ValidateData:
         ``for k, v in sorted(summary.items())`` keeps working without
         modification.
         """
-        for f in fields(self):
-            v = getattr(self, f.name)
+        for k, v in vars(self).items():
             if v is not None:
-                yield f.name, v
+                yield k, v
 
     def __contains__(self, key: str) -> bool:
         """Return ``True`` when *key* names a field that has been set (non-``None``)."""
