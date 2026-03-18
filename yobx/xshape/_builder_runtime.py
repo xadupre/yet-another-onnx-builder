@@ -9,8 +9,8 @@ from ..helpers.onnx_helper import (
     tensor_dtype_to_np_dtype,
     str_tensor_proto_type,
 )
+from ..xexpressions import simplify_expression
 from ..xshape._shape_helper import DYNAMIC_SHAPE, STATIC_SHAPE, all_int, all_int_or_str
-from ..xshape.simplify_expressions import simplify_expression
 
 
 @contextlib.contextmanager

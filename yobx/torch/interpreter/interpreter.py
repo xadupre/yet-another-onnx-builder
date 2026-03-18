@@ -12,8 +12,8 @@ from ...container.model_container import _get_type
 from ...helpers import string_type, make_hash, flatten_object
 from ...xbuilder import GraphBuilder, FunctionOptions, GraphBuilderTorchProtocol
 from ...xbuilder._virtual_tensor import VirtualTensor
+from ...xexpressions.rename_expressions import parse_expression_tokens
 from ...xshape._shape_helper import all_int, DYNAMIC_SHAPE
-from ...xshape.rename_expressions import parse_expression_tokens
 from ...helpers.onnx_helper import onnx_dtype_name
 from ..torch_helper import torch_dtype_to_onnx_dtype, onnx_dtype_to_torch_dtype
 from ..export_options import ExportOptions
