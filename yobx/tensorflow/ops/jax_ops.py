@@ -9,7 +9,7 @@ for each ``stablehlo.*`` op encountered in the parsed MLIR.
 
 Direct mappings (:data:`_MAPPING_JAX_ONNX`)
 --------------------------------------------
-StableHLO unary ops that map 1-to-1 to a single ONNX op.
+StableHLO unary and binary ops that map 1-to-1 to a single ONNX op.
 
 Composite mappings (:data:`_COMPOSITE_JAX_OPS`)
 ------------------------------------------------
@@ -24,10 +24,13 @@ from ...typing import GraphBuilderExtendedProtocol
 # Direct 1-to-1 mappings
 # ---------------------------------------------------------------------------
 
-# Mapping from StableHLO unary op names (after stripping the ``stablehlo.``
+# Mapping from StableHLO op names (after stripping the ``stablehlo.``
 # prefix) to their direct ONNX-op-name equivalents.  Only truly 1-to-1 ops
 # belong here; composite ops are handled via :data:`_COMPOSITE_JAX_OPS`.
 _MAPPING_JAX_ONNX: dict = {
+    # -----------------------------------------------------------------------
+    # Unary ops
+    # -----------------------------------------------------------------------
     # Magnitude / rounding
     "abs": "Abs",
     "ceil": "Ceil",
@@ -47,8 +50,38 @@ _MAPPING_JAX_ONNX: dict = {
     "logistic": "Sigmoid",
     # Square-root
     "sqrt": "Sqrt",
-    # Bitwise / logical
+    # Bitwise / logical unary
     "not": "Not",
+    # -----------------------------------------------------------------------
+    # Binary arithmetic ops
+    # -----------------------------------------------------------------------
+    "add": "Add",
+    "subtract": "Sub",
+    "multiply": "Mul",
+    "divide": "Div",
+    "maximum": "Max",
+    "minimum": "Min",
+    "power": "Pow",
+    "remainder": "Mod",
+    # -----------------------------------------------------------------------
+    # Binary bitwise / logical ops
+    # -----------------------------------------------------------------------
+    "and": "And",
+    "or": "Or",
+    "xor": "Xor",
+    # -----------------------------------------------------------------------
+    # Selection (ternary but acts like a binary-class op)
+    # -----------------------------------------------------------------------
+    "select": "Where",
+    # -----------------------------------------------------------------------
+    # Comparison ops (direction encoded in op name by parse_mlir)
+    # stablehlo.compare is rewritten as compare_<DIRECTION> during MLIR parsing
+    # -----------------------------------------------------------------------
+    "compare_EQ": "Equal",
+    "compare_GT": "Greater",
+    "compare_GE": "GreaterOrEqual",
+    "compare_LT": "Less",
+    "compare_LE": "LessOrEqual",
 }
 
 
@@ -119,6 +152,22 @@ def _make_exponential_minus_one(g: GraphBuilderExtendedProtocol):
     return _expm1
 
 
+def _make_compare_ne(g: GraphBuilderExtendedProtocol):
+    """Return a callable for ``stablehlo.compare NE`` → ``Not(Equal(a, b))``."""
+
+    def _ne(*args, **kwargs):
+        name = kwargs.pop("name", "compare_ne")
+        outputs = kwargs.pop("outputs", None)
+        a, b = args
+        eq = g.op.Equal(a, b, name=f"{name}_eq")
+        kw = {"name": name}
+        if outputs is not None:
+            kw["outputs"] = outputs
+        return g.op.Not(eq, **kw)
+
+    return _ne
+
+
 # Factory functions for composite ops that cannot be expressed as a single
 # ONNX op.  Each factory receives the :class:`GraphBuilderExtendedProtocol`
 # instance and returns a callable with the same signature as a simple
@@ -127,6 +176,8 @@ _COMPOSITE_JAX_OPS: dict = {
     "rsqrt": _make_rsqrt,
     "log_plus_one": _make_log_plus_one,
     "exponential_minus_one": _make_exponential_minus_one,
+    # compare_NE: stablehlo.compare NE → Not(Equal(a, b))
+    "compare_NE": _make_compare_ne,
 }
 
 
