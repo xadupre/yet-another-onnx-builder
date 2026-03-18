@@ -15,7 +15,6 @@ import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_jax
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -45,21 +44,24 @@ func.func @main(%arg0: tensor<3x4xf32>, %arg1: tensor<3x4xf32>) -> tensor<3x4xf3
 
 _MLIR_COMPARE_GT = """
 func.func @main(%arg0: tensor<3x4xf32>, %arg1: tensor<3x4xf32>) -> tensor<3x4xi1> {
-  %0 = stablehlo.compare  GT, %arg0, %arg1,  FLOAT : (tensor<3x4xf32>, tensor<3x4xf32>) -> tensor<3x4xi1> loc(#loc0)
+  %0 = stablehlo.compare  GT, %arg0, %arg1,  FLOAT :
+        (tensor<3x4xf32>, tensor<3x4xf32>) -> tensor<3x4xi1> loc(#loc0)
   return %0 : tensor<3x4xi1> loc(#loc1)
 }
 """
 
 _MLIR_COMPARE_EQ = """
 func.func @main(%arg0: tensor<3x4xf32>, %arg1: tensor<3x4xf32>) -> tensor<3x4xi1> {
-  %0 = stablehlo.compare  EQ, %arg0, %arg1,  FLOAT : (tensor<3x4xf32>, tensor<3x4xf32>) -> tensor<3x4xi1> loc(#loc0)
+  %0 = stablehlo.compare  EQ, %arg0, %arg1,  FLOAT :
+        (tensor<3x4xf32>, tensor<3x4xf32>) -> tensor<3x4xi1> loc(#loc0)
   return %0 : tensor<3x4xi1> loc(#loc1)
 }
 """
 
 _MLIR_COMPARE_NE = """
 func.func @main(%arg0: tensor<3x4xf32>, %arg1: tensor<3x4xf32>) -> tensor<3x4xi1> {
-  %0 = stablehlo.compare  NE, %arg0, %arg1,  FLOAT : (tensor<3x4xf32>, tensor<3x4xf32>) -> tensor<3x4xi1> loc(#loc0)
+  %0 = stablehlo.compare  NE, %arg0, %arg1,  FLOAT :
+        (tensor<3x4xf32>, tensor<3x4xf32>) -> tensor<3x4xi1> loc(#loc0)
   return %0 : tensor<3x4xi1> loc(#loc1)
 }
 """
@@ -111,9 +113,16 @@ class TestMappingJaxOnnx(ExtTestCase):
     def test_all_common_unary_ops_present(self):
         """All commonly-used StableHLO unary ops must be mapped."""
         expected = {
-            "abs", "ceil", "floor", "negate", "round_nearest_even", "sign",
-            "exponential", "log",
-            "cosine", "sine",
+            "abs",
+            "ceil",
+            "floor",
+            "negate",
+            "round_nearest_even",
+            "sign",
+            "exponential",
+            "log",
+            "cosine",
+            "sine",
             "tanh",
             "logistic",
             "sqrt",
@@ -199,11 +208,23 @@ class TestGetJaxCvt(ExtTestCase):
         from yobx.tensorflow.ops.xla_call_module import _MAPPING_JAX_ONNX
 
         expected_binary = {
-            "add", "subtract", "multiply", "divide",
-            "maximum", "minimum", "power", "remainder",
-            "and", "or", "xor", "select",
-            "compare_EQ", "compare_GT", "compare_GE",
-            "compare_LT", "compare_LE",
+            "add",
+            "subtract",
+            "multiply",
+            "divide",
+            "maximum",
+            "minimum",
+            "power",
+            "remainder",
+            "and",
+            "or",
+            "xor",
+            "select",
+            "compare_EQ",
+            "compare_GT",
+            "compare_GE",
+            "compare_LT",
+            "compare_LE",
         }
         missing = expected_binary - set(_MAPPING_JAX_ONNX.keys())
         self.assertEqual(missing, set(), f"Missing binary op mappings: {missing}")
@@ -277,9 +298,7 @@ class TestJaxBinaryOpsEndToEnd(ExtTestCase):
         from yobx.tensorflow import to_onnx
 
         onx = to_onnx(jax_fn, (x, y))
-        sess = InferenceSession(
-            onx.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
         input_names = [i.name for i in onx.graph.input]
         (result,) = sess.run(None, {input_names[0]: x, input_names[1]: y})
         expected = jax_fn(x, y)
@@ -402,9 +421,7 @@ class TestJaxUnaryOpsEndToEnd(ExtTestCase):
         from yobx.tensorflow import to_onnx
 
         onx = to_onnx(jax_fn, (x,), dynamic_shapes=({0: "batch"},))
-        sess = InferenceSession(
-            onx.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
         input_name = onx.graph.input[0].name
         result = sess.run(None, {input_name: x})[0]
         expected = jax_fn(x)

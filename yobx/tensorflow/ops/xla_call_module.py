@@ -34,7 +34,10 @@ def convert_exp(
             )
 
         fct = get_jax_cvt(decoded_module, g, layer["op"])
-        args = [results[a] for a in layer["operands"]]
+        args = []
+        for a in layer["operands"]:
+            assert a in results, f"Missing arg {a!r} in {results}\n----\n{decoded_module}"
+            args.append(results[a])
         res = fct(*args, name="XlaCallModule")
         if isinstance(res, str):
             res = (res,)
@@ -92,9 +95,7 @@ def parse_mlir(mlir_string):
     # text as before.
     arg_header_pattern = r"(%arg\d+)\s*:\s*(tensor<[^>]+>)"
 
-    public_func_match = re.search(
-        r"func\.func\s+public\s+@\w+\s*\(", mlir_string
-    )
+    public_func_match = re.search(r"func\.func\s+public\s+@\w+\s*\(", mlir_string)
     if public_func_match:
         paren_start = public_func_match.end() - 1  # position of '('
         header_text = _extract_balanced_parens(mlir_string, paren_start)
@@ -162,9 +163,7 @@ def parse_mlir(mlir_string):
         # Extract wrapped args, skipping jax.global_constant scalar args.
         wrapped_params = re.findall(arg_header_pattern, wrapped_sig_text)
 
-        call_match = re.search(
-            r"call\s+@_wrapped_jax_export_main\s*\(([^)]*)\)", mlir_string
-        )
+        call_match = re.search(r"call\s+@_wrapped_jax_export_main\s*\(([^)]*)\)", mlir_string)
         if call_match:
             call_args = [a.strip() for a in call_match.group(1).split(",")]
             for i, (w_arg_id, _) in enumerate(wrapped_params):
