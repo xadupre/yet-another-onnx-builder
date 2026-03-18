@@ -1496,7 +1496,7 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
             return self.none()
 
         # The first Expand output must be used only by the Unsqueeze.
-        if g.is_used_more_than_once(node.output[0]):
+        if g.is_used_more_than_once(node.output[0]) or g.main_opset < 13:
             return self.none(node, inspect.currentframe().f_lineno)
 
         next_nodes = g.next_nodes(node.output[0])
@@ -1507,20 +1507,8 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
         if unsq_node.op_type != "Unsqueeze" or unsq_node.domain != "":
             return self.none(node, inspect.currentframe().f_lineno)
 
-        # The Unsqueeze must use the Expand output as its data input (not axes).
-        if unsq_node.input[0] != node.output[0]:
-            return self.none(node, inspect.currentframe().f_lineno)
-
         # The Unsqueeze axes must be provided as an input (opset >= 13).
-        if len(unsq_node.input) < 2 or not g.is_constant(unsq_node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
-
-        # shape1 must be a constant so we can compute the combined output shape.
-        if not g.is_constant(node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
-
-        # The Unsqueeze output must be used only by the second Expand.
-        if g.is_used_more_than_once(unsq_node.output[0]):
+        if not g.is_constant(unsq_node.input[1]):
             return self.none(node, inspect.currentframe().f_lineno)
 
         next_next_nodes = g.next_nodes(unsq_node.output[0])
@@ -1531,9 +1519,7 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
         if expand2_node.op_type != "Expand" or expand2_node.domain != "":
             return self.none(node, inspect.currentframe().f_lineno)
 
-        # The second Expand must use the Unsqueeze output as its data input.
-        if expand2_node.input[0] != unsq_node.output[0]:
-            return self.none(node, inspect.currentframe().f_lineno)
+        # all is left is to check we can do expand twice.
 
         return MatchResult(self, [node, unsq_node, expand2_node], self.apply, insert_at=node)
 
@@ -1572,9 +1558,7 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
                 np.array([int(x) for x in shape2_val], dtype=np.int64),
             )
             combined_shape_input = g.make_initializer(
-                "",
-                combined_arr,
-                source=f"{self.__class__.__name__}.combined",
+                "", combined_arr, source=f"{self.__class__.__name__}.combined"
             )
             extra_nodes: List[NodeProto] = []
         else:
