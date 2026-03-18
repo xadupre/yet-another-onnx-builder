@@ -5,19 +5,33 @@ Unit tests for :mod:`yobx.sql.convert` — SQL-to-ONNX converter.
 import unittest
 import numpy as np
 
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, has_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sql import sql_to_onnx
+
+
+def _ort_run(onx, feeds):
+    """Run *onx* with onnxruntime and return outputs. Skip if ORT is not installed."""
+    from onnxruntime import InferenceSession
+
+    sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+    return sess.run(None, feeds)
 
 
 class TestSqlToOnnxSelect(ExtTestCase):
     """Tests for the SELECT clause conversion."""
 
     def _run(self, query, dtypes, feeds, *, right_dtypes=None):
-        """Convert *query*, run it, return outputs."""
+        """Convert *query*, run with reference evaluator and (when available) ORT."""
         onx = sql_to_onnx(query, dtypes, right_input_dtypes=right_dtypes)
         ref = ExtendedReferenceEvaluator(onx)
-        return ref.run(None, feeds)
+        ref_outputs = ref.run(None, feeds)
+        if has_onnxruntime():
+            ort_outputs = _ort_run(onx, feeds)
+            self.assertEqual(len(ref_outputs), len(ort_outputs))
+            for ref_out, ort_out in zip(ref_outputs, ort_outputs):
+                np.testing.assert_allclose(ort_out, ref_out, rtol=1e-5, atol=1e-6)
+        return ref_outputs
 
     # ------------------------------------------------------------------
     # Column pass-through
@@ -120,7 +134,13 @@ class TestSqlToOnnxFilter(ExtTestCase):
     def _run(self, query, dtypes, feeds):
         onx = sql_to_onnx(query, dtypes)
         ref = ExtendedReferenceEvaluator(onx)
-        return ref.run(None, feeds)
+        ref_outputs = ref.run(None, feeds)
+        if has_onnxruntime():
+            ort_outputs = _ort_run(onx, feeds)
+            self.assertEqual(len(ref_outputs), len(ort_outputs))
+            for ref_out, ort_out in zip(ref_outputs, ort_outputs):
+                np.testing.assert_allclose(ort_out, ref_out, rtol=1e-5, atol=1e-6)
+        return ref_outputs
 
     def test_filter_greater(self):
         dtypes = {"a": np.float32}
@@ -209,7 +229,13 @@ class TestSqlToOnnxGroupBy(ExtTestCase):
     def _run(self, query, dtypes, feeds):
         onx = sql_to_onnx(query, dtypes)
         ref = ExtendedReferenceEvaluator(onx)
-        return ref.run(None, feeds)
+        ref_outputs = ref.run(None, feeds)
+        if has_onnxruntime():
+            ort_outputs = _ort_run(onx, feeds)
+            self.assertEqual(len(ref_outputs), len(ort_outputs))
+            for ref_out, ort_out in zip(ref_outputs, ort_outputs):
+                np.testing.assert_allclose(ort_out, ref_out, rtol=1e-5, atol=1e-6)
+        return ref_outputs
 
     def test_group_by_sum(self):
         dtypes = {"a": np.float32, "b": np.float32}
