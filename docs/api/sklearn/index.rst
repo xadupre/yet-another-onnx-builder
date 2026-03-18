@@ -44,6 +44,7 @@ yobx.sklearn
     neighbors/index
     pipeline/index
     preprocessing/index
+    sksurv/index
     svm/index
     tree/index
     xgboost/index

@@ -27,6 +27,7 @@ The workflow is:
 
 # %%
 import numpy as np
+import onnx
 import polars as pl
 import onnxruntime
 from yobx.doc import plot_dot
@@ -108,10 +109,9 @@ print(
 #      - ``INT64``
 #      - 7
 
-from onnx import TensorProto
 
 for inp in onx.graph.input:
-    elem_name = TensorProto.DataType.Name(inp.type.tensor_type.elem_type)
+    elem_name = onnx.TensorProto.DataType.Name(inp.type.tensor_type.elem_type)
     batch_dim = inp.type.tensor_type.shape.dim[0].dim_param
     print(f"  {inp.name:12s} → ONNX {elem_name:8s}  batch_dim={batch_dim!r}")
 
@@ -139,10 +139,7 @@ all_feeds = {
     "active": np.array([True, False, True], dtype=bool),
     "name": np.array(["Alice", "Bob", "Carol"]),
 }
-results = sess.run(
-    [f"{k}_out" for k in all_feeds],
-    all_feeds,
-)
+results = sess.run([f"{k}_out" for k in all_feeds], all_feeds)
 for name, result in zip(all_feeds, results):
     np.testing.assert_array_equal(all_feeds[name], result)
     print(f"  {name}_out matches input ✓")
@@ -155,17 +152,12 @@ for name, result in zip(all_feeds, results):
 # pass it directly.
 
 schema = pl.Schema(
-    {
-        "product_id": pl.UInt32,
-        "price": pl.Float64,
-        "in_stock": pl.Boolean,
-        "category": pl.String,
-    }
+    {"product_id": pl.UInt32, "price": pl.Float64, "in_stock": pl.Boolean, "category": pl.String}
 )
 onx_schema = to_onnx(schema, batch_dim="batch")
 print("\nSchema-only model inputs:")
 for inp in onx_schema.graph.input:
-    elem_name = TensorProto.DataType.Name(inp.type.tensor_type.elem_type)
+    elem_name = onnx.TensorProto.DataType.Name(inp.type.tensor_type.elem_type)
     print(f"  {inp.name:12s} → {elem_name}")
 
 # %%

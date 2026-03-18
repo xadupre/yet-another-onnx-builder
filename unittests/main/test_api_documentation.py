@@ -105,14 +105,6 @@ _KNOWN_EXCLUSIONS = frozenset(
         "yobx.reference.torch_ops.sequence_ops",
         "yobx.reference.torch_ops.shape_ops",
         "yobx.reference.torch_ops.unary_ops",
-        # xshape.expressions is an internal subpackage whose symbols are all
-        # re-exported at the yobx.xshape level (e.g. yobx.xshape.evaluate_expressions).
-        # The top-level forwarding modules are individually documented.
-        "yobx.xshape.expressions",
-        "yobx.xshape.expressions.evaluate_expressions",
-        "yobx.xshape.expressions.expressions_torch",
-        "yobx.xshape.expressions.rename_expressions",
-        "yobx.xshape.expressions.simplify_expressions",
     }
 )
 

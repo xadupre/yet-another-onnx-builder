@@ -6,6 +6,7 @@ yobx.sklearn.preprocessing
     :caption: modules
 
     binarizer
+    function_transformer
     kbins_discretizer
     kernel_centerer
     max_abs_scaler

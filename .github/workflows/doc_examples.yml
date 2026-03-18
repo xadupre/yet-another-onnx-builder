@@ -28,7 +28,7 @@ jobs:
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
 
       - name: Install dependencies
-        run: pip install -e ".[category_encoders,dev,docs,imblearn,lightgbm,sklearn,spox,tensorflow,torch,transformers,xgboost]"
+        run: pip install -e ".[category_encoders,dev,docs,imblearn,lightgbm,sklearn,sksurv,spox,tensorflow,torch,transformers,xgboost]"
 
       - name: pip freeze
         run: pip freeze

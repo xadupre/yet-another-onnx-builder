@@ -10,6 +10,7 @@ from yobx.ext_test_case import (
     is_windows,
     ignore_errors,
     has_sklearn,
+    has_sksurv,
     has_spox,
     has_tensorflow,
     has_torch,
@@ -97,6 +98,7 @@ class TestDocumentationExamples(ExtTestCase):
                     "plot_input_observer_tiny_llm.py",
                     "plot_sklearn_convert_options.py",
                     "plot_sklearn_function_options.py",
+                    "plot_sklearn_function_transformer.py",
                     "plot_sklearn_kmeans.py",
                     "plot_sklearn_pipeline.py",
                     "plot_sklearn_with_sklearn_onnx.py",
@@ -149,6 +151,9 @@ class TestDocumentationExamples(ExtTestCase):
 
             if not reason and not has_tensorflow() and "tensorflow" in name:
                 reason = "tensorflow not installed"
+
+            if not reason and not has_sksurv() and "sksurv" in name:
+                reason = "scikit-survival not installed"
 
             if reason:
 

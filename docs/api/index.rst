@@ -19,4 +19,6 @@ API Reference
    translate/index
    xbuilder/index
    xoptim/index
+   xexpressions/index
    xshape/index
+   xtracing/index

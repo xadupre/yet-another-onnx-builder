@@ -65,7 +65,7 @@ class TestValidateModel(ExtTestCase):
 
     def test_validate_model_tiny_llm(self):
         import torch
-        from yobx.torch.validate import validate_model
+        from yobx.torch.validate import validate_model, ValidateSummary, ValidateData
 
         tokenized = {
             "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
@@ -79,14 +79,14 @@ class TestValidateModel(ExtTestCase):
             do_run=False,
             verbose=0,
         )
-        self.assertIn("model_id", summary)
-        self.assertEqual(summary["model_id"], "arnir0/Tiny-LLM")
-        self.assertIn("export", summary)
-        self.assertEqual(summary["export"], "OK")
-        self.assertIn("observer", data)
-        self.assertIn("kwargs", data)
-        self.assertIn("dynamic_shapes", data)
-        self.assertIn("filename", data)
+        self.assertIsInstance(summary, ValidateSummary)
+        self.assertIsInstance(data, ValidateData)
+        self.assertEqual(summary.model_id, "arnir0/Tiny-LLM")
+        self.assertEqual(summary.export, "OK")
+        self.assertIsNotNone(data.observer)
+        self.assertIsNotNone(data.kwargs)
+        self.assertIsNotNone(data.dynamic_shapes)
+        self.assertIsNotNone(data.filename)
 
     def test_validate_model_captures_inputs(self):
         import torch
@@ -104,7 +104,7 @@ class TestValidateModel(ExtTestCase):
             do_run=False,
             verbose=0,
         )
-        observer = data["observer"]
+        observer = data.observer
         # The observer should have captured at least one input set
         self.assertGreater(len(observer.info), 0)
 
@@ -127,10 +127,10 @@ class TestValidateModel(ExtTestCase):
             quiet=True,
             verbose=0,
         )
-        self.assertIn("model_id", summary)
-        self.assertEqual(summary["model_id"], "arnir0/Tiny-LLM")
+        self.assertIsNotNone(summary.model_id)
+        self.assertEqual(summary.model_id, "arnir0/Tiny-LLM")
         # Export may succeed or fail depending on torch version; both are acceptable.
-        self.assertIn("export", summary)
+        self.assertIsNotNone(summary.export)
 
     def test_validate_model_exporter_modelbuilder(self):
         """validate_model with exporter='modelbuilder' runs without unhandled exception."""
@@ -151,10 +151,10 @@ class TestValidateModel(ExtTestCase):
             quiet=True,
             verbose=0,
         )
-        self.assertIn("model_id", summary)
-        self.assertEqual(summary["model_id"], "arnir0/Tiny-LLM")
+        self.assertIsNotNone(summary.model_id)
+        self.assertEqual(summary.model_id, "arnir0/Tiny-LLM")
         # Export may succeed or fail depending on torch version; both are acceptable.
-        self.assertIn("export", summary)
+        self.assertIsNotNone(summary.export)
 
 
 if __name__ == "__main__":

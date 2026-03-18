@@ -34,7 +34,7 @@ def polars_dtype_to_onnx_element_type(dtype) -> int:
     # Accept both dtype *instances* (e.g. pl.Float32()) and dtype *classes*
     # (e.g. pl.Float32).  Normalise to an instance for isinstance checks.
     if isinstance(dtype, type) and issubclass(dtype, pl.DataType):
-        try:
+        try:  # noqa: SIM105
             dtype = dtype()
         except TypeError:
             # Parametric types that require arguments (e.g. pl.Datetime)
@@ -78,10 +78,7 @@ def polars_dtype_to_onnx_element_type(dtype) -> int:
         return TensorProto.STRING
 
     # Also handle uninstantiated parametric classes (e.g. pl.Datetime itself)
-    for pl_cls, onnx_type in [
-        (pl.Datetime, TensorProto.INT64),
-        (pl.Duration, TensorProto.INT64),
-    ]:
+    for pl_cls, onnx_type in [(pl.Datetime, TensorProto.INT64), (pl.Duration, TensorProto.INT64)]:
         if dtype is pl_cls or (isinstance(dtype, type) and issubclass(dtype, pl_cls)):
             return onnx_type
 
