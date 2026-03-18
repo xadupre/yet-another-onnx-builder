@@ -173,9 +173,9 @@ class TestTfidfTransformer(ExtTestCase):
         from sklearn.feature_extraction.text import TfidfTransformer
         from yobx.sklearn import to_onnx
 
-        X = np.array([[1.0, 2.0, 0.0, 3.0],
-                      [0.0, 0.0, 0.0, 0.0],
-                      [1.0, 0.0, 0.0, 0.0]], dtype=np.float32)
+        X = np.array(
+            [[1.0, 2.0, 0.0, 3.0], [0.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], dtype=np.float32
+        )
         tt = TfidfTransformer(use_idf=True, norm="l2", sublinear_tf=False)
         tt.fit(X)
 
@@ -209,7 +209,6 @@ class TestTfidfTransformer(ExtTestCase):
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-5)
-
 
     def test_tfidf_low_opset_raises(self):
         """norm='l1' or 'l2' with opset < 18 must raise NotImplementedError."""
