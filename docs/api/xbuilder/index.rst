@@ -7,6 +7,7 @@ API for the graph builder used to construct and optimize ONNX graphs.
     :maxdepth: 1
     :caption: modules
 
+    builder_stats_helper
     function_options
     graph_builder
     graph_builder_opset
