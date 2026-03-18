@@ -482,19 +482,10 @@ class ModelStatistics:
     Usage::
 
         stats = ModelStatistics(model).compute()
-        # {
-        #   "n_nodes": 3,
-        #   "node_count_per_op_type": {"MatMul": 1, "Add": 1, "Relu": 1},
-        #   "flops_per_op_type":      {"MatMul": 1024, "Add": 64, "Relu": 64},
-        #   "total_estimated_flops":  1152,
-        #   "node_stats": [...]
-        # }
     """
 
     def __init__(
-        self,
-        model: Union[onnx.ModelProto, GraphBuilderExtendedProtocol],
-        verbose: int = 0,
+        self, model: Union[onnx.ModelProto, GraphBuilderExtendedProtocol], verbose: int = 0
     ) -> None:
         if isinstance(model, GraphBuilderExtendedProtocol):
             self._builder: Any = model
@@ -514,10 +505,6 @@ class ModelStatistics:
         self._node_count: Dict[str, int] = {}
         self._flops_by_op: Dict[str, List[Optional[DIM_TYPE]]] = {}
         self._node_stats: List[Dict[str, Any]] = []
-
-    # ------------------------------------------------------------------
-    # Shape-inference helpers
-    # ------------------------------------------------------------------
 
     def _collect_names(self, graph: onnx.GraphProto, all_names: set) -> None:
         """Recursively gathers every tensor name referenced in *graph*."""
@@ -600,10 +587,6 @@ class ModelStatistics:
             return None
         return tuple(int(v) for v in val)  # type: ignore
 
-    # ------------------------------------------------------------------
-    # Node-collection helpers
-    # ------------------------------------------------------------------
-
     def _collect_nodes(self, graph: onnx.GraphProto) -> None:
         """Recursively visits all nodes in *graph* and accumulates statistics."""
         for node in graph.node:
@@ -638,7 +621,7 @@ class ModelStatistics:
     # Public API
     # ------------------------------------------------------------------
 
-    def compute(self) -> Dict[str, Any]:
+    def compute(self) -> List[Dict[str, Any]]:
         """
         Runs the full analysis and returns a statistics dictionary.
 
@@ -654,35 +637,12 @@ class ModelStatistics:
         """
         self._build_shape_map()
         self._collect_nodes(self.model.graph)
-
-        # Aggregate FLOPs per op_type
-        flops_per_op: Dict[str, Optional[int]] = {}
-        total: Optional[int] = 0
-        for op, values in self._flops_by_op.items():
-            op_total: Optional[int] = 0
-            for v in values:
-                if v is None or not isinstance(v, int):
-                    op_total = None
-                    break
-                op_total += v  # type: ignore
-            flops_per_op[op] = op_total
-            if op_total is None:
-                total = None
-            elif total is not None:
-                total += op_total
-
-        return {
-            "n_nodes": sum(self._node_count.values()),
-            "node_count_per_op_type": self._node_count,
-            "total_estimated_flops": total,
-            "flops_per_op_type": flops_per_op,
-            "node_stats": self._node_stats,
-        }
+        return self._node_stats
 
 
 def model_statistics(
     model: Union[onnx.ModelProto, GraphBuilderExtendedProtocol], verbose: int = 0
-) -> Dict[str, Any]:
+) -> List[Dict[str, Any]]:
     """
     Computes statistics on an ONNX model.
 

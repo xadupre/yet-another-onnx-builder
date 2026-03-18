@@ -587,11 +587,6 @@ def _cmd_run_doc_examples(argv: List[Any]):
         sys.exit(1)
 
 
-#############
-# main parser
-#############
-
-
 def get_parser_copilot_draft() -> ArgumentParser:
     parser = ArgumentParser(
         prog="copilot-draft",
@@ -863,7 +858,7 @@ def get_parser_stats() -> ArgumentParser:
         default="",
         type=str,
         required=False,
-        help="output file (.json or .csv) or empty to print on standard output",
+        help="output file (.xlsx or .csv) or empty to print on standard output",
     )
     parser.add_argument("-v", "--verbose", type=int, default=0, required=False, help="verbosity")
     return parser
@@ -885,46 +880,16 @@ def _cmd_stats(argv: List[Any]):
 
     if args.output:
         outname = process_outputname(args.output, args.input)
+        assert outname.endswith(
+            (".csv", ".xlsx")
+        ), f"Unexpected extension for outname={outname!r}"
+        import pandas
+
+        df = pandas.DataFrame(stats).sort_values()
         if outname.endswith(".csv"):
-            import csv
-            import os
-
-            # Produce two separate CSV files:
-            #   <stem>_counts.csv  — op_type / count
-            #   <stem>_flops.csv   — op_type / estimated_flops
-            stem, ext = os.path.splitext(outname)
-            counts_file = f"{stem}_counts{ext}"
-            flops_file = f"{stem}_flops{ext}"
-
-            with open(counts_file, "w", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=["op_type", "count"])
-                writer.writeheader()
-                for op, count in sorted(stats["node_count_per_op_type"].items()):
-                    writer.writerow({"op_type": op, "count": count})
-
-            with open(flops_file, "w", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=["op_type", "estimated_flops"])
-                writer.writeheader()
-                for op, flops in sorted(stats["flops_per_op_type"].items()):
-                    writer.writerow({"op_type": op, "estimated_flops": flops})
-
-            if args.verbose:
-                print(f"-- saved counts into {counts_file!r}")
-                print(f"-- saved flops  into {flops_file!r}")
+            df.to_csv(outname, index=False)
         else:
-            # Default: JSON — store both reports under separate keys
-            out: Dict[str, Any] = {
-                "n_nodes": stats["n_nodes"],
-                "node_count_per_op_type": stats["node_count_per_op_type"],
-                "flops_per_op_type": stats["flops_per_op_type"],
-                "total_estimated_flops": stats["total_estimated_flops"],
-            }
-            if args.verbose:
-                out["node_stats"] = stats["node_stats"]
-            with open(outname, "w") as f:
-                json.dump(out, f, indent=2, default=str)
-            if args.verbose:
-                print(f"-- saved into {outname!r}")
+            df.to_excel(outname, index=False)
     else:
         _print_model_statistics(stats)
 
@@ -951,6 +916,11 @@ def _print_model_statistics(stats: Dict[str, Any]) -> None:
         print(f"Total estimated FLOPs: {total}")
     else:
         print("Total estimated FLOPs: n/a (dynamic shapes or unsupported op_types)")
+
+
+#############
+# main parser
+#############
 
 
 def get_main_parser() -> ArgumentParser:

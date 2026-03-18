@@ -175,7 +175,6 @@ class TestStatsHelper(ExtTestCase):
         ms.compute()
         self.assertEqual(ms.literal_fn("shape"), (32,))
 
-
     def test_model_statistics_from_graph_builder(self):
         """ModelStatistics accepts a GraphBuilderExtendedProtocol directly."""
         try:
