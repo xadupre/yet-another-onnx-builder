@@ -1,2 +1,2 @@
 def register():
-    from . import patch_extractor
+    from . import feature_hasher, patch_extractor
