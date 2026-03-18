@@ -121,6 +121,9 @@ def to_onnx(
                 cf = jax_to_concrete_function(
                     model, args, input_names=input_names, dynamic_shapes=dynamic_shapes
                 )
+                # Update input_specs to match the concrete function's actual
+                # input signature (jax2tf may rename inputs internally).
+                input_specs = list(cf.structured_input_signature[0])
             else:
                 # Re-raise non-JAX-related TypeErrors so they are not masked.
                 raise
