@@ -9,6 +9,10 @@ yet-another-onnx-builder documentation
     :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_sklearn.yml
     :alt: scikit-learn
 
+.. image:: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_sksurv.yml/badge.svg
+    :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_sksurv.yml
+    :alt: scikit-survival
+
 .. image:: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_tensorflow.yml/badge.svg
     :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_tensorflow.yml
     :alt: tensorflow
@@ -48,6 +52,8 @@ It can export from many libraries:
 | :epkg:`lightgbm`                      | :ref:`l-sklearn-converter`   |
 +---------------------------------------+------------------------------+
 | :epkg:`scikit-learn`                  | :ref:`l-sklearn-converter`   |
++---------------------------------------+------------------------------+
+| :epkg:`scikit-survival`               | :ref:`l-sklearn-converter`   |
 +---------------------------------------+------------------------------+
 | :epkg:`xgboost`                       | :ref:`l-sklearn-converter`   |
 +---------------------------------------+------------------------------+

@@ -194,6 +194,7 @@ epkg_dictionary = {
     "pytorch": "https://pytorch.org/",
     "run_with_ortvaluevector": "https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/python/onnxruntime_inference_collection.py#L339",
     "scikit-learn": "https://scikit-learn.org/stable/",
+    "scikit-survival": "https://scikit-survival.readthedocs.io/en/stable/",
     "scipy": "https://scipy.org/",
     "sklearn-onnx": "https://onnx.ai/sklearn-onnx/",
     "sktorch": "https://skorch.readthedocs.io/en/latest/",

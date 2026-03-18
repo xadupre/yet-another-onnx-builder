@@ -89,3 +89,17 @@ xgboost
     register_sklearn_converters()
 
     print(get_sklearn_estimator_coverage(libraries=("xgboost",), rst=True))
+
+scikit-survival
+---------------
+
+.. runpython::
+    :showcode:
+    :rst:
+
+    from yobx.sklearn import register_sklearn_converters
+    from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+    register_sklearn_converters()
+
+    print(get_sklearn_estimator_coverage(libraries=("sksurv",), rst=True))
