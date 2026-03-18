@@ -74,6 +74,10 @@ Expression nodes
     :members:
     :no-undoc-members:
 
+.. autoclass:: yobx.sql.parse.FuncCallExpr
+    :members:
+    :no-undoc-members:
+
 .. autoclass:: yobx.sql.parse.Condition
     :members:
     :no-undoc-members:

@@ -33,7 +33,8 @@ def convert_filter_op(
     :return: a new col_map with each column tensor replaced by its filtered
         (row-compressed) counterpart.
     """
-    emitter = _ExprEmitter(g, col_map)
+    custom_functions = sts.get("custom_functions", {}) if sts else {}
+    emitter = _ExprEmitter(g, col_map, custom_functions=custom_functions)
     mask = emitter.emit(op.condition, name="filter_mask")
     new_map: Dict[str, str] = {}
     for col, tensor in col_map.items():
