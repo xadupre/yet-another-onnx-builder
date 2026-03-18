@@ -6,3 +6,4 @@ yobx.sklearn.feature_extraction
     :caption: modules
 
     patch_extractor
+    tfidf_transformer
