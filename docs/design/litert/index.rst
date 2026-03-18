@@ -230,58 +230,43 @@ Supported ops
 
 The built-in converter registry covers the following TFLite ops:
 
-**Activations**
+.. runpython::
+    :showcode:
+    :rst:
 
-* ``RELU`` → ``Relu``
-* ``RELU_N1_TO_1`` → ``Clip(min=-1, max=1)``
-* ``TANH`` → ``Tanh``
-* ``SOFTMAX`` → ``Softmax(axis=-1)``
-* ``LOG_SOFTMAX`` → ``LogSoftmax(axis=-1)``
-* ``ELU`` → ``Elu``
-* ``LEAKY_RELU`` → ``LeakyRelu``
-* ``HARD_SWISH`` → ``HardSwish``
-* ``GELU`` → ``Gelu``
+    import re
+    from yobx.litert import register_litert_converters
+    from yobx.litert.register import LITERT_OP_CONVERTERS
+    from yobx.litert.litert_helper import builtin_op_name
 
-**Element-wise**
+    register_litert_converters()
 
-* ``ADD`` → ``Add``
-* ``SUB`` → ``Sub``
-* ``MUL`` → ``Mul``
-* ``DIV`` → ``Div``
-* ``NEG`` → ``Neg``
-* ``ABS`` → ``Abs``
-* ``FLOOR`` → ``Floor``
-* ``CEIL`` → ``Ceil``
-* ``ROUND`` → ``Round``
-* ``SQRT`` → ``Sqrt``
-* ``RSQRT`` → ``Reciprocal(Sqrt(x))``
-* ``EXP`` → ``Exp``
-* ``LOG`` → ``Log``
-* ``SIN`` → ``Sin``
-* ``POW`` → ``Pow``
-* ``SQUARED_DIFFERENCE`` → ``Mul(Sub(a,b), Sub(a,b))``
-* ``FLOOR_DIV`` → ``Floor(Div(a,b))``
-* ``LOGICAL_OR`` → ``Or``
-* ``LOGICAL_AND`` → ``And``
-* ``LOGICAL_NOT`` → ``Not``
+    PATTERN = re.compile(r"TFLite\s+``(\w+)``\s+→\s+ONNX\s+(.+)")
+    MODULE_LABELS = {
+        "yobx.litert.ops.activations": "Activations",
+        "yobx.litert.ops.elementwise": "Element-wise",
+        "yobx.litert.ops.nn_ops": "Neural network",
+        "yobx.litert.ops.reshape_ops": "Shape / tensor manipulation",
+    }
+    MODULE_ORDER = list(MODULE_LABELS.keys())
 
-**Neural network**
+    groups = {m: [] for m in MODULE_ORDER}
+    for code, fn in LITERT_OP_CONVERTERS.items():
+        mod = fn.__module__
+        doc = (fn.__doc__ or "").strip().splitlines()[0].strip().rstrip(".")
+        m = PATTERN.match(doc)
+        tflite_op = m.group(1) if m else (builtin_op_name(code) if isinstance(code, int) else code)
+        onnx_op = m.group(2).rstrip(".") if m else "?"
+        if mod in groups:
+            groups[mod].append((tflite_op, onnx_op))
 
-* ``FULLY_CONNECTED`` → ``Transpose(W)`` + ``MatMul`` + optional ``Add``
-* ``BATCH_MATMUL`` → ``MatMul`` (with optional transposes)
-* ``CONV_2D`` → ``Transpose(NHWC→NCHW)`` + ``Conv`` + ``Transpose``
-* ``DEPTHWISE_CONV_2D`` → ``Transpose(NHWC→NCHW)`` + ``Conv(group=C)`` + ``Transpose``
-* ``AVERAGE_POOL_2D`` → ``Transpose`` + ``AveragePool`` + ``Transpose``
-* ``MAX_POOL_2D`` → ``Transpose`` + ``MaxPool`` + ``Transpose``
-
-**Shape / tensor manipulation**
-
-* ``RESHAPE`` → ``Reshape``
-* ``SQUEEZE`` → ``Squeeze``
-* ``EXPAND_DIMS`` → ``Unsqueeze``
-* ``TRANSPOSE`` → ``Transpose``
-* ``CONCATENATION`` → ``Concat``
-* ``MEAN`` → ``ReduceMean``
-* ``SUM`` → ``ReduceSum``
-* ``REDUCE_MAX`` → ``ReduceMax``
-* ``REDUCE_MIN`` → ``ReduceMin``
+    for mod in MODULE_ORDER:
+        label = MODULE_LABELS[mod]
+        items = sorted(groups[mod])
+        if not items:
+            continue
+        print(f"**{label}**")
+        print()
+        for tflite_op, onnx_op in items:
+            print(f"* ``{tflite_op}`` → {onnx_op}")
+        print()

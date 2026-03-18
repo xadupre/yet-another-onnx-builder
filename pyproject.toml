@@ -79,7 +79,7 @@ tensorflow = [
     "tensorflow>=2.20",
 ]
 litert = [
-    "ai_edge_litert",
+    "ai-edge-litert",
 ]
 jax = [
     "jax[cpu]>=0.4",
