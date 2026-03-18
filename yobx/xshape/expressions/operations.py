@@ -15,7 +15,7 @@ def dim_mul(a: DIM_TYPE, b: DIM_TYPE) -> DIM_TYPE:
 def dim_multi_mul(*args: DIM_TYPE) -> DIM_TYPE:
     """Multiplies dimensions."""
     if all(isinstance(a, int) for a in args):
-        return int(np.prod(args))
+        return int(np.prod(args))  # type: ignore
     return simplify_expression("*".join(f"({a})" for a in args))
 
 
