@@ -10,4 +10,5 @@ yobx.sklearn.category_encoders
     ce_ordinal_encoder
     polynomial_encoder
     quantile_encoder
+    target_encoder
     woe_encoder

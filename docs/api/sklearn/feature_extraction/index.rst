@@ -7,3 +7,4 @@ yobx.sklearn.feature_extraction
 
     feature_hasher
     patch_extractor
+    tfidf_transformer
