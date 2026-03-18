@@ -11,6 +11,7 @@ def register():
             ordinal_encoder,
             polynomial_encoder,
             quantile_encoder,
+            target_encoder,
             woe_encoder,
         )
     except ImportError:
