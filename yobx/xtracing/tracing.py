@@ -165,9 +165,6 @@ def trace_numpy_to_onnx(
     if not inputs:
         raise ValueError("At least one sample input array must be provided.")
 
-    # ------------------------------------------------------------------
-    # Build the opset dictionary.
-    # ------------------------------------------------------------------
     if isinstance(target_opset, int):
         opsets: Dict[str, int] = {"": target_opset, "ai.onnx.ml": 1}
     else:
@@ -177,9 +174,6 @@ def trace_numpy_to_onnx(
         if "ai.onnx.ml" not in opsets:
             opsets["ai.onnx.ml"] = 1
 
-    # ------------------------------------------------------------------
-    # Resolve input names.
-    # ------------------------------------------------------------------
     if input_names is None:
         resolved_input_names: List[str] = (
             ["X"] if len(inputs) == 1 else [f"X{i}" for i in range(len(inputs))]
@@ -192,16 +186,10 @@ def trace_numpy_to_onnx(
                 f"input_names has {len(resolved_input_names)} elements."
             )
 
-    # ------------------------------------------------------------------
-    # Resolve output names (default to a single "output_0").
-    # ------------------------------------------------------------------
     resolved_output_names: List[str] = (
         list(output_names) if output_names is not None else ["output_0"]
     )
 
-    # ------------------------------------------------------------------
-    # Create the graph builder and register graph inputs.
-    # ------------------------------------------------------------------
     g = GraphBuilder(opsets)
 
     for iname, arr in zip(resolved_input_names, inputs):
@@ -210,16 +198,10 @@ def trace_numpy_to_onnx(
         shape: Tuple = (batch_dim, *arr.shape[1:])  # type: ignore[assignment]
         g.make_tensor_input(iname, itype, shape)
 
-    # ------------------------------------------------------------------
-    # Trace via the converter-API inner function.
-    # ------------------------------------------------------------------
-    trace_numpy_function(g, {}, resolved_output_names, func, resolved_input_names, name="trace")  # type: ignore[bad-argument-type]
+    trace_numpy_function(g, {}, resolved_output_names, func, resolved_input_names, name="trace")  # type: ignore
 
-    # ------------------------------------------------------------------
-    # Register graph outputs and export.
-    # ------------------------------------------------------------------
     for out_name in resolved_output_names:
         g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
 
-    onx, _ = g.to_onnx(return_optimize_report=True)  # type: ignore[not-iterable]
+    onx, _ = g.to_onnx(return_optimize_report=True)  # type: ignore
     return onx  # type: ignore[return-value]
