@@ -12,5 +12,6 @@ that maintain code across the project.
    :maxdepth: 1
 
    builder/index
+   litert/index
    misc/index
    ci
