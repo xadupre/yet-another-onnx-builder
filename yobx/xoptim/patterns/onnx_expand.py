@@ -245,6 +245,58 @@ class ShapeBasedExpandBroadcastPattern(PatternOptimization):
     but it allows dynamic shapes as well. It does not look into the second
     argument of Expand, it just infers than an expand is not needed for
     a binary operator following just after.
+
+    Model with nodes to be fused:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(1, b, c)"])
+            I_Y(["Y FLOAT(a, b, c)"])
+
+            Expand_0[["Expand(., .)"]]
+            Add_1[["Add(., .)"]]
+
+            I_X -->|"FLOAT(1, b, c)"| Expand_0
+            Expand_0 -->|"FLOAT(a, b, c)"| Add_1
+            I_Y -->|"FLOAT(a, b, c)"| Add_1
+
+            O_Z(["Z FLOAT(a, b, c)"])
+            Add_1 --> O_Z
+
+            class I_X,I_Y,O_Z ioNode
+            class Expand_0,Add_1 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(1, b, c)"])
+            I_Y(["Y FLOAT(a, b, c)"])
+
+            Add_0[["Add(., .)"]]
+
+            I_X -->|"FLOAT(1, b, c)"| Add_0
+            I_Y -->|"FLOAT(a, b, c)"| Add_0
+
+            O_Z(["Z FLOAT(a, b, c)"])
+            Add_0 --> O_Z
+
+            class I_X,I_Y,O_Z ioNode
+            class Add_0 opNode
     """
 
     _op_types = element_wise_binary_op_types() | element_wise_op_cmp_types()
