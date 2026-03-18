@@ -12,11 +12,25 @@ def builder_stats_to_dataframe(stats: List[Dict[str, Any]]) -> "pandas.DataFrame
 
     df = pandas.DataFrame(stats)
     for c in ["added", "removed"]:
-        df[c] = df[c].fillna(0).astype(int)
-    agg = df.groupby("pattern")[["added", "removed", "time_in", "iteration"]].agg(
-        {"added": "sum", "removed": "sum", "time_in": "sum", "iteration": "max"}
-    )
-    agg = agg[(agg["added"] > 0) | (agg["removed"] > 0) | (agg["time_in"] > 0)].sort_values(
-        "time_in", ascending=False
-    )
+        if c in df.columns:
+            df[c] = df[c].fillna(0).astype(int)
+
+    agg_columns = {
+        k: v
+        for k, v in {
+            "added": "sum",
+            "removed": "sum",
+            "time_in": "sum",
+            "iteration": "max",
+        }.items()
+        if k in df.columns
+    }
+    if not agg_columns or "pattern" not in df.columns:
+        # nothing to do
+        return df
+
+    agg = df.groupby("pattern")[list(agg_columns.keys())].agg(agg_columns)
+    for c in {"added", "removed", "time_in"} & set(agg_columns):
+        agg = agg[agg[c] > 0]
+    agg = agg.sort_values("time_in", ascending=False)
     return agg
