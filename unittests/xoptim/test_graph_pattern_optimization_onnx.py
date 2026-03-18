@@ -7526,9 +7526,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["SwapExpandUnsqueeze"], verbose=0
-            ),
+            optimization_options=OptimizationOptions(patterns=["SwapExpandUnsqueeze"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(["Unsqueeze", "Expand"], [n.op_type for n in opt_onx.graph.node])
@@ -7572,9 +7570,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["SwapExpandUnsqueeze"], verbose=0
-            ),
+            optimization_options=OptimizationOptions(patterns=["SwapExpandUnsqueeze"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
         # The optimised graph must contain an Unsqueeze followed by an Expand.
@@ -7615,9 +7611,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=["SwapExpandUnsqueeze"], verbose=0
-            ),
+            optimization_options=OptimizationOptions(patterns=["SwapExpandUnsqueeze"], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
         # No fusion: 3 nodes remain

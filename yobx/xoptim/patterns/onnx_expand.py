@@ -1821,10 +1821,7 @@ class SwapExpandUnsqueezePattern(PatternOptimization):
         return MatchResult(self, [node, unsq_node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        expand_node: NodeProto,
-        unsq_node: NodeProto,
+        self, g: "GraphBuilder", expand_node: NodeProto, unsq_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         axes_val = g.get_computed_constant(unsq_node.input[1])
 
