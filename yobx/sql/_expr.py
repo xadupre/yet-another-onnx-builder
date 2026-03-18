@@ -70,7 +70,7 @@ class _ExprEmitter:
                 left = self._g.op.CastLike(left, right, name=f"{name}_cast")
             if node.op == "<>":
                 eq = self._g.op.Equal(left, right, name=f"{name}_eq")
-                return self._g.op.Not(eq, name=name)
+                return self._g.op.Not(eq, name=name)  # type: ignore
             onnx_op = op_map.get(node.op)
             if onnx_op is None:
                 raise ValueError(f"Unsupported binary operator: {node.op!r}")
@@ -81,11 +81,11 @@ class _ExprEmitter:
             if op == "and":
                 left = self.emit(node.left, name=f"{name}_l")
                 right = self.emit(node.right, name=f"{name}_r")
-                return self._g.op.And(left, right, name=name)
+                return self._g.op.And(left, right, name=name)  # type: ignore
             if op == "or":
                 left = self.emit(node.left, name=f"{name}_l")
                 right = self.emit(node.right, name=f"{name}_r")
-                return self._g.op.Or(left, right, name=name)
+                return self._g.op.Or(left, right, name=name)  # type: ignore
             # leaf comparison — treat it as a BinaryExpr
             return self.emit(BinaryExpr(left=node.left, op=node.op, right=node.right), name=name)
 
@@ -95,7 +95,7 @@ class _ExprEmitter:
                 # COUNT(*) → total row count of the first known column
                 first_col = next(iter(self._col_map.values()))
                 size = self._g.op.Shape(first_col, name=f"{name}_shape")
-                return self._g.op.Gather(
+                return self._g.op.Gather(  # type: ignore
                     size, np.array(0, dtype=np.int64), axis=0, name=f"{name}_count"
                 )
             arg_tensor = self.emit(node.arg, name=f"{name}_arg")

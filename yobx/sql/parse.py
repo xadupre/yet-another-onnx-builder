@@ -418,9 +418,9 @@ class _Parser:
                 _, alias = self._consume()
             elif (
                 self._peek() is not None
-                and self._peek()[0] == "id"
-                and self._peek()[1] not in _KEYWORDS
-                and self._peek()[1] not in (",",)
+                and self._peek()[0] == "id"  # type: ignore
+                and self._peek()[1] not in _KEYWORDS  # type: ignore
+                and self._peek()[1] not in (",",)  # type: ignore
             ):
                 _, alias = self._consume()
             items.append(SelectItem(expr=expr, alias=alias))

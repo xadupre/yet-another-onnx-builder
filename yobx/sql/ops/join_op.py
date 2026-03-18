@@ -64,7 +64,7 @@ def convert_join_op(
     # Compress left columns to matched rows
     for col, tensor in col_map.items():
         compressed = g.op.Compress(tensor, has_match, axis=0, name=f"join_l_{col}")
-        new_map[col] = compressed
+        new_map[col] = compressed  # type: ignore
 
     # Compress right_indices then Gather right columns
     right_indices_filtered = g.op.Compress(
@@ -72,6 +72,6 @@ def convert_join_op(
     )
     for col, tensor in right_col_map.items():
         gathered = g.op.Gather(tensor, right_indices_filtered, axis=0, name=f"join_r_{col}")
-        new_map[col] = gathered
+        new_map[col] = gathered  # type: ignore
 
     return new_map

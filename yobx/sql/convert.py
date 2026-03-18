@@ -223,5 +223,5 @@ def _build_onnx(
     for out_name in output_names:
         g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
 
-    onx, _ = g.to_onnx(return_optimize_report=True)
+    onx, _ = g.to_onnx(return_optimize_report=True)  # type: ignore
     return onx  # type: ignore[return-value]

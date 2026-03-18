@@ -38,5 +38,5 @@ def convert_filter_op(
     new_map: Dict[str, str] = {}
     for col, tensor in col_map.items():
         compressed = g.op.Compress(tensor, mask, axis=0, name=f"filter_{col}")
-        new_map[col] = compressed
+        new_map[col] = compressed  # type: ignore
     return new_map
