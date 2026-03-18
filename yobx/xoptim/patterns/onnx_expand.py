@@ -1519,7 +1519,9 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
         if expand2_node.op_type != "Expand" or expand2_node.domain != "":
             return self.none(node, inspect.currentframe().f_lineno)
 
-        # all is left is to check we can do expand twice.
+        if not g.is_constant(node.input[1]):
+            # Not implemented in this case but it is possible.
+            return self.none(node, inspect.currentframe().f_lineno)
 
         return MatchResult(self, [node, unsq_node, expand2_node], self.apply, insert_at=node)
 
@@ -1530,53 +1532,39 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
         unsq_node: NodeProto,
         expand2_node: NodeProto,
     ) -> List[NodeProto]:
-        # Retrieve constant values for shape1 and axes.
-        shape1_val = g.get_computed_constant(expand_node.input[1])
+        exp_shapes = [
+            g.get_computed_constant(expand_node.input[1]),
+            g.get_computed_constant(expand2_node.input[1]),
+        ]
         axes_val = g.get_computed_constant(unsq_node.input[1])
-        shape1_list = [int(x) for x in shape1_val]
-        axes_list = [int(a) for a in axes_val]
 
-        # Build shape1_with_new_1s: shape1 with 1s inserted at the axes positions.
-        # ONNX Expand broadcasts, so Xe = broadcast(X, shape1).  For dims where
-        # shape1[j] > 1, Xe[j] = shape1[j]; for dims where shape1[j] = 1, Xe[j] = X[j].
-        # When we bypass the first Expand, those shape1[j] > 1 values must still appear in
-        # the combined shape so the trailing Expand broadcasts X's 1-dims correctly.
-        output_rank = len(shape1_list) + len(axes_list)
-        axes_normalized = sorted(a + output_rank if a < 0 else a for a in axes_list)
-        shape1_with_new_1s = shape1_list[:]
-        for axis in axes_normalized:
-            shape1_with_new_1s.insert(axis, 1)
-
-        # combined_shape = element-wise Max(shape1_with_new_1s, shape2).
-        # This ensures dims expanded by shape1 (shape1[j] > 1) are preserved even when
-        # shape2 has a 1 in those positions.
-        shape2_val = g.get_computed_constant(expand2_node.input[1])
-        if shape2_val is not None:
-            # Both shape1 and shape2 are static: compute combined shape as a constant.
-            combined_arr = np.maximum(
-                np.array(shape1_with_new_1s, dtype=np.int64),
-                np.array([int(x) for x in shape2_val], dtype=np.int64),
-            )
-            combined_shape_input = g.make_initializer(
-                "", combined_arr, source=f"{self.__class__.__name__}.combined"
-            )
-            extra_nodes: List[NodeProto] = []
-        else:
-            # shape2 is dynamic: use an ONNX Max node to compute the combined shape.
-            combined_cst_name = g.make_initializer(
-                "",
-                np.array(shape1_with_new_1s, dtype=np.int64),
-                source=f"{self.__class__.__name__}.combined_cst",
-            )
-            combined_shape_input = g.unique_name(f"{self.__class__.__name__}_combined_shape")
-            extra_nodes = [
-                g.make_node(
-                    "Max",
-                    [combined_cst_name, expand2_node.input[1]],
-                    [combined_shape_input],
-                    name=f"{self.__class__.__name__}--combined_shape",
+        extra_nodes: List[NodeProto] = []
+        if exp_shapes[0] is not None:
+            first_expand = exp_shapes[0].tolist()
+            for i in axes_val:
+                first_expand.insert(i, 1)
+            if exp_shapes[1] is not None:
+                final = np.maximum(np.array(first_expand), exp_shapes[1])
+                combined_shape_input = g.make_initializer(
+                    "", np.array(final, dtype=np.int64), source=f"{self.__class__.__name__}.0"
                 )
-            ]
+            else:
+                first_shape_insert = g.make_initializer(
+                    "", np.array(final, dtype=np.int64), source=f"{self.__class__.__name__}.1"
+                )
+                combined_shape_input = g.unique_name(f"{self.__class__.__name__}_combined_shape")
+                extra_nodes = [
+                    g.make_node(
+                        "Max",
+                        [first_shape_insert, expand2_node.input[1]],
+                        [combined_shape_input],
+                        name=f"{self.__class__.__name__}--combined_shape",
+                    )
+                ]
+        else:
+            raise NotImplementedError(
+                f"{exp_shapes[0]!r} is not constant, this is not implemented yet."
+            )
 
         # Apply Unsqueeze directly to the original tensor (before first Expand).
         new_unsq_name = g.unique_name(f"{self.__class__.__name__}_{unsq_node.output[0]}")
