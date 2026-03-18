@@ -12,6 +12,7 @@ API Reference
    container/index
    helpers/index
    reference/index
+   polars/index
    sklearn/index
    tensorflow/index
    torch/index

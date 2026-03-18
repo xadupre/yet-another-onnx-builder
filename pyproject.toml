@@ -56,6 +56,9 @@ lightgbm = [
     "scikit-learn>=1.4",
     "lightgbm>=3.0",
 ]
+polars = [
+    "polars>=0.20",
+]
 sklearn = [
     "scikit-learn>=1.4",
 ]
