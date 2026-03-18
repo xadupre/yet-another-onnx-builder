@@ -9,38 +9,7 @@ with :func:`~yobx.sql.ops.register.register_sql_op_converter`.
 
 .. toctree::
     :maxdepth: 1
-    :caption: modules
 
     register
     filter_op
     join_op
-
-SQL_OP_CONVERTERS
-+++++++++++++++++
-
-.. autodata:: yobx.sql.ops.register.SQL_OP_CONVERTERS
-
-register_sql_op_converter
-+++++++++++++++++++++++++
-
-.. autofunction:: yobx.sql.ops.register.register_sql_op_converter
-
-get_sql_op_converter
-++++++++++++++++++++
-
-.. autofunction:: yobx.sql.ops.register.get_sql_op_converter
-
-get_sql_op_converters
-+++++++++++++++++++++
-
-.. autofunction:: yobx.sql.ops.register.get_sql_op_converters
-
-convert_filter_op
-+++++++++++++++++
-
-.. autofunction:: yobx.sql.ops.filter_op.convert_filter_op
-
-convert_join_op
-+++++++++++++++
-
-.. autofunction:: yobx.sql.ops.join_op.convert_join_op

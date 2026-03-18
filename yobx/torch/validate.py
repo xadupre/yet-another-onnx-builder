@@ -17,47 +17,69 @@ DEFAULT_PROMPT = "Continue: it rains, what should I do?"
 """Default text prompt used when validating text-generation models."""
 
 
-@dataclass
 class ValidateSummary:
-    """Flat summary dictionary returned by :func:`validate_model`.
+    """
+    Flat summary dictionary returned by :func:`validate_model`.
 
     Contains status flags and error messages collected during validation.
     Fields that were not reached (e.g. because an earlier step failed) remain
     ``None``.
+
+    Args:
+        model_id: HuggingFace model identifier
+        prompt: Text prompt used during validation
+        config_from_cache: bundled"`` / ``"local"``
+            when config was loaded from cache, ``False`` for network.
+        config_overrides: String representation of the config overrides applied.
+        error_config: Error message if config loading failed.
+        error_tokenizer: Error message if tokenizer loading failed.
+        model_from_cache: ``True`` when the model was loaded from the local HF cache
+        error_model: Error message if model loading failed.
+        n_captured: Number of input sets captured by the :class:`InputObserver`.
+        error_observer: Error message if input capture failed.
+        export: ``"OK"`` or ``"FAILED"`` depending on whether the ONNX export succeeded.
+        error_export: Error message if the ONNX export failed.
+        discrepancies_ok: Number of input sets where ONNX Runtime results matched PyTorch.
+        discrepancies_total: Total number of input sets checked for discrepancies.
+        discrepancies: ``"OK"`` or ``"FAILED"`` for the overall discrepancy check.
+        error_discrepancies: Error message if the discrepancy check raised an exception.
     """
 
-    model_id: str
-    """HuggingFace model identifier."""
-    prompt: str
-    """Text prompt used during validation."""
-    config_from_cache: Optional[Union[str, bool]] = None
-    """``"bundled"`` / ``"local"`` when config was loaded from cache, ``False`` for network."""
-    config_overrides: Optional[str] = None
-    """String representation of the config overrides applied."""
-    error_config: Optional[str] = None
-    """Error message if config loading failed."""
-    error_tokenizer: Optional[str] = None
-    """Error message if tokenizer loading failed."""
-    model_from_cache: Optional[bool] = None
-    """``True`` when the model was loaded from the local HF cache."""
-    error_model: Optional[str] = None
-    """Error message if model loading failed."""
-    n_captured: Optional[int] = None
-    """Number of input sets captured by the :class:`InputObserver`."""
-    error_observer: Optional[str] = None
-    """Error message if input capture failed."""
-    export: Optional[str] = None
-    """``"OK"`` or ``"FAILED"`` depending on whether the ONNX export succeeded."""
-    error_export: Optional[str] = None
-    """Error message if the ONNX export failed."""
-    discrepancies_ok: Optional[int] = None
-    """Number of input sets where ONNX Runtime results matched PyTorch."""
-    discrepancies_total: Optional[int] = None
-    """Total number of input sets checked for discrepancies."""
-    discrepancies: Optional[str] = None
-    """``"OK"`` or ``"FAILED"`` for the overall discrepancy check."""
-    error_discrepancies: Optional[str] = None
-    """Error message if the discrepancy check raised an exception."""
+    def __init__(
+        self,
+        model_id: str,
+        prompt: str,
+        config_from_cache: Optional[Union[str, bool]] = None,
+        config_overrides: Optional[str] = None,
+        error_config: Optional[str] = None,
+        error_tokenizer: Optional[str] = None,
+        model_from_cache: Optional[bool] = None,
+        error_model: Optional[str] = None,
+        n_captured: Optional[int] = None,
+        error_observer: Optional[str] = None,
+        export: Optional[str] = None,
+        error_export: Optional[str] = None,
+        discrepancies_ok: Optional[int] = None,
+        discrepancies_total: Optional[int] = None,
+        discrepancies: Optional[str] = None,
+        error_discrepancies: Optional[str] = None,
+    ):
+        self.model_id = model_id
+        self.prompt = prompt
+        self.config_from_cache = config_from_cache
+        self.config_overrides = config_overrides
+        self.error_config = error_config
+        self.error_tokenizer = error_tokenizer
+        self.model_from_cache = model_from_cache
+        self.error_model = error_model
+        self.n_captured = n_captured
+        self.error_observer = error_observer
+        self.export = export
+        self.error_export = error_export
+        self.discrepancies_ok = discrepancies_ok
+        self.discrepancies_total = discrepancies_total
+        self.discrepancies = discrepancies
+        self.error_discrepancies = error_discrepancies
 
     def items(self):
         """Yield ``(field_name, value)`` pairs for every non-``None`` field.
@@ -74,13 +96,6 @@ class ValidateSummary:
     def __contains__(self, key: str) -> bool:
         """Return ``True`` when *key* names a field that has been set (non-``None``)."""
         return getattr(self, key, None) is not None
-
-    def __getitem__(self, key: str) -> Any:
-        """Dict-style read access: ``summary["model_id"]``."""
-        try:
-            return getattr(self, key)
-        except AttributeError:
-            raise KeyError(f"Attribute {key!r} does not exist.") from None
 
 
 @dataclass
@@ -110,16 +125,21 @@ class ValidateData:
     discrepancies: Optional[List[Dict[str, Any]]] = None
     """Per-input-set discrepancy records from :meth:`InputObserver.check_discrepancies`."""
 
+    def items(self):
+        """Yield ``(field_name, value)`` pairs for every non-``None`` field.
+
+        This mirrors ``dict.items()`` so that existing code such as
+        ``for k, v in sorted(summary.items())`` keeps working without
+        modification.
+        """
+        for f in fields(self):
+            v = getattr(self, f.name)
+            if v is not None:
+                yield f.name, v
+
     def __contains__(self, key: str) -> bool:
         """Return ``True`` when *key* names a field that has been set (non-``None``)."""
         return getattr(self, key, None) is not None
-
-    def __getitem__(self, key: str) -> Any:
-        """Dict-style read access: ``data["observer"]``."""
-        try:
-            return getattr(self, key)
-        except AttributeError:
-            raise KeyError(f"Attribute {key!r} does not exist.") from None
 
 
 def _to_onnx(*args, exporter: str = "yobx", **kwargs):
