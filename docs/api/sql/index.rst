@@ -12,6 +12,8 @@ input** tensor.  See :ref:`l-design-sql` for the full design discussion.
 
     parse
     convert
+    _expr
+    ops/index
 
 sql_to_onnx
 +++++++++++
@@ -75,3 +77,26 @@ Expression nodes
 .. autoclass:: yobx.sql.parse.Condition
     :members:
     :no-undoc-members:
+
+Expression emitter
+++++++++++++++++++
+
+.. autoclass:: yobx.sql._expr._ExprEmitter
+    :members:
+    :no-undoc-members:
+
+SQL op converter registry
++++++++++++++++++++++++++
+
+.. autofunction:: yobx.sql.ops.register.register_sql_op_converter
+
+.. autofunction:: yobx.sql.ops.register.get_sql_op_converter
+
+.. autofunction:: yobx.sql.ops.register.get_sql_op_converters
+
+Built-in SQL op converters
+++++++++++++++++++++++++++
+
+.. autofunction:: yobx.sql.ops.filter_op.convert_filter_op
+
+.. autofunction:: yobx.sql.ops.join_op.convert_join_op
