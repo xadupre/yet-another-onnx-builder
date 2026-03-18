@@ -23,7 +23,7 @@ These ``stablehlo`` ops map to a single ONNX op with the same semantics:
     :showcode:
     :rst:
 
-    from yobx.tensorflow.ops.xla_call_module import _MAPPING_JAX_ONNX
+    from yobx.tensorflow.ops.jax_ops import _MAPPING_JAX_ONNX
 
     # Group by ONNX op name for a more readable table
     rows = sorted(_MAPPING_JAX_ONNX.items())  # (jax_op, onnx_op)
@@ -48,7 +48,7 @@ as small sub-graphs by dedicated factory functions:
     :showcode:
     :rst:
 
-    from yobx.tensorflow.ops.xla_call_module import _COMPOSITE_JAX_OPS
+    from yobx.tensorflow.ops.jax_ops import _COMPOSITE_JAX_OPS
 
     _descriptions = {
         "rsqrt": "``Reciprocal(Sqrt(x))``",
