@@ -14,8 +14,7 @@ from sklearn.preprocessing import FunctionTransformer
 
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
-from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
-from ...xtracing.numpy_array import NumpyArray
+from ...xtracing.tracing import trace_numpy_function
 
 
 @register_sklearn_converter(FunctionTransformer)
@@ -31,7 +30,7 @@ def sklearn_function_transformer(
     Converts a :class:`sklearn.preprocessing.FunctionTransformer` into ONNX.
 
     The function stored in ``estimator.func`` is traced using
-    :class:`~yobx.xtracing.NumpyArray` proxies: every arithmetic operation,
+    :func:`~yobx.xtracing.trace_numpy_function`: every arithmetic operation,
     ufunc, or reduction is recorded as an ONNX node in *g*.  If ``func`` is
     ``None`` the transformer is an identity and a single ``Identity`` node is
     emitted.
@@ -60,34 +59,11 @@ def sklearn_function_transformer(
         return res
 
     # ----------------------------------------------------------------
-    # Traced transformer
+    # Traced transformer — delegate to trace_numpy_function which follows
+    # the same API convention as other converters.
     # ----------------------------------------------------------------
-    # Determine the numpy dtype from the ONNX element type of X so that
-    # scalar constants created during tracing use the right dtype.
-    if g.has_type(X):
-        itype = g.get_type(X)
-        dtype = tensor_dtype_to_np_dtype(itype)
-    else:
-        dtype = None
-
-    # Wrap the input tensor as a NumpyArray proxy and call the function.
-    proxy = NumpyArray(X, g, dtype=dtype)
-    kw_args = estimator.kw_args if estimator.kw_args is not None else {}
-    result = estimator.func(proxy, **kw_args)
-
-    # Normalise result to a single NumpyArray (FunctionTransformer.transform
-    # returns a single array).
-    if isinstance(result, (list, tuple)):
-        result = result[0]
-    if not isinstance(result, NumpyArray):
-        raise TypeError(
-            f"FunctionTransformer.func must return a NumpyArray when traced; "
-            f"got {type(result).__name__!r}.  Ensure the function uses only "
-            "numpy operations that are supported by the ONNX tracing mechanism."
-        )
-
-    # Rename the result tensor to the expected output name via an Identity node.
-    res = g.op.Identity(result.name, outputs=outputs, name=name)
+    kw_args = estimator.kw_args
+    res = trace_numpy_function(g, estimator.func, [X], outputs, name=name, kw_args=kw_args)
     assert isinstance(res, str)
     if not sts:
         g.set_type_shape_unary_op(res, X)

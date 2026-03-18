@@ -16,7 +16,10 @@ a larger graph when converting a
 Public API
 ----------
 * :class:`NumpyArray` — proxy that records numpy ops as ONNX nodes
-* :func:`trace_numpy_to_onnx` — convert a numpy function to an ONNX model
+* :func:`trace_numpy_function` — converter-API function: trace a numpy function
+  into an existing :class:`~yobx.xbuilder.GraphBuilder`
+* :func:`trace_numpy_to_onnx` — high-level entry point: convert a numpy
+  function to a standalone ONNX model
 
 Example
 -------
@@ -33,9 +36,10 @@ Example
 """
 
 from .numpy_array import NumpyArray
-from .tracing import trace_numpy_to_onnx
+from .tracing import trace_numpy_function, trace_numpy_to_onnx
 
 __all__ = [
     "NumpyArray",
+    "trace_numpy_function",
     "trace_numpy_to_onnx",
 ]

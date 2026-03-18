@@ -346,6 +346,47 @@ class TestNumpyArray(ExtTestCase):
         expected = f(X)
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    # ------------------------------------------------------------------
+    # trace_numpy_function (converter-API)
+    # ------------------------------------------------------------------
+
+    def test_trace_numpy_function_basic(self):
+        """trace_numpy_function should work with an existing GraphBuilder."""
+        from onnx import TensorProto
+        from yobx.xbuilder import GraphBuilder
+        from yobx.xtracing import trace_numpy_function
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        def f(X):
+            return np.sqrt(np.abs(X) + np.float32(1))
+
+        g = GraphBuilder({"": 21, "ai.onnx.ml": 1})
+        g.make_tensor_input("X", TensorProto.FLOAT, ("batch", 3))
+        trace_numpy_function(g, f, ["X"], ["output_0"])
+        g.make_tensor_output("output_0", indexed=False, allow_untyped_output=True)
+        onx, _ = g.to_onnx(return_optimize_report=True)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, {"X": X})[0]
+        expected = f(X)
+        self.assertEqualArray(expected, got, atol=1e-5)
+
+    def test_trace_numpy_function_multiple_outputs(self):
+        """trace_numpy_function raises when output count mismatches."""
+        from onnx import TensorProto
+        from yobx.xbuilder import GraphBuilder
+        from yobx.xtracing import trace_numpy_function
+
+        def f(X):
+            return X + np.float32(1)
+
+        g = GraphBuilder({"": 21, "ai.onnx.ml": 1})
+        g.make_tensor_input("X", TensorProto.FLOAT, ("batch", 3))
+        # Providing 2 output names for a single-output function should raise.
+        with self.assertRaises(ValueError):
+            trace_numpy_function(g, f, ["X"], ["out0", "out1"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
