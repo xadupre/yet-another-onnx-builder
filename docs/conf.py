@@ -164,6 +164,7 @@ epkg_dictionary = {
     "imbalanced-learn": "https://imbalanced-learn.org/stable/",
     "ir-py": "https://onnx.ai/ir-py/",
     "jax": "https://docs.jax.dev/en/latest/",
+    "JAX": "https://docs.jax.dev/en/latest/",
     "lightgbm": "https://lightgbm.readthedocs.io/en/latest/",
     "LightGBM": "https://lightgbm.readthedocs.io/en/latest/",
     "Linux": "https://www.linux.org/",
