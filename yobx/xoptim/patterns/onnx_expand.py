@@ -1703,3 +1703,166 @@ class SwapExpandReshapePattern(PatternOptimization):
                 doc_string=expand_node.doc_string,
             ),
         ]
+
+
+class SwapExpandUnsqueezePattern(PatternOptimization):
+    """
+    Swaps Expand and Unsqueeze when Unsqueeze directly follows Expand.
+    ``Expand(X, shape) → Unsqueeze(expanded, axes)`` is rewritten as
+    ``Unsqueeze(X, axes) → Expand(unsqueezed, new_shape)`` where
+    ``new_shape`` is obtained by inserting ``1`` at every position listed in
+    ``axes`` into the original expand shape.  Performing the Unsqueeze before
+    the Expand means the Unsqueeze operates on the smaller (pre-expanded)
+    tensor, which is more efficient.
+
+    Model with nodes to be fused:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(1, 5, 7)"])
+            I_shape(["shape INT64(3)"])
+            I_axes(["axes INT64(1)"])
+
+            Constant_0[["Constant() -#gt; shape"]]
+            Constant_1[["Constant() -#gt; axes"]]
+            Expand_2[["Expand(., .)"]]
+            Unsqueeze_3[["Unsqueeze(., .)"]]
+
+            I_X -->|"FLOAT(1, 5, 7)"| Expand_2
+            Constant_0 -->|"INT64(3)"| Expand_2
+            Expand_2 -->|"FLOAT(3, 5, 7)"| Unsqueeze_3
+            Constant_1 -->|"INT64(1)"| Unsqueeze_3
+
+            O_Y(["Y FLOAT(3, 1, 5, 7)"])
+            Unsqueeze_3 --> O_Y
+
+            class I_X,I_shape,I_axes,O_Y ioNode
+            class Constant_0,Constant_1 constNode
+            class Expand_2,Unsqueeze_3 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(1, 5, 7)"])
+            I_axes(["axes INT64(1)"])
+            I_new_shape(["new_shape INT64(4)"])
+
+            Constant_0[["Constant() -#gt; axes"]]
+            Constant_1[["Constant() -#gt; new_shape"]]
+            Unsqueeze_2[["Unsqueeze(., .)"]]
+            Expand_3[["Expand(., .)"]]
+
+            I_X -->|"FLOAT(1, 5, 7)"| Unsqueeze_2
+            Constant_0 -->|"INT64(1)"| Unsqueeze_2
+            Unsqueeze_2 -->|"FLOAT(1, 1, 5, 7)"| Expand_3
+            Constant_1 -->|"INT64(4)"| Expand_3
+
+            O_Y(["Y FLOAT(3, 1, 5, 7)"])
+            Expand_3 --> O_Y
+
+            class I_X,I_axes,I_new_shape,O_Y ioNode
+            class Constant_0,Constant_1 constNode
+            class Unsqueeze_2,Expand_3 opNode
+    """
+
+    def __init__(self, verbose: int = 0, priority: int = 0):
+        super().__init__(verbose, priority)
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        if node.op_type != "Expand" or node.domain != "":
+            return self.none()
+
+        # The Expand output must be used only by the Unsqueeze (opset >= 13).
+        if g.is_used_more_than_once(node.output[0]) or g.main_opset < 13:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        next_nodes = g.next_nodes(node.output[0])
+        if len(next_nodes) != 1:
+            return self.none(node, inspect.currentframe().f_lineno)
+        unsq_node = next_nodes[0]
+
+        if unsq_node.op_type != "Unsqueeze" or unsq_node.domain != "":
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # The Unsqueeze axes must be a constant so we can rewrite the Expand shape.
+        if not g.is_constant(unsq_node.input[1]):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # We must be able to determine the new Expand shape: either the original
+        # Expand shape is a constant, or the Expand output shape is fully known.
+        expand_shape_cst = g.get_computed_constant(node.input[1])
+        if expand_shape_cst is None:
+            if not g.has_shape(node.output[0]):
+                return self.none(node, inspect.currentframe().f_lineno)
+            shape = g.get_shape(node.output[0])
+            if not all_int(shape):
+                return self.none(node, inspect.currentframe().f_lineno)
+
+        return MatchResult(self, [node, unsq_node], self.apply, insert_at=node)
+
+    def apply(
+        self,
+        g: "GraphBuilder",  # noqa: F821
+        expand_node: NodeProto,
+        unsq_node: NodeProto,
+    ) -> List[NodeProto]:
+        axes_val = g.get_computed_constant(unsq_node.input[1])
+
+        expand_shape_cst = g.get_computed_constant(expand_node.input[1])
+        if expand_shape_cst is not None:
+            base_shape = expand_shape_cst.tolist()
+        else:
+            base_shape = list(g.get_shape(expand_node.output[0]))
+
+        # Normalise negative axes (relative to the output rank after unsqueeze).
+        rank_out = len(base_shape) + len(axes_val)
+        axes = sorted(int(a) if a >= 0 else int(a) + rank_out for a in axes_val)
+
+        # Insert 1s at the axes positions to build the new Expand target shape.
+        new_shape_list = list(base_shape)
+        for a in axes:
+            new_shape_list.insert(a, 1)
+
+        new_shape = g.make_initializer(
+            "",
+            np.array(new_shape_list, dtype=np.int64),
+            source=f"{self.__class__.__name__}.apply.new_shape",
+        )
+
+        new_name = g.unique_name(f"{self.__class__.__name__}_{expand_node.input[0]}")
+        return [
+            g.make_node(
+                "Unsqueeze",
+                [expand_node.input[0], unsq_node.input[1]],
+                [new_name],
+                name=f"{self.__class__.__name__}--{unsq_node.name}",
+                doc_string=unsq_node.doc_string,
+            ),
+            g.make_node(
+                "Expand",
+                [new_name, new_shape],
+                unsq_node.output,
+                name=f"{self.__class__.__name__}--{expand_node.name}",
+                doc_string=expand_node.doc_string,
+            ),
+        ]

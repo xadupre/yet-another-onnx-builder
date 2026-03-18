@@ -7499,6 +7499,135 @@ class TestGraphPatternOptimization(ExtTestCase):
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(["Add", "Cast"], [n.op_type for n in opt_onx.graph.node])
 
+    def test_swap_expand_unsqueeze_constant_shape(self):
+        """Expand → Unsqueeze with a fully-constant expand shape."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Expand", ["X", "shape"], ["xe"]),
+                    oh.make_node("Unsqueeze", ["xe", "axes"], ["Y"]),
+                ],
+                "test",
+                [_mkv_("X", TFLOAT, [1, 5, 7])],
+                [_mkv_("Y", TFLOAT, [3, 1, 5, 7])],
+                [
+                    onh.from_array(np.array([3, 5, 7], dtype=np.int64), name="shape"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="axes"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(1, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["SwapExpandUnsqueeze"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Unsqueeze", "Expand"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_swap_expand_unsqueeze_inferred_shape(self):
+        """Expand -> Unsqueeze where the Expand shape is dynamic (built by Shape+Concat)
+        so get_computed_constant cannot resolve it; the pattern must fall back to shape
+        inference to determine the new Expand target shape."""
+        # Shape of X is [1, 5, 7] (static); shape of "xe" after Expand is
+        # inferred by ONNX shape inference as [1, 5, 7].  We provide the first
+        # dimension dynamically via a Shape node so the expand-shape constant is not
+        # resolvable by get_computed_constant, exercising the inferred-shape path.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["X"], ["d0"], start=0, end=1),
+                    oh.make_node("Concat", ["d0", "dim57"], ["shape"], axis=0),
+                    oh.make_node("Expand", ["X", "shape"], ["xe"]),
+                    oh.make_node("Unsqueeze", ["xe", "axes"], ["Y"]),
+                ],
+                "test",
+                [_mkv_("X", TFLOAT, [1, 5, 7])],
+                [_mkv_("Y", TFLOAT, [1, 1, 5, 7])],
+                [
+                    onh.from_array(np.array([5, 7], dtype=np.int64), name="dim57"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="axes"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(1, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["SwapExpandUnsqueeze"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # The optimised graph must contain an Unsqueeze followed by an Expand.
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("Unsqueeze", op_types)
+        self.assertIn("Expand", op_types)
+        self.assertLess(op_types.index("Unsqueeze"), op_types.index("Expand"))
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_swap_expand_unsqueeze_no_match_shared(self):
+        """Expand output is consumed by more than one node – pattern must NOT fire."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Expand", ["X", "shape"], ["xe"]),
+                    oh.make_node("Unsqueeze", ["xe", "axes"], ["Y"]),
+                    oh.make_node("Relu", ["xe"], ["Z"]),
+                ],
+                "test",
+                [_mkv_("X", TFLOAT, [1, 5, 7])],
+                [_mkv_("Y", TFLOAT, [3, 1, 5, 7]), _mkv_("Z", TFLOAT, [3, 5, 7])],
+                [
+                    onh.from_array(np.array([3, 5, 7], dtype=np.int64), name="shape"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="axes"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(1, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected_y, expected_z = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["SwapExpandUnsqueeze"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # No fusion: 3 nodes remain
+        self.assertEqual(3, len(opt_onx.graph.node))
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got_y, got_z = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected_y, got_y)
+        self.assertEqualArray(expected_z, got_z)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
