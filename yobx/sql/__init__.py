@@ -59,8 +59,6 @@ from .parse import (
 )
 
 __all__ = [
-    "sql_to_onnx",
-    "parse_sql",
     "AggExpr",
     "BinaryExpr",
     "ColumnRef",
@@ -72,4 +70,6 @@ __all__ = [
     "ParsedQuery",
     "SelectItem",
     "SelectOp",
+    "parse_sql",
+    "sql_to_onnx",
 ]

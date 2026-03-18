@@ -23,7 +23,6 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
-
 # ---------------------------------------------------------------------------
 # Small expression dataclasses used inside operations
 # ---------------------------------------------------------------------------
@@ -118,8 +117,6 @@ class Condition:
 class SqlOperation:
     """Base class for all SQL operations produced by :func:`parse_sql`."""
 
-    pass
-
 
 @dataclass
 class SelectOp(SqlOperation):
@@ -142,7 +139,9 @@ class FilterOp(SqlOperation):
     :param condition: the parsed predicate tree.
     """
 
-    condition: Condition = field(default_factory=lambda: Condition(Literal(True), "=", Literal(True)))
+    condition: Condition = field(
+        default_factory=lambda: Condition(Literal(True), "=", Literal(True))
+    )
 
 
 @dataclass
@@ -198,10 +197,31 @@ class ParsedQuery:
 # ---------------------------------------------------------------------------
 
 _KEYWORDS = {
-    "select", "distinct", "from", "where", "group", "by",
-    "join", "inner", "left", "right", "full", "outer", "on",
-    "and", "or", "not", "as", "order", "having", "limit",
-    "sum", "count", "avg", "min", "max",
+    "select",
+    "distinct",
+    "from",
+    "where",
+    "group",
+    "by",
+    "join",
+    "inner",
+    "left",
+    "right",
+    "full",
+    "outer",
+    "on",
+    "and",
+    "or",
+    "not",
+    "as",
+    "order",
+    "having",
+    "limit",
+    "sum",
+    "count",
+    "avg",
+    "min",
+    "max",
 }
 
 _COMPARISON_OPS = {"=", "<", ">", "<=", ">=", "<>", "!="}
@@ -433,10 +453,7 @@ class _Parser:
             right_key = str(right_expr)
 
         return JoinOp(
-            right_table=right_table,
-            left_key=left_key,
-            right_key=right_key,
-            join_type=join_type,
+            right_table=right_table, left_key=left_key, right_key=right_key, join_type=join_type
         )
 
     def parse(self) -> ParsedQuery:
@@ -491,11 +508,7 @@ class _Parser:
         # Collect all referenced column names
         columns = _collect_columns(operations)
 
-        return ParsedQuery(
-            operations=operations,
-            from_table=from_table,
-            columns=columns,
-        )
+        return ParsedQuery(operations=operations, from_table=from_table, columns=columns)
 
 
 # ---------------------------------------------------------------------------

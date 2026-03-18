@@ -171,7 +171,8 @@ Limitations and future work
 Example
 =======
 
-.. code-block:: python
+.. runpython::
+    :showcode:
 
     import numpy as np
     from yobx.sql import sql_to_onnx, parse_sql

@@ -46,12 +46,8 @@ def convert_join_op(
     right_key_tensor = right_col_map[op.right_key]
 
     # Broadcast equality: match[i,j] = (left_key[i] == right_key[j])
-    lk_2d = g.op.Unsqueeze(
-        left_key_tensor, np.array([1], dtype=np.int64), name="join_lk2d"
-    )
-    rk_2d = g.op.Unsqueeze(
-        right_key_tensor, np.array([0], dtype=np.int64), name="join_rk2d"
-    )
+    lk_2d = g.op.Unsqueeze(left_key_tensor, np.array([1], dtype=np.int64), name="join_lk2d")
+    rk_2d = g.op.Unsqueeze(right_key_tensor, np.array([0], dtype=np.int64), name="join_rk2d")
     match_matrix = g.op.Equal(lk_2d, rk_2d, name="join_match")
 
     # Cast bool → int32 to use ArgMax; pick the first matching right index
@@ -60,10 +56,7 @@ def convert_join_op(
 
     # Filter left to rows that have at least one match
     any_match = g.op.ReduceMax(
-        match_int,
-        np.array([1], dtype=np.int64),
-        keepdims=0,
-        name="join_any",
+        match_int, np.array([1], dtype=np.int64), keepdims=0, name="join_any"
     )
     has_match = g.op.Cast(any_match, to=TensorProto.BOOL, name="join_hasmatch")
 
@@ -78,9 +71,7 @@ def convert_join_op(
         right_indices, has_match, axis=0, name="join_ridx_filt"
     )
     for col, tensor in right_col_map.items():
-        gathered = g.op.Gather(
-            tensor, right_indices_filtered, axis=0, name=f"join_r_{col}"
-        )
+        gathered = g.op.Gather(tensor, right_indices_filtered, axis=0, name=f"join_r_{col}")
         new_map[col] = gathered
 
     return new_map

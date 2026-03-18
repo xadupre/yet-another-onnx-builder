@@ -93,9 +93,7 @@ class TestSqlToOnnxSelect(ExtTestCase):
         dtypes = {"a": np.float32, "b": np.float32}
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-        out_a, total = self._run(
-            "SELECT a, a + b AS total FROM t", dtypes, {"a": a, "b": b}
-        )
+        out_a, total = self._run("SELECT a, a + b AS total FROM t", dtypes, {"a": a, "b": b})
         self.assertEqualArray(out_a, a)
         self.assertEqualArray(total, a + b, atol=1e-6)
 
@@ -187,18 +185,14 @@ class TestSqlToOnnxFilter(ExtTestCase):
     def test_filter_and(self):
         dtypes = {"a": np.float32}
         a = np.array([1.0, -2.0, 3.0, 2.0], dtype=np.float32)
-        (out,) = self._run(
-            "SELECT a FROM t WHERE a > 0 AND a < 3", dtypes, {"a": a}
-        )
+        (out,) = self._run("SELECT a FROM t WHERE a > 0 AND a < 3", dtypes, {"a": a})
         expected = np.array([1.0, 2.0], dtype=np.float32)
         self.assertEqualArray(out, expected)
 
     def test_filter_or(self):
         dtypes = {"a": np.float32}
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
-        (out,) = self._run(
-            "SELECT a FROM t WHERE a < 0 OR a > 2", dtypes, {"a": a}
-        )
+        (out,) = self._run("SELECT a FROM t WHERE a < 0 OR a > 2", dtypes, {"a": a})
         expected = np.array([-2.0, 3.0], dtype=np.float32)
         self.assertEqualArray(out, expected)
 
@@ -206,9 +200,7 @@ class TestSqlToOnnxFilter(ExtTestCase):
         dtypes = {"a": np.float32, "b": np.float32}
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
         b = np.array([10.0, 20.0, 30.0], dtype=np.float32)
-        out_a, out_b = self._run(
-            "SELECT a, b FROM t WHERE a > 0", dtypes, {"a": a, "b": b}
-        )
+        out_a, out_b = self._run("SELECT a, b FROM t WHERE a > 0", dtypes, {"a": a, "b": b})
         self.assertEqualArray(out_a, np.array([1.0, 3.0], dtype=np.float32))
         self.assertEqualArray(out_b, np.array([10.0, 30.0], dtype=np.float32))
 
@@ -216,9 +208,7 @@ class TestSqlToOnnxFilter(ExtTestCase):
         dtypes = {"a": np.float32, "b": np.float32}
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-        (total,) = self._run(
-            "SELECT a + b AS total FROM t WHERE a > 0", dtypes, {"a": a, "b": b}
-        )
+        (total,) = self._run("SELECT a + b AS total FROM t WHERE a > 0", dtypes, {"a": a, "b": b})
         expected = np.array([5.0, 9.0], dtype=np.float32)
         self.assertEqualArray(total, expected, atol=1e-6)
 
@@ -249,11 +239,7 @@ class TestSqlToOnnxGroupBy(ExtTestCase):
         dtypes = {"a": np.float32, "b": np.float32}
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
         b = np.array([1.0, 1.0, 2.0], dtype=np.float32)
-        (s,) = self._run(
-            "SELECT SUM(a) FROM t WHERE a > 0 GROUP BY b",
-            dtypes,
-            {"a": a, "b": b},
-        )
+        (s,) = self._run("SELECT SUM(a) FROM t WHERE a > 0 GROUP BY b", dtypes, {"a": a, "b": b})
         # After filter (a>0): a=[1.0, 3.0], SUM = 4.0
         self.assertEqualArray(np.array(float(s)), np.array(4.0), atol=1e-5)
 

@@ -11,9 +11,9 @@ from .register import get_sql_op_converter, get_sql_op_converters, register_sql_
 from . import filter_op, join_op
 
 __all__ = [
-    "register_sql_op_converter",
+    "filter_op",
     "get_sql_op_converter",
     "get_sql_op_converters",
-    "filter_op",
     "join_op",
+    "register_sql_op_converter",
 ]

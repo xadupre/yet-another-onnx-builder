@@ -54,6 +54,14 @@ It can export from many libraries:
 | :epkg:`xgboost`                       | :ref:`l-sklearn-converter`   |
 +---------------------------------------+------------------------------+
 
+**data manipulations**
+
+This is work in progress.
+Many packages produce SQL queries. It starts by converting a SQL
+query into ONNX.
+
+* :ref:`l-design-sql`
+
 **deeplearning**
 
 +---------------------------------------+----------------------------------------+

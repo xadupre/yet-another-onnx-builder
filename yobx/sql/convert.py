@@ -48,13 +48,7 @@ from .. import DEFAULT_TARGET_OPSET
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
 from .ops import get_sql_op_converter
-from .parse import (
-    GroupByOp,
-    JoinOp,
-    ParsedQuery,
-    SelectOp,
-    parse_sql,
-)
+from .parse import GroupByOp, JoinOp, ParsedQuery, SelectOp, parse_sql
 
 # ---------------------------------------------------------------------------
 # Dtype helper
@@ -150,7 +144,9 @@ def _build_onnx(
     # Resolve dtype dicts
     left_dtypes: Dict[str, np.dtype] = {k: np.dtype(v) for k, v in input_dtypes.items()}
     if right_input_dtypes is not None:
-        right_dtypes: Dict[str, np.dtype] = {k: np.dtype(v) for k, v in right_input_dtypes.items()}
+        right_dtypes: Dict[str, np.dtype] = {
+            k: np.dtype(v) for k, v in right_input_dtypes.items()
+        }
     else:
         right_dtypes = left_dtypes
 
@@ -198,9 +194,7 @@ def _build_onnx(
     for op in pq.operations:
         converter = get_sql_op_converter(type(op))
         if converter is not None:
-            col_map = converter(
-                g, {}, list(col_map.keys()), op, col_map, right_col_map
-            )
+            col_map = converter(g, {}, list(col_map.keys()), op, col_map, right_col_map)
         elif isinstance(op, GroupByOp):
             group_op = op  # retained for SelectOp aggregation
         elif isinstance(op, SelectOp):
@@ -209,10 +203,11 @@ def _build_onnx(
     if select_op is None:
         raise ValueError("No SELECT clause found in the query.")
 
+    if group_op is None:
+        raise ValueError("GROUP bY does not seem implemented.")
+
     if select_op.distinct:
-        raise NotImplementedError(
-            "SELECT DISTINCT is not yet supported by the ONNX converter."
-        )
+        raise NotImplementedError("SELECT DISTINCT is not yet supported by the ONNX converter.")
 
     # Emit SELECT expressions
     emitter = _ExprEmitter(g, col_map)

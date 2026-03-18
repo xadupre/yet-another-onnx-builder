@@ -30,8 +30,7 @@ class _ExprEmitter:
             col = node.column
             if col not in self._col_map:
                 raise KeyError(
-                    f"Column {col!r} not found in inputs. "
-                    f"Available: {list(self._col_map)}"
+                    f"Column {col!r} not found in inputs. Available: {list(self._col_map)}"
                 )
             return self._col_map[col]
 
@@ -88,10 +87,7 @@ class _ExprEmitter:
                 right = self.emit(node.right, name=f"{name}_r")
                 return self._g.op.Or(left, right, name=name)
             # leaf comparison — treat it as a BinaryExpr
-            return self.emit(
-                BinaryExpr(left=node.left, op=node.op, right=node.right),
-                name=name,
-            )
+            return self.emit(BinaryExpr(left=node.left, op=node.op, right=node.right), name=name)
 
         if isinstance(node, AggExpr):
             func = node.func
@@ -100,15 +96,10 @@ class _ExprEmitter:
                 first_col = next(iter(self._col_map.values()))
                 size = self._g.op.Shape(first_col, name=f"{name}_shape")
                 return self._g.op.Gather(
-                    size,
-                    np.array(0, dtype=np.int64),
-                    axis=0,
-                    name=f"{name}_count",
+                    size, np.array(0, dtype=np.int64), axis=0, name=f"{name}_count"
                 )
             arg_tensor = self.emit(node.arg, name=f"{name}_arg")
-            reduce_axes = self._g.make_initializer(
-                f"{name}_axes", np.array([0], dtype=np.int64)
-            )
+            reduce_axes = self._g.make_initializer(f"{name}_axes", np.array([0], dtype=np.int64))
             agg_map = {
                 "sum": "ReduceSum",
                 "avg": "ReduceMean",
@@ -118,8 +109,6 @@ class _ExprEmitter:
             onnx_op = agg_map.get(func)
             if onnx_op is None:
                 raise ValueError(f"Unsupported aggregation function: {func!r}")
-            return getattr(self._g.op, onnx_op)(
-                arg_tensor, reduce_axes, keepdims=0, name=name
-            )
+            return getattr(self._g.op, onnx_op)(arg_tensor, reduce_axes, keepdims=0, name=name)
 
         raise TypeError(f"Cannot emit expression of type {type(node)}")
