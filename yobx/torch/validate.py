@@ -165,7 +165,7 @@ class ValidateData:
         """Yield ``(field_name, value)`` pairs for every non-``None`` field.
 
         This mirrors ``dict.items()`` so that existing code such as
-        ``for k, v in sorted(summary.items())`` keeps working without
+        ``for k, v in sorted(data.items())`` keeps working without
         modification.
         """
         for f in fields(self):
