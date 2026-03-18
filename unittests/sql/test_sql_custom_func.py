@@ -59,7 +59,7 @@ class TestFuncCallExprParsing(unittest.TestCase):
 
     def test_func_call_in_where(self):
         pq = parse_sql("SELECT a FROM t WHERE norm(a) > 0")
-        from yobx.sql.parse import FilterOp, Condition
+        from yobx.sql.parse import FilterOp
 
         filter_op = next(op for op in pq.operations if isinstance(op, FilterOp))
         cond = filter_op.condition
@@ -98,10 +98,7 @@ class TestCustomFunctionSelect(ExtTestCase):
         dtypes = {"a": np.float32}
         a = np.array([-1.0, 2.0, -3.0], dtype=np.float32)
         (out,) = self._run(
-            "SELECT my_abs(a) AS r FROM t",
-            dtypes,
-            {"a": a},
-            custom_functions={"my_abs": np.abs},
+            "SELECT my_abs(a) AS r FROM t", dtypes, {"a": a}, custom_functions={"my_abs": np.abs}
         )
         self.assertEqualArray(out, np.abs(a), atol=1e-6)
 
@@ -130,12 +127,7 @@ class TestCustomFunctionSelect(ExtTestCase):
         def f(x):
             return np.sqrt(np.abs(x) + np.float32(1))
 
-        (out,) = self._run(
-            "SELECT f(a) AS r FROM t",
-            dtypes,
-            {"a": a},
-            custom_functions={"f": f},
-        )
+        (out,) = self._run("SELECT f(a) AS r FROM t", dtypes, {"a": a}, custom_functions={"f": f})
         self.assertEqualArray(out, f(a), atol=1e-6)
 
     def test_custom_function_with_filter(self):

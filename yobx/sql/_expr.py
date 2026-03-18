@@ -129,7 +129,9 @@ class _ExprEmitter:
                 )
             func = self._custom_functions[func_name]
             # Emit the argument expressions first
-            arg_tensors = [self.emit(arg, name=f"{name}_arg{i}") for i, arg in enumerate(node.args)]
+            arg_tensors = [
+                self.emit(arg, name=f"{name}_arg{i}") for i, arg in enumerate(node.args)
+            ]
             # Allocate a unique output tensor name
             out_name = self._g.unique_name(f"{name}_{func_name}")
             trace_numpy_function(self._g, {}, [out_name], func, arg_tensors, name=out_name)
