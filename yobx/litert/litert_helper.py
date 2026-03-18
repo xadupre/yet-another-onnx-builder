@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import os
 import struct
-from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -358,18 +357,24 @@ class Padding:
 # ---------------------------------------------------------------------------
 
 
-@dataclass
 class TFLiteTensor:
     """Parsed representation of a TFLite :class:`Tensor`."""
 
-    index: int
-    name: str
-    dtype: int  # TFLite TensorType int
-    shape: Tuple[int, ...]  # static shape; dynamic dims encoded as -1
-    data: Optional[np.ndarray]  # None if no buffer data (e.g., activation tensors)
+    def __init__(
+        self,
+        index: int,
+        name: str,
+        dtype: int,  # TFLite TensorType int
+        shape: Tuple[int, ...],  # static shape; dynamic dims encoded as -1
+        data: Optional[np.ndarray],  # None if no buffer data (e.g., activation tensors)
+    ):
+        self.index = index
+        self.name = name
+        self.dtype = dtype
+        self.shape = shape
+        self.data = data
 
 
-@dataclass
 class TFLiteOperator:
     """Parsed representation of a TFLite :class:`Operator`.
 
@@ -378,11 +383,19 @@ class TFLiteOperator:
     Unrecognised op options are left unparsed (empty dict).
     """
 
-    opcode: int  # BuiltinOperator int; -1 means CUSTOM
-    custom_code: str  # non-empty only when opcode == BuiltinOperator.CUSTOM
-    inputs: Tuple[int, ...]  # tensor indices (-1 = optional absent)
-    outputs: Tuple[int, ...]  # tensor indices
-    builtin_options: Dict  # decoded option fields
+    def __init__(
+        self,
+        opcode: int,  # BuiltinOperator int; -1 means CUSTOM
+        custom_code: str,  # non-empty only when opcode == BuiltinOperator.CUSTOM
+        inputs: Tuple[int, ...],  # tensor indices (-1 = optional absent)
+        outputs: Tuple[int, ...],  # tensor indices
+        builtin_options: Dict,  # decoded option fields
+    ):
+        self.opcode = opcode
+        self.custom_code = custom_code
+        self.inputs = inputs
+        self.outputs = outputs
+        self.builtin_options = builtin_options
 
     @property
     def name(self) -> str:
@@ -392,23 +405,30 @@ class TFLiteOperator:
         return builtin_op_name(self.opcode)
 
 
-@dataclass
 class TFLiteSubgraph:
     """Parsed representation of a TFLite :class:`SubGraph`."""
 
-    name: str
-    tensors: List[TFLiteTensor]
-    inputs: Tuple[int, ...]  # indices into tensors
-    outputs: Tuple[int, ...]  # indices into tensors
-    operators: List[TFLiteOperator]
+    def __init__(
+        self,
+        name: str,
+        tensors: List[TFLiteTensor],
+        inputs: Tuple[int, ...],  # indices into tensors
+        outputs: Tuple[int, ...],  # indices into tensors
+        operators: List[TFLiteOperator],
+    ):
+        self.name = name
+        self.tensors = tensors
+        self.inputs = inputs
+        self.outputs = outputs
+        self.operators = operators
 
 
-@dataclass
 class TFLiteModel:
     """Top-level parsed TFLite model."""
 
-    version: int
-    subgraphs: List[TFLiteSubgraph] = field(default_factory=list)
+    def __init__(self, version: int, subgraphs: Optional[List[TFLiteSubgraph]] = None):
+        self.version = version
+        self.subgraphs = subgraphs or []
 
 
 # ---------------------------------------------------------------------------

@@ -9,7 +9,6 @@ yobx.tensorflow
     register
     tensorflow_helper
     ops/index
-    jax_ops/index
 
 to_onnx
 +++++++

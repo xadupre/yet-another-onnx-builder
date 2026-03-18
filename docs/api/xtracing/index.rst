@@ -11,13 +11,6 @@ See :ref:`l-design-function-transformer-tracing` for a full walkthrough.
     numpy_array
     tracing
 
-NumpyArray
-++++++++++
-
-.. autoclass:: yobx.xtracing.NumpyArray
-    :members:
-    :no-undoc-members:
-
 trace_numpy_function
 ++++++++++++++++++++
 
