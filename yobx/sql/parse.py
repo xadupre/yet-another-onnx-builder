@@ -565,9 +565,10 @@ def parse_sql(query: str) -> ParsedQuery:
     :return: a :class:`ParsedQuery` with an ``operations`` list and a
         ``columns`` list of all referenced column names.
 
-    Example::
+    .. runpython::
+        :showcode:
 
-        from yobx.sql.parse import parse_sql, SelectOp, FilterOp
+        from yobx.sql.parse import parse_sql
 
         pq = parse_sql("SELECT a, b FROM t WHERE a > 0")
         for op in pq.operations:
