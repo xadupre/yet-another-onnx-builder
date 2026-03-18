@@ -16,7 +16,8 @@ Overview
 The mechanism consists of two layers:
 
 1. **:class:`~yobx.xtracing.NumpyArray`** — a proxy that wraps an ONNX tensor
-   name and an active :class:`~yobx.xbuilder.GraphBuilder`.  It overloads all
+   name and an object following the
+   :class:`~yobx.typing.GraphBuilderExtendedProtocol`.  It overloads all
    Python arithmetic operators and registers itself as an implementation for
    both the ``__array_ufunc__`` and ``__array_function__`` numpy protocols.
    Whenever numpy (or user code) calls an operation on a
@@ -25,7 +26,8 @@ The mechanism consists of two layers:
    wrapping the result tensor name.
 
 2. **:func:`~yobx.xtracing.trace_numpy_function`** — the converter-API
-   function.  It receives an existing :class:`~yobx.xbuilder.GraphBuilder`,
+   function.  It receives an object following the
+   :class:`~yobx.typing.GraphBuilderExtendedProtocol`,
    the desired output names, the callable to trace, and the names of the
    input tensors already registered in that graph.  It wraps those tensors
    as :class:`~yobx.xtracing.NumpyArray` proxies, calls the function, and
@@ -57,8 +59,8 @@ every other converter in this package:
 ===========  ================================================================
 Parameter    Description
 ===========  ================================================================
-``g``        :class:`~yobx.xbuilder.GraphBuilder` — call ``g.op.<Op>(…)``
-             to emit ONNX nodes.
+``g``        :class:`~yobx.typing.GraphBuilderExtendedProtocol` — call
+             ``g.op.<Op>(…)`` to emit ONNX nodes.
 ``sts``      ``Dict`` of metadata (empty ``{}`` in most call sites).
 ``outputs``  Pre-allocated output tensor names the tracer must write to.
 ``func``     Python callable that uses numpy operations.
@@ -135,26 +137,31 @@ Standalone usage
 You can also use the tracing machinery outside of scikit-learn pipelines via
 :func:`~yobx.xtracing.trace_numpy_to_onnx`:
 
-.. code-block:: python
+.. runpython::
+    :showcode:
 
     import numpy as np
     from yobx.xtracing import trace_numpy_to_onnx
+    from yobx.helpers.onnx_helper import pretty_onnx
 
     def my_func(X):
         return np.sqrt(np.abs(X) + np.float32(1))
 
     X_sample = np.zeros((4, 3), dtype=np.float32)
     onx = trace_numpy_to_onnx(my_func, X_sample)
+    print(pretty_onnx(onx))
 
 Or embedded into a larger graph using
 :func:`~yobx.xtracing.trace_numpy_function` directly:
 
-.. code-block:: python
+.. runpython::
+    :showcode:
 
+    import numpy as np
     from onnx import TensorProto
     from yobx.xbuilder import GraphBuilder
     from yobx.xtracing import trace_numpy_function
-    import numpy as np
+    from yobx.helpers.onnx_helper import pretty_onnx
 
     g = GraphBuilder({"": 21, "ai.onnx.ml": 1})
     g.make_tensor_input("X", TensorProto.FLOAT, ("batch", 3))
@@ -165,6 +172,7 @@ Or embedded into a larger graph using
     trace_numpy_function(g, {}, ["output_0"], my_func, ["X"])
     g.make_tensor_output("output_0", indexed=False, allow_untyped_output=True)
     onx, _ = g.to_onnx(return_optimize_report=True)
+    print(pretty_onnx(onx))
 
 .. seealso::
 
