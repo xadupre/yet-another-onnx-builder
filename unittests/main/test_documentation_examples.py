@@ -98,6 +98,7 @@ class TestDocumentationExamples(ExtTestCase):
                     "plot_input_observer_tiny_llm.py",
                     "plot_sklearn_convert_options.py",
                     "plot_sklearn_function_options.py",
+                    "plot_sklearn_function_transformer.py",
                     "plot_sklearn_kmeans.py",
                     "plot_sklearn_pipeline.py",
                     "plot_sklearn_with_sklearn_onnx.py",

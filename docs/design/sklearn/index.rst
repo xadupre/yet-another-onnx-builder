@@ -11,6 +11,7 @@ scikit-learn Export to ONNX
    sklearn_like_converter
    supported_converters
    custom_converter
+   function_transformer_tracing
    contrib_ops
    copilot_draft
    debug
