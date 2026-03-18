@@ -213,7 +213,7 @@ def trace_numpy_to_onnx(
     # ------------------------------------------------------------------
     # Trace via the converter-API inner function.
     # ------------------------------------------------------------------
-    trace_numpy_function(g, {}, resolved_output_names, func, resolved_input_names, name="trace")
+    trace_numpy_function(g, {}, resolved_output_names, func, resolved_input_names, name="trace")  # type: ignore[bad-argument-type]
 
     # ------------------------------------------------------------------
     # Register graph outputs and export.
@@ -221,5 +221,5 @@ def trace_numpy_to_onnx(
     for out_name in resolved_output_names:
         g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
 
-    onx, _ = g.to_onnx(return_optimize_report=True)
+    onx, _ = g.to_onnx(return_optimize_report=True)  # type: ignore[not-iterable]
     return onx  # type: ignore[return-value]
