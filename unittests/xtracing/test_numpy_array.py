@@ -362,7 +362,7 @@ class TestNumpyArray(ExtTestCase):
 
         g = GraphBuilder({"": 21, "ai.onnx.ml": 1})
         g.make_tensor_input("X", TensorProto.FLOAT, ("batch", 3))
-        trace_numpy_function(g, f, ["X"], ["output_0"])
+        trace_numpy_function(g, {}, ["output_0"], f, ["X"])
         g.make_tensor_output("output_0", indexed=False, allow_untyped_output=True)
         onx, _ = g.to_onnx(return_optimize_report=True)
 
@@ -385,7 +385,7 @@ class TestNumpyArray(ExtTestCase):
         g.make_tensor_input("X", TensorProto.FLOAT, ("batch", 3))
         # Providing 2 output names for a single-output function should raise.
         with self.assertRaises(ValueError):
-            trace_numpy_function(g, f, ["X"], ["out0", "out1"])
+            trace_numpy_function(g, {}, ["out0", "out1"], f, ["X"])
 
 
 if __name__ == "__main__":

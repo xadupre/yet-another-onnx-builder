@@ -26,9 +26,10 @@ _BATCH_DIM = "batch"
 
 def trace_numpy_function(
     g: GraphBuilderExtendedProtocol,
+    sts: Dict,
+    outputs: List[str],
     func: Callable,
     inputs: List[str],
-    outputs: List[str],
     name: str = "trace",
     kw_args: Optional[Dict[str, Any]] = None,
 ) -> str:
@@ -38,17 +39,19 @@ def trace_numpy_function(
     numpy operations as ONNX nodes in *g*.
 
     This function follows the same API convention as other converters in this
-    package: it takes an existing :class:`~yobx.xbuilder.GraphBuilder`, a list
-    of input tensor names already registered in that builder, and a list of
-    desired output tensor names.
+    package: it takes an existing :class:`~yobx.xbuilder.GraphBuilder`, the
+    scikit-learn shape/type dictionary *sts*, the desired output tensor names,
+    and then the callable and input tensor names.
 
     :param g: the graph builder to add nodes to
+    :param sts: shapes defined by scikit-learn (may be empty; forwarded to
+        ``g.set_type_shape_unary_op`` when non-empty)
+    :param outputs: desired output tensor names (one per output returned by
+        *func*)
     :param func: the numpy function to trace; must accept ``len(inputs)``
         positional arguments and return a :class:`NumpyArray` or a tuple/list
         of :class:`NumpyArray` objects
     :param inputs: existing input tensor names already present in *g*
-    :param outputs: desired output tensor names (one per output returned by
-        *func*)
     :param name: node name prefix used when emitting ``Identity`` rename nodes
     :param kw_args: optional keyword arguments forwarded to *func*
     :return: the first output tensor name (``outputs[0]``)
@@ -66,7 +69,7 @@ def trace_numpy_function(
         def my_func(X):
             return np.sqrt(np.abs(X) + np.float32(1))
 
-        trace_numpy_function(g, my_func, ["X"], ["output_0"])
+        trace_numpy_function(g, {}, ["output_0"], my_func, ["X"])
         g.make_tensor_output("output_0", indexed=False, allow_untyped_output=True)
         onx, _ = g.to_onnx(return_optimize_report=True)
     """
@@ -210,7 +213,7 @@ def trace_numpy_to_onnx(
     # ------------------------------------------------------------------
     # Trace via the converter-API inner function.
     # ------------------------------------------------------------------
-    trace_numpy_function(g, func, resolved_input_names, resolved_output_names, name="trace")
+    trace_numpy_function(g, {}, resolved_output_names, func, resolved_input_names, name="trace")
 
     # ------------------------------------------------------------------
     # Register graph outputs and export.

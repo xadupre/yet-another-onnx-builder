@@ -63,7 +63,7 @@ def sklearn_function_transformer(
     # the same API convention as other converters.
     # ----------------------------------------------------------------
     kw_args = estimator.kw_args
-    res = trace_numpy_function(g, estimator.func, [X], outputs, name=name, kw_args=kw_args)
+    res = trace_numpy_function(g, sts, outputs, estimator.func, [X], name=name, kw_args=kw_args)
     assert isinstance(res, str)
     if not sts:
         g.set_type_shape_unary_op(res, X)
