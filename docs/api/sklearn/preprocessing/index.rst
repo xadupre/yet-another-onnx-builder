@@ -10,6 +10,7 @@ yobx.sklearn.preprocessing
     kernel_centerer
     max_abs_scaler
     min_max_scaler
+    normalizer
     one_hot_encoder
     ordinal_encoder
     polynomial_features

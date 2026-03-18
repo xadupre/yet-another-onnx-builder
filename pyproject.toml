@@ -67,6 +67,10 @@ xgboost = [
     "scikit-learn>=1.4",
     "xgboost>=3.0",
 ]
+sksurv = [
+    "scikit-learn>=1.4",
+    "scikit-survival>=0.22",
+]
 spox = [
     "spox>=0.12",
 ]
@@ -194,12 +198,14 @@ module = [
     "yobx.sklearn.linear_model.*",
     "yobx.sklearn.lightgbm.*",
     "yobx.sklearn.manifold.*",
+    "yobx.sklearn.model_selection.*",
     "yobx.sklearn.multiclass.*",
     "yobx.sklearn.multioutput.*",
     "yobx.sklearn.naive_bayes.*",
     "yobx.sklearn.neighbors.*",
     "yobx.sklearn.neural_network.*",
     "yobx.sklearn.preprocessing.*",
+    "yobx.sklearn.sksurv.*",
     "yobx.sklearn.svm.*",
     "yobx.sklearn.tree.*",
     "yobx.sklearn.xgboost.*",
@@ -250,6 +256,8 @@ project-excludes = [
     "yobx/torch/torch_helper.py",
     "yobx/torch/tracing.py",
     "yobx/translate/*",
+    "yobx/xexpressions/evaluate_expressions.py",
+    "yobx/xexpressions/simplify_expressions.py",
     "yobx/xoptim/*",
     "yobx/xshape/_builder_runtime.py",
     "yobx/xshape/_inference_runtime.py",
@@ -257,8 +265,6 @@ project-excludes = [
     "yobx/xshape/shape_builder.py",
     "yobx/xshape/shape_builder_impl.py",
     "yobx/xshape/shape_type_compute.py",
-    "yobx/xshape/expressions/evaluate_expressions.py",
-    "yobx/xshape/expressions/simplify_expressions.py",
 ]
 
 [tool.pyrefly.errors]

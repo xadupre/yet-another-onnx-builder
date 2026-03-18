@@ -119,10 +119,7 @@ def to_onnx(
                     ) from import_error
 
                 cf = jax_to_concrete_function(
-                    model,
-                    args,
-                    input_names=input_names,
-                    dynamic_shapes=dynamic_shapes,
+                    model, args, input_names=input_names, dynamic_shapes=dynamic_shapes
                 )
             else:
                 # Re-raise non-JAX-related TypeErrors so they are not masked.

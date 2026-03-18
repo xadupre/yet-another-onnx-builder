@@ -8,3 +8,4 @@ yobx.sklearn.model_selection
     grid_search
     halving_search
     random_search
+    tuned_threshold_classifier_cv

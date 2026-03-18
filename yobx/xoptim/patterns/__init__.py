@@ -35,6 +35,7 @@ from .onnx_expand import (
     ExpandPattern,
     ExpandBroadcastPattern,
     ExpandSwapPattern,
+    ExpandUnsqueezeExpandPattern,
     ShapeBasedConcatExpandPattern,
     ShapeBasedExpandBroadcastPattern,
     ShapeBasedExpandBroadcastMatMulPattern,
@@ -102,6 +103,7 @@ from .onnx_transpose import (
     TransposeTransposePattern,
 )
 from .onnx_unsqueeze import (
+    MulUnsqueezeUnsqueezePattern,
     SqueezeAddPattern,
     SqueezeBinaryUnsqueezePattern,
     SqueezeUnsqueezePattern,
@@ -174,6 +176,7 @@ def get_default_patterns(verbose: int = 0) -> List[PatternOptimization]:
         ExpandPattern(verbose=verbose),
         ExpandBroadcastPattern(verbose=verbose),
         ExpandSwapPattern(verbose=verbose),
+        ExpandUnsqueezeExpandPattern(verbose=verbose),
         GathersSplitPattern(verbose=verbose),
         GeluPattern(verbose=verbose),
         IdentityPattern(verbose=verbose),
@@ -181,6 +184,7 @@ def get_default_patterns(verbose: int = 0) -> List[PatternOptimization]:
         LayerNormalizationScalePattern(verbose=verbose),
         LeakyReluPattern(verbose=verbose),
         MulMulMulScalarPattern(verbose=verbose),
+        MulUnsqueezeUnsqueezePattern(verbose=verbose),
         NotNotPattern(verbose=verbose),
         NotWherePattern(verbose=verbose),
         ReduceArgTopKPattern(verbose=verbose),

@@ -3802,6 +3802,36 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
+    def test_aten_div_tensor_mode_trunc_float(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return torch.div(x, y, rounding_mode="trunc")
+
+        model = Model()
+        x = torch.tensor([-7.0, -7.0, 7.0, 7.0])
+        y = torch.tensor([2.0, -2.0, 2.0, -2.0])
+        expected = model(x, y)
+        onx = to_onnx(model, (x, y))
+        self.dump_onnx("test_aten_div_tensor_mode_trunc_float.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, (expected,), (x, y))
+
+    def test_aten_div_tensor_mode_trunc_int(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return torch.div(x, y, rounding_mode="trunc")
+
+        model = Model()
+        x = torch.tensor([-7, -7, 7, 7], dtype=torch.int64)
+        y = torch.tensor([2, -2, 2, -2], dtype=torch.int64)
+        expected = model(x, y)
+        onx = to_onnx(model, (x, y))
+        self.dump_onnx("test_aten_div_tensor_mode_trunc_int.onnx", onx)
+        self.assert_conversion_with_ort_on_cpu(onx, (expected,), (x, y))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

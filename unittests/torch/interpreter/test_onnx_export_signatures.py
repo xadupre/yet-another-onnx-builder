@@ -336,6 +336,57 @@ class TestOnnxExportSignatures(ExtTestCase):
         )
 
     @skipif_ci_windows("not working on windows")
+    def test_signature_s1d_ls_r_yobx(self):
+        class Neuron(torch.nn.Module):
+            def __init__(self, n_dims: int = 3, n_targets: int = 1):
+                super().__init__()
+                self.linear = torch.nn.Linear(n_dims, n_targets)
+                self.buff = torch.nn.parameter.Buffer(torch.tensor([0.5] * n_targets))
+
+            def forward(self, x, lx):
+                return (
+                    torch.sigmoid(self.linear(x))
+                    - self.buff
+                    + lx[0] * lx[1].sum(axis=1, keepdim=True)
+                )
+
+        inputs = (
+            (torch.arange(4 * 3) + 10).reshape((-1, 3)).to(torch.float32),
+            [
+                (torch.arange(4) + 10).reshape((-1, 1)).to(torch.float32),
+                (torch.arange(4 * 2) + 10).reshape((-1, 2)).to(torch.float32),
+            ],
+        )
+        inputs2 = (
+            (torch.arange(8 * 3) + 10).reshape((-1, 3)).to(torch.float32),
+            [
+                (torch.arange(8) + 10).reshape((-1, 1)).to(torch.float32),
+                (torch.arange(8 * 2) + 10).reshape((-1, 2)).to(torch.float32),
+            ],
+        )
+        dyn = {
+            "x": {0: torch.export.Dim("batch")},
+            "lx": [{0: torch.export.Dim("batch")}, {0: torch.export.Dim("batch")}],
+        }
+        sname = inspect.currentframe().f_code.co_name
+        sig_custom = (
+            ("x", 1, ("batch", 3)),
+            ("lx_0", 1, ("batch", 1)),
+            ("lx_1", 1, ("batch", 2)),
+        )
+        self._check_exporter(
+            sname,
+            Neuron(),
+            inputs,
+            sig_custom,
+            dynamic_shapes=dyn,
+            exporter="yobx",
+            flatten_inputs=True,
+            others=inputs2,
+            atol=1e-4,
+        )
+
+    @skipif_ci_windows("not working on windows")
     @unittest.skip("broken test about tracing")
     @ignore_warnings(UserWarning)
     def test_signature_s1d_ls_r_tracing(self):

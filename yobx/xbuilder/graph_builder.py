@@ -59,7 +59,11 @@ from ..helpers.onnx_helper import (
     unary_like_op_types,
     str_tensor_proto_type,
 )
-from ..xshape.rename_expressions import rename_dynamic_dimensions, rename_dynamic_expression
+from ..xexpressions import simplify_expression, rename_expression
+from ..xexpressions.rename_expressions import rename_dynamic_dimensions, rename_dynamic_expression
+from ..xexpressions.rename_expressions import parse_expression_tokens
+from ..xexpressions.simplify_expressions import simplify_two_expressions
+from ..xexpressions.expressions_torch import Expression, parse_expression
 from ..xshape._shape_helper import (
     DYNAMIC_SHAPE,
     STATIC_SHAPE,
@@ -76,10 +80,6 @@ from ..xshape.shape_type_compute import (
 from ..xshape._builder_runtime import _BuilderRuntime
 from ..xshape._shape_runtime import _ShapeRuntime
 from ..xshape._inference_runtime import _InferenceRuntime
-from ..xshape.simplify_expressions import simplify_expression
-from ..xshape.rename_expressions import rename_expression, parse_expression_tokens
-from ..xshape.simplify_expressions import simplify_two_expressions
-from ..xshape.expressions_torch import Expression, parse_expression
 from .graph_builder_opset import Opset
 from .optimization_options import OptimizationOptions
 from .function_options import FunctionOptions
