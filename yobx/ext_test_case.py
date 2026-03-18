@@ -557,6 +557,22 @@ def requires_tensorflow(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
+def has_jax(version: str = "") -> bool:
+    """
+    Returns True if JAX is installed and the installed
+    version is >= the given version (if specified).
+    """
+    try:
+        import jax  # noqa: F401
+    except (ImportError, AttributeError):
+        return False
+    if not hasattr(jax, "__version__"):
+        return False
+    if not version:
+        return True
+    return PvVersion(jax.__version__) >= PvVersion(version)
+
+
 def requires_jax(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`jax` or :mod:`jax.experimental.jax2tf` is not available."""
     try:

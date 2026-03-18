@@ -9,6 +9,7 @@ from yobx.ext_test_case import (
     ExtTestCase,
     is_windows,
     ignore_errors,
+    has_jax,
     has_sklearn,
     has_sksurv,
     has_spox,
@@ -149,11 +150,14 @@ class TestDocumentationExamples(ExtTestCase):
             if not reason and not has_spox() and "spox" in name:
                 reason = "spox not installed"
 
+            if not reason and not has_sksurv() and "sksurv" in name:
+                reason = "scikit-survival not installed"
+
             if not reason and not has_tensorflow() and "tensorflow" in name:
                 reason = "tensorflow not installed"
 
-            if not reason and not has_sksurv() and "sksurv" in name:
-                reason = "scikit-survival not installed"
+            if not reason and not has_jax() and "jax" in name:
+                reason = "jax not installed"
 
             if reason:
 

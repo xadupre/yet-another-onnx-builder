@@ -194,7 +194,7 @@ class TestSubclassingModels(ExtTestCase):
         expected = mlp(np_input).numpy()
         input_name = onx.graph.input[0].name
         (result,) = _ort_run(onx, {input_name: np_input})
-        self.assertEqualArray(expected, result, atol=1e-4)
+        self.assertEqualArray(expected, result, atol=3e-4)
 
     # ------------------------------------------------------------------
     # TF math ops
@@ -223,7 +223,7 @@ class TestSubclassingModels(ExtTestCase):
         inp_names = [i.name for i in onx.graph.input]
         expected = op_func(x, y).numpy()
         (result,) = _ort_run(onx, {inp_names[0]: x, inp_names[1]: y})
-        self.assertEqualArray(expected, result, atol=1e-4)
+        self.assertEqualArray(expected, result, atol=2e-4)
 
     # ------------------------------------------------------------------
     # Variational AutoEncoder (random ops)

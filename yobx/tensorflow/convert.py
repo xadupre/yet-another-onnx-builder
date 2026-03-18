@@ -99,36 +99,30 @@ def to_onnx(
     else:
         # For plain Python callables: try the standard tf.function path first.
         # JAX functions fail here because they cannot accept TF symbolic tensors
-        # (the tracer raises a TypeError about "abstract array").  When that
-        # happens and JAX is installed, fall back to jax_to_concrete_function.
+        # (the tracer raises a TypeError mentioning an "abstract array" or
+        # "SymbolicTensor"). When that happens and JAX is installed, fall back
+        # to jax_to_concrete_function; otherwise, surface a clear ImportError.
         try:
-            fn = tf.function(model)
-            cf = fn.get_concrete_function(*input_specs)
+            cf = tf.function(model).get_concrete_function(*input_specs)
         except TypeError as e:
-            _is_jax_error = "abstract array" in str(e) and (
-                "tensorflow.python.framework.ops.SymbolicTensor" in str(e)
-                or "jax" in str(e).lower()
-            )
-            if _is_jax_error:
+            msg = str(e)
+            # Only treat the error as JAX-related if it matches the known
+            # JAX tracing failures.
+            if "abstract array" in msg or "SymbolicTensor" in msg:
                 try:
                     from .tensorflow_helper import jax_to_concrete_function
-                except ImportError as ie:
+                except ImportError as import_error:
                     raise ImportError(
-                        "JAX function detected (TF tracing raised: "
-                        f"{e!s}), but 'jax' or 'jax.experimental.jax2tf' "
-                        "could not be imported.  Install JAX with: "
-                        "pip install jax[cpu]"
-                    ) from ie
-                if verbose:
-                    print(
-                        "[yobx.tensorflow.to_onnx] JAX function detected; "
-                        "converting via jax_to_concrete_function"
-                    )
+                        "Converting JAX-based models to ONNX requires 'jax' and "
+                        "'jax2tf' to be installed. Please install these "
+                        "dependencies and try again."
+                    ) from import_error
+
                 cf = jax_to_concrete_function(
                     model, args, input_names=input_names, dynamic_shapes=dynamic_shapes
                 )
-                input_specs = list(cf.structured_input_signature[0])
             else:
+                # Re-raise non-JAX-related TypeErrors so they are not masked.
                 raise
 
     # Populate an ONNX GraphBuilder by walking the concrete-function graph.
@@ -358,6 +352,7 @@ def _convert_concrete_function(
                 f"Type {op_type!r} has no converting function mapped to it, "
                 f"inputs={[t.name for t in op.inputs]}, "
                 f"outputs={[t.name for t in op.outputs]}"
+                f"{g.get_debug_msg()}"
             )
 
         assert all(g.has_shape(i.name) for i in op.inputs), (

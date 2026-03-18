@@ -30,6 +30,7 @@ to [ONNX](https://onnx.ai) format from many libraries:
 
 **deeplearning**
 
+* [jax](https://jax.readthedocs.io/en/latest/) *in progress*
 * [tensorflow](https://www.tensorflow.org)
 * [torch](https://pytorch.org)
 
