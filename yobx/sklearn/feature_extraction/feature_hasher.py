@@ -103,11 +103,10 @@ def sklearn_feature_hasher(
     assert X_values is not None, (
         "FeatureHasher conversion requires a companion float input X_values of "
         "shape (N, K) with feature values (1.0 per non-padding feature, 0.0 for "
-        f"padding slots). Pass it as the second positional argument to to_onnx().{g.get_debug_msg()}"
+        f"padding slots). Pass it as the second positional argument to to_onnx()."
+        f"{g.get_debug_msg()}"
     )
-    assert g.has_type(X_values), (
-        f"Missing type for {X_values!r}{g.get_debug_msg()}"
-    )
+    assert g.has_type(X_values), f"Missing type for {X_values!r}{g.get_debug_msg()}"
 
     target_dtype = np.dtype(estimator.dtype)
     target_onnx_type = np_dtype_to_tensor_dtype(target_dtype)
@@ -116,12 +115,7 @@ def sklearn_feature_hasher(
 
     # Step 1: hash feature names
     hashes = g.make_node(
-        "MurmurHash3",
-        [X],
-        domain="com.microsoft",
-        seed=0,
-        positive=0,
-        name=f"{name}_mmh3",
+        "MurmurHash3", [X], domain="com.microsoft", seed=0, positive=0, name=f"{name}_mmh3"
     )
 
     # Step 2: indices = abs(hashes) % n_features  (INT64)
@@ -148,31 +142,16 @@ def sklearn_feature_hasher(
 
     # Step 4: build zero output matrix (N, n_features)
     input_shape = g.op.Shape(X, name=f"{name}_shape")
-    n_rows = g.op.Gather(
-        input_shape,
-        np.array(0, dtype=np.int64),
-        axis=0,
-        name=f"{name}_n_rows",
-    )
-    n_rows_1d = g.op.Unsqueeze(
-        n_rows, np.array([0], dtype=np.int64), name=f"{name}_n_rows_1d"
-    )
+    n_rows = g.op.Gather(input_shape, np.array(0, dtype=np.int64), axis=0, name=f"{name}_n_rows")
+    n_rows_1d = g.op.Unsqueeze(n_rows, np.array([0], dtype=np.int64), name=f"{name}_n_rows_1d")
     n_feat_i64 = np.array([n_features], dtype=np.int64)
-    out_shape = g.op.Concat(
-        n_rows_1d, n_feat_i64, axis=0, name=f"{name}_out_shape"
-    )
+    out_shape = g.op.Concat(n_rows_1d, n_feat_i64, axis=0, name=f"{name}_out_shape")
     zeros = g.op.ConstantOfShape(out_shape, name=f"{name}_zeros")
     zeros_typed = g.op.CastLike(zeros, one_f, name=f"{name}_zeros_typed")
 
     # Step 5: scatter-add weighted values into the output matrix
     res = g.op.ScatterElements(
-        zeros_typed,
-        indices,
-        weighted,
-        axis=1,
-        reduction="add",
-        name=name,
-        outputs=outputs,
+        zeros_typed, indices, weighted, axis=1, reduction="add", name=name, outputs=outputs
     )
     if not sts:
         g.set_type(res, target_onnx_type)

@@ -62,22 +62,16 @@ class TestFeatureHasherMurmurHash(ExtTestCase):
         from onnx.helper import make_tensor_value_info
         from yobx.sklearn import to_onnx
 
-        N, K = X_names.shape
+        _N, K = X_names.shape
         target_dtype = np.dtype(fh.dtype)
 
         vi_names = make_tensor_value_info("X", onnx.TensorProto.STRING, [None, K])
         vi_vals = make_tensor_value_info(
             "X_values",
-            onnx.TensorProto.FLOAT
-            if target_dtype == np.float32
-            else onnx.TensorProto.DOUBLE,
+            onnx.TensorProto.FLOAT if target_dtype == np.float32 else onnx.TensorProto.DOUBLE,
             [None, K],
         )
-        return to_onnx(
-            fh,
-            (vi_names, vi_vals),
-            target_opset={"": 18, "com.microsoft": 1},
-        )
+        return to_onnx(fh, (vi_names, vi_vals), target_opset={"": 18, "com.microsoft": 1})
 
     def test_murmurhash_string_input_float32(self):
         """Native path: 'string' input_type, float32, alternate_sign=True."""
@@ -139,9 +133,7 @@ class TestFeatureHasherMurmurHash(ExtTestCase):
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X_names, "X_values": X_values})[0]
 
-        expected = (
-            fh.transform([["foo", "bar"], ["baz"]]).toarray().astype(np.float32)
-        )
+        expected = fh.transform([["foo", "bar"], ["baz"]]).toarray().astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-6)
 
     def test_murmurhash_output_shape(self):
