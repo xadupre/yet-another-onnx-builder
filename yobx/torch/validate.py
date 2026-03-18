@@ -646,6 +646,8 @@ def validate_model(
 
     # --------------------------------------------------------- check discrepancies
     if do_run:
+        assert collected_data.filename, "No filename, this is needed to check for discrepancies."
+        assert os.path.exists(collected_data.filename), f"{collected_data.filename!r} is missing"
         _check_discrepancies(
             observer, collected_data.filename, verbose, quiet, summary, collected_data
         )
