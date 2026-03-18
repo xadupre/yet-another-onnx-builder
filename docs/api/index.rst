@@ -20,3 +20,4 @@ API Reference
    xoptim/index
    xexpressions/index
    xshape/index
+   xtracing/index

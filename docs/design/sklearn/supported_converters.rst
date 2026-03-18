@@ -20,20 +20,6 @@ showing which ones have a native converter in :mod:`yobx.sklearn` among those
 which can (*predictable*).  External-library estimators are appended at the
 end.
 
-scikit-learn
-------------
-
-.. runpython::
-    :showcode:
-    :rst:
-
-    from yobx.sklearn import register_sklearn_converters
-    from yobx.sklearn.register import get_sklearn_estimator_coverage
-
-    register_sklearn_converters()
-
-    print(get_sklearn_estimator_coverage(libraries=("sklearn",), rst=True))
-
 category_encoders
 -----------------
 
@@ -75,6 +61,34 @@ lightgbm
     register_sklearn_converters()
 
     print(get_sklearn_estimator_coverage(libraries=("lightgbm",), rst=True))
+
+scikit-learn
+------------
+
+.. runpython::
+    :showcode:
+    :rst:
+
+    from yobx.sklearn import register_sklearn_converters
+    from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+    register_sklearn_converters()
+
+    print(get_sklearn_estimator_coverage(libraries=("sklearn",), rst=True))
+
+scikit-survival
+---------------
+
+.. runpython::
+    :showcode:
+    :rst:
+
+    from yobx.sklearn import register_sklearn_converters
+    from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+    register_sklearn_converters()
+
+    print(get_sklearn_estimator_coverage(libraries=("sksurv",), rst=True))
 
 xgboost
 -------

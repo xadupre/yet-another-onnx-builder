@@ -638,7 +638,12 @@ class IdentityPattern(PatternOptimization):
             return MatchResult(self, [node], self.apply, insert_at=node)
 
         if node.op_type == "Transpose":
-            perm = list(g.get_attribute(node, "perm").ints)
+            perm_attr = g.get_attribute(node, "perm", exc=False)
+            if perm_attr is None:
+                # perm is optional in ONNX; without it the op reverses all axes,
+                # which is never a no-op for rank > 1, so we can safely skip.
+                return self.none(node, inspect.currentframe().f_lineno)
+            perm = list(perm_attr.ints)
             expected = list(range(len(perm)))
             if perm != expected:
                 return self.none(node, inspect.currentframe().f_lineno)

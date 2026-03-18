@@ -467,7 +467,7 @@ def requires_onnxir(version: str, msg: str = "") -> Callable:
 
 
 def has_sklearn(version: str = "") -> bool:
-    "Returns True if torch transformers is higher."
+    "Returns True if torch transformers is available and recent enough."
     try:
         import sklearn
     except (ImportError, AttributeError):
@@ -497,7 +497,7 @@ def requires_sklearn(version: str = "", msg: str = "") -> Callable:
 
 
 def has_torch(version: str = "") -> bool:
-    "Returns True if torch transformers is higher."
+    "Returns True if torch transformers is available and recent enough."
     try:
         import torch
     except (ImportError, AttributeError):
@@ -510,7 +510,7 @@ def has_torch(version: str = "") -> bool:
 
 
 def has_transformers(version: str = "") -> bool:
-    "Returns True if transformers version is higher."
+    "Returns True if transformers version is available and recent enough."
     try:
         import torch  # noqa: F401
         import transformers
@@ -555,6 +555,22 @@ def requires_tensorflow(version: str = "", msg: str = "") -> Callable:
         msg = f"tensorflow version {tensorflow.__version__} < {version}: {msg}"
         return unittest.skip(msg)
     return lambda x: x
+
+
+def has_jax(version: str = "") -> bool:
+    """
+    Returns True if JAX is installed and the installed
+    version is >= the given version (if specified).
+    """
+    try:
+        import jax  # noqa: F401
+    except (ImportError, AttributeError):
+        return False
+    if not hasattr(jax, "__version__"):
+        return False
+    if not version:
+        return True
+    return PvVersion(jax.__version__) >= PvVersion(version)
 
 
 def requires_jax(version: str = "", msg: str = "") -> Callable:
@@ -671,6 +687,38 @@ def requires_lightgbm(version: str = "", msg: str = "") -> Callable:
 
     if PvVersion(lightgbm.__version__) < PvVersion(version):
         msg = f"lightgbm version {lightgbm.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
+def has_sksurv(version: str = "") -> bool:
+    "Returns True if :epkg:`scikit-survival` is available and recent enough."
+    try:
+        import sksurv
+    except (ImportError, AttributeError):
+        return False
+    if not hasattr(sksurv, "__version__"):
+        return False
+    if not version:
+        return True
+    return PvVersion(sksurv.__version__) >= PvVersion(version)
+
+
+def requires_sksurv(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`scikit-survival` is not recent enough."""
+    try:
+        import sksurv
+    except (AttributeError, ImportError):
+        return unittest.skip(msg or "scikit-survival not installed")
+
+    if not hasattr(sksurv, "__version__"):
+        return unittest.skip(msg or "scikit-survival not installed")
+
+    if not version:
+        return lambda x: x
+
+    if PvVersion(sksurv.__version__) < PvVersion(version):
+        msg = f"scikit-survival version {sksurv.__version__} < {version}: {msg}"
         return unittest.skip(msg)
     return lambda x: x
 
