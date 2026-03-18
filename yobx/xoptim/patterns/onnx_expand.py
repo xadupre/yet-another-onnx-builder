@@ -1586,18 +1586,21 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
         return [*extra_nodes, new_unsq, new_expand2]
 
 
-class MulUnsqueezeExpandPattern(PatternOptimization):
+class BinaryUnsqueezeExpandPattern(PatternOptimization):
     """
-    Removes an unnecessary ``Expand`` inside ``Mul(x, Unsqueeze(Expand(y, shape), axes))``.
-    Since ``Mul`` supports broadcasting, the ``Expand`` is redundant when ``x`` already
-    has the dimensions that ``Expand`` was introducing.
+    Removes an unnecessary ``Expand`` inside
+    ``BinaryOp(x, Unsqueeze(Expand(y, shape), axes))`` for any element-wise
+    binary operator.  Since element-wise binary operators support broadcasting,
+    the ``Expand`` is redundant when ``x`` already has the dimensions that
+    ``Expand`` was introducing.
 
-    Pattern: ``Mul(x, Unsqueeze(Expand(y, shape), axes))``
+    Pattern: ``BinaryOp(x, Unsqueeze(Expand(y, shape), axes))``
 
     Valid when, for every dimension ``i`` where ``Expand`` actually expanded (i.e.
     ``y.shape[i] == 1`` and ``shape[i] > 1``), the corresponding dimension of ``x``
     (aligned from the right) equals ``shape[i]``.  In that case broadcasting in
-    ``Mul`` reproduces the same result without the intermediate ``Expand``.
+    the binary operator reproduces the same result without the intermediate
+    ``Expand``.
 
     Model with nodes to be fused:
 
@@ -1619,21 +1622,21 @@ class MulUnsqueezeExpandPattern(PatternOptimization):
             Constant_1[["Constant() -#gt; axes"]]
             Expand_2[["Expand(., .)"]]
             Unsqueeze_3[["Unsqueeze(., .)"]]
-            Mul_4[["Mul(., .)"]]
+            BinaryOp_4[["BinaryOp(., .)"]]
 
             I_Y -->|"FLOAT(1, a, b)"| Expand_2
             Constant_0 -->|"INT64(3)"| Expand_2
             Expand_2 -->|"FLOAT(c, a, b)"| Unsqueeze_3
             Constant_1 -->|"INT64(1)"| Unsqueeze_3
-            Unsqueeze_3 -->|"FLOAT(c, 1, a, b)"| Mul_4
-            I_X -->|"FLOAT(c, d, a, b)"| Mul_4
+            Unsqueeze_3 -->|"FLOAT(c, 1, a, b)"| BinaryOp_4
+            I_X -->|"FLOAT(c, d, a, b)"| BinaryOp_4
 
             O_Z(["Z FLOAT(c, d, a, b)"])
-            Mul_4 --> O_Z
+            BinaryOp_4 --> O_Z
 
             class I_X,I_Y,I_shape,I_axes,O_Z ioNode
             class Constant_0,Constant_1 constNode
-            class Expand_2,Unsqueeze_3,Mul_4 opNode
+            class Expand_2,Unsqueeze_3,BinaryOp_4 opNode
 
     Outcome of the fusion:
 
@@ -1652,26 +1655,28 @@ class MulUnsqueezeExpandPattern(PatternOptimization):
 
             Constant_0[["Constant() -#gt; axes"]]
             Unsqueeze_1[["Unsqueeze(., .)"]]
-            Mul_2[["Mul(., .)"]]
+            BinaryOp_2[["BinaryOp(., .)"]]
 
             I_Y -->|"FLOAT(1, a, b)"| Unsqueeze_1
             Constant_0 -->|"INT64(1)"| Unsqueeze_1
-            Unsqueeze_1 -->|"FLOAT(1, 1, a, b)"| Mul_2
-            I_X -->|"FLOAT(c, d, a, b)"| Mul_2
+            Unsqueeze_1 -->|"FLOAT(1, 1, a, b)"| BinaryOp_2
+            I_X -->|"FLOAT(c, d, a, b)"| BinaryOp_2
 
             O_Z(["Z FLOAT(c, d, a, b)"])
-            Mul_2 --> O_Z
+            BinaryOp_2 --> O_Z
 
             class I_X,I_Y,I_axes,O_Z ioNode
             class Constant_0 constNode
-            class Unsqueeze_1,Mul_2 opNode
+            class Unsqueeze_1,BinaryOp_2 opNode
     """
+
+    _op_types = element_wise_binary_op_types() | element_wise_op_cmp_types()
 
     def __init__(self, verbose: int = 0, priority: int = 0):
         super().__init__(verbose, priority)
 
     @classmethod
-    def _is_expand_redundant_for_mul(
+    def _is_expand_redundant_for_binary(
         cls,
         y_shape: Tuple[int, ...],
         expand_shape: Tuple[int, ...],
@@ -1680,8 +1685,9 @@ class MulUnsqueezeExpandPattern(PatternOptimization):
     ) -> bool:
         """
         Returns True if ``Expand(y, expand_shape)`` followed by
-        ``Unsqueeze(..., axes)`` is redundant given that ``Mul(x, ...)``
-        follows, i.e. broadcasting in ``Mul`` produces the same result.
+        ``Unsqueeze(..., axes)`` is redundant given that a binary operator
+        with ``x`` follows, i.e. broadcasting in that operator produces the
+        same result.
 
         Condition: for every position ``j`` in the aligned shapes where
         ``unsq_y_shape[j] == 1`` but ``unsq_exp_shape[j] > 1`` (meaning
@@ -1720,7 +1726,7 @@ class MulUnsqueezeExpandPattern(PatternOptimization):
         for xs, ys, es in zip(x_aligned, unsq_y_shape, unsq_exp_shape):
             if ys != es:
                 # ys == 1 and es > 1: Expand expanded this dimension.
-                # For the simplified Mul to broadcast correctly, x must be es.
+                # For the simplified binary op to broadcast correctly, x must be es.
                 if xs != es:
                     return False
         return True
@@ -1750,23 +1756,23 @@ class MulUnsqueezeExpandPattern(PatternOptimization):
         if len(unsq_node.input) < 2 or not g.is_constant(unsq_node.input[1]):
             return self.none(node, inspect.currentframe().f_lineno)
 
-        # Unsqueeze output must be used only by Mul.
+        # Unsqueeze output must be used only by the binary operator.
         if g.is_used_more_than_once(unsq_node.output[0]):
             return self.none(node, inspect.currentframe().f_lineno)
 
         next_next_nodes = g.next_nodes(unsq_node.output[0])
         if len(next_next_nodes) != 1:
             return self.none(node, inspect.currentframe().f_lineno)
-        mul_node = next_next_nodes[0]
+        binary_node = next_next_nodes[0]
 
-        if mul_node.op_type != "Mul" or mul_node.domain != "":
+        if binary_node.op_type not in self._op_types or binary_node.domain != "":
             return self.none(node, inspect.currentframe().f_lineno)
 
-        # Identify x (the other Mul input, not the Unsqueeze output).
-        if mul_node.input[0] == unsq_node.output[0]:
-            x_name = mul_node.input[1]
+        # Identify x (the other binary-op input, not the Unsqueeze output).
+        if binary_node.input[0] == unsq_node.output[0]:
+            x_name = binary_node.input[1]
         else:
-            x_name = mul_node.input[0]
+            x_name = binary_node.input[0]
 
         y_name = node.input[0]  # input to Expand
 
@@ -1794,20 +1800,20 @@ class MulUnsqueezeExpandPattern(PatternOptimization):
         with g.builder.maybe_disable_fake_tensor_mode():
             axes = [int(a) for a in axes_val]
 
-        if not self._is_expand_redundant_for_mul(y_shape, expand_shape, axes, x_shape):
+        if not self._is_expand_redundant_for_binary(y_shape, expand_shape, axes, x_shape):
             return self.none(node, inspect.currentframe().f_lineno)
 
-        return MatchResult(self, [node, unsq_node, mul_node], self.apply, insert_at=node)
+        return MatchResult(self, [node, unsq_node, binary_node], self.apply, insert_at=node)
 
     def apply(
         self,
         g: "GraphBuilder",  # noqa: F821
         expand_node: NodeProto,
         unsq_node: NodeProto,
-        mul_node: NodeProto,
+        binary_node: NodeProto,
     ) -> List[NodeProto]:
-        # Replace Mul(x, Unsqueeze(Expand(y, shape), axes))
-        #      -> Mul(x, Unsqueeze(y, axes))
+        # Replace BinaryOp(x, Unsqueeze(Expand(y, shape), axes))
+        #      -> BinaryOp(x, Unsqueeze(y, axes))
         new_unsq_name = g.unique_name(f"{self.__class__.__name__}_{unsq_node.output[0]}")
         new_unsq = g.make_node(
             "Unsqueeze",
@@ -1816,18 +1822,22 @@ class MulUnsqueezeExpandPattern(PatternOptimization):
             name=f"{self.__class__.__name__}--{unsq_node.name}",
             doc_string=unsq_node.doc_string,
         )
-        if mul_node.input[0] == unsq_node.output[0]:
-            new_mul_inputs = [new_unsq_name, mul_node.input[1]]
+        if binary_node.input[0] == unsq_node.output[0]:
+            new_binary_inputs = [new_unsq_name, binary_node.input[1]]
         else:
-            new_mul_inputs = [mul_node.input[0], new_unsq_name]
-        new_mul = g.make_node(
-            "Mul",
-            new_mul_inputs,
-            mul_node.output,
-            name=f"{self.__class__.__name__}--{mul_node.name}",
-            doc_string=mul_node.doc_string,
+            new_binary_inputs = [binary_node.input[0], new_unsq_name]
+        new_binary = g.make_node(
+            binary_node.op_type,
+            new_binary_inputs,
+            binary_node.output,
+            name=f"{self.__class__.__name__}--{binary_node.name}",
+            doc_string=binary_node.doc_string,
         )
-        return [new_unsq, new_mul]
+        return [new_unsq, new_binary]
+
+
+# Backward-compatible alias.
+MulUnsqueezeExpandPattern = BinaryUnsqueezeExpandPattern
 
 
 class SwapExpandReshapePattern(PatternOptimization):

@@ -1863,7 +1863,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["MulUnsqueezeExpand"], verbose=0
+                patterns=["BinaryUnsqueezeExpand"], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
@@ -1909,7 +1909,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["MulUnsqueezeExpand"], verbose=0
+                patterns=["BinaryUnsqueezeExpand"], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
@@ -1957,7 +1957,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["MulUnsqueezeExpand"], verbose=0
+                patterns=["BinaryUnsqueezeExpand"], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
@@ -1968,6 +1968,96 @@ class TestGraphPatternOptimization(ExtTestCase):
         got_z, got_w = opt_ref.run(None, feeds)
         self.assertEqualArray(expected_z, got_z)
         self.assertEqualArray(expected_w, got_w)
+
+    def test_binary_unsqueeze_expand_add(self):
+        # Same pattern but with Add instead of Mul.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Expand", ["Y", "shape"], ["ye"]),
+                    oh.make_node("Unsqueeze", ["ye", "axes"], ["yu"]),
+                    oh.make_node("Add", ["X", "yu"], ["Z"]),
+                ],
+                "dummy",
+                [
+                    _mkv_("X", TFLOAT, [3, 4, 5, 7]),
+                    _mkv_("Y", TFLOAT, [1, 5, 7]),
+                ],
+                [_mkv_("Z", TFLOAT, [3, 4, 5, 7])],
+                [
+                    onh.from_array(np.array([3, 5, 7], dtype=np.int64), name="shape"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="axes"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {
+            "X": self._range(3, 4, 5, 7),
+            "Y": self._range(1, 5, 7),
+        }
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["BinaryUnsqueezeExpand"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Unsqueeze", "Add"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_binary_unsqueeze_expand_sub(self):
+        # Same pattern but with Sub; operand order matters.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Expand", ["Y", "shape"], ["ye"]),
+                    oh.make_node("Unsqueeze", ["ye", "axes"], ["yu"]),
+                    oh.make_node("Sub", ["X", "yu"], ["Z"]),
+                ],
+                "dummy",
+                [
+                    _mkv_("X", TFLOAT, [3, 4, 5, 7]),
+                    _mkv_("Y", TFLOAT, [1, 5, 7]),
+                ],
+                [_mkv_("Z", TFLOAT, [3, 4, 5, 7])],
+                [
+                    onh.from_array(np.array([3, 5, 7], dtype=np.int64), name="shape"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="axes"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {
+            "X": self._range(3, 4, 5, 7, bias=1.0),
+            "Y": self._range(1, 5, 7),
+        }
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["BinaryUnsqueezeExpand"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Unsqueeze", "Sub"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
 
     def test_slices_split(self):
         model = oh.make_model(

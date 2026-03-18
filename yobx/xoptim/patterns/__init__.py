@@ -32,6 +32,7 @@ from .onnx_conv import ConvBiasNullPattern
 from .onnx_dropout import DropoutPattern
 from .onnx_equal import UnsqueezeEqualPattern
 from .onnx_expand import (
+    BinaryUnsqueezeExpandPattern,
     ExpandPattern,
     ExpandBroadcastPattern,
     ExpandSwapPattern,
@@ -178,7 +179,7 @@ def get_default_patterns(verbose: int = 0) -> List[PatternOptimization]:
         ExpandBroadcastPattern(verbose=verbose),
         ExpandSwapPattern(verbose=verbose),
         ExpandUnsqueezeExpandPattern(verbose=verbose),
-        MulUnsqueezeExpandPattern(verbose=verbose),
+        BinaryUnsqueezeExpandPattern(verbose=verbose),
         GathersSplitPattern(verbose=verbose),
         GeluPattern(verbose=verbose),
         IdentityPattern(verbose=verbose),
