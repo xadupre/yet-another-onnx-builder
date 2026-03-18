@@ -1740,6 +1740,48 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    def test_expand_unsqueeze_expand_combined_shape(self):
+        # shape2 has 1s in positions where shape1 expands X's 1-dims.
+        # The combined shape must be max(shape1_with_new_1s, shape2) = (3, 1, 5, 7),
+        # NOT just shape2 = (1, 1, 5, 7).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Expand", ["X", "shape1"], ["xe"]),
+                    oh.make_node("Unsqueeze", ["xe", "axes"], ["xu"]),
+                    oh.make_node("Expand", ["xu", "shape2"], ["Y"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, [1, 5, 7])],
+                [_mkv_("Y", TFLOAT, [3, 1, 5, 7])],
+                [
+                    onh.from_array(np.array([3, 5, 7], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([1], dtype=np.int64), name="axes"),
+                    onh.from_array(np.array([1, 1, 5, 7], dtype=np.int64), name="shape2"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(1, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["ExpandUnsqueezeExpand"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Unsqueeze", "Expand"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
     def test_expand_unsqueeze_expand_no_match_shared(self):
         # First Expand output is used twice (by Unsqueeze and by Relu)
         # so the pattern should NOT match.

@@ -1459,24 +1459,28 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
 
             I_X(["X FLOAT(1, a, b)"])
             I_axes(["axes INT64(1)"])
+            I_shape1_new(["shape1_with_new_1s INT64(4)"])
             I_shape2(["shape2 INT64(4)"])
 
             Constant_0[["Constant() -#gt; axes"]]
-            Constant_1[["Constant() -#gt; shape2"]]
-            Unsqueeze_2[["Unsqueeze(., .)"]]
-            Expand_3[["Expand(., .)"]]
+            Constant_1[["Constant() -#gt; shape1_with_new_1s"]]
+            Max_2[["Max(., .)"]]
+            Unsqueeze_3[["Unsqueeze(., .)"]]
+            Expand_4[["Expand(., .)"]]
 
-            I_X -->|"FLOAT(1, a, b)"| Unsqueeze_2
-            Constant_0 -->|"INT64(1)"| Unsqueeze_2
-            Unsqueeze_2 -->|"FLOAT(1, 1, a, b)"| Expand_3
-            Constant_1 -->|"INT64(4)"| Expand_3
+            I_X -->|"FLOAT(1, a, b)"| Unsqueeze_3
+            Constant_0 -->|"INT64(1)"| Unsqueeze_3
+            Constant_1 -->|"INT64(4)"| Max_2
+            I_shape2 -->|"INT64(4)"| Max_2
+            Unsqueeze_3 -->|"FLOAT(1, 1, a, b)"| Expand_4
+            Max_2 -->|"INT64(4)"| Expand_4
 
             O_Y(["Y FLOAT(c, d, a, b)"])
-            Expand_3 --> O_Y
+            Expand_4 --> O_Y
 
             class I_X,I_axes,I_shape2,O_Y ioNode
             class Constant_0,Constant_1 constNode
-            class Unsqueeze_2,Expand_3 opNode
+            class Max_2,Unsqueeze_3,Expand_4 opNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -1511,6 +1515,10 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
         if len(unsq_node.input) < 2 or not g.is_constant(unsq_node.input[1]):
             return self.none(node, inspect.currentframe().f_lineno)
 
+        # shape1 must be a constant so we can compute the combined output shape.
+        if not g.is_constant(node.input[1]):
+            return self.none(node, inspect.currentframe().f_lineno)
+
         # The Unsqueeze output must be used only by the second Expand.
         if g.is_used_more_than_once(unsq_node.output[0]):
             return self.none(node, inspect.currentframe().f_lineno)
@@ -1536,6 +1544,56 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
         unsq_node: NodeProto,
         expand2_node: NodeProto,
     ) -> List[NodeProto]:
+        # Retrieve constant values for shape1 and axes.
+        shape1_val = g.get_computed_constant(expand_node.input[1])
+        axes_val = g.get_computed_constant(unsq_node.input[1])
+        shape1_list = [int(x) for x in shape1_val]
+        axes_list = [int(a) for a in axes_val]
+
+        # Build shape1_with_new_1s: shape1 with 1s inserted at the axes positions.
+        # ONNX Expand broadcasts, so Xe = broadcast(X, shape1).  For dims where
+        # shape1[j] > 1, Xe[j] = shape1[j]; for dims where shape1[j] = 1, Xe[j] = X[j].
+        # When we bypass the first Expand, those shape1[j] > 1 values must still appear in
+        # the combined shape so the trailing Expand broadcasts X's 1-dims correctly.
+        output_rank = len(shape1_list) + len(axes_list)
+        axes_normalized = sorted(a + output_rank if a < 0 else a for a in axes_list)
+        shape1_with_new_1s = shape1_list[:]
+        for axis in axes_normalized:
+            shape1_with_new_1s.insert(axis, 1)
+
+        # combined_shape = element-wise Max(shape1_with_new_1s, shape2).
+        # This ensures dims expanded by shape1 (shape1[j] > 1) are preserved even when
+        # shape2 has a 1 in those positions.
+        shape2_val = g.get_computed_constant(expand2_node.input[1])
+        if shape2_val is not None:
+            # Both shape1 and shape2 are static: compute combined shape as a constant.
+            combined_arr = np.maximum(
+                np.array(shape1_with_new_1s, dtype=np.int64),
+                np.array([int(x) for x in shape2_val], dtype=np.int64),
+            )
+            combined_shape_input = g.make_initializer(
+                "",
+                combined_arr,
+                source=f"{self.__class__.__name__}.combined",
+            )
+            extra_nodes: List[NodeProto] = []
+        else:
+            # shape2 is dynamic: use an ONNX Max node to compute the combined shape.
+            combined_cst_name = g.make_initializer(
+                "",
+                np.array(shape1_with_new_1s, dtype=np.int64),
+                source=f"{self.__class__.__name__}.combined_cst",
+            )
+            combined_shape_input = g.unique_name(f"{self.__class__.__name__}_combined_shape")
+            extra_nodes = [
+                g.make_node(
+                    "Max",
+                    [combined_cst_name, expand2_node.input[1]],
+                    [combined_shape_input],
+                    name=f"{self.__class__.__name__}--combined_shape",
+                )
+            ]
+
         # Apply Unsqueeze directly to the original tensor (before first Expand).
         new_unsq_name = g.unique_name(f"{self.__class__.__name__}_{unsq_node.output[0]}")
         new_unsq = g.make_node(
@@ -1545,15 +1603,15 @@ class ExpandUnsqueezeExpandPattern(PatternOptimization):
             name=f"{self.__class__.__name__}--{unsq_node.name}",
             doc_string=unsq_node.doc_string,
         )
-        # The second Expand broadcasts the unsqueezed original tensor to the final shape.
+        # The second Expand broadcasts the unsqueezed original tensor to the combined shape.
         new_expand2 = g.make_node(
             "Expand",
-            [new_unsq_name, expand2_node.input[1]],
+            [new_unsq_name, combined_shape_input],
             expand2_node.output,
             name=f"{self.__class__.__name__}--{expand2_node.name}",
             doc_string=expand2_node.doc_string,
         )
-        return [new_unsq, new_expand2]
+        return [*extra_nodes, new_unsq, new_expand2]
 
 
 class SwapExpandReshapePattern(PatternOptimization):
