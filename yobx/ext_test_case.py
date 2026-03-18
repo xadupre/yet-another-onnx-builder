@@ -999,6 +999,36 @@ def requires_onnxruntime_training(
     return lambda x: x
 
 
+def has_litert(version: str = "") -> bool:
+    """Returns True if ``ai_edge_litert`` or ``tensorflow.lite`` is available."""
+    try:
+        import ai_edge_litert  # noqa: F401
+
+        if not version:
+            return True
+        return PvVersion(ai_edge_litert.__version__) >= PvVersion(version)
+    except (ImportError, AttributeError):
+        pass
+    try:
+        import tensorflow as tf  # noqa: F401
+
+        if not version:
+            return True
+        return PvVersion(tf.__version__) >= PvVersion(version)
+    except (ImportError, AttributeError):
+        return False
+
+
+def requires_litert(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if neither :epkg:`ai_edge_litert` nor
+    :epkg:`tensorflow` (which ships ``tf.lite``) is installed."""
+    if not has_litert(version):
+        return unittest.skip(
+            msg or "ai_edge_litert / tensorflow not installed or version too old"
+        )
+    return lambda x: x
+
+
 def requires_onnx(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx` is not recent enough."""
     try:

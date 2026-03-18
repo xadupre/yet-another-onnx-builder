@@ -36,6 +36,7 @@ query into ONNX.
 
 **deeplearning**
 
+* [litert](https://ai.google.dev/edge/litert/)
 * [jax](https://jax.readthedocs.io/en/latest/) *in progress*
 * [tensorflow](https://www.tensorflow.org)
 * [torch](https://pytorch.org)
