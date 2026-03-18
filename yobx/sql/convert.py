@@ -46,17 +46,12 @@ from onnx import ModelProto, TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
 from ..xbuilder import GraphBuilder
+from ._expr import _ExprEmitter
+from .ops import get_sql_op_converter
 from .parse import (
-    AggExpr,
-    BinaryExpr,
-    ColumnRef,
-    Condition,
-    FilterOp,
     GroupByOp,
     JoinOp,
-    Literal,
     ParsedQuery,
-    SelectItem,
     SelectOp,
     parse_sql,
 )
@@ -80,199 +75,6 @@ def _np_dtype_to_onnx(dt: Union[np.dtype, type, str]) -> int:
     if dt in _NP_TO_ONNX:
         return _NP_TO_ONNX[dt]
     raise ValueError(f"Unsupported numpy dtype for SQL conversion: {dt}")
-
-
-# ---------------------------------------------------------------------------
-# Expression emitter
-# ---------------------------------------------------------------------------
-
-
-class _ExprEmitter:
-    """Emits ONNX nodes for SQL expressions."""
-
-    def __init__(self, g: GraphBuilder, col_map: Dict[str, str]):
-        self._g = g
-        # col_map: column_name → current ONNX tensor name for that column
-        self._col_map = col_map
-
-    def emit(self, node: object, name: str = "sql") -> str:
-        """Emit *node* into the graph and return the output tensor name."""
-        if isinstance(node, ColumnRef):
-            col = node.column
-            if col not in self._col_map:
-                raise KeyError(
-                    f"Column {col!r} not found in inputs. "
-                    f"Available: {list(self._col_map)}"
-                )
-            return self._col_map[col]
-
-        if isinstance(node, Literal):
-            v = node.value
-            if isinstance(v, bool):
-                arr = np.array([v], dtype=np.bool_)
-            elif isinstance(v, int):
-                arr = np.array([v], dtype=np.int64)
-            elif isinstance(v, float):
-                arr = np.array([v], dtype=np.float32)
-            else:
-                raise TypeError(f"Unsupported literal type {type(v)}")
-            cst = self._g.make_initializer(f"{name}_lit", arr)
-            return cst
-
-        if isinstance(node, BinaryExpr):
-            left = self.emit(node.left, name=f"{name}_l")
-            right = self.emit(node.right, name=f"{name}_r")
-            op_map = {
-                "+": "Add",
-                "-": "Sub",
-                "*": "Mul",
-                "/": "Div",
-                "=": "Equal",
-                "<": "Less",
-                ">": "Greater",
-                "<=": "LessOrEqual",
-                ">=": "GreaterOrEqual",
-                "<>": "Not",  # handled below
-            }
-            # Cast the right operand to match the left operand type when one
-            # side is a column (has a known type) and the other is a literal.
-            if isinstance(node.right, Literal) and self._g.has_type(left):
-                right = self._g.op.CastLike(right, left, name=f"{name}_cast")
-            elif isinstance(node.left, Literal) and self._g.has_type(right):
-                left = self._g.op.CastLike(left, right, name=f"{name}_cast")
-            if node.op == "<>":
-                eq = self._g.op.Equal(left, right, name=f"{name}_eq")
-                return self._g.op.Not(eq, name=name)
-            onnx_op = op_map.get(node.op)
-            if onnx_op is None:
-                raise ValueError(f"Unsupported binary operator: {node.op!r}")
-            return getattr(self._g.op, onnx_op)(left, right, name=name)
-
-        if isinstance(node, Condition):
-            op = node.op
-            if op == "and":
-                left = self.emit(node.left, name=f"{name}_l")
-                right = self.emit(node.right, name=f"{name}_r")
-                return self._g.op.And(left, right, name=name)
-            if op == "or":
-                left = self.emit(node.left, name=f"{name}_l")
-                right = self.emit(node.right, name=f"{name}_r")
-                return self._g.op.Or(left, right, name=name)
-            # leaf comparison — treat it as a BinaryExpr
-            return self.emit(
-                BinaryExpr(left=node.left, op=node.op, right=node.right),
-                name=name,
-            )
-
-        if isinstance(node, AggExpr):
-            func = node.func
-            if func == "count":
-                # COUNT(*) → total row count of the first known column
-                first_col = next(iter(self._col_map.values()))
-                size = self._g.op.Shape(first_col, name=f"{name}_shape")
-                return self._g.op.Gather(
-                    size,
-                    np.array(0, dtype=np.int64),
-                    axis=0,
-                    name=f"{name}_count",
-                )
-            arg_tensor = self.emit(node.arg, name=f"{name}_arg")
-            reduce_axes = self._g.make_initializer(
-                f"{name}_axes", np.array([0], dtype=np.int64)
-            )
-            agg_map = {
-                "sum": "ReduceSum",
-                "avg": "ReduceMean",
-                "min": "ReduceMin",
-                "max": "ReduceMax",
-            }
-            onnx_op = agg_map.get(func)
-            if onnx_op is None:
-                raise ValueError(f"Unsupported aggregation function: {func!r}")
-            return getattr(self._g.op, onnx_op)(
-                arg_tensor, reduce_axes, keepdims=0, name=name
-            )
-
-        raise TypeError(f"Cannot emit expression of type {type(node)}")
-
-
-# ---------------------------------------------------------------------------
-# Main converter
-# ---------------------------------------------------------------------------
-
-
-def _apply_filter(
-    g: GraphBuilder,
-    col_map: Dict[str, str],
-    condition: Condition,
-    name: str = "filter",
-) -> Dict[str, str]:
-    """
-    Apply a WHERE *condition* to every column in *col_map* using ``Compress``.
-
-    Returns a new ``col_map`` mapping each column to a filtered tensor.
-    """
-    emitter = _ExprEmitter(g, col_map)
-    mask = emitter.emit(condition, name=f"{name}_mask")
-    new_map: Dict[str, str] = {}
-    for col, tensor in col_map.items():
-        compressed = g.op.Compress(tensor, mask, axis=0, name=f"{name}_{col}")
-        new_map[col] = compressed
-    return new_map
-
-
-def _apply_join(
-    g: GraphBuilder,
-    col_map: Dict[str, str],
-    join_op: JoinOp,
-    right_col_map: Dict[str, str],
-    name: str = "join",
-) -> Dict[str, str]:
-    """
-    Apply an equi-join between *col_map* (left) and *right_col_map* (right).
-
-    Only inner-join semantics on a single key column are implemented.
-    Returns a merged ``col_map`` with all columns from both sides aligned.
-    """
-    left_key_tensor = col_map[join_op.left_key]
-    right_key_tensor = right_col_map[join_op.right_key]
-
-    # For each left row, find the matching index in the right key
-    # We implement this as a loop-free broadcast comparison:
-    #   match[i,j] = (left_key[i] == right_key[j])
-    # then select the first match per left row with ArgMax.
-    lk_2d = g.op.Unsqueeze(left_key_tensor, np.array([1], dtype=np.int64), name=f"{name}_lk2d")
-    rk_2d = g.op.Unsqueeze(right_key_tensor, np.array([0], dtype=np.int64), name=f"{name}_rk2d")
-    match_matrix = g.op.Equal(lk_2d, rk_2d, name=f"{name}_match")
-
-    # Cast bool → int to use ArgMax; pick the first matching right index
-    match_int = g.op.Cast(match_matrix, to=TensorProto.INT32, name=f"{name}_match_int")
-    right_indices = g.op.ArgMax(match_int, axis=1, name=f"{name}_ridx")
-
-    # Filter left to rows that have at least one match
-    any_match = g.op.ReduceMax(
-        match_int,
-        np.array([1], dtype=np.int64),
-        keepdims=0,
-        name=f"{name}_any",
-    )
-    has_match = g.op.Cast(any_match, to=TensorProto.BOOL, name=f"{name}_hasmatch")
-
-    new_map: Dict[str, str] = {}
-    # Filter left columns
-    for col, tensor in col_map.items():
-        compressed = g.op.Compress(tensor, has_match, axis=0, name=f"{name}_l_{col}")
-        new_map[col] = compressed
-
-    # Filter right_indices to matched rows, then gather right columns
-    right_indices_filtered = g.op.Compress(
-        right_indices, has_match, axis=0, name=f"{name}_ridx_filt"
-    )
-    for col, tensor in right_col_map.items():
-        gathered = g.op.Gather(tensor, right_indices_filtered, axis=0, name=f"{name}_r_{col}")
-        new_map[col] = gathered
-
-    return new_map
 
 
 def sql_to_onnx(
@@ -394,10 +196,11 @@ def _build_onnx(
     group_op: Optional[GroupByOp] = None
 
     for op in pq.operations:
-        if isinstance(op, JoinOp):
-            col_map = _apply_join(g, col_map, op, right_col_map, name="join")
-        elif isinstance(op, FilterOp):
-            col_map = _apply_filter(g, col_map, op.condition, name="filter")
+        converter = get_sql_op_converter(type(op))
+        if converter is not None:
+            col_map = converter(
+                g, {}, list(col_map.keys()), op, col_map, right_col_map
+            )
         elif isinstance(op, GroupByOp):
             group_op = op  # retained for SelectOp aggregation
         elif isinstance(op, SelectOp):
