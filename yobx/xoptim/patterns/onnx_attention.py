@@ -98,6 +98,7 @@ class FunctionAttentionPattern(PatternOptimization):
 
             class I_values,I_keys,I_scale_sqrt,I_mask,I_query,O_Y ioNode
             class LocalAttention_to1_0 opNode
+
     GroupQueryAttention (GQA)
     +++++++++++++++++++++++++
 

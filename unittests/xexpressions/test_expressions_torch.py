@@ -1,6 +1,6 @@
 import unittest
 from yobx.ext_test_case import ExtTestCase, requires_torch
-from yobx.xshape.expressions.expressions_torch import parse_expression, Expression
+from yobx.xexpressions.expressions_torch import parse_expression, Expression
 
 
 class TestDimension(ExtTestCase):

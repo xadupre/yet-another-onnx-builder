@@ -5,11 +5,6 @@ yobx.xshape
     :maxdepth: 1
     :caption: modules
 
-    expressions/index
-    expressions_torch
-    evaluate_expressions
-    rename_expressions
-    simplify_expressions
     _builder_runtime
     _inference_runtime
     _shape_runtime
