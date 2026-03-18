@@ -97,17 +97,37 @@ emitted instead of tracing.
 Supported numpy operations
 ==========================
 
-The :class:`~yobx.xtracing.NumpyArray` proxy supports:
+The :class:`~yobx.xtracing.NumpyArray` proxy also supports all Python
+arithmetic and comparison operators (``+``, ``-``, ``*``, ``/``, ``//``,
+``**``, ``%``, ``@``, ``==``, ``!=``, ``<``, ``<=``, ``>``, ``>=``,
+unary ``-``).
 
-* **Arithmetic operators**: ``+``, ``-``, ``*``, ``/``, ``//``, ``**``,
-  ``%``, ``@`` (matmul), unary ``-``.
-* **Comparison operators**: ``==``, ``!=``, ``<``, ``<=``, ``>``, ``>=``.
-* **Ufuncs** (via ``__array_ufunc__``): ``np.sqrt``, ``np.abs``, ``np.exp``,
-  ``np.log``, ``np.log1p``, ``np.sin``, ``np.cos``, ``np.tanh``, and others.
-* **Array functions** (via ``__array_function__``): ``np.sum``, ``np.mean``,
-  ``np.max``, ``np.min``, ``np.prod``, ``np.where``, ``np.concatenate``,
-  ``np.stack``, ``np.reshape``, ``np.transpose``, ``np.squeeze``,
-  ``np.expand_dims``, ``np.clip``.
+The full list of supported ufuncs and array functions is generated below
+directly from the live dispatch tables in
+:mod:`yobx.xtracing.numpy_array`.
+
+.. runpython::
+    :showcode:
+    :rst:
+
+    import numpy as np
+    from yobx.xtracing.numpy_array import _UFUNC_TO_ONNX, _HANDLED_FUNCTIONS
+
+    rows_ufunc = []
+    for k in sorted(_UFUNC_TO_ONNX.keys(), key=lambda x: x.__name__):
+        v = _UFUNC_TO_ONNX[k]
+        onnx_op = v[0] if isinstance(v, tuple) else v
+        rows_ufunc.append(f"* ``np.{k.__name__}`` → ``{onnx_op}``")
+
+    rows_func = []
+    for k in sorted(_HANDLED_FUNCTIONS.keys(), key=lambda x: x.__name__):
+        rows_func.append(f"* ``np.{k.__name__}``")
+
+    print("**Ufuncs** (via ``__array_ufunc__``)\n")
+    print("\n".join(rows_ufunc))
+    print()
+    print("**Array functions** (via ``__array_function__``)\n")
+    print("\n".join(rows_func))
 
 Standalone usage
 ================
