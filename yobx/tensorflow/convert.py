@@ -352,6 +352,7 @@ def _convert_concrete_function(
                 f"Type {op_type!r} has no converting function mapped to it, "
                 f"inputs={[t.name for t in op.inputs]}, "
                 f"outputs={[t.name for t in op.outputs]}"
+                f"{g.get_debug_msg()}"
             )
 
         assert all(g.has_shape(i.name) for i in op.inputs), (

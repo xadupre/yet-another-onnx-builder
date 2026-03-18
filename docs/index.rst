@@ -57,7 +57,7 @@ It can export from many libraries:
 **deeplearning**
 
 +---------------------------------------+----------------------------------------+
-| :epkg:`jax`                           | :ref:`l-plot-jax-to-onnx`             |
+| :epkg:`jax` *in progress*             | :ref:`l-plot-jax-to-onnx`              |
 +---------------------------------------+----------------------------------------+
 | :epkg:`tensorflow`                    | :ref:`l-design-tensorflow-converter`   |
 +---------------------------------------+----------------------------------------+

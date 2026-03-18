@@ -45,7 +45,6 @@ def jax_to_concrete_function(
     args: Tuple[Any, ...],
     input_names: Optional[Sequence[str]] = None,
     dynamic_shapes: Optional[Tuple[Dict[int, str], ...]] = None,
-    native_serialization: bool = False,
 ):
     """
     Converts a :epkg:`JAX` function into a :class:`tensorflow.ConcreteFunction`.
@@ -67,14 +66,6 @@ def jax_to_concrete_function(
         Example: ``({0: "batch"},)`` marks axis 0 of the first input as a
         dynamic (variable-length) dimension.
         When *None*, axis 0 of every input is made dynamic by default.
-    :param native_serialization: passed to :func:`jax.experimental.jax2tf.convert`.
-        When *False* (the default) the JAX computation is lowered to standard
-        TensorFlow ops, which can be converted to ONNX by the existing op
-        converters in :mod:`yobx.tensorflow`.  When *True*, :epkg:`jax2tf`
-        embeds the computation in an ``XlaCallModule`` TF op that currently
-        has no ONNX converter registered; use *True* only if you intend to
-        inspect the intermediate :class:`~tensorflow.ConcreteFunction`
-        without converting further to ONNX.
     :return: a :class:`tensorflow.ConcreteFunction` ready for ONNX export.
 
     Example::
@@ -110,9 +101,6 @@ def jax_to_concrete_function(
 
         if dynamic_shapes and i < len(dynamic_shapes):
             dyn_axes = dynamic_shapes[i]
-        elif n > 0:
-            # Default: make axis 0 (batch dimension) dynamic with name "batch".
-            dyn_axes = {0: "batch"}
         else:
             dyn_axes = {}
 
@@ -131,7 +119,11 @@ def jax_to_concrete_function(
             polymorphic_shapes.append(f"({', '.join(dims)})")
 
     tf_fn = jax2tf.convert(
-        jax_fn, polymorphic_shapes=polymorphic_shapes, native_serialization=native_serialization
+        jax_fn,
+        polymorphic_shapes=polymorphic_shapes,
+        native_serialization=False,
+        enable_xla=False,
+        with_gradient=False,
     )
     cf = tf.function(tf_fn, autograph=False).get_concrete_function(*specs)
     return cf

@@ -20,3 +20,5 @@ yobx.tensorflow.ops
     random_ops
     reduction_ops
     shape_ops
+    special_ops
+    xla_call_module
