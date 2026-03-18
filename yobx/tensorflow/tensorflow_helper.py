@@ -101,9 +101,6 @@ def jax_to_concrete_function(
 
         if dynamic_shapes and i < len(dynamic_shapes):
             dyn_axes = dynamic_shapes[i]
-        elif n > 0:
-            # Default: make axis 0 (batch dimension) dynamic with name "batch".
-            dyn_axes = {0: "batch"}
         else:
             dyn_axes = {}
 
@@ -121,6 +118,12 @@ def jax_to_concrete_function(
             ]
             polymorphic_shapes.append(f"({', '.join(dims)})")
 
-    tf_fn = jax2tf.convert(jax_fn, polymorphic_shapes=polymorphic_shapes)
+    tf_fn = jax2tf.convert(
+        jax_fn,
+        polymorphic_shapes=polymorphic_shapes,
+        native_serialization=False,
+        enable_xla=False,
+        with_gradient=False,
+    )
     cf = tf.function(tf_fn, autograph=False).get_concrete_function(*specs)
     return cf
