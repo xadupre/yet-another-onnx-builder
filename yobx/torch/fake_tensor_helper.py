@@ -158,7 +158,8 @@ class FakeTensorContext:
                     f"Length mismatch between x (len={len(x)}) and "
                     f"dynamic_shapes (len={len(dynamic_shapes)}); "
                     f"dynamic_shapes must have one entry per element of x, "
-                    f"or be None to use no dynamic dimensions"
+                    f"or be None to use no dynamic dimensions, "
+                    f"dynamic_shapes={dynamic_shapes}"
                 )
                 ds_list = dynamic_shapes
             return x.__class__(
