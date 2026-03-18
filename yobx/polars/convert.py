@@ -93,18 +93,23 @@ def to_onnx(
     batch_dim: Optional[Union[int, str]] = "N",
     target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
     builder_cls: Union[type, Callable] = GraphBuilder,
+    row_filter: bool = False,
 ) -> ModelProto:
     """
     Converts a :class:`polars.DataFrame` (or its schema) into an ONNX
-    identity model that encodes the schema as typed inputs/outputs.
+    model that encodes the schema as typed inputs/outputs.
 
-    Each column in the DataFrame maps to one ONNX graph input and one
-    output connected by an ``Identity`` node.  The primary purpose is to
-    capture the *schema contract* of a DataFrame as a portable ONNX model.
+    Each column in the DataFrame maps to one ONNX graph input.  By
+    default each input is passed straight through to the corresponding
+    output via an ``Identity`` node.  When *row_filter* is ``True`` a
+    boolean ``mask`` input is added and each column is filtered through
+    an ONNX ``Compress`` node instead, enabling row-level selection at
+    inference time.
 
-    :param df_or_schema: a :class:`polars.DataFrame` or
-        :class:`polars.Schema` whose column names and dtypes define the
-        ONNX inputs.
+    :param df_or_schema: a :class:`polars.DataFrame`,
+        :class:`polars.LazyFrame`, or :class:`polars.Schema` whose
+        column names and dtypes define the ONNX inputs.  A plain
+        ``{name: dtype}`` dict is also accepted.
     :param batch_dim: controls the first (batch) axis of every input tensor.
         Pass a :class:`str` (e.g. ``"N"`` or ``"batch"``) for a symbolic
         dynamic dimension (default), an :class:`int` for a fixed size, or
@@ -118,8 +123,13 @@ def to_onnx(
         :class:`yobx.xbuilder.GraphBuilder` but any builder can
         be used as long it implements the apis :ref:`builder-api`
         and :ref:`builder-api-make`.
-    :return: an :class:`onnx.ModelProto` with one ``Identity`` node per
-        column.
+    :param row_filter: when ``True``, a boolean input named ``mask`` of
+        shape ``(batch_dim,)`` is added to the graph, and each column
+        output is produced via ``Compress(col, mask, axis=0)`` instead of
+        ``Identity``.  The filtered outputs have a dynamic first dimension
+        ``"K"`` (where ``K ≤ N``).  Requires *batch_dim* to be set in
+        order to have a meaningful input shape for ``mask``.
+    :return: an :class:`onnx.ModelProto` with one node per column.
 
     Example::
 
@@ -127,19 +137,24 @@ def to_onnx(
         from yobx.polars import to_onnx
 
         df = pl.DataFrame({"age": [25, 30], "score": [0.8, 0.9]})
+        # plain identity model
         onx = to_onnx(df)
+        # with row filtering via Compress
+        onx_filtered = to_onnx(df, row_filter=True)
     """
     import polars as pl
 
     if isinstance(df_or_schema, pl.DataFrame):
         schema = df_or_schema.schema
+    elif isinstance(df_or_schema, pl.LazyFrame):
+        schema = df_or_schema.collect_schema()
     elif isinstance(df_or_schema, pl.Schema):
         schema = df_or_schema
     elif isinstance(df_or_schema, dict):
         schema = df_or_schema
     else:
         raise TypeError(
-            f"df_or_schema must be a polars.DataFrame or polars.Schema, "
+            f"df_or_schema must be a polars.DataFrame, polars.LazyFrame, or polars.Schema, "
             f"got {type(df_or_schema)!r}."
         )
 
@@ -160,12 +175,21 @@ def to_onnx(
     g = builder_cls(dict_target_opset)
 
     shape = (batch_dim,) if batch_dim is not None else None
+    # After Compress the first dimension becomes "K" (number of True values)
+    out_shape = ("K",) if (row_filter and shape is not None) else shape
+
+    if row_filter:
+        g.make_tensor_input("mask", TensorProto.BOOL, shape)
+
     for col_name, col_dtype in schema.items():
         elem_type = polars_dtype_to_onnx_element_type(col_dtype)
         out_name = f"{col_name}_out"
         g.make_tensor_input(col_name, elem_type, shape)
-        g.op.Identity(col_name, outputs=[out_name], name=f"id_{col_name}")
-        g.make_tensor_output(out_name, elem_type=elem_type, shape=shape, indexed=False)
+        if row_filter:
+            g.op.Compress(col_name, "mask", axis=0, outputs=[out_name], name=f"compress_{col_name}")
+        else:
+            g.op.Identity(col_name, outputs=[out_name], name=f"id_{col_name}")
+        g.make_tensor_output(out_name, elem_type=elem_type, shape=out_shape, indexed=False)
 
     if isinstance(g, GraphBuilder):
         onx, _ = g.to_onnx(return_optimize_report=True)
@@ -179,7 +203,8 @@ def schema_to_numpy_dtypes(schema) -> Dict[str, np.dtype]:
     Returns a mapping from column name to :class:`numpy.dtype` for each
     column in the given :class:`polars.Schema`.
 
-    :param schema: a :class:`polars.Schema` (or a polars DataFrame).
+    :param schema: a :class:`polars.Schema`, :class:`polars.DataFrame`, or
+        :class:`polars.LazyFrame`.
     :return: dict mapping ``{column_name: numpy_dtype}``.
 
     Example::
@@ -196,6 +221,8 @@ def schema_to_numpy_dtypes(schema) -> Dict[str, np.dtype]:
 
     if isinstance(schema, pl.DataFrame):
         schema = schema.schema
+    elif isinstance(schema, pl.LazyFrame):
+        schema = schema.collect_schema()
 
     result = {}
     for col_name, col_dtype in schema.items():

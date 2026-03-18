@@ -200,6 +200,61 @@ class TestPolarsToOnnx(unittest.TestCase):
         (result,) = sess.run(None, feeds)
         np.testing.assert_array_equal(result, feeds["score"])
 
+    def test_lazy_frame_input(self):
+        """to_onnx accepts a polars.LazyFrame and extracts its schema."""
+        to_onnx = self._get_to_onnx()
+        df = pl.DataFrame({"a": [1.0, 2.0], "b": [3, 4]})
+        lf = df.lazy()
+        onx = to_onnx(lf)
+        self.assertIsInstance(onx, onnx.ModelProto)
+        onnx.checker.check_model(onx)
+        input_names = [inp.name for inp in onx.graph.input]
+        self.assertEqual(input_names, ["a", "b"])
+
+    def test_row_filter_adds_mask_input(self):
+        """row_filter=True adds a boolean 'mask' input to the graph."""
+        to_onnx = self._get_to_onnx()
+        df = pl.DataFrame({"x": [1.0, 2.0, 3.0]})
+        onx = to_onnx(df, row_filter=True)
+        onnx.checker.check_model(onx)
+        input_names = [inp.name for inp in onx.graph.input]
+        self.assertIn("mask", input_names)
+        # mask should be the first input
+        self.assertEqual(input_names[0], "mask")
+        mask_input = onx.graph.input[0]
+        self.assertEqual(mask_input.type.tensor_type.elem_type, TensorProto.BOOL)
+
+    def test_row_filter_uses_compress_nodes(self):
+        """row_filter=True produces Compress nodes instead of Identity."""
+        to_onnx = self._get_to_onnx()
+        df = pl.DataFrame({"a": [1, 2], "b": [3.0, 4.0]})
+        onx = to_onnx(df, row_filter=True)
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertEqual(op_types.count("Compress"), 2)
+        self.assertNotIn("Identity", op_types)
+
+    def test_row_filter_ort_execution(self):
+        """row_filter=True model filters rows correctly at runtime."""
+        to_onnx = self._get_to_onnx()
+        df = pl.DataFrame({"age": pl.Series([25, 30, 35], dtype=pl.Int64)})
+        onx = to_onnx(df, row_filter=True)
+        sess = onnxruntime.InferenceSession(
+            onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        mask = np.array([True, False, True])
+        age = np.array([25, 30, 35], dtype=np.int64)
+        (result,) = sess.run(None, {"mask": mask, "age": age})
+        np.testing.assert_array_equal(result, np.array([25, 35], dtype=np.int64))
+
+    def test_row_filter_output_has_dynamic_dim(self):
+        """row_filter=True outputs carry a dynamic 'K' first dimension."""
+        to_onnx = self._get_to_onnx()
+        df = pl.DataFrame({"x": [1.0]})
+        onx = to_onnx(df, row_filter=True, batch_dim="N")
+        out = onx.graph.output[0]
+        shape = out.type.tensor_type.shape
+        self.assertEqual(shape.dim[0].dim_param, "K")
+
 
 @unittest.skipUnless(HAS_POLARS, "polars not installed")
 class TestPolarsHelpers(unittest.TestCase):
@@ -236,6 +291,13 @@ class TestPolarsHelpers(unittest.TestCase):
         df = pl.DataFrame({"a": pl.Series([1.0], dtype=pl.Float64)})
         dtypes = schema_to_numpy_dtypes(df)
         self.assertEqual(dtypes["a"], np.dtype("float64"))
+
+    def test_schema_to_numpy_dtypes_from_lazyframe(self):
+        from yobx.polars.convert import schema_to_numpy_dtypes
+
+        lf = pl.DataFrame({"x": pl.Series([1.0], dtype=pl.Float32)}).lazy()
+        dtypes = schema_to_numpy_dtypes(lf)
+        self.assertEqual(dtypes["x"], np.dtype("float32"))
 
 
 if __name__ == "__main__":
