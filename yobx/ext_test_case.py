@@ -675,6 +675,25 @@ def requires_lightgbm(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
+def requires_sksurv(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`scikit-survival` is not recent enough."""
+    try:
+        import sksurv
+    except (AttributeError, ImportError):
+        return unittest.skip(msg or "scikit-survival not installed")
+
+    if not hasattr(sksurv, "__version__"):
+        return unittest.skip(msg or "scikit-survival not installed")
+
+    if not version:
+        return lambda x: x
+
+    if PvVersion(sksurv.__version__) < PvVersion(version):
+        msg = f"scikit-survival version {sksurv.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def requires_onnx_diagnostic(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx-diagnostic` is not recent enough."""
     try:

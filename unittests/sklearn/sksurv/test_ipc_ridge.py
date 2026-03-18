@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_sksurv
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
 
@@ -26,6 +26,7 @@ def _make_survival_data(n=50, n_features=5, seed=0):
 
 
 @requires_sklearn("1.4")
+@requires_sksurv()
 class TestSklearnIPCRidge(ExtTestCase):
     _X, _y = _make_survival_data()
 
