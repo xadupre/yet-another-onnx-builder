@@ -15,3 +15,4 @@ that maintain code across the project.
    litert/index
    misc/index
    ci
+   sql/index
