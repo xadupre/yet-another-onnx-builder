@@ -5228,9 +5228,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=False,
-            optimization_options=OptimizationOptions(
-                patterns="MulUnsqueezeUnsqueeze", verbose=0
-            ),
+            optimization_options=OptimizationOptions(patterns="MulUnsqueezeUnsqueeze", verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(["Mul", "Unsqueeze"], [n.op_type for n in opt_onx.graph.node])
@@ -5261,19 +5259,14 @@ class TestGraphPatternOptimization(ExtTestCase):
             ir_version=10,
         )
 
-        feeds = {
-            "X": np.arange(3).astype(np.float32),
-            "Y": np.arange(3).astype(np.float32) + 1,
-        }
+        feeds = {"X": np.arange(3).astype(np.float32), "Y": np.arange(3).astype(np.float32) + 1}
         ref = ExtendedReferenceEvaluator(model)
         z = ref.run(None, feeds)[0]
 
         gr = GraphBuilder(
             model,
             infer_shapes_options=False,
-            optimization_options=OptimizationOptions(
-                patterns="MulUnsqueezeUnsqueeze", verbose=0
-            ),
+            optimization_options=OptimizationOptions(patterns="MulUnsqueezeUnsqueeze", verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
         # Pattern should NOT fire because axes differ.

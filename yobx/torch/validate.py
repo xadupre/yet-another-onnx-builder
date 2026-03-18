@@ -80,7 +80,7 @@ class ValidateSummary:
         try:
             return getattr(self, key)
         except AttributeError:
-            raise KeyError(key)
+            raise KeyError(f"Attribute {key!r} does not exist.") from None
 
 
 @dataclass
@@ -119,7 +119,7 @@ class ValidateData:
         try:
             return getattr(self, key)
         except AttributeError:
-            raise KeyError(key)
+            raise KeyError(f"Attribute {key!r} does not exist.") from None
 
 
 def _to_onnx(*args, exporter: str = "yobx", **kwargs):
