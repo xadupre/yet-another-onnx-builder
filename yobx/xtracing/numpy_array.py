@@ -508,12 +508,12 @@ class NumpyArray:
 
         if mapping == "log1p":
             one = np.array(1, dtype=ref_dtype if ref_dtype is not None else np.float32)
-            added = g.op.Add(*onnx_args, one, name=g.unique_name("add"))
+            added = g.op.Add(onnx_args[0], one, name=g.unique_name("add"))
             res = g.op.Log(added, name=g.unique_name("log1p"))
             return NumpyArray(res, g)
 
         if mapping == "expm1":
-            exp = g.op.Exp(*onnx_args, name=g.unique_name("exp"))
+            exp = g.op.Exp(onnx_args[0], name=g.unique_name("exp"))
             one = np.array(1, dtype=ref_dtype if ref_dtype is not None else np.float32)
             res = g.op.Sub(exp, one, name=g.unique_name("expm1"))
             return NumpyArray(res, g)

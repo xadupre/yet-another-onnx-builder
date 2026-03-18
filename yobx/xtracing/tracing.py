@@ -16,6 +16,9 @@ from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
 from .numpy_array import NumpyArray
 
+#: Name used for the dynamic (batch) first dimension when none is specified.
+_BATCH_DIM = "batch"
+
 
 def trace_numpy_to_onnx(
     func: Callable,
@@ -23,6 +26,7 @@ def trace_numpy_to_onnx(
     input_names: Optional[Sequence[str]] = None,
     output_names: Optional[Sequence[str]] = None,
     target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
+    batch_dim: str = _BATCH_DIM,
 ) -> ModelProto:
     """
     Trace a numpy function and return the equivalent ONNX model.
@@ -49,6 +53,9 @@ def trace_numpy_to_onnx(
         …]`` for multiple outputs).
     :param target_opset: ONNX opset version.  Can be an integer (default
         domain only) or a dictionary mapping domain names to opset versions.
+    :param batch_dim: name of the dynamic first dimension (default:
+        ``"batch"``).  Change this when the default name conflicts with
+        another symbolic dimension in the same graph.
     :return: an :class:`onnx.ModelProto` representing the traced function.
 
     Example::
@@ -100,8 +107,8 @@ def trace_numpy_to_onnx(
     proxy_inputs: List[NumpyArray] = []
     for iname, arr in zip(resolved_input_names, inputs):
         itype = np_dtype_to_tensor_dtype(arr.dtype)
-        # Make the batch dimension dynamic (first dimension).
-        shape: Tuple = ("batch",) + arr.shape[1:]  # type: ignore[assignment]
+        # Make the first (batch) dimension dynamic; keep the rest static.
+        shape: Tuple = (batch_dim,) + arr.shape[1:]  # type: ignore[assignment]
         g.make_tensor_input(iname, itype, shape)
         proxy_inputs.append(NumpyArray(iname, g, dtype=arr.dtype, shape=arr.shape))
 
