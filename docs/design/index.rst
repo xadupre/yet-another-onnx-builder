@@ -14,3 +14,4 @@ that maintain code across the project.
    builder/index
    misc/index
    ci
+   sql/index

@@ -21,3 +21,4 @@ API Reference
    xexpressions/index
    xshape/index
    xtracing/index
+   sql/index
