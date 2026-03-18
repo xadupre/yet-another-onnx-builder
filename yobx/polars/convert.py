@@ -9,13 +9,13 @@ is to capture the *schema contract* of a DataFrame as a portable,
 runtime-agnostic ONNX artifact.
 """
 
-from typing import Dict, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Optional, Union
 
 import numpy as np
 from onnx import ModelProto, TensorProto
-import onnx.helper as oh
 
 from .. import DEFAULT_TARGET_OPSET
+from ..xbuilder import GraphBuilder
 
 
 def polars_dtype_to_onnx_element_type(dtype) -> int:
@@ -91,45 +91,11 @@ def polars_dtype_to_onnx_element_type(dtype) -> int:
     )
 
 
-def _schema_to_onnx_inputs_outputs(
-    schema,
-    batch_dim: Optional[Union[int, str]],
-) -> Tuple[list, list, list]:
-    """Build ONNX input/output value-info and identity nodes from a schema.
-
-    :param schema: a :class:`polars.Schema` (or any mapping ``{name: dtype}``).
-    :param batch_dim: first-axis specification — ``None`` for a fully-static
-        1-D input, an ``int`` for a fixed batch size, or a ``str`` for a
-        dynamic (symbolic) batch dimension.
-    :return: ``(inputs, outputs, nodes)`` ready to be passed to
-        :func:`onnx.helper.make_graph`.
-    """
-    inputs = []
-    outputs = []
-    nodes = []
-    for col_name, col_dtype in schema.items():
-        elem_type = polars_dtype_to_onnx_element_type(col_dtype)
-
-        if batch_dim is None:
-            shape: Optional[list] = None
-        else:
-            shape = [batch_dim]
-
-        inp = oh.make_tensor_value_info(col_name, elem_type, shape)
-        out_name = f"{col_name}_out"
-        out = oh.make_tensor_value_info(out_name, elem_type, shape)
-        node = oh.make_node("Identity", inputs=[col_name], outputs=[out_name], name=f"id_{col_name}")
-        inputs.append(inp)
-        outputs.append(out)
-        nodes.append(node)
-    return inputs, outputs, nodes
-
-
 def to_onnx(
     df_or_schema,
     batch_dim: Optional[Union[int, str]] = "N",
-    target_opset: int = DEFAULT_TARGET_OPSET,
-    name: str = "polars_schema",
+    target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
+    builder_cls: Union[type, Callable] = GraphBuilder,
 ) -> ModelProto:
     """
     Converts a :class:`polars.DataFrame` (or its schema) into an ONNX
@@ -146,9 +112,15 @@ def to_onnx(
         Pass a :class:`str` (e.g. ``"N"`` or ``"batch"``) for a symbolic
         dynamic dimension (default), an :class:`int` for a fixed size, or
         ``None`` to omit shape information entirely.
-    :param target_opset: ONNX opset version for the produced model
-        (default: :data:`yobx.DEFAULT_TARGET_OPSET`).
-    :param name: ONNX graph name embedded in the model proto.
+    :param target_opset: ONNX opset version for the produced model.
+        Either an integer for the default domain (``""``), or a dictionary
+        mapping domain names to opset versions,
+        e.g. ``{"": 20}``.
+        Default: :data:`yobx.DEFAULT_TARGET_OPSET`.
+    :param builder_cls: by default the graph builder is a
+        :class:`yobx.xbuilder.GraphBuilder` but any builder can
+        be used as long it implements the apis :ref:`builder-api`
+        and :ref:`builder-api-make`.
     :return: an :class:`onnx.ModelProto` with one ``Identity`` node per
         column.
 
@@ -177,14 +149,32 @@ def to_onnx(
     if not schema:
         raise ValueError("The DataFrame/Schema has no columns.")
 
-    inputs, outputs, nodes = _schema_to_onnx_inputs_outputs(schema, batch_dim)
+    if isinstance(target_opset, int):
+        dict_target_opset: Dict[str, int] = {"": target_opset}
+    else:
+        if not isinstance(target_opset, dict):
+            raise TypeError(
+                f"target_opset must be a dictionary or an integer not {target_opset!r}"
+            )
+        dict_target_opset = target_opset.copy()
+        if "" not in dict_target_opset:
+            dict_target_opset[""] = DEFAULT_TARGET_OPSET
 
-    graph = oh.make_graph(nodes, name, inputs, outputs)
-    model = oh.make_model(
-        graph,
-        opset_imports=[oh.make_opsetid("", target_opset)],
-    )
-    return model
+    g = builder_cls(dict_target_opset)
+
+    shape = (batch_dim,) if batch_dim is not None else None
+    for col_name, col_dtype in schema.items():
+        elem_type = polars_dtype_to_onnx_element_type(col_dtype)
+        out_name = f"{col_name}_out"
+        g.make_tensor_input(col_name, elem_type, shape)
+        g.op.Identity(col_name, outputs=[out_name], name=f"id_{col_name}")
+        g.make_tensor_output(out_name, elem_type=elem_type, shape=shape, indexed=False)
+
+    if isinstance(g, GraphBuilder):
+        onx, _ = g.to_onnx(return_optimize_report=True)
+    else:
+        onx = g.to_onnx()
+    return onx  # type: ignore
 
 
 def schema_to_numpy_dtypes(schema) -> Dict[str, np.dtype]:

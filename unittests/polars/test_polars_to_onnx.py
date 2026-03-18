@@ -148,12 +148,27 @@ class TestPolarsToOnnx(unittest.TestCase):
             to_onnx([1, 2, 3])
 
     def test_target_opset(self):
-        """to_onnx respects the target_opset argument."""
+        """to_onnx respects the target_opset argument as int."""
         to_onnx = self._get_to_onnx()
         df = pl.DataFrame({"x": [1.0]})
         onx = to_onnx(df, target_opset=17)
         opsets = {op.domain: op.version for op in onx.opset_import}
         self.assertEqual(opsets[""], 17)
+
+    def test_target_opset_dict(self):
+        """to_onnx respects the target_opset argument as a dictionary."""
+        to_onnx = self._get_to_onnx()
+        df = pl.DataFrame({"x": [1.0]})
+        onx = to_onnx(df, target_opset={"": 17})
+        opsets = {op.domain: op.version for op in onx.opset_import}
+        self.assertEqual(opsets[""], 17)
+
+    def test_target_opset_invalid_raises(self):
+        """Passing an invalid target_opset type raises TypeError."""
+        to_onnx = self._get_to_onnx()
+        df = pl.DataFrame({"x": [1.0]})
+        with self.assertRaises(TypeError):
+            to_onnx(df, target_opset="17")
 
     def test_date_dtype(self):
         """Date columns map to INT32."""
