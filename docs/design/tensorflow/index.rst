@@ -8,6 +8,7 @@ TensorFlow / JAX Export to ONNX
    :maxdepth: 1
 
    supported_ops
+   supported_jax_ops
 
 :func:`yobx.tensorflow.to_onnx` converts a :epkg:`TensorFlow`/:epkg:`Keras`
 model — or a :epkg:`JAX` function — into an :class:`onnx.ModelProto`.  The implementation is a
