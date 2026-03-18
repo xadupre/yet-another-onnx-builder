@@ -477,7 +477,11 @@ class NumpyArray:
         if g is None:
             return NotImplemented
         ref_dtype = next(
-            (inp._dtype for inp in inputs if isinstance(inp, NumpyArray) and inp._dtype is not None),
+            (
+                inp._dtype
+                for inp in inputs
+                if isinstance(inp, NumpyArray) and inp._dtype is not None
+            ),
             None,
         )
 
@@ -626,8 +630,7 @@ def _where(condition, x=None, y=None):
     if g is None:
         return NotImplemented
     ref_dtype = next(
-        (v._dtype for v in (x, y) if isinstance(v, NumpyArray) and v._dtype is not None),
-        None,
+        (v._dtype for v in (x, y) if isinstance(v, NumpyArray) and v._dtype is not None), None
     )
     cond_arg = _to_onnx_arg(condition, g)
     x_arg = _to_onnx_arg(x, g, ref_dtype)
@@ -690,8 +693,7 @@ def _matmul(a, b, out=None, **kwargs):
     if g is None:
         return NotImplemented
     ref_dtype = next(
-        (v._dtype for v in (a, b) if isinstance(v, NumpyArray) and v._dtype is not None),
-        None,
+        (v._dtype for v in (a, b) if isinstance(v, NumpyArray) and v._dtype is not None), None
     )
     res = g.op.MatMul(
         _to_onnx_arg(a, g, ref_dtype), _to_onnx_arg(b, g, ref_dtype), name=g.unique_name("matmul")
@@ -707,8 +709,7 @@ def _dot(a, b, out=None):
     if g is None:
         return NotImplemented
     ref_dtype = next(
-        (v._dtype for v in (a, b) if isinstance(v, NumpyArray) and v._dtype is not None),
-        None,
+        (v._dtype for v in (a, b) if isinstance(v, NumpyArray) and v._dtype is not None), None
     )
     res = g.op.MatMul(
         _to_onnx_arg(a, g, ref_dtype), _to_onnx_arg(b, g, ref_dtype), name=g.unique_name("dot")

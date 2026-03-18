@@ -44,9 +44,9 @@ def sklearn_function_transformer(
     :param name: prefix for added node names
     :return: output tensor name
     """
-    assert isinstance(estimator, FunctionTransformer), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(
+        estimator, FunctionTransformer
+    ), f"Unexpected type {type(estimator)} for estimator."
 
     # ----------------------------------------------------------------
     # Identity transformer (func=None)

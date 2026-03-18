@@ -121,7 +121,7 @@ class TestFunctionTransformer(ExtTestCase):
         from sklearn.preprocessing import FunctionTransformer
         from yobx.sklearn import to_onnx
 
-        def my_func(X, scale=np.float32(1)):
+        def my_func(X, scale=1):
             return X * scale
 
         X = np.random.randn(6, 4).astype(np.float32)
@@ -149,12 +149,7 @@ class TestFunctionTransformer(ExtTestCase):
             return np.sqrt(np.abs(X) + np.float32(1))
 
         X = np.random.randn(20, 5).astype(np.float32)
-        pipe = Pipeline(
-            [
-                ("fn", FunctionTransformer(func=my_func)),
-                ("scaler", StandardScaler()),
-            ]
-        )
+        pipe = Pipeline([("fn", FunctionTransformer(func=my_func)), ("scaler", StandardScaler())])
         pipe.fit(X)
 
         onx = to_onnx(pipe, (X,))

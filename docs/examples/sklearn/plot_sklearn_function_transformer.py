@@ -103,8 +103,12 @@ ref_ft = onnxruntime.InferenceSession(
 (onnx_ft_out,) = ref_ft.run(None, {"X": X_test})
 sklearn_ft_out = transformer.transform(X_test).astype(np.float32)
 
-print("\nMax absolute difference (FunctionTransformer):", np.abs(onnx_ft_out - sklearn_ft_out).max())
-assert np.allclose(onnx_ft_out, sklearn_ft_out, atol=1e-5), "Mismatch in FunctionTransformer model!"
+print(
+    "\nMax absolute difference (FunctionTransformer):", np.abs(onnx_ft_out - sklearn_ft_out).max()
+)
+assert np.allclose(
+    onnx_ft_out, sklearn_ft_out, atol=1e-5
+), "Mismatch in FunctionTransformer model!"
 print("FunctionTransformer ✓")
 
 # %%
@@ -137,10 +141,7 @@ print("Identity transformer ✓")
 # The traced operations land directly in the surrounding ONNX graph, so
 # the full pipeline produces a single flat ONNX model.
 
-pipe = Pipeline([
-    ("func", FunctionTransformer(func=log1p_abs)),
-    ("scaler", StandardScaler()),
-])
+pipe = Pipeline([("func", FunctionTransformer(func=log1p_abs)), ("scaler", StandardScaler())])
 
 X_train = rng.standard_normal((80, 4)).astype(np.float32)
 pipe.fit(X_train)

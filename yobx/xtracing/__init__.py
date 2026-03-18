@@ -38,8 +38,4 @@ Example
 from .numpy_array import NumpyArray
 from .tracing import trace_numpy_function, trace_numpy_to_onnx
 
-__all__ = [
-    "NumpyArray",
-    "trace_numpy_function",
-    "trace_numpy_to_onnx",
-]
+__all__ = ["NumpyArray", "trace_numpy_function", "trace_numpy_to_onnx"]

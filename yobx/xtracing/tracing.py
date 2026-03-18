@@ -207,7 +207,7 @@ def trace_numpy_to_onnx(
     for iname, arr in zip(resolved_input_names, inputs):
         itype = np_dtype_to_tensor_dtype(arr.dtype)
         # Make the first (batch) dimension dynamic; keep the rest static.
-        shape: Tuple = (batch_dim,) + arr.shape[1:]  # type: ignore[assignment]
+        shape: Tuple = (batch_dim, *arr.shape[1:])  # type: ignore[assignment]
         g.make_tensor_input(iname, itype, shape)
 
     # ------------------------------------------------------------------
