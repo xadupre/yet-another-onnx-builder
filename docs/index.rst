@@ -99,9 +99,10 @@ Its unique API:
    :maxdepth: 1
    :caption: Contents
 
-   design/sklearn/index
-   design/tensorflow/index
    design/litert/index
+   design/sklearn/index
+   design/sql/index
+   design/tensorflow/index
    design/torch/index
    design/index
    cmds/index
