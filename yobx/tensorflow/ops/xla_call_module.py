@@ -261,12 +261,17 @@ def _make_rsqrt(g: GraphBuilderExtendedProtocol):
 def _make_log_plus_one(g: GraphBuilderExtendedProtocol):
     """Return a callable for ``stablehlo.log_plus_one`` → ``Log(Add(x, 1))``."""
     import numpy as np
+    from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
     def _log1p(*args, **kwargs):
         name = kwargs.pop("name", "log_plus_one")
         outputs = kwargs.pop("outputs", None)
         (x,) = args
-        one = np.array(1, dtype=np.float32)
+        try:
+            dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+        except (AssertionError, KeyError):
+            dtype = np.float32
+        one = np.array(1, dtype=dtype)
         xp1 = g.op.Add(x, one, name=f"{name}_add")
         kw = {"name": name}
         if outputs is not None:
@@ -279,12 +284,17 @@ def _make_log_plus_one(g: GraphBuilderExtendedProtocol):
 def _make_exponential_minus_one(g: GraphBuilderExtendedProtocol):
     """Return a callable for ``stablehlo.exponential_minus_one`` → ``Sub(Exp(x), 1)``."""
     import numpy as np
+    from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 
     def _expm1(*args, **kwargs):
         name = kwargs.pop("name", "exponential_minus_one")
         outputs = kwargs.pop("outputs", None)
         (x,) = args
-        one = np.array(1, dtype=np.float32)
+        try:
+            dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+        except (AssertionError, KeyError):
+            dtype = np.float32
+        one = np.array(1, dtype=dtype)
         exp_x = g.op.Exp(x, name=f"{name}_exp")
         kw = {"name": name}
         if outputs is not None:
