@@ -366,15 +366,7 @@ def convert_exp(
                 continue
 
             # Generic elementwise op via get_jax_cvt.
-            try:
-                fct = get_jax_cvt(decoded_module, g, op_type)
-            except RuntimeError:
-                warnings.warn(
-                    f"XlaCallModule: unsupported StableHLO op {op_type!r} "
-                    f"(layer id={layer.get('id')!r}); skipping.",
-                    stacklevel=2,
-                )
-                continue
+            fct = get_jax_cvt(decoded_module, g, op_type)
             args_list = []
             for a in layer["operands"]:
                 if a not in local_results:
