@@ -423,10 +423,10 @@ requiring code changes:
    * - ``PRINT_EXPORTED_PROGRAM=1``
      - Prints the :class:`~torch.export.ExportedProgram` before interpretation.
 
-Debugging
-=========
-
 .. _l-design-torch-debugging:
+
+Debugging when Exporting with GraphBuilder
+==========================================
 
 :class:`~yobx.xbuilder.GraphBuilder` reads several environment variables at
 construction time that raise an exception as soon as a named result is

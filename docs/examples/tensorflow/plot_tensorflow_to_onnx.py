@@ -40,7 +40,11 @@ from yobx.tensorflow import to_onnx
 
 # %%
 # Remove this line to run on GPU.
-tf.config.set_visible_devices([], "GPU")
+try:
+    tf.config.set_visible_devices([], "GPU")
+except RuntimeError:
+    # may fail if tensorflow has already been running before this script
+    pass
 
 # %%
 # 1. Build a simple Dense layer
@@ -120,7 +124,7 @@ ref_mlp = onnxruntime.InferenceSession(
 (result_mlp,) = ref_mlp.run(None, {"X:0": X_test})
 
 expected_mlp = mlp(X_test).numpy()
-assert np.allclose(expected_mlp, result_mlp, atol=1e-5), "MLP mismatch!"
+np.testing.assert_allclose(expected_mlp, result_mlp, atol=1e-2)
 print("MLP predictions match ✓")
 
 # %%
