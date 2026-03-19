@@ -206,6 +206,7 @@ class TestSklearnCountVectorizerConverter(ExtTestCase):
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-6)
 
+    @requires_sklearn("1.8")
     def test_model_count_vectorizer11_empty_string_case2(self):
         """An empty-string document produces an all-zero feature vector."""
         from sklearn.feature_extraction.text import CountVectorizer
