@@ -566,7 +566,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
         y = torch.randn(2, 3)
 
         explicit_options = OptimizationOptions(patterns="default")
-        _onx, builder = to_onnx(
+        onx = to_onnx(
             Model(),
             (x, y),
             target_opset={"": 22, "com.microsoft": 1},
@@ -574,7 +574,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
             return_builder=True,
         )
         self.assertIs(
-            builder.optimization_options,
+            onx.builder.optimization_options,
             explicit_options,
             "Explicit options should not be replaced by the auto-detected ort options",
         )

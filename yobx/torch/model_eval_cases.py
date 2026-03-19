@@ -584,9 +584,10 @@ def run_exporter(
 
         import onnxruntime
 
+        assert hasattr(onx, "SerializeToString"), f"unexpected type {type(onx)} for onx"
         try:
             sess = onnxruntime.InferenceSession(
-                onx.proto.SerializeToString(), providers=["CPUExecutionProvider"]
+                onx.SerializeToString(), providers=["CPUExecutionProvider"]
             )
         except Exception as e:
             if not quiet:
@@ -633,7 +634,7 @@ def run_exporter(
 
     if dynamic and onx is not None:
         ds = []
-        for i in onx.proto.graph.input:
+        for i in onx.graph.input:
             if i.type.tensor_type:
                 for di, dim in enumerate(i.type.tensor_type.shape.dim):
                     if dim.dim_param:

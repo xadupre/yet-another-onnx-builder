@@ -1071,6 +1071,8 @@ def to_onnx(
         function_options=function_options,
         mask_outputs=mask_outputs,
     )
+    if return_builder:
+        onx.builder = builder
     all_stats = dict(builder=builder.statistics_)
     if onx.report and onx.report.stats:
         add_stats["optimization"] = onx.report

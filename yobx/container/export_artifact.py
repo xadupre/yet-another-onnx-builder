@@ -90,22 +90,21 @@ class ExportArtifact(ExportArtifactProtocol):
     container, an :class:`ExportReport` describing the export process,
     and an optional filename.
 
-    Attributes
-    ----------
-    proto : ModelProto | FunctionProto | GraphProto | None
-        The ONNX proto produced by the export.  When *large_model* was
-        requested the proto contains *placeholders* for external data;
-        use :meth:`get_proto` to obtain a fully self-contained proto.
-    container : ExtendedModelContainer | None
-        The :class:`~yobx.container.ExtendedModelContainer` produced when
-        the conversion was called with ``large_model=True``.  ``None``
-        otherwise.
-    report : ExportReport
-        Statistics and metadata about the export.
-    filename : str | None
-        Path where the model was last saved, or ``None`` if never saved.
-    builder: GraphBuilderExtendedProtocol
-        Keeps the builder building the onnx model
+    Args:
+        proto : ModelProto | FunctionProto | GraphProto | None
+            The ONNX proto produced by the export.  When *large_model* was
+            requested the proto contains *placeholders* for external data;
+            use :meth:`get_proto` to obtain a fully self-contained proto.
+        container : ExtendedModelContainer | None
+            The :class:`~yobx.container.ExtendedModelContainer` produced when
+            the conversion was called with ``large_model=True``.  ``None``
+            otherwise.
+        report : ExportReport | None
+            Statistics and metadata about the export.
+        filename : str | None
+            Path where the model was last saved, or ``None`` if never saved.
+        builder: GraphBuilderExtendedProtocol
+            Keeps the builder building the onnx model
 
     Example::
 

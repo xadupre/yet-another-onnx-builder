@@ -57,6 +57,10 @@ def trace_numpy_function(
 
     Example::
 
+    .. runpython::
+        :showcode:
+
+        from yobx.helpers.onnx_hepler import pretty_onnx
         from yobx.xbuilder import GraphBuilder
         from yobx.xtracing import trace_numpy_function
         import numpy as np
@@ -70,7 +74,8 @@ def trace_numpy_function(
 
         trace_numpy_function(g, {}, ["output_0"], my_func, ["X"])
         g.make_tensor_output("output_0", indexed=False, allow_untyped_output=True)
-        onx, _ = g.to_onnx(return_optimize_report=True)
+        onx = g.to_onnx()
+        print(pretty_onnx(onx))
     """
     # Build NumpyArray proxies from the named tensors already in g,
     # preserving the dtype information where available.

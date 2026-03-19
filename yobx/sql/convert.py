@@ -129,7 +129,11 @@ def sql_to_onnx_graph(
 
     Example::
 
+    .. runpython::
+        :showcode:
+
         import numpy as np
+        from yobx.helpers.onnx_helper import pretty_onnx
         from yobx.xbuilder import GraphBuilder
         from yobx.sql import sql_to_onnx_graph
 
@@ -142,7 +146,8 @@ def sql_to_onnx_graph(
             "SELECT a + b AS total FROM t WHERE a > 0",
             dtypes,
         )
-        onx, _ = g.to_onnx(return_optimize_report=True)
+        onx = g.to_onnx()
+        print(pretty_onnx(onx))
     """
     custom_functions = (sts or {}).get("custom_functions", {})
     pq = parse_sql(query)

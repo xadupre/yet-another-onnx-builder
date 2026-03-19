@@ -425,7 +425,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
         attn = _make_llama_attention().eval()
         hs, cos, sin = self._get_inputs()
-        model = _to_model(attn, hs, cos, sin, target_opset=22)
+        model = _to_model(attn, hs, cos, sin, target_opset=22).proto
 
         self.assertIsInstance(model, onnx.ModelProto)
         # Inputs
