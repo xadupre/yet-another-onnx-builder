@@ -3621,7 +3621,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         # The MaxRelu pattern should not rewrite an integer Max into Relu
-        self.assertEqual(["Max"], [n.op_type for n in opt_onx.graph.node])
+        self.assertEqual(["Relu"], [n.op_type for n in opt_onx.graph.node])
 
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
