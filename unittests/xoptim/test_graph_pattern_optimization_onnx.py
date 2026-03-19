@@ -37,6 +37,7 @@ from yobx.xoptim.patterns import MatMulAddPattern
 
 TBOOL = TensorProto.BOOL
 TFLOAT = TensorProto.FLOAT
+TINT64 = TensorProto.INT64
 TFLOAT16 = TensorProto.FLOAT16
 TINT64 = TensorProto.INT64
 _mkv_ = oh.make_tensor_value_info
@@ -3499,6 +3500,166 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
         # self._check_with_ort(opt_onx)
+
+    def test_max_relu(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Max", ["X", "zero"], ["Y"])],
+                "dummy",
+                [_mkv_("X", TFLOAT, [3, 3])],
+                [_mkv_("Y", TFLOAT, [3, 3])],
+                [onh.from_array(np.array([0], dtype=np.float32), name="zero")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(3, 3, bias=-0.5).astype(np.float32)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["MaxRelu"], verbose=0),
+            verbose=0,
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Relu"], [n.op_type for n in opt_onx.graph.node])
+        self.assertEqual(0, len(opt_onx.graph.initializer))
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_max_relu_commuted(self):
+        # Max(0, x) should also be fused to Relu(x)
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Max", ["zero", "X"], ["Y"])],
+                "dummy",
+                [_mkv_("X", TFLOAT, [3, 3])],
+                [_mkv_("Y", TFLOAT, [3, 3])],
+                [onh.from_array(np.array([0], dtype=np.float32), name="zero")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(3, 3, bias=-0.5).astype(np.float32)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["MaxRelu"], verbose=0),
+            verbose=0,
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Relu"], [n.op_type for n in opt_onx.graph.node])
+        self.assertEqual(0, len(opt_onx.graph.initializer))
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_max_relu_not(self):
+        # Max(x, 1) should NOT be fused to Relu
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Max", ["X", "one"], ["Y"])],
+                "dummy",
+                [_mkv_("X", TFLOAT, [3, 3])],
+                [_mkv_("Y", TFLOAT, [3, 3])],
+                [onh.from_array(np.array([1], dtype=np.float32), name="one")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(3, 3, bias=-0.5).astype(np.float32)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["MaxRelu"], verbose=0),
+            verbose=0,
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertNotEqual(["Relu"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_max_relu_int_not(self):
+        # Integer-typed Max should NOT be fused to Relu
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Max", ["X", "zero"], ["Y"])],
+                "dummy",
+                [_mkv_("X", TINT64, [3, 3])],
+                [_mkv_("Y", TINT64, [3, 3])],
+                [onh.from_array(np.array([0], dtype=np.int64), name="zero")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(3, 3, bias=-2).astype(np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["MaxRelu"], verbose=0),
+            verbose=0,
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # The MaxRelu pattern should not rewrite an integer Max into Relu
+        self.assertEqual(["Relu"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_max_relu_both_zero_constants(self):
+        # Max(0, 0) with both inputs constants should not produce an invalid Relu(None)
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Max", ["zero1", "zero2"], ["Y"])],
+                "dummy",
+                [],
+                [_mkv_("Y", TFLOAT, [1])],
+                [
+                    onh.from_array(np.array([0], dtype=np.float32), name="zero1"),
+                    onh.from_array(np.array([0], dtype=np.float32), name="zero2"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, {})[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["MaxRelu"], verbose=0),
+            verbose=0,
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # The MaxRelu pattern should not turn Max(0, 0) into an invalid Relu(None)
+        self.assertEqual(["Max"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, {})[0]
+        self.assertEqualArray(expected, got)
 
     @requires_torch("2.6")
     def test_conv_null_bias(self):
