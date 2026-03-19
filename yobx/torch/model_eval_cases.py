@@ -560,9 +560,9 @@ def run_exporter(
                 else pretty_onnx(onx)
             )
         if verbose >= 2:
-            onnx.save(onx, f"evaluation-{model.__class__.__name__}-{dynamic}-{exporter}.onnx")
+            onnx.save(onx.proto, f"evaluation-{model.__class__.__name__}-{dynamic}-{exporter}.onnx")
 
-        names = [i.name for i in onx.graph.input]
+        names = [i.name for i in onx.proto.graph.input]
         flats = _flatten_inputs(inputs[0]) if len(names) > len(inputs[0]) else inputs[0]
 
         assert quiet or len(names) == len(flats), (
@@ -584,7 +584,7 @@ def run_exporter(
 
         try:
             sess = onnxruntime.InferenceSession(
-                onx.SerializeToString(), providers=["CPUExecutionProvider"]
+                onx.proto.SerializeToString(), providers=["CPUExecutionProvider"]
             )
         except Exception as e:
             if not quiet:
@@ -631,7 +631,7 @@ def run_exporter(
 
     if dynamic and onx is not None:
         ds = []
-        for i in onx.graph.input:
+        for i in onx.proto.graph.input:
             if i.type.tensor_type:
                 for di, dim in enumerate(i.type.tensor_type.shape.dim):
                     if dim.dim_param:

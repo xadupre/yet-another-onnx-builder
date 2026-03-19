@@ -1502,6 +1502,10 @@ class ExtTestCase(unittest.TestCase):
         self, proto: Union["onnx.ModelProto", str], cpu: bool = False  # noqa: F821
     ) -> "onnxruntime.InferenceSession":  # noqa: F821
         from onnxruntime import InferenceSession, get_available_providers
+        from .container.export_artifact import ExportArtifact
+
+        if isinstance(proto, ExportArtifact):
+            proto = proto.proto
 
         providers = ["CPUExecutionProvider"]
         if not cpu and "CUDAExecutionProvider" in get_available_providers():

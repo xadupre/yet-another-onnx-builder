@@ -21,7 +21,7 @@ class TestPolynomialFeatures(ExtTestCase):
         onx = to_onnx(pf, (X,))
 
         # Verify graph contains expected ops
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Unsqueeze", op_types)
         self.assertIn("Where", op_types)
         self.assertIn("Pow", op_types)

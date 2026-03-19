@@ -52,7 +52,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         onx = self._check_lda(lda, X_train, X_test)
 
         # Verify ONNX graph contains expected ops.
-        op_types = {n.op_type for n in onx.graph.node}
+        op_types = {n.op_type for n in onx.proto.graph.node}
         self.assertIn("MatMul", op_types)
         self.assertIn("Div", op_types)
         self.assertIn("Exp", op_types)
@@ -98,7 +98,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         # Verify that the ONNX graph operates in float32.
         import onnx
 
-        input_type = onx.graph.input[0].type.tensor_type.elem_type
+        input_type = onx.proto.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(input_type, onnx.TensorProto.FLOAT)
 
     def test_lda_float64(self):
@@ -117,7 +117,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         # Verify that the ONNX graph operates in float64.
         import onnx
 
-        input_type = onx.graph.input[0].type.tensor_type.elem_type
+        input_type = onx.proto.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(input_type, onnx.TensorProto.DOUBLE)
 
     def test_lda_output_shape(self):

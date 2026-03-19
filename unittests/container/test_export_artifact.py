@@ -65,21 +65,12 @@ class TestExportArtifact(ExtTestCase):
         artifact = self._artifact()
         self.assertIsNotNone(artifact.proto)
         self.assertIsNone(artifact.container)
+        self.assertIsNone(artifact.filename)
         self.assertIsInstance(artifact.report, ExportReport)
 
-    def test_proto_delegation_graph(self):
-        """Accessing .graph should delegate to proto.graph."""
-        artifact = self._artifact()
-        # graph is an attribute of ModelProto – must be reachable through the artifact
-        self.assertIsNotNone(artifact.graph)
-        self.assertEqual(artifact.graph.name, "g")
-
-    def test_proto_delegation_serialize(self):
-        """SerializeToString() should delegate to the underlying proto."""
-        artifact = self._artifact()
-        data = artifact.SerializeToString()
-        self.assertIsInstance(data, bytes)
-        self.assertGreater(len(data), 0)
+    def test_filename_stored(self):
+        artifact = ExportArtifact(proto=_make_simple_model(), filename="model.onnx")
+        self.assertEqual(artifact.filename, "model.onnx")
 
     def test_get_proto_no_container(self):
         artifact = self._artifact()
@@ -104,6 +95,7 @@ class TestExportArtifact(ExtTestCase):
             returned = artifact.save(path)
             self.assertTrue(os.path.exists(path))
             self.assertIsInstance(returned, onnx.ModelProto)
+            self.assertEqual(artifact.filename, path)
 
     def test_save_non_model_proto_raises(self):
         """Saving a FunctionProto directly should raise TypeError."""
@@ -122,11 +114,7 @@ class TestExportArtifact(ExtTestCase):
         text = repr(artifact)
         self.assertIn("ExportArtifact", text)
         self.assertIn("ModelProto", text)
-
-    def test_missing_attribute_raises(self):
-        artifact = self._artifact()
-        with self.assertRaises(AttributeError):
-            _ = artifact._nonexistent_attribute_xyz
+        self.assertIn("filename=None", text)
 
     def test_reference_evaluator_accepts_artifact(self):
         """ExtendedReferenceEvaluator should accept an ExportArtifact."""
@@ -149,9 +137,6 @@ class TestExportArtifact(ExtTestCase):
         self.assertIsInstance(artifact.report, ExportReport)
         self.assertIsInstance(artifact.proto, onnx.ModelProto)
         self.assertIsNone(artifact.container)
-
-        # Backward-compat: .graph still accessible
-        self.assertIsNotNone(artifact.graph)
 
         # Can be passed to ExtendedReferenceEvaluator
         ref = ExtendedReferenceEvaluator(artifact)

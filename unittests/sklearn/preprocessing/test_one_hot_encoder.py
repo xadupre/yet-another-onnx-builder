@@ -21,7 +21,7 @@ class TestOneHotEncoder(ExtTestCase):
         onx = to_onnx(enc, (X,))
 
         # Check graph contains Equal and Cast nodes
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
         self.assertIn("Cast", op_types)
         self.assertIn("Concat", op_types)
@@ -65,7 +65,7 @@ class TestOneHotEncoder(ExtTestCase):
 
         onx = to_onnx(enc, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
         self.assertIn("Cast", op_types)
 
@@ -134,7 +134,7 @@ class TestOneHotEncoder(ExtTestCase):
 
         onx = to_onnx(pipe, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
         self.assertIn("Cast", op_types)
 

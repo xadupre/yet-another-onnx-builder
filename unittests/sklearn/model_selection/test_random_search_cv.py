@@ -30,7 +30,7 @@ class TestSklearnRandomizedSearchCV(ExtTestCase):
             Xd = X.astype(dtype)
             onx = to_onnx(clf, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -54,7 +54,7 @@ class TestSklearnRandomizedSearchCV(ExtTestCase):
             Xd = X.astype(dtype)
             onx = to_onnx(reg, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)

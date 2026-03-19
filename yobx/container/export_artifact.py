@@ -65,7 +65,8 @@ class ExportArtifact:
     :class:`~onnx.ModelProto` or
     :class:`~yobx.container.ExtendedModelContainer`.
     The instance bundles the exported proto, the optional large-model
-    container, and an :class:`ExportReport` describing the export process.
+    container, an :class:`ExportReport` describing the export process,
+    and an optional filename.
 
     Attributes
     ----------
@@ -79,22 +80,8 @@ class ExportArtifact:
         otherwise.
     report : ExportReport
         Statistics and metadata about the export.
-
-    Backward Compatibility
-    ----------------------
-    :class:`ExportArtifact` transparently proxies attribute access to its
-    underlying *proto* so that code that previously received a raw
-    :class:`~onnx.ModelProto` continues to work without modification::
-
-        onx = to_onnx(estimator, (X,))
-
-        # New API:
-        print(onx.proto)
-        onx.save("model.onnx")
-
-        # Legacy API still works:
-        print(onx.graph.node)  # delegated to proto.graph.node
-        onx.SerializeToString()  # delegated to proto.SerializeToString()
+    filename : str | None
+        Path where the model was last saved, or ``None`` if never saved.
 
     Example::
 
@@ -120,33 +107,12 @@ class ExportArtifact:
         proto: Any = None,
         container: Optional[Any] = None,
         report: Optional[ExportReport] = None,
+        filename: Optional[str] = None,
     ):
         self.proto = proto
         self.container = container
         self.report = report if report is not None else ExportReport()
-
-    # ------------------------------------------------------------------
-    # Backward-compatibility proxy
-    # ------------------------------------------------------------------
-
-    def __getattr__(self, name: str) -> Any:
-        """Delegate unknown attribute access to the underlying proto."""
-        # Avoid infinite recursion: access stored attributes directly.
-        proto = object.__getattribute__(self, "proto")
-        if proto is not None:
-            try:
-                return getattr(proto, name)
-            except AttributeError:
-                pass
-        container = object.__getattribute__(self, "container")
-        if container is not None:
-            try:
-                return getattr(container, name)
-            except AttributeError:
-                pass
-        raise AttributeError(
-            f"'{type(self).__name__}' object has no attribute {name!r}"
-        )
+        self.filename = filename
 
     # ------------------------------------------------------------------
     # Public API
@@ -177,13 +143,16 @@ class ExportArtifact:
             artifact.save("model.onnx")
         """
         if self.container is not None:
-            return self.container.save(
+            result = self.container.save(
                 file_path, all_tensors_to_one_file=all_tensors_to_one_file
             )
+            self.filename = file_path
+            return result
         import onnx
 
         if isinstance(self.proto, onnx.ModelProto):
             onnx.save_model(self.proto, file_path)
+            self.filename = file_path
             return self.proto
         raise TypeError(
             f"Cannot save a proto of type {type(self.proto).__name__}. "
@@ -199,10 +168,9 @@ class ExportArtifact:
         When the export was performed with ``large_model=True`` (i.e.
         :attr:`container` is set), the raw :attr:`proto` has
         *external-data* placeholders instead of embedded weight tensors.
-        Passing ``include_weights=True`` (the default) returns a deep copy
-        of the :class:`~onnx.ModelProto` with all external tensors
-        replaced by their in-memory values so the result is fully
-        self-contained.
+        Passing ``include_weights=True`` (the default) uses
+        :meth:`~yobx.container.ExtendedModelContainer.to_ir` to build a
+        fully self-contained :class:`~onnx.ModelProto`.
 
         :param include_weights: when ``True`` (default) embed the large
             initializers stored in :attr:`container` into the returned
@@ -222,52 +190,12 @@ class ExportArtifact:
         if self.container is None:
             return self.proto
 
-        proto = self.container.model_proto
         if not include_weights:
-            return proto
+            return self.container.model_proto
 
-        # Embed large initializers into a copy of the ModelProto.
-        import copy
+        import onnx_ir.serde as oirs
 
-        import numpy as np
-        import onnx
-        from onnx.external_data_helper import _get_all_tensors, uses_external_data
-
-        proto_copy = copy.deepcopy(proto)
-        large_inits = self.container.large_initializers
-
-        for tensor in _get_all_tensors(proto_copy):
-            if not uses_external_data(tensor):
-                continue
-            location: Optional[str] = None
-            for ext in tensor.external_data:
-                if ext.key == "location":
-                    location = ext.value
-                    break
-            if location is None or location not in large_inits:
-                continue
-            val = large_inits[location]
-
-            tensor.data_location = onnx.TensorProto.DEFAULT
-            del tensor.external_data[:]
-
-            if isinstance(val, np.ndarray):
-                tensor.raw_data = val.tobytes()
-            elif isinstance(val, onnx.TensorProto):
-                tensor.raw_data = val.raw_data
-            else:
-                # Assume a torch tensor.
-                import torch
-
-                if isinstance(val, (torch.nn.Parameter, torch.Tensor)):
-                    arr = val.detach().cpu().numpy()
-                    tensor.raw_data = arr.tobytes()
-                else:
-                    raise TypeError(
-                        f"Unsupported large initializer type {type(val)!r}"
-                    )
-
-        return proto_copy
+        return oirs.serialize_model(self.container.to_ir())
 
     # ------------------------------------------------------------------
     # Dunder helpers
@@ -280,5 +208,6 @@ class ExportArtifact:
             f"{self.__class__.__name__}("
             f"proto={proto_type}, "
             f"container={has_container}, "
+            f"filename={self.filename!r}, "
             f"report={self.report!r})"
         )

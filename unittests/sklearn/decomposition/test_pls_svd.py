@@ -23,7 +23,7 @@ class TestPLSSVD(ExtTestCase):
         onx = to_onnx(pls, (X,))
 
         # Check that Sub (centering) and Div (scaling) are present.
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("Div", op_types)
         self.assertIn("MatMul", op_types)

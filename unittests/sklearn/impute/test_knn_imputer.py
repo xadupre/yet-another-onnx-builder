@@ -161,7 +161,7 @@ class TestKNNImputer(ExtTestCase):
 
         onx = to_onnx(imp, (X,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
         expected = imp.transform(X).astype(np.float32)
@@ -181,7 +181,7 @@ class TestKNNImputer(ExtTestCase):
 
         onx = to_onnx(imp, (X,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
         expected = imp.transform(X).astype(np.float32)
@@ -206,7 +206,7 @@ class TestKNNImputer(ExtTestCase):
 
         onx = to_onnx(imp, (X,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
         expected = imp.transform(X)

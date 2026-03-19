@@ -24,7 +24,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         onx = to_onnx(ss, (X,))
 
         # Check graph structure
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("Div", op_types)
 
@@ -49,7 +49,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         onx = to_onnx(lr, (X,))
 
         # Check graph structure
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Gemm", op_types)
 
         # Check outputs
@@ -76,7 +76,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         onx = to_onnx(lr, (X,))
 
         # Check graph structure
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Gemm", op_types)
         self.assertIn("Softmax", op_types)
 
@@ -104,7 +104,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         onx = to_onnx(pipe, (X,))
 
         # Check graph contains nodes from both steps
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("Div", op_types)
         self.assertIn("Gemm", op_types)
@@ -195,7 +195,7 @@ class TestSklearnBaseConverters(ExtTestCase):
 
         onx = to_onnx(est, (X,), extra_converters={ScaleByConstant: convert_scale_by_constant})
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Mul", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -228,7 +228,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         onx = to_onnx(ss, (X,), extra_converters={StandardScaler: custom_scaler_converter})
 
         self.assertTrue(called, "custom converter was not called")
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Identity", op_types)
         self.assertNotIn("Sub", op_types)
 
@@ -254,7 +254,7 @@ class TestSklearnBaseConverters(ExtTestCase):
 
         onx = to_onnx(rf, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -272,7 +272,7 @@ class TestSklearnBaseConverters(ExtTestCase):
 
         onx = to_onnx(rf, (X,), target_opset=18)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleClassifier", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -290,7 +290,7 @@ class TestSklearnBaseConverters(ExtTestCase):
 
         onx = to_onnx(rf, (X,), target_opset=18)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleRegressor", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -310,7 +310,7 @@ class TestSklearnBaseConverters(ExtTestCase):
 
         onx = to_onnx(rf, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleClassifier", op_types)
 
@@ -330,7 +330,7 @@ class TestSklearnBaseConverters(ExtTestCase):
 
         onx = to_onnx(rf, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleClassifier", op_types)
 
@@ -350,7 +350,7 @@ class TestSklearnBaseConverters(ExtTestCase):
 
         onx = to_onnx(rf, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleRegressor", op_types)
 
@@ -375,7 +375,7 @@ class TestSklearnBaseConverters(ExtTestCase):
 
         onx = to_onnx(pipe, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -491,9 +491,9 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
         onx = to_onnx(ss, (vip,))
 
         # The ONNX graph input must use the name from the ValueInfoProto.
-        self.assertEqual(onx.graph.input[0].name, "features")
+        self.assertEqual(onx.proto.graph.input[0].name, "features")
         # Shape dim 0 should be symbolic ("N"), dim 1 should be static 2.
-        shape = onx.graph.input[0].type.tensor_type.shape
+        shape = onx.proto.graph.input[0].type.tensor_type.shape
         self.assertEqual(shape.dim[0].dim_param, "N")
         self.assertEqual(shape.dim[1].dim_value, 2)
 
@@ -512,7 +512,7 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
         vip = onnx.helper.make_tensor_value_info("features", onnx.TensorProto.FLOAT, ["N", 2])
         onx = to_onnx(ss, (vip,), input_names=["my_input"])
 
-        self.assertEqual(onx.graph.input[0].name, "my_input")
+        self.assertEqual(onx.proto.graph.input[0].name, "my_input")
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"my_input": X})[0]
@@ -531,7 +531,7 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
         vip = onnx.helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [None, 2])
         onx = to_onnx(pipe, (vip,))
 
-        self.assertEqual(onx.graph.input[0].name, "X")
+        self.assertEqual(onx.proto.graph.input[0].name, "X")
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -552,7 +552,7 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
         vip = onnx.helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [None, 2])
         onx = to_onnx(pipe, (vip,), verbose=1)
 
-        self.assertEqual(onx.graph.input[0].name, "X")
+        self.assertEqual(onx.proto.graph.input[0].name, "X")
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]

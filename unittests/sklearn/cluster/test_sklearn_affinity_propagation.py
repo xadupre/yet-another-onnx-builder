@@ -21,7 +21,7 @@ class TestAffinityPropagation(ExtTestCase):
 
         onx = to_onnx(ap, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ArgMin", op_types)
         self.assertIn("MatMul", op_types)
 
