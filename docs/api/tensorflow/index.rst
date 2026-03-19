@@ -1,10 +1,11 @@
 yobx.tensorflow
 ===============
 
-to_onnx
-+++++++
+.. toctree::
+    :maxdepth: 1
+    :caption: main functions
 
-.. autofunction:: yobx.tensorflow.to_onnx
+    to_onnx
 
 .. toctree::
     :maxdepth: 1

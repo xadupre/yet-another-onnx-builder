@@ -1,5 +1,10 @@
 """
 Unit tests for yobx.sklearn.neighbors RadiusNeighbors converters.
+
+Includes tests ported from the sklearn-onnx test suite
+(tests/test_sklearn_nearest_neighbour_converter.py in the onnx/sklearn-onnx
+repository) to validate that the yobx converters produce outputs that match
+scikit-learn for the scenarios covered there.
 """
 
 import unittest
@@ -268,20 +273,24 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
         with self.assertRaises(NotImplementedError):
             to_onnx(clf, (X,), target_opset=12)
 
-    def test_rnn_classifier_non_uniform_weights_raises(self):
-        """weights != 'uniform' must raise NotImplementedError."""
+    def test_rnn_classifier_distance_weights(self):
+        """weights='distance' should produce correct results."""
         from sklearn.neighbors import RadiusNeighborsClassifier
         from yobx.sklearn import to_onnx
 
         rng = np.random.default_rng(8)
-        X = rng.standard_normal((20, 3)).astype(np.float32)
+        X = rng.standard_normal((30, 3)).astype(np.float32)
         y = (X[:, 0] > 0).astype(np.int64)
 
         clf = RadiusNeighborsClassifier(radius=2.0, weights="distance")
         clf.fit(X, y)
 
-        with self.assertRaises(NotImplementedError):
-            to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,))
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        expected_labels = clf.predict(X).astype(np.int64)
+        self.assertEqualArray(expected_labels, ort_results[0])
 
 
 @requires_sklearn("1.4")
@@ -452,20 +461,24 @@ class TestRadiusNeighborsRegressor(ExtTestCase):
         with self.assertRaises(NotImplementedError):
             to_onnx(reg, (X,), target_opset=12)
 
-    def test_rnn_regressor_non_uniform_weights_raises(self):
-        """weights != 'uniform' must raise NotImplementedError."""
+    def test_rnn_regressor_distance_weights(self):
+        """weights='distance' should produce correct results."""
         from sklearn.neighbors import RadiusNeighborsRegressor
         from yobx.sklearn import to_onnx
 
         rng = np.random.default_rng(6)
-        X = rng.standard_normal((20, 3)).astype(np.float32)
-        y = X[:, 0] + 1
+        X = rng.standard_normal((30, 3)).astype(np.float32)
+        y = (X[:, 0] + 1).astype(np.float32)
 
         reg = RadiusNeighborsRegressor(radius=2.0, weights="distance")
         reg.fit(X, y)
 
-        with self.assertRaises(NotImplementedError):
-            to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,))
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        expected = reg.predict(X).astype(np.float32)
+        self.assertEqualArray(expected, ort_results[0], atol=2e-3)
 
 
 if __name__ == "__main__":

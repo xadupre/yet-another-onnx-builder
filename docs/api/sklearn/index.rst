@@ -1,20 +1,12 @@
 yobx.sklearn
 ============
 
-register_sklearn_converters
-+++++++++++++++++++++++++++
+.. toctree::
+    :maxdepth: 1
+    :caption: main functions
 
-.. autofunction:: yobx.sklearn.register_sklearn_converters
-
-to_onnx
-+++++++
-
-.. autofunction:: yobx.sklearn.to_onnx
-
-ConvertOptions
-++++++++++++++
-
-.. autofunction:: yobx.sklearn.ConvertOptions
+    to_onnx
+    convert_options
 
 .. toctree::
     :maxdepth: 1

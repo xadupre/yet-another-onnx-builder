@@ -22,7 +22,7 @@ def _make_survival_data(n=100, n_features=5, seed=0):
     return X, y
 
 
-@requires_sklearn("1.4")
+@requires_sklearn("1.8")
 @requires_sksurv()
 class TestRandomSurvivalForest(ExtTestCase):
     _X, _y = _make_survival_data()
