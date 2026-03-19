@@ -113,7 +113,6 @@ def sklearn_column_transformer(
         X_sub = g.op.Gather(X, col_indices, axis=1, name=f"{name}__{trans_name}")
 
         if _is_passthrough(transformer):
-            assert isinstance(X_sub, str)  # type happiness
             parts.append(X_sub)
         else:
             try:
@@ -128,7 +127,6 @@ def sklearn_column_transformer(
 
             is_container = isinstance(transformer, (Pipeline, ColumnTransformer, FeatureUnion))
             if function_options and function_options.export_as_function and not is_container:
-                assert isinstance(X_sub, str)  # type happiness
                 _wrap_step_as_function(
                     g,  # type: ignore
                     function_options,
@@ -163,5 +161,4 @@ def sklearn_column_transformer(
     else:
         res = g.op.Concat(*parts, axis=-1, name=name, outputs=outputs)
 
-    assert isinstance(res, str)
     return res

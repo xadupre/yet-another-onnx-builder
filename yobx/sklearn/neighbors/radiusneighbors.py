@@ -75,17 +75,16 @@ def _classify_single_output(
 
     # Weighted votes: (N, M) @ (M, n_classes) = (N, n_classes)
     vote_counts = g.op.MatMul(weights, one_hot, name=f"{name}_votes")
-    assert isinstance(vote_counts, str)
-    g.set_type(vote_counts, onnx.TensorProto.FLOAT)
 
     # Predicted class index: (N,) int64
     class_idx = g.op.ArgMax(vote_counts, axis=1, keepdims=0, name=f"{name}_argmax")
 
     # Map back to actual class labels: (N,)
-    if np.issubdtype(classes_arr.dtype, np.integer):
-        classes_init = classes_arr.astype(np.int64)
-    else:
-        classes_init = classes_arr
+    classes_init = (
+        classes_arr.astype(np.int64)
+        if np.issubdtype(classes_arr.dtype, np.integer)
+        else classes_arr
+    )
 
     predicted_label = g.op.Gather(classes_init, class_idx, axis=0, name=f"{name}_pred")
 
@@ -110,15 +109,6 @@ def _classify_single_output(
     else:
         labels = g.op.Identity(predicted_label, name=f"{name}_labels", outputs=outputs[:1])
 
-    assert isinstance(labels, str)
-    if not sts:
-        out_itype = (
-            onnx.TensorProto.INT64
-            if np.issubdtype(classes_arr.dtype, np.integer)
-            else onnx.TensorProto.STRING
-        )
-        g.set_type(labels, out_itype)
-
     n_out = len(outputs)
     if n_out >= 2:
         # Normalise vote counts → probabilities in [0, 1]
@@ -130,9 +120,6 @@ def _classify_single_output(
         probabilities = g.op.Div(
             vote_counts, safe_total, name=f"{name}_proba", outputs=outputs[1:2]
         )
-        assert isinstance(probabilities, str)
-        if not sts:
-            g.set_type(probabilities, onnx.TensorProto.FLOAT)
         return labels, probabilities
 
     return labels
@@ -459,9 +446,5 @@ def sklearn_radius_neighbors_regressor(
 
         # Average / weighted average: NaN when no in-radius neighbour (0/0)
         predictions = g.op.Div(sum_targets, weight_sum, name=f"{name}_pred", outputs=outputs[:1])
-
-    assert isinstance(predictions, str)
-    if not sts:
-        g.set_type(predictions, itype)
 
     return predictions

@@ -56,5 +56,4 @@ def sklearn_bernoulli_rbm(
     z = g.op.MatMul(X, weights.T, name=f"{name}_mm")
     z = g.op.Add(z, bias, name=f"{name}_add")
     result = g.op.Sigmoid(z, name=f"{name}_sigmoid", outputs=outputs)
-    assert isinstance(result, str)
     return result

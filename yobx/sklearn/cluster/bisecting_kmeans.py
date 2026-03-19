@@ -166,12 +166,9 @@ def sklearn_bisecting_kmeans(
 
     if n_outputs >= 2:
         distances = g.op.Identity(eucl_dists, name=f"{name}_distances", outputs=outputs[1:2])
-        assert isinstance(distances, str)
-        if not sts:
-            g.set_type(distances, itype)
+        g.set_type(distances, itype)
     else:
         distances = eucl_dists
-        assert isinstance(distances, str)
 
     # ------------------------------------------------------------------
     # Labels output: bisection-tree traversal
@@ -269,9 +266,7 @@ def sklearn_bisecting_kmeans(
         label_sum = g.op.Expand(np.array([0], dtype=np.int64), shape_1d, name=f"{name}_zeros")
 
     labels = g.op.Identity(label_sum, name=f"{name}_labels", outputs=outputs[:1])
-    assert isinstance(labels, str)
-    if not sts:
-        g.set_type(labels, onnx.TensorProto.INT64)
+    g.set_type(labels, onnx.TensorProto.INT64)
 
     if n_outputs >= 2:
         return labels, distances

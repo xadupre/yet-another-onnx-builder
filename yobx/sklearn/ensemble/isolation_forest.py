@@ -442,12 +442,10 @@ def sklearn_isolation_forest(
         name=f"{name}_label",
         outputs=outputs[:1],
     )
-    assert isinstance(label, str)
 
     emit_scores = len(outputs) > 1
     if emit_scores:
         scores_out = g.op.Identity(decision, name=f"{name}_scores", outputs=outputs[1:])
-        assert isinstance(scores_out, str)
         return label, scores_out
 
     return label

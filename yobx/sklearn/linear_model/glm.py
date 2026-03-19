@@ -71,7 +71,5 @@ def sklearn_glm_regressor(
             "Only IdentityLink and LogLink are supported."
         )
 
-    assert isinstance(result, str)
-    if not sts:
-        g.set_type(result, itype)
+    g.set_type(result, itype)
     return result

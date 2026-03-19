@@ -91,10 +91,8 @@ def sklearn_missing_indicator(
         idx = np.array(features_, dtype=np.int64)
         res = g.op.Gather(mask, idx, axis=1, name=name, outputs=outputs)
 
-    assert isinstance(res, str)  # type happiness
     # Output type is bool (ONNX type 9).
-    if not sts:
-        from onnx import TensorProto
+    from onnx import TensorProto
 
-        g.set_type(res, TensorProto.BOOL)
+    g.set_type(res, TensorProto.BOOL)
     return res

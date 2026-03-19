@@ -724,7 +724,6 @@ def sklearn_xgb_classifier(
 
         # Concat [p0, p1] → [N, 2]
         proba = g.op.Concat(p0, p1, axis=1, name=f"{name}_concat", outputs=outputs[1:])
-        assert isinstance(proba, str)
 
         # Label via ArgMax → [N]
         label_idx = g.op.ArgMax(proba, axis=1, keepdims=0, name=f"{name}_argmax")
@@ -732,7 +731,6 @@ def sklearn_xgb_classifier(
     else:
         # Multi-class: softmax → [N, n_classes]
         proba = g.op.Softmax(raw_scores, axis=1, name=f"{name}_softmax", outputs=outputs[1:])
-        assert isinstance(proba, str)
 
         # Label via ArgMax → [N]
         label_idx = g.op.ArgMax(proba, axis=1, keepdims=0, name=f"{name}_argmax")

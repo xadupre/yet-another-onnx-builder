@@ -107,10 +107,8 @@ def sklearn_elliptic_envelope(
         decision = g.op.Sub(
             score_samples, offset, name=f"{name}_decision", outputs=outputs[1:2]
         )  # (N,)
-        assert isinstance(decision, str)
     else:
         decision = g.op.Sub(score_samples, offset, name=f"{name}_decision")  # (N,)
-        assert isinstance(decision, str)
 
     # predict: 1 where decision >= 0, else -1
     zero = np.array([0], dtype=dtype)
@@ -119,7 +117,6 @@ def sklearn_elliptic_envelope(
     one = np.array([1], dtype=np.int64)
     minus_one = np.array([-1], dtype=np.int64)
     label = g.op.Where(mask, one, minus_one, name=f"{name}_where", outputs=outputs[:1])  # (N,)
-    assert isinstance(label, str)
 
     if n_outputs >= 2:
         return label, decision
