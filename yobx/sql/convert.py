@@ -337,7 +337,7 @@ def _populate_graph(
         )
 
     # Emit SELECT expressions
-    emitter = _ExprEmitter(g, col_map, custom_functions=resolved_custom_functions)
+    emitter = _ExprEmitter(g, col_map, custom_functions=resolved_custom_functions)  # type: ignore
     output_names: List[str] = []
     used_tensor_names: Set[str] = set()
     for i, item in enumerate(select_op.items):
@@ -358,7 +358,7 @@ def _populate_graph(
         tensor_name = candidate
         used_tensor_names.add(tensor_name)
         result = emitter.emit(item.expr, name=f"select_{out_name}")
-        g.op.Identity(result, outputs=[tensor_name], name=f"out_{out_name}")
+        g.op.Identity(result, outputs=[tensor_name], name=f"out_{out_name}")  # type: ignore
         output_names.append(tensor_name)
 
     for out_name in output_names:
