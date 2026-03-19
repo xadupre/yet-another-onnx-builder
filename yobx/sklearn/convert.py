@@ -1,5 +1,5 @@
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
-from onnx import ModelProto, ValueInfoProto
+from onnx import ValueInfoProto
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline, FeatureUnion
@@ -414,9 +414,7 @@ def to_onnx(
                 print(agg.to_string())
         report = ExportReport(stats=stats or [])
         if isinstance(onx, ExtendedModelContainer):
-            return ExportArtifact(
-                proto=onx.model_proto, container=onx, report=report
-            )
+            return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
         return ExportArtifact(proto=onx, report=report)
     onx = g.to_onnx(
         large_model=large_model,
@@ -427,4 +425,3 @@ def to_onnx(
     if isinstance(onx, ExtendedModelContainer):
         return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
     return ExportArtifact(proto=onx, report=report)
-

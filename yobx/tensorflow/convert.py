@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
-from onnx import ModelProto, ValueInfoProto
+from onnx import ValueInfoProto
 import tensorflow as tf
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExtendedModelContainer, ExportArtifact, ExportReport
@@ -182,7 +182,7 @@ def to_onnx(
             )
             if agg.shape[0]:
                 print(agg.to_string())
-        report = ExportReport(stats=stats or [])
+        report = ExportReport(stats=stats or [])  # type: ignore
         if isinstance(onx, ExtendedModelContainer):
             return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
         return ExportArtifact(proto=onx, report=report)

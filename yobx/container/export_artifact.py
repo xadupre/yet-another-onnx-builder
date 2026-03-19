@@ -3,7 +3,8 @@
 of every :func:`to_onnx` conversion function.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
+from ..typing import GraphBuilderExtendedProtocol
 
 
 class ExportReport:
@@ -27,9 +28,7 @@ class ExportReport:
     """
 
     def __init__(
-        self,
-        stats: Optional[List[Dict[str, Any]]] = None,
-        extra: Optional[Dict[str, Any]] = None,
+        self, stats: Optional[List[Dict[str, Any]]] = None, extra: Optional[Dict[str, Any]] = None
     ):
         self._stats: List[Dict[str, Any]] = stats if stats is not None else []
         self._extra: Dict[str, Any] = extra if extra is not None else {}
@@ -82,6 +81,8 @@ class ExportArtifact:
         Statistics and metadata about the export.
     filename : str | None
         Path where the model was last saved, or ``None`` if never saved.
+    builder: GraphBuilderExtendedProtocol
+        Keeps the builder building the onnx model
 
     Example::
 
@@ -108,21 +109,19 @@ class ExportArtifact:
         container: Optional[Any] = None,
         report: Optional[ExportReport] = None,
         filename: Optional[str] = None,
+        builder: Optional[GraphBuilderExtendedProtocol] = None,
     ):
         self.proto = proto
         self.container = container
         self.report = report if report is not None else ExportReport()
         self.filename = filename
+        self.builder = builder
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def save(
-        self,
-        file_path: str,
-        all_tensors_to_one_file: bool = True,
-    ) -> Any:
+    def save(self, file_path: str, all_tensors_to_one_file: bool = True) -> Any:
         """Save the exported model to *file_path*.
 
         When a :class:`~yobx.container.ExtendedModelContainer` is present
@@ -160,9 +159,7 @@ class ExportArtifact:
             "GraphProto embed it in a ModelProto first."
         )
 
-    def get_proto(
-        self, include_weights: bool = True
-    ) -> Any:
+    def get_proto(self, include_weights: bool = True) -> Any:
         """Return the ONNX proto, optionally with all weights inlined.
 
         When the export was performed with ``large_model=True`` (i.e.

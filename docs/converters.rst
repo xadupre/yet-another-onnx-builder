@@ -3,9 +3,10 @@
 Converters
 ==========
 
-This section documents the architecture and design of **yet-another-onnx-builder**
-(*yobx*), the conversion pipelines for each supported framework, SQL conversion,
-command-line utilities, and cross-cutting design topics.
+This section lists all available converters.
+They all relies on a function ``to_onnx(model, args)`` which walks through
+the model, converts piece by piece to onnx and connect them.
+They all retuns an instance of :class:`~yobx.container.ExportArtifact`.
 
 .. toctree::
    :maxdepth: 1

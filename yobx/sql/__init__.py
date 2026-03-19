@@ -12,7 +12,8 @@ containing an ordered list of :class:`~yobx.sql.parse.SqlOperation` objects
 
 Public API
 ----------
-* :func:`sql_to_onnx` — high-level entry point: SQL string → :class:`~yobx.container.ExportArtifact`
+* :func:`sql_to_onnx` — high-level entry point: SQL string →
+  :class:`~yobx.container.ExportArtifact`
 * :func:`sql_to_onnx_graph` — low-level entry point: SQL string → nodes added
   to an existing :class:`~yobx.typing.GraphBuilderProtocol`
 * :func:`~yobx.sql.parse.parse_sql` — parse a SQL string into a

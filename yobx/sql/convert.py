@@ -42,7 +42,7 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
-from onnx import ModelProto, TensorProto
+from onnx import TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact, ExportReport

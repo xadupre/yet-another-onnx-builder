@@ -257,6 +257,7 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
         self.assertIsInstance(onx, ExportArtifact)
         # The underlying proto is accessible via the attribute:
         from onnx import ModelProto
+
         self.assertIsInstance(onx.proto, ModelProto)
 
     def test_inputs_one_per_column(self):

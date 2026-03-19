@@ -40,10 +40,7 @@ class TestExportReport(ExtTestCase):
         self.assertAlmostEqual(r._extra["time_total"], 0.42)
 
     def test_to_dict(self):
-        r = ExportReport(
-            stats=[{"pattern": "a"}],
-            extra={"k": "v"},
-        )
+        r = ExportReport(stats=[{"pattern": "a"}], extra={"k": "v"})
         d = r.to_dict()
         self.assertIn("stats", d)
         self.assertIn("extra", d)
@@ -99,10 +96,11 @@ class TestExportArtifact(ExtTestCase):
 
     def test_save_non_model_proto_raises(self):
         """Saving a FunctionProto directly should raise TypeError."""
+        import os
+        import tempfile
         from onnx import FunctionProto
 
         artifact = ExportArtifact(proto=FunctionProto())
-        import tempfile, os
 
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "fn.onnx")

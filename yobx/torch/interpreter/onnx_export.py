@@ -5,7 +5,7 @@ import pprint
 import time
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
-from onnx import ModelProto, save_model
+from onnx import ModelProto
 from onnx.defs import onnx_opset_version
 from onnx.model_container import ModelContainer
 from ...container import ExtendedModelContainer, ExportArtifact, ExportReport
