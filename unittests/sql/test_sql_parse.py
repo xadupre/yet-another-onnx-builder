@@ -219,5 +219,57 @@ class TestParsedQueryColumns(unittest.TestCase):
         self.assertIn("b", pq.columns)
 
 
+class TestParseSqlSubquery(unittest.TestCase):
+    """Tests for subquery (``FROM (SELECT …)``) parsing."""
+
+    def test_subquery_sets_subquery_field(self):
+        pq = parse_sql("SELECT a FROM (SELECT a FROM t)")
+        self.assertIsNotNone(pq.subquery)
+
+    def test_subquery_inner_from_table(self):
+        pq = parse_sql("SELECT a FROM (SELECT a FROM t)")
+        self.assertEqual(pq.subquery.from_table, "t")
+
+    def test_subquery_alias_stored_in_from_table(self):
+        pq = parse_sql("SELECT a FROM (SELECT a FROM t) AS sub")
+        self.assertEqual(pq.from_table, "sub")
+
+    def test_subquery_no_alias_empty_from_table(self):
+        pq = parse_sql("SELECT a FROM (SELECT a FROM t)")
+        self.assertEqual(pq.from_table, "")
+
+    def test_subquery_inner_ops(self):
+        pq = parse_sql("SELECT a FROM (SELECT a FROM t WHERE a > 0)")
+        inner_ops = [type(op).__name__ for op in pq.subquery.operations]
+        self.assertIn("FilterOp", inner_ops)
+        self.assertIn("SelectOp", inner_ops)
+
+    def test_subquery_outer_ops(self):
+        pq = parse_sql("SELECT a FROM (SELECT a FROM t) WHERE a < 5")
+        outer_ops = [type(op).__name__ for op in pq.operations]
+        self.assertIn("FilterOp", outer_ops)
+        self.assertIn("SelectOp", outer_ops)
+
+    def test_subquery_inner_expression(self):
+        pq = parse_sql("SELECT a FROM (SELECT a + 1 AS a FROM t)")
+        inner_select = next(
+            (op for op in pq.subquery.operations if isinstance(op, SelectOp)), None
+        )
+        self.assertIsNotNone(inner_select)
+        self.assertEqual(inner_select.items[0].alias, "a")
+        self.assertIsInstance(inner_select.items[0].expr, BinaryExpr)
+
+    def test_subquery_no_alias_keyword_not_consumed(self):
+        """Alias should not be required; keywords must not be consumed as alias."""
+        pq = parse_sql("SELECT a FROM (SELECT a FROM t) WHERE a > 0")
+        # The WHERE follows without AS alias
+        outer_ops = [type(op).__name__ for op in pq.operations]
+        self.assertIn("FilterOp", outer_ops)
+
+    def test_plain_query_subquery_is_none(self):
+        pq = parse_sql("SELECT a FROM t")
+        self.assertIsNone(pq.subquery)
+
+
 if __name__ == "__main__":
     unittest.main()
