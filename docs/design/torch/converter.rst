@@ -10,6 +10,74 @@ Torch Converter to ONNX
     relevant when exporting PyTorch models and has no bearing on ONNX models
     built directly with the builder APIs.
 
+.. _l-not-torch-onnx-export:
+
+Not torch.onnx.export
+=====================
+
+:func:`yobx.torch.interpreter.to_onnx` is **not** :func:`torch.onnx.export`.
+They share a similar high-level goal — converting a :class:`torch.nn.Module` to
+an :class:`onnx.ModelProto` — but are otherwise independent implementations with
+different design priorities.
+
+.. list-table:: yobx vs torch.onnx.export
+   :widths: 30 35 35
+   :header-rows: 1
+
+   * - Aspect
+     - :func:`yobx.torch.interpreter.to_onnx`
+     - :func:`torch.onnx.export` (dynamo backend)
+   * - **ATen → ONNX translation**
+     - Custom :class:`~yobx.torch.interpreter.interpreter.DynamoInterpreter`
+       that walks the FX graph node-by-node and emits ONNX ops directly into a
+       :class:`~yobx.xbuilder.GraphBuilder`
+     - Uses `onnxscript <https://microsoft.github.io/onnxscript/>`_ as the
+       intermediate representation for ATen-to-ONNX mappings
+   * - **Export strategy**
+     - Multiple strategies selectable via
+       :class:`~yobx.torch.export_options.ExportOptions`:
+       ``strict``, ``nostrict``, ``tracing``, ``jit``, ``dynamo``, ``fake``, …
+     - Dynamo-based (``torch.export.export`` or ``torch._dynamo.export``)
+   * - **Built-in optimization**
+     - :class:`~yobx.xbuilder.GraphBuilder` runs constant folding, cast
+       elimination, redundant identity removal, and peephole passes controlled
+       by :class:`~yobx.xbuilder.OptimizationOptions`
+     - Relies on ONNX Runtime or third-party tools for post-export optimization
+   * - **Shape & type propagation**
+     - Every intermediate result is typed and (when possible) given a concrete
+       or symbolic shape inside the builder, enabling richer optimization and
+       easier debugging
+     - Shape information comes from the traced graph; no additional in-builder
+       propagation step
+   * - **Custom op overrides**
+     - :class:`~yobx.torch.interpreter.Dispatcher` /
+       :class:`~yobx.torch.interpreter.ForceDispatcher` let callers swap any
+       ATen converter without touching library code
+     - ``custom_opsets`` parameter or ``OnnxRegistry``
+   * - **Large-model support**
+     - ``large_model=True`` returns an
+       :class:`onnx.model_container.ModelContainer`; weights can be stored as
+       external data files via ``external_threshold``
+     - External data handled by the caller after export
+   * - **Built-in validation**
+     - ``validate_onnx=True`` (or a float tolerance) runs the exported model
+       with ONNX Runtime and compares outputs against PyTorch automatically
+     - Validation is left to the caller
+   * - **Dynamic shape inference**
+     - :class:`~yobx.torch.input_observer.InputObserver` can infer
+       ``dynamic_shapes`` automatically from real forward passes; useful for
+       LLMs with prefill/decode phases
+     - ``dynamic_shapes`` must be supplied manually by the caller
+   * - **Maintenance**
+     - Community project; part of *yet-another-onnx-builder* (``yobx``)
+     - Official PyTorch / ONNX maintained exporter
+
+In short: if you need the officially supported PyTorch exporter, use
+:func:`torch.onnx.export`.  If you need finer control over the
+ATen → ONNX translation, built-in graph optimization, or advanced export
+strategies such as fake-tensor mode or automatic dynamic-shape inference,
+:func:`yobx.torch.interpreter.to_onnx` may be a better fit.
+
 The entry point for converting a PyTorch model to ONNX is
 :func:`yobx.torch.interpreter.to_onnx`.  The function orchestrates a
 multi-stage pipeline:
