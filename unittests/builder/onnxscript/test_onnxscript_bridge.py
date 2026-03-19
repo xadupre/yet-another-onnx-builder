@@ -3,7 +3,6 @@ import numpy as np
 import onnx
 from onnx.checker import check_model
 import onnx.numpy_helper as onh
-import onnx_ir as ir
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
 from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 from yobx.reference import ExtendedReferenceEvaluator
@@ -317,6 +316,8 @@ class TestOnnxScriptBridge(ExtTestCase):
             gr.get_value("unknown")
 
     def test_get_value_returns_ir_value(self):
+        import onnx_ir as ir
+
         gr = self._make_builder()
         gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         v = gr.get_value("X")
