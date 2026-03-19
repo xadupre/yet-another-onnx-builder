@@ -36,7 +36,7 @@ different design priorities.
    * - **Export strategy**
      - Multiple strategies selectable via
        :class:`~yobx.torch.export_options.ExportOptions`:
-       ``strict``, ``nostrict``, ``tracing``, ``jit``, ``dynamo``, ``fake``, …
+       ``strict``, ``nostrict``, ``tracing``, ``fake``, …
        The ``tracing`` strategy uses
        :class:`~yobx.torch.tracing.CustomTracer` (symbolic tracing) and can
        handle models where ``torch.export.export`` fails.
@@ -51,31 +51,21 @@ different design priorities.
      - Always decomposes the graph into a fixed set of core ATen ops,
        making the exporter robust to new high-level ops at the cost of
        larger, less readable ONNX graphs
-   * - **Built-in optimization**
-     - :class:`~yobx.xbuilder.GraphBuilder` runs constant folding, cast
-       elimination, redundant identity removal, and peephole passes controlled
-       by :class:`~yobx.xbuilder.OptimizationOptions`
-     - Relies on ONNX Runtime or third-party tools for post-export optimization
+   * - **Pattern Optimization**
+     - Supports any kind of pattern matching, multiple outputs, variable number of
+       nodes, outputs, types.
+     - Supports a fixed number of outputs.
    * - **Shape & type propagation**
      - Every intermediate result is typed and (when possible) given a concrete
        or symbolic shape inside the builder, enabling richer optimization and
        easier debugging
      - Shape information comes from the traced graph; no additional in-builder
        propagation step
-   * - **Custom op overrides**
-     - :class:`~yobx.torch.interpreter.Dispatcher` /
-       :class:`~yobx.torch.interpreter.ForceDispatcher` let callers swap any
-       ATen converter without touching library code
-     - ``custom_opsets`` parameter or ``OnnxRegistry``
    * - **Large-model support**
      - ``large_model=True`` returns an
        :class:`onnx.model_container.ModelContainer`; weights can be stored as
        external data files via ``external_threshold``
      - External data handled by the caller after export
-   * - **Built-in validation**
-     - ``validate_onnx=True`` (or a float tolerance) runs the exported model
-       with ONNX Runtime and compares outputs against PyTorch automatically
-     - Validation is left to the caller
    * - **Debugging**
      - Rich set of environment variables (``ONNXSTOP``, ``ONNXSTOPSHAPE``,
        ``ONNXSTOPTYPE``, ``ONNXSTOPOUTPUT``, …) let you pinpoint exactly
@@ -83,14 +73,6 @@ different design priorities.
        :ref:`l-design-torch-debugging` and
        :ref:`l-graphbuilder-debugging-env`
      - Standard Python / PyTorch debugging tools
-   * - **Dynamic shape inference**
-     - :class:`~yobx.torch.input_observer.InputObserver` can infer
-       ``dynamic_shapes`` automatically from real forward passes; useful for
-       LLMs with prefill/decode phases
-     - ``dynamic_shapes`` must be supplied manually by the caller
-   * - **Maintenance**
-     - Community project; part of *yet-another-onnx-builder* (``yobx``)
-     - Official PyTorch / ONNX maintained exporter
 
 In short: if you need the officially supported PyTorch exporter, use
 :func:`torch.onnx.export`.  If you need finer control over the
