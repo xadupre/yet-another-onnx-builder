@@ -40,7 +40,11 @@ from yobx.tensorflow import to_onnx
 
 # %%
 # Remove this line to run on GPU.
-tf.config.set_visible_devices([], "GPU")
+try:
+    tf.config.set_visible_devices([], "GPU")
+except RuntimeError:
+    # may fail if tensorflow has already been running before this script
+    pass
 
 # %%
 # 1. Build a simple Dense layer
