@@ -1258,7 +1258,7 @@ def check_model_weights(
             original[name] = tuple(buf.shape)
 
     # Retrieve the graph proto.
-    if isinstance(proto, ModelProto):
+    if isinstance(proto, (ModelProto, ExportArtifact)):
         graph = proto.graph
     else:
         # ModelContainer

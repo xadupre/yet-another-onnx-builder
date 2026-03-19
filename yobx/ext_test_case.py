@@ -374,6 +374,7 @@ def statistics_on_folder(
         level = len(spl)
         stat = statistics_on_file(os.path.join(folder, name))
         stat["name"] = name
+        stat["files"] = 1
         if aggregation <= 0:
             rows.append(stat)
             continue

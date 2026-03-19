@@ -299,3 +299,14 @@ class ExportArtifact:
         if self.container and self.container.model_proto_:
             return self.container.model_proto_.functions
         raise AttributeError(f"The artifact do not contain any model {self!r}.")
+
+    @property
+    def metadata_props(self) -> Sequence[onnx.StringStringEntryProto]:
+        """Returns the opset import."""
+        if self.proto:
+            if hasattr(self.proto, "metadata_props"):
+                return self.proto.metadata_props
+            raise TypeError(f"Unable to return metadata_props from type {self.proto}.")
+        if self.container and self.container.model_proto_:
+            return self.container.model_proto_.metadata_props
+        raise AttributeError(f"The artifact do not contain any model {self!r}.")
