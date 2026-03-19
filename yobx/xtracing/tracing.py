@@ -12,9 +12,8 @@ graph, calls :func:`trace_numpy_function`, and returns a self-contained
 
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
-from onnx import ModelProto
-
 from .. import DEFAULT_TARGET_OPSET
+from ..container import ExportArtifact
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
 from ..typing import GraphBuilderExtendedProtocol
 from ..xbuilder import GraphBuilder
@@ -119,7 +118,7 @@ def trace_numpy_to_onnx(
     output_names: Optional[Sequence[str]] = None,
     target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
     batch_dim: str = _BATCH_DIM,
-) -> ModelProto:
+) -> ExportArtifact:
     """
     Trace a numpy function and return the equivalent ONNX model.
 
@@ -149,7 +148,7 @@ def trace_numpy_to_onnx(
     :param batch_dim: name of the dynamic first dimension (default:
         ``"batch"``).  Change this when the default name conflicts with
         another symbolic dimension in the same graph.
-    :return: an :class:`onnx.ModelProto` representing the traced function.
+    :return: an :class:`~yobx.container.ExportArtifact` representing the traced function.
 
     Example::
 
@@ -203,5 +202,5 @@ def trace_numpy_to_onnx(
     for out_name in resolved_output_names:
         g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
 
-    onx, _ = g.to_onnx(return_optimize_report=True)  # type: ignore
-    return onx  # type: ignore[return-value]
+    onx = g.to_onnx(return_optimize_report=True)  # type: ignore
+    return onx

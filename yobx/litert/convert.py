@@ -2,12 +2,10 @@
 
 import os
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
-
 import numpy as np
 import onnx
-
 from .. import DEFAULT_TARGET_OPSET
-from ..container import ExtendedModelContainer, ExportArtifact, ExportReport
+from ..container import ExportArtifact
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from .litert_helper import BuiltinOperator, TFLiteOperator, TFLiteSubgraph, parse_tflite_model
 from .register import get_litert_op_converter
@@ -120,7 +118,7 @@ def to_onnx(
     )
 
     if isinstance(g, GraphBuilder):
-        onx, stats = g.to_onnx(  # type: ignore
+        onx = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,
             return_optimize_report=True,
@@ -128,7 +126,7 @@ def to_onnx(
         if verbose:
             import pandas
 
-            df = pandas.DataFrame(stats)
+            df = pandas.DataFrame(onx.report.stats)
             for c in ["added", "removed"]:
                 df[c] = df[c].fillna(0).astype(int)
             agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
@@ -137,15 +135,8 @@ def to_onnx(
             )
             if agg.shape[0]:
                 print(agg.to_string())
-        report = ExportReport(stats=stats or [])  # type: ignore
-        if isinstance(onx, ExtendedModelContainer):
-            return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
-        return ExportArtifact(proto=onx, report=report)  # type: ignore
-    onx = g.to_onnx(large_model=large_model, external_threshold=external_threshold)
-    report = ExportReport()
-    if isinstance(onx, ExtendedModelContainer):
-        return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
-    return ExportArtifact(proto=onx, report=report)
+        return onx
+    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
 
 
 # ---------------------------------------------------------------------------
