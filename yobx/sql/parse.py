@@ -208,7 +208,7 @@ class ParsedQuery:
     operations: List[SqlOperation] = field(default_factory=list)
     from_table: str = ""
     columns: List[str] = field(default_factory=list)
-    subquery: Optional["ParsedQuery"] = None
+    subquery: Optional[ParsedQuery] = None
 
 
 # ---------------------------------------------------------------------------
@@ -460,7 +460,7 @@ class _Parser:
                 break
         return distinct, items
 
-    def _parse_from(self) -> Tuple[str, Optional["ParsedQuery"]]:
+    def _parse_from(self) -> Tuple[str, Optional[ParsedQuery]]:
         """Parse the FROM clause.
 
         Returns a ``(table_name, subquery)`` pair.  When the FROM clause

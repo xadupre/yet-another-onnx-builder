@@ -215,7 +215,7 @@ class TestSklearnCountVectorizerConverter(ExtTestCase):
         cv = CountVectorizer(ngram_range=(1, 1))
         cv.fit(_SKL2ONNX_CORPUS)
 
-        test_docs = list(_SKL2ONNX_CORPUS) + [""]
+        test_docs = [*_SKL2ONNX_CORPUS, ""]
         X = _sklearn_tokenize(cv, test_docs)
         onx = to_onnx(cv, (X,))
 
