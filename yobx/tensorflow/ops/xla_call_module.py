@@ -59,7 +59,7 @@ def _process_constant_layer(
         _dedup_idx += 1
         candidate = f"{const_name}_{_dedup_idx}_dup"
     const_name = candidate
-    g.make_initializer(const_name, np_val, source="XlaCallModule.constant")
+    g.make_initializer(const_name, np_val)
     local_results[layer["id"]] = const_name
 
 
