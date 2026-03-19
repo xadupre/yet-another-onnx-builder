@@ -75,6 +75,50 @@ class TestCommandLines(ExtTestCase):
         text = st.getvalue()
         self.assertIn("-- done", text)
 
+    def test_g_render_gallery_stdout(self):
+        example = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "docs",
+                "examples",
+                "core",
+                "plot_dot_graph.py",
+            )
+        )
+        if not os.path.isfile(example):
+            self.skipTest("gallery example not found")
+        st = StringIO()
+        with redirect_stdout(st):
+            main(["render-gallery", example])
+        text = st.getvalue()
+        self.assertIn(".. _l-plot-dot-graph:", text)
+        self.assertIn(".. code-block:: python", text)
+
+    def test_h_render_gallery_to_file(self):
+        example = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "docs",
+                "examples",
+                "core",
+                "plot_dot_graph.py",
+            )
+        )
+        if not os.path.isfile(example):
+            self.skipTest("gallery example not found")
+        output = self.get_dump_file("render_gallery_out.rst")
+        st = StringIO()
+        with redirect_stdout(st):
+            main(["render-gallery", example, "-o", output, "-v", "1"])
+        self.assertExists(output)
+        with open(output, encoding="utf-8") as fh:
+            content = fh.read()
+        self.assertIn(".. _l-plot-dot-graph:", content)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

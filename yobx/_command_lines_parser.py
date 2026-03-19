@@ -587,6 +587,110 @@ def _cmd_run_doc_examples(argv: List[Any]):
         sys.exit(1)
 
 
+def get_parser_render_gallery() -> ArgumentParser:
+    parser = ArgumentParser(
+        prog="render-gallery",
+        description=textwrap.dedent("""
+            Converts a sphinx-gallery Python example file (.py) to RST without
+            executing any code.  The output can be previewed in a text editor or
+            piped into a documentation build tool.
+
+            A sphinx-gallery example file consists of:
+              - A module docstring (verbatim RST: title, description, labels, …)
+              - Python code blocks separated by ``# %%`` section markers
+              - Comment lines following ``# %%`` are treated as RST prose
+            """),
+        epilog=textwrap.dedent("""
+            examples:
+
+                # Print the RST for a single gallery example
+                python -m yobx render-gallery docs/examples/core/plot_dot_graph.py
+
+                # Save the RST to a file
+                python -m yobx render-gallery docs/examples/core/plot_dot_graph.py \\
+                    -o /tmp/plot_dot_graph.rst
+
+                # Process several files at once
+                python -m yobx render-gallery \\
+                    docs/examples/core/plot_dot_graph.py \\
+                    docs/examples/sklearn/plot_sklearn_pipeline.py \\
+                    -o /tmp/
+            """),
+        formatter_class=RawTextHelpFormatter,
+    )
+    parser.add_argument(
+        "inputs",
+        nargs="+",
+        help="sphinx-gallery Python file(s) to convert to RST.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default="",
+        type=str,
+        required=False,
+        help="Output file or directory. When empty (default) the RST is printed to stdout. "
+        "When a directory is given, each input file produces a <name>.rst file there.",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        type=int,
+        default=0,
+        required=False,
+        help="verbosity",
+    )
+    return parser
+
+
+def _cmd_render_gallery(argv: List[Any]):
+    from .helpers._gallery_helper import gallery_to_rst
+
+    parser = get_parser_render_gallery()
+    args = parser.parse_args(argv[1:])
+
+    output = args.output.strip()
+    output_is_dir = output and os.path.isdir(output)
+
+    for filepath in args.inputs:
+        if not os.path.isfile(filepath):
+            print(f"[render-gallery] ERROR: file not found: {filepath!r}", file=sys.stderr)
+            sys.exit(1)
+
+        if args.verbose:
+            print(f"[render-gallery] converting {filepath!r}")
+
+        with open(filepath, "r", encoding="utf-8") as fh:
+            source = fh.read()
+
+        rst = gallery_to_rst(source)
+
+        if not output:
+            # Print to stdout (separate multiple files with a marker)
+            if len(args.inputs) > 1:
+                print(f"{'=' * 70}\n.. FILE: {filepath}\n{'=' * 70}")
+            print(rst)
+        elif output_is_dir:
+            basename = os.path.splitext(os.path.basename(filepath))[0] + ".rst"
+            out_path = os.path.join(output, basename)
+            if args.verbose:
+                print(f"[render-gallery] writing {out_path!r}")
+            with open(out_path, "w", encoding="utf-8") as fh:
+                fh.write(rst)
+        else:
+            # Single output file: only valid for a single input
+            if len(args.inputs) > 1:
+                parser.error(
+                    "Cannot write multiple inputs to a single output file. "
+                    "Pass a directory with -o or process files one at a time."
+                )
+            out_path = process_outputname(output, filepath)
+            if args.verbose:
+                print(f"[render-gallery] writing {out_path!r}")
+            with open(out_path, "w", encoding="utf-8") as fh:
+                fh.write(rst)
+
+
 #############
 # main parser
 #############
@@ -862,6 +966,7 @@ def get_main_parser() -> ArgumentParser:
             find              - find node consuming or producing a result
             partition         - partition a model, each partition appears as local function
             print             - prints the model on standard output
+            render-gallery    - convert a sphinx-gallery .py example to RST (no execution)
             run-doc-examples  - run all runpython:: and gdot:: examples in RST/Python files
             validate          - validate a model (knowing its model id on HuggingFace Hub)
             """),
@@ -875,6 +980,7 @@ def get_main_parser() -> ArgumentParser:
             "find",
             "partition",
             "print",
+            "render-gallery",
             "run-doc-examples",
             "validate",
         ],
@@ -891,6 +997,7 @@ def main(argv: Optional[List[Any]] = None):
         find=_cmd_find,
         partition=_cmd_partition,
         print=_cmd_print,
+        **{"render-gallery": _cmd_render_gallery},
         **{"run-doc-examples": _cmd_run_doc_examples},
         validate=_cmd_validate,
     )
@@ -909,6 +1016,7 @@ def main(argv: Optional[List[Any]] = None):
                 find=get_parser_find,
                 partition=get_parser_partition,
                 print=get_parser_print,
+                **{"render-gallery": get_parser_render_gallery},
                 **{"run-doc-examples": get_parser_run_doc_examples},
                 validate=get_parser_validate,
             )
