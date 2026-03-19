@@ -74,6 +74,9 @@ sksurv = [
 spox = [
     "spox>=0.12",
 ]
+polars = [
+    "polars>=0.20",
+]
 tensorflow = [
     "jax",
     "tensorflow>=2.20",

@@ -15,6 +15,8 @@ Public API
 * :func:`sql_to_onnx` — high-level entry point: SQL string → ONNX model
 * :func:`sql_to_onnx_graph` — low-level entry point: SQL string → nodes added
   to an existing :class:`~yobx.typing.GraphBuilderProtocol`
+* :func:`to_onnx` — convenience wrapper: ``polars.LazyFrame`` + SQL string →
+  ONNX model (dtypes are inferred from the frame schema)
 * :func:`~yobx.sql.parse.parse_sql` — parse a SQL string into a
   :class:`~yobx.sql.parse.ParsedQuery`
 * :class:`~yobx.sql.parse.ParsedQuery` — parsed query container
@@ -42,9 +44,21 @@ Example
     b = np.array([4.0,  5.0, 6.0], dtype=np.float32)
     (total,) = ref.run(None, {"a": a, "b": b})
     # total == array([5., 9.], dtype=float32)  (rows where a > 0)
+
+polars example
+--------------
+::
+
+    import polars as pl
+    from yobx.sql import to_onnx
+    from yobx.reference import ExtendedReferenceEvaluator
+
+    lf = pl.LazyFrame({"a": pl.Series([1.0, -2.0, 3.0], dtype=pl.Float32),
+                       "b": pl.Series([4.0,  5.0, 6.0], dtype=pl.Float32)})
+    onx = to_onnx(lf, "SELECT a + b AS total FROM t WHERE a > 0")
 """
 
-from .convert import sql_to_onnx, sql_to_onnx_graph
+from .convert import sql_to_onnx, sql_to_onnx_graph, to_onnx
 from .parse import (
     AggExpr,
     BinaryExpr,
@@ -77,4 +91,5 @@ __all__ = [
     "parse_sql",
     "sql_to_onnx",
     "sql_to_onnx_graph",
+    "to_onnx",
 ]

@@ -168,6 +168,60 @@ Limitations and future work
   (string literals are parsed but ONNX ``Equal`` on strings may need a
   separate handling path).
 
+Polars integration
+==================
+
+:func:`~yobx.sql.to_onnx` is a thin wrapper around :func:`~yobx.sql.sql_to_onnx`
+that accepts a ``polars.LazyFrame`` (or ``polars.DataFrame``) and extracts the
+column dtypes automatically from its schema, so the caller does not have to
+provide an explicit ``input_dtypes`` mapping.
+
+.. code-block:: python
+
+    import polars as pl
+    from yobx.sql import to_onnx
+
+    lf = pl.LazyFrame({"a": pl.Series([1.0, -2.0, 3.0], dtype=pl.Float32),
+                       "b": pl.Series([4.0,  5.0, 6.0], dtype=pl.Float32)})
+    onx = to_onnx(lf, "SELECT a + b AS total FROM t WHERE a > 0")
+
+The LazyFrame is used only for **schema inspection** — it is never collected or
+materialised.  The ONNX model is constructed entirely from the column names and
+their polars dtype classes.
+
+Supported polars dtypes
+-----------------------
+
+.. list-table::
+    :header-rows: 1
+
+    * - Polars dtype
+      - Numpy dtype
+    * - ``Float32``
+      - ``float32``
+    * - ``Float64``
+      - ``float64``
+    * - ``Int8``
+      - ``int8``
+    * - ``Int16``
+      - ``int16``
+    * - ``Int32``
+      - ``int32``
+    * - ``Int64``
+      - ``int64``
+    * - ``UInt8``
+      - ``uint8``
+    * - ``UInt16``
+      - ``uint16``
+    * - ``UInt32``
+      - ``uint32``
+    * - ``UInt64``
+      - ``uint64``
+    * - ``Boolean``
+      - ``bool``
+    * - ``String`` / ``Utf8``
+      - ``object`` (ONNX ``STRING``)
+
 Example
 =======
 
