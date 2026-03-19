@@ -187,9 +187,10 @@ def to_onnx(
             return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
         return ExportArtifact(proto=onx, report=report)
     onx = g.to_onnx(large_model=large_model, external_threshold=external_threshold)  # type: ignore
+    report = ExportReport()
     if isinstance(onx, ExtendedModelContainer):
-        return ExportArtifact(proto=onx.model_proto, container=onx)
-    return ExportArtifact(proto=onx)
+        return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
+    return ExportArtifact(proto=onx, report=report)
 
 
 # ---------------------------------------------------------------------------

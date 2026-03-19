@@ -423,7 +423,8 @@ def to_onnx(
         external_threshold=external_threshold,
         inline=(not function_options) or not function_options.export_as_function,
     )
+    report = ExportReport()
     if isinstance(onx, ExtendedModelContainer):
-        return ExportArtifact(proto=onx.model_proto, container=onx)
-    return ExportArtifact(proto=onx)
+        return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
+    return ExportArtifact(proto=onx, report=report)
 
