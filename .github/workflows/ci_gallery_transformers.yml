@@ -28,9 +28,9 @@ jobs:
         run: pip install -e ".[dev,torch,transformers]"
       - name: pip freeze
         run: pip freeze
-      - name: Run transformers gallery examples
+      - name: Run transformers gallery examples (pre-trained weights)
         run: |
           for f in docs/examples/transformers/plot_*.py; do
-            echo "Running $f ..."
-            python "$f"
+            echo "Running $f --trained ..."
+            python "$f" --trained
           done

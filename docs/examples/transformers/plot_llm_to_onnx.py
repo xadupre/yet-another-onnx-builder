@@ -19,14 +19,32 @@ outputs, which are then used to infer:
 
 We use :epkg:`arnir0/Tiny-LLM` — a very small causal language model —
 so the example runs without a GPU.
+
+**Command-line options**
+
+Run with pre-trained weights (default: random initialisation, config-only download)::
+
+    python plot_llm_to_onnx.py           # random weights — fast, no large download
+    python plot_llm_to_onnx.py --trained # full pre-trained weights from HuggingFace
+
+When ``--trained`` is *not* given the model is built from the config with random
+weights via :func:`transformers.AutoModelForCausalLM.from_config`.
+Only the tokenizer and the architecture config are downloaded (~few KB),
+which makes this mode useful for quick testing and CI.
+When ``--trained`` is given the full checkpoint is downloaded (~hundreds of MB)
+and the exported ONNX model produces meaningful text.
 """
 
 # %%
 # Imports
 # -------
 
+import argparse
+import sys
+
 import pandas
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+
 from yobx import doc
 from yobx.helpers import string_type
 from yobx.helpers.rt_helper import onnx_generate
@@ -38,14 +56,47 @@ from yobx.torch import (
 )
 
 # %%
+# Command-line argument
+# ---------------------
+#
+# ``--trained`` downloads the full pre-trained checkpoint; without it a randomly
+# initialised model is built from the architecture config only (much faster and
+# suitable for testing the export pipeline without a large download).
+
+parser = argparse.ArgumentParser(description="Export a HuggingFace LLM to ONNX.")
+parser.add_argument(
+    "--trained",
+    action="store_true",
+    default=False,
+    help=(
+        "Load the full pre-trained weights from HuggingFace Hub. "
+        "When omitted a randomly initialised model is built from the config "
+        "(no weight download, suitable for CI)."
+    ),
+)
+# parse_known_args avoids failures when sphinx-gallery passes extra arguments.
+args, _ = parser.parse_known_args(sys.argv[1:])
+
+# %%
 # Load model and tokenizer
 # ------------------------
 #
-# We download the tiny LLM from HuggingFace Hub.
+# The tokenizer is always fetched from HuggingFace (small download).
+# The model is either loaded with pre-trained weights (``--trained``) or
+# initialised with random weights from the config alone.
 
 MODEL_NAME = "arnir0/Tiny-LLM"
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+
+if args.trained:
+    print(f"Loading pre-trained weights for {MODEL_NAME!r} ...")
+    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+else:
+    print(f"Building randomly initialised model from config for {MODEL_NAME!r} ...")
+    config = AutoConfig.from_pretrained(MODEL_NAME)
+    model = AutoModelForCausalLM.from_config(config)
+
+print(f"  trained={args.trained}  #params={sum(p.numel() for p in model.parameters()):,}")
 
 # %%
 # Observe forward calls during generation
@@ -143,6 +194,8 @@ print(pandas.DataFrame(data))
 # :func:`onnx_generate <yobx.helpers.rt_helper.onnx_generate>` mimics
 # ``model.generate`` for the exported ONNX model: it feeds the *present*
 # key/value tensors back as *past* key/values on every decoding step.
+# (With random weights the output tokens will be meaningless, but the
+# pipeline itself is exercised end-to-end.)
 
 onnx_tokens = onnx_generate(
     filename,
