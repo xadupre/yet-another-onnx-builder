@@ -120,20 +120,17 @@ def sklearn_balanced_bagging_classifier(
         label = g.op.Gather(
             classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
         if not g.has_type(label):
             g.set_type(label, onnx.TensorProto.INT64)
     else:
         label = g.op.Gather(
             classes_arr, label_idx, axis=0, name=f"{name}_label_str", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
         if not g.has_type(label):
             g.set_type(label, onnx.TensorProto.STRING)
 
     if emit_proba:
         proba_out = g.op.Identity(avg_proba, name=f"{name}_proba", outputs=outputs[1:])
-        assert isinstance(proba_out, str)
         return label, proba_out
 
     return label

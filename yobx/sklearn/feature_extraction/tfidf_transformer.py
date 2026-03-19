@@ -101,7 +101,5 @@ def sklearn_tfidf_transformer(
             f"Unknown norm={norm!r} for TfidfTransformer, expected 'l1', 'l2', or None."
         )
 
-    assert isinstance(res, str)
-    if not sts:
-        g.set_type_shape_unary_op(res, X)
+    g.set_type_shape_unary_op(res, X)
     return res

@@ -49,5 +49,4 @@ def sklearn_ransac_regressor(
     sub_est = estimator.estimator_
     fct = get_sklearn_converter(type(sub_est))
     result = fct(g, sts, outputs, sub_est, X, name=f"{name}__base")
-    assert isinstance(result, str)
     return result

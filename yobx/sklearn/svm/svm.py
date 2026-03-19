@@ -207,5 +207,4 @@ def sklearn_svr(
         one_class=0,
     )
 
-    assert isinstance(result, str)
     return result
