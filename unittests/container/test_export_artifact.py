@@ -27,20 +27,20 @@ def _make_simple_model():
 class TestExportReport(ExtTestCase):
     def test_empty(self):
         r = ExportReport()
-        self.assertEqual(r._stats, [])
-        self.assertEqual(r._extra, {})
+        self.assertEqual(r.stats, [])
+        self.assertEqual(r.extra, {})
 
     def test_stats_stored(self):
         stats = [{"pattern": "p1", "added": 1, "removed": 0, "time_in": 0.01}]
         r = ExportReport(stats=stats)
-        self.assertEqual(len(r._stats), 1)
-        self.assertEqual(r._stats[0]["pattern"], "p1")
+        self.assertEqual(len(r.stats), 1)
+        self.assertEqual(r.stats[0]["pattern"], "p1")
 
     def test_update_extra(self):
         r = ExportReport()
         r.update({"time_total": 0.42, "source": "test"})
-        self.assertIn("time_total", r._extra)
-        self.assertAlmostEqual(r._extra["time_total"], 0.42)
+        self.assertIn("time_total", r.extra)
+        self.assertAlmostEqual(r.extra["time_total"], 0.42)
 
     def test_to_dict(self):
         r = ExportReport(stats=[{"pattern": "a"}], extra={"k": "v"})

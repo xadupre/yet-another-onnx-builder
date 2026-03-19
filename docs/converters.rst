@@ -6,7 +6,7 @@ Converters
 This section lists all available converters.
 They all relies on a function ``to_onnx(model, args)`` which walks through
 the model, converts piece by piece to onnx and connect them.
-They all retuns an instance of :class:`~yobx.container.ExportArtifact`.
+They all returns an instance of :class:`~yobx.container.ExportArtifact`.
 
 .. toctree::
    :maxdepth: 1

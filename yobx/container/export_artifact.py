@@ -57,8 +57,8 @@ class ExportReport:
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}("
-            f"n_stats={len(self._stats)}, "
-            f"extra={sorted(self._extra)}, "
+            f"n_stats={len(self.stats)}, "
+            f"extra={sorted(self.extra)}, "
             f"has_build_stats={self.build_stats is not None})"
         )
 
