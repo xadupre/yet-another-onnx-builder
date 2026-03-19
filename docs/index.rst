@@ -54,7 +54,15 @@ It can export from many libraries:
 | :epkg:`xgboost`                       | :ref:`l-sklearn-converter`   |
 +---------------------------------------+------------------------------+
 
-**deeplearning**
+**data manipulations**
+
+This is work in progress.
+Many packages produce SQL queries. It starts by converting a SQL
+query into ONNX.
+
+* :ref:`l-design-sql`
+
+**deep learning**
 
 +---------------------------------------+----------------------------------------+
 | :epkg:`jax` *in progress*             | :ref:`l-plot-jax-to-onnx`              |
@@ -62,6 +70,8 @@ It can export from many libraries:
 | :epkg:`tensorflow`                    | :ref:`l-design-tensorflow-converter`   |
 +---------------------------------------+----------------------------------------+
 | :epkg:`torch`                         | :ref:`l-torch-converter`               |
++---------------------------------------+----------------------------------------+
+| TFLite / :epkg:`LiteRT`               | :ref:`l-design-litert-converter`       |
 +---------------------------------------+----------------------------------------+
 
 It also provides:
@@ -89,7 +99,9 @@ Its unique API:
    :maxdepth: 1
    :caption: Contents
 
+   design/litert/index
    design/sklearn/index
+   design/sql/index
    design/tensorflow/index
    design/torch/index
    design/index
@@ -103,6 +115,7 @@ Its unique API:
    auto_examples_sklearn/index
    auto_examples_torch/index
    auto_examples_tensorflow/index
+   auto_examples_litert/index
 
 .. toctree::
    :maxdepth: 2

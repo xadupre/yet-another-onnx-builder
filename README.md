@@ -28,8 +28,15 @@ to [ONNX](https://onnx.ai) format from many libraries:
 * [scikit-survival](https://scikit-survival.readthedocs.io)
 * [xgboost](https://xgboost.readthedocs.io)
 
+**data manipulation**
+
+This is work in progress.
+Many packages produce SQL queries. It starts by converting a SQL
+query into ONNX.
+
 **deeplearning**
 
+* [litert](https://ai.google.dev/edge/litert/)
 * [jax](https://jax.readthedocs.io/en/latest/) *in progress*
 * [tensorflow](https://www.tensorflow.org)
 * [torch](https://pytorch.org)

@@ -18,6 +18,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.linkcode",
     "sphinx.ext.mathjax",
+    "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx_copybutton",
     "sphinx_gallery.gen_gallery",
@@ -112,6 +113,7 @@ sphinx_gallery_conf = {
         os.path.join(os.path.dirname(__file__), "examples", "sklearn"),
         os.path.join(os.path.dirname(__file__), "examples", "torch"),
         os.path.join(os.path.dirname(__file__), "examples", "tensorflow"),
+        os.path.join(os.path.dirname(__file__), "examples", "litert"),
     ],
     # path where to save gallery generated examples
     "gallery_dirs": [
@@ -119,6 +121,7 @@ sphinx_gallery_conf = {
         "auto_examples_sklearn",
         "auto_examples_torch",
         "auto_examples_tensorflow",
+        "auto_examples_litert",
     ],
     # no parallelization to avoid conflict with environment variables
     "parallel": 1,
@@ -162,6 +165,7 @@ epkg_dictionary = {
     "HuggingFace": "https://huggingface.co/docs/hub/en/index",
     "huggingface_hub": "https://github.com/huggingface/huggingface_hub",
     "imbalanced-learn": "https://imbalanced-learn.org/stable/",
+    "ai_edge_litert": "https://pypi.org/project/ai-edge-litert/",
     "flax": "https://flax.readthedocs.io/en/latest/",
     "equinox": "https://docs.kidger.site/equinox/",
     "ir-py": "https://onnx.ai/ir-py/",
@@ -171,6 +175,7 @@ epkg_dictionary = {
     "lightgbm": "https://lightgbm.readthedocs.io/en/latest/",
     "LightGBM": "https://lightgbm.readthedocs.io/en/latest/",
     "Linux": "https://www.linux.org/",
+    "LiteRT": "https://ai.google.dev/edge/litert/",
     "ml_dtypes": "https://github.com/jax-ml/ml_dtypes",
     "ModelBuilder": "https://onnxruntime.ai/docs/genai/howto/build-model.html",
     "monai": "https://github.com/Project-MONAI/MONAI",
@@ -212,6 +217,7 @@ epkg_dictionary = {
     "tensorflow": "https://www.tensorflow.org/",
     "TensorFlow": "https://www.tensorflow.org/",
     "tensorflow-onnx": "https://github.com/onnx/tensorflow-onnx",
+    "TFLite": "https://ai.google.dev/edge/litert",
     "timm": "https://github.com/huggingface/pytorch-image-models",
     "torch": "https://docs.pytorch.org/docs/stable/torch.html",
     "torchbench": "https://github.com/pytorch/benchmark",

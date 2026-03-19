@@ -12,6 +12,7 @@ API Reference
    container/index
    helpers/index
    reference/index
+   litert/index
    sklearn/index
    tensorflow/index
    torch/index
@@ -21,3 +22,4 @@ API Reference
    xexpressions/index
    xshape/index
    xtracing/index
+   sql/index

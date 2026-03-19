@@ -78,6 +78,9 @@ tensorflow = [
     "jax",
     "tensorflow>=2.20",
 ]
+litert = [
+    "ai-edge-litert",
+]
 jax = [
     "jax[cpu]>=0.4",
     "tensorflow>=2.20",
@@ -179,6 +182,7 @@ module = [
     "yobx.builder.spox.*",
     "yobx.container.*",
     "yobx.helpers._excel_helper",
+    "yobx.litert.ops.*",
     "yobx.helpers.helper",
     "yobx.reference.ops.*",
     "yobx.sklearn.calibration.*",
@@ -211,6 +215,7 @@ module = [
     "yobx.sklearn.xgboost.*",
     "yobx.reference.torch_ops.*",
     "yobx.tensorflow.ops.*",
+    "yobx.litert.ops.*",
     "yobx.torch._model_eval_cases",
     "yobx.torch.tracing.*",
     "yobx.torch.in_transformers._patches_model_rope_utils",
@@ -240,6 +245,7 @@ project-excludes = [
     "yobx/helpers/_excel_helper.py",
     "yobx/helpers/_onnx_simple_text_plot.py",
     "yobx/helpers/helper.py",
+    "yobx/litert/ops/*.py",
     "yobx/reference/ops/*",
     "yobx/reference/torch_ops/*",
     "yobx/reference/_inference_session.py",
