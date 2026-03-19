@@ -87,5 +87,4 @@ def sklearn_polynomial_features(
         powered, np.array([-1], dtype=np.int64), keepdims=0, name=name, outputs=outputs
     )
 
-    assert isinstance(res, str)  # type happiness
     return res

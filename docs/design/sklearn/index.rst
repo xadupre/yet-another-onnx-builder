@@ -12,7 +12,6 @@ scikit-learn Export to ONNX
    supported_converters
    custom_converter
    contrib_ops
-   copilot_draft
    debug
 
 .. seealso::
@@ -70,13 +69,6 @@ a new one but more to define what the converters expect to find in a class
 classed ``GraphBuilder``. It then becomes possible to create a bridge
 such as :class:`yobx.builder.onnxscript.OnnxScriptGraphBuilder` which implements
 this API for every known way. See :ref:`l-design-expected-api` for further details.
-
-**AI**
-
-Known LLMs now provides a good first draft when it comes to implement a new converter
-for a model not already covered but this library. This package includes
-a function able to query *Copilot* to get that first draft.
-That saves quite some time.
 
 **Opsets**
 

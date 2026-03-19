@@ -180,5 +180,4 @@ def category_encoders_one_hot_encoder(
     else:
         res = g.op.Concat(*col_tensors, axis=1, name=name, outputs=outputs)
 
-    assert isinstance(res, str)
     return res

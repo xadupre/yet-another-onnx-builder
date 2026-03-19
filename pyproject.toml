@@ -162,7 +162,7 @@ select = [
     "UP006", "UP007", "UP015", "UP027", "UP031", "UP032", "UP034", "UP035", "UP045",
 ]
 "*/__init__.py" = ["F401"]
-"docs/**" = ["RUF001"]
+"docs/**" = ["RUF001", "SIM105"]
 "unittests/**" = ["B023", "B904", "E731", "SIM300"]
 "unittests/helpers/test_dot_helper.py" = ["B904", "E501"]
 "yobx/builder/light/*" = ["PYI032", "UP037"]
@@ -188,20 +188,25 @@ module = [
     "yobx.sklearn.calibration.*",
     "yobx.sklearn.category_encoders.*",
     "yobx.sklearn.cluster.*",
-    "yobx.sklearn.coveriance.*",
+    "yobx.sklearn.compose.*",
+    "yobx.sklearn.covariance.*",
     "yobx.sklearn.cross_decomposition.*",
     "yobx.sklearn.decomposition.*",
     "yobx.sklearn.discriminant_analysis.*",
+    "yobx.sklearn.dummy.*",
     "yobx.sklearn.ensemble.*",
     "yobx.sklearn.feature_extraction.*",
+    "yobx.sklearn.feature_selection.*",
     "yobx.sklearn.gaussian_process.*",
     "yobx.sklearn.imblearn.*",
     "yobx.sklearn.impute.*",
     "yobx.sklearn.isotonic.*",
+    "yobx.sklearn.kernel_approximation.*",
     "yobx.sklearn.kernel_ridge.*",
     "yobx.sklearn.linear_model.*",
     "yobx.sklearn.lightgbm.*",
     "yobx.sklearn.manifold.*",
+    "yobx.sklearn.mixture.*",
     "yobx.sklearn.model_selection.*",
     "yobx.sklearn.multiclass.*",
     "yobx.sklearn.multioutput.*",
@@ -209,9 +214,11 @@ module = [
     "yobx.sklearn.neighbors.*",
     "yobx.sklearn.neural_network.*",
     "yobx.sklearn.preprocessing.*",
+    "yobx.sklearn.pipeline.*",
     "yobx.sklearn.sksurv.*",
     "yobx.sklearn.svm.*",
     "yobx.sklearn.tree.*",
+    "yobx.sklearn.variance_threshold.*",
     "yobx.sklearn.xgboost.*",
     "yobx.reference.torch_ops.*",
     "yobx.tensorflow.ops.*",
