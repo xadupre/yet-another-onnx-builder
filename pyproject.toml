@@ -36,7 +36,7 @@ docs = [
     "onnx-diagnostic",
     "openpyxl",
     "pandas",
-    "piccolo-theme",
+    "pydata-sphinx-theme",
     "skl2onnx",  # for one example
     "sphinx>=7",
     "sphinxcontrib-mermaid",
