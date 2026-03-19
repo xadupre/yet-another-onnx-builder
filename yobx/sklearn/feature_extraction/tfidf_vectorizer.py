@@ -103,10 +103,11 @@ def sklearn_tfidf_vectorizer(
     # ------------------------------------------------------------------
     # Step 1 – raw term-frequency counts via ONNX TfIdfVectorizer
     # ------------------------------------------------------------------
-    # Always use TF mode here; IDF weighting is handled manually below
+    # When binary=True, clip counts to 1 via ONNX mode="IDF" with unit
+    # weights; IDF weighting is still applied manually in Step 2 below
     # so that sublinear_tf and norm can be applied consistently.
     mode, pool_strings, ngram_counts, ngram_indexes, weights = _build_tfidf_vectorizer_attrs(
-        vocabulary, estimator.ngram_range, binary=False
+        vocabulary, estimator.ngram_range, binary=estimator.binary
     )
 
     tf_name = f"{name}_tf"
