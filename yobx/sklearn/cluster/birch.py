@@ -136,7 +136,6 @@ def sklearn_birch(
         distances = g.op.Identity(
             distances_clipped, name=f"{name}_distances", outputs=outputs[1:2]
         )
-        g.set_type(distances, itype)
     else:
         distances = distances_clipped
 
