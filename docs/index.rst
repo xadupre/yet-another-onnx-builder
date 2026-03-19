@@ -89,6 +89,7 @@ It also provides:
 
 Its unique API:
 
+.. install: ?
 .. code-block:: python
 
     # the model is called 
