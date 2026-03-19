@@ -11,10 +11,15 @@ scikit-learn Export to ONNX
    sklearn_like_converter
    supported_converters
    custom_converter
-   function_transformer_tracing
    contrib_ops
    copilot_draft
    debug
+
+.. seealso::
+
+    :ref:`l-design-function-transformer-tracing` — the numpy-tracing
+    mechanism used by :class:`~sklearn.preprocessing.FunctionTransformer`
+    is documented in the core design section.
 
 A basic :epkg:`scikit-learn` model may look like the following,
 a scaler following by an estimator. Every model can be converter

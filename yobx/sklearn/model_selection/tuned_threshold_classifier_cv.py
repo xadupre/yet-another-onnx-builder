@@ -136,7 +136,6 @@ def sklearn_tuned_threshold_classifier_cv(
         )
         g.set_type(label, onnx.TensorProto.STRING)
 
-
     # Probabilities are unchanged (delegate to inner estimator's predict_proba).
     proba = g.op.Identity(probas, name=f"{name}_proba", outputs=outputs[1:])
 

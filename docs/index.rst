@@ -100,6 +100,7 @@ Its unique API:
 
    api/index
    converters
+   core
    galleries
    cmds/index
    install
