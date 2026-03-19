@@ -3,7 +3,10 @@ Unit tests for :class:`~yobx.container.ExportArtifact` and
 :class:`~yobx.container.ExportReport`.
 """
 
+import os
+import tempfile
 import unittest
+
 import numpy as np
 import onnx
 import onnx.helper as oh
@@ -86,9 +89,6 @@ class TestExportArtifact(ExtTestCase):
         self.assertIs(proto, artifact.proto)
 
     def test_save(self):
-        import tempfile
-        import os
-
         artifact = self._artifact()
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "model.onnx")
@@ -99,11 +99,7 @@ class TestExportArtifact(ExtTestCase):
 
     def test_save_non_model_proto_raises(self):
         """Saving a FunctionProto directly should raise TypeError."""
-        from onnx import FunctionProto
-
-        artifact = ExportArtifact(proto=FunctionProto())
-        import tempfile, os
-
+        artifact = ExportArtifact(proto=onnx.FunctionProto())
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "fn.onnx")
             with self.assertRaises(TypeError):
@@ -115,6 +111,18 @@ class TestExportArtifact(ExtTestCase):
         self.assertIn("ExportArtifact", text)
         self.assertIn("ModelProto", text)
         self.assertIn("filename=None", text)
+        self.assertIn("container=None", text)
+
+    def test_load(self):
+        artifact = self._artifact()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "model.onnx")
+            artifact.save(path)
+            loaded = ExportArtifact.load(path)
+            self.assertIsInstance(loaded, ExportArtifact)
+            self.assertIsInstance(loaded.proto, onnx.ModelProto)
+            self.assertIsNone(loaded.container)
+            self.assertEqual(loaded.filename, path)
 
     def test_reference_evaluator_accepts_artifact(self):
         """ExtendedReferenceEvaluator should accept an ExportArtifact."""
