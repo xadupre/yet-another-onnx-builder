@@ -189,12 +189,14 @@ class GraphBuilderProtocol(Protocol):
         """
         ...
 
-    def make_initializer(self, name: str, value: Any) -> str:
+    def make_initializer(self, name: str, value: Any, give_unique_name: bool = True) -> str:
         """Adds a constant initializer and returns its name.
 
         :param name: initializer name; may be empty to auto-generate a unique name
         :param value: initializer value (:class:`numpy.ndarray`,
             :class:`onnx.TensorProto`, ``int``, or ``float``)
+        :param give_unique_name: changes the name if it is already taken, otherwise,
+            the user should expect an exception to raised
         :return: the final registered name
         """
         ...
@@ -1191,7 +1193,7 @@ class GraphBuilderPatternOptimizationProtocol(Protocol):
         external: bool = False,
         msg: str = "",
         source: Optional[str] = None,
-        give_unique: bool = True,
+        give_unique_name: bool = True,
     ) -> str:
         """Adds a constant initializer and returns its (possibly
         auto-generated) name.
@@ -1202,7 +1204,7 @@ class GraphBuilderPatternOptimizationProtocol(Protocol):
         :param external: store as external data
         :param msg: optional debug message
         :param source: optional source tag for debugging
-        :param give_unique: generate a unique name when *name* is already
+        :param give_unique_name: generate a unique name when *name* is already
             taken
         :return: the registered name
         """

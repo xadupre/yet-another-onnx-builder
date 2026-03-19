@@ -2,24 +2,35 @@ API
 ===
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+   :caption: Core
 
-   doc
-   ext_test_case
-   pv_version
    typing
    builder/index
    container/index
    helpers/index
    reference/index
-   litert/index
-   sklearn/index
-   tensorflow/index
-   torch/index
    translate/index
    xbuilder/index
    xoptim/index
    xexpressions/index
    xshape/index
    xtracing/index
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Converters
+
+   litert/index
    sql/index
+   sklearn/index
+   tensorflow/index
+   torch/index
+
+.. toctree::
+   :maxdepth: 1
+   :caption: documentation / tests
+
+   doc
+   ext_test_case
+   pv_version

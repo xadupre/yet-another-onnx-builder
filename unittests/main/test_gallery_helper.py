@@ -136,9 +136,7 @@ class TestGalleryHelper(ExtTestCase):
 
     def test_real_gallery_example(self):
         """Smoke-test with an actual gallery file from the repository."""
-        repo_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..")
-        )
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         example = os.path.join(repo_root, "docs", "examples", "core", "plot_dot_graph.py")
         if not os.path.isfile(example):
             self.skipTest("gallery example not found")
@@ -205,9 +203,7 @@ class TestGalleryHelper(ExtTestCase):
         self.assertTrue(path.endswith("plot_foo.rst"))
 
     def test_auto_output_path_real_file(self):
-        repo_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..")
-        )
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         example = os.path.join(repo_root, "docs", "examples", "core", "plot_dot_graph.py")
         if not os.path.isfile(example):
             self.skipTest("gallery example not found")
