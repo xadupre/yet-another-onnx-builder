@@ -16,4 +16,3 @@ They all retuns an instance of :class:`~yobx.container.ExportArtifact`.
    design/sql/index
    design/tensorflow/index
    design/torch/index
-   design/index
