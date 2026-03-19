@@ -45,6 +45,15 @@ Convert any fitted :epkg:`scikit-learn` estimator or pipeline with
 
     onnx_model = to_onnx(pipe, (X,))
 
+By default ``to_onnx`` marks axis 0 of every input as dynamic.  To
+customize the dynamic axes, pass a ``dynamic_shapes`` tuple — one
+``Dict[int, str]`` per input, mapping axis indices to symbolic dimension
+names:
+
+.. code-block:: python
+
+    onnx_model = to_onnx(pipe, (X,), dynamic_shapes=({0: "batch"},))
+
 See :ref:`l-sklearn-converter` for the full scikit-learn conversion guide.
 
 PyTorch
@@ -64,6 +73,25 @@ Convert a :class:`torch.nn.Module` with :func:`yobx.torch.interpreter.to_onnx`:
     model = MyModel()
     x = torch.randn(4, 8)
     onnx_model = to_onnx(model, (x,))
+
+To mark axis 0 as a dynamic batch dimension, pass a ``dynamic_shapes``
+dict following the :mod:`torch.export` convention:
+
+.. code-block:: python
+
+    import torch
+    from torch.export import Dim
+    from yobx.torch import to_onnx
+
+    class MyModel(torch.nn.Module):
+        def forward(self, x):
+            return torch.relu(x)
+
+    model = MyModel()
+    x = torch.randn(4, 8)
+
+    batch = Dim("batch")
+    onnx_model = to_onnx(model, (x,), dynamic_shapes={"x": {0: batch}})
 
 See :ref:`l-torch-converter` for the full PyTorch conversion guide,
 including dynamic shapes, model patching, and large-model support.
@@ -87,6 +115,13 @@ Convert a :epkg:`Keras` model with :func:`yobx.tensorflow.to_onnx`:
     X = np.random.rand(5, 4).astype(np.float32)
     onnx_model = to_onnx(model, (X,))
 
+By default axis 0 of every input is made dynamic.  To name specific
+dynamic axes, pass ``dynamic_shapes``:
+
+.. code-block:: python
+
+    onnx_model = to_onnx(model, (X,), dynamic_shapes=({0: "batch"},))
+
 See :ref:`l-design-tensorflow-converter` for the full TensorFlow/JAX conversion guide.
 
 LiteRT / TFLite
@@ -101,6 +136,13 @@ Convert a ``.tflite`` model file with :func:`yobx.litert.to_onnx`:
 
     X = np.random.rand(1, 4).astype(np.float32)
     onnx_model = to_onnx("model.tflite", (X,))
+
+Axis 0 is dynamic by default.  Control which axes are dynamic with
+``dynamic_shapes``:
+
+.. code-block:: python
+
+    onnx_model = to_onnx("model.tflite", (X,), dynamic_shapes=({0: "batch"},))
 
 See :ref:`l-design-litert-converter` for details on dynamic shapes and
 custom op converters.
