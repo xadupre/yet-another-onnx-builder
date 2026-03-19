@@ -100,6 +100,7 @@ Its unique API:
 
    api/index
    converters
+   coverage
    core
    galleries
    cmds/index
