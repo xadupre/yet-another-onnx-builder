@@ -1,5 +1,7 @@
-Elements of Design
-==================
+.. _l-core:
+
+Core
+====
 
 This section documents the architecture and design of **yet-another-onnx-builder** (*yobx*),
 a toolkit for converting machine learning models from multiple frameworks to ONNX format.
@@ -11,6 +13,6 @@ that maintain code across the project.
 .. toctree::
    :maxdepth: 1
 
-   builder/index
-   misc/index
-   ci
+   design/builder/index
+   design/misc/index
+   design/ci

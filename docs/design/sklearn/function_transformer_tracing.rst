@@ -78,10 +78,12 @@ The built-in converter for
 directly to :func:`~yobx.xtracing.trace_numpy_function`, so all numpy ops
 land in the surrounding graph with no sub-model inlining:
 
-.. code-block:: python
+.. runpython::
+    :showcode:
 
     from sklearn.preprocessing import FunctionTransformer
     import numpy as np
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.sklearn import to_onnx
 
     def my_func(X):
@@ -92,6 +94,8 @@ land in the surrounding graph with no sub-model inlining:
 
     transformer = FunctionTransformer(func=my_func).fit(X)
     onx = to_onnx(transformer, (X,))
+    print(pretty_onnx(onx))
+    
 
 When ``func=None`` (the identity transformer) a single ``Identity`` node is
 emitted instead of tracing.
