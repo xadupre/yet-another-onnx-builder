@@ -290,7 +290,7 @@ class ExportArtifact:
         raise AttributeError(f"The artifact do not contain any model or function {self!r}.")
 
     @property
-    def functions(self) -> Sequence[onnx.OperatorSetIdProto]:
+    def functions(self) -> Sequence[onnx.FunctionProto]:
         """Returns the opset import."""
         if self.proto:
             if isinstance(self.proto, onnx.ModelProto):
