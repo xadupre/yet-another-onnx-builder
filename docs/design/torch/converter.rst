@@ -37,7 +37,20 @@ different design priorities.
      - Multiple strategies selectable via
        :class:`~yobx.torch.export_options.ExportOptions`:
        ``strict``, ``nostrict``, ``tracing``, ``jit``, ``dynamo``, ``fake``, …
+       The ``tracing`` strategy uses
+       :class:`~yobx.torch.tracing.CustomTracer` (symbolic tracing) and can
+       handle models where ``torch.export.export`` fails.
      - Dynamo-based (``torch.export.export`` or ``torch._dynamo.export``)
+   * - **Graph decomposition**
+     - The graph is **not** decomposed by default (unless
+       ``decomposition_table`` is set in
+       :class:`~yobx.torch.export_options.ExportOptions`).  Each ATen op is
+       translated directly, which keeps the graph compact but means that a
+       new op introduced by PyTorch will raise a ``NotImplementedError``
+       until a dedicated converter is added.
+     - Always decomposes the graph into a fixed set of core ATen ops,
+       making the exporter robust to new high-level ops at the cost of
+       larger, less readable ONNX graphs
    * - **Built-in optimization**
      - :class:`~yobx.xbuilder.GraphBuilder` runs constant folding, cast
        elimination, redundant identity removal, and peephole passes controlled
