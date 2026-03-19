@@ -865,12 +865,7 @@ def to_onnx(
     output_names: Optional[List[str]] = None,
     output_dynamic_shapes: Optional[Union[Dict[str, Any], Tuple[Any]]] = None,
     validate_onnx: Union[bool, float] = False,
-) -> Union[
-    ExportArtifact,
-    Tuple[ExportArtifact, GraphBuilder],
-    Tuple[ExportArtifact, Dict[str, Any]],
-    Tuple[ExportArtifact, GraphBuilder, Dict[str, Any]],
-]:
+) -> ExportArtifact:
     """
     Exports a torch model into ONNX using
     `dynamo export
@@ -942,7 +937,6 @@ def to_onnx(
 
         x = torch.randn(3, 4)
         artifact = to_onnx(Neuron(), (x,))
-        proto = artifact.proto
         artifact.save("model.onnx")
     """
     if kwargs is None and isinstance(args, dict):
@@ -1122,8 +1116,8 @@ def to_onnx(
         )
 
     if return_builder:
-        return (artifact, builder, all_stats) if return_optimize_report else (artifact, builder)
-    return (artifact, all_stats) if return_optimize_report else artifact
+        artifact.builder = builder
+    return artifact
 
 
 def validate_exported_onnx(
