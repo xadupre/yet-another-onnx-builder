@@ -165,6 +165,7 @@ def sql_to_onnx(
     target_opset: int = DEFAULT_TARGET_OPSET,
     n_rows: Optional[int] = None,
     custom_functions: Optional[Dict[str, Callable]] = None,
+    builder_cls: Union[type, Callable] = GraphBuilder,
 ) -> ModelProto:
     """
     Convert a SQL *query* to a self-contained :class:`onnx.ModelProto`.
@@ -175,9 +176,10 @@ def sql_to_onnx(
     the ``SELECT`` clause, in order.
 
     Internally this function creates a fresh
-    :class:`~yobx.xbuilder.GraphBuilder`, delegates to
-    :func:`sql_to_onnx_graph` to populate it, and then calls
-    :meth:`~yobx.xbuilder.GraphBuilder.to_onnx` to finalise the model.
+    :class:`~yobx.xbuilder.GraphBuilder` (or the class supplied via
+    *builder_cls*), delegates to :func:`sql_to_onnx_graph` to populate it,
+    and then calls :meth:`~yobx.xbuilder.GraphBuilder.to_onnx` to finalise
+    the model.
     Use :func:`sql_to_onnx_graph` directly when you need to embed the SQL
     subgraph inside a larger ONNX model you are already building.
 
@@ -215,6 +217,13 @@ def sql_to_onnx(
                 custom_functions={"my_sqrt": np.sqrt},
             )
 
+    :param builder_cls: the graph-builder class (or factory callable) to
+        instantiate when creating the internal
+        :class:`~yobx.xbuilder.GraphBuilder`.  Defaults to
+        :class:`~yobx.xbuilder.GraphBuilder`.  Any class that implements
+        the :ref:`builder-api` can be supplied here, e.g. a custom subclass
+        that adds extra optimisation passes.
+
     :return: a :class:`onnx.ModelProto` ready for inference.
 
     Example::
@@ -232,7 +241,7 @@ def sql_to_onnx(
         key) would require an ONNX ``Loop`` or custom kernel and are not
         yet supported.
     """
-    g = GraphBuilder(target_opset, ir_version=10)
+    g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
     sql_to_onnx_graph(
         g,

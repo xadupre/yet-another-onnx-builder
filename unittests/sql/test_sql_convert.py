@@ -275,6 +275,23 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
         op_types = {n.op_type for n in onx.graph.node}
         self.assertIn("ReduceSum", op_types)
 
+    def test_builder_cls_used(self):
+        """builder_cls should be instantiated instead of the default GraphBuilder."""
+        from onnx import ModelProto
+        from yobx.xbuilder import GraphBuilder
+
+        instantiated = []
+
+        class TrackingBuilder(GraphBuilder):
+            def __init__(self, *args, **kwargs):
+                instantiated.append(True)
+                super().__init__(*args, **kwargs)
+
+        dtypes = {"a": np.float32}
+        onx = sql_to_onnx("SELECT a FROM t", dtypes, builder_cls=TrackingBuilder)
+        self.assertIsInstance(onx, ModelProto)
+        self.assertEqual(len(instantiated), 1, "TrackingBuilder was not instantiated")
+
 
 class TestSqlToOnnxGraph(ExtTestCase):
     """Tests for :func:`~yobx.sql.sql_to_onnx_graph`."""
