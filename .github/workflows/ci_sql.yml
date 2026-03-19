@@ -33,8 +33,7 @@ jobs:
 
       - name: Run sql tests with coverage
         run: |
-          coverage run -m unittest discover -s unittests/sql
-          coverage xml
+          pytest --cov=yobx --cov-report=xml --durations=10 unittests/sql
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
