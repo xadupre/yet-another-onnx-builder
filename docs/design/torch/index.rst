@@ -15,6 +15,10 @@ Torch Export to ONNX
    supported_aten_functions
    case_coverage
 
+.. note::
+    :func:`yobx.torch.interpreter.to_onnx` is **not** :func:`torch.onnx.export`.
+    See :ref:`l-not-torch-onnx-export` for a detailed comparison.
+
 This section describes the design of the PyTorch-to-ONNX conversion pipeline.
 The entry point is :func:`yobx.torch.interpreter.to_onnx`, which accepts a
 :class:`torch.nn.Module` and representative inputs and returns an
