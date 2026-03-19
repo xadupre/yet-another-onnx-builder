@@ -3503,9 +3503,7 @@ class TestGraphPatternOptimization(ExtTestCase):
     def test_max_relu(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("Max", ["X", "zero"], ["Y"]),
-                ],
+                [oh.make_node("Max", ["X", "zero"], ["Y"])],
                 "dummy",
                 [_mkv_("X", TFLOAT, [3, 3])],
                 [_mkv_("Y", TFLOAT, [3, 3])],
@@ -3537,9 +3535,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         # Max(0, x) should also be fused to Relu(x)
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("Max", ["zero", "X"], ["Y"]),
-                ],
+                [oh.make_node("Max", ["zero", "X"], ["Y"])],
                 "dummy",
                 [_mkv_("X", TFLOAT, [3, 3])],
                 [_mkv_("Y", TFLOAT, [3, 3])],
@@ -3571,9 +3567,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         # Max(x, 1) should NOT be fused to Relu
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("Max", ["X", "one"], ["Y"]),
-                ],
+                [oh.make_node("Max", ["X", "one"], ["Y"])],
                 "dummy",
                 [_mkv_("X", TFLOAT, [3, 3])],
                 [_mkv_("Y", TFLOAT, [3, 3])],

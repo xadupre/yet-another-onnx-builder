@@ -45,7 +45,12 @@ from .onnx_expand import (
     SwapExpandReshapePattern,
     SwapExpandUnsqueezePattern,
 )
-from .onnx_functions import GeluPattern, LeakyReluPattern, MaxReluPattern, SoftmaxCrossEntropyLossCastPattern
+from .onnx_functions import (
+    GeluPattern,
+    LeakyReluPattern,
+    MaxReluPattern,
+    SoftmaxCrossEntropyLossCastPattern,
+)
 from .onnx_layer_normalization import (
     BatchNormalizationPattern,
     BatchNormalizationTrainingPattern,

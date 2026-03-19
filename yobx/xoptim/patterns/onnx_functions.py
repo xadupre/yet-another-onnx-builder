@@ -433,9 +433,7 @@ class MaxReluPattern(PatternOptimization):
 
         return self.none(node, inspect.currentframe().f_lineno)
 
-    def apply(
-        self, g: "GraphBuilder", node: NodeProto  # noqa: F821
-    ) -> List[NodeProto]:
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         # Identify which input is the non-zero tensor
         x = None
         for inp in node.input:
@@ -444,10 +442,5 @@ class MaxReluPattern(PatternOptimization):
                 break
 
         return [
-            g.make_node(
-                "Relu",
-                [x],
-                node.output,
-                name=f"{self.__class__.__name__}--{node.name}",
-            )
+            g.make_node("Relu", [x], node.output, name=f"{self.__class__.__name__}--{node.name}")
         ]
