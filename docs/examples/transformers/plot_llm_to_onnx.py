@@ -22,18 +22,18 @@ so the example runs without a GPU.
 
 **Command-line options**
 
-Run with pre-trained weights (default: random initialisation, config-only download)::
+Run with pre-trained weights (default) or a randomly initialised model::
 
-    python plot_llm_to_onnx.py                        # random weights — fast, no large download
-    python plot_llm_to_onnx.py --trained              # full pre-trained weights from HuggingFace
+    python plot_llm_to_onnx.py                        # pre-trained weights (default)
+    python plot_llm_to_onnx.py --no-trained           # random weights — fast, no large download
     python plot_llm_to_onnx.py --num-hidden-layers 2  # use only 2 transformer layers
 
-When ``--trained`` is *not* given the model is built from the config with random
-weights via :func:`transformers.AutoModelForCausalLM.from_config`.
-Only the tokenizer and the architecture config are downloaded (~few KB),
-which makes this mode useful for quick testing and CI.
-When ``--trained`` is given the full checkpoint is downloaded (~hundreds of MB)
-and the exported ONNX model produces meaningful text.
+When ``--trained`` is given (the default) the full checkpoint is downloaded
+(~hundreds of MB) and the exported ONNX model produces meaningful text.
+Pass ``--no-trained`` to build the model from the config with random weights
+via :func:`transformers.AutoModelForCausalLM.from_config` — only the tokenizer
+and the architecture config are downloaded (~few KB), which is useful for
+quick testing and CI.
 
 ``--num-hidden-layers`` overrides ``config.num_hidden_layers`` before the model
 is instantiated, which shrinks the number of transformer decoder blocks.
@@ -64,9 +64,10 @@ from yobx.torch import (
 # Command-line arguments
 # ----------------------
 #
-# ``--trained`` downloads the full pre-trained checkpoint; without it a randomly
-# initialised model is built from the architecture config only (much faster and
-# suitable for testing the export pipeline without a large download).
+# ``--trained`` / ``--no-trained`` controls whether the full pre-trained
+# checkpoint is loaded (default: ``--trained``).  Pass ``--no-trained`` to
+# build a randomly initialised model from the architecture config only (faster,
+# no large download, suitable for CI).
 #
 # ``--num-hidden-layers`` overrides the number of transformer decoder blocks in
 # the config before the model is built.  Use a small value (e.g. ``2``) to
@@ -75,11 +76,11 @@ from yobx.torch import (
 parser = argparse.ArgumentParser(description="Export a HuggingFace LLM to ONNX.")
 parser.add_argument(
     "--trained",
-    action="store_true",
-    default=False,
+    action=argparse.BooleanOptionalAction,
+    default=True,
     help=(
-        "Load the full pre-trained weights from HuggingFace Hub. "
-        "When omitted a randomly initialised model is built from the config "
+        "Load the full pre-trained weights from HuggingFace Hub (default). "
+        "Pass --no-trained to build a randomly initialised model from the config "
         "(no weight download, suitable for CI)."
     ),
 )
@@ -104,8 +105,9 @@ args, _ = parser.parse_known_args(sys.argv[1:])
 # The tokenizer is always fetched from HuggingFace (small download).
 # The architecture config is fetched next; if ``--num-hidden-layers`` was given
 # the corresponding config attribute is overridden before the model is built.
-# The model is either loaded with pre-trained weights (``--trained``) or
-# initialised with random weights from the (possibly modified) config.
+# By default the model is loaded with pre-trained weights (``--trained``).
+# Pass ``--no-trained`` to use random weights instead (much faster, no large
+# download).
 
 MODEL_NAME = "arnir0/Tiny-LLM"
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
