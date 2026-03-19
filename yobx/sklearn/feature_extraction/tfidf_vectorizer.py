@@ -4,7 +4,6 @@ import numpy as np
 import onnx
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ...typing import GraphBuilderExtendedProtocol
 from ..register import register_sklearn_converter
 from .count_vectorizer import _build_tfidf_vectorizer_attrs
@@ -84,7 +83,7 @@ def sklearn_tfidf_vectorizer(
         raise NotImplementedError(
             f"TfidfVectorizer conversion requires a STRING input tensor (got ONNX "
             f"type {itype}). Pass a 2-D padded string array of pre-tokenised words "
-            f"as input X (shorter rows padded with empty string \"\")."
+            f'as input X (shorter rows padded with empty string "").'
         )
 
     analyzer = estimator.analyzer
@@ -121,15 +120,10 @@ def sklearn_tfidf_vectorizer(
         pool_strings=pool_strings,
     )
     if weights:
-        kwargs["weights"] = weights
+        kwargs["weights"] = weights  # type: ignore
 
     tf = g.make_node(
-        "TfIdfVectorizer",
-        [X],
-        outputs=[tf_name],
-        domain="",
-        name=f"{name}_tfvec",
-        **kwargs,
+        "TfIdfVectorizer", [X], outputs=[tf_name], domain="", name=f"{name}_tfvec", **kwargs
     )
     tf = tf if isinstance(tf, str) else tf[0]
 

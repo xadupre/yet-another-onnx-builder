@@ -12,9 +12,7 @@ def _pad_tokens(docs, tokenize=str.split):
     """Tokenise documents and pad rows with '' to a rectangular 2-D array."""
     tokenized = [tokenize(d) for d in docs]
     max_len = max(len(t) for t in tokenized)
-    return np.array(
-        [t + [""] * (max_len - len(t)) for t in tokenized], dtype=object
-    )
+    return np.array([t + [""] * (max_len - len(t)) for t in tokenized], dtype=object)
 
 
 @requires_sklearn("1.4")
@@ -33,7 +31,7 @@ class TestTfidfVectorizer(ExtTestCase):
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("TfIdfVectorizer", op_types)
-        self.assertIn("Mul", op_types)       # IDF weighting
+        self.assertIn("Mul", op_types)  # IDF weighting
         self.assertIn("ReduceL2", op_types)  # L2 normalisation
 
         ref = ExtendedReferenceEvaluator(onx)

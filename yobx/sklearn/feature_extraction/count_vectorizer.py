@@ -113,7 +113,7 @@ def sklearn_count_vectorizer(
         raise NotImplementedError(
             f"CountVectorizer conversion requires a STRING input tensor (got ONNX "
             f"type {itype}). Pass a 2-D padded string array of pre-tokenised words "
-            f"as input X (shorter rows padded with empty string \"\")."
+            f'as input X (shorter rows padded with empty string "").'
         )
 
     analyzer = estimator.analyzer
@@ -143,16 +143,9 @@ def sklearn_count_vectorizer(
         pool_strings=pool_strings,
     )
     if weights:
-        kwargs["weights"] = weights
+        kwargs["weights"] = weights  # type: ignore
 
-    res = g.make_node(
-        "TfIdfVectorizer",
-        [X],
-        outputs=outputs,
-        domain="",
-        name=name,
-        **kwargs,
-    )
+    res = g.make_node("TfIdfVectorizer", [X], outputs=outputs, domain="", name=name, **kwargs)
 
     res_name = res if isinstance(res, str) else res[0]
     # TfIdfVectorizer always outputs float32
