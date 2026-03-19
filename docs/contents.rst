@@ -16,4 +16,3 @@ command-line utilities, and cross-cutting design topics.
    design/tensorflow/index
    design/torch/index
    design/index
-   cmds/index

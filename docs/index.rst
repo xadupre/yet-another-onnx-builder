@@ -98,11 +98,12 @@ Its unique API:
 .. toctree::
    :maxdepth: 1
 
-   install
-   getting_started
+   api/index
    contents
    galleries
-   api/index
+   cmds/index
+   install
+   getting_started
    misc
 
 Indices and tables
