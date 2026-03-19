@@ -23,16 +23,24 @@ class StatsmodelsGLMWrapper(BaseEstimator):
     statsmodels' prediction logic without requiring the full design matrix (i.e. users
     pass the raw feature matrix *X*, **without** any constant/intercept column).
 
-    Supported link functions:
+    Supported link functions (formulas below are the **inverse** link, i.e. the
+    transformation applied to the linear predictor ``eta = X @ coef + intercept``
+    to obtain the response-scale prediction):
 
-    * **Identity** (Gaussian default) – pass-through
+    * **Identity** (Gaussian default) – ``eta`` (pass-through)
     * **Log** (Poisson / NegativeBinomial / Tweedie default) – ``exp(eta)``
-    * **Logit** (Binomial default) – ``sigmoid(eta)``
-    * **Power** (general) – ``eta ** (1 / power)``
+    * **Logit** (Binomial default) – ``sigmoid(eta)`` = ``1 / (1 + exp(-eta))``
+    * **Power** (general, link: ``g(μ) = μ^p``) – ``eta ** (1 / p)``
 
-      * **InversePower** (*power = -1*, Gamma default) – ``1 / eta``
-      * **Sqrt** (*power = 0.5*) – ``eta ** 2``
-      * **InverseSquared** (*power = -2*, InverseGaussian default) – ``eta ** (-0.5)``
+      * **InversePower** (*p = -1*, Gamma default) – ``1 / eta``
+      * **Sqrt** (*p = 0.5*) – ``eta ** 2``
+      * **InverseSquared** (*p = -2*, InverseGaussian default) – ``eta ** (-0.5)``
+
+    .. note::
+
+        ``Power(0)`` is a degenerate case (``μ^0 = 1`` for all ``μ``), which is not
+        invertible and therefore not supported.  This should not be confused with the
+        **Log** link, which is a distinct link class in statsmodels.
 
     Example usage::
 
@@ -134,10 +142,15 @@ def _inverse_link_onnx(g, link, eta: str, itype: int, name: str, outputs: List[s
 
     if isinstance(link, sm_links.Power):
         # Power link: g(mu) = mu^p  →  inverse: mu = eta^(1/p)
+        # Note: p=0 gives g(mu) = mu^0 = 1 (constant), which is NOT the Log link.
+        # The statsmodels Log link is a distinct class (sm_links.Log). Power(0) is
+        # a degenerate case that is not invertible.
         p = float(link.power)
         if p == 0:
             raise NotImplementedError(
-                "Power link with exponent 0 is not invertible and cannot be converted to ONNX."
+                "Power link with exponent 0 is not invertible (g(μ) = μ^0 = 1 is constant) "
+                "and cannot be converted to ONNX. "
+                "Use the statsmodels Log link class for log-link models."
             )
         inv_p = 1.0 / p
         exp_const = g.op.Constant(
@@ -179,12 +192,23 @@ def statsmodels_glm_converter(
                                                   │
                                       link⁻¹(·) ──►  mu  (output)
 
-    Supported link functions:
+    Supported link functions (ONNX node used for the inverse link):
 
     * **Identity** – ``Identity`` node (pass-through)
-    * **Log** – ``Exp``
-    * **Logit** – ``Sigmoid``
-    * **Power(p)** – ``Pow(eta, 1/p)``
+    * **Log** – ``Exp`` (inverse of log is exp)
+    * **Logit** – ``Sigmoid`` (inverse of logit is sigmoid)
+    * **Power(p)** – ``Pow(eta, 1/p)``; special cases:
+
+      * *p = 1* (Identity): ``Pow(eta, 1)`` = pass-through
+      * *p = -1* (InversePower): ``Pow(eta, -1)`` = reciprocal
+      * *p = 0.5* (Sqrt): ``Pow(eta, 2)`` = square
+      * *p = -2* (InverseSquared): ``Pow(eta, -0.5)``
+
+    .. note::
+
+        ``Power(0)`` is not invertible (``μ^0 = 1`` is constant) and raises
+        :class:`NotImplementedError`.  Use the statsmodels ``Log`` link class for
+        log-link models.
 
     :param g: the graph builder to add nodes to
     :param sts: shapes defined by :epkg:`scikit-learn`
