@@ -140,7 +140,7 @@ def to_onnx(
         report = ExportReport(stats=stats or [])  # type: ignore
         if isinstance(onx, ExtendedModelContainer):
             return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
-        return ExportArtifact(proto=onx, report=report)
+        return ExportArtifact(proto=onx, report=report)  # type: ignore
     onx = g.to_onnx(large_model=large_model, external_threshold=external_threshold)
     report = ExportReport()
     if isinstance(onx, ExtendedModelContainer):

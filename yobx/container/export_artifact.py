@@ -3,8 +3,10 @@
 of every :func:`to_onnx` conversion function.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
+import onnx
 from ..typing import GraphBuilderExtendedProtocol
+from .model_container import ExtendedModelContainer
 
 
 class ExportReport:
@@ -57,56 +59,59 @@ class ExportReport:
 
 class ExportArtifact:
     """
-    Standard output of every :func:`to_onnx` conversion function.
+        Standard output of every :func:`to_onnx` conversion function.
 
-    Every top-level ``to_onnx`` function (sklearn, tensorflow, litert,
-    torch, sql …) returns an :class:`ExportArtifact` instead of a bare
-    :class:`~onnx.ModelProto` or
-    :class:`~yobx.container.ExtendedModelContainer`.
-    The instance bundles the exported proto, the optional large-model
-    container, an :class:`ExportReport` describing the export process,
-    and an optional filename.
+        Every top-level ``to_onnx`` function (sklearn, tensorflow, litert,
+        torch, sql …) returns an :class:`ExportArtifact` instead of a bare
+        :class:`~onnx.ModelProto` or
+        :class:`~yobx.container.ExtendedModelContainer`.
+        The instance bundles the exported proto, the optional large-model
+        container, an :class:`ExportReport` describing the export process,
+        and an optional filename.
 
-    Attributes
-    ----------
-    proto : ModelProto | FunctionProto | GraphProto | None
-        The ONNX proto produced by the export.  When *large_model* was
-        requested the proto contains *placeholders* for external data;
-        use :meth:`get_proto` to obtain a fully self-contained proto.
-    container : ExtendedModelContainer | None
-        The :class:`~yobx.container.ExtendedModelContainer` produced when
-        the conversion was called with ``large_model=True``.  ``None``
-        otherwise.
-    report : ExportReport
-        Statistics and metadata about the export.
-    filename : str | None
-        Path where the model was last saved, or ``None`` if never saved.
-    builder: GraphBuilderExtendedProtocol
-        Keeps the builder building the onnx model
+        Attributes
+        ----------
+        proto : ModelProto | FunctionProto | GraphProto | None
+            The ONNX proto produced by the export.  When *large_model* was
+            requested the proto contains *placeholders* for external data;
+            use :meth:`get_proto` to obtain a fully self-contained proto.
+        container : ExtendedModelContainer | None
+            The :class:`~yobx.container.ExtendedModelContainer` produced when
+            the conversion was called with ``large_model=True``.  ``None``
+            otherwise.
+        report : ExportReport
+            Statistics and metadata about the export.
+        filename : str | None
+            Path where the model was last saved, or ``None`` if never saved.
+    <<<<<<< HEAD
+        builder: GraphBuilderExtendedProtocol
+            Keeps the builder building the onnx model
 
-    Example::
+        Example::
 
-        import numpy as np
-        from sklearn.linear_model import LinearRegression
-        from yobx.sklearn import to_onnx
-        from yobx.container import ExportArtifact, ExportReport
+            import numpy as np
+            from sklearn.linear_model import LinearRegression
+            from yobx.sklearn import to_onnx
+            from yobx.container import ExportArtifact, ExportReport
 
-        X = np.random.randn(20, 4).astype(np.float32)
-        y = X @ np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
-        reg = LinearRegression().fit(X, y)
+            X = np.random.randn(20, 4).astype(np.float32)
+            y = X @ np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+            reg = LinearRegression().fit(X, y)
 
-        artifact = to_onnx(reg, (X,))
-        assert isinstance(artifact, ExportArtifact)
-        assert isinstance(artifact.report, ExportReport)
+            artifact = to_onnx(reg, (X,))
+            assert isinstance(artifact, ExportArtifact)
+            assert isinstance(artifact.report, ExportReport)
 
-        proto = artifact.get_proto()
-        artifact.save("model.onnx")
+            proto = artifact.get_proto()
+            artifact.save("model.onnx")
+    =======
+    >>>>>>> 4e17a857e37cad067b15fbc6bc7d7b953888f7a2
     """
 
     def __init__(
         self,
-        proto: Any = None,
-        container: Optional[Any] = None,
+        proto: Optional[Union[onnx.ModelProto, onnx.GraphProto, onnx.FunctionProto]] = None,
+        container: Optional[ExtendedModelContainer] = None,
         report: Optional[ExportReport] = None,
         filename: Optional[str] = None,
         builder: Optional[GraphBuilderExtendedProtocol] = None,
@@ -194,17 +199,57 @@ class ExportArtifact:
 
         return oirs.serialize_model(self.container.to_ir())
 
+    @classmethod
+    def load(cls, file_path: str, load_large_initializers: bool = True) -> "ExportArtifact":
+        """Load a saved model from *file_path*.
+
+        If the file references external data (i.e. the model was saved
+        with ``large_model=True``) an
+        :class:`~yobx.container.ExtendedModelContainer` is created and
+        returned in :attr:`container`.  Otherwise the proto is loaded
+        directly with :func:`onnx.load` and :attr:`container` is ``None``.
+
+        :param file_path: path to the ``.onnx`` file.
+        :param load_large_initializers: when ``True`` (default) also load
+            the large initializers stored alongside the model file.
+        :return: :class:`ExportArtifact` with :attr:`filename` set to
+            *file_path*.
+
+        Example::
+
+            artifact = ExportArtifact.load("model.onnx")
+            proto = artifact.get_proto()
+        """
+        import onnx
+        from onnx.external_data_helper import _get_all_tensors, uses_external_data
+
+        from .model_container import ExtendedModelContainer
+
+        # Load without external data first to inspect the proto.
+        proto = onnx.load(file_path, load_external_data=False)
+        has_external = any(uses_external_data(t) for t in _get_all_tensors(proto))
+
+        if has_external:
+            container = ExtendedModelContainer()
+            container.load(file_path, load_large_initializers=load_large_initializers)
+            return cls(proto=container.model_proto, container=container, filename=file_path)
+
+        # Regular model — no external data, proto is already complete.
+        return cls(proto=proto, filename=file_path)
+
     # ------------------------------------------------------------------
     # Dunder helpers
     # ------------------------------------------------------------------
 
     def __repr__(self) -> str:
         proto_type = type(self.proto).__name__ if self.proto is not None else "None"
-        has_container = self.container is not None
+        container_repr = (
+            f"{type(self.container).__name__}()" if self.container is not None else "None"
+        )
         return (
             f"{self.__class__.__name__}("
             f"proto={proto_type}, "
-            f"container={has_container}, "
+            f"container={container_repr}, "
             f"filename={self.filename!r}, "
             f"report={self.report!r})"
         )
