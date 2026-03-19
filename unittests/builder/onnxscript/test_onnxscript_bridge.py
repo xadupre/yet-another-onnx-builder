@@ -4,20 +4,25 @@ import onnx
 from onnx.checker import check_model
 import onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
-from yobx.builder.onnxscript import OnnxScriptGraphBuilder
 from yobx.reference import ExtendedReferenceEvaluator
 
 
 @requires_onnxscript()
 class TestOnnxScriptBridge(ExtTestCase):
     def _make_builder(self, opset=18, ir_version=None):
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+
         return OnnxScriptGraphBuilder(opset, ir_version=ir_version)
 
     def test_construction_with_int_opset(self):
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+
         gr = OnnxScriptGraphBuilder(18)
         self.assertEqual(gr.opsets, {"": 18})
 
     def test_construction_with_dict_opset(self):
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+
         gr = OnnxScriptGraphBuilder({"": 18, "com.microsoft": 1})
         self.assertEqual(gr.opsets[""], 18)
         self.assertIn("com.microsoft", gr.opsets)
@@ -299,6 +304,8 @@ class TestOnnxScriptBridge(ExtTestCase):
                 )
 
     def test_to_onnx_custom_ir_version_at_construction(self):
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+
         gr = OnnxScriptGraphBuilder(18, ir_version=7)
         gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         gr.make_node("Relu", ["X"], ["Y"])
