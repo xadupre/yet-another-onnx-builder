@@ -10,14 +10,14 @@ class ExportReport:
     """
     Holds statistics and metadata gathered during an ONNX export.
 
-    The *stats* attribute stores the per-pattern optimization statistics
+    The :attr:`_stats` attribute stores the per-pattern optimization statistics
     returned by :meth:`~yobx.xbuilder.GraphBuilder.to_onnx` when called
     with ``return_optimize_report=True``.  Each element of the list is a
     dict with at least the keys ``"pattern"``, ``"added"``, ``"removed"``,
     and ``"time_in"``.
 
     Additional arbitrary key-value pairs can be recorded via the
-    :meth:`update` method.
+    :meth:`update` method and are stored in :attr:`_extra`.
 
     Example::
 
@@ -34,20 +34,10 @@ class ExportReport:
         self._stats: List[Dict[str, Any]] = stats if stats is not None else []
         self._extra: Dict[str, Any] = extra if extra is not None else {}
 
-    @property
-    def stats(self) -> List[Dict[str, Any]]:
-        """Per-pattern optimization statistics (list of dicts)."""
-        return self._stats
-
-    @property
-    def extra(self) -> Dict[str, Any]:
-        """Additional export metadata (arbitrary key-value pairs)."""
-        return self._extra
-
     def update(self, data: Dict[str, Any]) -> None:
-        """Merge *data* into :attr:`extra`.
+        """Merge *data* into :attr:`_extra`.
 
-        :param data: key-value pairs to add to :attr:`extra`.
+        :param data: key-value pairs to add to :attr:`_extra`.
         """
         self._extra.update(data)
 

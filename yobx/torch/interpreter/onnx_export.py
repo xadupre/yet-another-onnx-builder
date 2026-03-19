@@ -896,7 +896,7 @@ def to_onnx(
     :param external_threshold: if large_model is True, every tensor above this limit
         is stored as external
     :param return_optimize_report: returns statistics on the optimization as well;
-        statistics are also available via ``artifact.report.extra["optimization"]``
+        statistics are also available via ``artifact.report._extra["optimization"]``
         on the returned :class:`~yobx.container.ExportArtifact`
     :param filename: if specified, stores the model into that file
     :param inline: inline the model before converting to onnx, this is done before
