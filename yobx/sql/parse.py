@@ -208,7 +208,7 @@ class ParsedQuery:
     operations: List[SqlOperation] = field(default_factory=list)
     from_table: str = ""
     columns: List[str] = field(default_factory=list)
-    subquery: Optional["ParsedQuery"] = None
+    subquery: Optional[ParsedQuery] = None
 
 
 # ---------------------------------------------------------------------------
@@ -460,7 +460,7 @@ class _Parser:
                 break
         return distinct, items
 
-    def _parse_from(self) -> Tuple[str, Optional["ParsedQuery"]]:
+    def _parse_from(self) -> Tuple[str, Optional[ParsedQuery]]:
         """Parse the FROM clause.
 
         Returns a ``(table_name, subquery)`` pair.  When the FROM clause
@@ -512,7 +512,7 @@ class _Parser:
             right_table=right_table, left_key=left_key, right_key=right_key, join_type=join_type
         )
 
-    def _parse_query(self) -> "ParsedQuery":
+    def _parse_query(self) -> ParsedQuery:
         """Parse a full ``SELECT … FROM … [JOIN] [WHERE] [GROUP BY]`` statement.
 
         This method is called recursively for subqueries.
@@ -568,13 +568,10 @@ class _Parser:
         columns = _collect_columns(operations)
 
         return ParsedQuery(
-            operations=operations,
-            from_table=from_table,
-            columns=columns,
-            subquery=subquery,
+            operations=operations, from_table=from_table, columns=columns, subquery=subquery
         )
 
-    def parse(self) -> "ParsedQuery":
+    def parse(self) -> ParsedQuery:
         """Parse the token stream and return a :class:`ParsedQuery`."""
         return self._parse_query()
 

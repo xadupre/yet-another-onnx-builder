@@ -515,5 +515,234 @@ class TestJaxUnaryOpsEndToEnd(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-6)
 
 
+# ---------------------------------------------------------------------------
+# New ops: constant, dot_general, broadcast_in_dim, reduce, call (relu)
+# ---------------------------------------------------------------------------
+
+_MLIR_CONSTANT = """
+func.func @main(%arg0: tensor<2xf32>) -> tensor<2xf32> {
+  %cst = stablehlo.constant dense<[1.0, 2.0]> : tensor<2xf32> loc(#loc0)
+  %0 = stablehlo.add %arg0, %cst : tensor<2xf32> loc(#loc1)
+  return %0 : tensor<2xf32> loc(#loc2)
+}
+"""
+
+_MLIR_DOT_GENERAL = """
+func.func @main(%arg0: tensor<3x4xf32>, %arg1: tensor<4x2xf32>) -> tensor<3x2xf32> {
+  %0 = stablehlo.dot_general %arg0, %arg1, contracting_dims = [1] x [0]
+        : (tensor<3x4xf32>, tensor<4x2xf32>) -> tensor<3x2xf32> loc(#loc0)
+  return %0 : tensor<3x2xf32> loc(#loc1)
+}
+"""
+
+_MLIR_BROADCAST_IN_DIM = """
+func.func @main(%arg0: tensor<3xf32>) -> tensor<3xf32> {
+  %cst = stablehlo.constant dense<1.0> : tensor<f32> loc(#loc0)
+  %0 = stablehlo.broadcast_in_dim %cst, dims = [] : (tensor<f32>) -> tensor<3xf32> loc(#loc1)
+  %1 = stablehlo.add %arg0, %0 : tensor<3xf32> loc(#loc2)
+  return %1 : tensor<3xf32> loc(#loc3)
+}
+"""
+
+
+class TestParseMlirNewOps(ExtTestCase):
+    """Tests for new ops in :func:`parse_mlir`: constant, dot_general, broadcast_in_dim."""
+
+    def _import(self):
+        from yobx.tensorflow.ops.xla_call_module import parse_mlir
+
+        return parse_mlir
+
+    def test_parse_constant(self):
+        """parse_mlir extracts a stablehlo.constant layer."""
+        parse_mlir = self._import()
+        layers = parse_mlir(_MLIR_CONSTANT)
+        const_layers = [la for la in layers if la["op"] == "constant"]
+        self.assertEqual(len(const_layers), 1)
+        self.assertEqual(const_layers[0]["id"], "%cst")
+        self.assertIn("dense_content", const_layers[0])
+
+    def test_parse_dot_general(self):
+        """parse_mlir extracts a stablehlo.dot_general layer with contracting dims."""
+        parse_mlir = self._import()
+        layers = parse_mlir(_MLIR_DOT_GENERAL)
+        dot_layers = [la for la in layers if la["op"] == "dot_general"]
+        self.assertEqual(len(dot_layers), 1)
+        self.assertEqual(dot_layers[0]["operands"], ["%arg0", "%arg1"])
+        self.assertEqual(dot_layers[0]["lhs_contracting"], [1])
+        self.assertEqual(dot_layers[0]["rhs_contracting"], [0])
+
+    def test_parse_broadcast_in_dim(self):
+        """parse_mlir extracts stablehlo.broadcast_in_dim layers."""
+        parse_mlir = self._import()
+        layers = parse_mlir(_MLIR_BROADCAST_IN_DIM)
+        bcast_layers = [la for la in layers if la["op"] == "broadcast_in_dim"]
+        self.assertGreater(len(bcast_layers), 0)
+
+
+class TestParseTensorType(ExtTestCase):
+    """Tests for :func:`_parse_tensor_type`."""
+
+    def _import(self):
+        from yobx.tensorflow.ops.xla_call_module import _parse_tensor_type
+
+        return _parse_tensor_type
+
+    def test_scalar_f32(self):
+        _parse_tensor_type = self._import()
+        shape, dtype = _parse_tensor_type("tensor<f32>")
+        self.assertEqual(shape, ())
+        self.assertEqual(dtype, np.float32)
+
+    def test_1d_f32(self):
+        _parse_tensor_type = self._import()
+        shape, dtype = _parse_tensor_type("tensor<16xf32>")
+        self.assertEqual(shape, (16,))
+        self.assertEqual(dtype, np.float32)
+
+    def test_2d_f32(self):
+        _parse_tensor_type = self._import()
+        shape, dtype = _parse_tensor_type("tensor<8x16xf32>")
+        self.assertEqual(shape, (8, 16))
+        self.assertEqual(dtype, np.float32)
+
+    def test_dynamic_dim(self):
+        _parse_tensor_type = self._import()
+        shape, dtype = _parse_tensor_type("tensor<?x10xf32>")
+        self.assertEqual(shape, (-1, 10))
+        self.assertEqual(dtype, np.float32)
+
+    def test_scalar_i32(self):
+        _parse_tensor_type = self._import()
+        shape, dtype = _parse_tensor_type("tensor<i32>")
+        self.assertEqual(shape, ())
+        self.assertEqual(dtype, np.int32)
+
+    def test_1d_i32(self):
+        _parse_tensor_type = self._import()
+        shape, dtype = _parse_tensor_type("tensor<1xi32>")
+        self.assertEqual(shape, (1,))
+        self.assertEqual(dtype, np.int32)
+
+
+class TestParseDenseValue(ExtTestCase):
+    """Tests for :func:`_parse_dense_value`."""
+
+    def _import(self):
+        from yobx.tensorflow.ops.xla_call_module import _parse_dense_value
+
+        return _parse_dense_value
+
+    def test_scalar_zero(self):
+        _parse_dense_value = self._import()
+        arr = _parse_dense_value("0.000000e+00", (4,), np.float32)
+        np.testing.assert_array_equal(arr, [0.0, 0.0, 0.0, 0.0])
+
+    def test_hex_neg_inf(self):
+        """0xFF800000 is the IEEE 754 big-endian bit pattern for -inf."""
+        _parse_dense_value = self._import()
+        val = _parse_dense_value("0xFF800000", (), np.float32)
+        self.assertTrue(np.isneginf(val))
+
+    def test_nested_list(self):
+        _parse_dense_value = self._import()
+        arr = _parse_dense_value("[[1.0, 2.0], [3.0, 4.0]]", (2, 2), np.float32)
+        np.testing.assert_allclose(arr, [[1.0, 2.0], [3.0, 4.0]])
+
+    def test_scalar_integer(self):
+        _parse_dense_value = self._import()
+        val = _parse_dense_value("1", (), np.int32)
+        self.assertEqual(int(val), 1)
+
+
+@requires_jax()
+class TestJaxMlpEndToEnd(ExtTestCase):
+    """End-to-end tests for the MLP example from :ref:`l-plot-jax-to-onnx`."""
+
+    def _run(self, jax_fn, x, dynamic_shapes=None):
+        from onnxruntime import InferenceSession
+        from yobx.tensorflow import to_onnx
+
+        kwargs = {}
+        if dynamic_shapes is not None:
+            kwargs["dynamic_shapes"] = dynamic_shapes
+        onx = to_onnx(jax_fn, (x,), **kwargs)
+        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+        input_name = onx.graph.input[0].name
+        (result,) = sess.run(None, {input_name: x})
+        expected = np.asarray(jax_fn(x))
+        return expected, result, onx
+
+    def test_mlp_static(self):
+        """Static MLP: MatMul, relu (Max), MatMul → correct predictions."""
+        import jax
+
+        rng = np.random.default_rng(0)
+        key = jax.random.PRNGKey(42)
+        k1, k2 = jax.random.split(key)
+        W1 = jax.random.normal(k1, (8, 16), dtype=np.float32)
+        b1 = np.zeros(16, dtype=np.float32)
+        W2 = jax.random.normal(k2, (16, 4), dtype=np.float32)
+        b2 = np.zeros(4, dtype=np.float32)
+
+        def jax_mlp(x):
+            h = jax.nn.relu(x @ W1 + b1)
+            return h @ W2 + b2
+
+        X = rng.standard_normal((10, 8)).astype(np.float32)
+        expected, result, onx = self._run(jax_mlp, X)
+        self.assertEqualArray(expected, result, atol=1e-5)
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("MatMul", op_types)
+
+    def test_mlp_dynamic_batch(self):
+        """Dynamic-batch MLP: model accepts any batch size."""
+        import jax
+
+        rng = np.random.default_rng(1)
+        key = jax.random.PRNGKey(7)
+        k1, k2 = jax.random.split(key)
+        W1 = jax.random.normal(k1, (4, 8), dtype=np.float32)
+        b1 = np.zeros(8, dtype=np.float32)
+        W2 = jax.random.normal(k2, (8, 3), dtype=np.float32)
+        b2 = np.zeros(3, dtype=np.float32)
+
+        def mlp(x):
+            return jax.nn.relu(x @ W1 + b1) @ W2 + b2
+
+        X = rng.standard_normal((5, 4)).astype(np.float32)
+        _, _, onx = self._run(mlp, X, dynamic_shapes=({0: "batch"},))
+        batch_dim = onx.graph.input[0].type.tensor_type.shape.dim[0]
+        self.assertTrue(batch_dim.dim_param, "Expected a named dynamic batch dim")
+
+        from onnxruntime import InferenceSession
+
+        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+        iname = onx.graph.input[0].name
+        for n in (1, 3, 9):
+            Xn = rng.standard_normal((n, 4)).astype(np.float32)
+            (out,) = sess.run(None, {iname: Xn})
+            self.assertEqualArray(np.asarray(mlp(Xn)), out, atol=1e-5)
+
+    def test_softmax(self):
+        """Softmax via explicit jax_to_concrete_function."""
+        import jax
+
+        from yobx.tensorflow import to_onnx
+        from yobx.tensorflow.tensorflow_helper import jax_to_concrete_function
+        from onnxruntime import InferenceSession
+
+        def jax_softmax(x):
+            return jax.nn.softmax(x, axis=-1)
+
+        rng = np.random.default_rng(42)
+        X = rng.standard_normal((6, 10)).astype(np.float32)
+        cf = jax_to_concrete_function(jax_softmax, (X,), dynamic_shapes=({0: "batch"},))
+        onx = to_onnx(cf, (X,), dynamic_shapes=({0: "batch"},))
+        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+        (result,) = sess.run(None, {onx.graph.input[0].name: X})
+        self.assertEqualArray(np.asarray(jax_softmax(X)), result, atol=1e-5)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

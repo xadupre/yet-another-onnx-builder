@@ -425,9 +425,7 @@ class TestSqlToOnnxSubquery(ExtTestCase):
     def test_subquery_inner_where(self):
         dtypes = {"a": np.float32}
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
-        (out,) = self._run(
-            "SELECT a FROM (SELECT a FROM t WHERE a > 0)", dtypes, {"a": a}
-        )
+        (out,) = self._run("SELECT a FROM (SELECT a FROM t WHERE a > 0)", dtypes, {"a": a})
         self.assertEqualArray(out, np.array([1.0, 3.0], dtype=np.float32))
 
     def test_subquery_outer_where(self):
@@ -442,18 +440,14 @@ class TestSqlToOnnxSubquery(ExtTestCase):
     def test_subquery_with_alias(self):
         dtypes = {"a": np.float32}
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
-        (out,) = self._run(
-            "SELECT a FROM (SELECT a FROM t) AS sub", dtypes, {"a": a}
-        )
+        (out,) = self._run("SELECT a FROM (SELECT a FROM t) AS sub", dtypes, {"a": a})
         self.assertEqualArray(out, a)
 
     def test_subquery_inner_and_outer_where(self):
         dtypes = {"a": np.float32}
         a = np.array([-1.0, 1.0, 2.0, 3.0, 4.0], dtype=np.float32)
         (out,) = self._run(
-            "SELECT a FROM (SELECT a FROM t WHERE a > 0) WHERE a < 4",
-            dtypes,
-            {"a": a},
+            "SELECT a FROM (SELECT a FROM t WHERE a > 0) WHERE a < 4", dtypes, {"a": a}
         )
         # Inner WHERE: [1, 2, 3, 4]; outer WHERE a < 4: [1, 2, 3]
         self.assertEqualArray(out, np.array([1.0, 2.0, 3.0], dtype=np.float32))
@@ -464,9 +458,7 @@ class TestSqlToOnnxSubquery(ExtTestCase):
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
         (out,) = self._run(
-            "SELECT total FROM (SELECT a + b AS total FROM t)",
-            dtypes,
-            {"a": a, "b": b},
+            "SELECT total FROM (SELECT a + b AS total FROM t)", dtypes, {"a": a, "b": b}
         )
         self.assertEqualArray(out, a + b, atol=1e-6)
 
