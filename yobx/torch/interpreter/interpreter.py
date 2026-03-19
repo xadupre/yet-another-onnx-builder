@@ -1935,7 +1935,7 @@ class DynamoInterpreter:
                 # nothing to do
                 res = tuple(res)
             elif (
-                isinstance(res, tuple)
+                isinstance(res, (tuple, list))
                 and len(res) == 1
                 and str(getattr(node, "target", None))
                 in {"scan", "aten.split_with_sizes.default"}
