@@ -76,6 +76,13 @@ different design priorities.
      - ``validate_onnx=True`` (or a float tolerance) runs the exported model
        with ONNX Runtime and compares outputs against PyTorch automatically
      - Validation is left to the caller
+   * - **Debugging**
+     - Rich set of environment variables (``ONNXSTOP``, ``ONNXSTOPSHAPE``,
+       ``ONNXSTOPTYPE``, ``ONNXSTOPOUTPUT``, …) let you pinpoint exactly
+       which node assigns a suspicious shape or type; see
+       :ref:`l-design-torch-debugging` and
+       :ref:`l-graphbuilder-debugging-env`
+     - Standard Python / PyTorch debugging tools
    * - **Dynamic shape inference**
      - :class:`~yobx.torch.input_observer.InputObserver` can infer
        ``dynamic_shapes`` automatically from real forward passes; useful for
@@ -87,8 +94,10 @@ different design priorities.
 
 In short: if you need the officially supported PyTorch exporter, use
 :func:`torch.onnx.export`.  If you need finer control over the
-ATen → ONNX translation, built-in graph optimization, or advanced export
+ATen → ONNX translation, built-in graph optimization, advanced export
 strategies such as fake-tensor mode or automatic dynamic-shape inference,
+or rich debugging capabilities (:ref:`l-design-torch-debugging`,
+:ref:`l-graphbuilder-debugging-env`),
 :func:`yobx.torch.interpreter.to_onnx` may be a better fit.
 
 The entry point for converting a PyTorch model to ONNX is
@@ -417,6 +426,8 @@ requiring code changes:
 Debugging
 =========
 
+.. _l-design-torch-debugging:
+
 :class:`~yobx.xbuilder.GraphBuilder` reads several environment variables at
 construction time that raise an exception as soon as a named result is
 assigned a shape, type, or value.  Setting one of these is the fastest way to
@@ -458,6 +469,10 @@ See also
   successful symbolic tracing.
 * :ref:`l-design-input-observer` — automatic inference of export arguments
   and dynamic shapes.
+* :ref:`l-design-torch-debugging` — environment variables for tracing
+  converter issues (this page).
+* :ref:`l-graphbuilder-debugging-env` — ``GraphBuilder`` debugging environment
+  variables.
 * :class:`yobx.xbuilder.GraphBuilder` — the underlying ONNX graph builder.
 * :class:`yobx.torch.export_options.ExportOptions` — all export strategy options.
 * :func:`yobx.torch.interpreter.to_onnx` — the public conversion API.
