@@ -354,6 +354,28 @@ class TestSqlToOnnxGraph(ExtTestCase):
         _, (low_out,) = self._build_and_run(query, dtypes, feeds)
         self.assertEqualArray(high_out, low_out, atol=1e-6)
 
+    def test_output_names_from_alias(self):
+        """Output tensor names should reflect SELECT aliases when they don't conflict."""
+        from yobx.xbuilder import GraphBuilder
+
+        g = GraphBuilder(18, ir_version=10)
+        dtypes = {"a": np.float32, "b": np.float32}
+        out_names = sql_to_onnx_graph(
+            g, None, [], "SELECT a + b AS total FROM t", dtypes
+        )
+        # "total" is the alias and doesn't collide with any input
+        self.assertEqual(out_names, ["total"])
+
+    def test_output_names_fallback_on_collision(self):
+        """When the alias conflicts with an input name, fall back to indexed name."""
+        from yobx.xbuilder import GraphBuilder
+
+        g = GraphBuilder(18, ir_version=10)
+        dtypes = {"a": np.float32}
+        out_names = sql_to_onnx_graph(g, None, [], "SELECT a FROM t", dtypes)
+        # "a" is already registered as an input, so must fall back to "output_0"
+        self.assertEqual(out_names, ["output_0"])
+
 
 if __name__ == "__main__":
     unittest.main()

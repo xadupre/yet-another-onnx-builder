@@ -39,7 +39,7 @@ Limitations
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 from onnx import ModelProto, TensorProto
@@ -154,6 +154,7 @@ def sql_to_onnx_graph(
         right_input_dtypes=right_input_dtypes,
         n_rows=n_rows,
         custom_functions=custom_functions,
+        desired_outputs=outputs or None,
     )
 
 
@@ -258,6 +259,7 @@ def _populate_graph(
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]],
     n_rows: Optional[int],
     custom_functions: Optional[Dict[str, Callable]] = None,
+    desired_outputs: Optional[List[str]] = None,
 ) -> List[str]:
     """Populate *g* with ONNX nodes for *pq* and return the output tensor names."""
     dim = n_rows if n_rows is not None else "N"
@@ -336,12 +338,25 @@ def _populate_graph(
     # Emit SELECT expressions
     emitter = _ExprEmitter(g, col_map, custom_functions=resolved_custom_functions)
     output_names: List[str] = []
+    used_tensor_names: Set[str] = set()
     for i, item in enumerate(select_op.items):
         out_name = item.output_name()
-        # Use indexed tensor name to avoid collision with input names
-        tensor_name = f"output_{i}"
+        # Determine the desired tensor name: caller-supplied, then query alias, then indexed
+        if desired_outputs and i < len(desired_outputs):
+            candidate = desired_outputs[i]
+        else:
+            candidate = out_name
+        # Fall back to an indexed name if the candidate conflicts with existing names
+        if g.has_name(candidate) or candidate in used_tensor_names:
+            # Find a free indexed name (output_{i}, output_{i+1}, ...) that is not taken
+            j = i
+            candidate = f"output_{j}"
+            while g.has_name(candidate) or candidate in used_tensor_names:
+                j += 1
+                candidate = f"output_{j}"
+        tensor_name = candidate
+        used_tensor_names.add(tensor_name)
         result = emitter.emit(item.expr, name=f"select_{out_name}")
-        # Always emit an Identity node to give the output tensor a unique indexed name
         g.op.Identity(result, outputs=[tensor_name], name=f"out_{out_name}")
         output_names.append(tensor_name)
 
