@@ -17,6 +17,9 @@ Public API
   to an existing :class:`~yobx.typing.GraphBuilderProtocol`
 * :func:`to_onnx` — convenience wrapper: ``polars.LazyFrame`` + SQL string →
   ONNX model (dtypes are inferred from the frame schema)
+* :func:`polars_schema_to_input_dtypes` — extract a column-dtype mapping from
+  a ``polars.LazyFrame`` or ``polars.DataFrame`` (used internally by
+  :func:`to_onnx`, also available as a standalone utility)
 * :func:`~yobx.sql.parse.parse_sql` — parse a SQL string into a
   :class:`~yobx.sql.parse.ParsedQuery`
 * :class:`~yobx.sql.parse.ParsedQuery` — parsed query container
@@ -59,6 +62,7 @@ polars example
 """
 
 from .convert import sql_to_onnx, sql_to_onnx_graph, to_onnx
+from ._polars_helper import polars_schema_to_input_dtypes
 from .parse import (
     AggExpr,
     BinaryExpr,
@@ -89,6 +93,7 @@ __all__ = [
     "SelectItem",
     "SelectOp",
     "parse_sql",
+    "polars_schema_to_input_dtypes",
     "sql_to_onnx",
     "sql_to_onnx_graph",
     "to_onnx",

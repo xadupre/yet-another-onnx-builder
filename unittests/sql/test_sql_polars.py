@@ -1,5 +1,6 @@
 """
-Unit tests for :func:`yobx.sql.to_onnx` — polars LazyFrame → ONNX conversion.
+Unit tests for :func:`yobx.sql.to_onnx` and
+:func:`yobx.sql.polars_schema_to_input_dtypes` — polars integration.
 """
 
 import unittest
@@ -7,7 +8,7 @@ import numpy as np
 
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.sql import to_onnx
+from yobx.sql import polars_schema_to_input_dtypes, to_onnx
 
 try:
     import polars as _pl  # noqa: F401
@@ -185,6 +186,58 @@ class TestToOnnxImportError(ExtTestCase):
     def test_import_error(self):
         with self.assertRaises(ImportError):
             to_onnx(object(), "SELECT a FROM t")
+
+
+@unittest.skipUnless(HAS_POLARS, "polars not installed")
+class TestPolarsSchemaToInputDtypes(ExtTestCase):
+    """Tests for :func:`~yobx.sql.polars_schema_to_input_dtypes`."""
+
+    def test_float32(self):
+        import polars as pl
+
+        lf = pl.LazyFrame({"a": pl.Series([1.0], dtype=pl.Float32)})
+        result = polars_schema_to_input_dtypes(lf)
+        self.assertEqual(result, {"a": np.dtype("float32")})
+
+    def test_int64(self):
+        import polars as pl
+
+        lf = pl.LazyFrame({"x": pl.Series([1], dtype=pl.Int64)})
+        result = polars_schema_to_input_dtypes(lf)
+        self.assertEqual(result, {"x": np.dtype("int64")})
+
+    def test_multiple_dtypes(self):
+        import polars as pl
+
+        lf = pl.LazyFrame(
+            {
+                "f": pl.Series([1.0], dtype=pl.Float32),
+                "i": pl.Series([1], dtype=pl.Int32),
+                "b": pl.Series([True], dtype=pl.Boolean),
+            }
+        )
+        result = polars_schema_to_input_dtypes(lf)
+        self.assertEqual(result["f"], np.dtype("float32"))
+        self.assertEqual(result["i"], np.dtype("int32"))
+        self.assertEqual(result["b"], np.dtype("bool"))
+
+    def test_dataframe_accepted(self):
+        import polars as pl
+
+        df = pl.DataFrame({"a": pl.Series([1.0], dtype=pl.Float64)})
+        result = polars_schema_to_input_dtypes(df)
+        self.assertEqual(result, {"a": np.dtype("float64")})
+
+    def test_unsupported_dtype_raises_value_error(self):
+        import polars as pl
+
+        lf = pl.LazyFrame({"a": pl.Series([[1, 2]])})
+        with self.assertRaises(ValueError):
+            polars_schema_to_input_dtypes(lf)
+
+    def test_invalid_type_raises_type_error(self):
+        with self.assertRaises(TypeError):
+            polars_schema_to_input_dtypes({"a": np.float32})
 
 
 if __name__ == "__main__":

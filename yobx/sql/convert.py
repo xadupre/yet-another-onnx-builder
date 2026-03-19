@@ -48,6 +48,7 @@ from .. import DEFAULT_TARGET_OPSET
 from ..typing import GraphBuilderProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
+from ._polars_helper import polars_schema_to_input_dtypes
 from .ops import get_sql_op_converter
 from .parse import GroupByOp, JoinOp, ParsedQuery, SelectOp, parse_sql
 
@@ -70,67 +71,6 @@ def _np_dtype_to_onnx(dt: Union[np.dtype, type, str]) -> int:
     if dt in _NP_TO_ONNX:
         return _NP_TO_ONNX[dt]
     raise ValueError(f"Unsupported numpy dtype for SQL conversion: {dt}")
-
-
-# Mapping from polars DataType class name to numpy dtype.
-# Used by :func:`to_onnx` to extract column dtypes from a polars schema.
-_POLARS_DTYPE_TO_NP: Dict[str, np.dtype] = {
-    "Float32": np.dtype("float32"),
-    "Float64": np.dtype("float64"),
-    "Int8": np.dtype("int8"),
-    "Int16": np.dtype("int16"),
-    "Int32": np.dtype("int32"),
-    "Int64": np.dtype("int64"),
-    "UInt8": np.dtype("uint8"),
-    "UInt16": np.dtype("uint16"),
-    "UInt32": np.dtype("uint32"),
-    "UInt64": np.dtype("uint64"),
-    "Boolean": np.dtype("bool"),
-    "String": np.dtype("object"),
-    "Utf8": np.dtype("object"),
-}
-
-
-def _polars_schema_to_input_dtypes(
-    frame,
-) -> Dict[str, np.dtype]:
-    """Extract a column-name → numpy-dtype mapping from a polars frame.
-
-    :param frame: a ``polars.LazyFrame`` or ``polars.DataFrame``.
-    :return: dict mapping each column name to its numpy dtype.
-    :raises ImportError: if *polars* is not installed.
-    :raises ValueError: if any column dtype has no numpy equivalent.
-    """
-    try:
-        import polars as pl  # noqa: F401
-    except ImportError as exc:
-        raise ImportError(
-            "polars is required for yobx.sql.to_onnx. "
-            "Install it with: pip install polars"
-        ) from exc
-
-    if hasattr(frame, "collect_schema"):
-        # polars.LazyFrame — cheap, no execution
-        schema = frame.collect_schema()
-    elif hasattr(frame, "schema"):
-        # polars.DataFrame
-        schema = frame.schema
-    else:
-        raise TypeError(
-            f"Expected a polars.LazyFrame or polars.DataFrame, got {type(frame)!r}"
-        )
-
-    result: Dict[str, np.dtype] = {}
-    for col_name, dtype in schema.items():
-        key = type(dtype).__name__
-        if key not in _POLARS_DTYPE_TO_NP:
-            raise ValueError(
-                f"Column {col_name!r} has polars dtype {dtype!r} which cannot be "
-                f"mapped to a numpy dtype supported by sql_to_onnx. "
-                f"Supported polars dtypes: {sorted(_POLARS_DTYPE_TO_NP)}"
-            )
-        result[col_name] = _POLARS_DTYPE_TO_NP[key]
-    return result
 
 
 def sql_to_onnx_graph(
@@ -372,10 +312,10 @@ def to_onnx(
         key) would require an ONNX ``Loop`` or custom kernel and are not
         yet supported.
     """
-    input_dtypes = _polars_schema_to_input_dtypes(frame)
+    input_dtypes = polars_schema_to_input_dtypes(frame)
     right_input_dtypes: Optional[Dict[str, np.dtype]] = None
     if right_frame is not None:
-        right_input_dtypes = _polars_schema_to_input_dtypes(right_frame)
+        right_input_dtypes = polars_schema_to_input_dtypes(right_frame)
     return sql_to_onnx(
         query,
         input_dtypes,
