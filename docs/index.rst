@@ -99,7 +99,7 @@ Its unique API:
    :maxdepth: 1
 
    api/index
-   contents
+   converters
    galleries
    cmds/index
    install

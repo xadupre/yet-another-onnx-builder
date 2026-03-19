@@ -1,7 +1,7 @@
-.. _l-contents:
+.. _l-converters:
 
-Contents
-========
+Converters
+==========
 
 This section documents the architecture and design of **yet-another-onnx-builder**
 (*yobx*), the conversion pipelines for each supported framework, SQL conversion,
