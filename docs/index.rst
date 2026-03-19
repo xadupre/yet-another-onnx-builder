@@ -112,6 +112,7 @@ Its unique API:
    :caption: Galleries
 
    auto_examples_core/index
+   auto_examples_sql/index
    auto_examples_sklearn/index
    auto_examples_torch/index
    auto_examples_tensorflow/index

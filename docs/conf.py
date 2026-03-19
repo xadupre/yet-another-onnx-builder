@@ -110,6 +110,7 @@ sphinx_gallery_conf = {
     # path to your examples scripts
     "examples_dirs": [
         os.path.join(os.path.dirname(__file__), "examples", "core"),
+        os.path.join(os.path.dirname(__file__), "examples", "sql"),
         os.path.join(os.path.dirname(__file__), "examples", "sklearn"),
         os.path.join(os.path.dirname(__file__), "examples", "torch"),
         os.path.join(os.path.dirname(__file__), "examples", "tensorflow"),
@@ -118,6 +119,7 @@ sphinx_gallery_conf = {
     # path where to save gallery generated examples
     "gallery_dirs": [
         "auto_examples_core",
+        "auto_examples_sql",
         "auto_examples_sklearn",
         "auto_examples_torch",
         "auto_examples_tensorflow",
