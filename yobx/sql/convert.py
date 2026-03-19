@@ -127,7 +127,7 @@ def sql_to_onnx_graph(
     :return: a list of output tensor names that were added to *g* as model
         outputs (one per expression in the ``SELECT`` clause, in order).
 
-    Example::
+    Example:
 
     .. runpython::
         :showcode:
@@ -146,8 +146,8 @@ def sql_to_onnx_graph(
             "SELECT a + b AS total FROM t WHERE a > 0",
             dtypes,
         )
-        onx = g.to_onnx()
-        print(pretty_onnx(onx))
+        art = g.to_onnx()
+        print(pretty_onnx(art))
     """
     custom_functions = (sts or {}).get("custom_functions", {})
     pq = parse_sql(query)

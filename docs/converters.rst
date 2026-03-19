@@ -11,6 +11,7 @@ They all returns an instance of :class:`~yobx.container.ExportArtifact`.
 .. toctree::
    :maxdepth: 1
 
+   design/export_artifact
    design/litert/index
    design/sklearn/index
    design/sql/index

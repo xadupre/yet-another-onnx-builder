@@ -12,6 +12,7 @@ from yobx.ext_test_case import (
     skipif_ci_windows,
     requires_cuda,
     requires_torch,
+    hide_stdout,
 )
 from yobx.xbuilder import OptimizationOptions
 from yobx.torch import ExportOptions
@@ -203,6 +204,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
+    @hide_stdout()
     def test_simple_export_relu(self):
         model, input_tensor = return_module_cls_relu()
         names = export_utils("test_simple_export_relu", model, input_tensor)
@@ -233,6 +235,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_cuda()
     @requires_torch("2.13")
+    @hide_stdout()
     def test_simple_export_pool_bfloat16(self):
         import torch
         from onnxruntime import InferenceSession
@@ -368,6 +371,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
+    @hide_stdout()
     def test_simple_export_pool_constant_folding(self):
         from onnxruntime import InferenceSession
 
@@ -518,7 +522,6 @@ class TestOnnxExportCornerCase(ExtTestCase):
         expected = model(x)
         ep = torch.export.export(model, (x,))
         got = ep.module()(x)
-        print(ep)
         torch.testing.assert_close(expected, got)
         self.assertEqualArray(expected, got)
 
@@ -537,13 +540,15 @@ class TestOnnxExportCornerCase(ExtTestCase):
 
         # No explicit options — 'com.microsoft' in target_opset should trigger
         # OptimizationOptions(patterns="default+onnxruntime") automatically.
-        _onx, builder_ort = to_onnx(
+        onx = to_onnx(
             Model(), (x, y), target_opset={"": 22, "com.microsoft": 1}, return_builder=True
         )
+        builder_ort = onx.builder
         n_ort = len(builder_ort.optimization_options.patterns)
 
         # Default opset (integer) should use the standard default patterns.
-        _onx2, builder_default = to_onnx(Model(), (x, y), target_opset=22, return_builder=True)
+        onx2 = to_onnx(Model(), (x, y), target_opset=22, return_builder=True)
+        builder_default = onx2.builder
         n_default = len(builder_default.optimization_options.patterns)
 
         self.assertGreater(
