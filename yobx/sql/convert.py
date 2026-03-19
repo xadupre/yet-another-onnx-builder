@@ -39,19 +39,17 @@ Limitations
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 from onnx import ModelProto, TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
+from ..typing import GraphBuilderProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
 from .ops import get_sql_op_converter
 from .parse import GroupByOp, JoinOp, ParsedQuery, SelectOp, parse_sql
-
-if TYPE_CHECKING:
-    from ..typing import GraphBuilderProtocol
 
 # ---------------------------------------------------------------------------
 # Dtype helper
@@ -75,7 +73,7 @@ def _np_dtype_to_onnx(dt: Union[np.dtype, type, str]) -> int:
 
 
 def sql_to_onnx_graph(
-    g: "GraphBuilderProtocol",
+    g: GraphBuilderProtocol,
     sts: Optional[Dict],
     outputs: List[str],
     query: str,
@@ -244,13 +242,7 @@ def sql_to_onnx(
     g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
     sql_to_onnx_graph(
-        g,
-        sts,
-        [],
-        query,
-        input_dtypes,
-        right_input_dtypes=right_input_dtypes,
-        n_rows=n_rows,
+        g, sts, [], query, input_dtypes, right_input_dtypes=right_input_dtypes, n_rows=n_rows
     )
     onx, _ = g.to_onnx(return_optimize_report=True)  # type: ignore
     return onx  # type: ignore[return-value]
@@ -262,7 +254,7 @@ def sql_to_onnx(
 
 
 def _populate_graph(
-    g: "GraphBuilderProtocol",
+    g: GraphBuilderProtocol,
     pq: ParsedQuery,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]],

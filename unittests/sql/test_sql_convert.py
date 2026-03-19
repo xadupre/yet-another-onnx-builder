@@ -301,14 +301,7 @@ class TestSqlToOnnxGraph(ExtTestCase):
         from yobx.xbuilder import GraphBuilder
 
         g = GraphBuilder(18, ir_version=10)
-        out_names = sql_to_onnx_graph(
-            g,
-            None,
-            [],
-            query,
-            dtypes,
-            right_input_dtypes=right_dtypes,
-        )
+        out_names = sql_to_onnx_graph(g, None, [], query, dtypes, right_input_dtypes=right_dtypes)
         onx, _ = g.to_onnx(return_optimize_report=True)
         ref = ExtendedReferenceEvaluator(onx)
         return out_names, ref.run(None, feeds)
@@ -377,9 +370,7 @@ class TestSqlToOnnxGraph(ExtTestCase):
 
         g = GraphBuilder(18, ir_version=10)
         dtypes = {"a": np.float32, "b": np.float32}
-        out_names = sql_to_onnx_graph(
-            g, None, [], "SELECT a + b AS total FROM t", dtypes
-        )
+        out_names = sql_to_onnx_graph(g, None, [], "SELECT a + b AS total FROM t", dtypes)
         # "total" is the alias and doesn't collide with any input
         self.assertEqual(out_names, ["total"])
 
