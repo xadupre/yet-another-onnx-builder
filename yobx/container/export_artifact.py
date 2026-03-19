@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 import onnx
 from ..typing import GraphBuilderExtendedProtocol
 from .model_container import ExtendedModelContainer
+from .build_stats import BuildStats
 
 
 class ExportReport:
@@ -30,82 +31,84 @@ class ExportReport:
     """
 
     def __init__(
-        self, stats: Optional[List[Dict[str, Any]]] = None, extra: Optional[Dict[str, Any]] = None
+        self,
+        stats: Optional[List[Dict[str, Any]]] = None,
+        extra: Optional[Dict[str, Any]] = None,
+        build_stats: Optional[BuildStats] = None,
     ):
-        self._stats: List[Dict[str, Any]] = stats if stats is not None else []
-        self._extra: Dict[str, Any] = extra if extra is not None else {}
+        self.stats: List[Dict[str, Any]] = stats if stats is not None else []
+        self.extra: Dict[str, Any] = extra if extra is not None else {}
+        self.build_stats = build_stats
 
     def update(self, data: Dict[str, Any]) -> None:
         """Merge *data* into :attr:`_extra`.
 
         :param data: key-value pairs to add to :attr:`_extra`.
         """
-        self._extra.update(data)
+        self.extra.update(data)
 
     def to_dict(self) -> Dict[str, Any]:
         """Return a plain dictionary representation of this report.
 
         :return: dictionary with keys ``"stats"`` and ``"extra"``.
         """
-        return {"stats": self._stats, "extra": self._extra}
+        return {"stats": self.stats, "extra": self.extra, "build_stats": self.build_stats}
 
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}("
             f"n_stats={len(self._stats)}, "
-            f"extra={sorted(self._extra)})"
+            f"extra={sorted(self._extra)}, "
+            f"has_build_stats={self.build_stats is not None})"
         )
 
 
 class ExportArtifact:
     """
-        Standard output of every :func:`to_onnx` conversion function.
+    Standard output of every :func:`to_onnx` conversion function.
 
-        Every top-level ``to_onnx`` function (sklearn, tensorflow, litert,
-        torch, sql …) returns an :class:`ExportArtifact` instead of a bare
-        :class:`~onnx.ModelProto` or
-        :class:`~yobx.container.ExtendedModelContainer`.
-        The instance bundles the exported proto, the optional large-model
-        container, an :class:`ExportReport` describing the export process,
-        and an optional filename.
+    Every top-level ``to_onnx`` function (sklearn, tensorflow, litert,
+    torch, sql …) returns an :class:`ExportArtifact` instead of a bare
+    :class:`~onnx.ModelProto` or
+    :class:`~yobx.container.ExtendedModelContainer`.
+    The instance bundles the exported proto, the optional large-model
+    container, an :class:`ExportReport` describing the export process,
+    and an optional filename.
 
-        Attributes
-        ----------
-        proto : ModelProto | FunctionProto | GraphProto | None
-            The ONNX proto produced by the export.  When *large_model* was
-            requested the proto contains *placeholders* for external data;
-            use :meth:`get_proto` to obtain a fully self-contained proto.
-        container : ExtendedModelContainer | None
-            The :class:`~yobx.container.ExtendedModelContainer` produced when
-            the conversion was called with ``large_model=True``.  ``None``
-            otherwise.
-        report : ExportReport
-            Statistics and metadata about the export.
-        filename : str | None
-            Path where the model was last saved, or ``None`` if never saved.
-    <<<<<<< HEAD
-        builder: GraphBuilderExtendedProtocol
-            Keeps the builder building the onnx model
+    Attributes
+    ----------
+    proto : ModelProto | FunctionProto | GraphProto | None
+        The ONNX proto produced by the export.  When *large_model* was
+        requested the proto contains *placeholders* for external data;
+        use :meth:`get_proto` to obtain a fully self-contained proto.
+    container : ExtendedModelContainer | None
+        The :class:`~yobx.container.ExtendedModelContainer` produced when
+        the conversion was called with ``large_model=True``.  ``None``
+        otherwise.
+    report : ExportReport
+        Statistics and metadata about the export.
+    filename : str | None
+        Path where the model was last saved, or ``None`` if never saved.
+    builder: GraphBuilderExtendedProtocol
+        Keeps the builder building the onnx model
 
-        Example::
+    Example::
 
-            import numpy as np
-            from sklearn.linear_model import LinearRegression
-            from yobx.sklearn import to_onnx
-            from yobx.container import ExportArtifact, ExportReport
+        import numpy as np
+        from sklearn.linear_model import LinearRegression
+        from yobx.sklearn import to_onnx
+        from yobx.container import ExportArtifact, ExportReport
 
-            X = np.random.randn(20, 4).astype(np.float32)
-            y = X @ np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
-            reg = LinearRegression().fit(X, y)
+        X = np.random.randn(20, 4).astype(np.float32)
+        y = X @ np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        reg = LinearRegression().fit(X, y)
 
-            artifact = to_onnx(reg, (X,))
-            assert isinstance(artifact, ExportArtifact)
-            assert isinstance(artifact.report, ExportReport)
+        artifact = to_onnx(reg, (X,))
+        assert isinstance(artifact, ExportArtifact)
+        assert isinstance(artifact.report, ExportReport)
 
-            proto = artifact.get_proto()
-            artifact.save("model.onnx")
-    =======
-    >>>>>>> 4e17a857e37cad067b15fbc6bc7d7b953888f7a2
+        proto = artifact.get_proto()
+        artifact.save("model.onnx")
     """
 
     def __init__(
@@ -118,13 +121,14 @@ class ExportArtifact:
     ):
         self.proto = proto
         self.container = container
-        self.report = report if report is not None else ExportReport()
+        self.report = report
         self.filename = filename
         self.builder = builder
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
+        if self.container and self.container._stats:
+            if not self.report:
+                self.report = ExportReport(build_stats=self.container._stats)
+            else:
+                self.report.build_stats = self.container._stats
 
     def save(self, file_path: str, all_tensors_to_one_file: bool = True) -> Any:
         """Save the exported model to *file_path*.
@@ -237,10 +241,6 @@ class ExportArtifact:
         # Regular model — no external data, proto is already complete.
         return cls(proto=proto, filename=file_path)
 
-    # ------------------------------------------------------------------
-    # Dunder helpers
-    # ------------------------------------------------------------------
-
     def __repr__(self) -> str:
         proto_type = type(self.proto).__name__ if self.proto is not None else "None"
         container_repr = (
@@ -253,3 +253,27 @@ class ExportArtifact:
             f"filename={self.filename!r}, "
             f"report={self.report!r})"
         )
+
+    @property
+    def graph(self) -> onnx.GraphProto:
+        """Returns the GraphProto is the model is available. Fails otherwise."""
+        if self.proto:
+            if isinstance(self.proto, onnx.ModelProto):
+                return self.proto.graph
+            if isinstance(self.proto, onnx.GraphProto):
+                return self.proto
+            raise TypeError(f"Unable to return a GraphProto from type {self.proto}.")
+        if self.container and self.container.model_proto_:
+            return self.container.model_proto_.graph
+        raise AttributeError(f"The artifact do not contain any model {self!r}.")
+
+    def SerializeToString(self) -> bytes:
+        """
+        Serializes the model to bytes.
+        It does not includes weights if the model is stored in a container.
+        """
+        if self.proto:
+            return self.proto.SerializeToString()
+        if self.container and self.container.model_proto_:
+            return self.container.model_proto_.SerializeToString()
+        raise ValueError(f"There is nothing to serialize in {self!r}.")

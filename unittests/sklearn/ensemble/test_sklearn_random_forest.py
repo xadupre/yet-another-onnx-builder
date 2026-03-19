@@ -236,7 +236,7 @@ class TestSklearnRandomForest(ExtTestCase):
 
         rfc = RandomForestClassifier(n_estimators=5, random_state=0)
         rfc.fit(X, y_cls)
-        onx_c = to_onnx(rfc, (X,), target_opset=20)
+        onx_c = to_onnx(rfc, (X,), target_opset=20).proto
         ml_opsets_c = {op.domain: op.version for op in onx_c.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets_c)
         self.assertLess(ml_opsets_c["ai.onnx.ml"], 5)

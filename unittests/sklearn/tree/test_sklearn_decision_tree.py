@@ -235,7 +235,7 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         dtc = DecisionTreeClassifier(random_state=0)
         dtc.fit(X, y_cls)
-        onx_c = to_onnx(dtc, (X,), target_opset=20)
+        onx_c = to_onnx(dtc, (X,), target_opset=20).proto
         ml_opsets_c = {op.domain: op.version for op in onx_c.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets_c)
         self.assertLess(ml_opsets_c["ai.onnx.ml"], 5)
@@ -245,7 +245,7 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         dtr = DecisionTreeRegressor(random_state=0)
         dtr.fit(X, y_reg)
-        onx_r = to_onnx(dtr, (X,), target_opset=20)
+        onx_r = to_onnx(dtr, (X,), target_opset=20).proto
         ml_opsets_r = {op.domain: op.version for op in onx_r.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets_r)
         self.assertLess(ml_opsets_r["ai.onnx.ml"], 5)
