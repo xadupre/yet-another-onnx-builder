@@ -512,7 +512,7 @@ class _Parser:
             right_table=right_table, left_key=left_key, right_key=right_key, join_type=join_type
         )
 
-    def _parse_query(self) -> "ParsedQuery":
+    def _parse_query(self) -> ParsedQuery:
         """Parse a full ``SELECT … FROM … [JOIN] [WHERE] [GROUP BY]`` statement.
 
         This method is called recursively for subqueries.
@@ -571,7 +571,7 @@ class _Parser:
             operations=operations, from_table=from_table, columns=columns, subquery=subquery
         )
 
-    def parse(self) -> "ParsedQuery":
+    def parse(self) -> ParsedQuery:
         """Parse the token stream and return a :class:`ParsedQuery`."""
         return self._parse_query()
 
