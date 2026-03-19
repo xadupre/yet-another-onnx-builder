@@ -36,7 +36,7 @@ docs = [
     "onnx-diagnostic",
     "openpyxl",
     "pandas",
-    "piccolo-theme",
+    "pydata-sphinx-theme",
     "skl2onnx",  # for one example
     "sphinx>=7",
     "sphinxcontrib-mermaid",
@@ -216,6 +216,7 @@ module = [
     "yobx.reference.torch_ops.*",
     "yobx.tensorflow.ops.*",
     "yobx.litert.ops.*",
+    "yobx.sql._expr.*",
     "yobx.torch._model_eval_cases",
     "yobx.torch.tracing.*",
     "yobx.torch.in_transformers._patches_model_rope_utils",

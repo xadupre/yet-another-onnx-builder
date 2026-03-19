@@ -1,4 +1,4 @@
-name: ci-6-transformers
+name: ci-8-transformers
 
 on:
   push:
