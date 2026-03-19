@@ -3,7 +3,7 @@
 of every :func:`to_onnx` conversion function.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Sequence, Union
 import onnx
 from ..typing import GraphBuilderExtendedProtocol
 from .model_container import ExtendedModelContainer
@@ -277,3 +277,25 @@ class ExportArtifact:
         if self.container and self.container.model_proto_:
             return self.container.model_proto_.SerializeToString()
         raise ValueError(f"There is nothing to serialize in {self!r}.")
+
+    @property
+    def opset_import(self) -> Sequence[onnx.OperatorSetIdProto]:
+        """Returns the opset import."""
+        if self.proto:
+            if isinstance(self.proto, (onnx.ModelProto, onnx.FunctionProto)):
+                return self.proto.opset_import
+            raise TypeError(f"Unable to return opsets from type {self.proto}.")
+        if self.container and self.container.model_proto_:
+            return self.container.model_proto_.opset_import
+        raise AttributeError(f"The artifact do not contain any model or function {self!r}.")
+
+    @property
+    def functions(self) -> Sequence[onnx.OperatorSetIdProto]:
+        """Returns the opset import."""
+        if self.proto:
+            if isinstance(self.proto, onnx.ModelProto):
+                return self.proto.functions
+            raise TypeError(f"Unable to return a GraphProto from type {self.proto}.")
+        if self.container and self.container.model_proto_:
+            return self.container.model_proto_.functions
+        raise AttributeError(f"The artifact do not contain any model {self!r}.")

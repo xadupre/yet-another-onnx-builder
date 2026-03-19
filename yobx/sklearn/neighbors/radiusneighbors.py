@@ -126,9 +126,7 @@ def _classify_single_output(
             vote_counts, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_total"
         )  # (N, 1) float32
         # Clamp denominator to 1 to avoid NaN for outlier points (total == 0)
-        safe_total = g.op.Max(
-            total, np.array([1.0], dtype=np.float32), name=f"{name}_safe_total"
-        )
+        safe_total = g.op.Max(total, np.array([1.0], dtype=np.float32), name=f"{name}_safe_total")
         probabilities = g.op.Div(
             vote_counts, safe_total, name=f"{name}_proba", outputs=outputs[1:2]
         )

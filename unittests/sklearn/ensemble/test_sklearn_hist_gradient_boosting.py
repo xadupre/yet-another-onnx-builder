@@ -174,7 +174,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est = HistGradientBoostingClassifier(max_iter=5, max_depth=3, random_state=42)
         est.fit(X, y)
 
-        onx = to_onnx(est, (X,), target_opset=18).proto
+        onx = to_onnx(est, (X,), target_opset=18)
         self.dump_onnx("test_hgb_classifier_binary_float64.onnx", onx)
 
         ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
