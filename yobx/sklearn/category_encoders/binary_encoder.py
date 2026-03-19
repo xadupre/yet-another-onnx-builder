@@ -269,12 +269,10 @@ def category_encoders_binary_encoder(
     else:
         res = g.op.Concat(*col_tensors, axis=1, name=name, outputs=outputs)
 
-    assert isinstance(res, str)
-    if not sts:
-        g.set_type(res, itype)
-        if g.has_shape(X):
-            shape = g.get_shape(X)
-            g.set_shape(res, (shape[0], n_out))
-        elif g.has_rank(X):
-            g.set_rank(res, 2)
+    g.set_type(res, itype)
+    if g.has_shape(X):
+        shape = g.get_shape(X)
+        g.set_shape(res, (shape[0], n_out))
+    elif g.has_rank(X):
+        g.set_rank(res, 2)
     return res

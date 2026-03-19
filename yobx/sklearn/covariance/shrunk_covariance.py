@@ -81,5 +81,4 @@ def sklearn_shrunk_covariance(
         name=f"{name}_mahal_sq",
         outputs=outputs,
     )  # (N,)
-    assert isinstance(mahal_sq, str)
     return mahal_sq

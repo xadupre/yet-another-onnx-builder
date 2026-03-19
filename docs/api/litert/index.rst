@@ -1,7 +1,11 @@
 yobx.litert
 ===========
 
-.. autofunction:: yobx.litert.to_onnx
+.. toctree::
+    :maxdepth: 1
+    :caption: main functions
+
+    to_onnx
 
 .. toctree::
     :maxdepth: 1

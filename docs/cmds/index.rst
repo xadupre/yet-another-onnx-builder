@@ -15,7 +15,6 @@ Command Lines
     :maxdepth: 1
 
     agg
-    copilot_draft
     dot
     find
     partition

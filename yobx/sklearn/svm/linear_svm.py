@@ -21,17 +21,13 @@ def _build_label(
         label = g.op.Gather(
             classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.INT64)
+        g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
             classes_arr, label_idx, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.STRING)
+        g.set_type(label, onnx.TensorProto.STRING)
     return label
 
 
@@ -153,7 +149,5 @@ def sklearn_linear_svr(
         coef = coef.reshape(1, -1)
 
     result = g.op.Gemm(X, coef, intercept, transB=1, name=name, outputs=outputs)
-    assert isinstance(result, str)
-    if not sts:
-        g.set_type(result, itype)
+    g.set_type(result, itype)
     return result

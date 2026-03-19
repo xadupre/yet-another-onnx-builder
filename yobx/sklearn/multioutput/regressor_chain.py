@@ -109,12 +109,11 @@ def sklearn_regressor_chain(
             chain_preds, inv_order, axis=1, name=f"{name}_reorder", outputs=outputs[:1]
         )
 
-    if not sts:
-        g.set_type(predictions, itype)
-        if g.has_shape(X):
-            batch_dim = g.get_shape(X)[0]
-            g.set_shape(predictions, (batch_dim, n_targets))
-        elif g.has_rank(X):
-            g.set_rank(predictions, 2)
+    g.set_type(predictions, itype)
+    if g.has_shape(X):
+        batch_dim = g.get_shape(X)[0]
+        g.set_shape(predictions, (batch_dim, n_targets))
+    elif g.has_rank(X):
+        g.set_rank(predictions, 2)
 
     return predictions

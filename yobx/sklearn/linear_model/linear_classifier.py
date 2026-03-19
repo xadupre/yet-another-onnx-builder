@@ -38,17 +38,13 @@ def _build_label(
         label = g.op.Gather(
             classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.INT64)
+        g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
             classes_arr, label_idx, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.STRING)
+        g.set_type(label, onnx.TensorProto.STRING)
     return label
 
 
@@ -152,7 +148,6 @@ def sklearn_linear_classifier(
             proba = g.op.Concat(
                 proba_neg, proba_pos, axis=1, name=f"{name}_concat", outputs=outputs[1:]
             )
-            assert isinstance(proba, str)
             return label, proba
     else:
         label_idx_raw = g.op.ArgMax(decision, axis=1, keepdims=0, name=f"{name}_argmax")
@@ -168,7 +163,6 @@ def sklearn_linear_classifier(
                 sig, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_sum"
             )
             proba = g.op.Div(sig, sum_, name=f"{name}_normalize", outputs=outputs[1:])
-            assert isinstance(proba, str)
             return label, proba
 
     return label

@@ -123,7 +123,6 @@ def sklearn_mlp_classifier(
             f"Output activation {out_activation!r} is not supported for MLPClassifier."
         )
 
-    assert isinstance(proba, str)
     label_idx = g.op.ArgMax(proba, axis=1, keepdims=0, name=name)
     label_idx_cast = g.op.Cast(label_idx, to=onnx.TensorProto.INT64, name=name)
 
@@ -132,17 +131,13 @@ def sklearn_mlp_classifier(
         label = g.op.Gather(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.INT64)
+        g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.STRING)
+        g.set_type(label, onnx.TensorProto.STRING)
     return label, proba
 
 
@@ -194,7 +189,6 @@ def sklearn_mlp_regressor(
         bias = intercepts[i].astype(dtype)
         z = g.op.MatMul(h, coef, name=f"{name}_mm{i}")
         z = g.op.Add(z, bias, name=f"{name}_add{i}")
-        assert isinstance(z, str)  # type happiness
         h = _apply_activation(g, z, hidden_activation, name=f"{name}_act{i}")
 
     # Output layer: linear (identity activation).
@@ -202,5 +196,4 @@ def sklearn_mlp_regressor(
     bias_out = intercepts[-1].astype(dtype)
     z_out = g.op.MatMul(h, coef_out, name=f"{name}_mm_out")
     result = g.op.Add(z_out, bias_out, name=f"{name}_add_out", outputs=outputs)
-    assert isinstance(result, str)
     return result

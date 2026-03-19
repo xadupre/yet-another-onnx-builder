@@ -175,6 +175,7 @@ Example
     :showcode:
 
     import numpy as np
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.sql import sql_to_onnx, parse_sql
     from yobx.reference import ExtendedReferenceEvaluator
 
@@ -189,6 +190,7 @@ Example
         "SELECT a + b AS total FROM t WHERE a > 0",
         dtypes,
     )
+    print(pretty_onnx(onx))
 
     # ── run ──────────────────────────────────────────────────────────
     ref = ExtendedReferenceEvaluator(onx)
