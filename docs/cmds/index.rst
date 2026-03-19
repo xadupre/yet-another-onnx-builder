@@ -20,4 +20,5 @@ Command Lines
     find
     partition
     print
+    render_gallery
     run_doc_examples
