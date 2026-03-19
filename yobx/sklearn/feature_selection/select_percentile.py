@@ -45,5 +45,4 @@ def sklearn_select_percentile(
     indices = estimator.get_support(indices=True).astype(np.int64)
     res = g.op.Gather(X, indices, axis=1, name=name, outputs=outputs)
 
-    assert isinstance(res, str)
     return res

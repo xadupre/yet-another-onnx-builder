@@ -108,5 +108,4 @@ def sklearn_feature_union(
     else:
         res = g.op.Concat(*parts, axis=-1, name=name, outputs=outputs)
 
-    assert isinstance(res, str)
     return res

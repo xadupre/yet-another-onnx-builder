@@ -133,13 +133,12 @@ def sklearn_classifier_chain(
             chain_preds, inv_order, axis=1, name=f"{name}_label", outputs=outputs[:1]
         )
 
-    if not sts:
-        g.set_type(labels, itype)
-        if g.has_shape(X):
-            batch_dim = g.get_shape(X)[0]
-            g.set_shape(labels, (batch_dim, n_targets))
-        elif g.has_rank(X):
-            g.set_rank(labels, 2)
+    g.set_type(labels, itype)
+    if g.has_shape(X):
+        batch_dim = g.get_shape(X)[0]
+        g.set_shape(labels, (batch_dim, n_targets))
+    elif g.has_rank(X):
+        g.set_rank(labels, 2)
 
     if not emit_proba:
         return labels
@@ -164,12 +163,11 @@ def sklearn_classifier_chain(
             chain_probas, inv_order, axis=1, name=f"{name}_proba", outputs=outputs[1:]
         )
 
-    if not sts:
-        g.set_type(probabilities, itype)
-        if g.has_shape(X):
-            batch_dim = g.get_shape(X)[0]
-            g.set_shape(probabilities, (batch_dim, n_targets))
-        elif g.has_rank(X):
-            g.set_rank(probabilities, 2)
+    g.set_type(probabilities, itype)
+    if g.has_shape(X):
+        batch_dim = g.get_shape(X)[0]
+        g.set_shape(probabilities, (batch_dim, n_targets))
+    elif g.has_rank(X):
+        g.set_rank(probabilities, 2)
 
     return labels, probabilities

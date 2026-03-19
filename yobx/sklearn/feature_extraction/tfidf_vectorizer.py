@@ -186,7 +186,5 @@ def sklearn_tfidf_vectorizer(
             f"Unknown norm={norm!r} for TfidfVectorizer, expected 'l1', 'l2', or None."
         )
 
-    assert isinstance(res, str)
-    if not sts:
-        g.set_type_shape_unary_op(res, tf)
+    g.set_type_shape_unary_op(res, tf)
     return res

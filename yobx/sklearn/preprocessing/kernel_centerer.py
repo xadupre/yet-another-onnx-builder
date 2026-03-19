@@ -81,7 +81,5 @@ def sklearn_kernel_centerer(
     # Step 4: add the grand mean.
     res = g.op.Add(K_sub_cols, K_fit_all, name=name, outputs=outputs)  # (N, M)
 
-    assert isinstance(res, str)  # type happiness
-    if not sts:
-        g.set_type_shape_unary_op(res, X)
+    g.set_type_shape_unary_op(res, X)
     return res

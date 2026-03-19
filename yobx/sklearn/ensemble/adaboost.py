@@ -153,7 +153,6 @@ def sklearn_adaboost_classifier(
             stacked = g.op.Concat(neg_dec, dec_2d, axis=1, name=f"{name}_stack")
             half = g.op.Div(stacked, np.array(2.0, dtype=dtype), name=f"{name}_half")
             proba = g.op.Softmax(half, axis=1, name=f"{name}_softmax", outputs=outputs[1:])
-            assert isinstance(proba, str)
             return label, proba
 
         return label
@@ -172,7 +171,6 @@ def sklearn_adaboost_classifier(
             decision, np.array(n_classes - 1, dtype=dtype), name=f"{name}_proba_div"
         )
         proba = g.op.Softmax(proba_decision, axis=1, name=f"{name}_softmax", outputs=outputs[1:])
-        assert isinstance(proba, str)
         return label, proba
 
     return label
@@ -291,5 +289,4 @@ def sklearn_adaboost_regressor(
     result = g.op.Reshape(
         result_2d, np.array([-1], dtype=np.int64), name=f"{name}_reshape", outputs=outputs[:1]
     )
-    assert isinstance(result, str)
     return result
