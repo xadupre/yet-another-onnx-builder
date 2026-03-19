@@ -14,5 +14,6 @@ that maintain code across the project.
    :maxdepth: 1
 
    design/builder/index
+   design/xtracing/index
    design/misc/index
    design/ci
