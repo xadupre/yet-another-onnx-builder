@@ -1,4 +1,6 @@
 import re
+import struct
+import warnings
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import tensorflow as tf
@@ -79,17 +81,19 @@ def _parse_dense_value(dense_content: str, shape: tuple, dtype: type) -> np.ndar
     if dense_content.startswith(("0x", "0X")):
         # Single-element hex scalar: e.g. 0xFF800000 (-inf for f32).
         # In StableHLO text, the hex is the big-endian bit pattern.
-        import struct
-
         hex_str = dense_content[2:]
         nbytes = np.dtype(dtype).itemsize
         hex_str_padded = hex_str.zfill(nbytes * 2)
         raw = bytes.fromhex(hex_str_padded)
         # Decode as big-endian value of the appropriate type.
+        # ">e" is the struct format code for big-endian IEEE 754 float16
+        # (supported since Python 3.6 / struct docs).
         _be_fmt = {1: ">b", 2: ">e", 4: ">f", 8: ">d"}
         fmt = _be_fmt.get(nbytes)
         if fmt is None or dtype in (np.int32, np.int64, np.uint32, np.uint64, np.bool_):
-            scalar = int(dense_content, 16)
+            # For integer dtypes use numpy's dtype-aware conversion to handle
+            # two's-complement sign correctly.
+            scalar = np.frombuffer(raw[::-1], dtype=dtype)[0]
         else:
             scalar = struct.unpack(fmt, raw)[0]
         if static_shape:
@@ -198,6 +202,12 @@ def _get_function_param_info(mlir_string: str, func_name: str) -> List[Tuple]:
         if shape is None:
             info.append((arg_id, False))
             continue
+        # jax2tf injects integer scalar/vector parameters as shape bookkeeping
+        # variables annotated with ``jax.global_constant``.  These are:
+        # * dimension-variable scalars: tensor<i32>  (shape = ())
+        # * single-element shape tensors: tensor<1xi32>  (shape = (1,))
+        # Both have len(shape) <= 1 and integer dtype, so we identify them as
+        # shape-only (True) and skip them when building the inline arg map.
         is_shape_only = (
             dtype in (np.int32, np.int64, np.uint32, np.uint64) and len(shape) <= 1
         )
@@ -257,7 +267,12 @@ def convert_exp(
                     shape, dtype = (), np.float32
                 try:
                     np_val = _parse_dense_value(dense_content, shape, dtype)
-                except Exception:
+                except (ValueError, struct.error, Exception) as exc:
+                    warnings.warn(
+                        f"XlaCallModule: failed to parse dense constant "
+                        f"{const_name!r}: {exc}. Using zero fallback.",
+                        stacklevel=2,
+                    )
                     np_val = np.array(0, dtype=dtype)
                 # Generate a unique name if the candidate is already taken
                 # (e.g. when inlining a private function whose constants share
@@ -354,7 +369,11 @@ def convert_exp(
             try:
                 fct = get_jax_cvt(decoded_module, g, op_type)
             except RuntimeError:
-                # Unknown op; skip gracefully.
+                warnings.warn(
+                    f"XlaCallModule: unsupported StableHLO op {op_type!r} "
+                    f"(layer id={layer.get('id')!r}); skipping.",
+                    stacklevel=2,
+                )
                 continue
             args_list = []
             for a in layer["operands"]:
@@ -777,16 +796,19 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
     # ``stablehlo.get_dimension_size`` and are only needed for the
     # ``dynamic_broadcast_in_dim`` shape argument, which we elide.
     skip_patterns = [
-        # stablehlo.reshape (integer scalar/tensor for shapes)
+        # stablehlo.reshape of integer-typed tensors (shape-only ops).
+        # We match only when both input and output types end with an integer
+        # dtype suffix (i8, i16, i32, i64, ui8, ui32, ui64) to avoid
+        # accidentally skipping reshapes of float tensors.
         (
             r'(%\w+)\s*=\s*stablehlo\.reshape\s+(%\w+)'
-            r'\s*:\s*\(tensor<[^>]*[i][^>]*>\)\s*->\s*tensor<[^>]*[i][^>]*>'
+            r'\s*:\s*\(tensor<[^>]*x?(?:i|ui)\d+>\)\s*->\s*tensor<[^>]*x?(?:i|ui)\d+>'
             r'[^\n]*loc\(([^)]*)\)'
         ),
-        # stablehlo.concatenate (integer tensors)
+        # stablehlo.concatenate of integer tensors
         (
             r'(%\w+)\s*=\s*stablehlo\.concatenate\s+(%\w+)[^:]*'
-            r':\s*\(tensor<[^>]*[i][^>]*>[^)]*\)\s*->\s*tensor<[^>]*[i][^>]*>'
+            r':\s*\(tensor<[^>]*x?(?:i|ui)\d+>[^)]*\)\s*->\s*tensor<[^>]*x?(?:i|ui)\d+>'
             r'[^\n]*loc\(([^)]*)\)'
         ),
         # stablehlo.get_dimension_size

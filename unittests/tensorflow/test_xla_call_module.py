@@ -529,7 +529,8 @@ func.func @main(%arg0: tensor<2xf32>) -> tensor<2xf32> {
 
 _MLIR_DOT_GENERAL = """
 func.func @main(%arg0: tensor<3x4xf32>, %arg1: tensor<4x2xf32>) -> tensor<3x2xf32> {
-  %0 = stablehlo.dot_general %arg0, %arg1, contracting_dims = [1] x [0] : (tensor<3x4xf32>, tensor<4x2xf32>) -> tensor<3x2xf32> loc(#loc0)
+  %0 = stablehlo.dot_general %arg0, %arg1, contracting_dims = [1] x [0]
+        : (tensor<3x4xf32>, tensor<4x2xf32>) -> tensor<3x2xf32> loc(#loc0)
   return %0 : tensor<3x2xf32> loc(#loc1)
 }
 """
@@ -669,15 +670,12 @@ class TestJaxMlpEndToEnd(ExtTestCase):
         sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
         input_name = onx.graph.input[0].name
         (result,) = sess.run(None, {input_name: x})
-        import jax
-
         expected = np.asarray(jax_fn(x))
         return expected, result, onx
 
     def test_mlp_static(self):
         """Static MLP: MatMul, relu (Max), MatMul → correct predictions."""
         import jax
-        import jax.numpy as jnp
 
         rng = np.random.default_rng(0)
         key = jax.random.PRNGKey(42)
@@ -700,7 +698,6 @@ class TestJaxMlpEndToEnd(ExtTestCase):
     def test_mlp_dynamic_batch(self):
         """Dynamic-batch MLP: model accepts any batch size."""
         import jax
-        import jax.numpy as jnp
 
         rng = np.random.default_rng(1)
         key = jax.random.PRNGKey(7)
