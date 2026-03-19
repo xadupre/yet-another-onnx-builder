@@ -123,7 +123,7 @@ def to_onnx(
             external_threshold=external_threshold,
             return_optimize_report=True,
         )
-        if verbose:
+        if verbose and onx.report and onx.report.stats:
             import pandas
 
             df = pandas.DataFrame(onx.report.stats)

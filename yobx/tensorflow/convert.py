@@ -168,7 +168,7 @@ def to_onnx(
             external_threshold=external_threshold,
             return_optimize_report=True,
         )
-        if verbose:
+        if verbose and onx.report and onx.report.stats:
             import pandas
 
             print(f"[yobx.tensorflow.to_onnx] done, output type is {type(onx)}")
