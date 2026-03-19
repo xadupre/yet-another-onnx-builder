@@ -11,13 +11,15 @@ from .xla_call_module_helper import (  # noqa: F401
     _MLIR_DTYPE_MAP,
     _extract_balanced_parens,
     _extract_function_body,
+)
+from .xla_call_module_parsing import (  # noqa: F401
     _get_function_param_ids,
     _get_function_param_info,
     _parse_body,
     _parse_dense_value,
     _parse_tensor_type,
+    parse_mlir,
 )
-from .xla_call_module_parsing import parse_mlir  # noqa: F401
 
 
 def _process_constant_layer(
@@ -63,6 +65,126 @@ def _process_constant_layer(
     local_results[layer["id"]] = const_name
 
 
+def _process_broadcast_layer(
+    layer: dict,
+    local_results: Dict[str, str],
+) -> None:
+    """Handle a ``broadcast_in_dim`` or ``dynamic_broadcast_in_dim`` layer.
+
+    ONNX arithmetic ops support implicit broadcasting, so we simply pass the
+    operand tensor through unchanged.
+
+    :param layer: layer dict with keys ``id`` and ``operands``.
+    :param local_results: mutable id→tensor-name mapping for the current scope.
+    """
+    operand_id = layer["operands"][0]
+    if operand_id in local_results:
+        local_results[layer["id"]] = local_results[operand_id]
+
+
+def _process_dot_general_layer(
+    layer: dict,
+    local_results: Dict[str, str],
+    g: GraphBuilderExtendedProtocol,
+) -> None:
+    """Emit a MatMul ONNX op for a ``dot_general`` StableHLO layer.
+
+    :param layer: layer dict with keys ``id`` and ``operands`` (lhs, rhs).
+    :param local_results: mutable id→tensor-name mapping for the current scope.
+    :param g: ONNX graph builder.
+    """
+    lhs_id, rhs_id = layer["operands"]
+    if lhs_id not in local_results or rhs_id not in local_results:
+        return
+    res = g.op.MatMul(
+        local_results[lhs_id], local_results[rhs_id], name="XlaCallModule"
+    )
+    local_results[layer["id"]] = res if isinstance(res, str) else res[0]
+
+
+def _process_reduce_layer(
+    layer: dict,
+    local_results: Dict[str, str],
+    g: GraphBuilderExtendedProtocol,
+) -> None:
+    """Emit a ReduceMax or ReduceSum ONNX op for a ``reduce_*`` StableHLO layer.
+
+    :param layer: layer dict with keys ``id``, ``op``, ``operands``, and ``axes``.
+    :param local_results: mutable id→tensor-name mapping for the current scope.
+    :param g: ONNX graph builder.
+    """
+    inp_id = layer["operands"][0]
+    if inp_id not in local_results:
+        return
+    axes = layer.get("axes", [])
+    np_axes = np.array(axes, dtype=np.int64)
+    if layer["op"] == "reduce_max":
+        res = g.op.ReduceMax(
+            local_results[inp_id], np_axes, keepdims=1, name="XlaCallModule"
+        )
+    else:
+        res = g.op.ReduceSum(
+            local_results[inp_id], np_axes, keepdims=1, name="XlaCallModule"
+        )
+    local_results[layer["id"]] = res if isinstance(res, str) else res[0]
+
+
+def _process_call_layer(
+    layer: dict,
+    local_results: Dict[str, str],
+    g: GraphBuilderExtendedProtocol,
+    decoded_module: str,
+) -> None:
+    """Inline a ``call`` StableHLO layer by parsing and executing its body.
+
+    Looks up the named private function in *decoded_module*, maps caller
+    arguments to the function's parameter IDs (skipping shape-only args), and
+    processes the function body recursively via :func:`_process_layers`.
+
+    :param layer: layer dict with keys ``id``, ``operands``, and ``func``.
+    :param local_results: mutable id→tensor-name mapping for the current scope.
+    :param g: ONNX graph builder.
+    :param decoded_module: raw MLIR text used to look up the called function.
+    """
+    func_name = layer.get("func", "")
+    call_args = layer["operands"]
+
+    # Parse and inline the private function.
+    # Use _get_function_param_info to correctly align tensor params
+    # with their corresponding call arguments, skipping shape-only
+    # (integer) parameters that appear in dynamic-shape functions.
+    func_param_info = _get_function_param_info(decoded_module, func_name)
+    func_body = _extract_function_body(decoded_module, func_name)
+    if func_body is None:
+        return
+
+    # Build a local scope mapping function param IDs to caller args.
+    inline_results: Dict[str, str] = {}
+    for (param_id, is_shape_only), call_arg_id in zip(func_param_info, call_args):
+        if is_shape_only:
+            continue
+        if call_arg_id in local_results:
+            inline_results[param_id] = local_results[call_arg_id]
+
+    # Parse the function body (scan only the body, with no arg alias).
+    func_layers = _parse_body(func_body, {})
+
+    # Process function body layers (stops at return layer).
+    _process_layers(func_layers, inline_results, g, decoded_module)
+
+    # Retrieve the return value from the return layer.
+    ret_val: Optional[str] = None
+    for sub_layer in func_layers:
+        if sub_layer["op"] == "return":
+            operands = sub_layer["operands"]
+            if operands and operands[0] in inline_results:
+                ret_val = inline_results[operands[0]]
+            break
+
+    if ret_val is not None:
+        local_results[layer["id"]] = ret_val
+
+
 def _process_layers(
     layer_list: List[dict],
     local_results: Dict[str, str],
@@ -96,79 +218,19 @@ def _process_layers(
             continue
 
         if op_type in ("broadcast_in_dim", "dynamic_broadcast_in_dim"):
-            # ONNX arithmetic ops support implicit broadcasting; pass through.
-            operand_id = layer["operands"][0]
-            if operand_id in local_results:
-                local_results[layer["id"]] = local_results[operand_id]
+            _process_broadcast_layer(layer, local_results)
             continue
 
         if op_type == "dot_general":
-            lhs_id, rhs_id = layer["operands"]
-            if lhs_id not in local_results or rhs_id not in local_results:
-                continue
-            res = g.op.MatMul(
-                local_results[lhs_id], local_results[rhs_id], name="XlaCallModule"
-            )
-            local_results[layer["id"]] = res if isinstance(res, str) else res[0]
+            _process_dot_general_layer(layer, local_results, g)
             continue
 
         if op_type in ("reduce_max", "reduce_sum"):
-            inp_id = layer["operands"][0]
-            if inp_id not in local_results:
-                continue
-            axes = layer.get("axes", [])
-            np_axes = np.array(axes, dtype=np.int64)
-            if op_type == "reduce_max":
-                res = g.op.ReduceMax(
-                    local_results[inp_id], np_axes, keepdims=1, name="XlaCallModule"
-                )
-            else:
-                res = g.op.ReduceSum(
-                    local_results[inp_id], np_axes, keepdims=1, name="XlaCallModule"
-                )
-            local_results[layer["id"]] = res if isinstance(res, str) else res[0]
+            _process_reduce_layer(layer, local_results, g)
             continue
 
         if op_type == "call":
-            func_name = layer.get("func", "")
-            call_args = layer["operands"]
-
-            # Parse and inline the private function.
-            # Use _get_function_param_info to correctly align tensor params
-            # with their corresponding call arguments, skipping shape-only
-            # (integer) parameters that appear in dynamic-shape functions.
-            func_param_info = _get_function_param_info(decoded_module, func_name)
-            func_body = _extract_function_body(decoded_module, func_name)
-            if func_body is None:
-                continue
-
-            # Build a local scope mapping function param IDs to caller args.
-            inline_results: Dict[str, str] = {}
-            for (param_id, is_shape_only), call_arg_id in zip(
-                func_param_info, call_args
-            ):
-                if is_shape_only:
-                    continue
-                if call_arg_id in local_results:
-                    inline_results[param_id] = local_results[call_arg_id]
-
-            # Parse the function body (scan only the body, with no arg alias).
-            func_layers = _parse_body(func_body, {})
-
-            # Process function body layers (stops at return layer).
-            _process_layers(func_layers, inline_results, g, decoded_module)
-
-            # Retrieve the return value from the return layer.
-            ret_val: Optional[str] = None
-            for sub_layer in func_layers:
-                if sub_layer["op"] == "return":
-                    operands = sub_layer["operands"]
-                    if operands and operands[0] in inline_results:
-                        ret_val = inline_results[operands[0]]
-                    break
-
-            if ret_val is not None:
-                local_results[layer["id"]] = ret_val
+            _process_call_layer(layer, local_results, g, decoded_module)
             continue
 
         # Generic elementwise op via get_jax_cvt.
