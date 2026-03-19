@@ -25,7 +25,7 @@ class TestSklearnOneClassSVM(ExtTestCase):
             clf.fit(Xd)
             onx = to_onnx(clf, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
 
             sess = self.check_ort(onx)
@@ -44,7 +44,7 @@ class TestSklearnOneClassSVM(ExtTestCase):
         clf.fit(self._X)
         onx = to_onnx(clf, (self._X,))
 
-        output_names = [o.name for o in onx.graph.output]
+        output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 2)
 
         sess = self.check_ort(onx)
@@ -61,7 +61,7 @@ class TestSklearnOneClassSVM(ExtTestCase):
         clf.fit(Xd)
         onx = to_onnx(clf, (Xd,))
 
-        output_names = [o.name for o in onx.graph.output]
+        output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 2)
 
         sess = self.check_ort(onx)
@@ -79,7 +79,7 @@ class TestSklearnOneClassSVM(ExtTestCase):
             clf.fit(Xd)
             onx = to_onnx(clf, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2)
 
             sess = self.check_ort(onx)

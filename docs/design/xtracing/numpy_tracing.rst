@@ -175,7 +175,7 @@ Or embedded into a larger graph using
 
     trace_numpy_function(g, {}, ["output_0"], my_func, ["X"])
     g.make_tensor_output("output_0", indexed=False, allow_untyped_output=True)
-    onx, _ = g.to_onnx(return_optimize_report=True)
+    onx = g.to_onnx()
     print(pretty_onnx(onx))
 
 .. seealso::

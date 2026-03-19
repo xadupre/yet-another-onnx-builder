@@ -13,8 +13,10 @@ from yobx.sql import sql_to_onnx, sql_to_onnx_graph
 def _ort_run(onx, feeds):
     """Run *onx* with onnxruntime and return outputs. Skip if ORT is not installed."""
     from onnxruntime import InferenceSession
+    from yobx.container import ExportArtifact
 
-    sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+    proto = onx.proto if isinstance(onx, ExportArtifact) else onx
+    sess = InferenceSession(proto.SerializeToString(), providers=["CPUExecutionProvider"])
     return sess.run(None, feeds)
 
 
@@ -248,16 +250,20 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
     """Tests verifying properties of the returned ONNX model."""
 
     def test_returns_model_proto(self):
-        from onnx import ModelProto
+        from yobx.container import ExportArtifact
 
         dtypes = {"a": np.float32}
         onx = sql_to_onnx("SELECT a FROM t", dtypes)
-        self.assertIsInstance(onx, ModelProto)
+        self.assertIsInstance(onx, ExportArtifact)
+        # The underlying proto is accessible via the attribute:
+        from onnx import ModelProto
+
+        self.assertIsInstance(onx.proto, ModelProto)
 
     def test_inputs_one_per_column(self):
         dtypes = {"a": np.float32, "b": np.float32, "c": np.float32}
         onx = sql_to_onnx("SELECT a, b, c FROM t", dtypes)
-        input_names = [inp.name for inp in onx.graph.input]
+        input_names = [inp.name for inp in onx.proto.graph.input]
         self.assertIn("a", input_names)
         self.assertIn("b", input_names)
         self.assertIn("c", input_names)
@@ -266,18 +272,18 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
     def test_where_adds_filter_nodes(self):
         dtypes = {"a": np.float32}
         onx = sql_to_onnx("SELECT a FROM t WHERE a > 0", dtypes)
-        op_types = {n.op_type for n in onx.graph.node}
+        op_types = {n.op_type for n in onx.proto.graph.node}
         self.assertIn("Compress", op_types)
 
     def test_aggregation_adds_reduce_nodes(self):
         dtypes = {"a": np.float32}
         onx = sql_to_onnx("SELECT SUM(a) FROM t", dtypes)
-        op_types = {n.op_type for n in onx.graph.node}
+        op_types = {n.op_type for n in onx.proto.graph.node}
         self.assertIn("ReduceSum", op_types)
 
     def test_builder_cls_used(self):
         """builder_cls should be instantiated instead of the default GraphBuilder."""
-        from onnx import ModelProto
+        from yobx.container import ExportArtifact
         from yobx.xbuilder import GraphBuilder
 
         instantiated = []
@@ -289,7 +295,7 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
 
         dtypes = {"a": np.float32}
         onx = sql_to_onnx("SELECT a FROM t", dtypes, builder_cls=TrackingBuilder)
-        self.assertIsInstance(onx, ModelProto)
+        self.assertIsInstance(onx, ExportArtifact)
         self.assertEqual(len(instantiated), 1, "TrackingBuilder was not instantiated")
 
 
@@ -302,7 +308,7 @@ class TestSqlToOnnxGraph(ExtTestCase):
 
         g = GraphBuilder(18, ir_version=10)
         out_names = sql_to_onnx_graph(g, None, [], query, dtypes, right_input_dtypes=right_dtypes)
-        onx, _ = g.to_onnx(return_optimize_report=True)
+        onx = g.to_onnx(return_optimize_report=True)
         ref = ExtendedReferenceEvaluator(onx)
         return out_names, ref.run(None, feeds)
 
@@ -345,7 +351,7 @@ class TestSqlToOnnxGraph(ExtTestCase):
         g = GraphBuilder(18, ir_version=10)
         g.make_tensor_input("a", TensorProto.FLOAT, ("N",))
         sql_to_onnx_graph(g, None, [], "SELECT a FROM t", {"a": np.float32})
-        onx, _ = g.to_onnx(return_optimize_report=True)
+        onx = g.to_onnx(return_optimize_report=True)
         # Exactly one input named "a"
         input_names = [inp.name for inp in onx.graph.input]
         self.assertEqual(input_names.count("a"), 1)

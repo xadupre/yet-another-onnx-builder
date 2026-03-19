@@ -87,7 +87,7 @@ class TestFeatureHasherMurmurHash(ExtTestCase):
         onx = self._to_onnx_murmurhash(fh, X_names, X_values)
 
         # MurmurHash3 must be in the graph
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("MurmurHash3", "com.microsoft"), op_types)
 
         sess = self.check_ort(onx)

@@ -45,6 +45,79 @@ class DefaultConvertOptions(ConvertOptionsProtocol):
 
 
 @runtime_checkable
+class ExportArtifactProtocol(Protocol):
+    """Protocol for ExportArtifact."""
+
+    def save(self, file_path: str, all_tensors_to_one_file: bool = True):
+        """Save the exported model to *file_path*.
+
+        When a :class:`~yobx.container.ExtendedModelContainer` is present
+        (``large_model=True`` was used during export) the model and its
+        external weight files are saved via
+        :meth:`~yobx.container.ExtendedModelContainer.save`.  Otherwise
+        the proto is saved with :func:`onnx.save_model`.
+
+        :param file_path: destination file path (including ``.onnx``
+            extension).
+        :param all_tensors_to_one_file: when saving a large model, write
+            all external tensors into a single companion data file.
+        """
+        ...
+
+    def get_proto(self, include_weights: bool = True) -> Any:
+        """Return the ONNX proto, optionally with all weights inlined.
+
+        When the export was performed with ``large_model=True`` (i.e.
+        :attr:`container` is set), the raw :attr:`proto` has
+        *external-data* placeholders instead of embedded weight tensors.
+        Passing ``include_weights=True`` (the default) uses
+        :meth:`~yobx.container.ExtendedModelContainer.to_ir` to build a
+        fully self-contained :class:`~onnx.ModelProto`.
+
+        :param include_weights: when ``True`` (default) embed the large
+            initializers stored in :attr:`container` into the returned
+            proto.  When ``False`` return the raw proto as-is.
+        :return: :class:`~onnx.ModelProto`,
+            :class:`~onnx.FunctionProto`, or
+            :class:`~onnx.GraphProto`.
+
+        Example::
+
+            artifact = to_onnx(estimator, (X,), large_model=True)
+            # Fully self-contained proto (weights embedded):
+            proto_with_weights = artifact.get_proto(include_weights=True)
+            # Proto with external-data placeholders:
+            proto_no_weights = artifact.get_proto(include_weights=False)
+        """
+        ...
+
+    @classmethod
+    def load(
+        cls, file_path: str, load_large_initializers: bool = True
+    ) -> "ExportArtifactProtocol":
+        """Load a saved model from *file_path*.
+
+        If the file references external data (i.e. the model was saved
+        with ``large_model=True``) an
+        :class:`~yobx.container.ExtendedModelContainer` is created and
+        returned in :attr:`container`.  Otherwise the proto is loaded
+        directly with :func:`onnx.load` and :attr:`container` is ``None``.
+
+        :param file_path: path to the ``.onnx`` file.
+        :param load_large_initializers: when ``True`` (default) also load
+            the large initializers stored alongside the model file.
+        :return: :class:`ExportArtifact` with :attr:`filename` set to
+            *file_path*.
+
+        Example::
+
+            artifact = ExportArtifact.load("model.onnx")
+            proto = artifact.get_proto()
+        """
+        ...
+
+
+@runtime_checkable
 class GraphBuilderProtocol(Protocol):
     """Protocol describing the expected API for graph builders.
 
@@ -225,7 +298,7 @@ class GraphBuilderProtocol(Protocol):
         """
         ...
 
-    def to_onnx(self) -> Any:
+    def to_onnx(self) -> ExportArtifactProtocol:
         """Exports the graph and returns an ONNX proto or model container.
 
         :return: a :class:`~onnx.ModelProto`, :class:`~onnx.GraphProto`,

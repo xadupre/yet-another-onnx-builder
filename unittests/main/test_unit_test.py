@@ -30,7 +30,7 @@ class TestUnitTest(ExtTestCase):
 
         df = pandas.DataFrame(stat)
         gr = df.drop("name", axis=1).groupby(["dir", "ext"]).sum()
-        self.assertEqual(len(gr.columns), 2)
+        self.assertEqual(len(gr.columns), 3)
 
     def test_statistics_on_folders(self):
         stat = statistics_on_folder(
@@ -45,14 +45,10 @@ class TestUnitTest(ExtTestCase):
 
         df = pandas.DataFrame(stat)
         gr = df.drop("name", axis=1).groupby(["ext", "dir"]).sum().reset_index()
-        gr = gr[
-            (gr["dir"] != "_doc/auto_examples")
-            & (gr["dir"] != "_doc/auto_recipes")
-            & (gr["dir"] != "_doc/auto_technical")
-        ]
+        gr = gr[gr["dir"] != "_doc/auto_examples"]
         total = gr[gr["dir"].str.contains("yobx/")].drop(["ext", "dir"], axis=1).sum(axis=0)
-        self.assertEqual(len(gr.columns), 4)
-        self.assertEqual(total.shape, (2,))
+        self.assertEqual(len(gr.columns), 5)
+        self.assertEqual(total.shape, (3,))
 
     def test_is(self):
         is_apple()

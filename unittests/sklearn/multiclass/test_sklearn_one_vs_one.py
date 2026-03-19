@@ -155,7 +155,7 @@ class TestSklearnOneVsOneClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (self._X_multi,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         # 3 classes → 3 pairs → 3 Gemm nodes (one per binary LogisticRegression)
         self.assertEqual(op_types.count("Gemm"), 3)
         # One Slice per pair to extract positive-class prob

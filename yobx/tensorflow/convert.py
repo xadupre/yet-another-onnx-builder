@@ -1,9 +1,9 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
-from onnx import ModelProto, ValueInfoProto
+from onnx import ValueInfoProto
 import tensorflow as tf
 from .. import DEFAULT_TARGET_OPSET
-from ..container import ExtendedModelContainer
+from ..container import ExportArtifact
 from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from .register import get_tf_op_converter
@@ -21,7 +21,7 @@ def to_onnx(
     extra_converters: Optional[Dict[str, Callable]] = None,
     large_model: bool = False,
     external_threshold: int = 1024,
-) -> Union[ModelProto, ExtendedModelContainer]:
+) -> ExportArtifact:
     """
     Converts a :epkg:`TensorFlow`/:epkg:`Keras` model into ONNX.
 
@@ -49,14 +49,26 @@ def to_onnx(
     :param extra_converters: optional mapping from TF op-type string to converter
         function with signature ``(g, sts, outputs, op, verbose=0)``;
         entries here take priority over the built-in op converters
-    :param large_model: if True returns a
-        :class:`onnx.model_container.ModelContainer`, which lets the user
-        decide later whether weights should be embedded in the model or saved
-        as external data
+    :param large_model: if True the returned :class:`~yobx.container.ExportArtifact`
+        has its :attr:`~yobx.container.ExportArtifact.container` attribute set to
+        an :class:`~yobx.container.ExtendedModelContainer`
     :param external_threshold: if ``large_model`` is True, every tensor whose
         element count exceeds this threshold is stored as external data
-    :return: onnx model or :class:`onnx.model_container.ModelContainer`
-        when *large_model* is True
+    :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
+        ONNX proto together with an :class:`~yobx.container.ExportReport`.
+
+    Example::
+
+        import numpy as np
+        import tensorflow as tf
+        from yobx.tensorflow import to_onnx
+
+        model = tf.keras.Sequential([tf.keras.layers.Dense(4, input_shape=(3,))])
+        X = np.random.randn(5, 3).astype(np.float32)
+
+        artifact = to_onnx(model, (X,))
+        proto = artifact.proto
+        artifact.save("model.onnx")
     """
     from . import register_tensorflow_converters
 
@@ -151,17 +163,17 @@ def to_onnx(
 
     _convert_concrete_function(cf, g, args, input_specs, verbose, extra_converters or {})
     if isinstance(g, GraphBuilder):
-        onx, stats = g.to_onnx(  # type: ignore
+        onx = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,
             return_optimize_report=True,
         )
-        if verbose:
+        if verbose and onx.report and onx.report.stats:
             import pandas
 
             print(f"[yobx.tensorflow.to_onnx] done, output type is {type(onx)}")
 
-            df = pandas.DataFrame(stats)
+            df = pandas.DataFrame(onx.report.stats)
             for c in ["added", "removed"]:
                 df[c] = df[c].fillna(0).astype(int)
             agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
@@ -170,8 +182,8 @@ def to_onnx(
             )
             if agg.shape[0]:
                 print(agg.to_string())
-        return onx  # type: ignore
-    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)  # type: ignore
+        return onx
+    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
 
 
 # ---------------------------------------------------------------------------

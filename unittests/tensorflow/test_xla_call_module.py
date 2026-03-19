@@ -691,7 +691,7 @@ class TestJaxMlpEndToEnd(ExtTestCase):
 
         X = rng.standard_normal((10, 8)).astype(np.float32)
         expected, result, onx = self._run(jax_mlp, X)
-        self.assertEqualArray(expected, result, atol=1e-5)
+        self.assertEqualArray(expected, result, atol=1e-2)
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
 

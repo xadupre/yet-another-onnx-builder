@@ -25,7 +25,7 @@ class TestKernelDensity(ExtTestCase):
 
         onx = to_onnx(kde, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceLogSumExp", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -177,7 +177,7 @@ class TestKernelDensity(ExtTestCase):
 
         onx = to_onnx(kde, (X_train,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceLogSumExp", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -281,7 +281,7 @@ class TestKernelDensity(ExtTestCase):
 
         onx = to_onnx(kde, (X_train,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
         expected = kde.score_samples(X_test).astype(np.float32)
@@ -303,7 +303,7 @@ class TestKernelDensity(ExtTestCase):
 
         onx = to_onnx(kde, (X_train,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
         expected = kde.score_samples(X_test).astype(np.float64)

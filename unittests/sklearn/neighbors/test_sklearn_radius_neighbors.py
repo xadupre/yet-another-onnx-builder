@@ -28,7 +28,7 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Greater", op_types)
         self.assertIn("Not", op_types)
 
@@ -219,10 +219,10 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (X,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
-        domains = {oi.domain for oi in onx.opset_import}
+        domains = {oi.domain for oi in onx.proto.opset_import}
         self.assertIn("com.microsoft", domains)
 
         sess = self.check_ort(onx)
@@ -308,7 +308,7 @@ class TestRadiusNeighborsRegressor(ExtTestCase):
 
         onx = to_onnx(reg, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Greater", op_types)
         self.assertIn("Not", op_types)
         self.assertIn("Div", op_types)
@@ -389,7 +389,7 @@ class TestRadiusNeighborsRegressor(ExtTestCase):
 
         onx = to_onnx(reg, (X,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
         sess = self.check_ort(onx)

@@ -1,9 +1,10 @@
 import pprint
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union
 import numpy as np
 import onnx
 import onnx.numpy_helper as onh
 from .onnx_helper import tensor_dtype_to_np_dtype
+from ..container import ExportArtifact
 
 
 def _get_type(obj0):
@@ -401,7 +402,7 @@ def reorder_nodes_for_display(nodes, verbose=False):
 
 
 def onnx_simple_text_plot(
-    model: onnx.ModelProto,
+    model: Union[onnx.ModelProto, ExportArtifact],
     verbose: bool = False,
     att_display: Optional[Sequence[str]] = None,
     add_links: bool = False,
@@ -699,6 +700,9 @@ def onnx_simple_text_plot(
             ", ".join(inputs),
             ", ".join(node.output),
         )
+
+    if isinstance(model, ExportArtifact):
+        model = model.get_proto(include_weights=False)
 
     rows = []
     if hasattr(model, "opset_import"):

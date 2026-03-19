@@ -23,7 +23,7 @@ class TestRadiusNeighborsTransformer(ExtTestCase):
 
         onx = to_onnx(est, (X_train,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Greater", op_types)
         self.assertIn("Where", op_types)
 
@@ -50,7 +50,7 @@ class TestRadiusNeighborsTransformer(ExtTestCase):
 
         onx = to_onnx(est, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Cast", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -188,7 +188,7 @@ class TestRadiusNeighborsTransformer(ExtTestCase):
 
         onx = to_onnx(est, (X_train,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types_domains = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types_domains = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types_domains)
 
         sess = self.check_ort(onx)

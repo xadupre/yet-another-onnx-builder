@@ -21,7 +21,7 @@ class TestMaxAbsScaler(ExtTestCase):
         onx = to_onnx(mas, (X,))
 
         # Check graph structure: single Div node
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Div", op_types)
 
         # Check numerical output
@@ -62,7 +62,7 @@ class TestMaxAbsScaler(ExtTestCase):
 
         onx = to_onnx(pipe, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Div", op_types)
         self.assertIn("Gemm", op_types)
 

@@ -33,7 +33,7 @@ class TestXGBoostRFClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
             any(t in op_types for t in ("TreeEnsembleClassifier", "TreeEnsemble")),
             f"Expected a tree node, got {op_types}",
@@ -62,7 +62,7 @@ class TestXGBoostRFClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
             any(t in op_types for t in ("TreeEnsembleClassifier", "TreeEnsemble")),
             f"Expected a tree node, got {op_types}",
@@ -98,10 +98,10 @@ class TestXGBoostRFClassifier(ExtTestCase):
                     target_opset = {"": 21, "ai.onnx.ml": ml_opset}
                     onx = to_onnx(clf, (X,), target_opset=target_opset)
 
-                    ml_opsets = {op.domain: op.version for op in onx.opset_import}
+                    ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
                     self.assertEqual(ml_opsets.get("ai.onnx.ml"), ml_opset)
 
-                    op_types = [n.op_type for n in onx.graph.node]
+                    op_types = [n.op_type for n in onx.proto.graph.node]
                     if ml_opset >= 5:
                         self.assertIn("TreeEnsemble", op_types)
                     else:
@@ -132,10 +132,10 @@ class TestXGBoostRFClassifier(ExtTestCase):
                     target_opset = {"": 21, "ai.onnx.ml": ml_opset}
                     onx = to_onnx(clf, (X,), target_opset=target_opset)
 
-                    ml_opsets = {op.domain: op.version for op in onx.opset_import}
+                    ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
                     self.assertEqual(ml_opsets.get("ai.onnx.ml"), ml_opset)
 
-                    op_types = [n.op_type for n in onx.graph.node]
+                    op_types = [n.op_type for n in onx.proto.graph.node]
                     if ml_opset >= 5:
                         self.assertIn("TreeEnsemble", op_types)
                     else:

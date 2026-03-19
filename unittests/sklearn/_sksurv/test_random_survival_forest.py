@@ -34,7 +34,7 @@ class TestRandomSurvivalForest(ExtTestCase):
             Xd = X.astype(dtype)
             reg = RandomSurvivalForest(**kwargs)
             reg.fit(Xd, y)
-            onx = to_onnx(reg, (Xd,))
+            onx = to_onnx(reg, (Xd,)).proto
 
             output_names = [o.name for o in onx.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")

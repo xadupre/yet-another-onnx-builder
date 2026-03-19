@@ -22,7 +22,7 @@ class TestGaussianRandomProjection(ExtTestCase):
         onx = to_onnx(proj, (X,))
 
         # Check that a MatMul (projection) node is present.
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("MatMul", op_types)
 
         # Check numerical output.

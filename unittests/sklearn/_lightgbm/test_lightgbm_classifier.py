@@ -33,7 +33,7 @@ class TestLGBMClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
             any(t in op_types for t in ("TreeEnsembleClassifier", "TreeEnsemble")),
             f"Expected TreeEnsembleClassifier or TreeEnsemble, got {op_types}",
@@ -62,7 +62,7 @@ class TestLGBMClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
             any(t in op_types for t in ("TreeEnsembleClassifier", "TreeEnsemble")),
             f"Expected TreeEnsembleClassifier or TreeEnsemble, got {op_types}",
@@ -97,14 +97,14 @@ class TestLGBMClassifier(ExtTestCase):
                     target_opset = {"": 20, "ai.onnx.ml": ml_opset}
                     onx = to_onnx(clf, (X,), target_opset=target_opset)
 
-                    ml_opsets = {op.domain: op.version for op in onx.opset_import}
+                    ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
                     self.assertEqual(ml_opsets.get("ai.onnx.ml"), ml_opset)
 
                     if ml_opset >= 5:
-                        op_types = [n.op_type for n in onx.graph.node]
+                        op_types = [n.op_type for n in onx.proto.graph.node]
                         self.assertIn("TreeEnsemble", op_types)
                     else:
-                        op_types = [n.op_type for n in onx.graph.node]
+                        op_types = [n.op_type for n in onx.proto.graph.node]
                         self.assertIn("TreeEnsembleClassifier", op_types)
 
                     ref = ExtendedReferenceEvaluator(onx)
@@ -135,7 +135,7 @@ class TestLGBMClassifier(ExtTestCase):
                     target_opset = {"": 20, "ai.onnx.ml": ml_opset}
                     onx = to_onnx(clf, (X,), target_opset=target_opset)
 
-                    ml_opsets = {op.domain: op.version for op in onx.opset_import}
+                    ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
                     self.assertEqual(ml_opsets.get("ai.onnx.ml"), ml_opset)
 
                     ref = ExtendedReferenceEvaluator(onx)
@@ -245,7 +245,7 @@ class TestLGBMClassifier(ExtTestCase):
                     target_opset = {"": 21, "ai.onnx.ml": ml_opset}
                     onx = to_onnx(clf, (X,), target_opset=target_opset)
 
-                    ml_opsets = {op.domain: op.version for op in onx.opset_import}
+                    ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
                     self.assertEqual(ml_opsets.get("ai.onnx.ml"), ml_opset)
 
                     sess = self.check_ort(onx)

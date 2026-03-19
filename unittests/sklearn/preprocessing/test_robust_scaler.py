@@ -21,7 +21,7 @@ class TestRobustScaler(ExtTestCase):
         onx = to_onnx(rs, (X,))
 
         # Default settings use Sub + Div
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("Div", op_types)
 
@@ -46,7 +46,7 @@ class TestRobustScaler(ExtTestCase):
         onx = to_onnx(rs, (X,))
 
         # No centering means no Sub node
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertNotIn("Sub", op_types)
         self.assertIn("Div", op_types)
 
@@ -70,7 +70,7 @@ class TestRobustScaler(ExtTestCase):
         onx = to_onnx(rs, (X,))
 
         # No scaling means no Div node
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertNotIn("Div", op_types)
 
@@ -96,7 +96,7 @@ class TestRobustScaler(ExtTestCase):
 
         onx = to_onnx(pipe, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("Div", op_types)
         self.assertIn("Gemm", op_types)

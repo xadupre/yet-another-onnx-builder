@@ -26,7 +26,7 @@ class TestTfidfTransformer(ExtTestCase):
 
         onx = to_onnx(tt, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Mul", op_types)
         self.assertIn("ReduceL2", op_types)
 
@@ -92,7 +92,7 @@ class TestTfidfTransformer(ExtTestCase):
 
         onx = to_onnx(tt, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Log", op_types)
         self.assertIn("Where", op_types)
 
@@ -116,7 +116,7 @@ class TestTfidfTransformer(ExtTestCase):
 
         onx = to_onnx(tt, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceL1", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)

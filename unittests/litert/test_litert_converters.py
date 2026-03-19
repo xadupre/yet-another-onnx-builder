@@ -289,14 +289,14 @@ class TestLiteRTEndToEnd(ExtTestCase):
         onx = to_onnx(model_bytes, (X,), input_names=["x"])
 
         # Graph must contain a Relu node.
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Relu", op_types)
 
         # Output is numerically correct.
         from onnxruntime import InferenceSession
 
-        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
-        feeds = {onx.graph.input[0].name: X}
+        sess = InferenceSession(onx.proto.SerializeToString(), providers=["CPUExecutionProvider"])
+        feeds = {onx.proto.graph.input[0].name: X}
         (result,) = sess.run(None, feeds)
         self.assertEqualArray(np.maximum(X, 0), result)
 
@@ -332,7 +332,7 @@ class TestLiteRTEndToEnd(ExtTestCase):
         try:
             X = np.zeros((1, 4), dtype=np.float32)
             onx = to_onnx(path, (X,), input_names=["x"])
-            op_types = [n.op_type for n in onx.graph.node]
+            op_types = [n.op_type for n in onx.proto.graph.node]
             self.assertIn("Relu", op_types)
         finally:
             os.unlink(path)

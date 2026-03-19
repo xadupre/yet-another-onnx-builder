@@ -16,7 +16,7 @@ class TestMissingIndicator(ExtTestCase):
 
         onx = to_onnx(mi, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("IsNaN", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -38,7 +38,7 @@ class TestMissingIndicator(ExtTestCase):
 
         onx = to_onnx(mi, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("IsNaN", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -101,7 +101,7 @@ class TestMissingIndicator(ExtTestCase):
 
         onx = to_onnx(mi, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Gather", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -144,7 +144,7 @@ class TestMissingIndicator(ExtTestCase):
 
         onx = to_onnx(mi, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
         self.assertNotIn("IsNaN", op_types)
 
@@ -167,7 +167,7 @@ class TestMissingIndicator(ExtTestCase):
 
         onx = to_onnx(mi, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)

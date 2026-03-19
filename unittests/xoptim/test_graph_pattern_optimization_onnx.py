@@ -6466,7 +6466,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(["Expand"], [n.op_type for n in opt_onx.graph.node])
-        self.assertIn("ShapeBasedConcatExpandPattern", str(opt_onx))
+        self.assertIn("ShapeBasedConcatExpandPattern", str(opt_onx.proto))
         ref = ExtendedReferenceEvaluator(opt_onx)
         zz = ref.run(None, feeds)[0]
         self.assertEqualArray(z, zz)

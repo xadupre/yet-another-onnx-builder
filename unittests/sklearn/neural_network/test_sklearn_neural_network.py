@@ -22,7 +22,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
 
         onx = to_onnx(mlp, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
             "MatMul" in op_types or "Gemm" in op_types, f"Expected MatMul or Gemm in {op_types}"
         )
@@ -50,7 +50,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
 
         onx = to_onnx(mlp, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
             "MatMul" in op_types or "Gemm" in op_types, f"Expected MatMul or Gemm in {op_types}"
         )
@@ -102,7 +102,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
 
         onx = to_onnx(mlp, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Tanh", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -127,7 +127,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
 
         onx = to_onnx(mlp, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
             "MatMul" in op_types or "Gemm" in op_types, f"Expected MatMul or Gemm in {op_types}"
         )
@@ -151,7 +151,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
 
         onx = to_onnx(mlp, (X,))
 
-        self.assertEqual(onx.graph.input[0].type.tensor_type.elem_type, 1)  # FLOAT
+        self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 1)  # FLOAT
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -175,7 +175,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
 
         onx = to_onnx(mlp, (X,))
 
-        self.assertEqual(onx.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
+        self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -199,7 +199,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
 
         onx = to_onnx(mlp, (X,))
 
-        self.assertEqual(onx.graph.input[0].type.tensor_type.elem_type, 1)  # FLOAT
+        self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 1)  # FLOAT
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -220,7 +220,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
 
         onx = to_onnx(mlp, (X,))
 
-        self.assertEqual(onx.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
+        self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -246,7 +246,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
 
         onx = to_onnx(pipe, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertTrue(
             "MatMul" in op_types or "Gemm" in op_types, f"Expected MatMul or Gemm in {op_types}"

@@ -1,8 +1,7 @@
 import unittest
 from typing import List
-
-import onnx
 from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch, skipif_ci_windows
+from yobx.container import ExportArtifact
 from yobx.torch.interpreter import ForceDispatcher
 
 
@@ -196,7 +195,7 @@ class TestForceDispatcher(ExtTestCase):
         model = DummyModel()
         dispatcher = ForceDispatcher(domain="testlib_fd1", version=1)
         onx = to_onnx(model, (x,), dispatcher=dispatcher)
-        self.assertIsInstance(onx, onnx.ModelProto)
+        self.assertIsInstance(onx, ExportArtifact)
         domains = {n.domain for n in onx.graph.node}
         self.assertIn("testlib_fd1", domains)
 
@@ -234,7 +233,7 @@ class TestForceDispatcher(ExtTestCase):
             signatures={"testlib_fd2_scaled_default": sig_fn}, domain="testlib_fd2", version=1
         )
         onx = to_onnx(model, (x,), dispatcher=dispatcher)
-        self.assertIsInstance(onx, onnx.ModelProto)
+        self.assertIsInstance(onx, ExportArtifact)
         domains = {n.domain for n in onx.graph.node}
         self.assertIn("testlib_fd2", domains)
 
@@ -299,7 +298,7 @@ class TestForceDispatcher(ExtTestCase):
         model = DummyModel()
         dispatcher = ForceDispatcher(domain="testlib_fd4", version=1)
         onx = to_onnx(model, (x,), dispatcher=dispatcher)
-        self.assertIsInstance(onx, onnx.ModelProto)
+        self.assertIsInstance(onx, ExportArtifact)
         op_types = [(n.domain, n.op_type) for n in onx.graph.node]
         # The op_type should contain the function name
         custom_nodes = [(d, t) for d, t in op_types if d == "testlib_fd4"]
