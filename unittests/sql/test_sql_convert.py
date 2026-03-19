@@ -248,11 +248,14 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
     """Tests verifying properties of the returned ONNX model."""
 
     def test_returns_model_proto(self):
-        from onnx import ModelProto
+        from yobx.container import ExportArtifact
 
         dtypes = {"a": np.float32}
         onx = sql_to_onnx("SELECT a FROM t", dtypes)
-        self.assertIsInstance(onx, ModelProto)
+        self.assertIsInstance(onx, ExportArtifact)
+        # The underlying proto is accessible via the attribute:
+        from onnx import ModelProto
+        self.assertIsInstance(onx.proto, ModelProto)
 
     def test_inputs_one_per_column(self):
         dtypes = {"a": np.float32, "b": np.float32, "c": np.float32}
@@ -277,7 +280,7 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
 
     def test_builder_cls_used(self):
         """builder_cls should be instantiated instead of the default GraphBuilder."""
-        from onnx import ModelProto
+        from yobx.container import ExportArtifact
         from yobx.xbuilder import GraphBuilder
 
         instantiated = []
@@ -289,7 +292,7 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
 
         dtypes = {"a": np.float32}
         onx = sql_to_onnx("SELECT a FROM t", dtypes, builder_cls=TrackingBuilder)
-        self.assertIsInstance(onx, ModelProto)
+        self.assertIsInstance(onx, ExportArtifact)
         self.assertEqual(len(instantiated), 1, "TrackingBuilder was not instantiated")
 
 

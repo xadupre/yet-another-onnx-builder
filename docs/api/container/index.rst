@@ -6,4 +6,5 @@ yobx.container
     :caption: modules
 
     build_stats
+    export_artifact
     model_container

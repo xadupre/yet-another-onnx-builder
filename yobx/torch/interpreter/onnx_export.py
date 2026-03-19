@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Un
 from onnx import ModelProto, save_model
 from onnx.defs import onnx_opset_version
 from onnx.model_container import ModelContainer
+from ...container import ExtendedModelContainer, ExportArtifact, ExportReport
 from ...helpers import string_type
 from ...xbuilder.graph_builder import GraphBuilder, OptimizationOptions, FunctionOptions
 from ..export_options import ExportOptions
@@ -865,7 +866,10 @@ def to_onnx(
     output_dynamic_shapes: Optional[Union[Dict[str, Any], Tuple[Any]]] = None,
     validate_onnx: Union[bool, float] = False,
 ) -> Union[
-    Union[ModelProto, ModelContainer], Tuple[Union[ModelProto, ModelContainer], GraphBuilder]
+    ExportArtifact,
+    Tuple[ExportArtifact, GraphBuilder],
+    Tuple[ExportArtifact, Dict[str, Any]],
+    Tuple[ExportArtifact, GraphBuilder, Dict[str, Any]],
 ]:
     """
     Exports a torch model into ONNX using
@@ -891,7 +895,9 @@ def to_onnx(
         or saved as external weights
     :param external_threshold: if large_model is True, every tensor above this limit
         is stored as external
-    :param return_optimize_report: returns statistics on the optimization as well
+    :param return_optimize_report: returns statistics on the optimization as well;
+        statistics are also available via ``artifact.report.extra["optimization"]``
+        on the returned :class:`~yobx.container.ExportArtifact`
     :param filename: if specified, stores the model into that file
     :param inline: inline the model before converting to onnx, this is done before
             any optimization takes place
@@ -906,7 +912,11 @@ def to_onnx(
     :param validate_onnx: if a float or True, validates the onnx model
         against the model with the input used to export,
         if True, the tolerance is 1e-5
-    :return: onnx model
+    :return: :class:`~yobx.container.ExportArtifact` wrapping the exported ONNX
+        proto and an :class:`~yobx.container.ExportReport`.  When
+        *return_builder* is ``True`` a tuple ``(artifact, builder)`` is returned
+        instead; when *return_optimize_report* is also ``True`` the tuple is
+        ``(artifact, builder, stats)``.
 
     If environment variable ``PRINT_GRAPH_MODULE`` is set to one,
     information about the graph module is printed out.
@@ -916,6 +926,24 @@ def to_onnx(
     a progress bar on big models.
     Other debugging options are available, see :class:`GraphBuiler
     <yobx.xbuilder.GraphBuilder>`.
+
+    Example::
+
+        import torch
+        from yobx.torch.interpreter import to_onnx
+
+        class Neuron(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear = torch.nn.Linear(4, 2)
+
+            def forward(self, x):
+                return torch.relu(self.linear(x))
+
+        x = torch.randn(3, 4)
+        artifact = to_onnx(Neuron(), (x,))
+        proto = artifact.proto
+        artifact.save("model.onnx")
     """
     if kwargs is None and isinstance(args, dict):
         kwargs = args
@@ -1067,15 +1095,20 @@ def to_onnx(
         if verbose >= 10:
             print(builder.get_debug_msg())
 
+    # Build ExportArtifact
+    all_stats.update(add_stats)
+    report = ExportReport(extra=all_stats)
+    if isinstance(onx, ExtendedModelContainer):
+        artifact = ExportArtifact(proto=onx.model_proto, container=onx, report=report)
+    else:
+        artifact = ExportArtifact(proto=onx, report=report)
+
     if filename:
         from ...xbuilder.builder_stats_helper import builder_stats_to_dataframe
 
         df = builder_stats_to_dataframe(stats)
         df.to_excel(f"{os.path.splitext(filename)[0]}.xlsx")
-        if isinstance(onx, ModelProto):
-            save_model(onx, filename)
-        else:
-            onx.save(filename, all_tensors_to_one_file=True)
+        artifact.save(filename)
 
     if isinstance(validate_onnx, float) or validate_onnx:
         assert filename, "validate_onnx is only implemented when filename is specified"
@@ -1088,10 +1121,9 @@ def to_onnx(
             atol=validate_onnx if isinstance(validate_onnx, float) else 1e-5,
         )
 
-    all_stats.update(add_stats)
     if return_builder:
-        return (onx, builder, all_stats) if return_optimize_report else (onx, builder)
-    return (onx, all_stats) if return_optimize_report else onx
+        return (artifact, builder, all_stats) if return_optimize_report else (artifact, builder)
+    return (artifact, all_stats) if return_optimize_report else artifact
 
 
 def validate_exported_onnx(

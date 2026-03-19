@@ -6,7 +6,7 @@ from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.utils.validation import check_is_fitted
 from .. import DEFAULT_TARGET_OPSET
 from ..typing import ConvertOptionsProtocol
-from ..container import ExtendedModelContainer
+from ..container import ExtendedModelContainer, ExportArtifact, ExportReport
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from ..xbuilder.function_options import FunctionOptions
@@ -197,7 +197,7 @@ def to_onnx(
     external_threshold: int = 1024,
     function_options: Optional[FunctionOptions] = None,
     convert_options: Optional[ConvertOptionsProtocol] = None,
-) -> Union[ModelProto, ExtendedModelContainer]:
+) -> ExportArtifact:
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
     By default, the first dimension is considered as dynamic,
@@ -227,8 +227,9 @@ def to_onnx(
     :param extra_converters: optional mapping from estimator type to converter
         function; entries here take priority over the built-in converters and
         allow converting custom estimators that are not natively supported
-    :param large_model: if True returns a
-        :class:`onnx.model_container.ModelContainer`, which lets the user
+    :param large_model: if True the returned :class:`~yobx.container.ExportArtifact`
+        has its :attr:`~yobx.container.ExportArtifact.container` attribute set to
+        an :class:`~yobx.container.ExtendedModelContainer`, which lets the user
         decide later whether weights should be embedded in the model or saved
         as external data
     :param external_threshold: if ``large_model`` is True, every tensor whose
@@ -246,6 +247,8 @@ def to_onnx(
         function wrapping and produce a flat graph.
         when *large_model* is True
     :param convert_options: see :class:`yobx.sklearn.ConvertOptions`
+    :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
+        ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
     .. note::
 
@@ -255,6 +258,22 @@ def to_onnx(
         large usually introduces discrepancies. That is often the case when
         a matrix is the inverse of another one.
         See :ref:`l-plot-sklearn-pls-float32`.
+
+    Example::
+
+        import numpy as np
+        from sklearn.linear_model import LinearRegression
+        from yobx.sklearn import to_onnx
+
+        X = np.random.randn(10, 3).astype(np.float32)
+        y = X @ np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        reg = LinearRegression().fit(X, y)
+
+        artifact = to_onnx(reg, (X,))
+        # Access the raw proto:
+        proto = artifact.proto
+        # Save to disk:
+        artifact.save("model.onnx")
     """
     check_is_fitted(
         estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator,
@@ -393,9 +412,18 @@ def to_onnx(
             )
             if agg.shape[0]:
                 print(agg.to_string())
-        return onx  # type: ignore
-    return g.to_onnx(
+        report = ExportReport(stats=stats or [])
+        if isinstance(onx, ExtendedModelContainer):
+            return ExportArtifact(
+                proto=onx.model_proto, container=onx, report=report
+            )
+        return ExportArtifact(proto=onx, report=report)
+    onx = g.to_onnx(
         large_model=large_model,
         external_threshold=external_threshold,
         inline=(not function_options) or not function_options.export_as_function,
     )
+    if isinstance(onx, ExtendedModelContainer):
+        return ExportArtifact(proto=onx.model_proto, container=onx)
+    return ExportArtifact(proto=onx)
+

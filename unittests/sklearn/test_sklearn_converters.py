@@ -386,19 +386,20 @@ class TestSklearnBaseConverters(ExtTestCase):
         self.assertEqualArray(pipe.predict_proba(X).astype(np.float32), proba, atol=1e-5)
 
     def test_standard_scaler_large_model(self):
-        """to_onnx with large_model=True returns an ExtendedModelContainer."""
-        from yobx.container import ExtendedModelContainer
+        """to_onnx with large_model=True returns an ExportArtifact with container set."""
+        from yobx.container import ExportArtifact, ExtendedModelContainer
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         ss = StandardScaler()
         ss.fit(X)
 
-        container = to_onnx(ss, (X,), large_model=True)
-        self.assertIsInstance(container, ExtendedModelContainer)
+        artifact = to_onnx(ss, (X,), large_model=True)
+        self.assertIsInstance(artifact, ExportArtifact)
+        self.assertIsInstance(artifact.container, ExtendedModelContainer)
 
     def test_logistic_regression_large_model(self):
-        """to_onnx with large_model=True returns an ExtendedModelContainer."""
-        from yobx.container import ExtendedModelContainer
+        """to_onnx with large_model=True returns an ExportArtifact with container set."""
+        from yobx.container import ExportArtifact, ExtendedModelContainer
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         y = np.array([0, 0, 1, 1])
@@ -407,8 +408,9 @@ class TestSklearnBaseConverters(ExtTestCase):
         lr = LogisticRegression()
         lr.fit(X_scaled, y)
 
-        container = to_onnx(lr, (X,), large_model=True)
-        self.assertIsInstance(container, ExtendedModelContainer)
+        artifact = to_onnx(lr, (X,), large_model=True)
+        self.assertIsInstance(artifact, ExportArtifact)
+        self.assertIsInstance(artifact.container, ExtendedModelContainer)
 
 
 @requires_sklearn("1.4")

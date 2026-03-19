@@ -45,6 +45,7 @@ import numpy as np
 from onnx import ModelProto, TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
+from ..container import ExportArtifact, ExportReport
 from ..typing import GraphBuilderProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
@@ -164,9 +165,9 @@ def sql_to_onnx(
     n_rows: Optional[int] = None,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
-) -> ModelProto:
+) -> ExportArtifact:
     """
-    Convert a SQL *query* to a self-contained :class:`onnx.ModelProto`.
+    Convert a SQL *query* to a self-contained ONNX model.
 
     Each column in the query is represented as a **separate 1-D ONNX input**
     tensor, allowing the caller to feed column vectors independently.  The
@@ -209,7 +210,7 @@ def sql_to_onnx(
             from yobx.sql import sql_to_onnx
 
             dtypes = {"a": np.float32}
-            onx = sql_to_onnx(
+            artifact = sql_to_onnx(
                 "SELECT my_sqrt(a) AS r FROM t",
                 dtypes,
                 custom_functions={"my_sqrt": np.sqrt},
@@ -222,15 +223,22 @@ def sql_to_onnx(
         the :ref:`builder-api` can be supplied here, e.g. a custom subclass
         that adds extra optimisation passes.
 
-    :return: a :class:`onnx.ModelProto` ready for inference.
+    :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
+        ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
     Example::
 
         import numpy as np
         from yobx.sql import sql_to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
 
         dtypes = {"a": np.float32, "b": np.float32}
-        onx = sql_to_onnx("SELECT a + b AS total FROM t WHERE a > 0", dtypes)
+        artifact = sql_to_onnx("SELECT a + b AS total FROM t WHERE a > 0", dtypes)
+
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0,  5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
 
     .. note::
 
@@ -244,8 +252,8 @@ def sql_to_onnx(
     sql_to_onnx_graph(
         g, sts, [], query, input_dtypes, right_input_dtypes=right_input_dtypes, n_rows=n_rows
     )
-    onx, _ = g.to_onnx(return_optimize_report=True)  # type: ignore
-    return onx  # type: ignore[return-value]
+    onx, stats = g.to_onnx(return_optimize_report=True)  # type: ignore
+    return ExportArtifact(proto=onx, report=ExportReport(stats=stats or []))  # type: ignore[return-value]
 
 
 # ---------------------------------------------------------------------------
