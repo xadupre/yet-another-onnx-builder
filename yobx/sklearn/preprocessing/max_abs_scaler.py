@@ -43,6 +43,5 @@ def sklearn_max_abs_scaler(
 
     res = g.op.Div(X, max_abs, name=name, outputs=outputs)
     assert isinstance(res, str)  # type happiness
-    if not sts:
-        g.set_type_shape_unary_op(res, X)
+    g.set_type_shape_unary_op(res, X)
     return res

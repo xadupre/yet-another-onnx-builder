@@ -166,9 +166,8 @@ def sklearn_nystroem(
     res = g.op.MatMul(K, normalization_T, name=name, outputs=outputs)
 
     assert isinstance(res, str)  # type happiness
-    if not sts:
-        g.set_type(res, itype)
-        if g.has_shape(X):
-            batch_dim = g.get_shape(X)[0]
-            g.set_shape(res, (batch_dim, n_components))
+    g.set_type(res, itype)
+    if g.has_shape(X):
+        batch_dim = g.get_shape(X)[0]
+        g.set_shape(res, (batch_dim, n_components))
     return res

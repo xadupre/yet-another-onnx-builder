@@ -187,13 +187,12 @@ def sklearn_radius_neighbors_classifier(
         labels = g.op.Identity(predicted_label, name=f"{name}_labels", outputs=outputs[:1])
 
     assert isinstance(labels, str)
-    if not sts:
-        out_itype = (
-            onnx.TensorProto.INT64
-            if np.issubdtype(classes_arr.dtype, np.integer)
-            else onnx.TensorProto.STRING
-        )
-        g.set_type(labels, out_itype)
+    out_itype = (
+        onnx.TensorProto.INT64
+        if np.issubdtype(classes_arr.dtype, np.integer)
+        else onnx.TensorProto.STRING
+    )
+    g.set_type(labels, out_itype)
 
     n_out = len(outputs)
     if n_out >= 2:
@@ -207,8 +206,7 @@ def sklearn_radius_neighbors_classifier(
             vote_counts, safe_total, name=f"{name}_proba", outputs=outputs[1:2]
         )
         assert isinstance(probabilities, str)
-        if not sts:
-            g.set_type(probabilities, onnx.TensorProto.FLOAT)
+        g.set_type(probabilities, onnx.TensorProto.FLOAT)
         return labels, probabilities
 
     return labels
@@ -328,7 +326,6 @@ def sklearn_radius_neighbors_regressor(
     # 7. Average: (N,) — NaN for outlier points (0 / 0 = NaN in float)
     predictions = g.op.Div(sum_targets, count, name=f"{name}_pred", outputs=outputs[:1])
     assert isinstance(predictions, str)
-    if not sts:
-        g.set_type(predictions, itype)
+    g.set_type(predictions, itype)
 
     return predictions

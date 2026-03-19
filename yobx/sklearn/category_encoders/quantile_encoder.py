@@ -173,6 +173,5 @@ def category_encoders_quantile_encoder(
         res = g.op.Concat(*col_tensors, axis=1, name=name, outputs=outputs)
 
     assert isinstance(res, str)
-    if not sts:
-        g.set_type_shape_unary_op(res, X)
+    g.set_type_shape_unary_op(res, X)
     return res

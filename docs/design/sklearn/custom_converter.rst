@@ -41,15 +41,9 @@ Parameter         Description
 ================  =====================================================
 
 After writing the output tensor the converter should propagate type
-and shape information so that downstream nodes can use them:
-
-.. code-block:: python
-
-    if not sts:
-        g.set_type(result, g.get_type(X))
-        g.set_shape(result, g.get_shape(X))
-        if g.has_device(X):
-            g.set_device(result, g.get_device(X))
+and shape information so that downstream nodes can use them by calling
+:meth:`set_type_shape_unary_op
+<yobx.xbuilder.GraphBuilder.set_type_shape_unary_op>`.
 
 Ad-hoc conversion with ``extra_converters``
 ===========================================
@@ -91,11 +85,7 @@ validates the result numerically.
         """Emits a single ``Mul`` node: output = X * estimator.scale."""
         scale = np.array([estimator.scale], dtype=np.float32)
         result = g.op.Mul(X, scale, name=name, outputs=outputs)
-        if not sts:
-            g.set_type(result, g.get_type(X))
-            g.set_shape(result, g.get_shape(X))
-            if g.has_device(X):
-                g.set_device(result, g.get_device(X))
+        g.set_type_shape_unary_op(result, X)
         return result
 
     # ── 3. Convert ─────────────────────────────────────────────────────
@@ -131,11 +121,7 @@ Validate numerically
     def convert_scale_by_constant(g, sts, outputs, estimator, X, name="scale"):
         scale = np.array([estimator.scale], dtype=np.float32)
         result = g.op.Mul(X, scale, name=name, outputs=outputs)
-        if not sts:
-            g.set_type(result, g.get_type(X))
-            g.set_shape(result, g.get_shape(X))
-            if g.has_device(X):
-                g.set_device(result, g.get_device(X))
+        g.set_type_shape_unary_op(result, X)
         return result
 
     rng = np.random.default_rng(0)
@@ -169,11 +155,7 @@ trivial identity (just to illustrate the override mechanism):
     def identity_scaler(g, sts, outputs, estimator, X, name="scaler"):
         """Pass-through: return the input unchanged."""
         result = g.op.Identity(X, name=name, outputs=outputs)
-        if not sts:
-            g.set_type(result, g.get_type(X))
-            g.set_shape(result, g.get_shape(X))
-            if g.has_device(X):
-                g.set_device(result, g.get_device(X))
+        g.set_type_shape_unary_op(result, X)
         return result
 
     rng = np.random.default_rng(1)
@@ -225,11 +207,7 @@ means you no longer have to pass ``extra_converters`` at every call site:
     ) -> str:
         scale = np.array([estimator.scale], dtype=np.float32)
         result = g.op.Mul(X, scale, name=name, outputs=outputs)
-        if not sts:
-            g.set_type(result, g.get_type(X))
-            g.set_shape(result, g.get_shape(X))
-            if g.has_device(X):
-                g.set_device(result, g.get_device(X))
+        g.set_type_shape_unary_op(result, X)
         return result
 
 Once this module is imported the converter is available globally and

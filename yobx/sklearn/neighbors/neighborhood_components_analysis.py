@@ -49,6 +49,5 @@ def sklearn_neighborhood_components_analysis(
     components_T = estimator.components_.T.astype(dtype)
     res = g.op.MatMul(X, components_T, name=name, outputs=outputs)
     assert isinstance(res, str)
-    if not sts:
-        g.set_type(res, itype)
+    g.set_type(res, itype)
     return res

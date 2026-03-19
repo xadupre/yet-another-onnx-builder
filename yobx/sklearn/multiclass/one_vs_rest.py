@@ -142,16 +142,14 @@ def sklearn_one_vs_rest_classifier(
             classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.INT64)
+        g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
             classes_arr, label_idx, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
         assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.STRING)
+        g.set_type(label, onnx.TensorProto.STRING)
 
     if emit_proba:
         proba = g.op.Identity(proba_norm, name=f"{name}_proba", outputs=outputs[1:])

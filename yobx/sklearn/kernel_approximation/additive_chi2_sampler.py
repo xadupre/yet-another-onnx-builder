@@ -138,11 +138,10 @@ def sklearn_additive_chi2_sampler(
         res = g.op.Concat(*components, axis=1, name=name, outputs=outputs)
 
     assert isinstance(res, str)  # type happiness
-    if not sts:
-        g.set_type(res, itype)
-        if g.has_shape(X):
-            batch_dim = g.get_shape(X)[0]
-            n_features = g.get_shape(X)[1]
-            n_out_features = n_features * (2 * sample_steps - 1)
-            g.set_shape(res, (batch_dim, n_out_features))
+    g.set_type(res, itype)
+    if g.has_shape(X):
+        batch_dim = g.get_shape(X)[0]
+        n_features = g.get_shape(X)[1]
+        n_out_features = n_features * (2 * sample_steps - 1)
+        g.set_shape(res, (batch_dim, n_out_features))
     return res

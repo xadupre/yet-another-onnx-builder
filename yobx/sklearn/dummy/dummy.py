@@ -79,8 +79,7 @@ def sklearn_dummy_regressor(
         result = g.op.Expand(constant, target_shape, name=name, outputs=outputs)
 
     assert isinstance(result, str)
-    if not sts:
-        g.set_type(result, itype)
+    g.set_type(result, itype)
     return result
 
 
@@ -186,23 +185,20 @@ def sklearn_dummy_classifier(
         proba_const, proba_shape, name=f"{name}_expand_proba", outputs=outputs[1:]
     )
     assert isinstance(proba, str)
-    if not sts:
-        g.set_type(proba, itype)
+    g.set_type(proba, itype)
 
     # Broadcast the predicted class (1,) → (N,).
     if np.issubdtype(classes.dtype, np.integer):
         class_const = np.array([classes[predicted_idx]], dtype=np.int64)
         label = g.op.Expand(class_const, batch_size, name=f"{name}_label", outputs=outputs[:1])
         assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.INT64)
+        g.set_type(label, onnx.TensorProto.INT64)
     else:
         class_const = np.array([str(classes[predicted_idx])])
         label = g.op.Expand(
             class_const, batch_size, name=f"{name}_label_string", outputs=outputs[:1]
         )
         assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.STRING)
+        g.set_type(label, onnx.TensorProto.STRING)
 
     return label, proba

@@ -146,7 +146,6 @@ def sklearn_kneighbors_transformer(
     )
 
     assert isinstance(output, str)
-    if not sts:
-        g.set_type(output, itype)
+    g.set_type(output, itype)
 
     return output

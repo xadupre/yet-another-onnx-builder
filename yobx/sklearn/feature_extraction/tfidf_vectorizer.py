@@ -187,6 +187,5 @@ def sklearn_tfidf_vectorizer(
         )
 
     assert isinstance(res, str)
-    if not sts:
-        g.set_type_shape_unary_op(res, tf)
+    g.set_type_shape_unary_op(res, tf)
     return res

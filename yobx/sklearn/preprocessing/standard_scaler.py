@@ -60,6 +60,5 @@ def sklearn_standard_scaler(
         # No scaling: forward the (possibly centered) tensor to the desired outputs.
         res = g.op.Identity(centered, name=name, outputs=outputs)
     assert isinstance(res, str)  # type happiness
-    if not sts:
-        g.set_type_shape_unary_op(res, X)
+    g.set_type_shape_unary_op(res, X)
     return res

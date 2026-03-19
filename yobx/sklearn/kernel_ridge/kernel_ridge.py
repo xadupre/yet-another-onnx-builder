@@ -232,6 +232,5 @@ def sklearn_kernel_ridge(
         result = g.op.MatMul(K, dual_coef, name=name, outputs=outputs[:1])
 
     assert isinstance(result, str)
-    if not sts:
-        g.set_type(result, itype)
+    g.set_type(result, itype)
     return result

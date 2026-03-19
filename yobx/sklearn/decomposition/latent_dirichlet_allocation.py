@@ -194,6 +194,5 @@ def sklearn_latent_dirichlet_allocation(
     )
     res = g.op.Div(gamma, gamma_sum, name=name, outputs=outputs)
     assert isinstance(res, str)
-    if not sts:
-        g.set_type(res, itype)
+    g.set_type(res, itype)
     return res

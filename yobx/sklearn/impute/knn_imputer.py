@@ -315,6 +315,5 @@ def sklearn_knn_imputer(  # noqa: C901
     res = g.op.Where(mask_X_node, imputed, X, name=name, outputs=outputs)
 
     assert isinstance(res, str)  # type happiness
-    if not sts:
-        g.set_type_shape_unary_op(res, X)
+    g.set_type_shape_unary_op(res, X)
     return res

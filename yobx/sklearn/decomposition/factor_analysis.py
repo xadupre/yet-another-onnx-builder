@@ -61,6 +61,5 @@ def sklearn_factor_analysis(
 
     res = g.op.MatMul(centered, W_eff, name=name, outputs=outputs)
     assert isinstance(res, str)  # type happiness
-    if not sts:
-        g.set_type(res, itype)
+    g.set_type(res, itype)
     return res

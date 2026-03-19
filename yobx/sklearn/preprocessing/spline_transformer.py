@@ -238,9 +238,8 @@ def sklearn_spline_transformer(
         res = g.op.Identity(full_dm, name=name, outputs=outputs)
 
     assert isinstance(res, str)  # type happiness
-    if not sts:
-        g.set_type(res, itype)
-        if g.has_shape(X):
-            batch_dim = g.get_shape(X)[0]
-            g.set_shape(res, (batch_dim, estimator.n_features_out_))
+    g.set_type(res, itype)
+    if g.has_shape(X):
+        batch_dim = g.get_shape(X)[0]
+        g.set_shape(res, (batch_dim, estimator.n_features_out_))
     return res

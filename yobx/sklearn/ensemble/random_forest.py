@@ -543,16 +543,14 @@ def _sklearn_random_forest_classifier_v5(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.INT64)
+        g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
         assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.STRING)
+        g.set_type(label, onnx.TensorProto.STRING)
 
     extra_idx = 2
     if g.convert_options.has("decision_path", estimator):

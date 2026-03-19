@@ -96,8 +96,7 @@ def sklearn_kmeans(
     if n_outputs >= 2:
         distances = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt", outputs=outputs[1:2])
         assert isinstance(distances, str)
-        if not sts:
-            g.set_type(distances, itype)
+        g.set_type(distances, itype)
     else:
         distances = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt")
         assert isinstance(distances, str)
@@ -108,8 +107,7 @@ def sklearn_kmeans(
         label_idx, to=onnx.TensorProto.INT64, name=f"{name}_cast", outputs=outputs[:1]
     )
     assert isinstance(labels, str)
-    if not sts:
-        g.set_type(labels, onnx.TensorProto.INT64)
+    g.set_type(labels, onnx.TensorProto.INT64)
 
     if n_outputs >= 2:
         return labels, distances

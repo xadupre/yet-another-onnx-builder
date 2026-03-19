@@ -72,6 +72,5 @@ def sklearn_glm_regressor(
         )
 
     assert isinstance(result, str)
-    if not sts:
-        g.set_type(result, itype)
+    g.set_type(result, itype)
     return result

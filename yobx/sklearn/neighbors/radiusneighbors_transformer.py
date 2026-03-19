@@ -105,7 +105,6 @@ def sklearn_radius_neighbors_transformer(
         output = g.op.Where(in_radius, dists, zeros, name=f"{name}_where", outputs=outputs[:1])
 
     assert isinstance(output, str)
-    if not sts:
-        g.set_type(output, itype)
+    g.set_type(output, itype)
 
     return output

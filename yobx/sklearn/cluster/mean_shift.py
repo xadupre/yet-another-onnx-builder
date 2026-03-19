@@ -126,8 +126,7 @@ def sklearn_mean_shift(
     if n_outputs >= 2:
         distances = g.op.Identity(eucl_dists, name=f"{name}_distances", outputs=outputs[1:2])
         assert isinstance(distances, str)
-        if not sts:
-            g.set_type(distances, itype)
+        g.set_type(distances, itype)
     else:
         distances = eucl_dists
         assert isinstance(distances, str)
@@ -138,8 +137,7 @@ def sklearn_mean_shift(
         label_idx, to=onnx.TensorProto.INT64, name=f"{name}_cast", outputs=outputs[:1]
     )
     assert isinstance(labels, str)
-    if not sts:
-        g.set_type(labels, onnx.TensorProto.INT64)
+    g.set_type(labels, onnx.TensorProto.INT64)
 
     if n_outputs >= 2:
         return labels, distances

@@ -116,6 +116,5 @@ def sklearn_feature_agglomeration(
         )
 
     assert isinstance(out, str)
-    if not sts:
-        g.set_type(out, itype)
+    g.set_type(out, itype)
     return out

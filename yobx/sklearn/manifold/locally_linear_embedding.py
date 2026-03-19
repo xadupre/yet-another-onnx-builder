@@ -281,9 +281,8 @@ def sklearn_locally_linear_embedding(
     )  # (N, n_components)
 
     assert isinstance(res, str)
-    if not sts:
-        g.set_type(res, itype)
-        if g.has_shape(X):
-            batch_dim = g.get_shape(X)[0]
-            g.set_shape(res, (batch_dim, n_components))
+    g.set_type(res, itype)
+    if g.has_shape(X):
+        batch_dim = g.get_shape(X)[0]
+        g.set_shape(res, (batch_dim, n_components))
     return res

@@ -56,12 +56,11 @@ def sklearn_cca(
     res = g.op.MatMul(scaled, x_rotations, name=name, outputs=outputs)
 
     assert isinstance(res, str)
-    if not sts:
-        g.set_type(res, itype)
-        if g.has_shape(X):
-            batch_dim = g.get_shape(X)[0]
-            n_components = estimator.x_rotations_.shape[1]
-            g.set_shape(res, (batch_dim, n_components))
-        elif g.has_rank(X):
-            g.set_rank(res, 2)
+    g.set_type(res, itype)
+    if g.has_shape(X):
+        batch_dim = g.get_shape(X)[0]
+        n_components = estimator.x_rotations_.shape[1]
+        g.set_shape(res, (batch_dim, n_components))
+    elif g.has_rank(X):
+        g.set_rank(res, 2)
     return res

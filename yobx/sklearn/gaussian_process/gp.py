@@ -478,16 +478,14 @@ def _emit_label_and_proba_from_scores(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
         assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.INT64)
+        g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label_str", outputs=outputs[:1]
         )
         assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.STRING)
+        g.set_type(label, onnx.TensorProto.STRING)
     return label, proba
 
 
@@ -570,8 +568,7 @@ def sklearn_gaussian_process_regressor(
         )
 
     assert isinstance(result, str)
-    if not sts:
-        g.set_type(result, itype)
+    g.set_type(result, itype)
     return result
 
 
@@ -664,8 +661,7 @@ def sklearn_gaussian_process_classifier(
                 outputs=outputs[:1],
             )
             assert isinstance(label, str)
-            if not sts:
-                g.set_type(label, onnx.TensorProto.INT64)
+            g.set_type(label, onnx.TensorProto.INT64)
         else:
             label = g.op.Gather(
                 np.array(classes.astype(str)),
@@ -675,8 +671,7 @@ def sklearn_gaussian_process_classifier(
                 outputs=outputs[:1],
             )
             assert isinstance(label, str)
-            if not sts:
-                g.set_type(label, onnx.TensorProto.STRING)
+            g.set_type(label, onnx.TensorProto.STRING)
         return label, proba
 
     # Multiclass: base_estimator_ is OneVsRestClassifier
@@ -707,8 +702,7 @@ def sklearn_gaussian_process_classifier(
             outputs=outputs[:1],
         )
         assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.INT64)
+        g.set_type(label, onnx.TensorProto.INT64)
     else:
         label = g.op.Gather(
             np.array(classes.astype(str)),
@@ -718,6 +712,5 @@ def sklearn_gaussian_process_classifier(
             outputs=outputs[:1],
         )
         assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.STRING)
+        g.set_type(label, onnx.TensorProto.STRING)
     return label, proba

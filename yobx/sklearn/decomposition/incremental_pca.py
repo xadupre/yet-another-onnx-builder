@@ -64,6 +64,5 @@ def sklearn_incremental_pca(
         res = g.op.MatMul(centered, components_T, name=name, outputs=outputs)
 
     assert isinstance(res, str)  # type happiness
-    if not sts:
-        g.set_type(res, itype)
+    g.set_type(res, itype)
     return res
