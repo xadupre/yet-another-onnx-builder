@@ -162,7 +162,7 @@ select = [
     "UP006", "UP007", "UP015", "UP027", "UP031", "UP032", "UP034", "UP035", "UP045",
 ]
 "*/__init__.py" = ["F401"]
-"docs/**" = ["RUF001"]
+"docs/**" = ["RUF001", "SIM105"]
 "unittests/**" = ["B023", "B904", "E731", "SIM300"]
 "unittests/helpers/test_dot_helper.py" = ["B904", "E501"]
 "yobx/builder/light/*" = ["PYI032", "UP037"]
