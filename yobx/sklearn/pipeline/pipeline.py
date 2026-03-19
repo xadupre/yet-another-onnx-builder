@@ -57,26 +57,29 @@ def sklearn_pipeline(
         step_node_name = f"{name}__{step_name}"
         is_container = isinstance(step, (Pipeline, ColumnTransformer, FeatureUnion))
         if function_options and function_options.export_as_function and not is_container:
-            _wrap_step_as_function(
-                g,  # type: ignore
-                function_options,
-                step,
-                current_input,
-                output_names,
-                fct,
-                step_node_name,
-            )
+            with g.prefix_name_context(step_node_name):
+                _wrap_step_as_function(
+                    g,  # type: ignore
+                    function_options,
+                    step,
+                    current_input,
+                    output_names,
+                    fct,
+                    step_node_name,
+                )
         elif is_container:
-            fct(
-                g,
-                sts,
-                output_names,
-                step,
-                *current_input,
-                name=step_node_name,
-                function_options=function_options,
-            )
+            with g.prefix_name_context(step_node_name):
+                fct(
+                    g,
+                    sts,
+                    output_names,
+                    step,
+                    *current_input,
+                    name=step_node_name,
+                    function_options=function_options,
+                )
         else:
-            fct(g, sts, output_names, step, *current_input, name=step_node_name)
+            with g.prefix_name_context(step_node_name):
+                fct(g, sts, output_names, step, *current_input, name=step_node_name)
         current_input = output_names
     return current_input[0] if len(current_input) == 1 else tuple(current_input)

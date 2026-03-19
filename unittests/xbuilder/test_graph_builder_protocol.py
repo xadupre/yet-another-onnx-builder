@@ -85,6 +85,7 @@ class TestGraphBuilderSatisfiesProtocol(ExtTestCase):
             "set_opset",
             "has_opset",
             "unique_name",
+            "prefix_name_context",
             "has_name",
             "has_type",
             "get_type",
@@ -116,6 +117,36 @@ class TestGraphBuilderSatisfiesProtocol(ExtTestCase):
         n1 = g.unique_name("tmp")
         n2 = g.unique_name("tmp")
         self.assertNotEqual(n1, n2)
+
+    def test_prefix_name_context_prefixes_unique_name(self):
+        g = GraphBuilder(18, ir_version=9)
+        with g.prefix_name_context("mystep"):
+            name = g.unique_name("var")
+        self.assertEqual(name, "mystep__var")
+
+    def test_prefix_name_context_restores_after_exit(self):
+        g = GraphBuilder(18, ir_version=9)
+        with g.prefix_name_context("mystep"):
+            pass
+        name = g.unique_name("var")
+        self.assertEqual(name, "var")
+
+    def test_prefix_name_context_nested(self):
+        g = GraphBuilder(18, ir_version=9)
+        with g.prefix_name_context("outer"):
+            with g.prefix_name_context("inner"):
+                name = g.unique_name("var")
+        self.assertEqual(name, "outer__inner__var")
+
+    def test_prefix_name_context_restores_on_exception(self):
+        g = GraphBuilder(18, ir_version=9)
+        try:
+            with g.prefix_name_context("mystep"):
+                raise RuntimeError("test")
+        except RuntimeError:
+            pass
+        name = g.unique_name("var")
+        self.assertEqual(name, "var")
 
     def test_get_opset(self):
         g = GraphBuilder(18, ir_version=9)

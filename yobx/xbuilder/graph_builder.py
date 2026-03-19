@@ -175,6 +175,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     - `_unique_names`: used to create unused result names
     - `_unique_node_names`: used to create unused node names
+    - `_prefix_stack`: stack of active name prefixes pushed by :meth:`prefix_name_context`
     - `_known_names`: set of existing results names
     - `_known_shapes: Dict[str, DYNAMIC_SHAPE]`: declared shapes
     - `_known_types: Dict[str, int]`: declared element types
@@ -367,6 +368,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._known_sequences: Dict[str, Dict[str, Any]] = {}
         self._unique_names: Set[str] = set()
         self._unique_node_names: Set[str] = set()
+        self._prefix_stack: List[str] = []
         self._known_value_shape: Dict[str, Any] = {}
         self._dynamic_examples: Dict[str, Any] = {}
         self._parameter_renaming: Dict[str, str] = {}
@@ -2379,8 +2381,27 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._unique_names.add(sug)
         return sug
 
+    @contextlib.contextmanager
+    def prefix_name_context(self, prefix: str) -> Generator:
+        """Context manager that pushes *prefix* onto the prefix stack.
+
+        While active, :meth:`unique_name` prepends the joined stack to every
+        requested name so that all tensor names produced inside the block are
+        scoped to the current context.  The prefix is removed when the block
+        exits, even if an exception is raised.
+
+        :param prefix: scope prefix to push (e.g. a pipeline step name)
+        """
+        self._prefix_stack.append(prefix)
+        try:
+            yield
+        finally:
+            self._prefix_stack.pop()
+
     def unique_name(self, prefix: str) -> str:
         "Returns a unique result name."
+        if self._prefix_stack:
+            prefix = "__".join(self._prefix_stack) + "__" + prefix
         if prefix in self._unique_names:
             i = 2
             sug = f"{prefix}2"
