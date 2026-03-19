@@ -33,7 +33,7 @@ class TestSklearnRegister(ExtTestCase):
             if "." not in f and "__" not in f and not f.startswith("test_")
         }
         self.assertNotEmpty(subs)
-        for f in {"_imblearn", "_xgboost", "_lightgbm", "_category_encoders"}:
+        for f in {"_imblearn", "_xgboost", "_lightgbm", "_category_encoders", "_sksurv"}:
             if f in subfolders:
                 subfolders.add(f[1:])
         not_here = subs - subfolders & subs
@@ -61,6 +61,7 @@ class TestSklearnRegister(ExtTestCase):
             "xgboost": (5, 5),
             "lightgbm": (3, 3),
             "category_encoders": (10, 20),
+            "sksurv": (10, 30),
         }
         for lib, (mine, maxe) in boundaries.items():
             with self.subTest(lib=lib):
