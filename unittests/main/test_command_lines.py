@@ -132,9 +132,7 @@ class TestCommandLines(ExtTestCase):
 
     def test_parser_render_gallery_args(self):
         parser = get_parser_render_gallery()
-        args = parser.parse_args(
-            ["docs/examples/core/plot_dot_graph.py", "-v", "1"]
-        )
+        args = parser.parse_args(["docs/examples/core/plot_dot_graph.py", "-v", "1"])
         self.assertEqual(args.inputs, ["docs/examples/core/plot_dot_graph.py"])
         self.assertFalse(hasattr(args, "output"))
         self.assertEqual(args.verbose, 1)

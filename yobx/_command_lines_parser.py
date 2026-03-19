@@ -644,18 +644,9 @@ def get_parser_render_gallery() -> ArgumentParser:
         formatter_class=RawTextHelpFormatter,
     )
     parser.add_argument(
-        "inputs",
-        nargs="+",
-        help="sphinx-gallery Python file(s) to convert to RST.",
+        "inputs", nargs="+", help="sphinx-gallery Python file(s) to convert to RST."
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        type=int,
-        default=0,
-        required=False,
-        help="verbosity",
-    )
+    parser.add_argument("-v", "--verbose", type=int, default=0, required=False, help="verbosity")
     return parser
 
 
