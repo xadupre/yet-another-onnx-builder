@@ -20,6 +20,49 @@ from .xla_call_module_helper import (  # noqa: F401
 from .xla_call_module_parsing import parse_mlir  # noqa: F401
 
 
+def _process_constant_layer(
+    layer: dict,
+    local_results: Dict[str, str],
+    g: GraphBuilderExtendedProtocol,
+) -> None:
+    """Create an ONNX initializer for a ``constant`` StableHLO layer.
+
+    Updates *local_results* in-place, mapping the layer's result id to the
+    generated initializer name.
+
+    :param layer: layer dict with keys ``id``, ``shape``, and ``dense_content``.
+    :param local_results: mutable id→tensor-name mapping for the current scope.
+    :param g: ONNX graph builder.
+    """
+    const_name = layer["id"]
+    type_str = layer.get("shape", "")
+    dense_content = layer.get("dense_content", "")
+    shape, dtype = _parse_tensor_type(type_str)
+    if shape is None or dtype is None:
+        # Fall back to float32 scalar
+        shape, dtype = (), np.float32
+    try:
+        np_val = _parse_dense_value(dense_content, shape, dtype)
+    except (ValueError, Exception) as exc:
+        warnings.warn(
+            f"XlaCallModule: failed to parse dense constant "
+            f"{const_name!r}: {exc}. Using zero fallback.",
+            stacklevel=2,
+        )
+        np_val = np.array(0, dtype=dtype)
+    # Generate a unique name if the candidate is already taken
+    # (e.g. when inlining a private function whose constants share
+    # IDs with the outer-scope constants).
+    candidate = const_name
+    _dedup_idx = 0
+    while g.has_name(candidate):
+        _dedup_idx += 1
+        candidate = f"{const_name}_{_dedup_idx}_dup"
+    const_name = candidate
+    g.make_initializer(const_name, np_val, source="XlaCallModule.constant")
+    local_results[layer["id"]] = const_name
+
+
 def _process_layers(
     layer_list: List[dict],
     local_results: Dict[str, str],
@@ -49,34 +92,7 @@ def _process_layers(
             continue
 
         if op_type == "constant":
-            # Create an ONNX initializer from the dense attribute.
-            const_name = layer["id"]
-            type_str = layer.get("shape", "")
-            dense_content = layer.get("dense_content", "")
-            shape, dtype = _parse_tensor_type(type_str)
-            if shape is None or dtype is None:
-                # Fall back to float32 scalar
-                shape, dtype = (), np.float32
-            try:
-                np_val = _parse_dense_value(dense_content, shape, dtype)
-            except (ValueError, Exception) as exc:
-                warnings.warn(
-                    f"XlaCallModule: failed to parse dense constant "
-                    f"{const_name!r}: {exc}. Using zero fallback.",
-                    stacklevel=2,
-                )
-                np_val = np.array(0, dtype=dtype)
-            # Generate a unique name if the candidate is already taken
-            # (e.g. when inlining a private function whose constants share
-            # IDs with the outer-scope constants).
-            candidate = const_name
-            _dedup_idx = 0
-            while g.has_name(candidate):
-                _dedup_idx += 1
-                candidate = f"{const_name}_{_dedup_idx}_dup"
-            const_name = candidate
-            g.make_initializer(const_name, np_val, source="XlaCallModule.constant")
-            local_results[layer["id"]] = const_name
+            _process_constant_layer(layer, local_results, g)
             continue
 
         if op_type in ("broadcast_in_dim", "dynamic_broadcast_in_dim"):
