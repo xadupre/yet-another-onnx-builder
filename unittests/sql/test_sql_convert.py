@@ -7,7 +7,7 @@ import numpy as np
 
 from yobx.ext_test_case import ExtTestCase, has_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.sql import sql_to_onnx
+from yobx.sql import sql_to_onnx, sql_to_onnx_graph
 
 
 def _ort_run(onx, feeds):
@@ -274,6 +274,115 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
         onx = sql_to_onnx("SELECT SUM(a) FROM t", dtypes)
         op_types = {n.op_type for n in onx.graph.node}
         self.assertIn("ReduceSum", op_types)
+
+    def test_builder_cls_used(self):
+        """builder_cls should be instantiated instead of the default GraphBuilder."""
+        from onnx import ModelProto
+        from yobx.xbuilder import GraphBuilder
+
+        instantiated = []
+
+        class TrackingBuilder(GraphBuilder):
+            def __init__(self, *args, **kwargs):
+                instantiated.append(True)
+                super().__init__(*args, **kwargs)
+
+        dtypes = {"a": np.float32}
+        onx = sql_to_onnx("SELECT a FROM t", dtypes, builder_cls=TrackingBuilder)
+        self.assertIsInstance(onx, ModelProto)
+        self.assertEqual(len(instantiated), 1, "TrackingBuilder was not instantiated")
+
+
+class TestSqlToOnnxGraph(ExtTestCase):
+    """Tests for :func:`~yobx.sql.sql_to_onnx_graph`."""
+
+    def _build_and_run(self, query, dtypes, feeds, *, right_dtypes=None):
+        """Call sql_to_onnx_graph, finalise the model, run with reference evaluator."""
+        from yobx.xbuilder import GraphBuilder
+
+        g = GraphBuilder(18, ir_version=10)
+        out_names = sql_to_onnx_graph(g, None, [], query, dtypes, right_input_dtypes=right_dtypes)
+        onx, _ = g.to_onnx(return_optimize_report=True)
+        ref = ExtendedReferenceEvaluator(onx)
+        return out_names, ref.run(None, feeds)
+
+    def test_returns_list_of_output_names(self):
+        dtypes = {"a": np.float32, "b": np.float32}
+        from yobx.xbuilder import GraphBuilder
+
+        g = GraphBuilder(18, ir_version=10)
+        out_names = sql_to_onnx_graph(g, None, [], "SELECT a, b FROM t", dtypes)
+        self.assertIsInstance(out_names, list)
+        self.assertEqual(len(out_names), 2)
+
+    def test_simple_select(self):
+        dtypes = {"a": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        out_names, (out,) = self._build_and_run("SELECT a FROM t", dtypes, {"a": a})
+        self.assertEqual(len(out_names), 1)
+        self.assertEqualArray(out, a)
+
+    def test_arithmetic_expression(self):
+        dtypes = {"a": np.float32, "b": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        _, (total,) = self._build_and_run(
+            "SELECT a + b AS total FROM t", dtypes, {"a": a, "b": b}
+        )
+        self.assertEqualArray(total, a + b, atol=1e-6)
+
+    def test_where_filter(self):
+        dtypes = {"a": np.float32}
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        _, (out,) = self._build_and_run("SELECT a FROM t WHERE a > 0", dtypes, {"a": a})
+        self.assertEqualArray(out, np.array([1.0, 3.0], dtype=np.float32))
+
+    def test_existing_input_reused(self):
+        """sql_to_onnx_graph must not duplicate an input already in the builder."""
+        from onnx import TensorProto
+        from yobx.xbuilder import GraphBuilder
+
+        g = GraphBuilder(18, ir_version=10)
+        g.make_tensor_input("a", TensorProto.FLOAT, ("N",))
+        sql_to_onnx_graph(g, None, [], "SELECT a FROM t", {"a": np.float32})
+        onx, _ = g.to_onnx(return_optimize_report=True)
+        # Exactly one input named "a"
+        input_names = [inp.name for inp in onx.graph.input]
+        self.assertEqual(input_names.count("a"), 1)
+
+    def test_result_matches_sql_to_onnx(self):
+        """sql_to_onnx_graph result must be numerically identical to sql_to_onnx."""
+        dtypes = {"a": np.float32, "b": np.float32}
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        feeds = {"a": a, "b": b}
+        query = "SELECT a + b AS total FROM t WHERE a > 0"
+
+        onx_high = sql_to_onnx(query, dtypes)
+        (high_out,) = ExtendedReferenceEvaluator(onx_high).run(None, feeds)
+
+        _, (low_out,) = self._build_and_run(query, dtypes, feeds)
+        self.assertEqualArray(high_out, low_out, atol=1e-6)
+
+    def test_output_names_from_alias(self):
+        """Output tensor names should reflect SELECT aliases when they don't conflict."""
+        from yobx.xbuilder import GraphBuilder
+
+        g = GraphBuilder(18, ir_version=10)
+        dtypes = {"a": np.float32, "b": np.float32}
+        out_names = sql_to_onnx_graph(g, None, [], "SELECT a + b AS total FROM t", dtypes)
+        # "total" is the alias and doesn't collide with any input
+        self.assertEqual(out_names, ["total"])
+
+    def test_output_names_fallback_on_collision(self):
+        """When the alias conflicts with an input name, fall back to indexed name."""
+        from yobx.xbuilder import GraphBuilder
+
+        g = GraphBuilder(18, ir_version=10)
+        dtypes = {"a": np.float32}
+        out_names = sql_to_onnx_graph(g, None, [], "SELECT a FROM t", dtypes)
+        # "a" is already registered as an input, so must fall back to "output_0"
+        self.assertEqual(out_names, ["output_0"])
 
 
 if __name__ == "__main__":
