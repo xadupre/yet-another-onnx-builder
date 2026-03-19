@@ -24,8 +24,9 @@ so the example runs without a GPU.
 
 Run with pre-trained weights (default: random initialisation, config-only download)::
 
-    python plot_llm_to_onnx.py           # random weights — fast, no large download
-    python plot_llm_to_onnx.py --trained # full pre-trained weights from HuggingFace
+    python plot_llm_to_onnx.py                        # random weights — fast, no large download
+    python plot_llm_to_onnx.py --trained              # full pre-trained weights from HuggingFace
+    python plot_llm_to_onnx.py --num-hidden-layers 2  # use only 2 transformer layers
 
 When ``--trained`` is *not* given the model is built from the config with random
 weights via :func:`transformers.AutoModelForCausalLM.from_config`.
@@ -33,6 +34,10 @@ Only the tokenizer and the architecture config are downloaded (~few KB),
 which makes this mode useful for quick testing and CI.
 When ``--trained`` is given the full checkpoint is downloaded (~hundreds of MB)
 and the exported ONNX model produces meaningful text.
+
+``--num-hidden-layers`` overrides ``config.num_hidden_layers`` before the model
+is instantiated, which shrinks the number of transformer decoder blocks.
+This is useful for reducing memory use and export time during development.
 """
 
 # %%
@@ -56,12 +61,16 @@ from yobx.torch import (
 )
 
 # %%
-# Command-line argument
-# ---------------------
+# Command-line arguments
+# ----------------------
 #
 # ``--trained`` downloads the full pre-trained checkpoint; without it a randomly
 # initialised model is built from the architecture config only (much faster and
 # suitable for testing the export pipeline without a large download).
+#
+# ``--num-hidden-layers`` overrides the number of transformer decoder blocks in
+# the config before the model is built.  Use a small value (e.g. ``2``) to
+# speed up export and reduce memory during development.
 
 parser = argparse.ArgumentParser(description="Export a HuggingFace LLM to ONNX.")
 parser.add_argument(
@@ -74,6 +83,17 @@ parser.add_argument(
         "(no weight download, suitable for CI)."
     ),
 )
+parser.add_argument(
+    "--num-hidden-layers",
+    type=int,
+    default=None,
+    metavar="LAYERS",
+    help=(
+        "Override config.num_hidden_layers to N before building the model. "
+        "Reduces the number of transformer decoder blocks, which lowers memory "
+        "use and speeds up export. Defaults to the value in the model config."
+    ),
+)
 # parse_known_args avoids failures when sphinx-gallery passes extra arguments.
 args, _ = parser.parse_known_args(sys.argv[1:])
 
@@ -82,21 +102,35 @@ args, _ = parser.parse_known_args(sys.argv[1:])
 # ------------------------
 #
 # The tokenizer is always fetched from HuggingFace (small download).
+# The architecture config is fetched next; if ``--num-hidden-layers`` was given
+# the corresponding config attribute is overridden before the model is built.
 # The model is either loaded with pre-trained weights (``--trained``) or
-# initialised with random weights from the config alone.
+# initialised with random weights from the (possibly modified) config.
 
 MODEL_NAME = "arnir0/Tiny-LLM"
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+config = AutoConfig.from_pretrained(MODEL_NAME)
+
+if args.num_hidden_layers is not None:
+    print(
+        f"Overriding num_hidden_layers: "
+        f"{config.num_hidden_layers} -> {args.num_hidden_layers}"
+    )
+    config.num_hidden_layers = args.num_hidden_layers
 
 if args.trained:
     print(f"Loading pre-trained weights for {MODEL_NAME!r} ...")
-    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+    # ignore_mismatched_sizes=True is required when num_hidden_layers has been
+    # reduced: the checkpoint contains weights for all original layers, and
+    # without this flag from_pretrained would raise an error on the missing keys.
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME, config=config, ignore_mismatched_sizes=True
+    )
 else:
     print(f"Building randomly initialised model from config for {MODEL_NAME!r} ...")
-    config = AutoConfig.from_pretrained(MODEL_NAME)
     model = AutoModelForCausalLM.from_config(config)
 
-print(f"  trained={args.trained}  #params={sum(p.numel() for p in model.parameters()):,}")
+print(f"  trained={args.trained}  num_hidden_layers={config.num_hidden_layers}  #params={sum(p.numel() for p in model.parameters()):,}")
 
 # %%
 # Observe forward calls during generation
