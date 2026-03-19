@@ -328,7 +328,6 @@ def sklearn_quantile_transformer(
             outputs=outputs,
         )
 
-    assert isinstance(res, str)
     g.set_type_shape_unary_op(res, X)
     return res
 

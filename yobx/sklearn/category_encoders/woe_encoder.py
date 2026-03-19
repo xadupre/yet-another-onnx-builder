@@ -170,6 +170,5 @@ def category_encoders_woe_encoder(
     else:
         res = g.op.Concat(*col_tensors, axis=1, name=name, outputs=outputs)
 
-    assert isinstance(res, str)
     g.set_type_shape_unary_op(res, X)
     return res

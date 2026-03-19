@@ -73,6 +73,5 @@ def sklearn_sparse_pca(
     W = W.astype(dtype)
 
     res = g.op.MatMul(centered, W, name=name, outputs=outputs)
-    assert isinstance(res, str)  # type happiness
     g.set_type(res, itype)
     return res

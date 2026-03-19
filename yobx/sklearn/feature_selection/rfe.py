@@ -17,7 +17,6 @@ def _sklearn_rfe_transform(
     """Shared implementation: select fitted feature indices via Gather."""
     indices = estimator.get_support(indices=True).astype(np.int64)
     res = g.op.Gather(X, indices, axis=1, name=name, outputs=outputs)
-    assert isinstance(res, str)
     return res
 
 

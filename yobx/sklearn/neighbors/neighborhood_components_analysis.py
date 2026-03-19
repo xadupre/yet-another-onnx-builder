@@ -48,6 +48,5 @@ def sklearn_neighborhood_components_analysis(
     # components_ has shape (n_components, n_features); we need (n_features, n_components).
     components_T = estimator.components_.T.astype(dtype)
     res = g.op.MatMul(X, components_T, name=name, outputs=outputs)
-    assert isinstance(res, str)
     g.set_type(res, itype)
     return res

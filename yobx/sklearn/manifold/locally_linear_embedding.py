@@ -280,7 +280,6 @@ def sklearn_locally_linear_embedding(
         result_3d, np.array([1], dtype=np.int64), name=name, outputs=outputs
     )  # (N, n_components)
 
-    assert isinstance(res, str)
     g.set_type(res, itype)
     if g.has_shape(X):
         batch_dim = g.get_shape(X)[0]

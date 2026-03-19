@@ -564,7 +564,6 @@ def sklearn_gradient_boosting_classifier(
         proba_raw = g.op.Softmax(raw_typed, axis=1, name=f"{name}_softmax")
 
     proba = g.op.Identity(proba_raw, name=f"{name}_proba", outputs=outputs[1:])
-    assert isinstance(proba, str)
 
     # Predicted label: ArgMax over probabilities.
     label_idx = g.op.ArgMax(proba_raw, axis=1, keepdims=0, name=f"{name}_argmax")
@@ -583,5 +582,4 @@ def sklearn_gradient_boosting_classifier(
         )
         g.set_type(label, onnx.TensorProto.STRING)
 
-    assert isinstance(label, str)
     return label, proba

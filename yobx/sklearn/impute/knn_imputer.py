@@ -314,6 +314,5 @@ def sklearn_knn_imputer(  # noqa: C901
     # only when X is NaN (Where keeps original X for non-NaN positions).
     res = g.op.Where(mask_X_node, imputed, X, name=name, outputs=outputs)
 
-    assert isinstance(res, str)  # type happiness
     g.set_type_shape_unary_op(res, X)
     return res

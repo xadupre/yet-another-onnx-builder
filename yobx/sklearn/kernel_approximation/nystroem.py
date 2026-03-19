@@ -165,7 +165,6 @@ def sklearn_nystroem(
     # ── Step 2: Project using normalization_.T ───────────────────────────────
     res = g.op.MatMul(K, normalization_T, name=name, outputs=outputs)
 
-    assert isinstance(res, str)  # type happiness
     g.set_type(res, itype)
     if g.has_shape(X):
         batch_dim = g.get_shape(X)[0]

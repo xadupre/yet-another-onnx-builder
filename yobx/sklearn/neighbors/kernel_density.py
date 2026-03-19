@@ -306,6 +306,5 @@ def sklearn_kernel_density(
     # ── Step 3: Subtract log normalization constant ───────────────────────────
     result = g.op.Sub(log_sum, log_norm_arr, name=name, outputs=outputs[:1])
 
-    assert isinstance(result, str)
     g.set_type(result, itype)
     return result

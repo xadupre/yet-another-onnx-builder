@@ -82,7 +82,6 @@ def sklearn_pls_regression(
     else:
         res = g.op.Identity(y_pred, name=name, outputs=outputs)
 
-    assert isinstance(res, str)
     g.set_type(res, itype)
     if g.has_shape(X):
         batch_dim = g.get_shape(X)[0]

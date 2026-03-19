@@ -43,6 +43,5 @@ def sklearn_binarizer(
     mask = g.op.Greater(X, threshold, name=f"{name}_greater")
     res = g.op.Cast(mask, to=itype, name=name, outputs=outputs)
 
-    assert isinstance(res, str)  # type happiness
     g.set_type_shape_unary_op(res, X)
     return res

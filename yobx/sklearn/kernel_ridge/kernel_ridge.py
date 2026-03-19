@@ -231,6 +231,5 @@ def sklearn_kernel_ridge(
         # Multi-target: (N, M) @ (M, n_targets) → (N, n_targets)
         result = g.op.MatMul(K, dual_coef, name=name, outputs=outputs[:1])
 
-    assert isinstance(result, str)
     g.set_type(result, itype)
     return result

@@ -77,7 +77,6 @@ def sklearn_logistic_regression(
     else:
         proba = g.op.Softmax(decision, axis=1, name=name, outputs=outputs[1:])
 
-    assert isinstance(proba, str)  # type happiness
     label_idx = g.op.ArgMax(proba, axis=1, keepdims=0, name=name)
     label_idx_cast = g.op.Cast(label_idx, to=onnx.TensorProto.INT64, name=name)
 
@@ -86,13 +85,11 @@ def sklearn_logistic_regression(
         label = g.op.Gather(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
-        assert isinstance(label, str)  # type happiness
         g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
-        assert isinstance(label, str)  # type happiness
         g.set_type(label, onnx.TensorProto.STRING)
     return label, proba

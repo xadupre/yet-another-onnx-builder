@@ -119,6 +119,5 @@ def sklearn_linear_regressor(
         coef = coef.reshape(1, -1)
 
     result = g.op.Gemm(X, coef, intercept, transB=1, name=name, outputs=outputs)
-    assert isinstance(result, str)
     g.set_type(result, itype)
     return result

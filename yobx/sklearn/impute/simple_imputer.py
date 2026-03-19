@@ -82,6 +82,5 @@ def sklearn_simple_imputer(
 
     res = g.op.Where(mask, stats, X, name=name, outputs=outputs)
 
-    assert isinstance(res, str)  # type happiness
     g.set_type_shape_unary_op(res, X)
     return res

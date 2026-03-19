@@ -341,7 +341,6 @@ def sklearn_knn_classifier(
         one_hot_3d, np.array([1], dtype=np.int64), keepdims=0, name=f"{name}_votes"
     )  # (N, n_classes)
     # Ensure float type is propagated for downstream Div node.
-    assert isinstance(vote_counts, str)
     g.set_type(vote_counts, onnx.TensorProto.FLOAT)
 
     # 6. Predicted class index: (N,) int64
@@ -356,7 +355,6 @@ def sklearn_knn_classifier(
     labels = g.op.Gather(
         classes_init, class_idx, axis=0, name=f"{name}_labels", outputs=outputs[:1]
     )
-    assert isinstance(labels, str)
     out_itype = (
         onnx.TensorProto.INT64
         if np.issubdtype(classes_arr.dtype, np.integer)
@@ -371,7 +369,6 @@ def sklearn_knn_classifier(
             vote_counts, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_total"
         )  # (N, 1)
         probabilities = g.op.Div(vote_counts, total, name=f"{name}_proba", outputs=outputs[1:2])
-        assert isinstance(probabilities, str)
         g.set_type(probabilities, onnx.TensorProto.FLOAT)
         return labels, probabilities
 
@@ -457,7 +454,6 @@ def sklearn_knn_regressor(
         name=f"{name}_mean",
         outputs=outputs[:1],
     )
-    assert isinstance(predictions, str)
     g.set_type(predictions, itype)
 
     return predictions

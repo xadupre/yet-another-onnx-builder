@@ -70,6 +70,5 @@ def sklearn_min_max_scaler(
         scaled = g.op.Mul(normalized, feature_width, name=name)
         res = g.op.Add(scaled, feature_offset, name=name, outputs=outputs)
 
-    assert isinstance(res, str)  # type happiness
     g.set_type_shape_unary_op(res, X)
     return res

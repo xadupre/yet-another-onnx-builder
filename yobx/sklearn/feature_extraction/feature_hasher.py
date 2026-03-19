@@ -157,5 +157,4 @@ def sklearn_feature_hasher(
     if g.has_shape(X):
         g.set_shape(res, (g.get_shape(X)[0], n_features))
 
-    assert isinstance(res, str)
     return res

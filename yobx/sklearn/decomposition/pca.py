@@ -53,6 +53,5 @@ def sklearn_pca(
     # components_ has shape (n_components, n_features); we need (n_features, n_components).
     components_T = estimator.components_.T.astype(dtype)
     res = g.op.MatMul(centered, components_T, name=name, outputs=outputs)
-    assert isinstance(res, str)  # type happiness
     g.set_type(res, itype)
     return res

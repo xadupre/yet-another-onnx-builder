@@ -193,6 +193,5 @@ def sklearn_latent_dirichlet_allocation(
         gamma, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_final_sum"
     )
     res = g.op.Div(gamma, gamma_sum, name=name, outputs=outputs)
-    assert isinstance(res, str)
     g.set_type(res, itype)
     return res

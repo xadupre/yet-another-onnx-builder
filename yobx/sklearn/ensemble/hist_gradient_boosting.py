@@ -500,7 +500,6 @@ def sklearn_hgb_classifier(
 
     # Rename to desired output name.
     proba = g.op.Identity(proba_raw, name=f"{name}_proba", outputs=outputs[1:])
-    assert isinstance(proba, str)
 
     # ------------------------------------------------------------------ #
     # Predicted label: ArgMax over probabilities.                         #
@@ -521,5 +520,4 @@ def sklearn_hgb_classifier(
         )
         g.set_type(label, onnx.TensorProto.STRING)
 
-    assert isinstance(label, str)
     return label, proba

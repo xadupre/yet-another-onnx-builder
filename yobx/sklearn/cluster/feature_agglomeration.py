@@ -115,6 +115,5 @@ def sklearn_feature_agglomeration(
             "Supported functions are numpy.mean, numpy.max, and numpy.min."
         )
 
-    assert isinstance(out, str)
     g.set_type(out, itype)
     return out

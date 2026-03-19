@@ -79,5 +79,4 @@ def sklearn_min_cov_det(
         name=f"{name}_mahal_sq",
         outputs=outputs,
     )  # (N,)
-    assert isinstance(mahal_sq, str)
     return mahal_sq

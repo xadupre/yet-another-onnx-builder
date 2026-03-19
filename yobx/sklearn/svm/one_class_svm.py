@@ -135,7 +135,6 @@ def sklearn_one_class_svm(
             scores = scores_f32
         zero = np.array([0], dtype=np.float32)
 
-    assert isinstance(scores, str)
 
     # label = 1 if decision_function >= 0 else -1
     mask = g.op.GreaterOrEqual(scores, zero, name=f"{name}_mask")
@@ -146,7 +145,6 @@ def sklearn_one_class_svm(
         name=f"{name}_label",
         outputs=outputs[:1],
     )
-    assert isinstance(label, str)
 
     if emit_scores:
         return label, scores

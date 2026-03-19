@@ -136,10 +136,8 @@ def sklearn_tuned_threshold_classifier_cv(
         )
         g.set_type(label, onnx.TensorProto.STRING)
 
-    assert isinstance(label, str)
 
     # Probabilities are unchanged (delegate to inner estimator's predict_proba).
     proba = g.op.Identity(probas, name=f"{name}_proba", outputs=outputs[1:])
-    assert isinstance(proba, str)
 
     return label, proba

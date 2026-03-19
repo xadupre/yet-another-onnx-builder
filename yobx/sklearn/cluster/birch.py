@@ -136,7 +136,6 @@ def sklearn_birch(
         distances = g.op.Identity(
             distances_clipped, name=f"{name}_distances", outputs=outputs[1:2]
         )
-        assert isinstance(distances, str)
         g.set_type(distances, itype)
     else:
         distances = distances_clipped
@@ -151,7 +150,6 @@ def sklearn_birch(
     labels = g.op.Cast(
         label_idx, to=onnx.TensorProto.INT64, name=f"{name}_cast", outputs=outputs[:1]
     )
-    assert isinstance(labels, str)
     g.set_type(labels, onnx.TensorProto.INT64)
 
     if n_outputs >= 2:

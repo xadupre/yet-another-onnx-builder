@@ -201,7 +201,6 @@ def category_encoders_polynomial_encoder(
     else:
         res = g.op.Concat(*col_tensors, axis=1, name=name, outputs=outputs)
 
-    assert isinstance(res, str)
     g.set_type(res, itype)
     if g.has_shape(X):
         shape = g.get_shape(X)

@@ -166,7 +166,6 @@ def sklearn_quadratic_discriminant_analysis(
 
     # Softmax → probabilities
     proba = g.op.Softmax(dec, axis=1, name=name, outputs=outputs[1:])
-    assert isinstance(proba, str)
 
     # Label: ArgMax → Gather(classes_)
     label_idx = g.op.ArgMax(proba, axis=1, keepdims=0, name=name)
@@ -177,14 +176,12 @@ def sklearn_quadratic_discriminant_analysis(
         label = g.op.Gather(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
         g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
         g.set_type(label, onnx.TensorProto.STRING)
 
     return label, proba

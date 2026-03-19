@@ -176,7 +176,6 @@ def sklearn_isomap(
     # ── Step 6: Project onto scaled eigenvectors ────────────────────────────
     res = g.op.MatMul(K_centered, scaled_alphas, name=name, outputs=outputs)
 
-    assert isinstance(res, str)  # type happiness
     g.set_type(res, itype)
     if g.has_shape(X):
         batch_dim = g.get_shape(X)[0]

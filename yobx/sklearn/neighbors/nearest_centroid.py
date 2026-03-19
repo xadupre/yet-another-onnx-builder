@@ -195,7 +195,6 @@ def sklearn_nearest_centroid(
     labels = g.op.Gather(
         classes_init, class_idx, axis=0, name=f"{name}_labels", outputs=outputs[:1]
     )
-    assert isinstance(labels, str)
     out_itype = (
         onnx.TensorProto.INT64
         if np.issubdtype(classes_arr.dtype, np.integer)
@@ -219,7 +218,6 @@ def sklearn_nearest_centroid(
     s_exp = g.op.Exp(s_shifted, name=f"{name}_sexp")
     s_sum = g.op.ReduceSum(s_exp, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_ssum")
     probabilities = g.op.Div(s_exp, s_sum, name=f"{name}_proba_out", outputs=outputs[1:2])
-    assert isinstance(probabilities, str)
     g.set_type(probabilities, itype)
 
     return labels, probabilities

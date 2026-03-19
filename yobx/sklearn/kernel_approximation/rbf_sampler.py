@@ -70,7 +70,6 @@ def sklearn_rbf_sampler(
     # * sqrt(2 / n_components)
     res = g.op.Mul(cosined, scale, name=name, outputs=outputs)
 
-    assert isinstance(res, str)  # type happiness
     g.set_type(res, itype)
     if g.has_shape(X):
         batch_dim = g.get_shape(X)[0]

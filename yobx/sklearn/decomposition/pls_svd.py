@@ -50,7 +50,6 @@ def sklearn_pls_svd(
     x_weights = estimator.x_weights_.astype(dtype)
     res = g.op.MatMul(scaled, x_weights, name=name, outputs=outputs)
 
-    assert isinstance(res, str)
     g.set_type(res, itype)
     if g.has_shape(X):
         batch_dim = g.get_shape(X)[0]

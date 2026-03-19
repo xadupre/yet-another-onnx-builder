@@ -437,7 +437,5 @@ def sklearn_calibrated_classifier_cv(
         )
         g.set_type(label, onnx.TensorProto.STRING)
 
-    assert isinstance(label, str)
     proba = g.op.Identity(avg_proba, name=f"{name}_proba", outputs=outputs[1:])
-    assert isinstance(proba, str)
     return label, proba

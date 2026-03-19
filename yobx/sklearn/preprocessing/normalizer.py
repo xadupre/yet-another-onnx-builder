@@ -68,6 +68,5 @@ def sklearn_normalizer(
 
     res = g.op.Div(X, safe_norms, name=name, outputs=outputs)
 
-    assert isinstance(res, str)  # type happiness
     g.set_type_shape_unary_op(res, X)
     return res

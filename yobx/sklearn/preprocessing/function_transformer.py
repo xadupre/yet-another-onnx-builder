@@ -53,7 +53,6 @@ def sklearn_function_transformer(
     # ----------------------------------------------------------------
     if estimator.func is None:
         res = g.op.Identity(X, outputs=outputs, name=name)
-        assert isinstance(res, str)
         g.set_type_shape_unary_op(res, X)
         return res
 
@@ -63,6 +62,5 @@ def sklearn_function_transformer(
     # ----------------------------------------------------------------
     kw_args = estimator.kw_args
     res = trace_numpy_function(g, sts, outputs, estimator.func, [X], name=name, kw_args=kw_args)
-    assert isinstance(res, str)
     g.set_type_shape_unary_op(res, X)
     return res

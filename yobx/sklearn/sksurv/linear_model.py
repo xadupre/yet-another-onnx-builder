@@ -59,10 +59,8 @@ def sklearn_ipc_ridge(
 
     # Linear part: X @ coef.T + intercept  →  (N, 1)
     linear = g.op.Gemm(X, coef, intercept, transB=1, name=f"{name}_gemm")
-    assert isinstance(linear, str)
 
     # Exponential transformation: exp(linear)  →  (N, 1)
     result = g.op.Exp(linear, name=f"{name}_exp", outputs=outputs)
-    assert isinstance(result, str)
     g.set_type(result, itype)
     return result

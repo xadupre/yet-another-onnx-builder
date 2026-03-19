@@ -42,6 +42,5 @@ def sklearn_max_abs_scaler(
     max_abs = estimator.max_abs_.astype(dtype)
 
     res = g.op.Div(X, max_abs, name=name, outputs=outputs)
-    assert isinstance(res, str)  # type happiness
     g.set_type_shape_unary_op(res, X)
     return res
