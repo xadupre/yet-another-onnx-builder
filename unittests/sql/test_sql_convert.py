@@ -385,5 +385,91 @@ class TestSqlToOnnxGraph(ExtTestCase):
         self.assertEqual(out_names, ["output_0"])
 
 
+class TestSqlToOnnxSubquery(ExtTestCase):
+    """Tests for subquery (``SELECT … FROM (SELECT …)``) conversion."""
+
+    def _run(self, query, dtypes, feeds):
+        """Convert *query*, run with reference evaluator and (when available) ORT."""
+        onx = sql_to_onnx(query, dtypes)
+        ref = ExtendedReferenceEvaluator(onx)
+        ref_outputs = ref.run(None, feeds)
+        if has_onnxruntime():
+            ort_outputs = _ort_run(onx, feeds)
+            self.assertEqual(len(ref_outputs), len(ort_outputs))
+            for ref_out, ort_out in zip(ref_outputs, ort_outputs):
+                np.testing.assert_allclose(ort_out, ref_out, rtol=1e-5, atol=1e-6)
+        return ref_outputs
+
+    def test_subquery_passthrough_single_column(self):
+        dtypes = {"a": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out,) = self._run("SELECT a FROM (SELECT a FROM t)", dtypes, {"a": a})
+        self.assertEqualArray(out, a)
+
+    def test_subquery_passthrough_multiple_columns(self):
+        dtypes = {"a": np.float32, "b": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        out_a, out_b = self._run(
+            "SELECT a, b FROM (SELECT a, b FROM t)", dtypes, {"a": a, "b": b}
+        )
+        self.assertEqualArray(out_a, a)
+        self.assertEqualArray(out_b, b)
+
+    def test_subquery_inner_expression(self):
+        dtypes = {"a": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out,) = self._run("SELECT a FROM (SELECT a + 1 AS a FROM t)", dtypes, {"a": a})
+        self.assertEqualArray(out, a + 1, atol=1e-6)
+
+    def test_subquery_inner_where(self):
+        dtypes = {"a": np.float32}
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        (out,) = self._run(
+            "SELECT a FROM (SELECT a FROM t WHERE a > 0)", dtypes, {"a": a}
+        )
+        self.assertEqualArray(out, np.array([1.0, 3.0], dtype=np.float32))
+
+    def test_subquery_outer_where(self):
+        dtypes = {"a": np.float32}
+        a = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        (out,) = self._run(
+            "SELECT a FROM (SELECT a + 1 AS a FROM t) WHERE a > 2", dtypes, {"a": a}
+        )
+        # Inner: a+1 = [2, 3, 4, 5]; outer WHERE a > 2 => [3, 4, 5]
+        self.assertEqualArray(out, np.array([3.0, 4.0, 5.0], dtype=np.float32))
+
+    def test_subquery_with_alias(self):
+        dtypes = {"a": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out,) = self._run(
+            "SELECT a FROM (SELECT a FROM t) AS sub", dtypes, {"a": a}
+        )
+        self.assertEqualArray(out, a)
+
+    def test_subquery_inner_and_outer_where(self):
+        dtypes = {"a": np.float32}
+        a = np.array([-1.0, 1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        (out,) = self._run(
+            "SELECT a FROM (SELECT a FROM t WHERE a > 0) WHERE a < 4",
+            dtypes,
+            {"a": a},
+        )
+        # Inner WHERE: [1, 2, 3, 4]; outer WHERE a < 4: [1, 2, 3]
+        self.assertEqualArray(out, np.array([1.0, 2.0, 3.0], dtype=np.float32))
+
+    def test_subquery_column_rename(self):
+        """Outer query can reference the inner alias."""
+        dtypes = {"a": np.float32, "b": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (out,) = self._run(
+            "SELECT total FROM (SELECT a + b AS total FROM t)",
+            dtypes,
+            {"a": a, "b": b},
+        )
+        self.assertEqualArray(out, a + b, atol=1e-6)
+
+
 if __name__ == "__main__":
     unittest.main()
