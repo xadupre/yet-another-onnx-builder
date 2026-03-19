@@ -89,12 +89,18 @@ It also provides:
 
 Its unique API:
 
-.. install: ?
 .. code-block:: python
 
     # the model is called 
     expected = model(*args, **kwargs)
     onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, **options)
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Getting Started
+
+   install
+   getting_started
 
 .. toctree::
    :maxdepth: 1
