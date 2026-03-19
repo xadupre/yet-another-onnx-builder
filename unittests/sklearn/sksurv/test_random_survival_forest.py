@@ -18,10 +18,7 @@ def _make_survival_data(n=100, n_features=5, seed=0):
     X = rng.standard_normal((n, n_features)).astype(np.float32)
     time = rng.exponential(scale=10, size=n)
     event = rng.choice([True, False], size=n, p=[0.7, 0.3])
-    y = np.array(
-        [(e, t) for e, t in zip(event, time)],
-        dtype=[("event", "?"), ("time", "f8")],
-    )
+    y = np.array([(e, t) for e, t in zip(event, time)], dtype=[("event", "?"), ("time", "f8")])
     return X, y
 
 
@@ -59,15 +56,11 @@ class TestRandomSurvivalForest(ExtTestCase):
 
     def test_shallow_trees(self):
         """RandomSurvivalForest with limited tree depth."""
-        self._check_regressor(
-            self._X, self._y, n_estimators=5, max_depth=3, random_state=1
-        )
+        self._check_regressor(self._X, self._y, n_estimators=5, max_depth=3, random_state=1)
 
     def test_single_estimator(self):
         """RandomSurvivalForest with a single tree."""
-        self._check_regressor(
-            self._X, self._y, n_estimators=1, max_depth=4, random_state=2
-        )
+        self._check_regressor(self._X, self._y, n_estimators=1, max_depth=4, random_state=2)
 
     def test_in_pipeline(self):
         """RandomSurvivalForest as last step in a sklearn Pipeline."""
