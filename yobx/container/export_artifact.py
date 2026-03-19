@@ -5,7 +5,7 @@ of every :func:`to_onnx` conversion function.
 
 from typing import Any, Dict, List, Optional, Sequence, Union
 import onnx
-from ..typing import GraphBuilderExtendedProtocol
+from ..typing import GraphBuilderExtendedProtocol, ExportArtifactProtocol
 from .model_container import ExtendedModelContainer
 from .build_stats import BuildStats
 
@@ -63,7 +63,7 @@ class ExportReport:
         )
 
 
-class ExportArtifact:
+class ExportArtifact(ExportArtifactProtocol):
     """
     Standard output of every :func:`to_onnx` conversion function.
 
@@ -119,6 +119,12 @@ class ExportArtifact:
         filename: Optional[str] = None,
         builder: Optional[GraphBuilderExtendedProtocol] = None,
     ):
+        assert not proto or isinstance(
+            proto, (onnx.ModelProto, onnx.GraphProto, onnx.FunctionProto)
+        ), f"Unexpected type {proto} for proto"
+        assert not container or isinstance(
+            container, ExtendedModelContainer
+        ), f"Unexpected type {proto} for container"
         self.proto = proto
         self.container = container
         self.report = report
@@ -309,4 +315,15 @@ class ExportArtifact:
             raise TypeError(f"Unable to return metadata_props from type {self.proto}.")
         if self.container and self.container.model_proto_:
             return self.container.model_proto_.metadata_props
+        raise AttributeError(f"The artifact do not contain any model {self!r}.")
+
+    @property
+    def ir_version(self) -> int:
+        """Returns the opset import."""
+        if self.proto:
+            if hasattr(self.proto, "ir_version"):
+                return self.proto.ir_version
+            raise TypeError(f"Unable to return ir_version from type {self.proto}.")
+        if self.container and self.container.model_proto_:
+            return self.container.model_proto_.ir_version
         raise AttributeError(f"The artifact do not contain any model {self!r}.")

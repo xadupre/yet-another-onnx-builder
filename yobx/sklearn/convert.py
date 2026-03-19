@@ -6,7 +6,7 @@ from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.utils.validation import check_is_fitted
 from .. import DEFAULT_TARGET_OPSET
 from ..typing import ConvertOptionsProtocol
-from ..container import ExtendedModelContainer, ExportArtifact, ExportReport
+from ..container import ExportArtifact
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from ..xbuilder.function_options import FunctionOptions
@@ -412,16 +412,12 @@ def to_onnx(
             )
             if agg.shape[0]:
                 print(agg.to_string())
-        report = ExportReport(stats=stats or [])
-        if isinstance(onx, ExtendedModelContainer):
-            return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
-        return ExportArtifact(proto=onx, report=report)
+        assert isinstance(onx, ExportArtifact), f"Unexpected type {type(onx)} for onx."
+        return onx
     onx = g.to_onnx(
         large_model=large_model,
         external_threshold=external_threshold,
         inline=(not function_options) or not function_options.export_as_function,
     )
-    report = ExportReport()
-    if isinstance(onx, ExtendedModelContainer):
-        return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
-    return ExportArtifact(proto=onx, report=report)
+    assert isinstance(onx, ExportArtifact), f"Unexpected type {type(onx)} for onx."
+    return onx

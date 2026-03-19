@@ -18,21 +18,13 @@ from onnx import TensorProto
 
 from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_spox
 from yobx.typing import GraphBuilderExtendedProtocol
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+from yobx.container import ExportArtifact
 
 
 def _make_builder(opset=18):
     from yobx.builder.spox import SpoxGraphBuilder
 
     return SpoxGraphBuilder(opset)
-
-
-# ---------------------------------------------------------------------------
-# Protocol / import tests
-# ---------------------------------------------------------------------------
 
 
 @requires_spox()
@@ -155,15 +147,13 @@ class TestSpoxGraphBuilderCoreApi(ExtTestCase):
         self.assertIn(y, g.output_names)
 
     def test_to_onnx_returns_model_proto(self):
-        import onnx
-
         g = _make_builder(18)
         g.make_tensor_input("X", TensorProto.FLOAT, (None, 4))
         w = g.make_initializer("W", np.eye(4, dtype=np.float32))
         y = g.make_node("MatMul", ["X", w], 1)
         g.make_tensor_output(y)
         proto = g.to_onnx()
-        self.assertIsInstance(proto, onnx.ModelProto)
+        self.assertIsInstance(proto, ExportArtifact)
         op_types = [n.op_type for n in proto.graph.node]
         self.assertIn("MatMul", op_types)
 

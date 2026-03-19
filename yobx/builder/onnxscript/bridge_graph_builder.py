@@ -7,7 +7,7 @@ from onnx import numpy_helper as onnx_numpy_helper
 from onnx.model_container import make_large_tensor_proto
 import onnx_ir as ir
 from ...typing import GraphBuilderExtendedProtocol, OpsetProtocol
-from ...container import ExtendedModelContainer
+from ...container import ExtendedModelContainer, ExportArtifact
 from ...helpers.helper import size_type
 from ...helpers.onnx_helper import _default_OPSET_TO_IR_VERSION
 from ...xshape.shape_type_compute import set_type_shape_unary_op
@@ -611,13 +611,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
 
     def to_onnx(
         self, large_model: bool = False, external_threshold: int = 1024, inline: bool = True
-    ) -> Union[
-        onnx.FunctionProto,
-        onnx.ModelProto,
-        onnx.GraphProto,
-        ExtendedModelContainer,
-        Dict[str, Any],
-    ]:
+    ) -> ExportArtifact:
         """Exports the graph as an ONNX :class:`~onnx.ModelProto`.
 
         :param large_model: if True returns a :class:`onnx.model_container.ModelContainer`,
@@ -626,6 +620,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         :param external_threshold: if large_model is True, every tensor above this limit
             (in bytes) is stored as external
         :param inline: inline local function it any (this is currently not used)
+        :return: artifact
         """
         ir_model = ir.Model(self._graph, ir_version=self.ir_version)
         proto = ir.to_proto(ir_model)
@@ -640,7 +635,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
                 value_info.type.tensor_type.shape.CopyFrom(onnx.TensorShapeProto())
 
         if not large_model:
-            return proto
+            return ExportArtifact(proto=proto)
 
         # Extract initializers that exceed the threshold into an ExtendedModelContainer.
         large_initializers: Dict[str, np.ndarray] = {}
@@ -668,4 +663,4 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         if large_initializers:
             lm.set_large_initializers(large_initializers)
             lm.check_large_initializers()
-        return lm
+        return ExportArtifact(container=lm)

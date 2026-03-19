@@ -13,6 +13,7 @@ import numpy.typing as npt
 import onnx
 import spox
 
+from ...container import ExportArtifact
 from ...helpers.onnx_helper import attr_proto_to_python, tensor_dtype_to_np_dtype
 from ...typing import GraphBuilderExtendedProtocol, OpsetProtocol
 from ...xshape._shape_helper import DYNAMIC_SHAPE
@@ -691,7 +692,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
 
     def to_onnx(
         self, large_model: bool = False, external_threshold: int = 1024, inline: bool = True
-    ) -> onnx.ModelProto:
+    ) -> ExportArtifact:
         """Exports the accumulated graph as an :class:`onnx.ModelProto`.
 
         :param large_model: currently unused; present for API compatibility
@@ -702,9 +703,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
         """
         inputs_dict = {n: self._name_to_var[n] for n in self._input_names}
         outputs_dict = {n: self._name_to_var[n] for n in self._output_names}
-
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             proto = spox.build(inputs_dict, outputs_dict)
-
-        return proto
+        return ExportArtifact(proto=proto)
