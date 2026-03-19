@@ -4,6 +4,11 @@
 LiteRT / TFLite Export to ONNX
 ===================================
 
+.. toctree::
+   :maxdepth: 1
+
+   supported_ops
+
 :func:`yobx.litert.to_onnx` converts a :epkg:`TFLite`/:epkg:`LiteRT`
 ``.tflite`` model into an :class:`onnx.ModelProto`.  The implementation is
 a **proof-of-concept** that parses the binary
@@ -228,45 +233,5 @@ Adding a new built-in converter
 Supported ops
 =============
 
-The built-in converter registry covers the following TFLite ops:
-
-.. runpython::
-    :showcode:
-    :rst:
-
-    import re
-    from yobx.litert import register_litert_converters
-    from yobx.litert.register import LITERT_OP_CONVERTERS
-    from yobx.litert.litert_helper import builtin_op_name
-
-    register_litert_converters()
-
-    PATTERN = re.compile(r"TFLite\s+``(\w+)``\s+→\s+ONNX\s+(.+)")
-    MODULE_LABELS = {
-        "yobx.litert.ops.activations": "Activations",
-        "yobx.litert.ops.elementwise": "Element-wise",
-        "yobx.litert.ops.nn_ops": "Neural network",
-        "yobx.litert.ops.reshape_ops": "Shape / tensor manipulation",
-    }
-    MODULE_ORDER = list(MODULE_LABELS.keys())
-
-    groups = {m: [] for m in MODULE_ORDER}
-    for code, fn in LITERT_OP_CONVERTERS.items():
-        mod = fn.__module__
-        doc = (fn.__doc__ or "").strip().splitlines()[0].strip().rstrip(".")
-        m = PATTERN.match(doc)
-        tflite_op = m.group(1) if m else (builtin_op_name(code) if isinstance(code, int) else code)
-        onnx_op = m.group(2).rstrip(".") if m else "?"
-        if mod in groups:
-            groups[mod].append((tflite_op, onnx_op))
-
-    for mod in MODULE_ORDER:
-        label = MODULE_LABELS[mod]
-        items = sorted(groups[mod])
-        if not items:
-            continue
-        print(f"**{label}**")
-        print()
-        for tflite_op, onnx_op in items:
-            print(f"* ``{tflite_op}`` → {onnx_op}")
-        print()
+See :ref:`l-design-litert-supported-ops` for the full list of
+built-in LiteRT op converters, generated automatically from the live registry.
