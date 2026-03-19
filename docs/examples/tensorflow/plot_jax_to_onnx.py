@@ -33,6 +33,7 @@ import numpy as np
 import onnxruntime
 from yobx.doc import plot_dot
 from yobx.helpers import max_diff
+from yobx.helpers.onnx_helper import pretty_onnx
 from yobx.tensorflow import to_onnx
 from yobx.tensorflow.tensorflow_helper import jax_to_concrete_function
 
@@ -103,6 +104,10 @@ onx_mlp = to_onnx(jax_mlp, (X_mlp,))
 op_types = [n.op_type for n in onx_mlp.graph.node]
 print("\nOp-types in the MLP graph:", op_types)
 assert "MatMul" in op_types
+
+# %%
+# Display the model.
+print(pretty_onnx(onx_mlp))
 
 # %%
 # Verify predictions on a held-out batch.
