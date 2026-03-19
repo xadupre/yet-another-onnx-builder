@@ -427,11 +427,18 @@ class MaxReluPattern(PatternOptimization):
         if len(node.input) != 2:
             return self.none(node, inspect.currentframe().f_lineno)
 
-        for inp in node.input:
-            if g.is_constant_scalar(inp) and g.get_constant_scalar(inp) == 0:
-                return MatchResult(self, [node], self.apply, insert_at=node)
+        # Require exactly one zero-valued constant input among the two inputs.
+        zero_const_inputs = [
+            inp
+            for inp in node.input
+            if g.is_constant_scalar(inp) and g.get_constant_scalar(inp) == 0
+        ]
+        if len(zero_const_inputs) != 1:
+            # Either no zero-constant inputs or both inputs are zero-constants:
+            # do not apply the Max->Relu fusion in these cases.
+            return self.none(node, inspect.currentframe().f_lineno)
 
-        return self.none(node, inspect.currentframe().f_lineno)
+        return MatchResult(self, [node], self.apply, insert_at=node)
 
     def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
         # Identify which input is the non-zero tensor
