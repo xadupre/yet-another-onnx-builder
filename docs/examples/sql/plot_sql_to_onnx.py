@@ -17,6 +17,8 @@ This example covers:
 4. **Custom Python functions** — user-defined numpy functions called directly
    from SQL via the ``custom_functions`` parameter; the function body is
    traced to ONNX nodes using :func:`~yobx.xtracing.trace_numpy_function`.
+5. **Graph visualization** — rendering the produced ONNX model with
+   :func:`~yobx.doc.plot_dot`.
 
 See :ref:`l-design-sql` for the full design discussion.
 """
@@ -235,3 +237,16 @@ ax2.tick_params(axis="x", labelrotation=25)
 
 plt.tight_layout()
 plt.show()
+
+# %%
+# 9. Display the ONNX model graph
+# --------------------------------
+#
+# :func:`~yobx.doc.plot_dot` renders the ONNX graph as an image so you can
+# inspect nodes, edges, and tensor shapes at a glance.  Here we visualize the
+# basic ``SELECT a + b`` query — a single ``Add`` node connecting two inputs
+# to one output.
+
+from yobx.doc import plot_dot  # noqa: E402
+
+plot_dot(onx_add)
