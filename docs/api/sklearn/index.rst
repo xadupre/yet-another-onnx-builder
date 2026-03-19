@@ -1,6 +1,21 @@
 yobx.sklearn
 ============
 
+register_sklearn_converters
++++++++++++++++++++++++++++
+
+.. autofunction:: yobx.sklearn.register_sklearn_converters
+
+to_onnx
++++++++
+
+.. autofunction:: yobx.sklearn.to_onnx
+
+ConvertOptions
+++++++++++++++
+
+.. autofunction:: yobx.sklearn.ConvertOptions
+
 .. toctree::
     :maxdepth: 1
     :caption: main module
@@ -49,17 +64,3 @@ yobx.sklearn
     tree/index
     xgboost/index
 
-register_sklearn_converters
-+++++++++++++++++++++++++++
-
-.. autofunction:: yobx.sklearn.register_sklearn_converters
-
-to_onnx
-+++++++
-
-.. autofunction:: yobx.sklearn.to_onnx
-
-ConvertOptions
-++++++++++++++
-
-.. autofunction:: yobx.sklearn.ConvertOptions

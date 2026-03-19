@@ -66,10 +66,7 @@ html_logo = "_static/logo.svg"
 html_favicon = "_static/logo.svg"
 html_theme_options = {
     "github_url": "https://github.com/xadupre/yet-another-onnx-builder",
-    "logo": {
-        "image_light": "_static/logo.svg",
-        "image_dark": "_static/logo.svg",
-    },
+    "logo": {"image_light": "_static/logo.svg", "image_dark": "_static/logo.svg"},
 }
 
 

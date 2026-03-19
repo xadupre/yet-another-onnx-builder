@@ -52,7 +52,7 @@ class _ExprEmitter:
                 arr = np.array([v], dtype=np.float32)
             else:
                 raise TypeError(f"Unsupported literal type {type(v)}")
-            cst = self._g.make_initializer(f"{name}_lit", arr, give_unique=True)
+            cst = self._g.make_initializer(f"{name}_lit", arr, give_unique_name=True)
             return cst
 
         if isinstance(node, BinaryExpr):
