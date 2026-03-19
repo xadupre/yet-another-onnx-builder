@@ -10,6 +10,7 @@ from yobx._command_lines_parser import (
     get_parser_find,
     get_parser_partition,
     get_parser_print,
+    get_parser_render_gallery,
     get_parser_run_doc_examples,
     process_outputname,
 )
@@ -120,6 +121,30 @@ class TestCommandLines(ExtTestCase):
             get_main_parser().print_help()
         text = st.getvalue()
         self.assertIn("run-doc-examples", text)
+
+    def test_parser_render_gallery(self):
+        st = StringIO()
+        with redirect_stdout(st):
+            get_parser_render_gallery().print_help()
+        text = st.getvalue()
+        self.assertNotIn("--output", text)
+        self.assertIn("inputs", text)
+
+    def test_parser_render_gallery_args(self):
+        parser = get_parser_render_gallery()
+        args = parser.parse_args(
+            ["docs/examples/core/plot_dot_graph.py", "-v", "1"]
+        )
+        self.assertEqual(args.inputs, ["docs/examples/core/plot_dot_graph.py"])
+        self.assertFalse(hasattr(args, "output"))
+        self.assertEqual(args.verbose, 1)
+
+    def test_main_parser_has_render_gallery(self):
+        st = StringIO()
+        with redirect_stdout(st):
+            get_main_parser().print_help()
+        text = st.getvalue()
+        self.assertIn("render-gallery", text)
 
 
 if __name__ == "__main__":
