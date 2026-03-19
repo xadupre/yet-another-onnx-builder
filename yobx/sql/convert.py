@@ -76,30 +76,46 @@ def _np_dtype_to_onnx(dt: Union[np.dtype, type, str]) -> int:
 
 def sql_to_onnx_graph(
     g: "GraphBuilderProtocol",
+    sts: Optional[Dict],
+    outputs: List[str],
     query: str,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     n_rows: Optional[int] = None,
-    custom_functions: Optional[Dict[str, Callable]] = None,
 ) -> List[str]:
     """
     Build ONNX nodes for a SQL *query* into an existing graph builder *g*.
 
     This is the low-level entry point for callers that are already managing a
     :class:`~yobx.typing.GraphBuilderProtocol` instance (e.g. as part of a
-    larger model).  Any column referenced in the query that is not yet
-    registered as an input in *g* is added automatically.  The SELECT
-    expressions are emitted as model outputs and their tensor names are
-    returned.
+    larger model).  The signature follows the standard SQL op converter
+    convention ``(g, sts, outputs, ...)``.  Any column referenced in the
+    query that is not yet registered as an input in *g* is added
+    automatically.  The SELECT expressions are emitted as model outputs and
+    their tensor names are returned.
 
     :param g: an existing graph builder that satisfies
         :class:`~yobx.typing.GraphBuilderProtocol`.  Nodes and inputs are
         added to this builder in-place.
+    :param sts: shape/type context dict forwarded to SQL op converters, or
+        ``None``.  May contain:
+
+        * ``"custom_functions"`` — a mapping from function name (as it
+          appears in the SQL string) to a Python callable.  Each callable
+          must accept one or more numpy arrays and return a numpy array.  The
+          function body is traced with
+          :func:`~yobx.xtracing.trace_numpy_function` so that numpy
+          arithmetic is translated into ONNX nodes.
+
+        When ``None`` (or an empty dict) no custom functions are available.
+
+    :param outputs: expected output column names for the query result.
+        Passed through to individual op converters following the standard
+        converter convention; may be an empty list when the caller does not
+        know the output names in advance.
     :param query: a SQL string.  Supported clauses:
         ``SELECT``, ``FROM``, ``[INNER|LEFT|RIGHT|FULL] JOIN … ON``,
         ``WHERE``, ``GROUP BY``.
-        Custom Python functions can be called by name in the ``SELECT`` and
-        ``WHERE`` clauses when registered via *custom_functions*.
     :param input_dtypes: a mapping from *left-table* column name to numpy
         dtype (``np.float32``, ``np.int64``, etc.).  Only columns actually
         referenced in the query need to be listed.
@@ -109,11 +125,6 @@ def sql_to_onnx_graph(
     :param n_rows: optional static number of rows; used to fix the first
         dimension of every input tensor that is newly added to *g*.  When
         ``None`` the first dimension is symbolic (``"N"``).
-    :param custom_functions: an optional mapping from function name (as it
-        appears in the SQL string) to a Python callable.  Each callable must
-        accept one or more numpy arrays and return a numpy array.  The
-        function body is traced with :func:`~yobx.xtracing.trace_numpy_function`
-        so that numpy arithmetic is translated into ONNX nodes.
     :return: a list of output tensor names that were added to *g* as model
         outputs (one per expression in the ``SELECT`` clause, in order).
 
@@ -127,11 +138,14 @@ def sql_to_onnx_graph(
         dtypes = {"a": np.float32, "b": np.float32}
         out_names = sql_to_onnx_graph(
             g,
+            None,
+            [],
             "SELECT a + b AS total FROM t WHERE a > 0",
             dtypes,
         )
         onx, _ = g.to_onnx(return_optimize_report=True)
     """
+    custom_functions = (sts or {}).get("custom_functions", {})
     pq = parse_sql(query)
     return _populate_graph(
         g,
@@ -218,13 +232,15 @@ def sql_to_onnx(
         yet supported.
     """
     g = GraphBuilder(target_opset, ir_version=10)
+    sts = {"custom_functions": custom_functions or {}}
     sql_to_onnx_graph(
         g,
+        sts,
+        [],
         query,
-        input_dtypes=input_dtypes,
+        input_dtypes,
         right_input_dtypes=right_input_dtypes,
         n_rows=n_rows,
-        custom_functions=custom_functions,
     )
     onx, _ = g.to_onnx(return_optimize_report=True)  # type: ignore
     return onx  # type: ignore[return-value]

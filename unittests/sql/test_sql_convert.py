@@ -286,6 +286,8 @@ class TestSqlToOnnxGraph(ExtTestCase):
         g = GraphBuilder(18, ir_version=10)
         out_names = sql_to_onnx_graph(
             g,
+            None,
+            [],
             query,
             dtypes,
             right_input_dtypes=right_dtypes,
@@ -299,7 +301,7 @@ class TestSqlToOnnxGraph(ExtTestCase):
         from yobx.xbuilder import GraphBuilder
 
         g = GraphBuilder(18, ir_version=10)
-        out_names = sql_to_onnx_graph(g, "SELECT a, b FROM t", dtypes)
+        out_names = sql_to_onnx_graph(g, None, [], "SELECT a, b FROM t", dtypes)
         self.assertIsInstance(out_names, list)
         self.assertEqual(len(out_names), 2)
 
@@ -332,7 +334,7 @@ class TestSqlToOnnxGraph(ExtTestCase):
 
         g = GraphBuilder(18, ir_version=10)
         g.make_tensor_input("a", TensorProto.FLOAT, ("N",))
-        sql_to_onnx_graph(g, "SELECT a FROM t", {"a": np.float32})
+        sql_to_onnx_graph(g, None, [], "SELECT a FROM t", {"a": np.float32})
         onx, _ = g.to_onnx(return_optimize_report=True)
         # Exactly one input named "a"
         input_names = [inp.name for inp in onx.graph.input]
