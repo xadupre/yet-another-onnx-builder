@@ -1,0 +1,165 @@
+"""
+.. _l-plot-llm-to-onnx:
+
+Export a LLM to ONNX with InputObserver
+=========================================
+
+This example shows how to export a HuggingFace :epkg:`transformers` LLM to ONNX
+using :class:`InputObserver <yobx.torch.input_observer.InputObserver>`.
+
+The key challenge when exporting a LLM is that the HuggingFace examples
+typically call ``model.generate``, but we only need to export the ``forward``
+method.  :class:`InputObserver <yobx.torch.input_observer.InputObserver>`
+intercepts the forward calls during generation to record the actual inputs and
+outputs, which are then used to infer:
+
+* the **dynamic shapes** (which tensor dimensions vary across calls), and
+* a representative set of **export arguments** (with empty tensors for optional
+  inputs that were absent in some calls).
+
+We use :epkg:`arnir0/Tiny-LLM` — a very small causal language model —
+so the example runs without a GPU.
+"""
+
+# %%
+# Imports
+# -------
+
+import pandas
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from yobx import doc
+from yobx.helpers import string_type
+from yobx.helpers.rt_helper import onnx_generate
+from yobx.torch import (
+    InputObserver,
+    apply_patches_for_model,
+    register_flattening_functions,
+    to_onnx,
+)
+
+# %%
+# Load model and tokenizer
+# ------------------------
+#
+# We download the tiny LLM from HuggingFace Hub.
+
+MODEL_NAME = "arnir0/Tiny-LLM"
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+
+# %%
+# Observe forward calls during generation
+# ----------------------------------------
+#
+# :class:`InputObserver <yobx.torch.input_observer.InputObserver>` acts as a
+# context manager that replaces the model's ``forward`` method.  Every time
+# ``forward`` is called (internally by ``model.generate``), the inputs and
+# outputs are recorded.
+#
+# :func:`register_flattening_functions <yobx.torch.flatten.register_flattening_functions>`
+# must wrap the observation because the KV-cache
+# (:class:`transformers.cache_utils.DynamicCache`) is a custom Python class
+# that needs to be registered as a pytree node before
+# :mod:`torch.utils._pytree` can flatten it.
+
+prompt = "Continue: it rains, what should I do?"
+inputs = tokenizer(prompt, return_tensors="pt")
+
+observer = InputObserver()
+
+with (
+    register_flattening_functions(patch_transformers=True),
+    apply_patches_for_model(patch_transformers=True, model=model),
+    observer(model),
+):
+    model.generate(
+        input_ids=inputs["input_ids"],
+        attention_mask=inputs["attention_mask"],
+        do_sample=False,
+        max_new_tokens=10,
+    )
+
+print(f"number of stored forward calls: {observer.num_obs()}")
+
+# %%
+# Infer dynamic shapes and representative arguments
+# -------------------------------------------------
+#
+# After generation the observer has seen several forward calls, each with
+# different sequence lengths and KV-cache sizes.  We can now ask it to infer:
+#
+# * ``dynamic_shapes`` — a nested structure of ``torch.export.Dim`` values
+#   describing which dimensions must be treated as dynamic during export.
+# * ``kwargs`` — one representative set of inputs that can be passed directly
+#   to :func:`torch.export.export` or :func:`yobx.torch.to_onnx`.
+
+with register_flattening_functions(patch_transformers=True):
+    dynamic_shapes = observer.infer_dynamic_shapes(set_batch_dimension_for=True)
+    kwargs = observer.infer_arguments()
+
+print("dynamic_shapes:", dynamic_shapes)
+print("kwargs:", string_type(kwargs, with_shape=True))
+
+# %%
+# Export to ONNX
+# --------------
+#
+# We now export the model.  Both
+# :func:`register_flattening_functions <yobx.torch.flatten.register_flattening_functions>`
+# and :func:`apply_patches_for_model <yobx.torch.patch_model.apply_patches_for_model>`
+# must be active during export so that the exporter can correctly handle
+# the KV-cache type and any PyTorch ops that need patching.
+
+filename = "plot_llm_to_onnx.onnx"
+
+with (
+    register_flattening_functions(patch_transformers=True),
+    apply_patches_for_model(patch_torch=True, patch_transformers=True, model=model),
+):
+    to_onnx(
+        model,
+        (),
+        kwargs=observer.infer_arguments(),
+        dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
+        filename=filename,
+    )
+
+# %%
+# Verify: check discrepancies
+# ----------------------------
+#
+# :meth:`check_discrepancies <yobx.torch.input_observer.InputObserver.check_discrepancies>`
+# runs every recorded set of inputs through both the original PyTorch model
+# and the exported ONNX model, then reports the maximum absolute difference
+# for each output.  Values close to zero confirm that the export is correct.
+
+data = observer.check_discrepancies(filename, progress_bar=True)
+print(pandas.DataFrame(data))
+
+# %%
+# Run the ONNX model in a greedy auto-regressive loop
+# ----------------------------------------------------
+#
+# :func:`onnx_generate <yobx.helpers.rt_helper.onnx_generate>` mimics
+# ``model.generate`` for the exported ONNX model: it feeds the *present*
+# key/value tensors back as *past* key/values on every decoding step.
+
+onnx_tokens = onnx_generate(
+    filename,
+    input_ids=inputs["input_ids"],
+    attention_mask=inputs["attention_mask"],
+    eos_token_id=model.config.eos_token_id,
+    max_new_tokens=50,
+)
+onnx_generated_text = tokenizer.decode(onnx_tokens[0], skip_special_tokens=True)
+print("-----------------")
+print(onnx_generated_text)
+print("-----------------")
+
+# %%
+# Visualise the ONNX graph
+# ------------------------
+#
+# Render the exported ONNX model as a DOT graph.
+
+doc.save_fig(doc.plot_dot(filename), f"{filename}.png", dpi=400)

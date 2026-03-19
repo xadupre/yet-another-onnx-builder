@@ -1,0 +1,36 @@
+name: ci-10-gallery-transformers
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gallery_transformers:
+    name: gallery-transformers (ubuntu-latest, py3.13, torch-nightly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install nightly pytorch
+        run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+      - name: Install dependencies
+        run: pip install -e ".[dev,torch,transformers]"
+      - name: pip freeze
+        run: pip freeze
+      - name: Run transformers gallery examples
+        run: |
+          for f in docs/examples/transformers/plot_*.py; do
+            echo "Running $f ..."
+            python "$f"
+          done

@@ -116,6 +116,7 @@ Its unique API:
    auto_examples_torch/index
    auto_examples_tensorflow/index
    auto_examples_litert/index
+   auto_examples_transformers/index
 
 .. toctree::
    :maxdepth: 2

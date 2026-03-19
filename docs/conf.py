@@ -114,6 +114,7 @@ sphinx_gallery_conf = {
         os.path.join(os.path.dirname(__file__), "examples", "torch"),
         os.path.join(os.path.dirname(__file__), "examples", "tensorflow"),
         os.path.join(os.path.dirname(__file__), "examples", "litert"),
+        os.path.join(os.path.dirname(__file__), "examples", "transformers"),
     ],
     # path where to save gallery generated examples
     "gallery_dirs": [
@@ -122,6 +123,7 @@ sphinx_gallery_conf = {
         "auto_examples_torch",
         "auto_examples_tensorflow",
         "auto_examples_litert",
+        "auto_examples_transformers",
     ],
     # no parallelization to avoid conflict with environment variables
     "parallel": 1,
@@ -140,7 +142,7 @@ sphinx_gallery_conf = {
 
 substring_to_disable = []
 if int(os.environ.get("UNITTEST_GOING", "0")):
-    substring_to_disable = ["tiny_llm"]
+    substring_to_disable = ["tiny_llm", "examples.transformers.plot_"]
 substring = "|".join(f"({s})" for s in substring_to_disable)
 if substring:
     sphinx_gallery_conf["ignore_pattern"] = f".*({substring}).*"
