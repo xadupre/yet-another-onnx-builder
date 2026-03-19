@@ -1,15 +1,19 @@
 -m yobx render-gallery ... convert a sphinx-gallery example to RST
 ====================================================================
 
-The command parses a sphinx-gallery Python example file (``.py``) and emits
-the equivalent RST source without executing any code.  The output can be
-previewed in a text editor, checked into version control, or piped into other
-tools.
+The command parses a sphinx-gallery Python example file (``.py``) and writes
+the equivalent RST source to the corresponding ``auto_examples_<category>/``
+folder without executing any code.
+
+For an input file at ``docs/examples/<category>/plot_foo.py`` the output is
+written to ``docs/auto_examples_<category>/plot_foo.rst``.  The output
+directory is created automatically if it does not exist.
 
 Description
 +++++++++++
 
-See :func:`yobx.helpers._gallery_helper.gallery_to_rst`.
+See :func:`yobx.helpers._gallery_helper.gallery_to_rst` and
+:func:`yobx._command_lines_parser._gallery_auto_output_path`.
 
 .. runpython::
 
@@ -20,21 +24,16 @@ See :func:`yobx.helpers._gallery_helper.gallery_to_rst`.
 Examples
 ++++++++
 
-Print RST for a single gallery example to stdout:
+Convert a single gallery example:
 
 .. code-block:: bash
 
     python -m yobx render-gallery docs/examples/core/plot_dot_graph.py
 
-Save the RST to a file:
+Convert several examples at once:
 
 .. code-block:: bash
 
-    python -m yobx render-gallery docs/examples/core/plot_dot_graph.py \\
-        -o /tmp/plot_dot_graph.rst
-
-Write all examples in a gallery directory to an output directory:
-
-.. code-block:: bash
-
-    python -m yobx render-gallery docs/examples/core/*.py -o /tmp/gallery/
+    python -m yobx render-gallery \\
+        docs/examples/core/plot_dot_graph.py \\
+        docs/examples/sklearn/plot_sklearn_pipeline.py

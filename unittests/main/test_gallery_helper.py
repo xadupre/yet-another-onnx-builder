@@ -4,6 +4,7 @@ import textwrap
 import unittest
 from yobx.ext_test_case import ExtTestCase
 from yobx.helpers._gallery_helper import gallery_to_rst
+from yobx._command_lines_parser import _gallery_auto_output_path
 
 
 class TestGalleryHelper(ExtTestCase):
@@ -182,6 +183,37 @@ class TestGalleryHelper(ExtTestCase):
             self.assertEqual(rst, read_back)
         finally:
             os.unlink(path)
+
+    # ------------------------------------------------------------------
+    # _gallery_auto_output_path
+    # ------------------------------------------------------------------
+
+    def test_auto_output_path_standard_layout(self):
+        path = _gallery_auto_output_path("/base/docs/examples/core/plot_foo.py")
+        self.assertTrue(path.endswith("plot_foo.rst"))
+        self.assertIn("auto_examples_core", path)
+        self.assertNotIn("examples" + os.sep + "core", path)
+
+    def test_auto_output_path_sklearn(self):
+        path = _gallery_auto_output_path("/repo/docs/examples/sklearn/plot_bar.py")
+        self.assertIn("auto_examples_sklearn", path)
+        self.assertTrue(path.endswith("plot_bar.rst"))
+
+    def test_auto_output_path_fallback(self):
+        # No 'examples/<category>' pattern → fallback: .py → .rst in same dir
+        path = _gallery_auto_output_path("/some/other/dir/plot_foo.py")
+        self.assertTrue(path.endswith("plot_foo.rst"))
+
+    def test_auto_output_path_real_file(self):
+        repo_root = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..")
+        )
+        example = os.path.join(repo_root, "docs", "examples", "core", "plot_dot_graph.py")
+        if not os.path.isfile(example):
+            self.skipTest("gallery example not found")
+        out = _gallery_auto_output_path(example)
+        self.assertIn("auto_examples_core", out)
+        self.assertTrue(out.endswith("plot_dot_graph.rst"))
 
 
 if __name__ == "__main__":

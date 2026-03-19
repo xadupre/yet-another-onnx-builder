@@ -587,34 +587,59 @@ def _cmd_run_doc_examples(argv: List[Any]):
         sys.exit(1)
 
 
+def _gallery_auto_output_path(input_path: str) -> str:
+    """
+    Derive the sphinx-gallery ``auto_`` output RST path from a gallery source file.
+
+    The sphinx-gallery convention maps:
+
+    * ``<base>/examples/<category>/plot_foo.py``  →
+      ``<base>/auto_examples_<category>/plot_foo.rst``
+
+    :param input_path: absolute or relative path to the gallery ``.py`` file
+    :return: absolute path to the corresponding ``.rst`` file in the
+        ``auto_examples_<category>`` directory
+    """
+    abs_path = os.path.normpath(os.path.abspath(input_path))
+    parts = abs_path.split(os.sep)
+    # Walk backwards looking for a directory component named 'examples'
+    # followed immediately by the category name.
+    for i in range(len(parts) - 2, -1, -1):
+        if parts[i] == "examples" and i + 1 < len(parts) - 1:
+            category = parts[i + 1]
+            base_dir = os.sep.join(parts[:i]) or os.sep
+            basename = os.path.splitext(parts[-1])[0] + ".rst"
+            return os.path.join(base_dir, f"auto_examples_{category}", basename)
+    # Fallback: write next to the source file
+    return os.path.splitext(abs_path)[0] + ".rst"
+
+
 def get_parser_render_gallery() -> ArgumentParser:
     parser = ArgumentParser(
         prog="render-gallery",
         description=textwrap.dedent("""
             Converts a sphinx-gallery Python example file (.py) to RST without
-            executing any code.  The output can be previewed in a text editor or
-            piped into a documentation build tool.
+            executing any code and writes the result to the corresponding
+            auto_examples_<category>/ folder.
 
             A sphinx-gallery example file consists of:
               - A module docstring (verbatim RST: title, description, labels, …)
               - Python code blocks separated by ``# %%`` section markers
               - Comment lines following ``# %%`` are treated as RST prose
+
+            For an input file at ``docs/examples/<category>/plot_foo.py`` the
+            output is written to ``docs/auto_examples_<category>/plot_foo.rst``.
             """),
         epilog=textwrap.dedent("""
             examples:
 
-                # Print the RST for a single gallery example
+                # Convert a single gallery example
                 python -m yobx render-gallery docs/examples/core/plot_dot_graph.py
 
-                # Save the RST to a file
-                python -m yobx render-gallery docs/examples/core/plot_dot_graph.py \\
-                    -o /tmp/plot_dot_graph.rst
-
-                # Process several files at once
+                # Convert several examples at once
                 python -m yobx render-gallery \\
                     docs/examples/core/plot_dot_graph.py \\
-                    docs/examples/sklearn/plot_sklearn_pipeline.py \\
-                    -o /tmp/
+                    docs/examples/sklearn/plot_sklearn_pipeline.py
             """),
         formatter_class=RawTextHelpFormatter,
     )
@@ -622,15 +647,6 @@ def get_parser_render_gallery() -> ArgumentParser:
         "inputs",
         nargs="+",
         help="sphinx-gallery Python file(s) to convert to RST.",
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        default="",
-        type=str,
-        required=False,
-        help="Output file or directory. When empty (default) the RST is printed to stdout. "
-        "When a directory is given, each input file produces a <name>.rst file there.",
     )
     parser.add_argument(
         "-v",
@@ -649,9 +665,6 @@ def _cmd_render_gallery(argv: List[Any]):
     parser = get_parser_render_gallery()
     args = parser.parse_args(argv[1:])
 
-    output = args.output.strip()
-    output_is_dir = output and os.path.isdir(output)
-
     for filepath in args.inputs:
         if not os.path.isfile(filepath):
             print(f"[render-gallery] ERROR: file not found: {filepath!r}", file=sys.stderr)
@@ -665,30 +678,15 @@ def _cmd_render_gallery(argv: List[Any]):
 
         rst = gallery_to_rst(source)
 
-        if not output:
-            # Print to stdout (separate multiple files with a marker)
-            if len(args.inputs) > 1:
-                print(f"{'=' * 70}\n.. FILE: {filepath}\n{'=' * 70}")
-            print(rst)
-        elif output_is_dir:
-            basename = os.path.splitext(os.path.basename(filepath))[0] + ".rst"
-            out_path = os.path.join(output, basename)
-            if args.verbose:
-                print(f"[render-gallery] writing {out_path!r}")
-            with open(out_path, "w", encoding="utf-8") as fh:
-                fh.write(rst)
-        else:
-            # Single output file: only valid for a single input
-            if len(args.inputs) > 1:
-                parser.error(
-                    "Cannot write multiple inputs to a single output file. "
-                    "Pass a directory with -o or process files one at a time."
-                )
-            out_path = process_outputname(output, filepath)
-            if args.verbose:
-                print(f"[render-gallery] writing {out_path!r}")
-            with open(out_path, "w", encoding="utf-8") as fh:
-                fh.write(rst)
+        out_path = _gallery_auto_output_path(filepath)
+        out_dir = os.path.dirname(out_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+
+        if args.verbose:
+            print(f"[render-gallery] writing {out_path!r}")
+        with open(out_path, "w", encoding="utf-8") as fh:
+            fh.write(rst)
 
 
 #############
