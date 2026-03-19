@@ -6539,7 +6539,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if renaming:
                 g.rename_names(renaming)
 
-            new_g = g.to_onnx(optimize=False, as_graph_proto=True)
+            new_g = g.to_onnx(optimize=False, as_graph_proto=True).graph
             assert isinstance(new_g, GraphProto), f"unexpected type {type(new_g)}"
             if self.verbose > 1:
                 print(
