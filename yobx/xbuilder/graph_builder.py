@@ -2719,7 +2719,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         parameter_name: Optional[str] = None,
         source: str = "",
         allow_empty: bool = False,
-        give_unique: bool = False,
+        give_unique_name: bool = False,
     ) -> str:
         """
         Adds an initializer to the graph.
@@ -2738,7 +2738,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         :param source: any additional information, this field is usually used to
             let the number know where the initializer was created.
         :param allow_empty: allow_empty value
-        :param give_unique: give a unique name
+        :param give_unique_name: give a unique name
         :return: name of the initializer
         """
         if external:
@@ -2807,7 +2807,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             itype = _get_type(value.dtype)
             shape = tuple(value.shape)
 
-        if name == "" or give_unique:
+        if name == "" or give_unique_name:
             if name:
                 name = self.unique_name(name)
             else:
