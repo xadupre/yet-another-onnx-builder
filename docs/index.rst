@@ -97,38 +97,14 @@ Its unique API:
 
 .. toctree::
    :maxdepth: 1
-   :caption: Contents
-
-   design/litert/index
-   design/sklearn/index
-   design/sql/index
-   design/tensorflow/index
-   design/torch/index
-   design/index
-   cmds/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Galleries
-
-   auto_examples_core/index
-   auto_examples_sklearn/index
-   auto_examples_torch/index
-   auto_examples_tensorflow/index
-   auto_examples_litert/index
-   auto_examples_transformers/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: API
 
    api/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: misc
-
-   index_stats
+   contents
+   galleries
+   cmds/index
+   install
+   getting_started
+   misc
 
 Indices and tables
 ==================
