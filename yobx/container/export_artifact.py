@@ -50,7 +50,7 @@ class ExportReport:
         if isinstance(data, dict):
             self.extra.update(data)
         elif isinstance(data, list):
-            self.stats.append(data)
+            self.stats.extend(data)
         elif isinstance(data, BuildStats):
             self.build_stats = data
         elif isinstance(data, ExportReport):

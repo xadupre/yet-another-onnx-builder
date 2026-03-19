@@ -5563,7 +5563,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             for node in add.node:
                 self._check_constant(node, f"{prefix}-[add]")
 
-    def _to_onnx_function(self, function_options, opsets, mask_outputs):
+    def _to_onnx_function(
+        self, function_options, opsets, mask_outputs
+    ) -> Union[FunctionProto, Dict[str, Any]]:
         if self._debug_local_function:
             print(f"[GraphBuilder-{self._hash()}.to_onnx] export_as_function {function_options}")
         if self.verbose:
@@ -5850,8 +5852,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._add_hidden_inputs_to_nodes()
 
         if function_options.export_as_function:
-            # export as a function
-            return self._to_onnx_function(function_options, opsets, mask_outputs)
+            # export as a function, TODO: use artifact
+            return self._to_onnx_function(function_options, opsets, mask_outputs)  # type: ignore
 
         # export as a model
         if self.ir_version:
@@ -5886,7 +5888,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             model.graph.input.extend(self.inputs)
 
         if as_graph_proto:
-            return model.graph
+            return ExportArtifact(model.graph)
 
         # initializers
         initializers, large_initializers = self._build_initializers(
