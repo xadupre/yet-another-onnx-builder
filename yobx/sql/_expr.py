@@ -3,26 +3,34 @@ ONNX expression emitter for SQL AST nodes.
 
 :class:`_ExprEmitter` translates parsed SQL expression trees (column
 references, literals, binary operators, aggregate functions) into ONNX nodes
-inside a :class:`~yobx.xbuilder.GraphBuilder`.
+inside a :class:`~yobx.typing.GraphBuilderExtendedProtocol`.
 """
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Callable, Dict, Optional
 
 import numpy as np
 
-from ..xbuilder import GraphBuilder
-from .parse import AggExpr, BinaryExpr, ColumnRef, Condition, Literal
+from ..typing import GraphBuilderExtendedProtocol
+from ..xtracing.tracing import trace_numpy_function
+from .parse import AggExpr, BinaryExpr, ColumnRef, Condition, FuncCallExpr, Literal
 
 
 class _ExprEmitter:
     """Emits ONNX nodes for SQL expression AST nodes."""
 
-    def __init__(self, g: GraphBuilder, col_map: Dict[str, str]):
+    def __init__(
+        self,
+        g: GraphBuilderExtendedProtocol,
+        col_map: Dict[str, str],
+        custom_functions: Optional[Dict[str, Callable]] = None,
+    ):
         self._g = g
         # col_map: column_name → current ONNX tensor name for that column
         self._col_map = col_map
+        # custom_functions: function_name → Python callable (traced via xtracing)
+        self._custom_functions: Dict[str, Callable] = custom_functions or {}
 
     def emit(self, node: object, name: str = "sql") -> str:
         """Emit *node* into the graph and return the output tensor name."""
@@ -110,5 +118,23 @@ class _ExprEmitter:
             if onnx_op is None:
                 raise ValueError(f"Unsupported aggregation function: {func!r}")
             return getattr(self._g.op, onnx_op)(arg_tensor, reduce_axes, keepdims=0, name=name)
+
+        if isinstance(node, FuncCallExpr):
+            func_name = node.func
+            if func_name not in self._custom_functions:
+                raise KeyError(
+                    f"Unknown function {func_name!r} in SQL expression. "
+                    f"Register it via the custom_functions parameter. "
+                    f"Available: {list(self._custom_functions)}"
+                )
+            func = self._custom_functions[func_name]
+            # Emit the argument expressions first
+            arg_tensors = [
+                self.emit(arg, name=f"{name}_arg{i}") for i, arg in enumerate(node.args)
+            ]
+            # Allocate a unique output tensor name
+            out_name = self._g.unique_name(f"{name}_{func_name}")
+            trace_numpy_function(self._g, {}, [out_name], func, arg_tensors, name=out_name)
+            return out_name
 
         raise TypeError(f"Cannot emit expression of type {type(node)}")

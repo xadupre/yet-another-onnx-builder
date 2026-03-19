@@ -39,7 +39,7 @@ Limitations
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from onnx import ModelProto, TensorProto
@@ -77,6 +77,7 @@ def sql_to_onnx(
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
     n_rows: Optional[int] = None,
+    custom_functions: Optional[Dict[str, Callable]] = None,
 ) -> ModelProto:
     """
     Convert a SQL *query* to a self-contained :class:`onnx.ModelProto`.
@@ -89,6 +90,8 @@ def sql_to_onnx(
     :param query: a SQL string.  Supported clauses:
         ``SELECT``, ``FROM``, ``[INNER|LEFT|RIGHT|FULL] JOIN … ON``,
         ``WHERE``, ``GROUP BY``.
+        Custom Python functions can be called by name in the ``SELECT`` and
+        ``WHERE`` clauses when registered via *custom_functions*.
     :param input_dtypes: a mapping from *left-table* column name to numpy
         dtype (``np.float32``, ``np.int64``, etc.).  Only columns actually
         referenced in the query need to be listed.
@@ -100,6 +103,24 @@ def sql_to_onnx(
     :param n_rows: optional static number of rows; used to fix the first
         dimension of every input tensor.  When ``None`` the first dimension is
         symbolic (``"N"``).
+    :param custom_functions: an optional mapping from function name (as it
+        appears in the SQL string) to a Python callable.  Each callable must
+        accept one or more numpy arrays and return a numpy array.  The
+        function body is traced with :func:`~yobx.xtracing.trace_numpy_function`
+        so that numpy arithmetic is translated into ONNX nodes.
+
+        Example::
+
+            import numpy as np
+            from yobx.sql import sql_to_onnx
+
+            dtypes = {"a": np.float32}
+            onx = sql_to_onnx(
+                "SELECT my_sqrt(a) AS r FROM t",
+                dtypes,
+                custom_functions={"my_sqrt": np.sqrt},
+            )
+
     :return: a :class:`onnx.ModelProto` ready for inference.
 
     Example::
@@ -124,6 +145,7 @@ def sql_to_onnx(
         right_input_dtypes=right_input_dtypes,
         target_opset=target_opset,
         n_rows=n_rows,
+        custom_functions=custom_functions,
     )
 
 
@@ -138,6 +160,7 @@ def _build_onnx(
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]],
     target_opset: int,
     n_rows: Optional[int],
+    custom_functions: Optional[Dict[str, Callable]] = None,
 ) -> ModelProto:
     dim = n_rows if n_rows is not None else "N"
 
@@ -191,10 +214,13 @@ def _build_onnx(
     select_op: Optional[SelectOp] = None
     _group_op: Optional[GroupByOp] = None
 
+    resolved_custom_functions = custom_functions or {}
+
     for op in pq.operations:
         converter = get_sql_op_converter(type(op))
         if converter is not None:
-            col_map = converter(g, {}, list(col_map.keys()), op, col_map, right_col_map)
+            sts_ctx = {"custom_functions": resolved_custom_functions}
+            col_map = converter(g, sts_ctx, list(col_map.keys()), op, col_map, right_col_map)
         elif isinstance(op, GroupByOp):
             _group_op = op  # retained for SelectOp aggregation
         elif isinstance(op, SelectOp):
@@ -209,7 +235,7 @@ def _build_onnx(
         )
 
     # Emit SELECT expressions
-    emitter = _ExprEmitter(g, col_map)
+    emitter = _ExprEmitter(g, col_map, custom_functions=resolved_custom_functions)
     output_names: List[str] = []
     for i, item in enumerate(select_op.items):
         out_name = item.output_name()

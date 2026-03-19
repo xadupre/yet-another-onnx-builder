@@ -77,6 +77,18 @@ class AggExpr:
 
 
 @dataclass
+class FuncCallExpr:
+    """A call to a user-defined (custom) function: ``func_name(arg1, arg2, …)``."""
+
+    func: str  # function name as it appears in the SQL string (lower-cased)
+    args: List[object]  # positional arguments (ColumnRef | Literal | BinaryExpr | AggExpr)
+
+    def __str__(self) -> str:
+        args_str = ", ".join(str(a) for a in self.args)
+        return f"{self.func}({args_str})"
+
+
+@dataclass
 class SelectItem:
     """One item in the SELECT list: an expression with an optional alias."""
 
@@ -307,7 +319,7 @@ class _Parser:
     # ------------------------------------------------------------------
 
     def _parse_primary(self) -> object:
-        """Parse a primary expression: literal, column ref, or aggregation."""
+        """Parse a primary expression: literal, column ref, aggregation, or function call."""
         tok = self._peek()
         if tok is None:
             raise ValueError("Unexpected end of input in expression")
@@ -326,6 +338,27 @@ class _Parser:
             self._expect(")")
             return AggExpr(func=val, arg=arg)
 
+        # User-defined function call: any identifier immediately followed by '('
+        if kind == "id" and val not in _KEYWORDS:
+            # Look ahead one token to check for '('
+            next_pos = self._pos + 1
+            if next_pos < len(self._tokens) and self._tokens[next_pos] == ("op", "("):
+                self._consume()  # consume function name
+                self._consume()  # consume '('
+                args: List[object] = []
+                if self._peek_value() != ")":
+                    args.append(self._parse_expr())
+                    while self._maybe(","):
+                        args.append(self._parse_expr())
+                self._expect(")")
+                return FuncCallExpr(func=val, args=args)
+            # Plain identifier — fall through to ColumnRef below
+            self._consume()
+            parts = val.split(".")
+            if len(parts) == 2:
+                return ColumnRef(column=parts[1], table=parts[0])
+            return ColumnRef(column=parts[0])
+
         # Parenthesised expression
         if kind == "op" and val == "(":
             self._consume()
@@ -342,14 +375,6 @@ class _Parser:
         if kind == "str":
             self._consume()
             return Literal(val)
-
-        # Identifier (column ref, possibly table-qualified)
-        if kind == "id" and val not in _KEYWORDS:
-            self._consume()
-            parts = val.split(".")
-            if len(parts) == 2:
-                return ColumnRef(column=parts[1], table=parts[0])
-            return ColumnRef(column=parts[0])
 
         raise ValueError(f"Unexpected token {tok!r} in expression")
 
@@ -530,6 +555,9 @@ def _collect_columns(operations: List[SqlOperation]) -> List[str]:
         elif isinstance(node, AggExpr):
             if isinstance(node.arg, ColumnRef):
                 _visit(node.arg)
+        elif isinstance(node, FuncCallExpr):
+            for arg in node.args:
+                _visit(arg)
         elif isinstance(node, Condition):
             _visit(node.left)
             _visit(node.right)
