@@ -392,7 +392,7 @@ def to_onnx(
     # When local functions are requested we must NOT inline them; pass inline=False
     # so the function bodies are preserved in the returned ModelProto.
     if isinstance(g, GraphBuilder):
-        onx, stats = g.to_onnx(  # type: ignore
+        onx = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,
             inline=(not function_options) or not function_options.export_as_function,
@@ -403,7 +403,7 @@ def to_onnx(
 
             print(f"[yobx.sklearn.to_onnx] done, output type is {type(onx)}")
 
-            df = pandas.DataFrame(stats)
+            df = pandas.DataFrame(onx.report.stats)
             for c in ["added", "removed"]:
                 df[c] = df[c].fillna(0).astype(int)
             agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()

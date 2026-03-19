@@ -8,6 +8,7 @@ import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
 from .helpers.dot_helper import to_dot
+from .container import ExportArtifact
 
 
 def get_latest_pypi_version(package_name="yet-another-onnx-builder") -> str:  # pragma: no cover
@@ -207,6 +208,8 @@ def draw_graph_graphviz(dot: Union[str, onnx.ModelProto], image: str, engine: st
     """
     if isinstance(dot, onnx.ModelProto):
         sdot = to_dot(dot)
+    elif isinstance(dot, ExportArtifact):
+        sdot = to_dot(dot.get_proto(include_weights=False))
     else:
         if "{" not in dot:
             assert dot.endswith(".onnx"), f"Unexpected file extension for {dot!r}"

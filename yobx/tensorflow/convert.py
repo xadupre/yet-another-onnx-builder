@@ -3,7 +3,7 @@ import numpy as np
 from onnx import ValueInfoProto
 import tensorflow as tf
 from .. import DEFAULT_TARGET_OPSET
-from ..container import ExtendedModelContainer, ExportArtifact, ExportReport
+from ..container import ExportArtifact
 from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from .register import get_tf_op_converter
@@ -163,7 +163,7 @@ def to_onnx(
 
     _convert_concrete_function(cf, g, args, input_specs, verbose, extra_converters or {})
     if isinstance(g, GraphBuilder):
-        onx, stats = g.to_onnx(  # type: ignore
+        onx = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,
             return_optimize_report=True,
@@ -173,7 +173,7 @@ def to_onnx(
 
             print(f"[yobx.tensorflow.to_onnx] done, output type is {type(onx)}")
 
-            df = pandas.DataFrame(stats)
+            df = pandas.DataFrame(onx.report.stats)
             for c in ["added", "removed"]:
                 df[c] = df[c].fillna(0).astype(int)
             agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
@@ -182,15 +182,8 @@ def to_onnx(
             )
             if agg.shape[0]:
                 print(agg.to_string())
-        report = ExportReport(stats=stats or [])  # type: ignore
-        if isinstance(onx, ExtendedModelContainer):
-            return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
-        return ExportArtifact(proto=onx, report=report)  # type: ignore
-    onx = g.to_onnx(large_model=large_model, external_threshold=external_threshold)  # type: ignore
-    report = ExportReport()
-    if isinstance(onx, ExtendedModelContainer):
-        return ExportArtifact(proto=onx.model_proto, container=onx, report=report)
-    return ExportArtifact(proto=onx, report=report)
+        return onx
+    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
 
 
 # ---------------------------------------------------------------------------

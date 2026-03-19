@@ -308,7 +308,7 @@ class TestSqlToOnnxGraph(ExtTestCase):
 
         g = GraphBuilder(18, ir_version=10)
         out_names = sql_to_onnx_graph(g, None, [], query, dtypes, right_input_dtypes=right_dtypes)
-        onx, _ = g.to_onnx(return_optimize_report=True)
+        onx = g.to_onnx(return_optimize_report=True)
         ref = ExtendedReferenceEvaluator(onx)
         return out_names, ref.run(None, feeds)
 
@@ -351,7 +351,7 @@ class TestSqlToOnnxGraph(ExtTestCase):
         g = GraphBuilder(18, ir_version=10)
         g.make_tensor_input("a", TensorProto.FLOAT, ("N",))
         sql_to_onnx_graph(g, None, [], "SELECT a FROM t", {"a": np.float32})
-        onx, _ = g.to_onnx(return_optimize_report=True)
+        onx = g.to_onnx(return_optimize_report=True)
         # Exactly one input named "a"
         input_names = [inp.name for inp in onx.graph.input]
         self.assertEqual(input_names.count("a"), 1)

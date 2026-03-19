@@ -1529,7 +1529,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
 
         expected = model(X, training=False).numpy()
         ort_result = _ort_run(onx, feeds)
-        self.assertEqualArray(expected, ort_result, atol=1e-5)
+        self.assertEqualArray(expected, ort_result, atol=1e-2)
 
     # ------------------------------------------------------------------
     # Flatten

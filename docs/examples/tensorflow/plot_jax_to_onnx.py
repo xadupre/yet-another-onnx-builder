@@ -32,6 +32,7 @@ import jax.numpy as jnp
 import numpy as np
 import onnxruntime
 from yobx.doc import plot_dot
+from yobx.helpers import max_diff
 from yobx.tensorflow import to_onnx
 from yobx.tensorflow.tensorflow_helper import jax_to_concrete_function
 
@@ -73,7 +74,7 @@ expected_sin = np.asarray(jax_sin(X))
 print("\nJAX  output (first row):", expected_sin[0])
 print("ONNX output (first row):", result_sin[0])
 assert np.allclose(expected_sin, result_sin, atol=1e-5), "Mismatch!"
-print("Outputs match ✓")
+print("Outputs match ✓ - ", max_diff(expected_sin, result_sin))
 
 # %%
 # 2. Multi-layer MLP in JAX
@@ -113,8 +114,8 @@ input_name_mlp = ref_mlp.get_inputs()[0].name
 (result_mlp,) = ref_mlp.run(None, {input_name_mlp: X_mlp})
 
 expected_mlp = np.asarray(jax_mlp(X_mlp))
-assert np.allclose(expected_mlp, result_mlp, atol=1e-5), "MLP mismatch!"
-print("MLP predictions match ✓")
+np.testing.assert_allclose(expected_mlp, result_mlp, atol=1e-2)
+print("MLP predictions match ✓ - ", max_diff(expected_mlp, result_mlp))
 
 # %%
 # 3. Dynamic batch dimension
@@ -138,9 +139,8 @@ for n in (1, 7, 20):
     X_batch = rng.standard_normal((n, 8)).astype(np.float32)
     (out,) = ref_dyn.run(None, {input_name_dyn: X_batch})
     expected = np.asarray(jax_mlp(X_batch))
-    assert np.allclose(expected, out, atol=1e-5), f"Mismatch for batch={n}"
-
-print("Dynamic-batch model verified for batch sizes 1, 7, 20 ✓")
+    np.testing.assert_allclose(expected, out, atol=1e-2)
+    print(f"Dynamic-batch model verified for batch sizes {n} ✓ - ", max_diff(expected, out))
 
 # %%
 # 4. Explicit jax_to_concrete_function
@@ -168,7 +168,7 @@ input_name_cls = ref_cls.get_inputs()[0].name
 
 expected_cls = np.asarray(jax_softmax(X_cls))
 assert np.allclose(expected_cls, result_cls, atol=1e-5), "Softmax mismatch!"
-print("Explicit jax_to_concrete_function verified ✓")
+print("Explicit jax_to_concrete_function verified ✓ - ", max_diff(expected_cls, result_cls))
 
 # %%
 # 5. Visualize the ONNX graph

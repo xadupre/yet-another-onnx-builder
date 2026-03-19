@@ -39,7 +39,8 @@ from onnx.external_data_helper import uses_external_data
 from onnx.model_container import make_large_tensor_proto
 from onnx.shape_inference import infer_shapes as onnx_infer_shapes
 from ..typing import ConvertOptionsProtocol, DefaultConvertOptions
-from ..container.model_container import ExtendedModelContainer, _get_type
+from ..container import ExportArtifact, ExportReport, ExtendedModelContainer
+from ..container.model_container import _get_type
 from ..helpers.mini_onnx_builder import proto_from_array
 from ..helpers import make_hash, string_signature, string_type
 from ..helpers.helper import size_type
@@ -5770,7 +5771,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         function_options: Optional[FunctionOptions] = None,
         mask_outputs: Optional[List[bool]] = None,
         as_graph_proto: bool = False,
-    ) -> Union[FunctionProto, ModelProto, GraphProto, ExtendedModelContainer, Dict[str, Any]]:
+    ) -> ExportArtifact:
         """
         Conversion to onnx. Only then the initializers are converted into TensorProto.
 
@@ -5788,7 +5789,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         :param mask_outputs: to filter out some outputs if not None
         :param as_graph_proto: return a GraphProto with no initializers,
             they are returned as well.
-        :return: the proto
+        :return: the model
         """
         assert self.nodes, f"No node to convert{self.get_debug_msg()}"
         if function_options is None:
@@ -5977,9 +5978,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                             f"doc_string is missing for initializer {init.name!r}"
                             f"\n{self.pretty_text()}"
                         )
-            return (lm, stats) if return_optimize_report else lm  # type: ignore
-
-        return (model, stats) if return_optimize_report else model  # type: ignore
+            return ExportArtifact(
+                container=lm, report=ExportReport(stats=stats) if return_optimize_report else None
+            )
+        return ExportArtifact(
+            proto=model, report=ExportReport(stats=stats) if return_optimize_report else None
+        )
 
     def _rename_dynamic_dimension_inplace(
         self, obj: ValueInfoProto, replacements: Dict[str, str]

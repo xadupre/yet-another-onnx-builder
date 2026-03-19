@@ -45,7 +45,7 @@ import numpy as np
 from onnx import TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
-from ..container import ExportArtifact, ExportReport
+from ..container import ExportArtifact
 from ..typing import GraphBuilderProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
@@ -252,8 +252,7 @@ def sql_to_onnx(
     sql_to_onnx_graph(
         g, sts, [], query, input_dtypes, right_input_dtypes=right_input_dtypes, n_rows=n_rows
     )
-    onx, stats = g.to_onnx(return_optimize_report=True)  # type: ignore
-    return ExportArtifact(proto=onx, report=ExportReport(stats=stats or []))  # type: ignore[return-value]
+    return g.to_onnx(return_optimize_report=True)
 
 
 # ---------------------------------------------------------------------------
