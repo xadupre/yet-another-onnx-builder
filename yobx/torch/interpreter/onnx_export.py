@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Un
 from onnx import ModelProto
 from onnx.defs import onnx_opset_version
 from onnx.model_container import ModelContainer
-from ...container import ExtendedModelContainer, ExportArtifact, ExportReport
+from ...container import ExportArtifact, ExportReport
 from ...helpers import string_type
 from ...xbuilder.graph_builder import GraphBuilder, OptimizationOptions, FunctionOptions
 from ..export_options import ExportOptions
@@ -505,7 +505,7 @@ def _make_builder_interpreter(
     :param module_name: name of the module, to help retrieve the parameter name
     :param output_names: output names
     :param output_dynamic_shapes: same as dynamic shapes but for the outputs
-    :return: onnx model, interpreter, graph builder, mask_outputs
+    :return: interpreter, graph builder, mask_outputs
     """
 
     def _get(x, att=None):
@@ -891,7 +891,7 @@ def to_onnx(
     :param external_threshold: if large_model is True, every tensor above this limit
         is stored as external
     :param return_optimize_report: returns statistics on the optimization as well;
-        statistics are also available via ``artifact.report._extra["optimization"]``
+        statistics are also available via ``artifact.report``
         on the returned :class:`~yobx.container.ExportArtifact`
     :param filename: if specified, stores the model into that file
     :param inline: inline the model before converting to onnx, this is done before
@@ -1062,7 +1062,7 @@ def to_onnx(
         )
 
     begin = t
-    onx, stats = builder.to_onnx(
+    onx = builder.to_onnx(
         optimize=optimize,
         large_model=large_model,
         external_threshold=external_threshold,
@@ -1072,19 +1072,18 @@ def to_onnx(
         mask_outputs=mask_outputs,
     )
     all_stats = dict(builder=builder.statistics_)
-    if stats:
-        add_stats["optimization"] = stats
+    if onx.report and onx.report.stats:
+        add_stats["optimization"] = onx.report
     t = time.perf_counter()
     add_stats["time_export_to_onnx"] = t - begin
 
     if verbose:
-        proto = onx if isinstance(onx, ModelProto) else onx.model_proto
         print(
             f"[to_onnx] to_onnx done in {t - begin}s "
-            f"and {len(proto.graph.node)} nodes, "
-            f"{len(proto.graph.initializer)} initializers, "
-            f"{len(proto.graph.input)} inputs, "
-            f"{len(proto.graph.output)} outputs"
+            f"and {len(onx.graph.node)} nodes, "
+            f"{len(onx.graph.initializer)} initializers, "
+            f"{len(onx.graph.input)} inputs, "
+            f"{len(onx.graph.output)} outputs"
         )
         if verbose >= 10:
             print(builder.get_debug_msg())
@@ -1092,15 +1091,13 @@ def to_onnx(
     # Build ExportArtifact
     all_stats.update(add_stats)
     report = ExportReport(extra=all_stats)
-    if isinstance(onx, ExtendedModelContainer):
-        artifact = ExportArtifact(proto=onx.model_proto, container=onx, report=report)
-    else:
-        artifact = ExportArtifact(proto=onx, report=report)
+    onx.update(report)
+    artifact = onx
 
     if filename:
         from ...xbuilder.builder_stats_helper import builder_stats_to_dataframe
 
-        df = builder_stats_to_dataframe(stats)
+        df = builder_stats_to_dataframe(all_stats)
         df.to_excel(f"{os.path.splitext(filename)[0]}.xlsx")
         artifact.save(filename)
 
@@ -1114,9 +1111,6 @@ def to_onnx(
             verbose=verbose,
             atol=validate_onnx if isinstance(validate_onnx, float) else 1e-5,
         )
-
-    if return_builder:
-        artifact.builder = builder
     return artifact
 
 

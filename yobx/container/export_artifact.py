@@ -21,7 +21,7 @@ class ExportReport:
     and ``"time_in"``.
 
     Additional arbitrary key-value pairs can be recorded via the
-    :meth:`update` method and are stored in :attr:`_extra`.
+    :meth:`update` method and are stored in :attr:`extra`.
 
     Example::
 
@@ -40,12 +40,27 @@ class ExportReport:
         self.extra: Dict[str, Any] = extra if extra is not None else {}
         self.build_stats = build_stats
 
-    def update(self, data: Dict[str, Any]) -> None:
-        """Merge *data* into :attr:`_extra`.
-
-        :param data: key-value pairs to add to :attr:`_extra`.
+    def update(self, data: Any):
         """
-        self.extra.update(data)
+        Appends *data* to the report.
+
+        :param data: anything
+        :return: self
+        """
+        if isinstance(data, dict):
+            self.extra.update(data)
+        elif isinstance(data, list):
+            self.stats.append(data)
+        elif isinstance(data, BuildStats):
+            self.build_stats = data
+        elif isinstance(data, ExportReport):
+            self.update(data.stats)
+            self.update(data.extra)
+            if data.build_stats:
+                self.update(data.build_stats)
+        else:
+            raise TypeError(f"Unexpected tppe {type(data)} for data.")
+        return self
 
     def to_dict(self) -> Dict[str, Any]:
         """Return a plain dictionary representation of this report.
@@ -135,6 +150,12 @@ class ExportArtifact(ExportArtifactProtocol):
                 self.report = ExportReport(build_stats=self.container._stats)
             else:
                 self.report.build_stats = self.container._stats
+
+    def update(self, data: Any):
+        """Updates report."""
+        if not self.report:
+            self.report = ExportReport()
+        self.report.update(data)
 
     def save(self, file_path: str, all_tensors_to_one_file: bool = True) -> Any:
         """Save the exported model to *file_path*.

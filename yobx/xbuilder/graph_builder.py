@@ -432,7 +432,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             self.input_names: List[str] = list(input_names) if input_names else []
             self.current_input = 0
             self._unique_names = set(self.input_names)
-        elif isinstance(target_opset_or_existing_proto, (GraphProto, ModelProto, FunctionProto)):
+        elif isinstance(
+            target_opset_or_existing_proto,
+            (GraphProto, ModelProto, FunctionProto, ExportArtifact),
+        ):
             # loads a model from nothing
             if input_names:
                 raise ValueError("input_names must be empty if the input is an existing model.")
@@ -442,6 +445,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     _opsets is not None
                 ), "_opsets must be specified if the input is a GraphProto"
                 self.opsets = _opsets
+            elif isinstance(target_opset_or_existing_proto, ExportArtifact):
+                target_opset_or_existing_proto = target_opset_or_existing_proto.get_proto(
+                    include_weights=True
+                )
             else:
                 assert _opsets is None, "_opsets must be None if the input is not a GraphProto"
             self._update_structures_with_proto(
