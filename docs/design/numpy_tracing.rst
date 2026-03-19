@@ -1,8 +1,12 @@
 .. _l-design-function-transformer-tracing:
 
-==========================================
-Numpy-Tracing and FunctionTransformer
-==========================================
+=============
+Numpy-Tracing
+=============
+
+This section covers the numpy-tracing infrastructure that converts plain
+numpy functions into ONNX graphs — a core building block used by multiple
+converters and available as a standalone tool.
 
 ``yobx`` can export a :class:`~sklearn.preprocessing.FunctionTransformer`
 to ONNX by *tracing* its ``func`` attribute: the function is re-executed with

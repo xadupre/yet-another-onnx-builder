@@ -15,3 +15,4 @@ command-line utilities, and cross-cutting design topics.
    design/sql/index
    design/tensorflow/index
    design/torch/index
+   design/numpy_tracing
