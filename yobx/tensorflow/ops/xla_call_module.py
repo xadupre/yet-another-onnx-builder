@@ -23,9 +23,7 @@ from .xla_call_module_parsing import (  # noqa: F401
 
 
 def _process_constant_layer(
-    layer: dict,
-    local_results: Dict[str, str],
-    g: GraphBuilderExtendedProtocol,
+    layer: dict, local_results: Dict[str, str], g: GraphBuilderExtendedProtocol
 ) -> None:
     """Create an ONNX initializer for a ``constant`` StableHLO layer.
 
@@ -65,10 +63,7 @@ def _process_constant_layer(
     local_results[layer["id"]] = const_name
 
 
-def _process_broadcast_layer(
-    layer: dict,
-    local_results: Dict[str, str],
-) -> None:
+def _process_broadcast_layer(layer: dict, local_results: Dict[str, str]) -> None:
     """Handle a ``broadcast_in_dim`` or ``dynamic_broadcast_in_dim`` layer.
 
     ONNX arithmetic ops support implicit broadcasting, so we simply pass the
@@ -83,9 +78,7 @@ def _process_broadcast_layer(
 
 
 def _process_dot_general_layer(
-    layer: dict,
-    local_results: Dict[str, str],
-    g: GraphBuilderExtendedProtocol,
+    layer: dict, local_results: Dict[str, str], g: GraphBuilderExtendedProtocol
 ) -> None:
     """Emit a MatMul ONNX op for a ``dot_general`` StableHLO layer.
 
@@ -96,16 +89,12 @@ def _process_dot_general_layer(
     lhs_id, rhs_id = layer["operands"]
     if lhs_id not in local_results or rhs_id not in local_results:
         return
-    res = g.op.MatMul(
-        local_results[lhs_id], local_results[rhs_id], name="XlaCallModule"
-    )
+    res = g.op.MatMul(local_results[lhs_id], local_results[rhs_id], name="XlaCallModule")
     local_results[layer["id"]] = res if isinstance(res, str) else res[0]
 
 
 def _process_reduce_layer(
-    layer: dict,
-    local_results: Dict[str, str],
-    g: GraphBuilderExtendedProtocol,
+    layer: dict, local_results: Dict[str, str], g: GraphBuilderExtendedProtocol
 ) -> None:
     """Emit a ReduceMax or ReduceSum ONNX op for a ``reduce_*`` StableHLO layer.
 
@@ -119,13 +108,9 @@ def _process_reduce_layer(
     axes = layer.get("axes", [])
     np_axes = np.array(axes, dtype=np.int64)
     if layer["op"] == "reduce_max":
-        res = g.op.ReduceMax(
-            local_results[inp_id], np_axes, keepdims=1, name="XlaCallModule"
-        )
+        res = g.op.ReduceMax(local_results[inp_id], np_axes, keepdims=1, name="XlaCallModule")
     else:
-        res = g.op.ReduceSum(
-            local_results[inp_id], np_axes, keepdims=1, name="XlaCallModule"
-        )
+        res = g.op.ReduceSum(local_results[inp_id], np_axes, keepdims=1, name="XlaCallModule")
     local_results[layer["id"]] = res if isinstance(res, str) else res[0]
 
 

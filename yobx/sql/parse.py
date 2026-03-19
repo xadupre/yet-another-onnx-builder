@@ -568,10 +568,7 @@ class _Parser:
         columns = _collect_columns(operations)
 
         return ParsedQuery(
-            operations=operations,
-            from_table=from_table,
-            columns=columns,
-            subquery=subquery,
+            operations=operations, from_table=from_table, columns=columns, subquery=subquery
         )
 
     def parse(self) -> "ParsedQuery":

@@ -8,7 +8,6 @@ import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
 
-
 # Corpus from sklearn-onnx's test suite (natural-language sentences with
 # punctuation so that sklearn's default word-boundary regex tokenizer is
 # exercised via ``_sklearn_tokenize``).

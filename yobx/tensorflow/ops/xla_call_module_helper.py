@@ -8,11 +8,11 @@ Functions whose names contain ``parse`` (e.g. :func:`~xla_call_module_parsing._p
 :func:`~xla_call_module_parsing._parse_dense_value`, :func:`~xla_call_module_parsing._parse_body`)
 live in :mod:`xla_call_module_parsing` instead.
 """
+
 import re
 from typing import Dict, Optional
 
 import numpy as np
-
 
 # ---------------------------------------------------------------------------
 # Dtype and reduce-op maps
@@ -113,4 +113,3 @@ def _extract_function_body(mlir_string: str, func_name: str) -> Optional[str]:
     if body_start == -1:
         return None
     return _extract_balanced_parens(mlir_string, body_start, open_char="{")
-

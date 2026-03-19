@@ -32,9 +32,7 @@ def _rsf_leaf_value(tree_value: np.ndarray, node_id: int, is_event_time: np.ndar
 
 
 def _extract_rsf_attributes_legacy(
-    estimators: list,
-    n_estimators: int,
-    is_event_time: np.ndarray,
+    estimators: list, n_estimators: int, is_event_time: np.ndarray
 ) -> dict:
     """Extracts ``TreeEnsembleRegressor`` attributes for a :class:`RandomSurvivalForest`.
 
@@ -125,10 +123,7 @@ def _extract_rsf_attributes_legacy(
 
 
 def _extract_rsf_attributes_v5(
-    estimators: list,
-    n_estimators: int,
-    is_event_time: np.ndarray,
-    itype: int,
+    estimators: list, n_estimators: int, is_event_time: np.ndarray, itype: int
 ) -> dict:
     """Extracts ``TreeEnsemble`` (opset 5) attributes for a :class:`RandomSurvivalForest`.
 
