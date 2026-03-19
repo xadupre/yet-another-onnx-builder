@@ -19,3 +19,8 @@ sql_to_onnx
 +++++++++++
 
 .. autofunction:: yobx.sql.sql_to_onnx
+
+sql_to_onnx_graph
++++++++++++++++++
+
+.. autofunction:: yobx.sql.sql_to_onnx_graph

@@ -13,6 +13,8 @@ containing an ordered list of :class:`~yobx.sql.parse.SqlOperation` objects
 Public API
 ----------
 * :func:`sql_to_onnx` — high-level entry point: SQL string → ONNX model
+* :func:`sql_to_onnx_graph` — low-level entry point: SQL string → nodes added
+  to an existing :class:`~yobx.typing.GraphBuilderProtocol`
 * :func:`~yobx.sql.parse.parse_sql` — parse a SQL string into a
   :class:`~yobx.sql.parse.ParsedQuery`
 * :class:`~yobx.sql.parse.ParsedQuery` — parsed query container
@@ -42,7 +44,7 @@ Example
     # total == array([5., 9.], dtype=float32)  (rows where a > 0)
 """
 
-from .convert import sql_to_onnx
+from .convert import sql_to_onnx, sql_to_onnx_graph
 from .parse import (
     AggExpr,
     BinaryExpr,
@@ -74,4 +76,5 @@ __all__ = [
     "SelectOp",
     "parse_sql",
     "sql_to_onnx",
+    "sql_to_onnx_graph",
 ]

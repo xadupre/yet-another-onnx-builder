@@ -39,12 +39,13 @@ Limitations
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 from onnx import ModelProto, TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
+from ..typing import GraphBuilderProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
 from .ops import get_sql_op_converter
@@ -71,6 +72,90 @@ def _np_dtype_to_onnx(dt: Union[np.dtype, type, str]) -> int:
     raise ValueError(f"Unsupported numpy dtype for SQL conversion: {dt}")
 
 
+def sql_to_onnx_graph(
+    g: GraphBuilderProtocol,
+    sts: Optional[Dict],
+    outputs: List[str],
+    query: str,
+    input_dtypes: Dict[str, Union[np.dtype, type, str]],
+    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
+    n_rows: Optional[int] = None,
+) -> List[str]:
+    """
+    Build ONNX nodes for a SQL *query* into an existing graph builder *g*.
+
+    This is the low-level entry point for callers that are already managing a
+    :class:`~yobx.typing.GraphBuilderProtocol` instance (e.g. as part of a
+    larger model).  The signature follows the standard SQL op converter
+    convention ``(g, sts, outputs, ...)``.  Any column referenced in the
+    query that is not yet registered as an input in *g* is added
+    automatically.  The SELECT expressions are emitted as model outputs and
+    their tensor names are returned.
+
+    :param g: an existing graph builder that satisfies
+        :class:`~yobx.typing.GraphBuilderProtocol`.  Nodes and inputs are
+        added to this builder in-place.
+    :param sts: shape/type context dict forwarded to SQL op converters, or
+        ``None``.  May contain:
+
+        * ``"custom_functions"`` — a mapping from function name (as it
+          appears in the SQL string) to a Python callable.  Each callable
+          must accept one or more numpy arrays and return a numpy array.  The
+          function body is traced with
+          :func:`~yobx.xtracing.trace_numpy_function` so that numpy
+          arithmetic is translated into ONNX nodes.
+
+        When ``None`` (or an empty dict) no custom functions are available.
+
+    :param outputs: expected output column names for the query result.
+        Passed through to individual op converters following the standard
+        converter convention; may be an empty list when the caller does not
+        know the output names in advance.
+    :param query: a SQL string.  Supported clauses:
+        ``SELECT``, ``FROM``, ``[INNER|LEFT|RIGHT|FULL] JOIN … ON``,
+        ``WHERE``, ``GROUP BY``.
+    :param input_dtypes: a mapping from *left-table* column name to numpy
+        dtype (``np.float32``, ``np.int64``, etc.).  Only columns actually
+        referenced in the query need to be listed.
+    :param right_input_dtypes: if the query contains a ``JOIN``, a mapping
+        from *right-table* column name to numpy dtype.  Defaults to
+        ``input_dtypes`` when ``None``.
+    :param n_rows: optional static number of rows; used to fix the first
+        dimension of every input tensor that is newly added to *g*.  When
+        ``None`` the first dimension is symbolic (``"N"``).
+    :return: a list of output tensor names that were added to *g* as model
+        outputs (one per expression in the ``SELECT`` clause, in order).
+
+    Example::
+
+        import numpy as np
+        from yobx.xbuilder import GraphBuilder
+        from yobx.sql import sql_to_onnx_graph
+
+        g = GraphBuilder(18, ir_version=10)
+        dtypes = {"a": np.float32, "b": np.float32}
+        out_names = sql_to_onnx_graph(
+            g,
+            None,
+            [],
+            "SELECT a + b AS total FROM t WHERE a > 0",
+            dtypes,
+        )
+        onx, _ = g.to_onnx(return_optimize_report=True)
+    """
+    custom_functions = (sts or {}).get("custom_functions", {})
+    pq = parse_sql(query)
+    return _populate_graph(
+        g,
+        pq,
+        input_dtypes=input_dtypes,
+        right_input_dtypes=right_input_dtypes,
+        n_rows=n_rows,
+        custom_functions=custom_functions,
+        desired_outputs=outputs or None,
+    )
+
+
 def sql_to_onnx(
     query: str,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
@@ -78,6 +163,7 @@ def sql_to_onnx(
     target_opset: int = DEFAULT_TARGET_OPSET,
     n_rows: Optional[int] = None,
     custom_functions: Optional[Dict[str, Callable]] = None,
+    builder_cls: Union[type, Callable] = GraphBuilder,
 ) -> ModelProto:
     """
     Convert a SQL *query* to a self-contained :class:`onnx.ModelProto`.
@@ -86,6 +172,14 @@ def sql_to_onnx(
     tensor, allowing the caller to feed column vectors independently.  The
     resulting model's outputs correspond to the columns (or expressions) in
     the ``SELECT`` clause, in order.
+
+    Internally this function creates a fresh
+    :class:`~yobx.xbuilder.GraphBuilder` (or the class supplied via
+    *builder_cls*), delegates to :func:`sql_to_onnx_graph` to populate it,
+    and then calls :meth:`~yobx.xbuilder.GraphBuilder.to_onnx` to finalise
+    the model.
+    Use :func:`sql_to_onnx_graph` directly when you need to embed the SQL
+    subgraph inside a larger ONNX model you are already building.
 
     :param query: a SQL string.  Supported clauses:
         ``SELECT``, ``FROM``, ``[INNER|LEFT|RIGHT|FULL] JOIN … ON``,
@@ -121,6 +215,13 @@ def sql_to_onnx(
                 custom_functions={"my_sqrt": np.sqrt},
             )
 
+    :param builder_cls: the graph-builder class (or factory callable) to
+        instantiate when creating the internal
+        :class:`~yobx.xbuilder.GraphBuilder`.  Defaults to
+        :class:`~yobx.xbuilder.GraphBuilder`.  Any class that implements
+        the :ref:`builder-api` can be supplied here, e.g. a custom subclass
+        that adds extra optimisation passes.
+
     :return: a :class:`onnx.ModelProto` ready for inference.
 
     Example::
@@ -138,15 +239,13 @@ def sql_to_onnx(
         key) would require an ONNX ``Loop`` or custom kernel and are not
         yet supported.
     """
-    pq = parse_sql(query)
-    return _build_onnx(
-        pq,
-        input_dtypes=input_dtypes,
-        right_input_dtypes=right_input_dtypes,
-        target_opset=target_opset,
-        n_rows=n_rows,
-        custom_functions=custom_functions,
+    g = builder_cls(target_opset, ir_version=10)
+    sts = {"custom_functions": custom_functions or {}}
+    sql_to_onnx_graph(
+        g, sts, [], query, input_dtypes, right_input_dtypes=right_input_dtypes, n_rows=n_rows
     )
+    onx, _ = g.to_onnx(return_optimize_report=True)  # type: ignore
+    return onx  # type: ignore[return-value]
 
 
 # ---------------------------------------------------------------------------
@@ -154,14 +253,16 @@ def sql_to_onnx(
 # ---------------------------------------------------------------------------
 
 
-def _build_onnx(
+def _populate_graph(
+    g: GraphBuilderProtocol,
     pq: ParsedQuery,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]],
-    target_opset: int,
     n_rows: Optional[int],
     custom_functions: Optional[Dict[str, Callable]] = None,
-) -> ModelProto:
+    desired_outputs: Optional[List[str]] = None,
+) -> List[str]:
+    """Populate *g* with ONNX nodes for *pq* and return the output tensor names."""
     dim = n_rows if n_rows is not None else "N"
 
     # Resolve dtype dicts
@@ -203,9 +304,10 @@ def _build_onnx(
 
     all_inputs = left_inputs + right_inputs
 
-    g = GraphBuilder(target_opset, ir_version=10)
+    # Add inputs to the graph only when not already registered
     for inp_name, inp_type, inp_shape in all_inputs:
-        g.make_tensor_input(inp_name, inp_type, inp_shape)
+        if not g.has_name(inp_name):
+            g.make_tensor_input(inp_name, inp_type, inp_shape)
 
     # col_map: current ONNX tensor name for each column (left side)
     col_map: Dict[str, str] = {name: name for name, _, _ in left_inputs}
@@ -237,17 +339,29 @@ def _build_onnx(
     # Emit SELECT expressions
     emitter = _ExprEmitter(g, col_map, custom_functions=resolved_custom_functions)
     output_names: List[str] = []
+    used_tensor_names: Set[str] = set()
     for i, item in enumerate(select_op.items):
         out_name = item.output_name()
-        # Use indexed tensor name to avoid collision with input names
-        tensor_name = f"output_{i}"
+        # Determine the desired tensor name: caller-supplied, then query alias, then indexed
+        if desired_outputs and i < len(desired_outputs):
+            candidate = desired_outputs[i]
+        else:
+            candidate = out_name
+        # Fall back to an indexed name if the candidate conflicts with existing names
+        if g.has_name(candidate) or candidate in used_tensor_names:
+            # Find a free indexed name (output_{i}, output_{i+1}, ...) that is not taken
+            j = i
+            candidate = f"output_{j}"
+            while g.has_name(candidate) or candidate in used_tensor_names:
+                j += 1
+                candidate = f"output_{j}"
+        tensor_name = candidate
+        used_tensor_names.add(tensor_name)
         result = emitter.emit(item.expr, name=f"select_{out_name}")
-        # Always emit an Identity node to give the output tensor a unique indexed name
         g.op.Identity(result, outputs=[tensor_name], name=f"out_{out_name}")
         output_names.append(tensor_name)
 
     for out_name in output_names:
         g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
 
-    onx, _ = g.to_onnx(return_optimize_report=True)  # type: ignore
-    return onx  # type: ignore[return-value]
+    return output_names
