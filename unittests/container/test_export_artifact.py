@@ -10,7 +10,7 @@ import unittest
 import numpy as np
 import onnx
 import onnx.helper as oh
-from yobx.container import ExportArtifact, ExportReport, FunctionExportArtifact
+from yobx.container import ExportArtifact, ExportReport, FunctionPieces
 from yobx.ext_test_case import ExtTestCase
 
 
@@ -155,7 +155,7 @@ class TestExportArtifact(ExtTestCase):
         np.testing.assert_allclose(total, a + b, rtol=1e-5)
 
     def test_to_onnx_function_returns_artifact(self):
-        """to_onnx with export_as_function=True should return a FunctionExportArtifact."""
+        """to_onnx with export_as_function=True should return an ExportArtifact with function field."""
         from yobx.xbuilder import GraphBuilder, FunctionOptions
         from yobx.reference import ExtendedReferenceEvaluator
 
@@ -171,15 +171,16 @@ class TestExportArtifact(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(artifact, FunctionExportArtifact)
-        # FunctionExportArtifact is a subclass of ExportArtifact
         self.assertIsInstance(artifact, ExportArtifact)
         self.assertIsInstance(artifact.proto, onnx.FunctionProto)
         self.assertIsNone(artifact.container)
+        # function field is always set for function exports
+        self.assertIsNotNone(artifact.function)
+        self.assertIsInstance(artifact.function, FunctionPieces)
         # No initializers in this simple function
-        self.assertIsNone(artifact.initializers_name)
-        self.assertIsNone(artifact.initializers_dict)
-        self.assertIsNone(artifact.initializers_renaming)
+        self.assertIsNone(artifact.function.initializers_name)
+        self.assertIsNone(artifact.function.initializers_dict)
+        self.assertIsNone(artifact.function.initializers_renaming)
 
         # Proto should be usable with ExtendedReferenceEvaluator
         ref = ExtendedReferenceEvaluator(artifact)
@@ -208,13 +209,15 @@ class TestExportArtifact(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(artifact, FunctionExportArtifact)
+        self.assertIsInstance(artifact, ExportArtifact)
         self.assertIsInstance(artifact.proto, onnx.FunctionProto)
-        # Initializer data should be stored in the artifact
-        self.assertIsNotNone(artifact.initializers_name)
-        self.assertIsNotNone(artifact.initializers_dict)
-        self.assertIsNotNone(artifact.initializers_renaming)
-        self.assertGreater(len(artifact.initializers_name), 0)
+        # function field carries the initializer data
+        self.assertIsNotNone(artifact.function)
+        self.assertIsInstance(artifact.function, FunctionPieces)
+        self.assertIsNotNone(artifact.function.initializers_name)
+        self.assertIsNotNone(artifact.function.initializers_dict)
+        self.assertIsNotNone(artifact.function.initializers_renaming)
+        self.assertGreater(len(artifact.function.initializers_name), 0)
 
 
 if __name__ == "__main__":

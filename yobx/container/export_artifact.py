@@ -78,6 +78,56 @@ class ExportReport:
         )
 
 
+class FunctionPieces:
+    """
+    Holds the function-specific data produced by
+    :meth:`~yobx.xbuilder.GraphBuilder._to_onnx_function`.
+
+    An instance of this class is stored as :attr:`ExportArtifact.function`
+    when :meth:`~yobx.xbuilder.GraphBuilder.to_onnx` is called with
+    ``function_options.export_as_function=True``.  It is ``None`` for regular
+    model exports.
+
+    Args:
+        initializers_name : list[str] | None
+            Ordered list of extra input names that were promoted from
+            initializers into function inputs when ``return_initializer=True``
+            was set in :class:`~yobx.xbuilder.FunctionOptions`.  ``None``
+            when no initializers were promoted.
+        initializers_dict : dict[str, Any] | None
+            Mapping from (possibly renamed) initializer name to tensor value
+            for every name listed in :attr:`initializers_name`.  ``None``
+            when no initializers were promoted.
+        initializers_renaming : dict[str, str] | None
+            Mapping from original initializer name to the (possibly renamed)
+            name used in :attr:`initializers_name`.  ``None`` when no
+            initializers were promoted.
+        nested_functions : list[FunctionProto] | None
+            Local :class:`~onnx.FunctionProto` objects defined inside the
+            exported function that are needed to evaluate it.  ``None`` when
+            there are no nested functions.
+    """
+
+    def __init__(
+        self,
+        initializers_name: Optional[List[str]] = None,
+        initializers_dict: Optional[Dict[str, Any]] = None,
+        initializers_renaming: Optional[Dict[str, str]] = None,
+        nested_functions: Optional[List[onnx.FunctionProto]] = None,
+    ):
+        self.initializers_name = initializers_name
+        self.initializers_dict = initializers_dict
+        self.initializers_renaming = initializers_renaming
+        self.nested_functions = nested_functions
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}("
+            f"n_initializers={len(self.initializers_name) if self.initializers_name else 0}, "
+            f"n_nested_functions={len(self.nested_functions) if self.nested_functions else 0})"
+        )
+
+
 class ExportArtifact(ExportArtifactProtocol):
     """
     Standard output of every :func:`to_onnx` conversion function.
@@ -104,7 +154,13 @@ class ExportArtifact(ExportArtifactProtocol):
         filename : str | None
             Path where the model was last saved, or ``None`` if never saved.
         builder: GraphBuilderExtendedProtocol
-            Keeps the builder building the onnx model
+            Keeps the builder building the onnx model.
+        function : FunctionPieces | None
+            When the export was performed with
+            ``function_options.export_as_function=True``, this holds a
+            :class:`FunctionPieces` instance with function-specific data
+            (initializer names/values and nested local functions).  ``None``
+            for regular model exports.
 
     Example::
 
@@ -132,6 +188,7 @@ class ExportArtifact(ExportArtifactProtocol):
         report: Optional[ExportReport] = None,
         filename: Optional[str] = None,
         builder: Optional[GraphBuilderExtendedProtocol] = None,
+        function: Optional["FunctionPieces"] = None,
     ):
         assert not proto or isinstance(
             proto, (onnx.ModelProto, onnx.GraphProto, onnx.FunctionProto)
@@ -144,6 +201,7 @@ class ExportArtifact(ExportArtifactProtocol):
         self.report = report
         self.filename = filename
         self.builder = builder
+        self.function = function
         if self.container and self.container._stats:
             if not self.report:
                 self.report = ExportReport(build_stats=self.container._stats)
@@ -347,79 +405,3 @@ class ExportArtifact(ExportArtifactProtocol):
         if self.container and self.container.model_proto_:
             return self.container.model_proto_.ir_version
         raise AttributeError(f"The artifact do not contain any model {self!r}.")
-
-
-class FunctionExportArtifact(ExportArtifact):
-    """
-    Artifact produced when :meth:`~yobx.xbuilder.GraphBuilder.to_onnx` is
-    called with ``function_options.export_as_function=True``.
-
-    Extends :class:`ExportArtifact` with function-specific data that is
-    needed to embed the exported :class:`~onnx.FunctionProto` into a parent
-    model via :meth:`~yobx.xbuilder.GraphBuilder.make_local_function`.
-
-    Args:
-        proto : FunctionProto | None
-            The exported :class:`~onnx.FunctionProto`.
-        report : ExportReport | None
-            Statistics and metadata about the export.
-        builder : GraphBuilderExtendedProtocol | None
-            The builder that produced this artifact.
-        initializers_name : list[str] | None
-            When ``return_initializer=True`` was set in
-            :class:`~yobx.xbuilder.FunctionOptions`, this holds the ordered
-            list of extra input names that were promoted from initializers into
-            function inputs.  ``None`` when no initializers were promoted.
-        initializers_dict : dict[str, Any] | None
-            Mapping from (possibly renamed) initializer name to tensor value
-            for every name listed in :attr:`initializers_name`.  ``None``
-            when no initializers were promoted.
-        initializers_renaming : dict[str, str] | None
-            Mapping from original initializer name to the (possibly renamed)
-            name used in :attr:`initializers_name`.  ``None`` when no
-            initializers were promoted.
-        nested_functions : list[FunctionProto] | None
-            Local :class:`~onnx.FunctionProto` objects defined inside the
-            exported function that are needed to evaluate it.  ``None`` when
-            there are no nested functions.
-
-    Example::
-
-        import numpy as np
-        from yobx.xbuilder import GraphBuilder, FunctionOptions
-        from yobx.container import FunctionExportArtifact
-        from yobx.reference import ExtendedReferenceEvaluator
-
-        g = GraphBuilder(18, ir_version=9, as_function=True)
-        g.make_tensor_input("X", None, None, False)
-        g.op.Add("X", "X", outputs=["Y"])
-        g.make_tensor_output("Y", is_dimension=False, indexed=False)
-
-        artifact = g.to_onnx(
-            function_options=FunctionOptions(
-                export_as_function=True, name="double", domain="mylib"
-            ),
-            inline=False,
-        )
-        assert isinstance(artifact, FunctionExportArtifact)
-
-        ref = ExtendedReferenceEvaluator(artifact)
-        X = np.array([[1.0, 2.0]], dtype=np.float32)
-        (Y,) = ref.run(None, {"X": X})
-    """
-
-    def __init__(
-        self,
-        proto: Optional[onnx.FunctionProto] = None,
-        report: Optional[ExportReport] = None,
-        builder: Optional[GraphBuilderExtendedProtocol] = None,
-        initializers_name: Optional[List[str]] = None,
-        initializers_dict: Optional[Dict[str, Any]] = None,
-        initializers_renaming: Optional[Dict[str, str]] = None,
-        nested_functions: Optional[List[onnx.FunctionProto]] = None,
-    ):
-        super().__init__(proto=proto, report=report, builder=builder)
-        self.initializers_name = initializers_name
-        self.initializers_dict = initializers_dict
-        self.initializers_renaming = initializers_renaming
-        self.nested_functions = nested_functions

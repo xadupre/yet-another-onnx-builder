@@ -39,7 +39,7 @@ from onnx.external_data_helper import uses_external_data
 from onnx.model_container import make_large_tensor_proto
 from onnx.shape_inference import infer_shapes as onnx_infer_shapes
 from ..typing import ConvertOptionsProtocol, DefaultConvertOptions
-from ..container import ExportArtifact, ExportReport, ExtendedModelContainer, FunctionExportArtifact
+from ..container import ExportArtifact, ExportReport, ExtendedModelContainer, FunctionPieces
 from ..container.model_container import _get_type
 from ..helpers.mini_onnx_builder import proto_from_array
 from ..helpers import make_hash, string_signature, string_type
@@ -5565,7 +5565,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def _to_onnx_function(
         self, function_options, opsets, mask_outputs
-    ) -> "FunctionExportArtifact":
+    ) -> "ExportArtifact":
         if self._debug_local_function:
             print(f"[GraphBuilder-{self._hash()}.to_onnx] export_as_function {function_options}")
         if self.verbose:
@@ -5613,7 +5613,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         )
 
         if not function_options.return_initializer:
-            return FunctionExportArtifact(proto=proto)
+            return ExportArtifact(proto=proto, function=FunctionPieces())
 
         if len(self.initializers_dict) == 0 and len(self.functions) == 0:
             nested = None
@@ -5621,7 +5621,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 used_functions = self._get_used_local_functions()
                 if used_functions:
                     nested = used_functions
-            return FunctionExportArtifact(proto=proto, nested_functions=nested)
+            return ExportArtifact(proto=proto, function=FunctionPieces(nested_functions=nested))
 
         # We need to move the initializers as inputs, we sort them by decreasing size
         inits, functions = self._extend_local_function_inputs()
@@ -5629,20 +5629,22 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         nested_functions = (
             [v for k, v in self.functions.items() if k in functions] if functions else None
         )
-        return FunctionExportArtifact(
+        return ExportArtifact(
             proto=proto,
-            initializers_name=inits,
-            initializers_dict={
-                self._parameter_renaming.get(k, k): v
-                for k, v in self.initializers_dict.items()
-                if k in set(inits)
-            },
-            initializers_renaming={
-                k: self._parameter_renaming.get(k, k)
-                for k, v in self.initializers_dict.items()
-                if k in set(inits)
-            },
-            nested_functions=nested_functions,
+            function=FunctionPieces(
+                initializers_name=inits,
+                initializers_dict={
+                    self._parameter_renaming.get(k, k): v
+                    for k, v in self.initializers_dict.items()
+                    if k in set(inits)
+                },
+                initializers_renaming={
+                    k: self._parameter_renaming.get(k, k)
+                    for k, v in self.initializers_dict.items()
+                    if k in set(inits)
+                },
+                nested_functions=nested_functions,
+            ),
         )
 
     def _update_model_with_parameter_renaming(self, model: ModelProto):
@@ -8715,29 +8717,33 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._check_function_order()
 
         fct = builder.to_onnx(function_options=function_options, optimize=optimize, inline=False)
-        assert isinstance(fct, FunctionExportArtifact), (
+        assert isinstance(fct, ExportArtifact), (
             f"Unexpected type {type(fct)}, function_options={function_options}"
             f"{self.get_debug_msg()}"
+        )
+        assert fct.function is not None, (
+            f"ExportArtifact.function is None for function export, "
+            f"function_options={function_options}{self.get_debug_msg()}"
         )
         onx = fct.proto
 
         if metadata_props:
             oh.set_metadata_props(onx, metadata_props)
 
-        if self._debug_local_function and fct.initializers_name is not None:
+        if self._debug_local_function and fct.function.initializers_name is not None:
             print(
                 f"[GraphBuilder-{self._hash()}.make_local_function] "
-                f"initializers_name={fct.initializers_name}"
+                f"initializers_name={fct.function.initializers_name}"
             )
-            if fct.initializers_dict is not None:
+            if fct.function.initializers_dict is not None:
                 print(
                     f"[GraphBuilder-{self._hash()}.make_local_function] initializers_dict="
-                    f"{list(fct.initializers_dict)}"
+                    f"{list(fct.function.initializers_dict)}"
                 )
-            if fct.initializers_renaming is not None:
+            if fct.function.initializers_renaming is not None:
                 print(
                     f"[GraphBuilder-{self._hash()}.make_local_function] initializers_renaming="
-                    f"{fct.initializers_renaming}"
+                    f"{fct.function.initializers_renaming}"
                 )
         if self._debug_local_function:
             print(
@@ -8767,20 +8773,20 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             )
 
         # Let's rename the initializers.
-        if fct.initializers_dict is not None:
-            assert len(fct.initializers_dict) == len(fct.initializers_name), (
-                f"Names mismatch between {fct.initializers_name} and "
-                f"{list(fct.initializers_dict)}{builder.get_debug_msg()}"
+        if fct.function.initializers_dict is not None:
+            assert len(fct.function.initializers_dict) == len(fct.function.initializers_name), (
+                f"Names mismatch between {fct.function.initializers_name} and "
+                f"{list(fct.function.initializers_dict)}{builder.get_debug_msg()}"
             )
             repl = {}
-            for k, v in fct.initializers_dict.items():
+            for k, v in fct.function.initializers_dict.items():
                 new_name = self.add_initializer(
                     self.unique_name(k), v, source=f"GraphBuilder.make_local_function/from({k})"
                 )
                 repl[k] = new_name
-            renaming = fct.initializers_renaming
+            renaming = fct.function.initializers_renaming
             new_inits = []
-            for input_name in fct.initializers_name:
+            for input_name in fct.function.initializers_name:
                 init_name = renaming[input_name]
                 repl_name = repl[init_name]
                 new_inits.append(repl_name)
