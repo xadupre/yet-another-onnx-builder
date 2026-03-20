@@ -125,9 +125,7 @@ def _strip_outer_brackets(s: str) -> str:
     changed = True
     while changed:
         changed = False
-        if len(s) >= 2 and (
-            (s[0] == "[" and s[-1] == "]") or (s[0] == "(" and s[-1] == ")")
-        ):
+        if len(s) >= 2 and ((s[0] == "[" and s[-1] == "]") or (s[0] == "(" and s[-1] == ")")):
             inner = s[1:-1]
             if _is_balanced(inner):
                 s = inner.strip()
@@ -166,19 +164,13 @@ def _polars_expr_to_sql(expr: str) -> str:
     # ------------------------------------------------------------------
     # 3. col("name").agg_method() — aggregation functions
     # ------------------------------------------------------------------
-    agg_m = re.match(
-        r'^col\("([^"]+)"\)\.(sum|mean|min|max|count)\(\)\s*$', s
-    )
+    agg_m = re.match(r'^col\("([^"]+)"\)\.(sum|mean|min|max|count)\(\)\s*$', s)
     if agg_m:
         col_name = agg_m.group(1)
         func = agg_m.group(2)
-        sql_func = {
-            "sum": "SUM",
-            "mean": "AVG",
-            "min": "MIN",
-            "max": "MAX",
-            "count": "COUNT",
-        }[func]
+        sql_func = {"sum": "SUM", "mean": "AVG", "min": "MIN", "max": "MAX", "count": "COUNT"}[
+            func
+        ]
         return f"{sql_func}({col_name})"
 
     # ------------------------------------------------------------------
@@ -222,12 +214,7 @@ def _polars_expr_to_sql(expr: str) -> str:
             return f"{left} {sql_op} {right}"
 
     # Arithmetic operators — wrap operands in parens for correct precedence.
-    for polars_op, sql_op in [
-        ("+", "+"),
-        ("-", "-"),
-        ("*", "*"),
-        ("/", "/"),
-    ]:
+    for polars_op, sql_op in [("+", "+"), ("-", "-"), ("*", "*"), ("/", "/")]:
         parts = _split_top_level(s, f" {polars_op} ")
         if len(parts) == 2:
             left = _polars_expr_to_sql(parts[0])
@@ -243,9 +230,7 @@ def _polars_expr_to_sql(expr: str) -> str:
     # ------------------------------------------------------------------
     # 8. String literal (single or double quoted)
     # ------------------------------------------------------------------
-    if (s.startswith('"') and s.endswith('"')) or (
-        s.startswith("'") and s.endswith("'")
-    ):
+    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
         return f"'{s[1:-1]}'"
 
     # ------------------------------------------------------------------
@@ -422,10 +407,9 @@ def _plan_to_sql(plan: _PolarsPlan) -> str:
 
 
 def lazyframe_to_onnx(
-    lf: "polars.LazyFrame",  # noqa: F821
+    lf: "polars.LazyFrame",  # noqa: F821, UP037
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     target_opset: int = DEFAULT_TARGET_OPSET,
-    n_rows: Optional[int] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
 ) -> ExportArtifact:
     """Convert a :class:`polars.LazyFrame` into a self-contained ONNX model.
@@ -453,9 +437,6 @@ def lazyframe_to_onnx(
         that actually appear in the plan need to be listed.
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
-    :param n_rows: optional static number of rows; fixes the first dimension
-        of every input tensor.  When ``None`` the first dimension is symbolic
-        (``"N"``).
     :param builder_cls: the graph-builder class (or factory callable) to use.
         Defaults to :class:`~yobx.xbuilder.GraphBuilder`.
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
@@ -492,10 +473,4 @@ def lazyframe_to_onnx(
     plan_str = lf.explain()
     parsed = _parse_polars_plan(plan_str)
     query = _plan_to_sql(parsed)
-    return sql_to_onnx(
-        query,
-        input_dtypes,
-        target_opset=target_opset,
-        n_rows=n_rows,
-        builder_cls=builder_cls,
-    )
+    return sql_to_onnx(query, input_dtypes, target_opset=target_opset, builder_cls=builder_cls)

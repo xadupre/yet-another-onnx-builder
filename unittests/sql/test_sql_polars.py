@@ -94,28 +94,16 @@ class TestPolarsExprToSql(ExtTestCase):
         self.assertEqual(self._fn()('col("a").alias("x")'), "a AS x")
 
     def test_arithmetic_add(self):
-        self.assertEqual(
-            self._fn()('(col("a")) + (col("b"))'),
-            "(a) + (b)",
-        )
+        self.assertEqual(self._fn()('(col("a")) + (col("b"))'), "(a) + (b)")
 
     def test_arithmetic_sub(self):
-        self.assertEqual(
-            self._fn()('(col("a")) - (col("b"))'),
-            "(a) - (b)",
-        )
+        self.assertEqual(self._fn()('(col("a")) - (col("b"))'), "(a) - (b)")
 
     def test_arithmetic_mul(self):
-        self.assertEqual(
-            self._fn()('(col("a")) * (col("b"))'),
-            "(a) * (b)",
-        )
+        self.assertEqual(self._fn()('(col("a")) * (col("b"))'), "(a) * (b)")
 
     def test_arithmetic_div(self):
-        self.assertEqual(
-            self._fn()('(col("a")) / (col("b"))'),
-            "(a) / (b)",
-        )
+        self.assertEqual(self._fn()('(col("a")) / (col("b"))'), "(a) / (b)")
 
     def test_comparison_gt(self):
         self.assertEqual(self._fn()('(col("a")) > (0.0)'), "a > 0.0")
@@ -131,8 +119,7 @@ class TestPolarsExprToSql(ExtTestCase):
 
     def test_expr_alias(self):
         self.assertEqual(
-            self._fn()('[(col("a")) + (col("b"))].alias("total")'),
-            "(a) + (b) AS total",
+            self._fn()('[(col("a")) + (col("b"))].alias("total")'), "(a) + (b) AS total"
         )
 
     def test_agg_sum(self):
@@ -151,10 +138,7 @@ class TestPolarsExprToSql(ExtTestCase):
         self.assertEqual(self._fn()('col("v").count()'), "COUNT(v)")
 
     def test_agg_sum_alias(self):
-        self.assertEqual(
-            self._fn()('col("v").sum().alias("total")'),
-            "SUM(v) AS total",
-        )
+        self.assertEqual(self._fn()('col("v").sum().alias("total")'), "SUM(v) AS total")
 
     def test_boolean_and(self):
         expr = '([(col("a")) > (0.0)]) & ([(col("b")) < (6.0)])'
@@ -262,10 +246,9 @@ class TestLazyframeToOnnx(ExtTestCase):
         import polars as pl
 
         lf = pl.LazyFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
-        lf = lf.select([
-            (pl.col("a") + pl.col("b")).alias("s"),
-            (pl.col("a") - pl.col("b")).alias("d"),
-        ])
+        lf = lf.select(
+            [(pl.col("a") + pl.col("b")).alias("s"), (pl.col("a") - pl.col("b")).alias("d")]
+        )
         a = np.array([1.0, 2.0, 3.0], dtype=np.float64)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float64)
         s, d = self._run(lf, {"a": np.float64, "b": np.float64}, {"a": a, "b": b})
