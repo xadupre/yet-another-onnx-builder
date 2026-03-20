@@ -125,11 +125,7 @@ class FunctionPieces:
         self.nested_function_names = nested_function_names
 
     def __repr__(self) -> str:
-        n_nested = (
-            len(self.nested_functions or self.nested_function_names)
-            if self.nested_functions or self.nested_function_names
-            else 0
-        )
+        n_nested = len(self.nested_functions or self.nested_function_names or [])
         return (
             f"{self.__class__.__name__}("
             f"n_initializers={len(self.initializers_name) if self.initializers_name else 0}, "

@@ -8768,6 +8768,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     f"{fct.function.initializers_renaming}"
                 )
         if self._debug_local_function:
+            assert isinstance(onx, FunctionProto), f"unexpected type {type(onx)}"
             print(
                 f"[GraphBuilder-{self._hash()}.make_local_function] "
                 f"create {onx.name}[{onx.domain}]"
