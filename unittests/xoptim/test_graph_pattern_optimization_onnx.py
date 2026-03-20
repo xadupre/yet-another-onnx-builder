@@ -7857,9 +7857,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                     oh.make_tensor_value_info("y2", onnx.TensorProto.FLOAT, [1, "B"]),
                     oh.make_tensor_value_info("y3", onnx.TensorProto.FLOAT, [1, "B"]),
                 ],
-                [
-                    oh.make_tensor_value_info("z", onnx.TensorProto.FLOAT, ["N", "B"]),
-                ],
+                [oh.make_tensor_value_info("z", onnx.TensorProto.FLOAT, ["N", "B"])],
                 [onh.from_array(np.array([1], dtype=np.int64), "one")],
             ),
             ir_version=11,
@@ -7879,7 +7877,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(patterns=["ExpandBroadcast"], verbose=0),
+            optimization_options=OptimizationOptions(patterns=["ExpandBroadcast"], verbose=10),
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
