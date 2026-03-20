@@ -5,7 +5,12 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from yobx.ext_test_case import ExtTestCase, requires_torch, requires_onnxscript
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_tensorflow,
+    requires_torch,
+    requires_onnxscript,
+)
 
 TFLOAT = onnx.TensorProto.FLOAT
 
@@ -547,6 +552,108 @@ class TestBuildStats(ExtTestCase):
         r = repr(stats)
         self.assertIn("BuildStats", r)
         self.assertIn("time_export_write_model", r)
+
+
+@requires_tensorflow()
+class TestExtendedModelContainerTF(ExtTestCase):
+    """Tests for TF tensor handling in ExtendedModelContainer.get_raw_data()."""
+
+    def test_get_raw_data_tf_tensor(self):
+        """get_raw_data returns correct bytes for a tf.Tensor."""
+        import tensorflow as tf
+        from yobx.container.model_container import ExtendedModelContainer
+
+        data_np = np.ones((3, 4), dtype=np.float32)
+        tf_tensor = tf.constant(data_np)
+
+        container = ExtendedModelContainer()
+        raw = container.get_raw_data(tf_tensor)
+
+        self.assertIsInstance(raw, bytes)
+        self.assertEqual(raw, data_np.tobytes())
+
+    def test_get_raw_data_tf_variable(self):
+        """get_raw_data returns correct bytes for a tf.Variable."""
+        import tensorflow as tf
+        from yobx.container.model_container import ExtendedModelContainer
+
+        data_np = np.arange(6, dtype=np.float32).reshape(2, 3)
+        tf_var = tf.Variable(data_np)
+
+        container = ExtendedModelContainer()
+        raw = container.get_raw_data(tf_var)
+
+        self.assertIsInstance(raw, bytes)
+        self.assertEqual(raw, data_np.tobytes())
+
+    def test_save_tf_tensor(self):
+        """save() writes a model whose large initializer is a tf.Tensor."""
+        import tensorflow as tf
+        from yobx.container import ExtendedModelContainer
+
+        data_np = np.ones((3, 4), dtype=np.float32)
+        tf_tensor = tf.constant(data_np)
+        model = _make_simple_model_with_external("weight", data_np)
+
+        container = ExtendedModelContainer()
+        container.model_proto = model
+        container.large_initializers = {"#weight": tf_tensor}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            file_path = os.path.join(tmp, "model.onnx")
+            saved = container.save(file_path)
+            self.assertIsInstance(saved, onnx.ModelProto)
+            self.assertTrue(os.path.exists(file_path))
+
+    def test_save_then_load_all_in_one_file_tf(self):
+        """Round-trip: save a model with a tf.Tensor initializer (single data file) and reload."""
+        import tensorflow as tf
+        from yobx.container import ExtendedModelContainer
+
+        data_np = np.ones((3, 4), dtype=np.float32)
+        tf_tensor = tf.constant(data_np)
+        model = _make_simple_model_with_external("weight", data_np)
+
+        container = ExtendedModelContainer()
+        container.model_proto = model
+        container.large_initializers = {"#weight": tf_tensor}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            file_path = os.path.join(tmp, "model.onnx")
+            container.save(file_path, all_tensors_to_one_file=True)
+            self.assertTrue(os.path.exists(file_path))
+            self.assertTrue(os.path.exists(file_path + ".data"))
+
+            loaded = ExtendedModelContainer().load(file_path)
+            self.assertIsInstance(loaded.model_proto, onnx.ModelProto)
+            self.assertGreater(len(loaded.large_initializers), 0)
+            weight = next(iter(loaded.large_initializers.values()))
+            self.assertEqual(weight.shape, data_np.shape)
+
+    def test_save_then_load_one_file_per_tensor_tf(self):
+        import tensorflow as tf
+        from yobx.container import ExtendedModelContainer
+
+        data_np = np.ones((3, 4), dtype=np.float32)
+        tf_tensor = tf.constant(data_np)
+        model = _make_simple_model_with_external("weight", data_np)
+
+        container = ExtendedModelContainer()
+        container.model_proto = model
+        container.large_initializers = {"#weight": tf_tensor}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            file_path = os.path.join(tmp, "model.onnx")
+            container.save(file_path, all_tensors_to_one_file=False)
+            self.assertTrue(os.path.exists(file_path))
+            weight_files = [f for f in os.listdir(tmp) if f != "model.onnx"]
+            self.assertGreater(len(weight_files), 0)
+
+            loaded = ExtendedModelContainer().load(file_path)
+            self.assertIsInstance(loaded.model_proto, onnx.ModelProto)
+            self.assertGreater(len(loaded.large_initializers), 0)
+            weight = next(iter(loaded.large_initializers.values()))
+            self.assertEqual(weight.shape, data_np.shape)
 
 
 if __name__ == "__main__":
