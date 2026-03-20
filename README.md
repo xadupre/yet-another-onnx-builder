@@ -26,6 +26,7 @@ to [ONNX](https://onnx.ai) format from many libraries:
 * [lightgbm](https://lightgbm.readthedocs.io)
 * [scikit-learn](https://scikit-learn.org)
 * [scikit-survival](https://scikit-survival.readthedocs.io)
+* [statsmodels](https://www.statsmodels.org)
 * [xgboost](https://xgboost.readthedocs.io)
 
 **data manipulation**
