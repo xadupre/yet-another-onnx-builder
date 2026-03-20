@@ -845,10 +845,10 @@ def onnx_simple_text_plot(
         previous_in = set(node.input)
 
     # outputs
-    assert hasattr(model, "output"), "type checking"
     if level == 0:
         rows.append("----- output ----")
-    for out in model.output:
+    assert hasattr(model, "output"), "type checking"
+    for out in model.output:  # type: ignore
         if isinstance(out, str):
             if out in line_name_in:
                 line_name_in[out].append(len(rows))
