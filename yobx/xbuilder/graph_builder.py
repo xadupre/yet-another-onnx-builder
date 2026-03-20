@@ -454,7 +454,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             else:
                 assert _opsets is None, "_opsets must be None if the input is not a GraphProto"
             self._update_structures_with_proto(
-                target_opset_or_existing_proto, infer_shapes_options
+                target_opset_or_existing_proto, infer_shapes_options  # type: ignore
             )
             self.constant_folding(
                 (optimization_options or OptimizationOptions()).constant_folding,

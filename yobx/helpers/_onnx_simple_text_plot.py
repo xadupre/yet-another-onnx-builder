@@ -709,6 +709,7 @@ def onnx_simple_text_plot(
         for opset in model.opset_import:
             rows.append(f"opset: domain={opset.domain!r} version={opset.version!r}")
     if hasattr(model, "graph"):
+        assert hasattr(model, "doc_string"), "type checking"
         if model.doc_string:
             if len(model.doc_string) < 55:
                 rows.append(f"doc_string: {model.doc_string}")
@@ -724,6 +725,7 @@ def onnx_simple_text_plot(
     line_name_in = {}  # type: ignore[var-annotated]
     if level == 0:
         rows.append("----- input ----")
+    assert hasattr(model, "input"), "type checking"
     for inp in model.input:
         if isinstance(inp, str):
             rows.append(f"input: {inp!r}")
@@ -781,6 +783,7 @@ def onnx_simple_text_plot(
             indents[init.name] = 0
             init_names.add(init.name)
 
+    assert hasattr(model, "node"), "type checking"
     try:
         nodes = reorder_nodes_for_display(model.node, verbose=verbose)
     except RuntimeError as e:
@@ -842,6 +845,7 @@ def onnx_simple_text_plot(
         previous_in = set(node.input)
 
     # outputs
+    assert hasattr(model, "output"), "type checking"
     if level == 0:
         rows.append("----- output ----")
     for out in model.output:
