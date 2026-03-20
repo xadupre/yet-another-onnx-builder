@@ -15,7 +15,7 @@ Overview
 
 The mechanism consists of two layers:
 
-1. **:class:`~yobx.xtracing.NumpyArray`** — a proxy that wraps an ONNX tensor
+1. :class:`~yobx.xtracing.NumpyArray` — a proxy that wraps an ONNX tensor
    name and an object following the
    :class:`~yobx.typing.GraphBuilderExtendedProtocol`.  It overloads all
    Python arithmetic operators and registers itself as an implementation for
