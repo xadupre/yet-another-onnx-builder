@@ -5,7 +5,12 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from yobx.ext_test_case import ExtTestCase, requires_tensorflow, requires_torch, requires_onnxscript
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_tensorflow,
+    requires_torch,
+    requires_onnxscript,
+)
 
 TFLOAT = onnx.TensorProto.FLOAT
 
@@ -626,7 +631,6 @@ class TestExtendedModelContainerTF(ExtTestCase):
             self.assertEqual(weight.shape, data_np.shape)
 
     def test_save_then_load_one_file_per_tensor_tf(self):
-        """Round-trip: save a model with a tf.Tensor initializer (one file per tensor) and reload."""
         import tensorflow as tf
         from yobx.container import ExtendedModelContainer
 
