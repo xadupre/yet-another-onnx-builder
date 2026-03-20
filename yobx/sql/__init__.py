@@ -46,6 +46,7 @@ Example
 """
 
 from .convert import sql_to_onnx, sql_to_onnx_graph
+from .polars_convert import lazyframe_to_onnx
 from .parse import (
     AggExpr,
     BinaryExpr,
@@ -75,6 +76,7 @@ __all__ = [
     "ParsedQuery",
     "SelectItem",
     "SelectOp",
+    "lazyframe_to_onnx",
     "parse_sql",
     "sql_to_onnx",
     "sql_to_onnx_graph",
