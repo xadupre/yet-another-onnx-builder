@@ -309,7 +309,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             try:
                 import tensorflow
 
-                self._has_tensorflow = True
+                self._has_tensorflow = bool(tensorflow.__version__)
                 self.tensorflow = tensorflow
             except (ImportError, AttributeError):
                 self._has_tensorflow = False
