@@ -39,7 +39,7 @@ from onnx.external_data_helper import uses_external_data
 from onnx.model_container import make_large_tensor_proto
 from onnx.shape_inference import infer_shapes as onnx_infer_shapes
 from ..typing import ConvertOptionsProtocol, DefaultConvertOptions
-from ..container import ExportArtifact, ExportReport, ExtendedModelContainer
+from ..container import ExportArtifact, ExportReport, ExtendedModelContainer, FunctionPieces
 from ..container.model_container import _get_type
 from ..helpers.mini_onnx_builder import proto_from_array
 from ..helpers import make_hash, string_signature, string_type
@@ -302,6 +302,19 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 self._has_torch = False
                 self.torch = None
 
+        if os.environ.get("NOTF", "0") in ("1", "true"):
+            self._has_tensorflow = False
+            self.tensorflow = None
+        else:
+            try:
+                import tensorflow
+
+                self._has_tensorflow = bool(tensorflow.__version__)
+                self.tensorflow = tensorflow
+            except (ImportError, AttributeError):
+                self._has_tensorflow = False
+                self.tensorflow = None
+
         from . import TEMPLATE_TYPE
 
         self.TEMPLATE_TYPE = TEMPLATE_TYPE
@@ -454,7 +467,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             else:
                 assert _opsets is None, "_opsets must be None if the input is not a GraphProto"
             self._update_structures_with_proto(
-                target_opset_or_existing_proto, infer_shapes_options
+                target_opset_or_existing_proto, infer_shapes_options  # type: ignore
             )
             self.constant_folding(
                 (optimization_options or OptimizationOptions()).constant_folding,
@@ -462,7 +475,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             )
             if not isinstance(target_opset_or_existing_proto, FunctionProto):
                 self._update_shape_types_with_proto(
-                    target_opset_or_existing_proto, infer_shapes_options
+                    target_opset_or_existing_proto, infer_shapes_options  # type: ignore
                 )
         else:
             raise NotImplementedError(f"{type(target_opset_or_existing_proto)} is not supported.")
@@ -847,6 +860,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if self._has_torch and isinstance(value, self.torch.Tensor):  # type: ignore
             if value.dtype == self.torch.int64 and value.numel() < 8:  # type: ignore
                 return self.make_key(value.detach().cpu().numpy())
+            return None
+        if self._has_tensorflow and isinstance(
+            value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+        ):
             return None
         return None
 
@@ -1418,6 +1435,21 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 print(
                     f"[GraphBuilder-{self._hash()}.get_constant] "
                     f"  L: nptorch.Tensor {v.shape}, {v.dtype}"
+                )
+            return v
+
+        if self._has_tensorflow and isinstance(
+            value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+        ):
+            raw = value.numpy()
+            # Ensure we always return an ndarray (not a numpy scalar)
+            v = raw if isinstance(raw, np.ndarray) else np.array(raw)
+            self.constants_computed_[name] = v
+            assert not multiple_outputs, f"Multiple output is not allowed for name={name!r}"
+            if self._debug_get_constant:
+                print(
+                    f"[GraphBuilder-{self._hash()}.get_constant] "
+                    f"  TF: EagerTensor {v.shape}, {v.dtype}"
                 )
             return v
 
@@ -2799,6 +2831,15 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 f"Shape {value.shape} does not match the registered one {self.get_shape(name)} "
                 f"for name {name!r}{self.get_debug_msg()}"
             )
+        elif self._has_tensorflow and isinstance(
+            value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+        ):
+            # TensorFlow tensor/variable — keep as-is, convert to numpy at export time
+            tf_shape = tuple(value.shape.as_list())
+            assert not self.has_shape(name) or self.get_shape(name) == tf_shape, (
+                f"Shape {tf_shape} does not match the registered one {self.get_shape(name)} "
+                f"for name {name!r}{self.get_debug_msg()}"
+            )
         else:
             raise RuntimeError(
                 f"Initializer name={name!r}, "
@@ -2844,7 +2885,14 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 assert hasattr(
                     value, "shape"
                 ), f"value {name!r} is not a Tensor but {type(value)}"
-                size = int(np.prod(value.size())) if hasattr(value, "detach") else int(value.size)  # type: ignore
+                if hasattr(value, "detach"):
+                    size = int(np.prod(value.size()))  # type: ignore
+                elif self._has_tensorflow and isinstance(
+                    value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+                ):
+                    size = int(np.prod(shape)) if shape else 0
+                else:
+                    size = int(value.size)  # type: ignore
                 sh2 = (
                     "_".join(map(str, value.reshape((-1,)).tolist()))  # type: ignore
                     if size <= 5 and value.dtype == np.int64  # type: ignore
@@ -4908,6 +4956,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             itype = self.get_type(k)
             shape = self.get_shape(k)
             vshape = v.shape if hasattr(v, "shape") else tuple(v.dims)  # TensorProto
+            # Normalize TF TensorShape to a plain Python tuple for safe comparison
+            if self._has_tensorflow and isinstance(
+                v, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+            ):
+                vshape = tuple(v.shape.as_list())
             assert not is_static_shape(shape) or shape == vshape, (
                 f"Unexpected shape for initializer {k!r}, shape={shape!r}, itype={itype}, "
                 f"initializer shape={v.shape}, dtype={v.dtype}, "
@@ -5027,6 +5080,20 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     initializer.append(t)
                     continue
                 else:
+                    if self._has_tensorflow and isinstance(
+                        v, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+                    ):
+                        # TF tensor/variable — convert to numpy at export time
+                        np_v = v.numpy()
+                        t = TensorProto()
+                        t.name = k
+                        t.dims.extend(np_v.shape)
+                        t.data_type = dtype_to_tensor_dtype(v.dtype)
+                        t.raw_data = np_v.tobytes()
+                        if hasattr(t, "doc_string"):
+                            t.doc_string += doc_string
+                        initializer.append(t)
+                        continue
                     assert self._has_torch and isinstance(
                         v, self.torch.Tensor  # type: ignore
                     ), f"tensor {k!r} has un unexpected type {type(v)}"
@@ -5097,6 +5164,15 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if self._has_torch and isinstance(v, self.torch.Tensor):  # type: ignore
                 # no string tensor
                 t = self.from_array(v, name=k)  # type: ignore[attr-defined]
+                t.doc_string += doc_string
+                res.append(t)
+                continue
+            if self._has_tensorflow and isinstance(
+                v, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+            ):
+                # TF tensor/variable — convert to numpy at export time
+                np_v = v.numpy()
+                t = onh.from_array(np_v, name=k)
                 t.doc_string += doc_string
                 res.append(t)
                 continue
@@ -5584,9 +5660,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             for node in add.node:
                 self._check_constant(node, f"{prefix}-[add]")
 
-    def _to_onnx_function(
-        self, function_options, opsets, mask_outputs
-    ) -> Union[FunctionProto, Dict[str, Any]]:
+    def _to_onnx_function(self, function_options, opsets, mask_outputs) -> "ExportArtifact":
         if self._debug_local_function:
             print(f"[GraphBuilder-{self._hash()}.to_onnx] export_as_function {function_options}")
         if self.verbose:
@@ -5634,36 +5708,41 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         )
 
         if not function_options.return_initializer:
-            return proto
+            return ExportArtifact(proto=proto, function=FunctionPieces())
 
         if len(self.initializers_dict) == 0 and len(self.functions) == 0:
-            res = dict(proto=proto)
+            nested = None
             if self.functions:
                 used_functions = self._get_used_local_functions()
                 if used_functions:
-                    res["functions"] = used_functions  # type: ignore
-            return res
+                    nested = used_functions
+            return ExportArtifact(
+                proto=proto, function=FunctionPieces(nested_function_names=nested)
+            )
 
         # We need to move the initializers as inputs, we sort them by decreasing size
         inits, functions = self._extend_local_function_inputs()
         proto.input.extend(inits)
-        res = dict(
-            proto=proto,
-            initializers_name=inits,
-            initializers_dict={
-                self._parameter_renaming.get(k, k): v
-                for k, v in self.initializers_dict.items()
-                if k in set(inits)
-            },
-            initializers_renaming={
-                k: self._parameter_renaming.get(k, k)
-                for k, v in self.initializers_dict.items()
-                if k in set(inits)
-            },
+        nested_functions = (
+            [v for k, v in self.functions.items() if k in functions] if functions else None
         )
-        if functions:
-            res["functions"] = [v for k, v in self.functions.items() if k in functions]  # type: ignore
-        return res
+        return ExportArtifact(
+            proto=proto,
+            function=FunctionPieces(
+                initializers_name=inits,
+                initializers_dict={
+                    self._parameter_renaming.get(k, k): v
+                    for k, v in self.initializers_dict.items()
+                    if k in set(inits)
+                },
+                initializers_renaming={
+                    k: self._parameter_renaming.get(k, k)
+                    for k, v in self.initializers_dict.items()
+                    if k in set(inits)
+                },
+                nested_functions=nested_functions,
+            ),
+        )
 
     def _update_model_with_parameter_renaming(self, model: ModelProto):
         assert self.initializers_dict, (
@@ -5873,8 +5952,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._add_hidden_inputs_to_nodes()
 
         if function_options.export_as_function:
-            # export as a function, TODO: use artifact
-            return self._to_onnx_function(function_options, opsets, mask_outputs)  # type: ignore
+            return self._to_onnx_function(function_options, opsets, mask_outputs)
 
         # export as a model
         if self.ir_version:
@@ -8736,30 +8814,37 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._check_function_order()
 
         fct = builder.to_onnx(function_options=function_options, optimize=optimize, inline=False)
-        assert isinstance(fct, (dict, FunctionProto)), (
+        assert isinstance(fct, ExportArtifact), (
             f"Unexpected type {type(fct)}, function_options={function_options}"
             f"{self.get_debug_msg()}"
         )
-        onx = fct["proto"] if isinstance(fct, dict) else fct
+        assert fct.function is not None, (
+            f"ExportArtifact.function is None for function export, "
+            f"function_options={function_options}{self.get_debug_msg()}"
+        )
+        onx = fct.proto
+        assert onx is not None, "It should not be None"
 
         if metadata_props:
             oh.set_metadata_props(onx, metadata_props)
 
-        if self._debug_local_function and isinstance(fct, dict):
-            print(f"[GraphBuilder-{self._hash()}.make_local_function] keys={', '.join(fct)}")
-            if "initializers_name" in fct:
-                print(
-                    f"[GraphBuilder-{self._hash()}.make_local_function] initializers_name="
-                    f"{fct['initializers_name']}"
-                )
+        if self._debug_local_function and fct.function.initializers_name is not None:
+            print(
+                f"[GraphBuilder-{self._hash()}.make_local_function] "
+                f"initializers_name={fct.function.initializers_name}"
+            )
+            if fct.function.initializers_dict is not None:
                 print(
                     f"[GraphBuilder-{self._hash()}.make_local_function] initializers_dict="
-                    f"{list(fct['initializers_dict'])}"
+                    f"{list(fct.function.initializers_dict)}"
                 )
+            if fct.function.initializers_renaming is not None:
                 print(
                     f"[GraphBuilder-{self._hash()}.make_local_function] initializers_renaming="
-                    f"{fct['initializers_renaming']}"
+                    f"{fct.function.initializers_renaming}"
                 )
+        if self._debug_local_function:
+            assert isinstance(onx, FunctionProto), f"unexpected type {type(onx)}"
             print(
                 f"[GraphBuilder-{self._hash()}.make_local_function] "
                 f"create {onx.name}[{onx.domain}]"
@@ -8787,20 +8872,22 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             )
 
         # Let's rename the initializers.
-        if isinstance(fct, dict) and "initializers_dict" in fct:
-            assert len(fct["initializers_dict"]) == len(fct["initializers_name"]), (
-                f"Names mismatch between {fct['initializers_name']} and "
-                f"{list(fct['initializers_dict'])}{builder.get_debug_msg()}"
+        if fct.function.initializers_dict is not None:
+            assert fct.function.initializers_name is not None, "type consistency"
+            assert len(fct.function.initializers_dict) == len(fct.function.initializers_name), (
+                f"Names mismatch between {fct.function.initializers_name} and "
+                f"{list(fct.function.initializers_dict)}{builder.get_debug_msg()}"
             )
             repl = {}
-            for k, v in fct["initializers_dict"].items():
+            for k, v in fct.function.initializers_dict.items():
                 new_name = self.add_initializer(
                     self.unique_name(k), v, source=f"GraphBuilder.make_local_function/from({k})"
                 )
                 repl[k] = new_name
-            renaming = fct["initializers_renaming"]
+            renaming = fct.function.initializers_renaming
+            assert renaming is not None, "type consistency"
             new_inits = []
-            for input_name in fct["initializers_name"]:
+            for input_name in fct.function.initializers_name:
                 init_name = renaming[input_name]
                 repl_name = repl[init_name]
                 new_inits.append(repl_name)

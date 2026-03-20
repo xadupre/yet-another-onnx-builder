@@ -398,7 +398,7 @@ def to_onnx(
             inline=(not function_options) or not function_options.export_as_function,
             return_optimize_report=True,
         )
-        if verbose:
+        if verbose and onx.report and onx.report.stats:
             import pandas
 
             print(f"[yobx.sklearn.to_onnx] done, output type is {type(onx)}")

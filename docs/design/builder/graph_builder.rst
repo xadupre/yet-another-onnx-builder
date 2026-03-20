@@ -407,9 +407,10 @@ A sub-graph can be exported as a reusable ONNX local function (a
         ),
         inline=False,
     )
-    print(type(func).__name__)
-    print("function name  :", func.name)
-    print("function domain:", func.domain)
+    proto = func.proto
+    print(type(proto).__name__)
+    print("function name  :", proto.name)
+    print("function domain:", proto.domain)
 
 .. _l-graphbuilder-debugging-env:
 

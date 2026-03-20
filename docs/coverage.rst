@@ -12,8 +12,9 @@ scikit-learn and compatible libraries
 :ref:`l-design-sklearn-supported-converters` lists all
 :epkg:`scikit-learn` estimators and transformers, along with estimators
 from :epkg:`category_encoders`, :epkg:`imbalanced-learn`,
-:epkg:`lightgbm`, :epkg:`scikit-survival`, and :epkg:`xgboost`, showing
-which ones have a registered converter in :mod:`yobx.sklearn`.
+:epkg:`lightgbm`, :epkg:`scikit-survival`, :epkg:`statsmodels`, and
+:epkg:`xgboost`, showing which ones have a registered converter in
+:mod:`yobx.sklearn`.
 
 PyTorch
 -------

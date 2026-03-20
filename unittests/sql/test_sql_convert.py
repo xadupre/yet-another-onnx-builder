@@ -234,16 +234,98 @@ class TestSqlToOnnxGroupBy(ExtTestCase):
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([1.0, 2.0, 1.0], dtype=np.float32)
         (s,) = self._run("SELECT SUM(a) FROM t GROUP BY b", dtypes, {"a": a, "b": b})
-        # SUM over all = 6.0 (no per-group reduction yet)
-        self.assertEqualArray(np.array(float(s)), np.array(6.0), atol=1e-5)
+        # True GROUP BY: group b=1 → SUM([1,3])=4, group b=2 → SUM([2])=2
+        expected = np.array([4.0, 2.0], dtype=np.float32)
+        self.assertEqualArray(np.sort(s), np.sort(expected), atol=1e-5)
 
     def test_group_by_with_filter(self):
         dtypes = {"a": np.float32, "b": np.float32}
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
         b = np.array([1.0, 1.0, 2.0], dtype=np.float32)
         (s,) = self._run("SELECT SUM(a) FROM t WHERE a > 0 GROUP BY b", dtypes, {"a": a, "b": b})
-        # After filter (a>0): a=[1.0, 3.0], SUM = 4.0
-        self.assertEqualArray(np.array(float(s)), np.array(4.0), atol=1e-5)
+        # After filter (a>0): a=[1.0, 3.0], b=[1.0, 2.0]
+        # group b=1 → SUM([1])=1, group b=2 → SUM([3])=3
+        expected = np.array([1.0, 3.0], dtype=np.float32)
+        self.assertEqualArray(np.sort(s), np.sort(expected), atol=1e-5)
+
+    def test_group_by_avg(self):
+        dtypes = {"a": np.float32, "b": np.float32}
+        a = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        b = np.array([1.0, 2.0, 1.0, 2.0], dtype=np.float32)
+        (avg,) = self._run("SELECT AVG(a) FROM t GROUP BY b", dtypes, {"a": a, "b": b})
+        # group b=1 → AVG([1,3])=2, group b=2 → AVG([2,4])=3
+        expected = np.array([2.0, 3.0], dtype=np.float32)
+        self.assertEqualArray(np.sort(avg), np.sort(expected), atol=1e-5)
+
+    def test_group_by_min(self):
+        dtypes = {"a": np.float32, "b": np.float32}
+        a = np.array([1.0, 5.0, 2.0, 4.0, 3.0], dtype=np.float32)
+        b = np.array([1.0, 2.0, 1.0, 2.0, 1.0], dtype=np.float32)
+        (mn,) = self._run("SELECT MIN(a) FROM t GROUP BY b", dtypes, {"a": a, "b": b})
+        # group b=1 → MIN([1,2,3])=1, group b=2 → MIN([5,4])=4
+        expected = np.array([1.0, 4.0], dtype=np.float32)
+        self.assertEqualArray(np.sort(mn), np.sort(expected), atol=1e-5)
+
+    def test_group_by_max(self):
+        dtypes = {"a": np.float32, "b": np.float32}
+        a = np.array([1.0, 5.0, 2.0, 4.0, 3.0], dtype=np.float32)
+        b = np.array([1.0, 2.0, 1.0, 2.0, 1.0], dtype=np.float32)
+        (mx,) = self._run("SELECT MAX(a) FROM t GROUP BY b", dtypes, {"a": a, "b": b})
+        # group b=1 → MAX([1,2,3])=3, group b=2 → MAX([5,4])=5
+        expected = np.array([3.0, 5.0], dtype=np.float32)
+        self.assertEqualArray(np.sort(mx), np.sort(expected), atol=1e-5)
+
+    def test_group_by_key_in_select(self):
+        dtypes = {"a": np.float32, "b": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([1.0, 2.0, 1.0], dtype=np.float32)
+        b_out, s = self._run("SELECT b, SUM(a) FROM t GROUP BY b", dtypes, {"a": a, "b": b})
+        # Unique b values (sorted): [1.0, 2.0]
+        # group b=1 → SUM([1,3])=4, group b=2 → SUM([2])=2
+        order = np.argsort(b_out)
+        self.assertEqualArray(b_out[order], np.array([1.0, 2.0], dtype=np.float32), atol=1e-5)
+        self.assertEqualArray(s[order], np.array([4.0, 2.0], dtype=np.float32), atol=1e-5)
+
+    def test_group_by_two_columns(self):
+        dtypes = {"a": np.float32, "b": np.float32, "c": np.float32}
+        a = np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float32)
+        b = np.array([1.0, 2.0, 1.0, 2.0, 1.0], dtype=np.float32)
+        c = np.array([1.0, 1.0, 2.0, 1.0, 1.0], dtype=np.float32)
+        # Groups: (b=1,c=1)→[1,5]→sum=6, (b=1,c=2)→[3]→sum=3, (b=2,c=1)→[2,4]→sum=6
+        (s,) = self._run("SELECT SUM(a) FROM t GROUP BY b, c", dtypes, {"a": a, "b": b, "c": c})
+        expected = np.array([6.0, 3.0, 6.0], dtype=np.float32)
+        self.assertEqualArray(np.sort(s), np.sort(expected), atol=1e-5)
+
+    def test_group_by_three_columns(self):
+        dtypes = {"a": np.float32, "b": np.float32, "c": np.float32, "d": np.float32}
+        a = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        b = np.array([1.0, 1.0, 2.0, 2.0], dtype=np.float32)
+        c = np.array([1.0, 1.0, 1.0, 2.0], dtype=np.float32)
+        d = np.array([1.0, 2.0, 1.0, 1.0], dtype=np.float32)
+        # Groups: (1,1,1)→[1]→1, (1,1,2)→[2]→2, (2,1,1)→[3]→3, (2,2,1)→[4]→4
+        (s,) = self._run(
+            "SELECT SUM(a) FROM t GROUP BY b, c, d", dtypes, {"a": a, "b": b, "c": c, "d": d}
+        )
+        expected = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        self.assertEqualArray(np.sort(s), np.sort(expected), atol=1e-5)
+
+    def test_group_by_two_columns_key_in_select(self):
+        dtypes = {"a": np.float32, "b": np.float32, "c": np.float32}
+        a = np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float32)
+        b = np.array([1.0, 2.0, 1.0, 2.0, 1.0], dtype=np.float32)
+        c = np.array([1.0, 1.0, 2.0, 1.0, 1.0], dtype=np.float32)
+        b_out, c_out, s = self._run(
+            "SELECT b, c, SUM(a) FROM t GROUP BY b, c", dtypes, {"a": a, "b": b, "c": c}
+        )
+        # Sort output by (b, c) for stable comparison
+        order = np.lexsort((c_out, b_out))
+        self.assertEqualArray(
+            b_out[order], np.array([1.0, 1.0, 2.0], dtype=np.float32), atol=1e-5
+        )
+        self.assertEqualArray(
+            c_out[order], np.array([1.0, 2.0, 1.0], dtype=np.float32), atol=1e-5
+        )
+        self.assertEqualArray(s[order], np.array([6.0, 3.0, 6.0], dtype=np.float32), atol=1e-5)
 
 
 class TestSqlToOnnxReturnedModel(ExtTestCase):

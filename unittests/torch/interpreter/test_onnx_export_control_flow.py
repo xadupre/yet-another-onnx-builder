@@ -445,7 +445,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                 self.assertEqualArray(exp[0], got[0])
 
     @requires_torch("2.7", "export of torch.cond")
-    @ignore_warnings(UserWarning)
+    @ignore_warnings((UserWarning, FutureWarning))
     def test_controlflow_cond_submodule_1(self):
         import torch
 
