@@ -49,6 +49,7 @@ import argparse
 import sys
 
 import pandas
+import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from yobx import doc
@@ -151,6 +152,17 @@ else:
 print(f"  trained={args.trained}  num_hidden_layers={config.num_hidden_layers}  #params={sum(p.numel() for p in model.parameters()):,}")
 
 # %%
+# Device selection
+# ----------------
+#
+# Move the model to GPU if CUDA is available so that the observation,
+# export, and inference steps all run on the same device.
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"  device={device}")
+model = model.to(device)
+
+# %%
 # Observe forward calls during generation
 # ----------------------------------------
 #
@@ -167,6 +179,7 @@ print(f"  trained={args.trained}  num_hidden_layers={config.num_hidden_layers}  
 
 prompt = "Continue: it rains, what should I do?"
 inputs = tokenizer(prompt, return_tensors="pt")
+inputs = {k: v.to(device) for k, v in inputs.items()}
 
 observer = InputObserver()
 
