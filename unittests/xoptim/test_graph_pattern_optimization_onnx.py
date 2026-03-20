@@ -7783,6 +7783,111 @@ class TestGraphPatternOptimization(ExtTestCase):
         self.assertEqualArray(expected_y, got_y)
         self.assertEqualArray(expected_z, got_z)
 
+    def test_full_optimization_expand_broadcast(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["x"], ["n"], start=0, end=1),
+                    oh.make_node("Shape", ["x"], ["b"], start=1, end=2),
+                    oh.make_node("Concat", ["n", "b"], ["shape"], axis=0),
+                    oh.make_node("Expand", ["x", "shape"], ["expanded"]),
+                    oh.make_node("Add", ["expanded", "y1"], ["z1"]),
+                    oh.make_node("Add", ["expanded", "y2"], ["z2"]),
+                    oh.make_node("Add", ["expanded", "y3"], ["z3"]),
+                    oh.make_node("Add", ["z1", "z2"], ["z12"]),
+                    oh.make_node("Add", ["z12", "z3"], ["z"]),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("x", onnx.TensorProto.FLOAT, ["N", 1]),
+                    oh.make_tensor_value_info("y1", onnx.TensorProto.FLOAT, [1, "B"]),
+                    oh.make_tensor_value_info("y2", onnx.TensorProto.FLOAT, [1, "B"]),
+                    oh.make_tensor_value_info("y3", onnx.TensorProto.FLOAT, [1, "B"]),
+                ],
+                [oh.make_tensor_value_info("z", onnx.TensorProto.FLOAT, ["N", "B"])],
+            ),
+            ir_version=11,
+            opset_imports=[oh.make_opsetid("", 20)],
+        )
+
+        check_model(model)
+        feeds = {
+            "x": self._range(4, 1),
+            "y1": self._range(1, 5),
+            "y2": self._range(1, 5),
+            "y3": self._range(1, 5),
+        }
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="default", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(
+            ["Add", "Add", "Add", "Add", "Add"], [n.op_type for n in opt_onx.graph.node]
+        )
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected, got[0])
+
+    def test_full_optimization_expand_broadcast_more_complex(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["x"], ["n"], start=0, end=1),
+                    oh.make_node("Shape", ["x"], ["b"], start=1, end=2),
+                    oh.make_node("Concat", ["n", "b"], ["shape"], axis=0),
+                    oh.make_node("Add", ["shape", "one"], ["shape1"]),
+                    oh.make_node("Sub", ["shape1", "one"], ["shape2"]),
+                    oh.make_node("Expand", ["x", "shape2"], ["expanded"]),
+                    oh.make_node("Add", ["expanded", "y1"], ["z1"]),
+                    oh.make_node("Add", ["expanded", "y2"], ["z2"]),
+                    oh.make_node("Add", ["expanded", "y3"], ["z3"]),
+                    oh.make_node("Add", ["z1", "z2"], ["z12"]),
+                    oh.make_node("Add", ["z12", "z3"], ["z"]),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("x", onnx.TensorProto.FLOAT, ["N", 1]),
+                    oh.make_tensor_value_info("y1", onnx.TensorProto.FLOAT, [1, "B"]),
+                    oh.make_tensor_value_info("y2", onnx.TensorProto.FLOAT, [1, "B"]),
+                    oh.make_tensor_value_info("y3", onnx.TensorProto.FLOAT, [1, "B"]),
+                ],
+                [oh.make_tensor_value_info("z", onnx.TensorProto.FLOAT, ["N", "B"])],
+                [onh.from_array(np.array([1], dtype=np.int64), "one")],
+            ),
+            ir_version=11,
+            opset_imports=[oh.make_opsetid("", 20)],
+        )
+
+        check_model(model)
+        feeds = {
+            "x": self._range(4, 1),
+            "y1": self._range(1, 5),
+            "y2": self._range(1, 5),
+            "y3": self._range(1, 5),
+        }
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ShapeBasedExpandBroadcast"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(
+            ["Add", "Add", "Add", "Add", "Add"], [n.op_type for n in opt_onx.graph.node]
+        )
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected, got[0])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

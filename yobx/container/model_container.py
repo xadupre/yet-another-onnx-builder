@@ -1,7 +1,7 @@
 import os
 import sys
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 import numpy as np
 import onnx
 from onnx.model_container import ModelContainer
@@ -90,8 +90,75 @@ class ExtendedModelContainer(ModelContainer):
             self._load_large_initializers(file_path)
         return self
 
+    def get_raw_data(self, np_tensor: Union[np.ndarray, "torch.Tensor"]) -> bytes:  # noqa: F821
+        if sys.byteorder == "big":
+            # Convert endian from little to big
+            begin = time.perf_counter()
+            tensor_bytes = np_tensor.byteswap().tobytes()
+            self._stats["time_export_byteswap_tobytes"] += time.perf_counter() - begin
+        elif isinstance(np_tensor, np.ndarray):
+            begin = time.perf_counter()
+            tensor_bytes = np_tensor.tobytes()
+            self._stats["time_export_tobytes"] += time.perf_counter() - begin
+        elif isinstance(np_tensor, onnx.TensorProto):
+            tensor_bytes = np_tensor.raw_data
+            assert len(tensor_bytes) > 0, f"One tensor is null, np_tensor={np_tensor}."
+        else:
+            # Check for TensorFlow tensors/variables first
+            _tf_handled = False
+            try:
+                import tensorflow as _tf
+
+                if isinstance(np_tensor, (_tf.Tensor, _tf.Variable)):
+                    begin = time.perf_counter()
+                    tensor_bytes = np_tensor.numpy().tobytes()
+                    self._stats["time_export_tobytes"] += time.perf_counter() - begin
+                    _tf_handled = True
+            except ImportError:
+                pass
+
+            if not _tf_handled:
+                import torch
+
+                if isinstance(np_tensor, torch.nn.Parameter):
+                    pt = np_tensor.data
+                elif isinstance(np_tensor, torch.Tensor):
+                    pt = np_tensor
+                else:
+                    raise NotImplementedError(
+                        f"Handling of type {type(np_tensor)} as large initializer "
+                        f"is not implemented yet."
+                    )
+
+                begin = time.perf_counter()
+                proto = proto_from_array(pt, name="dummy")
+                self._stats["time_export_proto_from_array"] += time.perf_counter() - begin
+                tensor_bytes = proto.raw_data
+                assert pt.dtype != torch.float32 or len(tensor_bytes) == np.prod(pt.shape) * 4, (
+                    f"Unexpected size mismatch, buffer size is {len(tensor_bytes)}, "
+                    f"but tensor size={np.prod(pt.shape) * 4}, "
+                    f"shape={pt.shape}, dtype={pt.dtype}"
+                )
+        return tensor_bytes
+
+    def get_prop(self, tensor: onnx.TensorProto) -> onnx.StringStringEntryProto:
+        prop: Optional[onnx.StringStringEntryProto] = None
+        for ext in tensor.external_data:  # type: ignore[assignment]
+            if ext.key == "location":  # type: ignore[attr-defined]
+                prop = ext  # type: ignore[assignment]
+        if prop is None:
+            raise RuntimeError(f"No location found for tensor name {tensor.name!r}.")
+        if prop.value not in self.large_initializers:
+            raise RuntimeError(
+                f"Unable to find large tensor named {tensor.name!r} "
+                f"with location {prop.value!r} in "
+                f"{sorted(self.large_initializers)}."
+            )
+        return prop
+
     def _save_external(self, file_path: str, all_tensors_to_one_file: bool) -> onnx.ModelProto:
-        """Save the large model into a main onnx file and one file
+        """
+        Saves the large model into a main onnx file and one file
         per tensor. Follows the same format as :func:`write_external_data_tensors
         <onnx.external_data_helper.write_external_data_tensors>`.
         The main model needs to be modified to update the file location,
@@ -139,68 +206,9 @@ class ExtendedModelContainer(ModelContainer):
         for tensor in _get_all_tensors(copy):
             if not uses_external_data(tensor):
                 continue
-            prop: Optional[onnx.StringStringEntryProto] = None
-            for ext in tensor.external_data:  # type: ignore[assignment]
-                if ext.key == "location":  # type: ignore[attr-defined]
-                    prop = ext  # type: ignore[assignment]
-            if prop is None:
-                raise RuntimeError(f"No location found for tensor name {tensor.name!r}.")
-            if prop.value not in self.large_initializers:
-                raise RuntimeError(
-                    f"Unable to find large tensor named {tensor.name!r} "
-                    f"with location {prop.value!r} in "
-                    f"{sorted(self.large_initializers)}."
-                )
+            prop = self.get_prop(tensor)
             np_tensor = self.large_initializers[prop.value]
-
-            if sys.byteorder == "big":
-                # Convert endian from little to big
-                begin = time.perf_counter()
-                tensor_bytes = np_tensor.byteswap().tobytes()
-                self._stats["time_export_byteswap_tobytes"] += time.perf_counter() - begin
-            elif isinstance(np_tensor, np.ndarray):
-                begin = time.perf_counter()
-                tensor_bytes = np_tensor.tobytes()
-                self._stats["time_export_tobytes"] += time.perf_counter() - begin
-            elif isinstance(np_tensor, onnx.TensorProto):
-                tensor_bytes = np_tensor.raw_data
-                assert len(tensor_bytes) > 0, f"One tensor is null, np_tensor={np_tensor}."
-            else:
-                # Check for TensorFlow tensors/variables
-                _tf_handled = False
-                try:
-                    import tensorflow as _tf
-
-                    if isinstance(np_tensor, (_tf.Tensor, _tf.Variable)):
-                        begin = time.perf_counter()
-                        tensor_bytes = np_tensor.numpy().tobytes()
-                        self._stats["time_export_tobytes"] += time.perf_counter() - begin
-                        _tf_handled = True
-                except ImportError:
-                    pass
-
-                if not _tf_handled:
-                    import torch
-
-                    if isinstance(np_tensor, torch.nn.Parameter):
-                        pt = np_tensor.data
-                    elif isinstance(np_tensor, torch.Tensor):
-                        pt = np_tensor
-                    else:
-                        raise NotImplementedError(
-                            f"Handling of type {type(np_tensor)} as large initializer "
-                            f"is not implemented yet."
-                        )
-
-                    begin = time.perf_counter()
-                    proto = proto_from_array(pt, name="dummy")
-                    self._stats["time_export_proto_from_array"] += time.perf_counter() - begin
-                    tensor_bytes = proto.raw_data
-                    assert pt.dtype != torch.float32 or len(tensor_bytes) == np.prod(pt.shape) * 4, (
-                        f"Unexpected size mismatch, buffer size is {len(tensor_bytes)}, "
-                        f"but tensor size={np.prod(pt.shape) * 4}, "
-                        f"shape={pt.shape}, dtype={pt.dtype}"
-                    )
+            tensor_bytes = self.get_raw_data(np_tensor)
 
             begin = time.perf_counter()
             if all_tensors_to_one_file:
@@ -229,6 +237,33 @@ class ExtendedModelContainer(ModelContainer):
             f.write(copy.SerializeToString())
 
         self._stats["time_export_write_model"] += time.perf_counter() - begin
+        return copy
+
+    def get_model_with_data(self):
+        """
+        Returns a copy of the model with data included in it.
+        """
+        proto = self.model_proto.SerializeToString()
+        copy = onnx.ModelProto()
+        copy.ParseFromString(proto)
+        assert (
+            not copy.graph.sparse_initializer
+        ), "Not implemented when the model contains sparse initializers."
+        new_inits = []
+        for tensor in copy.graph.initializer:
+            prop = self.get_prop(tensor)
+            np_tensor = self.large_initializers[prop.value]
+            tensor_bytes = self.get_raw_data(np_tensor)
+            new_tensor = onnx.TensorProto()
+            new_tensor.name = tensor.name
+            new_tensor.raw_data = tensor_bytes
+            new_tensor.data_type = tensor.data_type
+            new_tensor.dims = tensor.dims
+            new_tensor.doc_string = tensor.doc_string
+            new_tensor.metadata_props.extend(tensor.metadata_props)
+            new_inits.append(new_tensor)
+        del copy.graph.initializer[:]
+        copy.graph.initializer.extend(new_inits)
         return copy
 
     def _deserialize_graph(
