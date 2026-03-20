@@ -154,6 +154,66 @@ class TestExportArtifact(ExtTestCase):
         (total,) = ref.run(None, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b, rtol=1e-5)
 
+    def test_to_onnx_function_returns_artifact(self):
+        """to_onnx with export_as_function=True should return an ExportArtifact."""
+        from yobx.xbuilder import GraphBuilder, FunctionOptions
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("X", None, None, False)
+        g.op.Add("X", "X", outputs=["Y"])
+        g.make_tensor_output("Y", is_dimension=False, indexed=False)
+
+        artifact = g.to_onnx(
+            function_options=FunctionOptions(
+                export_as_function=True, name="double", domain="test_domain"
+            ),
+            inline=False,
+        )
+
+        self.assertIsInstance(artifact, ExportArtifact)
+        self.assertIsInstance(artifact.proto, onnx.FunctionProto)
+        self.assertIsNone(artifact.container)
+        # No initializers in this simple function
+        self.assertIsNone(artifact.initializers_name)
+        self.assertIsNone(artifact.initializers_dict)
+        self.assertIsNone(artifact.initializers_renaming)
+
+        # Proto should be usable with ExtendedReferenceEvaluator
+        ref = ExtendedReferenceEvaluator(artifact)
+        X = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        (Y,) = ref.run(None, {"X": X})
+        np.testing.assert_allclose(Y, X + X)
+
+    def test_to_onnx_function_with_initializers_returns_artifact(self):
+        """to_onnx with export_as_function=True and return_initializer=True."""
+        from yobx.xbuilder import GraphBuilder, FunctionOptions
+
+        g = GraphBuilder(18, ir_version=9, as_function=True)
+        g.make_tensor_input("X", None, None, False)
+        np_weights = np.arange(6).reshape((2, 3)).astype(np.float32)
+        init = g.make_initializer("weights", np_weights)
+        g.op.MatMul("X", init, outputs=["Y"])
+        g.make_tensor_output("Y", is_dimension=False, indexed=False)
+
+        artifact = g.to_onnx(
+            function_options=FunctionOptions(
+                export_as_function=True,
+                name="linear",
+                domain="test_domain",
+                return_initializer=True,
+            ),
+            inline=False,
+        )
+
+        self.assertIsInstance(artifact, ExportArtifact)
+        self.assertIsInstance(artifact.proto, onnx.FunctionProto)
+        # Initializer data should be stored in the artifact
+        self.assertIsNotNone(artifact.initializers_name)
+        self.assertIsNotNone(artifact.initializers_dict)
+        self.assertIsNotNone(artifact.initializers_renaming)
+        self.assertGreater(len(artifact.initializers_name), 0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

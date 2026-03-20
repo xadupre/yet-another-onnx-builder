@@ -95,6 +95,8 @@ class ExportArtifact(ExportArtifactProtocol):
             The ONNX proto produced by the export.  When *large_model* was
             requested the proto contains *placeholders* for external data;
             use :meth:`get_proto` to obtain a fully self-contained proto.
+            When the export was performed with ``function_options.export_as_function=True``
+            this is a :class:`~onnx.FunctionProto`.
         container : ExtendedModelContainer | None
             The :class:`~yobx.container.ExtendedModelContainer` produced when
             the conversion was called with ``large_model=True``.  ``None``
@@ -105,6 +107,23 @@ class ExportArtifact(ExportArtifactProtocol):
             Path where the model was last saved, or ``None`` if never saved.
         builder: GraphBuilderExtendedProtocol
             Keeps the builder building the onnx model
+        initializers_name : list[str] | None
+            When the export produced a :class:`~onnx.FunctionProto` with
+            ``return_initializer=True``, this holds the list of extra input
+            names that were promoted from initializers into function inputs.
+            ``None`` for regular model exports.
+        initializers_dict : dict[str, Any] | None
+            Mapping from initializer name to tensor value for every
+            name listed in :attr:`initializers_name`.  ``None`` for
+            regular model exports.
+        initializers_renaming : dict[str, str] | None
+            Mapping from original initializer name to the (possibly renamed)
+            name used in :attr:`initializers_name`.  ``None`` for regular
+            model exports.
+        nested_functions : list[FunctionProto] | None
+            Local :class:`~onnx.FunctionProto` objects that were defined
+            inside the exported function and are needed to run it.  ``None``
+            when there are no nested functions.
 
     Example::
 
@@ -132,6 +151,10 @@ class ExportArtifact(ExportArtifactProtocol):
         report: Optional[ExportReport] = None,
         filename: Optional[str] = None,
         builder: Optional[GraphBuilderExtendedProtocol] = None,
+        initializers_name: Optional[List[str]] = None,
+        initializers_dict: Optional[Dict[str, Any]] = None,
+        initializers_renaming: Optional[Dict[str, str]] = None,
+        nested_functions: Optional[List[onnx.FunctionProto]] = None,
     ):
         assert not proto or isinstance(
             proto, (onnx.ModelProto, onnx.GraphProto, onnx.FunctionProto)
@@ -144,6 +167,10 @@ class ExportArtifact(ExportArtifactProtocol):
         self.report = report
         self.filename = filename
         self.builder = builder
+        self.initializers_name = initializers_name
+        self.initializers_dict = initializers_dict
+        self.initializers_renaming = initializers_renaming
+        self.nested_functions = nested_functions
         if self.container and self.container._stats:
             if not self.report:
                 self.report = ExportReport(build_stats=self.container._stats)

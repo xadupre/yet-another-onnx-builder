@@ -5565,7 +5565,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def _to_onnx_function(
         self, function_options, opsets, mask_outputs
-    ) -> Union[FunctionProto, Dict[str, Any]]:
+    ) -> "ExportArtifact":
         if self._debug_local_function:
             print(f"[GraphBuilder-{self._hash()}.to_onnx] export_as_function {function_options}")
         if self.verbose:
@@ -5613,20 +5613,23 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         )
 
         if not function_options.return_initializer:
-            return proto
+            return ExportArtifact(proto=proto)
 
         if len(self.initializers_dict) == 0 and len(self.functions) == 0:
-            res = dict(proto=proto)
+            nested = None
             if self.functions:
                 used_functions = self._get_used_local_functions()
                 if used_functions:
-                    res["functions"] = used_functions  # type: ignore
-            return res
+                    nested = used_functions
+            return ExportArtifact(proto=proto, nested_functions=nested)
 
         # We need to move the initializers as inputs, we sort them by decreasing size
         inits, functions = self._extend_local_function_inputs()
         proto.input.extend(inits)
-        res = dict(
+        nested_functions = (
+            [v for k, v in self.functions.items() if k in functions] if functions else None
+        )
+        return ExportArtifact(
             proto=proto,
             initializers_name=inits,
             initializers_dict={
@@ -5639,10 +5642,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 for k, v in self.initializers_dict.items()
                 if k in set(inits)
             },
+            nested_functions=nested_functions,
         )
-        if functions:
-            res["functions"] = [v for k, v in self.functions.items() if k in functions]  # type: ignore
-        return res
 
     def _update_model_with_parameter_renaming(self, model: ModelProto):
         assert self.initializers_dict, (
@@ -5852,8 +5853,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._add_hidden_inputs_to_nodes()
 
         if function_options.export_as_function:
-            # export as a function, TODO: use artifact
-            return self._to_onnx_function(function_options, opsets, mask_outputs)  # type: ignore
+            return self._to_onnx_function(function_options, opsets, mask_outputs)
 
         # export as a model
         if self.ir_version:
@@ -8715,30 +8715,31 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._check_function_order()
 
         fct = builder.to_onnx(function_options=function_options, optimize=optimize, inline=False)
-        assert isinstance(fct, (dict, FunctionProto)), (
+        assert isinstance(fct, ExportArtifact), (
             f"Unexpected type {type(fct)}, function_options={function_options}"
             f"{self.get_debug_msg()}"
         )
-        onx = fct["proto"] if isinstance(fct, dict) else fct
+        onx = fct.proto
 
         if metadata_props:
             oh.set_metadata_props(onx, metadata_props)
 
-        if self._debug_local_function and isinstance(fct, dict):
-            print(f"[GraphBuilder-{self._hash()}.make_local_function] keys={', '.join(fct)}")
-            if "initializers_name" in fct:
-                print(
-                    f"[GraphBuilder-{self._hash()}.make_local_function] initializers_name="
-                    f"{fct['initializers_name']}"
-                )
+        if self._debug_local_function and fct.initializers_name is not None:
+            print(
+                f"[GraphBuilder-{self._hash()}.make_local_function] "
+                f"initializers_name={fct.initializers_name}"
+            )
+            if fct.initializers_dict is not None:
                 print(
                     f"[GraphBuilder-{self._hash()}.make_local_function] initializers_dict="
-                    f"{list(fct['initializers_dict'])}"
+                    f"{list(fct.initializers_dict)}"
                 )
+            if fct.initializers_renaming is not None:
                 print(
                     f"[GraphBuilder-{self._hash()}.make_local_function] initializers_renaming="
-                    f"{fct['initializers_renaming']}"
+                    f"{fct.initializers_renaming}"
                 )
+        if self._debug_local_function:
             print(
                 f"[GraphBuilder-{self._hash()}.make_local_function] "
                 f"create {onx.name}[{onx.domain}]"
@@ -8766,20 +8767,20 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             )
 
         # Let's rename the initializers.
-        if isinstance(fct, dict) and "initializers_dict" in fct:
-            assert len(fct["initializers_dict"]) == len(fct["initializers_name"]), (
-                f"Names mismatch between {fct['initializers_name']} and "
-                f"{list(fct['initializers_dict'])}{builder.get_debug_msg()}"
+        if fct.initializers_dict is not None:
+            assert len(fct.initializers_dict) == len(fct.initializers_name), (
+                f"Names mismatch between {fct.initializers_name} and "
+                f"{list(fct.initializers_dict)}{builder.get_debug_msg()}"
             )
             repl = {}
-            for k, v in fct["initializers_dict"].items():
+            for k, v in fct.initializers_dict.items():
                 new_name = self.add_initializer(
                     self.unique_name(k), v, source=f"GraphBuilder.make_local_function/from({k})"
                 )
                 repl[k] = new_name
-            renaming = fct["initializers_renaming"]
+            renaming = fct.initializers_renaming
             new_inits = []
-            for input_name in fct["initializers_name"]:
+            for input_name in fct.initializers_name:
                 init_name = renaming[input_name]
                 repl_name = repl[init_name]
                 new_inits.append(repl_name)
