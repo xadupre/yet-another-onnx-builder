@@ -3,7 +3,7 @@
 of every :func:`to_onnx` conversion function.
 """
 
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 import onnx
 from ..typing import GraphBuilderExtendedProtocol, ExportArtifactProtocol
 from .model_container import ExtendedModelContainer
@@ -78,6 +78,61 @@ class ExportReport:
         )
 
 
+class FunctionPieces:
+    """
+    Holds the function-specific data produced by
+    :meth:`~yobx.xbuilder.GraphBuilder._to_onnx_function`.
+
+    An instance of this class is stored as :attr:`ExportArtifact.function`
+    when :meth:`~yobx.xbuilder.GraphBuilder.to_onnx` is called with
+    ``function_options.export_as_function=True``.  It is ``None`` for regular
+    model exports.
+
+    Args:
+        initializers_name : list[str] | None
+            Ordered list of extra input names that were promoted from
+            initializers into function inputs when ``return_initializer=True``
+            was set in :class:`~yobx.xbuilder.FunctionOptions`.  ``None``
+            when no initializers were promoted.
+        initializers_dict : dict[str, Any] | None
+            Mapping from (possibly renamed) initializer name to tensor value
+            for every name listed in :attr:`initializers_name`.  ``None``
+            when no initializers were promoted.
+        initializers_renaming : dict[str, str] | None
+            Mapping from original initializer name to the (possibly renamed)
+            name used in :attr:`initializers_name`.  ``None`` when no
+            initializers were promoted.
+        nested_functions : list[FunctionProto] | None
+            Local :class:`~onnx.FunctionProto` objects defined inside the
+            exported function that are needed to evaluate it.  ``None`` when
+            there are no nested functions.
+        nested_function_names: set of (domain, name) used by the GraphBuilder
+            owning the functions
+    """
+
+    def __init__(
+        self,
+        initializers_name: Optional[List[str]] = None,
+        initializers_dict: Optional[Dict[str, Any]] = None,
+        initializers_renaming: Optional[Dict[str, str]] = None,
+        nested_functions: Optional[List[onnx.FunctionProto]] = None,
+        nested_function_names: Optional[Set[Tuple[str, str]]] = None,
+    ):
+        self.initializers_name = initializers_name
+        self.initializers_dict = initializers_dict
+        self.initializers_renaming = initializers_renaming
+        self.nested_functions = nested_functions
+        self.nested_function_names = nested_function_names
+
+    def __repr__(self) -> str:
+        n_nested = len(self.nested_functions or self.nested_function_names or [])
+        return (
+            f"{self.__class__.__name__}("
+            f"n_initializers={len(self.initializers_name) if self.initializers_name else 0}, "
+            f"n_nested_functions={n_nested})"
+        )
+
+
 class ExportArtifact(ExportArtifactProtocol):
     """
     Standard output of every :func:`to_onnx` conversion function.
@@ -104,7 +159,13 @@ class ExportArtifact(ExportArtifactProtocol):
         filename : str | None
             Path where the model was last saved, or ``None`` if never saved.
         builder: GraphBuilderExtendedProtocol
-            Keeps the builder building the onnx model
+            Keeps the builder building the onnx model.
+        function : FunctionPieces | None
+            When the export was performed with
+            ``function_options.export_as_function=True``, this holds a
+            :class:`FunctionPieces` instance with function-specific data
+            (initializer names/values and nested local functions).  ``None``
+            for regular model exports.
 
     Example::
 
@@ -132,6 +193,7 @@ class ExportArtifact(ExportArtifactProtocol):
         report: Optional[ExportReport] = None,
         filename: Optional[str] = None,
         builder: Optional[GraphBuilderExtendedProtocol] = None,
+        function: Optional["FunctionPieces"] = None,
     ):
         assert not proto or isinstance(
             proto, (onnx.ModelProto, onnx.GraphProto, onnx.FunctionProto)
@@ -144,6 +206,7 @@ class ExportArtifact(ExportArtifactProtocol):
         self.report = report
         self.filename = filename
         self.builder = builder
+        self.function = function
         if self.container and self.container._stats:
             if not self.report:
                 self.report = ExportReport(build_stats=self.container._stats)
@@ -176,6 +239,7 @@ class ExportArtifact(ExportArtifactProtocol):
             artifact = to_onnx(estimator, (X,))
             artifact.save("model.onnx")
         """
+        assert not self.function, f"save is not implemented when function is not empty {self!r}"
         if self.container is not None:
             result = self.container.save(
                 file_path, all_tensors_to_one_file=all_tensors_to_one_file
@@ -224,10 +288,7 @@ class ExportArtifact(ExportArtifactProtocol):
 
         if not include_weights:
             return self.container.model_proto
-
-        import onnx_ir.serde as oirs
-
-        return oirs.serialize_model(self.container.to_ir())
+        return self.container.get_model_with_data()
 
     @classmethod
     def load(cls, file_path: str, load_large_initializers: bool = True) -> "ExportArtifact":
