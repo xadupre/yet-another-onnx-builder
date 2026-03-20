@@ -155,7 +155,6 @@ class TestExportArtifact(ExtTestCase):
         np.testing.assert_allclose(total, a + b, rtol=1e-5)
 
     def test_to_onnx_function_returns_artifact(self):
-        """to_onnx with export_as_function=True should return an ExportArtifact with function field."""
         from yobx.xbuilder import GraphBuilder, FunctionOptions
         from yobx.reference import ExtendedReferenceEvaluator
 

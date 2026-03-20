@@ -14,7 +14,7 @@ from yobx.ext_test_case import (
 )
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder import GraphBuilder, FunctionOptions, OptimizationOptions
-from yobx.container import ExtendedModelContainer, ExportArtifact, FunctionPieces
+from yobx.container import ExtendedModelContainer, ExportArtifact
 
 TFLOAT = TensorProto.FLOAT
 TFLOAT16 = TensorProto.FLOAT16
@@ -329,7 +329,9 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIsInstance(fct.function.initializers_name, list)
         self.assertEqual(fct.function.initializers_name, ["weights", "bias2", "bias"])
         self.assertIsInstance(fct.function.initializers_dict, dict)
-        self.assertTrue(all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values()))
+        self.assertTrue(
+            all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
+        )
         self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
         proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
@@ -432,7 +434,9 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIsInstance(fct.function.initializers_name, list)
         self.assertEqual(fct.function.initializers_name, ["weights", "bias3", "bias2", "bias"])
         self.assertIsInstance(fct.function.initializers_dict, dict)
-        self.assertTrue(all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values()))
+        self.assertTrue(
+            all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
+        )
         self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
         proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
@@ -553,7 +557,9 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIsInstance(fct.function.initializers_name, list)
         self.assertEqual(fct.function.initializers_name, ["weights", "bias"])
         self.assertIsInstance(fct.function.initializers_dict, dict)
-        self.assertTrue(all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values()))
+        self.assertTrue(
+            all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
+        )
         self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
         proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
@@ -677,7 +683,9 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIsInstance(fct.function.initializers_name, list)
         self.assertEqual(fct.function.initializers_name, ["weights", "bias2", "bias"])
         self.assertIsInstance(fct.function.initializers_dict, dict)
-        self.assertTrue(all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values()))
+        self.assertTrue(
+            all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
+        )
         self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
         proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
@@ -815,7 +823,9 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIsInstance(fct.function.initializers_name, list)
         self.assertEqual(fct.function.initializers_name, ["weights", "bias2", "bias"])
         self.assertIsInstance(fct.function.initializers_dict, dict)
-        self.assertTrue(all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values()))
+        self.assertTrue(
+            all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
+        )
         self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
         proto = fct.proto
         self.assertEqual(proto.output, ["Y"])

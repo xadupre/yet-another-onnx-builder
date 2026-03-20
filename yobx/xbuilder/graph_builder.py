@@ -5563,9 +5563,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             for node in add.node:
                 self._check_constant(node, f"{prefix}-[add]")
 
-    def _to_onnx_function(
-        self, function_options, opsets, mask_outputs
-    ) -> "ExportArtifact":
+    def _to_onnx_function(self, function_options, opsets, mask_outputs) -> "ExportArtifact":
         if self._debug_local_function:
             print(f"[GraphBuilder-{self._hash()}.to_onnx] export_as_function {function_options}")
         if self.verbose:
