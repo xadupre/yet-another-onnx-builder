@@ -1,6 +1,7 @@
 from __future__ import annotations
+import contextlib
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Union, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Union, Tuple
 import numpy as np
 import onnx
 from onnx import numpy_helper as onnx_numpy_helper
@@ -147,6 +148,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         self._name_to_value: Dict[str, ir.Value] = {}
         # Counter for auto-generating output names
         self._output_counter: int = 0
+        self._prefix_stack: List[str] = []
         self._unique_names: Set[str] = set()
         self._op = OnnxScriptGraphBuilderOpset(self)
 
@@ -273,6 +275,8 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
 
     def unique_name(self, prefix: str) -> str:
         """Returns a unique name."""
+        if self._prefix_stack:
+            prefix = f"{'__'.join(self._prefix_stack)}__{prefix}"
         if prefix in self._unique_names:
             i = 2
             sug = f"{prefix}2"
@@ -283,6 +287,23 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
             return sug
         self._unique_names.add(prefix)
         return prefix
+
+    @contextlib.contextmanager
+    def prefix_name_context(self, prefix: str) -> Generator:
+        """Context manager that pushes *prefix* onto the prefix stack.
+
+        While active, :meth:`unique_name` prepends the joined stack to every
+        requested name so that all tensor names produced inside the block are
+        scoped to the current context.  The prefix is removed when the block
+        exits, even if an exception is raised.
+
+        :param prefix: scope prefix to push (e.g. a pipeline step name)
+        """
+        self._prefix_stack.append(prefix)
+        try:
+            yield
+        finally:
+            self._prefix_stack.pop()
 
     def has_name(self, name: str) -> bool:
         """
