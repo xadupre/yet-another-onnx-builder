@@ -239,6 +239,7 @@ class ExportArtifact(ExportArtifactProtocol):
             artifact = to_onnx(estimator, (X,))
             artifact.save("model.onnx")
         """
+        assert not self.function, f"save is not implemented when function is not empty {self!r}"
         if self.container is not None:
             result = self.container.save(
                 file_path, all_tensors_to_one_file=all_tensors_to_one_file
@@ -287,10 +288,7 @@ class ExportArtifact(ExportArtifactProtocol):
 
         if not include_weights:
             return self.container.model_proto
-
-        import onnx_ir.serde as oirs
-
-        return oirs.serialize_model(self.container.to_ir())
+        return self.container.get_model_with_data()
 
     @classmethod
     def load(cls, file_path: str, load_large_initializers: bool = True) -> "ExportArtifact":

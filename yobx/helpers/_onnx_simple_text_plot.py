@@ -708,6 +708,8 @@ def onnx_simple_text_plot(
     if hasattr(model, "opset_import"):
         for opset in model.opset_import:
             rows.append(f"opset: domain={opset.domain!r} version={opset.version!r}")
+    if isinstance(model, ExportArtifact):
+        model = model.get_proto(include_weights=False)
     if hasattr(model, "graph"):
         if model.doc_string:
             if len(model.doc_string) < 55:
