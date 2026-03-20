@@ -16,6 +16,10 @@ Public API
   :class:`~yobx.container.ExportArtifact`
 * :func:`sql_to_onnx_graph` — low-level entry point: SQL string → nodes added
   to an existing :class:`~yobx.typing.GraphBuilderProtocol`
+* :func:`lazyframe_to_onnx` — high-level entry point: ``polars.LazyFrame`` →
+  :class:`~yobx.container.ExportArtifact`
+* :func:`to_onnx` — unified entry point: SQL string **or** ``polars.LazyFrame`` →
+  :class:`~yobx.container.ExportArtifact`
 * :func:`~yobx.sql.parse.parse_sql` — parse a SQL string into a
   :class:`~yobx.sql.parse.ParsedQuery`
 * :class:`~yobx.sql.parse.ParsedQuery` — parsed query container
@@ -45,8 +49,9 @@ Example
     # total == array([5., 9.], dtype=float32)  (rows where a > 0)
 """
 
-from .convert import sql_to_onnx, sql_to_onnx_graph
+from .sql_convert import sql_to_onnx, sql_to_onnx_graph
 from .polars_convert import lazyframe_to_onnx
+from .convert import to_onnx
 from .parse import (
     AggExpr,
     BinaryExpr,
@@ -80,4 +85,5 @@ __all__ = [
     "parse_sql",
     "sql_to_onnx",
     "sql_to_onnx_graph",
+    "to_onnx",
 ]

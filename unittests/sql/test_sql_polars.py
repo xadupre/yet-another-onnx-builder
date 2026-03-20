@@ -347,6 +347,45 @@ class TestLazyframeToOnnx(ExtTestCase):
 
         self.assertTrue(callable(lazyframe_to_onnx))
 
+    def test_to_onnx_with_lazyframe(self):
+        """The unified to_onnx() entry point accepts a polars LazyFrame."""
+        import polars as pl
+        from yobx.sql.convert import to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        lf = pl.LazyFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
+        lf = lf.select([(pl.col("a") + pl.col("b")).alias("total")])
+        dtypes = {"a": np.float64, "b": np.float64}
+        artifact = to_onnx(lf, dtypes)
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float64)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+
+    def test_to_onnx_imported_from_sql_package(self):
+        from yobx.sql import to_onnx  # noqa: F401
+
+        self.assertTrue(callable(to_onnx))
+
+
+@unittest.skipUnless(_has_polars(), "polars not installed")
+class TestToOnnxSqlString(ExtTestCase):
+    """Tests for the unified :func:`~yobx.sql.convert.to_onnx` with a SQL string."""
+
+    def test_to_onnx_with_sql_string(self):
+        """to_onnx() also accepts a plain SQL query string."""
+        from yobx.sql.convert import to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        dtypes = {"a": np.float64, "b": np.float64}
+        artifact = to_onnx("SELECT a + b AS total FROM t", dtypes)
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float64)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+
 
 if __name__ == "__main__":
     unittest.main()

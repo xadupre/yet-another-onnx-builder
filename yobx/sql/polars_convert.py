@@ -3,7 +3,7 @@
 Converts a ``polars.LazyFrame`` execution plan (as returned by
 ``LazyFrame.explain()``) into a self-contained ONNX model by translating
 the polars logical plan into a SQL query that is then processed by
-:func:`~yobx.sql.convert.sql_to_onnx`.
+:func:`~yobx.sql.sql_convert.sql_to_onnx`.
 
 Supported polars operations
 ---------------------------
@@ -28,7 +28,7 @@ import numpy as np
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
 from ..xbuilder import GraphBuilder
-from .convert import sql_to_onnx
+from .sql_convert import sql_to_onnx
 
 # ---------------------------------------------------------------------------
 # Polars → numpy dtype mapping
