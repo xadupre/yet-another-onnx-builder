@@ -5619,7 +5619,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 used_functions = self._get_used_local_functions()
                 if used_functions:
                     nested = used_functions
-            return ExportArtifact(proto=proto, function=FunctionPieces(nested_functions=nested))
+            return ExportArtifact(
+                proto=proto, function=FunctionPieces(nested_function_names=nested)
+            )
 
         # We need to move the initializers as inputs, we sort them by decreasing size
         inits, functions = self._extend_local_function_inputs()
@@ -8724,6 +8726,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             f"function_options={function_options}{self.get_debug_msg()}"
         )
         onx = fct.proto
+        assert onx is not None, "It should not be None"
 
         if metadata_props:
             oh.set_metadata_props(onx, metadata_props)
@@ -8772,6 +8775,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         # Let's rename the initializers.
         if fct.function.initializers_dict is not None:
+            assert fct.function.initializers_name, "type consistency"
             assert len(fct.function.initializers_dict) == len(fct.function.initializers_name), (
                 f"Names mismatch between {fct.function.initializers_name} and "
                 f"{list(fct.function.initializers_dict)}{builder.get_debug_msg()}"
@@ -8783,6 +8787,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 )
                 repl[k] = new_name
             renaming = fct.function.initializers_renaming
+            assert renaming, "type consistency"
             new_inits = []
             for input_name in fct.function.initializers_name:
                 init_name = renaming[input_name]

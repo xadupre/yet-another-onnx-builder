@@ -3,7 +3,7 @@
 of every :func:`to_onnx` conversion function.
 """
 
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 import onnx
 from ..typing import GraphBuilderExtendedProtocol, ExportArtifactProtocol
 from .model_container import ExtendedModelContainer
@@ -106,6 +106,8 @@ class FunctionPieces:
             Local :class:`~onnx.FunctionProto` objects defined inside the
             exported function that are needed to evaluate it.  ``None`` when
             there are no nested functions.
+        nested_function_names: set of (domain, name) used by the GraphBuilder
+            owning the functions
     """
 
     def __init__(
@@ -114,17 +116,24 @@ class FunctionPieces:
         initializers_dict: Optional[Dict[str, Any]] = None,
         initializers_renaming: Optional[Dict[str, str]] = None,
         nested_functions: Optional[List[onnx.FunctionProto]] = None,
+        nested_function_names: Optional[Set[Tuple[str, str]]] = None,
     ):
         self.initializers_name = initializers_name
         self.initializers_dict = initializers_dict
         self.initializers_renaming = initializers_renaming
         self.nested_functions = nested_functions
+        self.nested_function_names = nested_function_names
 
     def __repr__(self) -> str:
+        n_nested = (
+            len(self.nested_functions or self.nested_function_names)
+            if self.nested_functions or self.nested_function_names
+            else 0
+        )
         return (
             f"{self.__class__.__name__}("
             f"n_initializers={len(self.initializers_name) if self.initializers_name else 0}, "
-            f"n_nested_functions={len(self.nested_functions) if self.nested_functions else 0})"
+            f"n_nested_functions={n_nested})"
         )
 
 
