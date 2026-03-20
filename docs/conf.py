@@ -217,6 +217,7 @@ epkg_dictionary = {
     "spox": "https://spox.readthedocs.io/en/latest/",
     "Supported Operators and Data Types": "https://github.com/microsoft/onnxruntime/blob/main/docs/OperatorKernels.md",
     "sympy": "https://www.sympy.org/en/index.html",
+    "statsmodels": "https://www.statsmodels.org/",
     "Keras": "https://keras.io/",
     "tensorflow": "https://www.tensorflow.org/",
     "TensorFlow": "https://www.tensorflow.org/",

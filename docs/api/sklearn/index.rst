@@ -52,6 +52,7 @@ yobx.sklearn
     pipeline/index
     preprocessing/index
     sksurv/index
+    statsmodels/index
     svm/index
     tree/index
     xgboost/index
