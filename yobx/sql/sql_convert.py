@@ -25,15 +25,17 @@ ONNX operations used
   comparison predicates.
 * ``And``, ``Or`` — compound predicates.
 * ``ReduceSum``, ``ReduceMean``, ``ReduceMin``, ``ReduceMax`` —
-  ``SUM / AVG / MIN / MAX`` aggregations.
+  ``SUM / AVG / MIN / MAX`` aggregations (global, when no ``GROUP BY``).
+* ``Unique`` — extracting distinct group keys for ``GROUP BY``.
+* ``ScatterElements`` — per-group accumulation for ``GROUP BY`` aggregations.
 
 Limitations
 ~~~~~~~~~~~
 * Only *equi-joins* on a single key column are supported.
-* ``GROUP BY`` aggregation is limited to the row-wise functions listed above;
-  true SQL group-by semantics (unique key extraction) are not yet implemented
-  as ONNX lacks a native GroupBy node.
-* ``COUNT(*)`` emits the total row count as a scalar ``int64`` tensor.
+* ``GROUP BY`` with ``SUM``, ``AVG``, ``MIN``, ``MAX``, ``COUNT(*)``
+  produces one output row per unique key combination.  For multi-column
+  ``GROUP BY`` the key columns are internally cast to ``float64`` before
+  grouping, which may lose precision for integers larger than 2^53.
 * ``SELECT DISTINCT`` is not yet supported and raises :class:`NotImplementedError`.
 """
 
@@ -46,7 +48,7 @@ from onnx import TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
-from ..typing import GraphBuilderProtocol
+from ..typing import GraphBuilderExtendedProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
 from .ops import get_sql_op_converter
@@ -74,7 +76,7 @@ def _np_dtype_to_onnx(dt: Union[np.dtype, type, str]) -> int:
 
 
 def sql_to_onnx_graph(
-    g: GraphBuilderProtocol,
+    g: GraphBuilderExtendedProtocol,
     sts: Optional[Dict],
     outputs: List[str],
     query: str,
@@ -95,18 +97,7 @@ def sql_to_onnx_graph(
     :param g: an existing graph builder that satisfies
         :class:`~yobx.typing.GraphBuilderProtocol`.  Nodes and inputs are
         added to this builder in-place.
-    :param sts: shape/type context dict forwarded to SQL op converters, or
-        ``None``.  May contain:
-
-        * ``"custom_functions"`` — a mapping from function name (as it
-          appears in the SQL string) to a Python callable.  Each callable
-          must accept one or more numpy arrays and return a numpy array.  The
-          function body is traced with
-          :func:`~yobx.xtracing.trace_numpy_function` so that numpy
-          arithmetic is translated into ONNX nodes.
-
-        When ``None`` (or an empty dict) no custom functions are available.
-
+    :param sts: usually unused
     :param outputs: expected output column names for the query result.
         Passed through to individual op converters following the standard
         converter convention; may be an empty list when the caller does not
@@ -238,10 +229,11 @@ def sql_to_onnx(
 
     .. note::
 
-        ``GROUP BY`` aggregations are computed over the **whole filtered
-        dataset**.  True SQL group-by semantics (one output row per unique
-        key) would require an ONNX ``Loop`` or custom kernel and are not
-        yet supported.
+        ``GROUP BY`` produces one output row per unique key combination.
+        Supported aggregations: ``SUM``, ``AVG``, ``MIN``, ``MAX``,
+        ``COUNT(*)``.  For multi-column ``GROUP BY`` the grouping keys are
+        cast to ``float64`` internally, which may lose precision for integers
+        larger than 2^53.
     """
     g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
@@ -254,8 +246,94 @@ def sql_to_onnx(
 # ---------------------------------------------------------------------------
 
 
+def _build_group_by_tensors(
+    g: GraphBuilderExtendedProtocol, group_op: GroupByOp, col_map: Dict[str, str]
+) -> Tuple[str, str, str, Dict[str, str]]:
+    """Compute ONNX tensors for GROUP BY and return an updated column map.
+
+    Uses ONNX ``Unique`` to identify the distinct groups and produces two
+    index tensors that are later consumed by :class:`~yobx.sql._expr._ExprEmitter`
+    to implement per-group aggregations via ``ScatterElements``.
+
+    :param g: the graph builder.
+    :param group_op: the :class:`~yobx.sql.parse.GroupByOp` describing the
+        grouping columns.
+    :param col_map: current column-name → ONNX-tensor-name mapping (after
+        any prior ``WHERE`` / ``JOIN`` processing).
+    :return: a 4-tuple ``(inverse_indices, first_indices, n_groups, updated_col_map)``
+        where:
+
+        * *inverse_indices* — tensor name, shape ``(N,)`` int64: for each
+          input row, the index of its group in the sorted unique-groups list.
+        * *first_indices* — tensor name, shape ``(n_groups,)`` int64: for each
+          group, the row index of its first occurrence in the input.
+        * *n_groups* — tensor name, scalar int64: number of unique groups.
+        * *updated_col_map* — copy of *col_map* where every GROUP BY key column
+          is remapped to its per-group unique-value tensor so that plain column
+          references in SELECT produce one value per group.
+    """
+    group_cols = group_op.columns
+
+    if len(group_cols) == 1:
+        # Single GROUP BY column: apply Unique directly.
+        col_tensor = col_map[group_cols[0]]
+        unique_vals, first_indices, inverse_indices, _ = g.op.Unique(  # type: ignore[misc]
+            col_tensor, sorted=1, outputs=4, name="gb_unique"
+        )
+        n_groups = g.op.Gather(
+            g.op.Shape(unique_vals, name="gb_uvals_shape"),
+            np.array(0, dtype=np.int64),
+            axis=0,
+            name="gb_n_groups",
+        )
+        updated_col_map = dict(col_map)
+        updated_col_map[group_cols[0]] = unique_vals  # type: ignore[assignment]
+    else:
+        # Multiple GROUP BY columns: cast each to float64, stack into a 2-D
+        # matrix and apply Unique with axis=0 so that each unique row
+        # corresponds to one distinct key combination.
+        col_tensors = [col_map[c] for c in group_cols]
+        cast_tensors = [
+            g.op.Cast(t, to=TensorProto.DOUBLE, name=f"gb_cast_{c}")  # type: ignore[misc]
+            for t, c in zip(col_tensors, group_cols)
+        ]
+        unsqueezed = [
+            g.op.Unsqueeze(t, np.array([1], dtype=np.int64), name=f"gb_unsq_{c}")  # type: ignore[misc]
+            for t, c in zip(cast_tensors, group_cols)
+        ]
+        stacked = g.op.Concat(*unsqueezed, axis=1, name="gb_stack")  # type: ignore[misc]
+        unique_rows, first_indices, inverse_indices, _ = g.op.Unique(  # type: ignore[misc]
+            stacked, axis=0, sorted=1, outputs=4, name="gb_unique"
+        )
+        n_groups = g.op.Gather(
+            g.op.Shape(unique_rows, name="gb_urows_shape"),
+            np.array(0, dtype=np.int64),
+            axis=0,
+            name="gb_n_groups",
+        )
+        # Remap each GROUP BY key column to its per-group unique values
+        # (gathered from the original, pre-cast column to preserve dtype).
+        updated_col_map = dict(col_map)
+        for j, c in enumerate(group_cols):
+            col_unique_f64 = g.op.Gather(  # type: ignore[misc]
+                unique_rows, np.array(j, dtype=np.int64), axis=1, name=f"gb_col_{c}_f64"
+            )
+            # Cast back to the original column's dtype.
+            col_unique = g.op.CastLike(  # type: ignore[misc]
+                col_unique_f64, col_map[c], name=f"gb_col_{c}"
+            )
+            updated_col_map[c] = col_unique  # type: ignore[assignment]
+
+    return (  # type: ignore[return-value]
+        inverse_indices,
+        first_indices,
+        n_groups,
+        updated_col_map,
+    )
+
+
 def _populate_graph(
-    g: GraphBuilderProtocol,
+    g: GraphBuilderExtendedProtocol,
     pq: ParsedQuery,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]],
@@ -263,7 +341,8 @@ def _populate_graph(
     desired_outputs: Optional[List[str]] = None,
     _finalize: bool = True,
 ) -> List[str]:
-    """Populate *g* with ONNX nodes for *pq* and return the output tensor names.
+    """
+    Populates *g* with ONNX nodes for *pq* and return the output tensor names.
 
     :param _finalize: when ``True`` (default) the SELECT output tensors are
         registered as ONNX model outputs.  Pass ``False`` when processing an
@@ -366,8 +445,25 @@ def _populate_graph(
             f"SELECT DISTINCT is not yet supported by the ONNX converter, {select_op=}"
         )
 
+    # Compute GROUP BY tensors when a GROUP BY clause is present.
+    gb_inverse_indices: Optional[str] = None
+    gb_first_indices: Optional[str] = None
+    gb_n_groups: Optional[str] = None
+    effective_col_map = col_map
+    if _group_op is not None:
+        gb_inverse_indices, gb_first_indices, gb_n_groups, effective_col_map = (
+            _build_group_by_tensors(g, _group_op, col_map)
+        )
+
     # Emit SELECT expressions
-    emitter = _ExprEmitter(g, col_map, custom_functions=resolved_custom_functions)  # type: ignore
+    emitter = _ExprEmitter(  # type: ignore
+        g,
+        effective_col_map,
+        custom_functions=resolved_custom_functions,
+        group_by_inverse_indices=gb_inverse_indices,
+        group_by_first_indices=gb_first_indices,
+        group_by_n_groups=gb_n_groups,
+    )
     output_names: List[str] = []
     used_tensor_names: Set[str] = set()
     for i, item in enumerate(select_op.items):

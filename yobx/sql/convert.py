@@ -125,10 +125,11 @@ def to_onnx(
 
     .. note::
 
-        ``GROUP BY`` aggregations are computed over the **whole filtered
-        dataset**.  True SQL group-by semantics (one output row per unique
-        key) would require an ONNX ``Loop`` or custom kernel and are not
-        yet supported.
+        ``GROUP BY`` produces one output row per unique key combination.
+        Supported aggregations: ``SUM``, ``AVG``, ``MIN``, ``MAX``,
+        ``COUNT(*)``.  For multi-column ``GROUP BY`` the grouping keys are
+        cast to ``float64`` internally, which may lose precision for integers
+        larger than 2^53.
     """
     if isinstance(dataframe_or_query, str):
         return sql_to_onnx(
