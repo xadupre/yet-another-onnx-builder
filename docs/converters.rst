@@ -12,6 +12,7 @@ They all returns an instance of :class:`~yobx.container.ExportArtifact`.
    :maxdepth: 1
 
    design/export_artifact
+   coverage
    design/litert/index
    design/sklearn/index
    design/sql/index
