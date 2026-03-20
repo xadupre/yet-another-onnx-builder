@@ -33,7 +33,14 @@ class TestSklearnRegister(ExtTestCase):
             if "." not in f and "__" not in f and not f.startswith("test_")
         }
         self.assertNotEmpty(subs)
-        for f in {"_imblearn", "_xgboost", "_lightgbm", "_category_encoders", "_sksurv"}:
+        for f in {
+            "_imblearn",
+            "_xgboost",
+            "_lightgbm",
+            "_category_encoders",
+            "_sksurv",
+            "_statsmodels",
+        }:
             if f in subfolders:
                 subfolders.add(f[1:])
         not_here = subs - subfolders & subs
