@@ -22,7 +22,7 @@ class TestIncrementalPCA(ExtTestCase):
         onx = to_onnx(ipca, (X,))
 
         # Check that Sub (centering) and MatMul (projection) are present.
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("MatMul", op_types)
 
@@ -68,7 +68,7 @@ class TestIncrementalPCA(ExtTestCase):
         onx = to_onnx(ipca, (X,))
 
         # Whitening adds a Div node.
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("MatMul", op_types)
         self.assertIn("Div", op_types)

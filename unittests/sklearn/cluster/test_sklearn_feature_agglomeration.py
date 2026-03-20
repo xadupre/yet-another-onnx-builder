@@ -21,7 +21,7 @@ class TestFeatureAgglomeration(ExtTestCase):
 
         onx = to_onnx(model, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("MatMul", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -89,7 +89,7 @@ class TestFeatureAgglomeration(ExtTestCase):
 
         onx = to_onnx(model, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceMax", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -113,7 +113,7 @@ class TestFeatureAgglomeration(ExtTestCase):
 
         onx = to_onnx(model, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceMin", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)

@@ -21,7 +21,7 @@ def _ort_run(onx, feeds):
     """Run *onx* with onnxruntime and return outputs. Skip if ORT is not installed."""
     from onnxruntime import InferenceSession
 
-    sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+    sess = InferenceSession(onx.proto.SerializeToString(), providers=["CPUExecutionProvider"])
     return sess.run(None, feeds)
 
 

@@ -39,7 +39,8 @@ from onnx.external_data_helper import uses_external_data
 from onnx.model_container import make_large_tensor_proto
 from onnx.shape_inference import infer_shapes as onnx_infer_shapes
 from ..typing import ConvertOptionsProtocol, DefaultConvertOptions
-from ..container.model_container import ExtendedModelContainer, _get_type
+from ..container import ExportArtifact, ExportReport, ExtendedModelContainer
+from ..container.model_container import _get_type
 from ..helpers.mini_onnx_builder import proto_from_array
 from ..helpers import make_hash, string_signature, string_type
 from ..helpers.helper import size_type
@@ -431,7 +432,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             self.input_names: List[str] = list(input_names) if input_names else []
             self.current_input = 0
             self._unique_names = set(self.input_names)
-        elif isinstance(target_opset_or_existing_proto, (GraphProto, ModelProto, FunctionProto)):
+        elif isinstance(
+            target_opset_or_existing_proto,
+            (GraphProto, ModelProto, FunctionProto, ExportArtifact),
+        ):
             # loads a model from nothing
             if input_names:
                 raise ValueError("input_names must be empty if the input is an existing model.")
@@ -441,6 +445,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     _opsets is not None
                 ), "_opsets must be specified if the input is a GraphProto"
                 self.opsets = _opsets
+            elif isinstance(target_opset_or_existing_proto, ExportArtifact):
+                target_opset_or_existing_proto = target_opset_or_existing_proto.get_proto(
+                    include_weights=True
+                )
             else:
                 assert _opsets is None, "_opsets must be None if the input is not a GraphProto"
             self._update_structures_with_proto(
@@ -2719,7 +2727,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         parameter_name: Optional[str] = None,
         source: str = "",
         allow_empty: bool = False,
-        give_unique: bool = False,
+        give_unique_name: bool = False,
     ) -> str:
         """
         Adds an initializer to the graph.
@@ -2738,7 +2746,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         :param source: any additional information, this field is usually used to
             let the number know where the initializer was created.
         :param allow_empty: allow_empty value
-        :param give_unique: give a unique name
+        :param give_unique_name: give a unique name
         :return: name of the initializer
         """
         if external:
@@ -2807,7 +2815,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             itype = _get_type(value.dtype)
             shape = tuple(value.shape)
 
-        if name == "" or give_unique:
+        if name == "" or give_unique_name:
             if name:
                 name = self.unique_name(name)
             else:
@@ -5555,7 +5563,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             for node in add.node:
                 self._check_constant(node, f"{prefix}-[add]")
 
-    def _to_onnx_function(self, function_options, opsets, mask_outputs):
+    def _to_onnx_function(
+        self, function_options, opsets, mask_outputs
+    ) -> Union[FunctionProto, Dict[str, Any]]:
         if self._debug_local_function:
             print(f"[GraphBuilder-{self._hash()}.to_onnx] export_as_function {function_options}")
         if self.verbose:
@@ -5770,7 +5780,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         function_options: Optional[FunctionOptions] = None,
         mask_outputs: Optional[List[bool]] = None,
         as_graph_proto: bool = False,
-    ) -> Union[FunctionProto, ModelProto, GraphProto, ExtendedModelContainer, Dict[str, Any]]:
+    ) -> ExportArtifact:
         """
         Conversion to onnx. Only then the initializers are converted into TensorProto.
 
@@ -5788,7 +5798,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         :param mask_outputs: to filter out some outputs if not None
         :param as_graph_proto: return a GraphProto with no initializers,
             they are returned as well.
-        :return: the proto
+        :return: the model
         """
         assert self.nodes, f"No node to convert{self.get_debug_msg()}"
         if function_options is None:
@@ -5842,8 +5852,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._add_hidden_inputs_to_nodes()
 
         if function_options.export_as_function:
-            # export as a function
-            return self._to_onnx_function(function_options, opsets, mask_outputs)
+            # export as a function, TODO: use artifact
+            return self._to_onnx_function(function_options, opsets, mask_outputs)  # type: ignore
 
         # export as a model
         if self.ir_version:
@@ -5878,7 +5888,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             model.graph.input.extend(self.inputs)
 
         if as_graph_proto:
-            return model.graph
+            return ExportArtifact(model.graph)
 
         # initializers
         initializers, large_initializers = self._build_initializers(
@@ -5977,9 +5987,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                             f"doc_string is missing for initializer {init.name!r}"
                             f"\n{self.pretty_text()}"
                         )
-            return (lm, stats) if return_optimize_report else lm  # type: ignore
-
-        return (model, stats) if return_optimize_report else model  # type: ignore
+            return ExportArtifact(
+                container=lm, report=ExportReport(stats=stats) if return_optimize_report else None
+            )
+        return ExportArtifact(
+            proto=model, report=ExportReport(stats=stats) if return_optimize_report else None
+        )
 
     def _rename_dynamic_dimension_inplace(
         self, obj: ValueInfoProto, replacements: Dict[str, str]
@@ -6526,7 +6539,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if renaming:
                 g.rename_names(renaming)
 
-            new_g = g.to_onnx(optimize=False, as_graph_proto=True)
+            new_g = g.to_onnx(optimize=False, as_graph_proto=True).graph
             assert isinstance(new_g, GraphProto), f"unexpected type {type(new_g)}"
             if self.verbose > 1:
                 print(

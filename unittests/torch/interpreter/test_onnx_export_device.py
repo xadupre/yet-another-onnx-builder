@@ -33,9 +33,9 @@ class TestOnnxExportDevice(ExtTestCase):
         x, y = torch.randn(2, 3), torch.randn(2, 3)
         ds = ({0: "batch"}, {0: "batch"})
         Model()(x=x, y=y)
-        _onx, builder = to_onnx(Model(), (x, y), dynamic_shapes=ds, return_builder=True)
-        self.assertNotEmpty(builder._known_devices)
-        self.assertEqual(set(builder._known_devices.values()), {-1})
+        onx = to_onnx(Model(), (x, y), dynamic_shapes=ds, return_builder=True)
+        self.assertNotEmpty(onx.builder._known_devices)
+        self.assertEqual(set(onx.builder._known_devices.values()), {-1})
 
     @requires_cuda()
     def test_export_devices_cuda(self):
@@ -48,9 +48,9 @@ class TestOnnxExportDevice(ExtTestCase):
         x, y = torch.randn(2, 3).cuda(), torch.randn(2, 3).cuda()
         ds = ({0: "batch"}, {0: "batch"})
         Model()(x=x, y=y)
-        _onx, builder = to_onnx(Model(), (x, y), dynamic_shapes=ds, return_builder=True)
-        self.assertNotEmpty(builder._known_devices)
-        self.assertEqual(set(builder._known_devices.values()), {0})
+        onx = to_onnx(Model(), (x, y), dynamic_shapes=ds, return_builder=True)
+        self.assertNotEmpty(onx.builder._known_devices)
+        self.assertEqual(set(onx.builder._known_devices.values()), {0})
 
 
 if __name__ == "__main__":

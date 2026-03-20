@@ -224,7 +224,5 @@ def sklearn_nmf(
     g.set_type(W_final, itype)
 
     res = g.op.Identity(W_final, name=name, outputs=outputs)
-    assert isinstance(res, str)
-    if not sts:
-        g.set_type(res, itype)
+    g.set_type(res, itype)
     return res

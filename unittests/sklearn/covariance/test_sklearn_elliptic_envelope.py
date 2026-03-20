@@ -20,7 +20,7 @@ class TestEllipticEnvelope(ExtTestCase):
         estimator.fit(X)
         onx = to_onnx(estimator, (X,))
 
-        output_names = [o.name for o in onx.graph.output]
+        output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
         self.assertEqual(output_names[0], "label")
         self.assertEqual(output_names[1], "scores")
@@ -81,7 +81,7 @@ class TestEllipticEnvelope(ExtTestCase):
         ee.fit(X)
         onx = to_onnx(ee, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("MatMul", op_types)
         self.assertIn("ReduceSum", op_types)
         self.assertIn("Where", op_types)

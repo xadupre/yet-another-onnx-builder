@@ -23,7 +23,7 @@ class TestKNeighborsClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TopK", op_types)
         self.assertIn("Gather", op_types)
 
@@ -172,11 +172,11 @@ class TestKNeighborsClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (X,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         # CDist from com.microsoft should appear in the graph
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
-        domains = {oi.domain for oi in onx.opset_import}
+        domains = {oi.domain for oi in onx.proto.opset_import}
         self.assertIn("com.microsoft", domains)
 
         # Verify predictions match sklearn using ORT (which supports CDist)
@@ -264,7 +264,7 @@ class TestKNeighborsRegressor(ExtTestCase):
 
         onx = to_onnx(reg, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TopK", op_types)
         self.assertIn("Gather", op_types)
 
@@ -365,11 +365,11 @@ class TestKNeighborsRegressor(ExtTestCase):
 
         onx = to_onnx(reg, (X,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         # CDist from com.microsoft should appear in the graph
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
-        domains = {oi.domain for oi in onx.opset_import}
+        domains = {oi.domain for oi in onx.proto.opset_import}
         self.assertIn("com.microsoft", domains)
 
         # Verify predictions match sklearn using ORT

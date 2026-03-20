@@ -153,10 +153,8 @@ def sklearn_feature_hasher(
     res = g.op.ScatterElements(
         zeros_typed, indices, weighted, axis=1, reduction="add", name=name, outputs=outputs
     )
-    if not sts:
-        g.set_type(res, target_onnx_type)
-        if g.has_shape(X):
-            g.set_shape(res, (g.get_shape(X)[0], n_features))
+    g.set_type(res, target_onnx_type)
+    if g.has_shape(X):
+        g.set_shape(res, (g.get_shape(X)[0], n_features))
 
-    assert isinstance(res, str)
     return res

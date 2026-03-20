@@ -211,15 +211,12 @@ def _sklearn_mixture_core(
         )
 
     proba = g.op.Softmax(log_p, axis=1, name=f"{name}_proba", outputs=outputs[1:])
-    assert isinstance(proba, str)
     label_idx = g.op.ArgMax(log_p, axis=1, keepdims=0, name=f"{name}_argmax")
     label = g.op.Cast(
         label_idx, to=onnx.TensorProto.INT64, name=f"{name}_label", outputs=outputs[:1]
     )
-    assert isinstance(label, str)
-    if not sts:
-        g.set_type(label, onnx.TensorProto.INT64)
-        g.set_type(proba, itype)
+    g.set_type(label, onnx.TensorProto.INT64)
+    g.set_type(proba, itype)
     return label, proba
 
 

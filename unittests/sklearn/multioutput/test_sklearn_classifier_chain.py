@@ -176,7 +176,7 @@ class TestSklearnClassifierChain(ExtTestCase):
 
         onx = to_onnx(cc, (self._X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         # One Gemm per sub-estimator (LogisticRegression → Gemm)
         self.assertEqual(op_types.count("Gemm"), 3)
         # Concat nodes to augment input features for subsequent chain steps

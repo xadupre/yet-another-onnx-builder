@@ -24,7 +24,7 @@ class TestPatchExtractor(ExtTestCase):
 
         onx = to_onnx(pe, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Slice", op_types)
         self.assertIn("Reshape", op_types)
 

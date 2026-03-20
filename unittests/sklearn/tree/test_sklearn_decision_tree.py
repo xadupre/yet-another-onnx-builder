@@ -23,10 +23,10 @@ class TestSklearnDecisionTree(ExtTestCase):
         onx = to_onnx(dt, (X,), target_opset=18)
 
         # Check graph structure
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleClassifier", op_types)
 
         # Check outputs
@@ -53,10 +53,10 @@ class TestSklearnDecisionTree(ExtTestCase):
         onx = to_onnx(dt, (X,), target_opset=18)
 
         # Check graph structure
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleClassifier", op_types)
 
         # Check outputs
@@ -83,10 +83,10 @@ class TestSklearnDecisionTree(ExtTestCase):
         onx = to_onnx(dt, (X,), target_opset=18)
 
         # Check graph structure
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleRegressor", op_types)
 
         # Check outputs
@@ -112,10 +112,10 @@ class TestSklearnDecisionTree(ExtTestCase):
         onx = to_onnx(pipe, (X,), target_opset=18)
 
         # Check graph contains nodes from both steps
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("Div", op_types)
         self.assertIn("TreeEnsembleClassifier", op_types)
@@ -144,12 +144,12 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertEqual(ml_opsets["ai.onnx.ml"], 5)
 
         # Should use the new unified operator, not the legacy one
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleClassifier", op_types)
 
@@ -177,11 +177,11 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertEqual(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleClassifier", op_types)
 
@@ -208,11 +208,11 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertEqual(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleRegressor", op_types)
 
@@ -235,7 +235,7 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         dtc = DecisionTreeClassifier(random_state=0)
         dtc.fit(X, y_cls)
-        onx_c = to_onnx(dtc, (X,), target_opset=20)
+        onx_c = to_onnx(dtc, (X,), target_opset=20).proto
         ml_opsets_c = {op.domain: op.version for op in onx_c.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets_c)
         self.assertLess(ml_opsets_c["ai.onnx.ml"], 5)
@@ -245,7 +245,7 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         dtr = DecisionTreeRegressor(random_state=0)
         dtr.fit(X, y_reg)
-        onx_r = to_onnx(dtr, (X,), target_opset=20)
+        onx_r = to_onnx(dtr, (X,), target_opset=20).proto
         ml_opsets_r = {op.domain: op.version for op in onx_r.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets_r)
         self.assertLess(ml_opsets_r["ai.onnx.ml"], 5)
@@ -264,11 +264,11 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(pipe, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertEqual(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleClassifier", op_types)
 
@@ -295,7 +295,7 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset=18)
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
 
@@ -323,7 +323,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         onx = to_onnx(dt, (X,), target_opset=18)
         self.print_onnx(onx)
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
 
@@ -350,7 +350,7 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset=18)
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
 
@@ -374,7 +374,7 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset=18)
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
 
@@ -398,16 +398,16 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertEqual(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleClassifier", op_types)
 
         # nodes_splits tensor must be float32 when input is float32
-        for node in onx.graph.node:
+        for node in onx.proto.graph.node:
             if node.op_type == "TreeEnsemble":
                 for attr in node.attribute:
                     if attr.name == "nodes_splits":
@@ -430,16 +430,16 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertEqual(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleClassifier", op_types)
 
         # nodes_splits tensor must be float64 when input is float64
-        for node in onx.graph.node:
+        for node in onx.proto.graph.node:
             if node.op_type == "TreeEnsemble":
                 for attr in node.attribute:
                     if attr.name == "nodes_splits":
@@ -462,16 +462,16 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertEqual(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleRegressor", op_types)
 
         # nodes_splits tensor must be float32 when input is float32
-        for node in onx.graph.node:
+        for node in onx.proto.graph.node:
             if node.op_type == "TreeEnsemble":
                 for attr in node.attribute:
                     if attr.name == "nodes_splits":
@@ -495,16 +495,16 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset={"": 21, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertEqual(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleRegressor", op_types)
 
         # nodes_splits tensor must be float64 when input is float64
-        for node in onx.graph.node:
+        for node in onx.proto.graph.node:
             if node.op_type == "TreeEnsemble":
                 for attr in node.attribute:
                     if attr.name == "nodes_splits":
@@ -526,10 +526,10 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 3})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertEqual(ml_opsets["ai.onnx.ml"], 3)
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleClassifier", op_types)
         self.assertNotIn("TreeEnsemble", op_types)
 
@@ -549,10 +549,10 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 3})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertEqual(ml_opsets["ai.onnx.ml"], 3)
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleClassifier", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -571,10 +571,10 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 3})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertEqual(ml_opsets["ai.onnx.ml"], 3)
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleRegressor", op_types)
         self.assertNotIn("TreeEnsemble", op_types)
 
@@ -595,10 +595,10 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 3})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertEqual(ml_opsets["ai.onnx.ml"], 3)
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleRegressor", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -727,10 +727,10 @@ class TestSklearnDecisionTree(ExtTestCase):
         onx = to_onnx(dt, (X,), target_opset=18)
 
         # Check graph structure
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleClassifier", op_types)
 
         # Check outputs
@@ -783,10 +783,10 @@ class TestSklearnDecisionTree(ExtTestCase):
         onx = to_onnx(dt, (X,), target_opset=18)
 
         # Check graph structure
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleRegressor", op_types)
 
         # Check outputs
@@ -811,9 +811,9 @@ class TestSklearnDecisionTree(ExtTestCase):
 
         onx = to_onnx(dt, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertGreaterEqual(ml_opsets.get("ai.onnx.ml", 0), 5)
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)

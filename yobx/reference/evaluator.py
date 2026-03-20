@@ -235,6 +235,12 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         new_ops: Optional[List[type[OpRun]]] = None,
         **kwargs,
     ):
+        from ..container.export_artifact import ExportArtifact
+
+        if isinstance(proto, ExportArtifact):
+            # Unwrap: prefer the container (for large models) then the proto.
+            proto = proto.container if proto.container is not None else proto.proto
+
         if new_ops is None:
             new_ops = ExtendedReferenceEvaluator.default_ops
         else:

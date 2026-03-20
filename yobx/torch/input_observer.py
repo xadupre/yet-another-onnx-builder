@@ -1040,6 +1040,8 @@ class InputObserverInfo:
 
     def remove_inputs(self, input_names: Sequence[str | int]) -> int:
         """Lets the users drops inputs. Returns the number of removals."""
+        if not self.inputs:
+            raise RuntimeError("No captured candidates.")
         if self.args_name_and_position is not None:
             args_name, args_pos = self.args_name_and_position
             if args_name in input_names or args_pos in input_names:
@@ -1050,7 +1052,11 @@ class InputObserverInfo:
         for candidate in self.inputs:
             r += candidate.remove_inputs(input_names)
         if not r:
-            raise ValueError(f"No input in all candidates was removed from {input_names=}.")
+            raise ValueError(
+                f"No input in all candidates was removed from {input_names=}, last candidate is "
+                f"{string_type(self.inputs[-1].args, with_shape=True)}, "
+                f"{string_type(self.inputs[-1].kwargs, with_shape=True)}"
+            )
         if self._best_candidate:
             self._best_candidate.remove_inputs(input_names)
 

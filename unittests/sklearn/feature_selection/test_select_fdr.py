@@ -26,7 +26,7 @@ class TestSelectFdr(ExtTestCase):
 
         onx = to_onnx(sel, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Gather", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -71,7 +71,7 @@ class TestSelectFdr(ExtTestCase):
 
         onx = to_onnx(pipe, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Gather", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)

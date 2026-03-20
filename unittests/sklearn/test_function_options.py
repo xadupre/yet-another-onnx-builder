@@ -44,8 +44,8 @@ class TestSklearnFunctionOptions(ExtTestCase):
         ss = StandardScaler().fit(self.X)
         # default function_options=False
         onx = to_onnx(ss, (self.X,))
-        self.assertEqual(len(onx.functions), 0)
-        op_types = [n.op_type for n in onx.graph.node]
+        self.assertEqual(len(onx.proto.functions), 0)
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("Div", op_types)
 
@@ -58,15 +58,15 @@ class TestSklearnFunctionOptions(ExtTestCase):
         onx = to_onnx(ss, (self.X,), function_options=self.fopts)
 
         # One local function with the estimator's class name.
-        func_names = [(f.name, f.domain) for f in onx.functions]
+        func_names = [(f.name, f.domain) for f in onx.proto.functions]
         self.assertEqual(len(func_names), 1)
         self.assertIn(("StandardScaler", "test_sklearn"), func_names)
 
         # The main graph has a single function-call node.
-        graph_ops = [(n.op_type, n.domain) for n in onx.graph.node]
+        graph_ops = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("StandardScaler", "test_sklearn"), graph_ops)
-        self.assertNotIn("Sub", [n.op_type for n in onx.graph.node])
-        self.assertNotIn("Div", [n.op_type for n in onx.graph.node])
+        self.assertNotIn("Sub", [n.op_type for n in onx.proto.graph.node])
+        self.assertNotIn("Div", [n.op_type for n in onx.proto.graph.node])
 
         # Numerical correctness.
         ref = ExtendedReferenceEvaluator(onx)
@@ -78,7 +78,7 @@ class TestSklearnFunctionOptions(ExtTestCase):
         lr = LogisticRegression(max_iter=200).fit(self.X, self.y)
         onx = to_onnx(lr, (self.X,), function_options=self.fopts)
 
-        func_names = [f.name for f in onx.functions]
+        func_names = [f.name for f in onx.proto.functions]
         self.assertIn("LogisticRegression", func_names)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -96,7 +96,7 @@ class TestSklearnFunctionOptions(ExtTestCase):
         ).fit(self.X, self.y)
         onx = to_onnx(pipe, (self.X,), function_options=self.fopts)
 
-        func_names = [f.name for f in onx.functions]
+        func_names = [f.name for f in onx.proto.functions]
         # Both steps must appear as local functions.
         self.assertIn("StandardScaler", func_names)
         self.assertIn("LogisticRegression", func_names)
@@ -104,7 +104,7 @@ class TestSklearnFunctionOptions(ExtTestCase):
         self.assertNotIn("Pipeline", func_names)
 
         # No raw ops from the individual converters in the main graph.
-        graph_ops = [n.op_type for n in onx.graph.node]
+        graph_ops = [n.op_type for n in onx.proto.graph.node]
         self.assertNotIn("Sub", graph_ops)
         self.assertNotIn("Gemm", graph_ops)
 
@@ -120,8 +120,8 @@ class TestSklearnFunctionOptions(ExtTestCase):
             [("scaler", StandardScaler()), ("clf", LogisticRegression(max_iter=200))]
         ).fit(self.X, self.y)
         onx = to_onnx(pipe, (self.X,))
-        self.assertEqual(len(onx.functions), 0)
-        op_types = [n.op_type for n in onx.graph.node]
+        self.assertEqual(len(onx.proto.functions), 0)
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("Gemm", op_types)
 
@@ -136,13 +136,13 @@ class TestSklearnFunctionOptions(ExtTestCase):
         ).fit(X)
         onx = to_onnx(ct, (X,), function_options=self.fopts)
 
-        func_names = [f.name for f in onx.functions]
+        func_names = [f.name for f in onx.proto.functions]
         self.assertIn("StandardScaler", func_names)
         self.assertIn("MinMaxScaler", func_names)
         self.assertNotIn("ColumnTransformer", func_names)
 
         # Concat is still in the main graph (CT orchestration).
-        graph_ops = [n.op_type for n in onx.graph.node]
+        graph_ops = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Concat", graph_ops)
         self.assertNotIn("Sub", graph_ops)
 
@@ -165,7 +165,7 @@ class TestSklearnFunctionOptions(ExtTestCase):
         ).fit(self.X, self.y)
         onx = to_onnx(pipe, (self.X,), function_options=self.fopts)
 
-        func_names = [f.name for f in onx.functions]
+        func_names = [f.name for f in onx.proto.functions]
         # Both steps must appear as local functions.
         self.assertIn("StandardScaler", func_names)
         self.assertIn("LogisticRegression", func_names)
@@ -174,7 +174,7 @@ class TestSklearnFunctionOptions(ExtTestCase):
         self.assertNotIn("ColumnTransformer", func_names)
 
         # No raw ops from the individual converters in the main graph.
-        graph_ops = [n.op_type for n in onx.graph.node]
+        graph_ops = [n.op_type for n in onx.proto.graph.node]
         self.assertNotIn("Sub", graph_ops)
         self.assertNotIn("Gemm", graph_ops)
 
@@ -195,8 +195,8 @@ class TestSklearnFunctionOptions(ExtTestCase):
         )
         onx = to_onnx(ss, (self.X,), function_options=custom_opts)
 
-        self.assertEqual(len(onx.functions), 1)
-        self.assertEqual(onx.functions[0].domain, "acme.corp.v1")
+        self.assertEqual(len(onx.proto.functions), 1)
+        self.assertEqual(onx.proto.functions[0].domain, "acme.corp.v1")
 
 
 if __name__ == "__main__":

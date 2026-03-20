@@ -58,5 +58,5 @@ Size of the package:
     from yobx.ext_test_case import statistics_on_folder
 
     df = pandas.DataFrame(statistics_on_folder(os.path.dirname(__file__), aggregation=1))
-    gr = df[["dir", "ext", "lines", "chars"]].groupby(["ext", "dir"]).sum()
+    gr = df[["dir", "ext", "files", "lines", "chars"]].groupby(["ext", "dir"]).sum()
     print(gr)

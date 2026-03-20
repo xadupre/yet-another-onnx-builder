@@ -77,7 +77,7 @@ class TestSklearnDummyClassifier(ExtTestCase):
             estimator.fit(Xd, y)
             onx = to_onnx(estimator, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)

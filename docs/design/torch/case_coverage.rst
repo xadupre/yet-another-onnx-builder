@@ -1,9 +1,12 @@
+.. _l-design-torch-case-coverage:
+
 =========================
 Overview of Exportability
 =========================
 
 The following script shows the exported program for many short cases
 to retrieve an ONNX model equivalent to the original model.
+Go to :ref:`l-this-bottom-page-coverage` to see a table summarizing the results.
 
 .. runpython::
     :showcode:
@@ -100,3 +103,8 @@ to retrieve an ONNX model equivalent to the original model.
     piv = df.pivot(index="case", columns="exporter", values="error")
     print(piv.to_markdown(tablefmt="rst"))
     print()
+
+.. _l-this-bottom-page-coverage:
+
+Bottom of the page
+------------------

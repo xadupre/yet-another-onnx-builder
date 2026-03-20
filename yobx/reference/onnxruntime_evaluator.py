@@ -6,6 +6,7 @@ import onnx.numpy_helper as onh
 import onnx.shape_inference as shi
 from onnx.defs import onnx_opset_version
 import onnxruntime
+from ..container import ExportArtifact
 from ..helpers import string_type
 from ..helpers.onnx_helper import (
     get_hidden_inputs,
@@ -100,7 +101,7 @@ class OnnxruntimeEvaluator:
 
     def __init__(
         self,
-        proto: Union[str, Proto, "OnnxruntimeEvaluator"],
+        proto: Union[str, Proto, "OnnxruntimeEvaluator", ExportArtifact],
         session_options: Optional[onnxruntime.SessionOptions] = None,
         providers: Optional[Union[str, List[str]]] = None,
         nvtx: bool = False,
@@ -124,6 +125,8 @@ class OnnxruntimeEvaluator:
     ):
         if isinstance(proto, str):
             self.proto: Proto = onnx.load(proto)
+        elif isinstance(proto, ExportArtifact):
+            self.proto = proto.get_proto(include_weights=True)
         elif isinstance(proto, OnnxruntimeEvaluator):
             assert isinstance(
                 proto.proto, PROTO

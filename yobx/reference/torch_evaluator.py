@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
 import onnx
 import torch
+from ..container import ExportArtifact
 from .runtime_info import first_used_last_used, RuntimeValue
 from .report_results_comparison import ReportResultComparison
 from . import torch_ops
@@ -280,7 +281,7 @@ class TorchReferenceEvaluator:
 
     def __init__(
         self,
-        proto: Union[onnx.FunctionProto, onnx.GraphProto, onnx.ModelProto],
+        proto: Union[onnx.FunctionProto, onnx.GraphProto, onnx.ModelProto, ExportArtifact],
         providers: Tuple[str, ...] = ("CPUExecutionProvider",),
         opsets: Optional[Dict[str, int]] = None,
         local_functions: Optional[Dict[Tuple[str, str], "TorchReferenceEvaluator"]] = None,
@@ -304,6 +305,8 @@ class TorchReferenceEvaluator:
 
         if isinstance(proto, str):
             proto = onnx.load(proto)
+        elif isinstance(proto, ExportArtifact):
+            proto = proto.get_proto(include_weights=True)
         if isinstance(proto, onnx.ModelProto):
             assert opsets is None, "proto is a model, opsets must be None in that case"
             assert not proto.graph.sparse_initializer, "sparse_initializer not support yet"

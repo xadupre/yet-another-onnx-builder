@@ -1265,7 +1265,7 @@ class EasyPatternOptimization(PatternOptimization):
                         new_outputs[0],
                         value,
                         source=f"EasyPatternOptimization.constant/from({new_outputs[0]})",
-                        give_unique=False,
+                        give_unique_name=False,
                     )
                     assert name == new_outputs[0], f"Name mismatch {name} != {new_outputs[0]}"
                     continue

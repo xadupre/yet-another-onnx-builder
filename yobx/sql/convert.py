@@ -42,9 +42,10 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
-from onnx import ModelProto, TensorProto
+from onnx import TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
+from ..container import ExportArtifact
 from ..typing import GraphBuilderProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
@@ -126,9 +127,13 @@ def sql_to_onnx_graph(
     :return: a list of output tensor names that were added to *g* as model
         outputs (one per expression in the ``SELECT`` clause, in order).
 
-    Example::
+    Example:
+
+    .. runpython::
+        :showcode:
 
         import numpy as np
+        from yobx.helpers.onnx_helper import pretty_onnx
         from yobx.xbuilder import GraphBuilder
         from yobx.sql import sql_to_onnx_graph
 
@@ -141,7 +146,8 @@ def sql_to_onnx_graph(
             "SELECT a + b AS total FROM t WHERE a > 0",
             dtypes,
         )
-        onx, _ = g.to_onnx(return_optimize_report=True)
+        art = g.to_onnx()
+        print(pretty_onnx(art))
     """
     custom_functions = (sts or {}).get("custom_functions", {})
     pq = parse_sql(query)
@@ -164,9 +170,9 @@ def sql_to_onnx(
     n_rows: Optional[int] = None,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
-) -> ModelProto:
+) -> ExportArtifact:
     """
-    Convert a SQL *query* to a self-contained :class:`onnx.ModelProto`.
+    Convert a SQL *query* to a self-contained ONNX model.
 
     Each column in the query is represented as a **separate 1-D ONNX input**
     tensor, allowing the caller to feed column vectors independently.  The
@@ -209,7 +215,7 @@ def sql_to_onnx(
             from yobx.sql import sql_to_onnx
 
             dtypes = {"a": np.float32}
-            onx = sql_to_onnx(
+            artifact = sql_to_onnx(
                 "SELECT my_sqrt(a) AS r FROM t",
                 dtypes,
                 custom_functions={"my_sqrt": np.sqrt},
@@ -222,15 +228,22 @@ def sql_to_onnx(
         the :ref:`builder-api` can be supplied here, e.g. a custom subclass
         that adds extra optimisation passes.
 
-    :return: a :class:`onnx.ModelProto` ready for inference.
+    :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
+        ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
     Example::
 
         import numpy as np
         from yobx.sql import sql_to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
 
         dtypes = {"a": np.float32, "b": np.float32}
-        onx = sql_to_onnx("SELECT a + b AS total FROM t WHERE a > 0", dtypes)
+        artifact = sql_to_onnx("SELECT a + b AS total FROM t WHERE a > 0", dtypes)
+
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0,  5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
 
     .. note::
 
@@ -244,8 +257,7 @@ def sql_to_onnx(
     sql_to_onnx_graph(
         g, sts, [], query, input_dtypes, right_input_dtypes=right_input_dtypes, n_rows=n_rows
     )
-    onx, _ = g.to_onnx(return_optimize_report=True)  # type: ignore
-    return onx  # type: ignore[return-value]
+    return g.to_onnx(return_optimize_report=True)
 
 
 # ---------------------------------------------------------------------------
@@ -261,8 +273,14 @@ def _populate_graph(
     n_rows: Optional[int],
     custom_functions: Optional[Dict[str, Callable]] = None,
     desired_outputs: Optional[List[str]] = None,
+    _finalize: bool = True,
 ) -> List[str]:
-    """Populate *g* with ONNX nodes for *pq* and return the output tensor names."""
+    """Populate *g* with ONNX nodes for *pq* and return the output tensor names.
+
+    :param _finalize: when ``True`` (default) the SELECT output tensors are
+        registered as ONNX model outputs.  Pass ``False`` when processing an
+        inner subquery so that its outputs remain intermediate tensors.
+    """
     dim = n_rows if n_rows is not None else "N"
 
     # Resolve dtype dicts
@@ -274,49 +292,74 @@ def _populate_graph(
     else:
         right_dtypes = left_dtypes
 
-    # Build list of inputs needed for left table
-    # (only columns that appear in the query)
-    all_cols = pq.columns
-    left_inputs: List[Tuple[str, int, Tuple]] = []
-    right_inputs: List[Tuple[str, int, Tuple]] = []
+    resolved_custom_functions = custom_functions or {}
 
-    seen_right: List[str] = []
-    join_op: Optional[JoinOp] = None
-    for op in pq.operations:
-        if isinstance(op, JoinOp):
-            join_op = op
-            break
+    if pq.subquery is not None:
+        # Process the inner subquery first.  Its SELECT outputs become the
+        # column tensors for the outer query.
+        inner_output_names = _populate_graph(
+            g,
+            pq.subquery,
+            input_dtypes,
+            right_input_dtypes,
+            n_rows,
+            custom_functions=resolved_custom_functions,
+            desired_outputs=None,
+            _finalize=False,
+        )
+        # Build col_map: inner SELECT alias → ONNX tensor name
+        inner_select_op: Optional[SelectOp] = next(
+            (op for op in pq.subquery.operations if isinstance(op, SelectOp)), None
+        )
+        if inner_select_op is None:
+            raise ValueError("Subquery has no SELECT clause.")
+        col_map: Dict[str, str] = {
+            item.output_name(): tensor_name
+            for item, tensor_name in zip(inner_select_op.items, inner_output_names)
+        }
+        right_col_map: Dict[str, str] = {}
+    else:
+        # Build list of inputs needed for left table
+        # (only columns that appear in the query)
+        all_cols = pq.columns
+        left_inputs: List[Tuple[str, int, Tuple]] = []
+        right_inputs: List[Tuple[str, int, Tuple]] = []
 
-    for col in all_cols:
-        if col in left_dtypes:
-            onnx_type = _np_dtype_to_onnx(left_dtypes[col])
-            left_inputs.append((col, onnx_type, (dim,)))
-        elif col in right_dtypes and join_op is not None:
-            onnx_type = _np_dtype_to_onnx(right_dtypes[col])
-            right_inputs.append((col, onnx_type, (dim,)))
-            seen_right.append(col)
+        seen_right: List[str] = []
+        join_op: Optional[JoinOp] = None
+        for op in pq.operations:
+            if isinstance(op, JoinOp):
+                join_op = op
+                break
 
-    # If we have a join, make sure key columns are registered on the right side
-    if join_op is not None and join_op.right_key not in seen_right:
-        if join_op.right_key in right_dtypes:
-            onnx_type = _np_dtype_to_onnx(right_dtypes[join_op.right_key])
-            right_inputs.append((join_op.right_key, onnx_type, (dim,)))
+        for col in all_cols:
+            if col in left_dtypes:
+                onnx_type = _np_dtype_to_onnx(left_dtypes[col])
+                left_inputs.append((col, onnx_type, (dim,)))
+            elif col in right_dtypes and join_op is not None:
+                onnx_type = _np_dtype_to_onnx(right_dtypes[col])
+                right_inputs.append((col, onnx_type, (dim,)))
+                seen_right.append(col)
 
-    all_inputs = left_inputs + right_inputs
+        # If we have a join, make sure key columns are registered on the right side
+        if join_op is not None and join_op.right_key not in seen_right:
+            if join_op.right_key in right_dtypes:
+                onnx_type = _np_dtype_to_onnx(right_dtypes[join_op.right_key])
+                right_inputs.append((join_op.right_key, onnx_type, (dim,)))
 
-    # Add inputs to the graph only when not already registered
-    for inp_name, inp_type, inp_shape in all_inputs:
-        if not g.has_name(inp_name):
-            g.make_tensor_input(inp_name, inp_type, inp_shape)
+        all_inputs = left_inputs + right_inputs
 
-    # col_map: current ONNX tensor name for each column (left side)
-    col_map: Dict[str, str] = {name: name for name, _, _ in left_inputs}
-    right_col_map: Dict[str, str] = {name: name for name, _, _ in right_inputs}
+        # Add inputs to the graph only when not already registered
+        for inp_name, inp_type, inp_shape in all_inputs:
+            if not g.has_name(inp_name):
+                g.make_tensor_input(inp_name, inp_type, inp_shape)
+
+        # col_map: current ONNX tensor name for each column (left side)
+        col_map = {name: name for name, _, _ in left_inputs}
+        right_col_map = {name: name for name, _, _ in right_inputs}
 
     select_op: Optional[SelectOp] = None
     _group_op: Optional[GroupByOp] = None
-
-    resolved_custom_functions = custom_functions or {}
 
     for op in pq.operations:
         converter = get_sql_op_converter(type(op))
@@ -361,7 +404,8 @@ def _populate_graph(
         g.op.Identity(result, outputs=[tensor_name], name=f"out_{out_name}")  # type: ignore
         output_names.append(tensor_name)
 
-    for out_name in output_names:
-        g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
+    if _finalize:
+        for out_name in output_names:
+            g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
 
     return output_names

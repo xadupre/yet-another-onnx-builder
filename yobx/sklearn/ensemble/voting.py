@@ -59,7 +59,6 @@ def _build_label_output(
         label = g.op.Gather(
             classes_arr, winner_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
         if not g.get_type(label):
             g.set_type(label, onnx.TensorProto.INT64)
     else:
@@ -67,7 +66,6 @@ def _build_label_output(
         label = g.op.Gather(
             classes_arr, winner_idx, axis=0, name=f"{name}_label_str", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
         if not g.get_type(label):
             g.set_type(label, onnx.TensorProto.STRING)
     return label
@@ -152,7 +150,6 @@ def sklearn_voting_regressor(
         total_w = np.array(float(sum(weights)), dtype=dtype)
         result = g.op.Div(sum_w, total_w, name=f"{name}_wdiv", outputs=outputs[:1])
 
-    assert isinstance(result, str)
     return result
 
 
@@ -273,7 +270,6 @@ def sklearn_voting_classifier(
 
         if emit_proba:
             proba_out = g.op.Identity(avg_proba, name=f"{name}_proba", outputs=outputs[1:])
-            assert isinstance(proba_out, str)
             return label, proba_out
 
         return label
