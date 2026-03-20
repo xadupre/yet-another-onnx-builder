@@ -251,7 +251,7 @@ def _convert_concrete_function(
     # using keras or not keras, tf does not seem consistent into
     # what it does in both case.
     ops = cf.graph.get_operations()
-    initializer_values: Dict[str, np.ndarray] = {}
+    initializer_values: Dict[str, Any] = {}
     value_alias = {}
     forbidden = set()
     # Build a mapping from resource handle unique_id to variable for correct pairing.
@@ -265,13 +265,16 @@ def _convert_concrete_function(
         if var is None:
             # Non-variable capture (e.g. a training-phase boolean); skip.
             continue
-        value = var.numpy()
+        # Keep the TF variable as-is; numpy conversion is deferred to export time.
+        value = var.value()
         name = f"{var.name}[{captured_tensor._unique_id}]"
         initializer_values[name] = value
         assert not g.has_name(name), f"name {name!r} is already taken."
         g.make_initializer(name, value, source="_convert_concrete_function.0")
-        assert value.shape == var.shape or value.shape != captured_tensor.shape, (
-            f"Shape Mismatch for {var.name!r}, {var.shape=}, {value.shape=}, "
+        assert tuple(value.shape) == tuple(var.shape) or tuple(value.shape) != tuple(
+            captured_tensor.shape
+        ), (
+            f"Shape Mismatch for {var.name!r}, {var.shape=}, {tuple(value.shape)=}, "
             f"{captured_tensor.shape=}"
         )
 
