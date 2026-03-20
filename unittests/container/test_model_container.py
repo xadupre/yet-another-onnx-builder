@@ -384,6 +384,87 @@ class TestDeserializeGraph(ExtTestCase):
         np.testing.assert_array_equal(g.initializers["W"].const_value.numpy(), np_data)
 
 
+class TestGetProp(ExtTestCase):
+    """Unit tests for ExtendedModelContainer.get_prop."""
+
+    def _make_container(self, large_initializers=None):
+        from yobx.container.model_container import ExtendedModelContainer
+
+        c = ExtendedModelContainer()
+        c.large_initializers = large_initializers or {}
+        return c
+
+    def test_get_prop_returns_location_prop(self):
+        """get_prop returns the StringStringEntryProto whose key is 'location'."""
+        from yobx.container.model_container import ExtendedModelContainer
+
+        data = np.ones((2, 3), dtype=np.float32)
+        init = _make_external_init("W", data, "#W")
+        c = ExtendedModelContainer()
+        c.large_initializers = {"#W": data}
+        prop = c.get_prop(init)
+        self.assertEqual(prop.key, "location")
+        self.assertEqual(prop.value, "#W")
+
+    def test_get_prop_no_location_raises(self):
+        """get_prop raises RuntimeError when the tensor has no 'location' entry."""
+        data = np.ones((2, 3), dtype=np.float32)
+        # Build a tensor with no external_data at all
+        init = onnx.TensorProto()
+        init.data_type = onnx.TensorProto.FLOAT
+        init.name = "W"
+        init.data_location = onnx.TensorProto.EXTERNAL
+        for d in data.shape:
+            init.dims.append(d)
+        # Add an entry with a different key (not "location")
+        ext = init.external_data.add()
+        ext.key = "offset"
+        ext.value = "0"
+
+        c = self._make_container()
+        with self.assertRaises(RuntimeError) as ctx:
+            c.get_prop(init)
+        self.assertIn("No location found", str(ctx.exception))
+        self.assertIn("W", str(ctx.exception))
+
+    def test_get_prop_unknown_location_raises(self):
+        """get_prop raises RuntimeError when the location is not in large_initializers."""
+        data = np.ones((2, 3), dtype=np.float32)
+        init = _make_external_init("W", data, "#W")
+        # Container has no entry for "#W"
+        c = self._make_container(large_initializers={"#other": data})
+        with self.assertRaises(RuntimeError) as ctx:
+            c.get_prop(init)
+        self.assertIn("Unable to find", str(ctx.exception))
+        self.assertIn("W", str(ctx.exception))
+        self.assertIn("#W", str(ctx.exception))
+
+    def test_get_prop_multiple_external_entries_picks_location(self):
+        """get_prop works correctly when there are multiple external_data entries."""
+        data = np.ones((2, 3), dtype=np.float32)
+        init = onnx.TensorProto()
+        init.data_type = onnx.TensorProto.FLOAT
+        init.name = "W"
+        init.data_location = onnx.TensorProto.EXTERNAL
+        for d in data.shape:
+            init.dims.append(d)
+        # Add offset before location to test that location is still found
+        ext_offset = init.external_data.add()
+        ext_offset.key = "offset"
+        ext_offset.value = "0"
+        ext_loc = init.external_data.add()
+        ext_loc.key = "location"
+        ext_loc.value = "#W"
+
+        from yobx.container.model_container import ExtendedModelContainer
+
+        c = ExtendedModelContainer()
+        c.large_initializers = {"#W": data}
+        prop = c.get_prop(init)
+        self.assertEqual(prop.key, "location")
+        self.assertEqual(prop.value, "#W")
+
+
 class TestBuildStats(ExtTestCase):
     def test_len_empty(self):
         from yobx.container import BuildStats
