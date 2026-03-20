@@ -1,17 +1,33 @@
-from typing import Any, Callable, Dict, Tuple, Union
+"""
+Unified SQL / polars LazyFrame → ONNX dispatcher.
+
+:func:`to_onnx` is the single entry point that accepts either a plain SQL
+query string or a :class:`polars.LazyFrame` and returns a self-contained
+:class:`~yobx.container.ExportArtifact`.  Internally it delegates to
+:func:`~yobx.sql.sql_convert.sql_to_onnx` or
+:func:`~yobx.sql.polars_convert.lazyframe_to_onnx` depending on the type of
+the first argument.
+"""
+
+from __future__ import annotations
+
+from typing import Callable, Dict, Optional, Union
+
+import numpy as np
+
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
 from ..xbuilder import GraphBuilder
 from .polars_convert import lazyframe_to_onnx
 from .sql_convert import sql_to_onnx, sql_to_onnx_graph  # noqa: F401 – re-exported
 
-import numpy as np
-
 
 def to_onnx(
     dataframe_or_query: Union[str, "polars.LazyFrame"],  # noqa: F821, UP037
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
+    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
+    custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
 ) -> ExportArtifact:
     """Convert either a SQL query string or a :class:`polars.LazyFrame` to ONNX.
@@ -20,38 +36,108 @@ def to_onnx(
     when *dataframe_or_query* is a string, or to :func:`lazyframe_to_onnx`
     when it is a :class:`polars.LazyFrame`.
 
+    Each *source* column is represented as a **separate 1-D ONNX input**
+    tensor.  The model outputs correspond to the ``SELECT`` expressions (SQL)
+    or the ``select`` / ``agg`` step of the LazyFrame plan.
+
     :param dataframe_or_query: a SQL query string **or** a
         :class:`polars.LazyFrame`.
-    :param input_dtypes: a mapping from *source* column name to numpy dtype.
-        For SQL queries this maps left-table columns; for a ``LazyFrame`` it
-        maps the source DataFrame columns used in the plan.
+
+        * **SQL string** — supported clauses: ``SELECT``, ``FROM``,
+          ``[INNER|LEFT|RIGHT|FULL] JOIN … ON``, ``WHERE``, ``GROUP BY``.
+          Custom Python functions can be called by name in the ``SELECT`` and
+          ``WHERE`` clauses when registered via *custom_functions*.
+        * **polars.LazyFrame** — the execution plan is extracted via
+          :meth:`polars.LazyFrame.explain` and translated into SQL before
+          conversion.  See :func:`lazyframe_to_onnx` for details of supported
+          operations.
+
+    :param input_dtypes: a mapping from *source* column name to numpy dtype
+        (e.g. ``{"a": np.float32, "b": np.float64}``).  For SQL queries this
+        maps *left-table* columns; for a ``LazyFrame`` it maps the source
+        DataFrame columns referenced in the plan.  Only columns that actually
+        appear in the query / plan need to be listed.
+    :param right_input_dtypes: if *dataframe_or_query* is a SQL string that
+        contains a ``JOIN``, a mapping from *right-table* column name to numpy
+        dtype.  Defaults to *input_dtypes* when ``None``.  Ignored when
+        *dataframe_or_query* is a :class:`polars.LazyFrame`.
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
+    :param custom_functions: an optional mapping from function name (as it
+        appears in the SQL string) to a Python callable.  Each callable must
+        accept one or more numpy arrays and return a numpy array.  The
+        function body is traced with :func:`~yobx.xtracing.trace_numpy_function`
+        so that numpy arithmetic is translated into ONNX nodes.  Ignored when
+        *dataframe_or_query* is a :class:`polars.LazyFrame`.
+
+        Example::
+
+            import numpy as np
+            from yobx.sql import to_onnx
+
+            artifact = to_onnx(
+                "SELECT my_sqrt(a) AS r FROM t",
+                {"a": np.float32},
+                custom_functions={"my_sqrt": np.sqrt},
+            )
+
     :param builder_cls: the graph-builder class (or factory callable) to use.
-        Defaults to :class:`~yobx.xbuilder.GraphBuilder`.
+        Defaults to :class:`~yobx.xbuilder.GraphBuilder`.  Any class that
+        implements the :ref:`builder-api` can be supplied here, e.g. a custom
+        subclass that adds extra optimisation passes.
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
-    Example::
+    Example — from a SQL string::
+
+        import numpy as np
+        from yobx.sql import to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        dtypes = {"a": np.float32, "b": np.float32}
+        artifact = to_onnx("SELECT a + b AS total FROM t WHERE a > 0", dtypes)
+
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0,  5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        # total == array([5., 9.], dtype=float32)  (rows where a > 0)
+
+    Example — from a polars LazyFrame::
 
         import numpy as np
         import polars as pl
         from yobx.sql import to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
 
-        # From a SQL string:
-        artifact = to_onnx(
-            "SELECT a + b AS total FROM t",
-            {"a": np.float64, "b": np.float64},
+        lf = pl.LazyFrame({"a": [1.0, -2.0, 3.0], "b": [4.0, 5.0, 6.0]})
+        lf = lf.filter(pl.col("a") > 0).select(
+            [(pl.col("a") + pl.col("b")).alias("total")]
         )
+        dtypes = {"a": np.float64, "b": np.float64}
+        artifact = to_onnx(lf, dtypes)
 
-        # From a polars LazyFrame:
-        lf = pl.LazyFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
-        lf = lf.select([(pl.col("a") + pl.col("b")).alias("total")])
-        artifact = to_onnx(lf, {"a": np.float64, "b": np.float64})
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float64)
+        b = np.array([4.0,  5.0, 6.0], dtype=np.float64)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        # total == array([5., 9.])  (rows where a > 0)
+
+    .. note::
+
+        ``GROUP BY`` aggregations are computed over the **whole filtered
+        dataset**.  True SQL group-by semantics (one output row per unique
+        key) would require an ONNX ``Loop`` or custom kernel and are not
+        yet supported.
     """
     if isinstance(dataframe_or_query, str):
         return sql_to_onnx(
-            dataframe_or_query, input_dtypes, target_opset=target_opset, builder_cls=builder_cls
+            dataframe_or_query,
+            input_dtypes,
+            right_input_dtypes=right_input_dtypes,
+            target_opset=target_opset,
+            custom_functions=custom_functions,
+            builder_cls=builder_cls,
         )
     return lazyframe_to_onnx(
         dataframe_or_query, input_dtypes, target_opset=target_opset, builder_cls=builder_cls

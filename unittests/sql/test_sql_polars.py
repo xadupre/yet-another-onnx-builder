@@ -369,7 +369,6 @@ class TestLazyframeToOnnx(ExtTestCase):
         self.assertTrue(callable(to_onnx))
 
 
-@unittest.skipUnless(_has_polars(), "polars not installed")
 class TestToOnnxSqlString(ExtTestCase):
     """Tests for the unified :func:`~yobx.sql.convert.to_onnx` with a SQL string."""
 
@@ -385,6 +384,38 @@ class TestToOnnxSqlString(ExtTestCase):
         b = np.array([4.0, 5.0, 6.0], dtype=np.float64)
         (total,) = ref.run(None, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b)
+
+    def test_to_onnx_with_custom_functions(self):
+        """to_onnx() forwards custom_functions to sql_to_onnx."""
+        from yobx.sql.convert import to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        dtypes = {"a": np.float64}
+        artifact = to_onnx(
+            "SELECT my_sqrt(a) AS r FROM t",
+            dtypes,
+            custom_functions={"my_sqrt": np.sqrt},
+        )
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 4.0, 9.0], dtype=np.float64)
+        (r,) = ref.run(None, {"a": a})
+        np.testing.assert_allclose(r, np.sqrt(a))
+
+    def test_to_onnx_with_filter(self):
+        """to_onnx() forwards the WHERE clause correctly."""
+        from yobx.sql.convert import to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        dtypes = {"a": np.float64, "b": np.float64}
+        artifact = to_onnx(
+            "SELECT a + b AS total FROM t WHERE a > 0",
+            dtypes,
+        )
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float64)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float64)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, np.array([5.0, 9.0]))
 
 
 if __name__ == "__main__":
