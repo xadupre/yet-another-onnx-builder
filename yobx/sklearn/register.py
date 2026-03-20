@@ -154,6 +154,8 @@ def get_sklearn_estimator_coverage(
             if cls.__name__.startswith("XGB"):
                 return "xgboost"
             parts = cls.__module__.split(".")
+            if cls.__module__.startswith("yobx.sklearn.statsmodels"):
+                return f"statsmodels.{'.'.join(parts[3:])}"
             return ".".join(p for p in parts if not p.startswith("_"))
 
         all_pairs = {}
