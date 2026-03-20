@@ -97,7 +97,7 @@ class TestOrdinalEncoder(ExtTestCase):
         enc.fit(X)
 
         onx = to_onnx(enc, (X,))
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
         self.assertIn("ArgMax", op_types)
         self.assertIn("Concat", op_types)

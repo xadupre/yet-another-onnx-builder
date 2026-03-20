@@ -2,12 +2,10 @@
 
 import os
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
-
 import numpy as np
 import onnx
-
 from .. import DEFAULT_TARGET_OPSET
-from ..container import ExtendedModelContainer
+from ..container import ExportArtifact
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from .litert_helper import BuiltinOperator, TFLiteOperator, TFLiteSubgraph, parse_tflite_model
 from .register import get_litert_op_converter
@@ -25,7 +23,7 @@ def to_onnx(
     large_model: bool = False,
     external_threshold: int = 1024,
     subgraph_index: int = 0,
-) -> Union[onnx.ModelProto, ExtendedModelContainer]:
+) -> ExportArtifact:
     """Convert a :epkg:`TFLite`/:epkg:`LiteRT` model to ONNX.
 
     The function parses the binary FlatBuffer that every ``.tflite`` file
@@ -53,14 +51,15 @@ def to_onnx(
         name string) to converter function with signature
         ``(g, sts, outputs, op)``.  Entries here take priority over the
         built-in op converters.
-    :param large_model: if *True* return an
-        :class:`onnx.model_container.ModelContainer` instead of a
-        :class:`~onnx.ModelProto`.
+    :param large_model: if *True* the returned
+        :class:`~yobx.container.ExportArtifact` has its
+        :attr:`~yobx.container.ExportArtifact.container` attribute set to an
+        :class:`~yobx.container.ExtendedModelContainer`.
     :param external_threshold: if *large_model* is *True*, every tensor
         whose element count exceeds this threshold is stored as external data.
     :param subgraph_index: index of the subgraph to convert (default: 0).
-    :return: ONNX model or :class:`onnx.model_container.ModelContainer`
-        when *large_model* is True.
+    :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
+        ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
     Example::
 
@@ -68,7 +67,9 @@ def to_onnx(
         from yobx.litert import to_onnx
 
         X = np.random.rand(1, 4).astype(np.float32)
-        onx = to_onnx("model.tflite", (X,))
+        artifact = to_onnx("model.tflite", (X,))
+        proto = artifact.proto
+        artifact.save("model.onnx")
     """
     from . import register_litert_converters
 
@@ -117,15 +118,15 @@ def to_onnx(
     )
 
     if isinstance(g, GraphBuilder):
-        onx, stats = g.to_onnx(  # type: ignore
+        onx = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,
             return_optimize_report=True,
         )
-        if verbose:
+        if verbose and onx.report and onx.report.stats:
             import pandas
 
-            df = pandas.DataFrame(stats)
+            df = pandas.DataFrame(onx.report.stats)
             for c in ["added", "removed"]:
                 df[c] = df[c].fillna(0).astype(int)
             agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
@@ -134,7 +135,7 @@ def to_onnx(
             )
             if agg.shape[0]:
                 print(agg.to_string())
-        return onx  # type: ignore
+        return onx
     return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
 
 

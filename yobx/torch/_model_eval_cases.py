@@ -6,6 +6,42 @@ DIM = torch.export.Dim
 DYN = torch.export.Dim.DYNAMIC
 
 
+def _make_vmap_scan_body(func, n_args):
+    """
+    Creates a scan body function with *n_args* explicit positional parameters
+    for use with :func:`torch.ops.higher_order.scan` inside
+    :func:`patched_vmap`.  Using explicit parameters (rather than ``*args``)
+    allows :func:`torch.export.export` to properly trace the subgraph.
+    """
+    if n_args == 1:
+
+        def body(arg0):
+            return [func(arg0)]
+
+    elif n_args == 2:
+
+        def body(arg0, arg1):
+            return [func(arg0, arg1)]
+
+    elif n_args == 3:
+
+        def body(arg0, arg1, arg2):
+            return [func(arg0, arg1, arg2)]
+
+    elif n_args == 4:
+
+        def body(arg0, arg1, arg2, arg3):
+            return [func(arg0, arg1, arg2, arg3)]
+
+    else:
+        # Fallback for larger arities.  May not trace correctly with all
+        # exporters, but keeps the function working for eager execution.
+        def body(*args):
+            return [func(*args)]
+
+    return body
+
+
 def patched_vmap(func, in_dims=0, out_dims=0, use_scan: bool = False):
     """
     Python implementation of :func:`torch.vmap`.
@@ -55,9 +91,8 @@ def patched_vmap(func, in_dims=0, out_dims=0, use_scan: bool = False):
                 )
                 for arg, in_dim in zip(batched_args, in_dims_)
             ]
-            results = torch.ops.higher_order.scan(
-                lambda *args, **kwargs: [func(*args, **kwargs)], [], batched_tensors, []
-            )
+            scan_body = _make_vmap_scan_body(func, len(batched_tensors))
+            results = torch.ops.higher_order.scan(scan_body, [], batched_tensors, [])
             stacked = results[0]
             if out_dims != 0:
                 return stacked.movedim(0, out_dims)

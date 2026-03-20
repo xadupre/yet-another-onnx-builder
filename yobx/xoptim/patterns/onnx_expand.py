@@ -403,7 +403,7 @@ class ShapeBasedExpandBroadcastPattern(PatternOptimization):
         # shape_left   = (1, 1, 'seq_length', 'cache_length + seq_length')
         # shape_right  = (1, 1, 'seq_length', 'cache_length + seq_length')
         # output_shape = ('batch', 1, 'seq_length', 'cache_length + seq_length')
-        # When this happes, it could also be caught by another pattern.
+        # When this happens, it could also be caught by another pattern.
         return self.none(node, inspect.currentframe().f_lineno)
 
     def apply(

@@ -463,16 +463,38 @@ class DynamoInterpreter:
     def make_nn_module_with_callable(self, f: Callable) -> "torch.nn.Module":  # noqa: F821
         """Wraps a function into a nn Module to export it."""
         sig = inspect.signature(f)
-        if len(sig.parameters) == 3:
+        n = len(sig.parameters)
+        if n == 1:
+
+            class LocalFunction1(self.torch.nn.Module):
+                def forward(self, arg0):
+                    return f(arg0)
+
+            return LocalFunction1
+        if n == 2:
+
+            class LocalFunction2(self.torch.nn.Module):
+                def forward(self, arg0, arg1):
+                    return f(arg0, arg1)
+
+            return LocalFunction2
+        if n == 3:
 
             class LocalFunction3(self.torch.nn.Module):
-                def forward(self, x, y, z):
-                    return f(x, y, z)
+                def forward(self, arg0, arg1, arg2):
+                    return f(arg0, arg1, arg2)
 
             return LocalFunction3
+        if n == 4:
+
+            class LocalFunction4(self.torch.nn.Module):
+                def forward(self, arg0, arg1, arg2, arg3):
+                    return f(arg0, arg1, arg2, arg3)
+
+            return LocalFunction4
         raise NotImplementedError(
             f"make_nn_module_with_callable not implemented for "
-            f"{len(sig.parameters)} parameters{self.builder.get_debug_msg()}"
+            f"{n} parameters{self.builder.get_debug_msg()}"
         )
 
     def _make_tensor_check(self, name: str, fake_tensor: bool, users: Any):
@@ -1913,7 +1935,7 @@ class DynamoInterpreter:
                 # nothing to do
                 res = tuple(res)
             elif (
-                isinstance(res, tuple)
+                isinstance(res, (tuple, list))
                 and len(res) == 1
                 and str(getattr(node, "target", None))
                 in {"scan", "aten.split_with_sizes.default"}

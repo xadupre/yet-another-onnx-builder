@@ -1,22 +1,256 @@
-import re
-from typing import Any, Dict, List
+import warnings
+from typing import Any, Dict, List, Optional
+
+import numpy as np
 import tensorflow as tf
+
 from ..register import register_tf_op_converter
 from ...typing import GraphBuilderExtendedProtocol
 from .jax_ops import _MAPPING_JAX_ONNX, _COMPOSITE_JAX_OPS, get_jax_cvt  # noqa: F401
+from .xla_call_module_helper import (  # noqa: F401
+    _MLIR_DTYPE_MAP,
+    _extract_balanced_parens,
+    _extract_function_body,
+)
+from .xla_call_module_parsing import (  # noqa: F401
+    _get_function_param_ids,
+    _get_function_param_info,
+    _parse_body,
+    _parse_dense_value,
+    _parse_tensor_type,
+    parse_mlir,
+)
+
+
+def _process_constant_layer(
+    layer: dict, local_results: Dict[str, str], g: GraphBuilderExtendedProtocol
+) -> None:
+    """Create an ONNX initializer for a ``constant`` StableHLO layer.
+
+    Updates *local_results* in-place, mapping the layer's result id to the
+    generated initializer name.
+
+    :param layer: layer dict with keys ``id``, ``shape``, and ``dense_content``.
+    :param local_results: mutable id→tensor-name mapping for the current scope.
+    :param g: ONNX graph builder.
+    """
+    const_name = layer["id"]
+    type_str = layer.get("shape", "")
+    dense_content = layer.get("dense_content", "")
+    shape, dtype = _parse_tensor_type(type_str)
+    if shape is None or dtype is None:
+        # Fall back to float32 scalar
+        shape, dtype = (), np.float32
+    try:
+        np_val = _parse_dense_value(dense_content, shape, dtype)
+    except (ValueError, Exception) as exc:
+        warnings.warn(
+            f"XlaCallModule: failed to parse dense constant "
+            f"{const_name!r}: {exc}. Using zero fallback.",
+            stacklevel=2,
+        )
+        np_val = np.array(0, dtype=dtype)
+    # Generate a unique name if the candidate is already taken
+    # (e.g. when inlining a private function whose constants share
+    # IDs with the outer-scope constants).
+    candidate = const_name
+    _dedup_idx = 0
+    while g.has_name(candidate):
+        _dedup_idx += 1
+        candidate = f"{const_name}_{_dedup_idx}_dup"
+    const_name = candidate
+    g.make_initializer(const_name, np_val)
+    local_results[layer["id"]] = const_name
+
+
+def _process_broadcast_layer(layer: dict, local_results: Dict[str, str]) -> None:
+    """Handle a ``broadcast_in_dim`` or ``dynamic_broadcast_in_dim`` layer.
+
+    ONNX arithmetic ops support implicit broadcasting, so we simply pass the
+    operand tensor through unchanged.
+
+    :param layer: layer dict with keys ``id`` and ``operands``.
+    :param local_results: mutable id→tensor-name mapping for the current scope.
+    """
+    operand_id = layer["operands"][0]
+    if operand_id in local_results:
+        local_results[layer["id"]] = local_results[operand_id]
+
+
+def _process_dot_general_layer(
+    layer: dict, local_results: Dict[str, str], g: GraphBuilderExtendedProtocol
+) -> None:
+    """Emit a MatMul ONNX op for a ``dot_general`` StableHLO layer.
+
+    :param layer: layer dict with keys ``id`` and ``operands`` (lhs, rhs).
+    :param local_results: mutable id→tensor-name mapping for the current scope.
+    :param g: ONNX graph builder.
+    """
+    lhs_id, rhs_id = layer["operands"]
+    if lhs_id not in local_results or rhs_id not in local_results:
+        return
+    res = g.op.MatMul(local_results[lhs_id], local_results[rhs_id], name="XlaCallModule")
+    local_results[layer["id"]] = res if isinstance(res, str) else res[0]
+
+
+def _process_reduce_layer(
+    layer: dict, local_results: Dict[str, str], g: GraphBuilderExtendedProtocol
+) -> None:
+    """Emit a ReduceMax or ReduceSum ONNX op for a ``reduce_*`` StableHLO layer.
+
+    :param layer: layer dict with keys ``id``, ``op``, ``operands``, and ``axes``.
+    :param local_results: mutable id→tensor-name mapping for the current scope.
+    :param g: ONNX graph builder.
+    """
+    inp_id = layer["operands"][0]
+    if inp_id not in local_results:
+        return
+    axes = layer.get("axes", [])
+    np_axes = np.array(axes, dtype=np.int64)
+    if layer["op"] == "reduce_max":
+        res = g.op.ReduceMax(local_results[inp_id], np_axes, keepdims=1, name="XlaCallModule")
+    else:
+        res = g.op.ReduceSum(local_results[inp_id], np_axes, keepdims=1, name="XlaCallModule")
+    local_results[layer["id"]] = res if isinstance(res, str) else res[0]
+
+
+def _process_call_layer(
+    layer: dict,
+    local_results: Dict[str, str],
+    g: GraphBuilderExtendedProtocol,
+    decoded_module: str,
+) -> None:
+    """Inline a ``call`` StableHLO layer by parsing and executing its body.
+
+    Looks up the named private function in *decoded_module*, maps caller
+    arguments to the function's parameter IDs (skipping shape-only args), and
+    processes the function body recursively via :func:`_process_layers`.
+
+    :param layer: layer dict with keys ``id``, ``operands``, and ``func``.
+    :param local_results: mutable id→tensor-name mapping for the current scope.
+    :param g: ONNX graph builder.
+    :param decoded_module: raw MLIR text used to look up the called function.
+    """
+    func_name = layer.get("func", "")
+    call_args = layer["operands"]
+
+    # Parse and inline the private function.
+    # Use _get_function_param_info to correctly align tensor params
+    # with their corresponding call arguments, skipping shape-only
+    # (integer) parameters that appear in dynamic-shape functions.
+    func_param_info = _get_function_param_info(decoded_module, func_name)
+    func_body = _extract_function_body(decoded_module, func_name)
+    if func_body is None:
+        return
+
+    # Build a local scope mapping function param IDs to caller args.
+    inline_results: Dict[str, str] = {}
+    for (param_id, is_shape_only), call_arg_id in zip(func_param_info, call_args):
+        if is_shape_only:
+            continue
+        if call_arg_id in local_results:
+            inline_results[param_id] = local_results[call_arg_id]
+
+    # Parse the function body (scan only the body, with no arg alias).
+    func_layers = _parse_body(func_body, {})
+
+    # Process function body layers (stops at return layer).
+    _process_layers(func_layers, inline_results, g, decoded_module)
+
+    # Retrieve the return value from the return layer.
+    ret_val: Optional[str] = None
+    for sub_layer in func_layers:
+        if sub_layer["op"] == "return":
+            operands = sub_layer["operands"]
+            if operands and operands[0] in inline_results:
+                ret_val = inline_results[operands[0]]
+            break
+
+    if ret_val is not None:
+        local_results[layer["id"]] = ret_val
+
+
+def _process_layers(
+    layer_list: List[dict],
+    local_results: Dict[str, str],
+    g: GraphBuilderExtendedProtocol,
+    decoded_module: str,
+) -> None:
+    """Process a list of StableHLO layers, emitting ONNX ops into *g*.
+
+    Updates *local_results* in-place mapping StableHLO result ids to ONNX
+    tensor names.  Returns early when a ``return`` layer is encountered.
+
+    :param layer_list: list of layer dicts produced by :func:`parse_mlir`.
+    :param local_results: mutable id→tensor-name mapping for the current scope.
+    :param g: ONNX graph builder.
+    :param decoded_module: raw MLIR text (needed to inline ``call`` targets).
+    """
+    for layer in layer_list:
+        op_type = layer["op"]
+
+        if op_type == "Input":
+            continue  # inputs already in local_results
+
+        if op_type == "return":
+            return
+
+        if op_type == "skip":
+            continue
+
+        if op_type == "constant":
+            _process_constant_layer(layer, local_results, g)
+            continue
+
+        if op_type in ("broadcast_in_dim", "dynamic_broadcast_in_dim"):
+            _process_broadcast_layer(layer, local_results)
+            continue
+
+        if op_type == "dot_general":
+            _process_dot_general_layer(layer, local_results, g)
+            continue
+
+        if op_type in ("reduce_max", "reduce_sum"):
+            _process_reduce_layer(layer, local_results, g)
+            continue
+
+        if op_type == "call":
+            _process_call_layer(layer, local_results, g, decoded_module)
+            continue
+
+        # Generic elementwise op via get_jax_cvt.
+        fct = get_jax_cvt(decoded_module, g, op_type)
+        args_list = []
+        for a in layer["operands"]:
+            if a not in local_results:
+                break
+            args_list.append(local_results[a])
+        else:
+            res = fct(*args_list, name="XlaCallModule")
+            if isinstance(res, str):
+                res = (res,)
+            if res:
+                local_results[layer["id"]] = res[0]
 
 
 @register_tf_op_converter("XlaCallModule")
 def convert_exp(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
-    """Not fully implemented."""
+    """Convert a StableHLO ``XlaCallModule`` operation to ONNX.
+
+    Supports the following StableHLO ops: unary/binary elementwise,
+    ``dot_general`` (matrix multiply), ``broadcast_in_dim``,
+    ``dynamic_broadcast_in_dim``, ``constant``, ``reduce`` (max/sum),
+    ``call`` (to private functions), and comparison ops.
+    """
     import jax.extend.mlir
 
     hlo_module = op.get_attr("module")
     decoded_module = jax.extend.mlir.deserialize_portable_artifact(hlo_module)
     layers = parse_mlir(decoded_module)
-    results = {}
+    results: Dict[str, str] = {}
+
     for layer in layers:
         if layer["op"] == "Input":
             if layer["id"] not in results:
@@ -33,237 +267,9 @@ def convert_exp(
                 for i, a in enumerate(layer["operands"])
             )
 
-        fct = get_jax_cvt(decoded_module, g, layer["op"])
-        args = []
-        for a in layer["operands"]:
-            assert a in results, f"Missing arg {a!r} in {results}\n----\n{decoded_module}"
-            args.append(results[a])
-        res = fct(*args, name="XlaCallModule")
-        if isinstance(res, str):
-            res = (res,)
-        assert len(res) == 1, f"Not yet implemented for layer={layer}{g.get_debug_msg()}"
-        results[layer["id"]] = res[0]
+        _process_layers([layer], results, g, decoded_module)
 
     raise NotImplementedError(
         f"Unable to convert XlaCallModule with the following assembly"
         f"\n{layers}\n{decoded_module}{g.get_debug_msg()}"
     )
-
-
-def _extract_balanced_parens(text: str, start: int, open_char: str = "(") -> str:
-    """
-    Extract the content between the opening bracket at *start* and its matching
-    closing bracket, properly handling nested brackets.
-
-    *start* must point at the *open_char* character.  Returns the text *inside*
-    the outermost bracket pair (the delimiters themselves are not included).
-    Returns an empty string if *start* does not point at *open_char*.
-
-    The *open_char* / close pair defaults to ``"("`` / ``")"``; pass
-    ``open_char="{"`` to extract curly-brace blocks.
-    """
-    close_char = ")" if open_char == "(" else "}"
-    if start >= len(text) or text[start] != open_char:
-        return ""
-    depth = 0
-    pos = start
-    while pos < len(text):
-        ch = text[pos]
-        if ch == open_char:
-            depth += 1
-        elif ch == close_char:
-            depth -= 1
-            if depth == 0:
-                return text[start + 1 : pos]
-        pos += 1
-    return text[start + 1 :]  # unterminated – return rest of string
-
-
-def parse_mlir(mlir_string):
-    results = []
-
-    # 1. Capture Function Arguments (The Initial Inputs)
-    #
-    # jax2tf with dynamic shapes emits a @main function followed by a private
-    # @_wrapped_jax_export_main helper.  The helper carries both the actual
-    # tensor inputs *and* extra scalar dimension-variable arguments annotated
-    # with ``jax.global_constant``.  We only want the tensor inputs that
-    # correspond to entries in op.inputs.
-    #
-    # Strategy: extract inputs only from the *public* @main function signature.
-    # If there is no explicit @main function, fall back to scanning the whole
-    # text as before.
-    arg_header_pattern = r"(%arg\d+)\s*:\s*(tensor<[^>]+>)"
-
-    public_func_match = re.search(r"func\.func\s+public\s+@\w+\s*\(", mlir_string)
-    if public_func_match:
-        paren_start = public_func_match.end() - 1  # position of '('
-        header_text = _extract_balanced_parens(mlir_string, paren_start)
-    else:
-        header_text = mlir_string
-
-    seen_arg_ids: set = set()
-    for arg_id, shape in re.findall(arg_header_pattern, header_text):
-        if arg_id in seen_arg_ids:
-            continue
-        seen_arg_ids.add(arg_id)
-        results.append(
-            {"id": arg_id, "op": "Input", "operands": tuple(), "shape": shape, "loc": "header"}
-        )
-
-    # 2. Determine which text region to scan for computation ops.
-    #
-    # When jax2tf emits a @_wrapped_jax_export_main helper, the actual
-    # computation lives there.  The @main body only has boilerplate (shape
-    # assertions, dimension-size reads, the call instruction, and a return).
-    # We must:
-    #   (a) parse ops from the wrapped function body, and
-    #   (b) remap the wrapped function's %argN references back to the @main
-    #       %argM names so that the result lookup works correctly.
-    #
-    # If no helper function exists, scan the whole MLIR text as before.
-
-    # Build an alias map from the @_wrapped helper's arg names back to the
-    # @main arg names so that op references in the helper resolve correctly.
-    # The @main body contains exactly one ``call @_wrapped…(args…)`` instruction
-    # whose positional arguments tell us the mapping:
-    #   call @_wrapped_jax_export_main(%dim0, %mainArg0, %mainArg1, …)
-    # We map wrapped_arg_id → main_arg_id for each position that is a @main arg.
-    arg_alias: dict = {}
-
-    # Try to extract just the body of @_wrapped_jax_export_main if it exists.
-    wrapped_func_match = re.search(
-        r"func\.func\s+private\s+@_wrapped_jax_export_main\s*\(", mlir_string
-    )
-    if wrapped_func_match:
-        # Extract full wrapped function signature (handles nested parens from
-        # ``loc(...)`` attribute annotations).
-        paren_start = wrapped_func_match.end() - 1  # position of '('
-        wrapped_sig_text = _extract_balanced_parens(mlir_string, paren_start)
-        # Find body start (``{``) after the signature closing ')'
-        sig_end = paren_start + len(wrapped_sig_text) + 2  # +2 for the '(' and ')'
-        body_start = mlir_string.find("{", sig_end)
-        if body_start != -1:
-            # Skip ``{`` that are part of attribute annotations like
-            # ``{jax.result_info = ...}`` — these appear before the actual
-            # function body.  The function body ``{`` is preceded by a ')'
-            # (closing the return-type annotation).
-            while body_start != -1:
-                # Check that this '{' is the function-body opener: it should
-                # come right after ') {' or '}) {' on the same/adjacent line.
-                preceding = mlir_string[max(0, body_start - 50) : body_start]
-                if re.search(r"\)\s*$", preceding):
-                    break
-                body_start = mlir_string.find("{", body_start + 1)
-        if body_start != -1:
-            scan_text = _extract_balanced_parens(mlir_string, body_start, open_char="{")
-        else:
-            scan_text = mlir_string
-
-        # Extract wrapped args, skipping jax.global_constant scalar args.
-        wrapped_params = re.findall(arg_header_pattern, wrapped_sig_text)
-
-        call_match = re.search(r"call\s+@_wrapped_jax_export_main\s*\(([^)]*)\)", mlir_string)
-        if call_match:
-            call_args = [a.strip() for a in call_match.group(1).split(",")]
-            for i, (w_arg_id, _) in enumerate(wrapped_params):
-                if i < len(call_args):
-                    main_ref = call_args[i].strip()
-                    if main_ref in seen_arg_ids:
-                        # This wrapped arg corresponds to a real @main input.
-                        arg_alias[w_arg_id] = main_ref
-    else:
-        scan_text = mlir_string
-
-    # 3. Comprehensive Pattern for Ops and Returns
-    # Group 1: Result ID (%0)
-    # Group 2: Op Name (stablehlo.sine)
-    # Group 3: Operands (%arg0, or %0, %1)
-    # Group 4: Shape (tensor<5x4xf32>)
-    # Group 5: Location (#loc13)
-    op_pattern = (
-        r"(?:(%?\w+)\s*=\s*)?\"?([\w\.]+)\"?\s*(%[\w\s,%]+)?"
-        r"\s*:\s*(?:.*?->\s*)?(tensor<[^>]+>).*?loc\((.*?)\)"
-    )
-
-    # Special pattern for stablehlo.compare whose MLIR textual format puts
-    # the comparison direction *before* the operands:
-    #   %0 = stablehlo.compare  GT, %arg0, %arg1,  FLOAT : (...) -> tensor<i1> loc(...)
-    # Group 1: result id (%0)
-    # Group 2: direction (GT / LT / GE / LE / EQ / NE)
-    # Group 3: first operand (%arg0)
-    # Group 4: second operand (%arg1)
-    # Group 5: output tensor type (tensor<...>)
-    # Group 6: location
-    compare_pattern = (
-        r"(%\w+)\s*=\s*stablehlo\.compare\s+(\w+)\s*,\s*(%\w+)\s*,\s*(%\w+)"
-        r"[^:]*:\s*(?:.*?->\s*)?(tensor<[^>]+>).*?loc\((.*?)\)"
-    )
-
-    # Build an ordered set of character offsets for already-matched spans so
-    # that the general op_pattern does not re-process compare lines.
-    compare_spans: set[int] = set()
-
-    for match in re.finditer(compare_pattern, scan_text):
-        res_id, direction, op1, op2, shape, location = match.groups()
-        compare_spans.update(range(match.start(), match.end()))
-        op1 = arg_alias.get(op1, op1)
-        op2 = arg_alias.get(op2, op2)
-        obs = {
-            "id": res_id,
-            "op": f"compare_{direction}",
-            "operands": [op1, op2],
-            "shape": shape,
-            "loc": location,
-        }
-        results.append(obs)
-
-    for match in re.finditer(op_pattern, scan_text):
-        # Skip ranges already handled by the compare_pattern pass.
-        if match.start() in compare_spans:
-            continue
-
-        res_id, op_name, operands, shape, location = match.groups()
-
-        # Clean up operands (remove extra whitespace/newlines) and apply the
-        # alias map so references to @_wrapped args resolve to @main arg names.
-        if operands:
-            raw_operands = operands.strip().split(",")
-            clean_operands = [arg_alias.get(o.strip(), o.strip()) for o in raw_operands]
-        else:
-            clean_operands = []
-        clean_op = op_name.replace("stablehlo.", "")
-        if not clean_operands:
-            continue
-
-        obs = {
-            "id": res_id or "?",
-            "op": clean_op,
-            "operands": clean_operands,
-            "shape": shape,
-            "loc": location,
-        }
-        results.append(obs)
-        if op_name == "return":
-            break
-
-    # Sort all non-Input, non-return layers by their position in scan_text so
-    # that compare and regular ops are interleaved in the correct execution
-    # order.  Input layers captured from the header are always first.
-    input_layers = [la for la in results if la["op"] == "Input"]
-    compute_layers = [la for la in results if la["op"] not in ("Input", "return")]
-    return_layers = [la for la in results if la["op"] == "return"]
-
-    def _layer_pos(layer: dict) -> int:
-        """Return the character offset of this layer's result id in scan_text."""
-        rid = layer.get("id", "")
-        if rid and rid != "?":
-            # Search for the result id followed by any non-word character
-            # (space, newline, colon, comma) to avoid partial matches.
-            m = re.search(re.escape(rid) + r"\b", scan_text)
-            if m:
-                return m.start()
-        return len(scan_text)
-
-    compute_layers.sort(key=_layer_pos)
-    return input_layers + compute_layers + return_layers

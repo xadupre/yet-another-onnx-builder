@@ -3,6 +3,7 @@ import numpy as np
 import onnx
 from onnx.checker import check_model
 import onnx.numpy_helper as onh
+from yobx.container import ExportArtifact
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
 from yobx.reference import ExtendedReferenceEvaluator
 
@@ -262,14 +263,12 @@ class TestOnnxScriptBridge(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_to_onnx_returns_model_proto(self):
-        from onnx import ModelProto
-
         gr = self._make_builder()
         gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
         gr.make_node("Relu", ["X"], ["Y"])
         gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
-        self.assertIsInstance(proto, ModelProto)
+        self.assertIsInstance(proto, ExportArtifact)
 
     def test_to_onnx_multiple_outputs(self):
         gr = self._make_builder()
@@ -352,10 +351,7 @@ class TestOnnxScriptBridge(ExtTestCase):
         gr.make_node("MatMul", ["X", w], ["Y"])
         gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
-
-        import onnx.reference as ref_impl
-
-        session = ref_impl.ReferenceEvaluator(proto)
+        session = ExtendedReferenceEvaluator(proto)
         x = np.arange(6, dtype=np.float32).reshape((2, 3))
         (y,) = session.run(None, {"X": x})
         self.assertEqualArray(y, x @ np.eye(3, dtype=np.float32))

@@ -1,7 +1,7 @@
 import inspect
 from typing import List, Optional
 from onnx import NodeProto, TensorProto
-from ..patterns_api import EasyPatternOptimization
+from ..patterns_api import EasyPatternOptimization, MatchResult, PatternOptimization
 
 
 class GeluPattern(EasyPatternOptimization):
@@ -359,3 +359,95 @@ class SoftmaxCrossEntropyLossCastPattern(EasyPatternOptimization):
                     return self.none(node, inspect.currentframe().f_lineno)
                 continue
         return True
+
+
+class MaxReluPattern(PatternOptimization):
+    """
+    Replaces ``Max(x, 0)`` or ``Max(0, x)`` with ``Relu(x)``.
+
+    Model with nodes to be fused:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(a, b)"])
+            I_zero(["zero FLOAT(1)"])
+
+            Constant_0[["Constant() -#gt; zero"]]
+            Max_1[["Max(., .)"]]
+
+            I_X -->|"FLOAT(a, b)"| Max_1
+            Constant_0 -->|"FLOAT(1)"| Max_1
+
+            O_Y(["Y FLOAT(a, b)"])
+            Max_1 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Constant_0 constNode
+            class Max_1 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(a, b)"])
+
+            Relu_0[["Relu(.)"]]
+
+            I_X -->|"FLOAT(a, b)"| Relu_0
+
+            O_Y(["Y FLOAT(a, b)"])
+            Relu_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Relu_0 opNode
+    """
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        if node.op_type != "Max" or node.domain != "":
+            return self.none()
+        if len(node.input) != 2:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Require exactly one zero-valued constant input among the two inputs.
+        zero_const_inputs = [
+            inp
+            for inp in node.input
+            if g.is_constant_scalar(inp) and g.get_constant_scalar(inp) == 0
+        ]
+        if len(zero_const_inputs) != 1:
+            # Either no zero-constant inputs or both inputs are zero-constants:
+            # do not apply the Max->Relu fusion in these cases.
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        return MatchResult(self, [node], self.apply, insert_at=node)
+
+    def apply(self, g: "GraphBuilder", node: NodeProto) -> List[NodeProto]:  # noqa: F821
+        # Identify which input is the non-zero tensor
+        x = None
+        for inp in node.input:
+            if not (g.is_constant_scalar(inp) and g.get_constant_scalar(inp) == 0):
+                x = inp
+                break
+
+        return [
+            g.make_node("Relu", [x], node.output, name=f"{self.__class__.__name__}--{node.name}")
+        ]

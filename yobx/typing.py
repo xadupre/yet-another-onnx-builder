@@ -1,6 +1,7 @@
 from typing import (
     Any,
     Callable,
+    ContextManager,
     Dict,
     Iterable,
     Iterator,
@@ -42,6 +43,79 @@ class DefaultConvertOptions(ConvertOptionsProtocol):
     def has(self, option_name: str, piece: object) -> bool:
         """Returns always False."""
         return False
+
+
+@runtime_checkable
+class ExportArtifactProtocol(Protocol):
+    """Protocol for ExportArtifact."""
+
+    def save(self, file_path: str, all_tensors_to_one_file: bool = True):
+        """Save the exported model to *file_path*.
+
+        When a :class:`~yobx.container.ExtendedModelContainer` is present
+        (``large_model=True`` was used during export) the model and its
+        external weight files are saved via
+        :meth:`~yobx.container.ExtendedModelContainer.save`.  Otherwise
+        the proto is saved with :func:`onnx.save_model`.
+
+        :param file_path: destination file path (including ``.onnx``
+            extension).
+        :param all_tensors_to_one_file: when saving a large model, write
+            all external tensors into a single companion data file.
+        """
+        ...
+
+    def get_proto(self, include_weights: bool = True) -> Any:
+        """Return the ONNX proto, optionally with all weights inlined.
+
+        When the export was performed with ``large_model=True`` (i.e.
+        :attr:`container` is set), the raw :attr:`proto` has
+        *external-data* placeholders instead of embedded weight tensors.
+        Passing ``include_weights=True`` (the default) uses
+        :meth:`~yobx.container.ExtendedModelContainer.to_ir` to build a
+        fully self-contained :class:`~onnx.ModelProto`.
+
+        :param include_weights: when ``True`` (default) embed the large
+            initializers stored in :attr:`container` into the returned
+            proto.  When ``False`` return the raw proto as-is.
+        :return: :class:`~onnx.ModelProto`,
+            :class:`~onnx.FunctionProto`, or
+            :class:`~onnx.GraphProto`.
+
+        Example::
+
+            artifact = to_onnx(estimator, (X,), large_model=True)
+            # Fully self-contained proto (weights embedded):
+            proto_with_weights = artifact.get_proto(include_weights=True)
+            # Proto with external-data placeholders:
+            proto_no_weights = artifact.get_proto(include_weights=False)
+        """
+        ...
+
+    @classmethod
+    def load(
+        cls, file_path: str, load_large_initializers: bool = True
+    ) -> "ExportArtifactProtocol":
+        """Load a saved model from *file_path*.
+
+        If the file references external data (i.e. the model was saved
+        with ``large_model=True``) an
+        :class:`~yobx.container.ExtendedModelContainer` is created and
+        returned in :attr:`container`.  Otherwise the proto is loaded
+        directly with :func:`onnx.load` and :attr:`container` is ``None``.
+
+        :param file_path: path to the ``.onnx`` file.
+        :param load_large_initializers: when ``True`` (default) also load
+            the large initializers stored alongside the model file.
+        :return: :class:`ExportArtifact` with :attr:`filename` set to
+            *file_path*.
+
+        Example::
+
+            artifact = ExportArtifact.load("model.onnx")
+            proto = artifact.get_proto()
+        """
+        ...
 
 
 @runtime_checkable
@@ -189,12 +263,14 @@ class GraphBuilderProtocol(Protocol):
         """
         ...
 
-    def make_initializer(self, name: str, value: Any) -> str:
+    def make_initializer(self, name: str, value: Any, give_unique_name: bool = True) -> str:
         """Adds a constant initializer and returns its name.
 
         :param name: initializer name; may be empty to auto-generate a unique name
         :param value: initializer value (:class:`numpy.ndarray`,
             :class:`onnx.TensorProto`, ``int``, or ``float``)
+        :param give_unique_name: changes the name if it is already taken, otherwise,
+            the user should expect an exception to raised
         :return: the final registered name
         """
         ...
@@ -223,11 +299,25 @@ class GraphBuilderProtocol(Protocol):
         """
         ...
 
-    def to_onnx(self) -> Any:
+    def to_onnx(self) -> ExportArtifactProtocol:
         """Exports the graph and returns an ONNX proto or model container.
 
         :return: a :class:`~onnx.ModelProto`, :class:`~onnx.GraphProto`,
             :class:`~onnx.FunctionProto`, or a model container object
+        """
+        ...
+
+    def prefix_name_context(self, prefix: str) -> ContextManager[None]:
+        """Context manager that scopes all :meth:`unique_name` calls to *prefix*.
+
+        While the context is active, every name returned by :meth:`unique_name`
+        is prefixed with the joined stack of active prefixes so that tensors
+        produced inside the block are clearly associated with their enclosing
+        scope (e.g. a pipeline step name).  Contexts may be nested; each level
+        pushes one entry onto the stack.
+
+        :param prefix: scope prefix to push (e.g. a pipeline step name)
+        :return: a context manager; use as ``with g.prefix_name_context("step"): ...``
         """
         ...
 
@@ -1191,7 +1281,7 @@ class GraphBuilderPatternOptimizationProtocol(Protocol):
         external: bool = False,
         msg: str = "",
         source: Optional[str] = None,
-        give_unique: bool = True,
+        give_unique_name: bool = True,
     ) -> str:
         """Adds a constant initializer and returns its (possibly
         auto-generated) name.
@@ -1202,7 +1292,7 @@ class GraphBuilderPatternOptimizationProtocol(Protocol):
         :param external: store as external data
         :param msg: optional debug message
         :param source: optional source tag for debugging
-        :param give_unique: generate a unique name when *name* is already
+        :param give_unique_name: generate a unique name when *name* is already
             taken
         :return: the registered name
         """

@@ -328,9 +328,9 @@ exploration:
 
     opts = OptimizationOptions(patterns="default")
     g = GraphBuilder(model, infer_shapes_options=True, optimization_options=opts)
-    optimized, stats = g.to_onnx(return_optimize_report=True)
+    optimized = g.to_onnx(return_optimize_report=True)
 
-    df = pandas.DataFrame(stats)
+    df = pandas.DataFrame(optimized.report.stats)
     # keep only rows that have numeric added/removed counts
     df["added"] = df["added"].fillna(0).astype(int)
     df["removed"] = df["removed"].fillna(0).astype(int)
@@ -367,9 +367,9 @@ The report can be aggregated by pass name:
 
     opts = OptimizationOptions(patterns="default")
     g = GraphBuilder(model, infer_shapes_options=True, optimization_options=opts)
-    _, stats = g.to_onnx(return_optimize_report=True)
+    art = g.to_onnx(return_optimize_report=True)
 
-    df = pandas.DataFrame(stats)
+    df = pandas.DataFrame(art.report.stats)
     for c in ["added", "removed"]:
         df[c] = df[c].fillna(0).astype(int)
     agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
@@ -407,9 +407,10 @@ A sub-graph can be exported as a reusable ONNX local function (a
         ),
         inline=False,
     )
-    print(type(func).__name__)
-    print("function name  :", func.name)
-    print("function domain:", func.domain)
+    proto = func.proto
+    print(type(proto).__name__)
+    print("function name  :", proto.name)
+    print("function domain:", proto.domain)
 
 .. _l-graphbuilder-debugging-env:
 

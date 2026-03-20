@@ -113,7 +113,6 @@ def sklearn_column_transformer(
         X_sub = g.op.Gather(X, col_indices, axis=1, name=f"{name}__{trans_name}")
 
         if _is_passthrough(transformer):
-            assert isinstance(X_sub, str)  # type happiness
             parts.append(X_sub)
         else:
             try:
@@ -128,28 +127,30 @@ def sklearn_column_transformer(
 
             is_container = isinstance(transformer, (Pipeline, ColumnTransformer, FeatureUnion))
             if function_options and function_options.export_as_function and not is_container:
-                assert isinstance(X_sub, str)  # type happiness
-                _wrap_step_as_function(
-                    g,  # type: ignore
-                    function_options,
-                    transformer,
-                    [X_sub],
-                    sub_outputs,
-                    fct,
-                    step_node_name,
-                )
+                with g.prefix_name_context(step_node_name):
+                    _wrap_step_as_function(
+                        g,  # type: ignore
+                        function_options,
+                        transformer,
+                        [X_sub],
+                        sub_outputs,
+                        fct,
+                        step_node_name,
+                    )
             elif is_container:
-                fct(
-                    g,
-                    sts,
-                    sub_outputs,
-                    transformer,
-                    X_sub,
-                    name=step_node_name,
-                    function_options=function_options,
-                )
+                with g.prefix_name_context(step_node_name):
+                    fct(
+                        g,
+                        sts,
+                        sub_outputs,
+                        transformer,
+                        X_sub,
+                        name=step_node_name,
+                        function_options=function_options,
+                    )
             else:
-                fct(g, sts, sub_outputs, transformer, X_sub, name=step_node_name)
+                with g.prefix_name_context(step_node_name):
+                    fct(g, sts, sub_outputs, transformer, X_sub, name=step_node_name)
             parts.append(sub_outputs[0])
 
     if not parts:
@@ -163,5 +164,4 @@ def sklearn_column_transformer(
     else:
         res = g.op.Concat(*parts, axis=-1, name=name, outputs=outputs)
 
-    assert isinstance(res, str)
     return res

@@ -1,18 +1,19 @@
 from __future__ import annotations
-
 import collections
+import contextlib
 import importlib
 import inspect
 import typing
 import warnings
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
 import onnx
 import spox
 
+from ...container import ExportArtifact
 from ...helpers.onnx_helper import attr_proto_to_python, tensor_dtype_to_np_dtype
 from ...typing import GraphBuilderExtendedProtocol, OpsetProtocol
 from ...xshape._shape_helper import DYNAMIC_SHAPE
@@ -197,6 +198,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
         self._shape_map: Dict[str, DYNAMIC_SHAPE] = {}
         # Counter for auto-generated unique names
         self._unique_names: Set[str] = set()
+        self._prefix_stack: List[str] = []
         self._op = SpoxGraphBuilderOpset(self)
 
     # ------------------------------------------------------------------
@@ -215,6 +217,8 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
 
     def unique_name(self, prefix: str) -> str:
         """Returns a unique name derived from *prefix*."""
+        if self._prefix_stack:
+            prefix = f"{'__'.join(self._prefix_stack)}__{prefix}"
         if prefix not in self._unique_names:
             self._unique_names.add(prefix)
             return prefix
@@ -225,6 +229,23 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
             candidate = f"{prefix}{i}"
         self._unique_names.add(candidate)
         return candidate
+
+    @contextlib.contextmanager
+    def prefix_name_context(self, prefix: str) -> Generator:
+        """Context manager that pushes *prefix* onto the prefix stack.
+
+        While active, :meth:`unique_name` prepends the joined stack to every
+        requested name so that all tensor names produced inside the block are
+        scoped to the current context.  The prefix is removed when the block
+        exits, even if an exception is raised.
+
+        :param prefix: scope prefix to push (e.g. a pipeline step name)
+        """
+        self._prefix_stack.append(prefix)
+        try:
+            yield
+        finally:
+            self._prefix_stack.pop()
 
     def set_type_shape_unary_op(
         self, name: str, input_name: str, itype: Optional[int] = None
@@ -691,7 +712,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
 
     def to_onnx(
         self, large_model: bool = False, external_threshold: int = 1024, inline: bool = True
-    ) -> onnx.ModelProto:
+    ) -> ExportArtifact:
         """Exports the accumulated graph as an :class:`onnx.ModelProto`.
 
         :param large_model: currently unused; present for API compatibility
@@ -702,9 +723,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
         """
         inputs_dict = {n: self._name_to_var[n] for n in self._input_names}
         outputs_dict = {n: self._name_to_var[n] for n in self._output_names}
-
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             proto = spox.build(inputs_dict, outputs_dict)
-
-        return proto
+        return ExportArtifact(proto=proto)

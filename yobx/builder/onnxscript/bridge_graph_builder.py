@@ -1,13 +1,14 @@
 from __future__ import annotations
+import contextlib
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Union, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Union, Tuple
 import numpy as np
 import onnx
 from onnx import numpy_helper as onnx_numpy_helper
 from onnx.model_container import make_large_tensor_proto
 import onnx_ir as ir
 from ...typing import GraphBuilderExtendedProtocol, OpsetProtocol
-from ...container import ExtendedModelContainer
+from ...container import ExtendedModelContainer, ExportArtifact
 from ...helpers.helper import size_type
 from ...helpers.onnx_helper import _default_OPSET_TO_IR_VERSION
 from ...xshape.shape_type_compute import set_type_shape_unary_op
@@ -147,6 +148,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         self._name_to_value: Dict[str, ir.Value] = {}
         # Counter for auto-generating output names
         self._output_counter: int = 0
+        self._prefix_stack: List[str] = []
         self._unique_names: Set[str] = set()
         self._op = OnnxScriptGraphBuilderOpset(self)
 
@@ -273,6 +275,8 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
 
     def unique_name(self, prefix: str) -> str:
         """Returns a unique name."""
+        if self._prefix_stack:
+            prefix = f"{'__'.join(self._prefix_stack)}__{prefix}"
         if prefix in self._unique_names:
             i = 2
             sug = f"{prefix}2"
@@ -283,6 +287,23 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
             return sug
         self._unique_names.add(prefix)
         return prefix
+
+    @contextlib.contextmanager
+    def prefix_name_context(self, prefix: str) -> Generator:
+        """Context manager that pushes *prefix* onto the prefix stack.
+
+        While active, :meth:`unique_name` prepends the joined stack to every
+        requested name so that all tensor names produced inside the block are
+        scoped to the current context.  The prefix is removed when the block
+        exits, even if an exception is raised.
+
+        :param prefix: scope prefix to push (e.g. a pipeline step name)
+        """
+        self._prefix_stack.append(prefix)
+        try:
+            yield
+        finally:
+            self._prefix_stack.pop()
 
     def has_name(self, name: str) -> bool:
         """
@@ -611,13 +632,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
 
     def to_onnx(
         self, large_model: bool = False, external_threshold: int = 1024, inline: bool = True
-    ) -> Union[
-        onnx.FunctionProto,
-        onnx.ModelProto,
-        onnx.GraphProto,
-        ExtendedModelContainer,
-        Dict[str, Any],
-    ]:
+    ) -> ExportArtifact:
         """Exports the graph as an ONNX :class:`~onnx.ModelProto`.
 
         :param large_model: if True returns a :class:`onnx.model_container.ModelContainer`,
@@ -626,6 +641,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         :param external_threshold: if large_model is True, every tensor above this limit
             (in bytes) is stored as external
         :param inline: inline local function it any (this is currently not used)
+        :return: artifact
         """
         ir_model = ir.Model(self._graph, ir_version=self.ir_version)
         proto = ir.to_proto(ir_model)
@@ -640,7 +656,7 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
                 value_info.type.tensor_type.shape.CopyFrom(onnx.TensorShapeProto())
 
         if not large_model:
-            return proto
+            return ExportArtifact(proto=proto)
 
         # Extract initializers that exceed the threshold into an ExtendedModelContainer.
         large_initializers: Dict[str, np.ndarray] = {}
@@ -668,4 +684,4 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         if large_initializers:
             lm.set_large_initializers(large_initializers)
             lm.check_large_initializers()
-        return lm
+        return ExportArtifact(container=lm)

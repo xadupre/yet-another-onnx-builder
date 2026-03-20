@@ -25,7 +25,7 @@ class TestPLSRegression(ExtTestCase):
 
         # Check that Sub (centering) is present and a linear transform (MatMul or
         # fused Gemm) is present.
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertTrue(
             "MatMul" in op_types or "Gemm" in op_types, f"Expected MatMul or Gemm in {op_types}"

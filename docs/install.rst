@@ -93,10 +93,11 @@ To contribute or run the test suite, clone the repository and install the
     cd yet-another-onnx-builder
     pip install -e ".[dev]"
 
-To build the documentation locally, also install the ``docs`` extras:
+To build the documentation locally, also install the ``docs`` extras
+in addition to all the packages the library supports.
 
 .. code-block:: bash
 
     pip install -e ".[docs]"
     cd docs
-    make html
+    bash make_doc

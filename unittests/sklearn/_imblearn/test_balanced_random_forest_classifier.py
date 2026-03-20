@@ -29,7 +29,7 @@ class TestSklearnBalancedRandomForestClassifier(ExtTestCase):
             clf.fit(Xd, y)
             onx = to_onnx(clf, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -98,7 +98,7 @@ class TestSklearnBalancedRandomForestClassifier(ExtTestCase):
         clf = BalancedRandomForestClassifier(n_estimators=3, random_state=0)
         clf.fit(Xd, y)
         onx = to_onnx(clf, (Xd,), convert_options=ConvertOptions(decision_path=True))
-        self.assertEqual(len(onx.graph.output), 3)
+        self.assertEqual(len(onx.proto.graph.output), 3)
 
     def test_classifier_decision_leaf(self):
         """BalancedRandomForestClassifier with decision_leaf extra output."""
@@ -107,7 +107,7 @@ class TestSklearnBalancedRandomForestClassifier(ExtTestCase):
         clf = BalancedRandomForestClassifier(n_estimators=3, random_state=0)
         clf.fit(Xd, y)
         onx = to_onnx(clf, (Xd,), convert_options=ConvertOptions(decision_leaf=True))
-        self.assertEqual(len(onx.graph.output), 3)
+        self.assertEqual(len(onx.proto.graph.output), 3)
 
 
 if __name__ == "__main__":

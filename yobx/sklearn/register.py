@@ -125,7 +125,15 @@ def get_sklearn_estimator_coverage(
             the converting function if a converter is registered in :mod:`yobx.sklearn`.
     """
     if libraries == "all":
-        libraries = "category_encoders", "imblearn", "lightgbm", "sklearn", "sksurv", "xgboost"
+        libraries = (
+            "category_encoders",
+            "imblearn",
+            "lightgbm",
+            "sklearn",
+            "sksurv",
+            "statsmodels",
+            "xgboost",
+        )
     if isinstance(libraries, str):
         libraries = (libraries,)
 
@@ -146,6 +154,8 @@ def get_sklearn_estimator_coverage(
             if cls.__name__.startswith("XGB"):
                 return "xgboost"
             parts = cls.__module__.split(".")
+            if cls.__module__.startswith("yobx.sklearn.statsmodels"):
+                return f"statsmodels.{'.'.join(parts[3:])}"
             return ".".join(p for p in parts if not p.startswith("_"))
 
         all_pairs = {}
@@ -172,6 +182,10 @@ def get_sklearn_estimator_coverage(
                 all_pairs.update(dict(all_estimators()))
             elif lib == "sksurv":
                 from .sksurv import all_estimators
+
+                all_pairs.update(dict(all_estimators()))
+            elif lib == "statsmodels":
+                from .statsmodels import all_estimators
 
                 all_pairs.update(dict(all_estimators()))
             else:

@@ -38,7 +38,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
                 estimator.fit(X, y)  # always fit in float64
             onx = to_onnx(estimator, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -59,7 +59,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
                 estimator.fit(X, y)  # always fit in float64
             onx = to_onnx(estimator, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -208,7 +208,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
 
         onx = to_onnx(gpr, (X,), target_opset={"": 20, "ai.onnx.ml": 3, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
         sess = self.check_ort(onx)
@@ -224,7 +224,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
 
         onx = to_onnx(gpc, (X,), target_opset={"": 20, "ai.onnx.ml": 3, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
         sess = self.check_ort(onx)

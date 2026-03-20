@@ -20,7 +20,7 @@ class TestBinarizer(ExtTestCase):
         onx = to_onnx(binarizer, (X,))
 
         # Check graph structure: should use Greater + Cast
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Greater", op_types)
         self.assertIn("Cast", op_types)
 
@@ -85,7 +85,7 @@ class TestBinarizer(ExtTestCase):
 
         onx = to_onnx(pipe, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Greater", op_types)
         self.assertIn("Cast", op_types)
         self.assertIn("Gemm", op_types)

@@ -587,104 +587,102 @@ def _cmd_run_doc_examples(argv: List[Any]):
         sys.exit(1)
 
 
-#############
-# main parser
-#############
+def _gallery_auto_output_path(input_path: str) -> str:
+    """
+    Derive the sphinx-gallery ``auto_`` output RST path from a gallery source file.
+
+    The sphinx-gallery convention maps:
+
+    * ``<base>/examples/<category>/plot_foo.py``  →
+      ``<base>/auto_examples_<category>/plot_foo.rst``
+
+    :param input_path: absolute or relative path to the gallery ``.py`` file
+    :return: absolute path to the corresponding ``.rst`` file in the
+        ``auto_examples_<category>`` directory
+    """
+    abs_path = os.path.normpath(os.path.abspath(input_path))
+    parts = abs_path.split(os.sep)
+    # Walk backwards looking for a directory component named 'examples'
+    # followed immediately by the category name.
+    for i in range(len(parts) - 2, -1, -1):
+        if parts[i] == "examples" and i + 1 < len(parts) - 1:
+            category = parts[i + 1]
+            base_dir = os.sep.join(parts[:i]) or os.sep
+            basename = os.path.splitext(parts[-1])[0] + ".rst"
+            return os.path.join(base_dir, f"auto_examples_{category}", basename)
+    # Fallback: write next to the source file
+    return os.path.splitext(abs_path)[0] + ".rst"
 
 
-def get_parser_copilot_draft() -> ArgumentParser:
+def get_parser_render_gallery() -> ArgumentParser:
     parser = ArgumentParser(
-        prog="copilot-draft",
+        prog="render-gallery",
         description=textwrap.dedent("""
-            Use the GitHub Copilot chat API to generate a first-draft ONNX
-            converter for a scikit-learn estimator and write it into the
-            yobx/sklearn/ sub-package tree.
+            Converts a sphinx-gallery Python example file (.py) to RST without
+            executing any code and writes the result to the corresponding
+            auto_examples_<category>/ folder.
+
+            A sphinx-gallery example file consists of:
+              - A module docstring (verbatim RST: title, description, labels, …)
+              - Python code blocks separated by ``# %%`` section markers
+              - Comment lines following ``# %%`` are treated as RST prose
+
+            For an input file at ``docs/examples/<category>/plot_foo.py`` the
+            output is written to ``docs/auto_examples_<category>/plot_foo.rst``.
             """),
         epilog=textwrap.dedent("""
-            Examples:
+            examples:
 
-                # Preview the generated code without writing anything
-                python -m yobx copilot-draft sklearn.linear_model.Ridge --dry-run
+                # Convert a single gallery example
+                python -m yobx render-gallery docs/examples/core/plot_dot_graph.py
 
-                # Write to yobx/sklearn/linear_model/ridge.py
-                python -m yobx copilot-draft sklearn.preprocessing.MinMaxScaler \\
-                    --token ghp_...
-
-                # Write to a custom directory
-                python -m yobx copilot-draft sklearn.linear_model.Ridge \\
-                    --output-dir /tmp/my_converters
-
-            The GitHub token can also be supplied via the GITHUB_TOKEN or
-            GH_TOKEN environment variable.
+                # Convert several examples at once
+                python -m yobx render-gallery \\
+                    docs/examples/core/plot_dot_graph.py \\
+                    docs/examples/sklearn/plot_sklearn_pipeline.py
             """),
         formatter_class=RawTextHelpFormatter,
     )
     parser.add_argument(
-        "estimator",
-        type=str,
-        help="Fully-qualified class name of the scikit-learn estimator, "
-        "e.g. sklearn.linear_model.Ridge",
-    )
-    parser.add_argument(
-        "--token",
-        default="",
-        type=str,
-        required=False,
-        help="GitHub PAT with the copilot scope. "
-        "Falls back to GITHUB_TOKEN / GH_TOKEN env-vars when not set.",
-    )
-    parser.add_argument(
-        "--output-dir",
-        default="",
-        type=str,
-        required=False,
-        help="Directory to write the generated file. "
-        "Defaults to the appropriate yobx/sklearn/<submodule>/ directory.",
-    )
-    parser.add_argument(
-        "--dry-run",
-        default=False,
-        action="store_true",
-        help="Print the generated code without writing any file.",
+        "inputs", nargs="+", help="sphinx-gallery Python file(s) to convert to RST."
     )
     parser.add_argument("-v", "--verbose", type=int, default=0, required=False, help="verbosity")
     return parser
 
 
-def _cmd_copilot_draft(argv: List[Any]):
-    import importlib
+def _cmd_render_gallery(argv: List[Any]):
+    from .helpers._gallery_helper import gallery_to_rst
 
-    parser = get_parser_copilot_draft()
+    parser = get_parser_render_gallery()
     args = parser.parse_args(argv[1:])
 
-    # Resolve the estimator class from its fully-qualified name
-    fqname: str = args.estimator
-    if "." not in fqname:
-        parser.error(
-            f"estimator must be a fully-qualified class name such as "
-            f"sklearn.linear_model.Ridge, got {fqname!r}"
-        )
-    module_path, class_name = fqname.rsplit(".", 1)
-    try:
-        module = importlib.import_module(module_path)
-    except ImportError as exc:
-        parser.error(f"Cannot import module {module_path!r}: {exc}")
-    estimator_class = getattr(module, class_name, None)
-    if estimator_class is None:
-        parser.error(f"Class {class_name!r} not found in module {module_path!r}")
+    for filepath in args.inputs:
+        if not os.path.isfile(filepath):
+            print(f"[render-gallery] ERROR: file not found: {filepath!r}", file=sys.stderr)
+            sys.exit(1)
 
-    token = args.token or None
-    output_dir = args.output_dir or None
+        if args.verbose:
+            print(f"[render-gallery] converting {filepath!r}")
 
-    from .helpers.copilot import draft_converter_with_copilot
+        with open(filepath, "r", encoding="utf-8") as fh:
+            source = fh.read()
 
-    draft_converter_with_copilot(
-        estimator_class,
-        token=token,
-        output_dir=output_dir,
-        dry_run=args.dry_run,
-        verbose=args.verbose,
-    )
+        rst = gallery_to_rst(source)
+
+        out_path = _gallery_auto_output_path(filepath)
+        out_dir = os.path.dirname(out_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+
+        if args.verbose:
+            print(f"[render-gallery] writing {out_path!r}")
+        with open(out_path, "w", encoding="utf-8") as fh:
+            fh.write(rst)
+
+
+#############
+# main parser
+#############
 
 
 def get_parser_validate() -> ArgumentParser:
@@ -857,11 +855,11 @@ def get_main_parser() -> ArgumentParser:
             to get help for a specific command.
 
             agg               - aggregates statistics from multiple files
-            copilot-draft     - draft a sklearn→ONNX converter via GitHub Copilot
             dot               - converts an onnx model into dot format
             find              - find node consuming or producing a result
             partition         - partition a model, each partition appears as local function
             print             - prints the model on standard output
+            render-gallery    - convert a sphinx-gallery .py example to RST (no execution)
             run-doc-examples  - run all runpython:: and gdot:: examples in RST/Python files
             validate          - validate a model (knowing its model id on HuggingFace Hub)
             """),
@@ -870,11 +868,11 @@ def get_main_parser() -> ArgumentParser:
         "cmd",
         choices=[
             "agg",
-            "copilot-draft",
             "dot",
             "find",
             "partition",
             "print",
+            "render-gallery",
             "run-doc-examples",
             "validate",
         ],
@@ -886,11 +884,11 @@ def get_main_parser() -> ArgumentParser:
 def main(argv: Optional[List[Any]] = None):
     fcts = dict(
         agg=_cmd_agg,
-        **{"copilot-draft": _cmd_copilot_draft},
         dot=_cmd_dot,
         find=_cmd_find,
         partition=_cmd_partition,
         print=_cmd_print,
+        **{"render-gallery": _cmd_render_gallery},
         **{"run-doc-examples": _cmd_run_doc_examples},
         validate=_cmd_validate,
     )
@@ -904,11 +902,11 @@ def main(argv: Optional[List[Any]] = None):
         else:
             parsers = dict(
                 agg=get_parser_agg,
-                **{"copilot-draft": get_parser_copilot_draft},
                 dot=get_parser_dot,
                 find=get_parser_find,
                 partition=get_parser_partition,
                 print=get_parser_print,
+                **{"render-gallery": get_parser_render_gallery},
                 **{"run-doc-examples": get_parser_run_doc_examples},
                 validate=get_parser_validate,
             )

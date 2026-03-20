@@ -57,7 +57,7 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 """
 
-templates_path = ["_templates"]
+# templates_path = ["_templates"]
 exclude_patterns = ["_build"]
 html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]
@@ -66,10 +66,7 @@ html_logo = "_static/logo.svg"
 html_favicon = "_static/logo.svg"
 html_theme_options = {
     "github_url": "https://github.com/xadupre/yet-another-onnx-builder",
-    "logo": {
-        "image_light": "_static/logo.svg",
-        "image_dark": "_static/logo.svg",
-    },
+    "logo": {"image_light": "_static/logo.svg", "image_dark": "_static/logo.svg"},
 }
 
 
@@ -115,6 +112,7 @@ sphinx_gallery_conf = {
     # path to your examples scripts
     "examples_dirs": [
         os.path.join(os.path.dirname(__file__), "examples", "core"),
+        os.path.join(os.path.dirname(__file__), "examples", "sql"),
         os.path.join(os.path.dirname(__file__), "examples", "sklearn"),
         os.path.join(os.path.dirname(__file__), "examples", "torch"),
         os.path.join(os.path.dirname(__file__), "examples", "tensorflow"),
@@ -124,6 +122,7 @@ sphinx_gallery_conf = {
     # path where to save gallery generated examples
     "gallery_dirs": [
         "auto_examples_core",
+        "auto_examples_sql",
         "auto_examples_sklearn",
         "auto_examples_torch",
         "auto_examples_tensorflow",
@@ -220,6 +219,7 @@ epkg_dictionary = {
     "spox": "https://spox.readthedocs.io/en/latest/",
     "Supported Operators and Data Types": "https://github.com/microsoft/onnxruntime/blob/main/docs/OperatorKernels.md",
     "sympy": "https://www.sympy.org/en/index.html",
+    "statsmodels": "https://www.statsmodels.org/",
     "Keras": "https://keras.io/",
     "tensorflow": "https://www.tensorflow.org/",
     "TensorFlow": "https://www.tensorflow.org/",

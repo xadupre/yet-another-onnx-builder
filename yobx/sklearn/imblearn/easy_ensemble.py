@@ -64,7 +64,8 @@ def imblearn_pipeline(
 
         fct = get_sklearn_converter(type(step))
         step_node_name = f"{name}__{step_name}"
-        fct(g, sts, step_outputs, step, *current_input, name=step_node_name)
+        with g.prefix_name_context(step_node_name):
+            fct(g, sts, step_outputs, step, *current_input, name=step_node_name)
         current_input = step_outputs
 
     return current_input[0] if len(current_input) == 1 else tuple(current_input)
@@ -180,20 +181,17 @@ def sklearn_easy_ensemble_classifier(
         label = g.op.Gather(
             classes_arr, label_idx, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
         if not g.has_type(label):
             g.set_type(label, onnx.TensorProto.INT64)
     else:
         label = g.op.Gather(
             classes_arr, label_idx, axis=0, name=f"{name}_label_str", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
         if not g.has_type(label):
             g.set_type(label, onnx.TensorProto.STRING)
 
     if emit_proba:
         proba_out = g.op.Identity(avg_proba, name=f"{name}_proba", outputs=outputs[1:])
-        assert isinstance(proba_out, str)
         return label, proba_out
 
     return label

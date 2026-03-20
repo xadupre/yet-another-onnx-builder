@@ -3,6 +3,12 @@ yobx.litert
 
 .. toctree::
     :maxdepth: 1
+    :caption: main functions
+
+    to_onnx
+
+.. toctree::
+    :maxdepth: 1
     :caption: modules
 
     convert
@@ -10,7 +16,3 @@ yobx.litert
     litert_helper
     ops/index
 
-to_onnx
-+++++++
-
-.. autofunction:: yobx.litert.to_onnx

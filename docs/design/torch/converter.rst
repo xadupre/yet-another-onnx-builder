@@ -10,6 +10,78 @@ Torch Converter to ONNX
     relevant when exporting PyTorch models and has no bearing on ONNX models
     built directly with the builder APIs.
 
+.. _l-not-torch-onnx-export:
+
+Not torch.onnx.export
+=====================
+
+:func:`yobx.torch.interpreter.to_onnx` is **not** :func:`torch.onnx.export`.
+They share a similar high-level goal — converting a :class:`torch.nn.Module` to
+an :class:`onnx.ModelProto` — but are otherwise independent implementations with
+different design priorities.
+
+.. list-table:: yobx vs torch.onnx.export
+   :widths: 30 35 35
+   :header-rows: 1
+
+   * - Aspect
+     - :func:`yobx.torch.interpreter.to_onnx`
+     - :func:`torch.onnx.export` (dynamo backend)
+   * - **ATen → ONNX translation**
+     - Custom :class:`~yobx.torch.interpreter.interpreter.DynamoInterpreter`
+       that walks the FX graph node-by-node and emits ONNX ops directly into a
+       :class:`~yobx.xbuilder.GraphBuilder`
+     - Uses `onnxscript <https://microsoft.github.io/onnxscript/>`_ as the
+       intermediate representation for ATen-to-ONNX mappings
+   * - **Export strategy**
+     - Multiple strategies selectable via
+       :class:`~yobx.torch.export_options.ExportOptions`:
+       ``strict``, ``nostrict``, ``tracing``, ``fake``, …
+       The ``tracing`` strategy uses
+       :class:`~yobx.torch.tracing.CustomTracer` (symbolic tracing) and can
+       handle models where ``torch.export.export`` fails.
+     - Dynamo-based (``torch.export.export`` or ``torch._dynamo.export``)
+   * - **Graph decomposition**
+     - The graph is **not** decomposed by default (unless
+       ``decomposition_table`` is set in
+       :class:`~yobx.torch.export_options.ExportOptions`).  Each ATen op is
+       translated directly, which keeps the graph compact but means that a
+       new op introduced by PyTorch will raise a ``NotImplementedError``
+       until a dedicated converter is added.
+     - Always decomposes the graph into a fixed set of core ATen ops,
+       making the exporter robust to new high-level ops at the cost of
+       larger, less readable ONNX graphs
+   * - **Pattern Optimization**
+     - Supports any kind of pattern matching, multiple outputs, variable number of
+       nodes, outputs, types.
+     - Supports a fixed number of outputs.
+   * - **Shape & type propagation**
+     - Every intermediate result is typed and (when possible) given a concrete
+       or symbolic shape inside the builder, enabling richer optimization and
+       easier debugging
+     - Shape information comes from the traced graph; no additional in-builder
+       propagation step
+   * - **Large-model support**
+     - ``large_model=True`` returns an
+       :class:`onnx.model_container.ModelContainer`; weights can be stored as
+       external data files via ``external_threshold``
+     - External data handled by the caller after export
+   * - **Debugging**
+     - Rich set of environment variables (``ONNXSTOP``, ``ONNXSTOPSHAPE``,
+       ``ONNXSTOPTYPE``, ``ONNXSTOPOUTPUT``, …) let you pinpoint exactly
+       which node assigns a suspicious shape or type; see
+       :ref:`l-design-torch-debugging` and
+       :ref:`l-graphbuilder-debugging-env`
+     - Standard Python / PyTorch debugging tools
+
+In short: if you need the officially supported PyTorch exporter, use
+:func:`torch.onnx.export`.  If you need finer control over the
+ATen → ONNX translation, built-in graph optimization, advanced export
+strategies such as fake-tensor mode or automatic dynamic-shape inference,
+or rich debugging capabilities (:ref:`l-design-torch-debugging`,
+:ref:`l-graphbuilder-debugging-env`),
+:func:`yobx.torch.interpreter.to_onnx` may be a better fit.
+
 The entry point for converting a PyTorch model to ONNX is
 :func:`yobx.torch.interpreter.to_onnx`.  The function orchestrates a
 multi-stage pipeline:
@@ -333,8 +405,10 @@ requiring code changes:
    * - ``PRINT_EXPORTED_PROGRAM=1``
      - Prints the :class:`~torch.export.ExportedProgram` before interpretation.
 
-Debugging
-=========
+.. _l-design-torch-debugging:
+
+Debugging when Exporting with GraphBuilder
+==========================================
 
 :class:`~yobx.xbuilder.GraphBuilder` reads several environment variables at
 construction time that raise an exception as soon as a named result is
@@ -377,6 +451,10 @@ See also
   successful symbolic tracing.
 * :ref:`l-design-input-observer` — automatic inference of export arguments
   and dynamic shapes.
+* :ref:`l-design-torch-debugging` — environment variables for tracing
+  converter issues (this page).
+* :ref:`l-graphbuilder-debugging-env` — ``GraphBuilder`` debugging environment
+  variables.
 * :class:`yobx.xbuilder.GraphBuilder` — the underlying ONNX graph builder.
 * :class:`yobx.torch.export_options.ExportOptions` — all export strategy options.
 * :func:`yobx.torch.interpreter.to_onnx` — the public conversion API.

@@ -30,7 +30,7 @@ class TestSklearnRANSACRegressor(ExtTestCase):
             reg.fit(Xd, yd)
             onx = to_onnx(reg, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)

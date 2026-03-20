@@ -17,12 +17,15 @@ This example covers:
 4. **Custom Python functions** — user-defined numpy functions called directly
    from SQL via the ``custom_functions`` parameter; the function body is
    traced to ONNX nodes using :func:`~yobx.xtracing.trace_numpy_function`.
+5. **Graph visualization** — rendering the produced ONNX model with
+   :func:`~yobx.doc.plot_dot`.
 
 See :ref:`l-design-sql` for the full design discussion.
 """
 
 import numpy as np
 import onnxruntime
+from yobx.helpers.onnx_helper import pretty_onnx
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sql import sql_to_onnx
 
@@ -69,6 +72,10 @@ print("a + b =", total)
 print("ONNX inputs:", [inp.name for inp in onx_add.graph.input])
 
 # %%
+# The model
+print(pretty_onnx(onx_add))
+
+# %%
 # 2. WHERE clause (row filtering)
 # --------------------------------
 #
@@ -82,6 +89,10 @@ print("rows where a > 1.5:")
 print("  a =", a_filt)
 print("  b =", b_filt)
 assert list(a_filt) == [2.0, 3.0]
+
+# %%
+# The model
+print(pretty_onnx(onx_where))
 
 # %%
 # 3. Aggregation functions
@@ -101,6 +112,10 @@ assert abs(s - 6.0) < 1e-5
 assert abs(m - 5.0) < 1e-5
 
 # %%
+# The model
+print(pretty_onnx(onx_agg))
+
+# %%
 # 4. WHERE + arithmetic SELECT
 # ----------------------------
 #
@@ -113,6 +128,10 @@ b2 = np.array([4.0, 5.0, 6.0], dtype=np.float32)
 (total2,) = run(onx_combined, {"a": a2, "b": b2})
 print("a + b WHERE a > 0 =", total2)
 np.testing.assert_allclose(total2, np.array([5.0, 9.0], dtype=np.float32))
+
+# %%
+# The model
+print(pretty_onnx(onx_combined))
 
 # %%
 # 5. Custom Python functions
@@ -148,6 +167,10 @@ np.testing.assert_allclose(r, expected, atol=1e-6)
 print("clip_sqrt ✓")
 
 # %%
+# The model
+print(pretty_onnx(onx_func))
+
+# %%
 # 6. Custom function in WHERE clause
 # -----------------------------------
 #
@@ -161,6 +184,11 @@ onx_where_func = sql_to_onnx(
 print("a WHERE clip_sqrt(a) > 1 =", a_filt2)
 np.testing.assert_allclose(a_filt2, a3[clip_sqrt(a3) > 1], atol=1e-6)
 print("WHERE custom function ✓")
+
+# %%
+# The model
+print(pretty_onnx(onx_where_func))
+
 
 # %%
 # 7. Two-argument custom function
@@ -184,6 +212,10 @@ expected_ws = weighted_sum(a, b)
 print("weighted_sum(a, b) =", ws)
 np.testing.assert_allclose(ws, expected_ws, atol=1e-6)
 print("Two-argument custom function ✓")
+
+# %%
+# The model
+print(pretty_onnx(onx_ws))
 
 # %%
 # 8. Visualise the ONNX node types
@@ -235,3 +267,16 @@ ax2.tick_params(axis="x", labelrotation=25)
 
 plt.tight_layout()
 plt.show()
+
+# %%
+# 9. Display the ONNX model graph
+# --------------------------------
+#
+# :func:`~yobx.doc.plot_dot` renders the ONNX graph as an image so you can
+# inspect nodes, edges, and tensor shapes at a glance.  Here we visualize the
+# basic ``SELECT a + b`` query — a single ``Add`` node connecting two inputs
+# to one output.
+
+from yobx.doc import plot_dot  # noqa: E402
+
+plot_dot(onx_add)

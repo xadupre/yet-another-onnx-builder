@@ -36,7 +36,17 @@ yet-another-onnx-builder documentation
 
 **yet-another-onnx-builder** (``yobx``) proposes a unique API to convert machine learning models
 to `ONNX <https://onnx.ai>`_ format and manipulating ONNX graphs programmatically.
-It can export from many libraries:
+It can export from many libraries. Each converters relies on a common GraphBuider API
+(:class:`~yobx.typing.GraphBuiderExtendedProtocol`)
+to build the final ONNX model. One default implementation is provided but
+it can also be replaced by any implementation of your own.
+Any user can implement its own. You can see
+:class:`~yobx.builder.onnxscript.bridge_graph_builder.OnnxScriptGraphBuilder`
+or :class:`yobx.builder.spox.gridge_graph_spox.SpoxGraphBuilder` for a reference.
+These API are close to :epkg:`onnx` API, using `NodeProto` for nodes
+and strings for names. This is on purpose: what this API produces is
+what you see in the final ONNX model. You can add your own metadata,
+choose your own names.
 
 **standard machine learning**
 
@@ -50,6 +60,8 @@ It can export from many libraries:
 | :epkg:`scikit-learn`                  | :ref:`l-sklearn-converter`   |
 +---------------------------------------+------------------------------+
 | :epkg:`scikit-survival`               | :ref:`l-sklearn-converter`   |
++---------------------------------------+------------------------------+
+| :epkg:`statsmodels`                   | :ref:`l-sklearn-converter`   |
 +---------------------------------------+------------------------------+
 | :epkg:`xgboost`                       | :ref:`l-sklearn-converter`   |
 +---------------------------------------+------------------------------+
@@ -99,7 +111,8 @@ Its unique API:
    :maxdepth: 1
 
    api/index
-   contents
+   converters
+   core
    galleries
    cmds/index
    install

@@ -14,7 +14,7 @@ from yobx.ext_test_case import (
 )
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder import GraphBuilder, FunctionOptions, OptimizationOptions
-from yobx.container import ExtendedModelContainer
+from yobx.container import ExtendedModelContainer, ExportArtifact
 
 TFLOAT = TensorProto.FLOAT
 TFLOAT16 = TensorProto.FLOAT16
@@ -321,44 +321,37 @@ class TestGraphBuilder(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(fct, dict)
-        self.assertEqual(
-            set(fct),
-            {
-                "proto",
-                "functions",
-                "initializers_name",
-                "initializers_dict",
-                "initializers_renaming",
-            },
+        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsNotNone(fct.function)
+        self.assertIsInstance(fct.proto, FunctionProto)
+        self.assertIsInstance(fct.function.nested_functions, list)
+        self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.function.nested_functions))
+        self.assertIsInstance(fct.function.initializers_name, list)
+        self.assertEqual(fct.function.initializers_name, ["weights", "bias2", "bias"])
+        self.assertIsInstance(fct.function.initializers_dict, dict)
+        self.assertTrue(
+            all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
         )
-        self.assertIsInstance(fct["proto"], FunctionProto)
-        self.assertIsInstance(fct["functions"], list)
-        self.assertTrue(all(isinstance(p, FunctionProto) for p in fct["functions"]))
-        self.assertIsInstance(fct["initializers_name"], list)
-        self.assertEqual(fct["initializers_name"], ["weights", "bias2", "bias"])
-        self.assertIsInstance(fct["initializers_dict"], dict)
-        self.assertTrue(all(isinstance(p, np.ndarray) for p in fct["initializers_dict"].values()))
-        self.assertEqual(len(fct["initializers_name"]), len(fct["initializers_dict"]))
-        proto = fct["proto"]
+        self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
+        proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
         self.assertEqual(proto.input, ["X", "weights", "bias2", "bias"])
         self.assertEqual(proto.domain, "mine")
         self.assertEqual(proto.name, "linear")
-        f1 = fct["functions"][0]
+        f1 = fct.function.nested_functions[0]
         self.assertEqual(f1.domain, "custom")
         self.assertEqual(f1.name, "Regression")
         self.assertEqual(f1.output, ["Y"])
         self.assertEqual(f1.input, ["X", "weights", "bias"])
 
         feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
-        feeds.update(fct["initializers_dict"])
+        feeds.update(fct.function.initializers_dict)
         self.assertEqualArray(np_weights, feeds["weights"])
         self.assertEqualArray(np_bias, feeds["bias"])
         self.assertEqualArray(np_bias2, feeds["bias2"])
         self.assertEqual(set(feeds), {"X", "weights", "bias2", "bias"})
         expected = feeds["X"] @ np_weights + np_bias + np_bias2
-        ref = ExtendedReferenceEvaluator(fct["proto"], functions=fct["functions"])
+        ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0])
 
@@ -433,44 +426,37 @@ class TestGraphBuilder(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(fct, dict)
-        self.assertEqual(
-            set(fct),
-            {
-                "proto",
-                "functions",
-                "initializers_name",
-                "initializers_dict",
-                "initializers_renaming",
-            },
+        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsNotNone(fct.function)
+        self.assertIsInstance(fct.proto, FunctionProto)
+        self.assertIsInstance(fct.function.nested_functions, list)
+        self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.function.nested_functions))
+        self.assertIsInstance(fct.function.initializers_name, list)
+        self.assertEqual(fct.function.initializers_name, ["weights", "bias3", "bias2", "bias"])
+        self.assertIsInstance(fct.function.initializers_dict, dict)
+        self.assertTrue(
+            all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
         )
-        self.assertIsInstance(fct["proto"], FunctionProto)
-        self.assertIsInstance(fct["functions"], list)
-        self.assertTrue(all(isinstance(p, FunctionProto) for p in fct["functions"]))
-        self.assertIsInstance(fct["initializers_name"], list)
-        self.assertEqual(fct["initializers_name"], ["weights", "bias3", "bias2", "bias"])
-        self.assertIsInstance(fct["initializers_dict"], dict)
-        self.assertTrue(all(isinstance(p, np.ndarray) for p in fct["initializers_dict"].values()))
-        self.assertEqual(len(fct["initializers_name"]), len(fct["initializers_dict"]))
-        proto = fct["proto"]
+        self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
+        proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
         self.assertEqual(proto.input, ["X", "weights", "bias3", "bias2", "bias"])
         self.assertEqual(proto.domain, "mine")
         self.assertEqual(proto.name, "linear")
-        self.assertEqual(2, len(fct["functions"]))
-        f1 = fct["functions"][0]
+        self.assertEqual(2, len(fct.function.nested_functions))
+        f1 = fct.function.nested_functions[0]
         self.assertEqual(f1.domain, "custom")
         self.assertEqual(f1.name, "Regression")
         self.assertEqual(f1.output, ["Y"])
         self.assertEqual(f1.input, ["X", "weights", "bias"])
-        f2 = fct["functions"][1]
+        f2 = fct.function.nested_functions[1]
         self.assertEqual(f2.domain, "custom")
         self.assertEqual(f2.name, "RegressionBias")
         self.assertEqual(f2.output, ["Y"])
         self.assertEqual(f2.input, ["X", "weights", "bias2", "bias"])
 
         feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
-        feeds.update(fct["initializers_dict"])
+        feeds.update(fct.function.initializers_dict)
         self.assertEqualArray(np_weights, feeds["weights"])
         self.assertEqualArray(np_bias, feeds["bias"])
         self.assertEqualArray(np_bias2, feeds["bias2"])
@@ -480,7 +466,7 @@ class TestGraphBuilder(ExtTestCase):
 
         # Evaluation of a function
         self.assertIn("opset: '': 18", g.pretty_text())
-        ref = ExtendedReferenceEvaluator(fct["proto"], functions=fct["functions"])
+        ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0])
 
@@ -563,45 +549,38 @@ class TestGraphBuilder(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(fct, dict)
-        self.assertEqual(
-            set(fct),
-            {
-                "proto",
-                "functions",
-                "initializers_name",
-                "initializers_dict",
-                "initializers_renaming",
-            },
+        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsNotNone(fct.function)
+        self.assertIsInstance(fct.proto, FunctionProto)
+        self.assertIsInstance(fct.function.nested_functions, list)
+        self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.function.nested_functions))
+        self.assertIsInstance(fct.function.initializers_name, list)
+        self.assertEqual(fct.function.initializers_name, ["weights", "bias"])
+        self.assertIsInstance(fct.function.initializers_dict, dict)
+        self.assertTrue(
+            all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
         )
-        self.assertIsInstance(fct["proto"], FunctionProto)
-        self.assertIsInstance(fct["functions"], list)
-        self.assertTrue(all(isinstance(p, FunctionProto) for p in fct["functions"]))
-        self.assertIsInstance(fct["initializers_name"], list)
-        self.assertEqual(fct["initializers_name"], ["weights", "bias"])
-        self.assertIsInstance(fct["initializers_dict"], dict)
-        self.assertTrue(all(isinstance(p, np.ndarray) for p in fct["initializers_dict"].values()))
-        self.assertEqual(len(fct["initializers_name"]), len(fct["initializers_dict"]))
-        proto = fct["proto"]
+        self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
+        proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
         self.assertEqual(proto.input, ["X", "weights", "bias"])
         self.assertEqual(proto.domain, "mine")
         self.assertEqual(proto.name, "linear")
-        f1 = fct["functions"][0]
+        f1 = fct.function.nested_functions[0]
         self.assertEqual(f1.domain, "custom")
         self.assertEqual(f1.name, "Regression")
         self.assertEqual(f1.output, ["Y"])
         self.assertEqual(f1.input, ["X", "weights", "bias"])
-        f2 = fct["functions"][1]
+        f2 = fct.function.nested_functions[1]
         self.assertEqual(f2.domain, "custom")
         self.assertEqual(f2.name, "Regression_l2l")
         self.assertEqual(f2.output, ["Y"])
         self.assertEqual(f2.input, ["X", "weights", "bias"])
 
         feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
-        feeds.update(fct["initializers_dict"])
+        feeds.update(fct.function.initializers_dict)
         expected = feeds["X"] @ np_weights + np_bias + feeds["X"] @ np_weights - np_bias
-        ref = ExtendedReferenceEvaluator(fct["proto"], functions=fct["functions"])
+        ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
@@ -696,44 +675,37 @@ class TestGraphBuilder(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(fct, dict)
-        self.assertEqual(
-            set(fct),
-            {
-                "proto",
-                "functions",
-                "initializers_name",
-                "initializers_dict",
-                "initializers_renaming",
-            },
+        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsNotNone(fct.function)
+        self.assertIsInstance(fct.proto, FunctionProto)
+        self.assertIsInstance(fct.function.nested_functions, list)
+        self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.function.nested_functions))
+        self.assertIsInstance(fct.function.initializers_name, list)
+        self.assertEqual(fct.function.initializers_name, ["weights", "bias2", "bias"])
+        self.assertIsInstance(fct.function.initializers_dict, dict)
+        self.assertTrue(
+            all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
         )
-        self.assertIsInstance(fct["proto"], FunctionProto)
-        self.assertIsInstance(fct["functions"], list)
-        self.assertTrue(all(isinstance(p, FunctionProto) for p in fct["functions"]))
-        self.assertIsInstance(fct["initializers_name"], list)
-        self.assertEqual(fct["initializers_name"], ["weights", "bias2", "bias"])
-        self.assertIsInstance(fct["initializers_dict"], dict)
-        self.assertTrue(all(isinstance(p, np.ndarray) for p in fct["initializers_dict"].values()))
-        self.assertEqual(len(fct["initializers_name"]), len(fct["initializers_dict"]))
-        proto = fct["proto"]
+        self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
+        proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
         self.assertEqual(proto.input, ["X", "weights", "bias2", "bias"])
         self.assertEqual(proto.domain, "mine")
         self.assertEqual(proto.name, "linear")
-        self.assertEqual(4, len(fct["functions"]))
-        f1 = fct["functions"][0]
+        self.assertEqual(4, len(fct.function.nested_functions))
+        f1 = fct.function.nested_functions[0]
         self.assertEqual(f1.domain, "custom")
         self.assertEqual(f1.name, "Regression")
         self.assertEqual(f1.output, ["Y"])
         self.assertEqual(f1.input, ["X", "weights", "bias"])
-        f2 = fct["functions"][1]
+        f2 = fct.function.nested_functions[1]
         self.assertEqual(f2.domain, "custom")
         self.assertEqual(f2.name, "RegressionBias")
         self.assertEqual(f2.output, ["Y"])
         self.assertEqual(f2.input, ["X", "weights", "bias2", "bias"])
 
         feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
-        feeds.update(fct["initializers_dict"])
+        feeds.update(fct.function.initializers_dict)
         self.assertEqualArray(np_weights, feeds["weights"])
         self.assertEqualArray(np_bias, feeds["bias"])
         self.assertEqualArray(np_bias2, feeds["bias2"])
@@ -741,7 +713,7 @@ class TestGraphBuilder(ExtTestCase):
 
         # Evaluation of a function
         self.assertIn("opset: '': 18", g.pretty_text())
-        ref = ExtendedReferenceEvaluator(fct["proto"], functions=fct["functions"])
+        ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0])
 
@@ -843,44 +815,37 @@ class TestGraphBuilder(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(fct, dict)
-        self.assertEqual(
-            set(fct),
-            {
-                "proto",
-                "functions",
-                "initializers_name",
-                "initializers_dict",
-                "initializers_renaming",
-            },
+        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsNotNone(fct.function)
+        self.assertIsInstance(fct.proto, FunctionProto)
+        self.assertIsInstance(fct.function.nested_functions, list)
+        self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.function.nested_functions))
+        self.assertIsInstance(fct.function.initializers_name, list)
+        self.assertEqual(fct.function.initializers_name, ["weights", "bias2", "bias"])
+        self.assertIsInstance(fct.function.initializers_dict, dict)
+        self.assertTrue(
+            all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
         )
-        self.assertIsInstance(fct["proto"], FunctionProto)
-        self.assertIsInstance(fct["functions"], list)
-        self.assertTrue(all(isinstance(p, FunctionProto) for p in fct["functions"]))
-        self.assertIsInstance(fct["initializers_name"], list)
-        self.assertEqual(fct["initializers_name"], ["weights", "bias2", "bias"])
-        self.assertIsInstance(fct["initializers_dict"], dict)
-        self.assertTrue(all(isinstance(p, np.ndarray) for p in fct["initializers_dict"].values()))
-        self.assertEqual(len(fct["initializers_name"]), len(fct["initializers_dict"]))
-        proto = fct["proto"]
+        self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
+        proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
         self.assertEqual(proto.input, ["X", "weights", "bias2", "bias"])
         self.assertEqual(proto.domain, "mine")
         self.assertEqual(proto.name, "linear")
-        self.assertEqual(2, len(fct["functions"]))
-        f1 = fct["functions"][0]
+        self.assertEqual(2, len(fct.function.nested_functions))
+        f1 = fct.function.nested_functions[0]
         self.assertEqual(f1.domain, "custom")
         self.assertEqual(f1.name, "Regression")
         self.assertEqual(f1.output, ["Y"])
         self.assertEqual(f1.input, ["X", "weights", "bias"])
-        f2 = fct["functions"][1]
+        f2 = fct.function.nested_functions[1]
         self.assertEqual(f2.domain, "custom")
         self.assertEqual(f2.name, "RegressionBias")
         self.assertEqual(f2.output, ["Y"])
         self.assertEqual(f2.input, ["X", "weights", "bias2", "bias"])
 
         feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
-        feeds.update(fct["initializers_dict"])
+        feeds.update(fct.function.initializers_dict)
         self.assertEqualArray(np_weights, feeds["weights"])
         self.assertEqualArray(np_bias, feeds["bias"])
         self.assertEqualArray(np_bias2, feeds["bias2"])
@@ -888,7 +853,7 @@ class TestGraphBuilder(ExtTestCase):
 
         # Evaluation of a function
         self.assertIn("opset: '': 18", g.pretty_text())
-        ref = ExtendedReferenceEvaluator(fct["proto"], functions=fct["functions"])
+        ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0])
 
@@ -947,7 +912,8 @@ class TestGraphBuilder(ExtTestCase):
         gr = GraphBuilder(onnx_model)
         self.assertEqual(len(gr.functions), 1)
         container = gr.to_onnx(inline=False, large_model=True)
-        self.assertIsInstance(container, ExtendedModelContainer)
+        self.assertIsInstance(container, ExportArtifact)
+        self.assertIsInstance(container.container, ExtendedModelContainer)
         filename = self.get_dump_file("test_large_model_onnxscript_ir.onnx")
         container.save(filename, True)
         ref2 = ExtendedReferenceEvaluator(filename)
@@ -955,7 +921,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqualArray(expected, got)
 
         # ir
-        m = container.to_ir()
+        m = container.container.to_ir()
         proto = oir.to_proto(m)
 
         ref3 = ExtendedReferenceEvaluator(proto)
@@ -2744,11 +2710,12 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         sub.make_tensor_output("Y", is_dimension=False, indexed=False)
 
         fct = sub.to_onnx(function_options=FunctionOptions(name="LinearSub", domain="mydom"))
-        self.assertIsInstance(fct, FunctionProto)
-        self.assertEqual(list(fct.input), ["X", "W"])
-        self.assertEqual(list(fct.output), ["Y"])
-        self.assertEqual(fct.domain, "mydom")
-        self.assertEqual(fct.name, "LinearSub")
+        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsInstance(fct.proto, FunctionProto)
+        self.assertEqual(list(fct.proto.input), ["X", "W"])
+        self.assertEqual(list(fct.proto.output), ["Y"])
+        self.assertEqual(fct.proto.domain, "mydom")
+        self.assertEqual(fct.proto.name, "LinearSub")
 
         feeds = dict(
             X=np.arange(8).reshape((2, 4)).astype(np.float32),
@@ -2783,11 +2750,12 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         fct = sub.to_onnx(
             function_options=FunctionOptions(name="SubFunc", domain="subdom"), inline=False
         )
-        self.assertIsInstance(fct, FunctionProto)
-        self.assertEqual(list(fct.input), ["A"])
-        self.assertEqual(list(fct.output), ["C"])
-        self.assertEqual(fct.domain, "subdom")
-        self.assertEqual(fct.name, "SubFunc")
+        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsInstance(fct.proto, FunctionProto)
+        self.assertEqual(list(fct.proto.input), ["A"])
+        self.assertEqual(list(fct.proto.output), ["C"])
+        self.assertEqual(fct.proto.domain, "subdom")
+        self.assertEqual(fct.proto.name, "SubFunc")
 
     def test_same_shape_static(self):
         g = GraphBuilder(18)

@@ -39,7 +39,8 @@ from onnx.external_data_helper import uses_external_data
 from onnx.model_container import make_large_tensor_proto
 from onnx.shape_inference import infer_shapes as onnx_infer_shapes
 from ..typing import ConvertOptionsProtocol, DefaultConvertOptions
-from ..container.model_container import ExtendedModelContainer, _get_type
+from ..container import ExportArtifact, ExportReport, ExtendedModelContainer, FunctionPieces
+from ..container.model_container import _get_type
 from ..helpers.mini_onnx_builder import proto_from_array
 from ..helpers import make_hash, string_signature, string_type
 from ..helpers.helper import size_type
@@ -174,6 +175,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     - `_unique_names`: used to create unused result names
     - `_unique_node_names`: used to create unused node names
+    - `_prefix_stack`: stack of active name prefixes pushed by :meth:`prefix_name_context`
     - `_known_names`: set of existing results names
     - `_known_shapes: Dict[str, DYNAMIC_SHAPE]`: declared shapes
     - `_known_types: Dict[str, int]`: declared element types
@@ -366,6 +368,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._known_sequences: Dict[str, Dict[str, Any]] = {}
         self._unique_names: Set[str] = set()
         self._unique_node_names: Set[str] = set()
+        self._prefix_stack: List[str] = []
         self._known_value_shape: Dict[str, Any] = {}
         self._dynamic_examples: Dict[str, Any] = {}
         self._parameter_renaming: Dict[str, str] = {}
@@ -431,7 +434,10 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             self.input_names: List[str] = list(input_names) if input_names else []
             self.current_input = 0
             self._unique_names = set(self.input_names)
-        elif isinstance(target_opset_or_existing_proto, (GraphProto, ModelProto, FunctionProto)):
+        elif isinstance(
+            target_opset_or_existing_proto,
+            (GraphProto, ModelProto, FunctionProto, ExportArtifact),
+        ):
             # loads a model from nothing
             if input_names:
                 raise ValueError("input_names must be empty if the input is an existing model.")
@@ -441,10 +447,14 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     _opsets is not None
                 ), "_opsets must be specified if the input is a GraphProto"
                 self.opsets = _opsets
+            elif isinstance(target_opset_or_existing_proto, ExportArtifact):
+                target_opset_or_existing_proto = target_opset_or_existing_proto.get_proto(
+                    include_weights=True
+                )
             else:
                 assert _opsets is None, "_opsets must be None if the input is not a GraphProto"
             self._update_structures_with_proto(
-                target_opset_or_existing_proto, infer_shapes_options
+                target_opset_or_existing_proto, infer_shapes_options  # type: ignore
             )
             self.constant_folding(
                 (optimization_options or OptimizationOptions()).constant_folding,
@@ -452,7 +462,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             )
             if not isinstance(target_opset_or_existing_proto, FunctionProto):
                 self._update_shape_types_with_proto(
-                    target_opset_or_existing_proto, infer_shapes_options
+                    target_opset_or_existing_proto, infer_shapes_options  # type: ignore
                 )
         else:
             raise NotImplementedError(f"{type(target_opset_or_existing_proto)} is not supported.")
@@ -2371,8 +2381,27 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._unique_names.add(sug)
         return sug
 
+    @contextlib.contextmanager
+    def prefix_name_context(self, prefix: str) -> Generator:
+        """Context manager that pushes *prefix* onto the prefix stack.
+
+        While active, :meth:`unique_name` prepends the joined stack to every
+        requested name so that all tensor names produced inside the block are
+        scoped to the current context.  The prefix is removed when the block
+        exits, even if an exception is raised.
+
+        :param prefix: scope prefix to push (e.g. a pipeline step name)
+        """
+        self._prefix_stack.append(prefix)
+        try:
+            yield
+        finally:
+            self._prefix_stack.pop()
+
     def unique_name(self, prefix: str) -> str:
         "Returns a unique result name."
+        if self._prefix_stack:
+            prefix = f"{'__'.join(self._prefix_stack)}__{prefix}"
         if prefix in self._unique_names:
             i = 2
             sug = f"{prefix}2"
@@ -2719,7 +2748,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         parameter_name: Optional[str] = None,
         source: str = "",
         allow_empty: bool = False,
-        give_unique: bool = False,
+        give_unique_name: bool = False,
     ) -> str:
         """
         Adds an initializer to the graph.
@@ -2738,7 +2767,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         :param source: any additional information, this field is usually used to
             let the number know where the initializer was created.
         :param allow_empty: allow_empty value
-        :param give_unique: give a unique name
+        :param give_unique_name: give a unique name
         :return: name of the initializer
         """
         if external:
@@ -2807,7 +2836,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             itype = _get_type(value.dtype)
             shape = tuple(value.shape)
 
-        if name == "" or give_unique:
+        if name == "" or give_unique_name:
             if name:
                 name = self.unique_name(name)
             else:
@@ -5555,7 +5584,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             for node in add.node:
                 self._check_constant(node, f"{prefix}-[add]")
 
-    def _to_onnx_function(self, function_options, opsets, mask_outputs):
+    def _to_onnx_function(self, function_options, opsets, mask_outputs) -> "ExportArtifact":
         if self._debug_local_function:
             print(f"[GraphBuilder-{self._hash()}.to_onnx] export_as_function {function_options}")
         if self.verbose:
@@ -5603,36 +5632,41 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         )
 
         if not function_options.return_initializer:
-            return proto
+            return ExportArtifact(proto=proto, function=FunctionPieces())
 
         if len(self.initializers_dict) == 0 and len(self.functions) == 0:
-            res = dict(proto=proto)
+            nested = None
             if self.functions:
                 used_functions = self._get_used_local_functions()
                 if used_functions:
-                    res["functions"] = used_functions  # type: ignore
-            return res
+                    nested = used_functions
+            return ExportArtifact(
+                proto=proto, function=FunctionPieces(nested_function_names=nested)
+            )
 
         # We need to move the initializers as inputs, we sort them by decreasing size
         inits, functions = self._extend_local_function_inputs()
         proto.input.extend(inits)
-        res = dict(
-            proto=proto,
-            initializers_name=inits,
-            initializers_dict={
-                self._parameter_renaming.get(k, k): v
-                for k, v in self.initializers_dict.items()
-                if k in set(inits)
-            },
-            initializers_renaming={
-                k: self._parameter_renaming.get(k, k)
-                for k, v in self.initializers_dict.items()
-                if k in set(inits)
-            },
+        nested_functions = (
+            [v for k, v in self.functions.items() if k in functions] if functions else None
         )
-        if functions:
-            res["functions"] = [v for k, v in self.functions.items() if k in functions]  # type: ignore
-        return res
+        return ExportArtifact(
+            proto=proto,
+            function=FunctionPieces(
+                initializers_name=inits,
+                initializers_dict={
+                    self._parameter_renaming.get(k, k): v
+                    for k, v in self.initializers_dict.items()
+                    if k in set(inits)
+                },
+                initializers_renaming={
+                    k: self._parameter_renaming.get(k, k)
+                    for k, v in self.initializers_dict.items()
+                    if k in set(inits)
+                },
+                nested_functions=nested_functions,
+            ),
+        )
 
     def _update_model_with_parameter_renaming(self, model: ModelProto):
         assert self.initializers_dict, (
@@ -5770,7 +5804,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         function_options: Optional[FunctionOptions] = None,
         mask_outputs: Optional[List[bool]] = None,
         as_graph_proto: bool = False,
-    ) -> Union[FunctionProto, ModelProto, GraphProto, ExtendedModelContainer, Dict[str, Any]]:
+    ) -> ExportArtifact:
         """
         Conversion to onnx. Only then the initializers are converted into TensorProto.
 
@@ -5788,7 +5822,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         :param mask_outputs: to filter out some outputs if not None
         :param as_graph_proto: return a GraphProto with no initializers,
             they are returned as well.
-        :return: the proto
+        :return: the model
         """
         assert self.nodes, f"No node to convert{self.get_debug_msg()}"
         if function_options is None:
@@ -5842,7 +5876,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._add_hidden_inputs_to_nodes()
 
         if function_options.export_as_function:
-            # export as a function
             return self._to_onnx_function(function_options, opsets, mask_outputs)
 
         # export as a model
@@ -5878,7 +5911,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             model.graph.input.extend(self.inputs)
 
         if as_graph_proto:
-            return model.graph
+            return ExportArtifact(model.graph)
 
         # initializers
         initializers, large_initializers = self._build_initializers(
@@ -5977,9 +6010,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                             f"doc_string is missing for initializer {init.name!r}"
                             f"\n{self.pretty_text()}"
                         )
-            return (lm, stats) if return_optimize_report else lm  # type: ignore
-
-        return (model, stats) if return_optimize_report else model  # type: ignore
+            return ExportArtifact(
+                container=lm, report=ExportReport(stats=stats) if return_optimize_report else None
+            )
+        return ExportArtifact(
+            proto=model, report=ExportReport(stats=stats) if return_optimize_report else None
+        )
 
     def _rename_dynamic_dimension_inplace(
         self, obj: ValueInfoProto, replacements: Dict[str, str]
@@ -6526,7 +6562,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if renaming:
                 g.rename_names(renaming)
 
-            new_g = g.to_onnx(optimize=False, as_graph_proto=True)
+            new_g = g.to_onnx(optimize=False, as_graph_proto=True).graph
             assert isinstance(new_g, GraphProto), f"unexpected type {type(new_g)}"
             if self.verbose > 1:
                 print(
@@ -8702,30 +8738,37 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._check_function_order()
 
         fct = builder.to_onnx(function_options=function_options, optimize=optimize, inline=False)
-        assert isinstance(fct, (dict, FunctionProto)), (
+        assert isinstance(fct, ExportArtifact), (
             f"Unexpected type {type(fct)}, function_options={function_options}"
             f"{self.get_debug_msg()}"
         )
-        onx = fct["proto"] if isinstance(fct, dict) else fct
+        assert fct.function is not None, (
+            f"ExportArtifact.function is None for function export, "
+            f"function_options={function_options}{self.get_debug_msg()}"
+        )
+        onx = fct.proto
+        assert onx is not None, "It should not be None"
 
         if metadata_props:
             oh.set_metadata_props(onx, metadata_props)
 
-        if self._debug_local_function and isinstance(fct, dict):
-            print(f"[GraphBuilder-{self._hash()}.make_local_function] keys={', '.join(fct)}")
-            if "initializers_name" in fct:
-                print(
-                    f"[GraphBuilder-{self._hash()}.make_local_function] initializers_name="
-                    f"{fct['initializers_name']}"
-                )
+        if self._debug_local_function and fct.function.initializers_name is not None:
+            print(
+                f"[GraphBuilder-{self._hash()}.make_local_function] "
+                f"initializers_name={fct.function.initializers_name}"
+            )
+            if fct.function.initializers_dict is not None:
                 print(
                     f"[GraphBuilder-{self._hash()}.make_local_function] initializers_dict="
-                    f"{list(fct['initializers_dict'])}"
+                    f"{list(fct.function.initializers_dict)}"
                 )
+            if fct.function.initializers_renaming is not None:
                 print(
                     f"[GraphBuilder-{self._hash()}.make_local_function] initializers_renaming="
-                    f"{fct['initializers_renaming']}"
+                    f"{fct.function.initializers_renaming}"
                 )
+        if self._debug_local_function:
+            assert isinstance(onx, FunctionProto), f"unexpected type {type(onx)}"
             print(
                 f"[GraphBuilder-{self._hash()}.make_local_function] "
                 f"create {onx.name}[{onx.domain}]"
@@ -8753,20 +8796,22 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             )
 
         # Let's rename the initializers.
-        if isinstance(fct, dict) and "initializers_dict" in fct:
-            assert len(fct["initializers_dict"]) == len(fct["initializers_name"]), (
-                f"Names mismatch between {fct['initializers_name']} and "
-                f"{list(fct['initializers_dict'])}{builder.get_debug_msg()}"
+        if fct.function.initializers_dict is not None:
+            assert fct.function.initializers_name is not None, "type consistency"
+            assert len(fct.function.initializers_dict) == len(fct.function.initializers_name), (
+                f"Names mismatch between {fct.function.initializers_name} and "
+                f"{list(fct.function.initializers_dict)}{builder.get_debug_msg()}"
             )
             repl = {}
-            for k, v in fct["initializers_dict"].items():
+            for k, v in fct.function.initializers_dict.items():
                 new_name = self.add_initializer(
                     self.unique_name(k), v, source=f"GraphBuilder.make_local_function/from({k})"
                 )
                 repl[k] = new_name
-            renaming = fct["initializers_renaming"]
+            renaming = fct.function.initializers_renaming
+            assert renaming is not None, "type consistency"
             new_inits = []
-            for input_name in fct["initializers_name"]:
+            for input_name in fct.function.initializers_name:
                 init_name = renaming[input_name]
                 repl_name = repl[init_name]
                 new_inits.append(repl_name)
