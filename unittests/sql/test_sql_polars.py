@@ -8,7 +8,7 @@ import numpy as np
 
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.sql import polars_schema_to_input_dtypes, to_onnx
+from yobx.sql import polars_frame_to_sql, polars_schema_to_input_dtypes, to_onnx
 
 try:
     import polars as _pl  # noqa: F401
@@ -238,6 +238,114 @@ class TestPolarsSchemaToInputDtypes(ExtTestCase):
     def test_invalid_type_raises_type_error(self):
         with self.assertRaises(TypeError):
             polars_schema_to_input_dtypes({"a": np.float32})
+
+
+@unittest.skipUnless(HAS_POLARS, "polars not installed")
+class TestToOnnxEmbeddedQuery(ExtTestCase):
+    """Tests for :func:`~yobx.sql.to_onnx` using the query-embedded calling
+    convention: ``to_onnx(src.sql("SELECT ... FROM self ..."))``."""
+
+    def test_basic_select_embedded(self):
+        """Query extracted from frame.sql(); simple column pass-through."""
+        import polars as pl
+
+        src = pl.LazyFrame({"a": pl.Series([1.0, 2.0, 3.0], dtype=pl.Float32)})
+        onx = to_onnx(src.sql("SELECT a FROM self"))
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out,) = _run(onx, {"a": a})
+        self.assertEqualArray(out, a)
+
+    def test_arithmetic_embedded(self):
+        """Element-wise addition with query embedded in LazyFrame."""
+        import polars as pl
+
+        src = pl.LazyFrame(
+            {
+                "a": pl.Series([1.0, 2.0, 3.0], dtype=pl.Float32),
+                "b": pl.Series([4.0, 5.0, 6.0], dtype=pl.Float32),
+            }
+        )
+        onx = to_onnx(src.sql("SELECT a + b AS total FROM self"))
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = _run(onx, {"a": a, "b": b})
+        self.assertEqualArray(total, a + b, atol=1e-6)
+
+    def test_filter_embedded(self):
+        """WHERE clause extracted from frame.sql()."""
+        import polars as pl
+
+        src = pl.LazyFrame({"a": pl.Series([1.0, -2.0, 3.0], dtype=pl.Float32)})
+        onx = to_onnx(src.sql("SELECT a FROM self WHERE a > 0"))
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        (out,) = _run(onx, {"a": a})
+        self.assertEqualArray(out, np.array([1.0, 3.0], dtype=np.float32))
+
+    def test_embedded_matches_explicit(self):
+        """Embedded and explicit calling conventions produce identical ONNX."""
+        import polars as pl
+
+        src = pl.LazyFrame(
+            {
+                "a": pl.Series([1.0, -2.0, 3.0], dtype=pl.Float32),
+                "b": pl.Series([4.0, 5.0, 6.0], dtype=pl.Float32),
+            }
+        )
+        onx_embedded = to_onnx(src.sql("SELECT a + b AS total FROM self WHERE a > 0"))
+        onx_explicit = to_onnx(src, "SELECT a + b AS total FROM t WHERE a > 0")
+
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        feeds = {"a": a, "b": b}
+        (out1,) = _run(onx_embedded, feeds)
+        (out2,) = _run(onx_explicit, feeds)
+        self.assertEqualArray(out1, out2, atol=1e-6)
+
+    def test_non_sql_frame_raises(self):
+        """A plain LazyFrame (not from .sql()) should raise ValueError."""
+        import polars as pl
+
+        src = pl.LazyFrame({"a": pl.Series([1.0, 2.0], dtype=pl.Float32)})
+        with self.assertRaises(ValueError):
+            to_onnx(src)
+
+
+@unittest.skipUnless(HAS_POLARS, "polars not installed")
+class TestPolarsFrameToSql(ExtTestCase):
+    """Tests for :func:`~yobx.sql.polars_frame_to_sql`."""
+
+    def test_simple_select(self):
+        import polars as pl
+
+        src = pl.LazyFrame({"a": pl.Series([1.0], dtype=pl.Float32)})
+        query, dtypes = polars_frame_to_sql(src.sql("SELECT a FROM self"))
+        self.assertIn("a", query.lower())
+        self.assertIn("a", dtypes)
+        self.assertEqual(dtypes["a"], np.dtype("float32"))
+
+    def test_schema_fields_extracted(self):
+        import polars as pl
+
+        src = pl.LazyFrame(
+            {
+                "x": pl.Series([1.0], dtype=pl.Float32),
+                "y": pl.Series([1], dtype=pl.Int64),
+            }
+        )
+        _, dtypes = polars_frame_to_sql(src.sql("SELECT x FROM self"))
+        self.assertEqual(dtypes["x"], np.dtype("float32"))
+        self.assertEqual(dtypes["y"], np.dtype("int64"))
+
+    def test_non_lazyframe_raises(self):
+        with self.assertRaises(TypeError):
+            polars_frame_to_sql({"a": 1.0})
+
+    def test_non_sql_frame_raises(self):
+        import polars as pl
+
+        src = pl.LazyFrame({"a": pl.Series([1.0], dtype=pl.Float32)})
+        with self.assertRaises(ValueError):
+            polars_frame_to_sql(src)
 
 
 if __name__ == "__main__":

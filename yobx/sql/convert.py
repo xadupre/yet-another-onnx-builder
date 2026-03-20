@@ -48,7 +48,7 @@ from .. import DEFAULT_TARGET_OPSET
 from ..typing import GraphBuilderProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
-from ._polars_helper import polars_schema_to_input_dtypes
+from ._polars_helper import polars_frame_to_sql, polars_schema_to_input_dtypes
 from .ops import get_sql_op_converter
 from .parse import GroupByOp, JoinOp, ParsedQuery, SelectOp, parse_sql
 
@@ -251,7 +251,7 @@ def sql_to_onnx(
 
 def to_onnx(
     frame,
-    query: str,
+    query: Optional[str] = None,
     right_frame=None,
     target_opset: int = DEFAULT_TARGET_OPSET,
     n_rows: Optional[int] = None,
@@ -259,31 +259,50 @@ def to_onnx(
     builder_cls: Union[type, Callable] = GraphBuilder,
 ) -> ModelProto:
     """
-    Convert a SQL *query* to ONNX using a :class:`polars.LazyFrame` for schema
-    inference.
+    Convert a polars :class:`~polars.LazyFrame` to ONNX.
 
-    This is a convenience wrapper around :func:`sql_to_onnx` that extracts
-    ``input_dtypes`` automatically from the *schema* of *frame* (and
-    *right_frame* for JOIN queries) so that the caller does not need to spell
-    out the dtype mapping manually.
+    This is a convenience wrapper around :func:`sql_to_onnx` that accepts a
+    polars ``LazyFrame`` instead of a raw ``input_dtypes`` dict.
 
-    :param frame: a ``polars.LazyFrame`` or ``polars.DataFrame`` whose schema
-        defines the *left-table* column names and their dtypes.  The frame is
-        used only for schema inspection — it is **never collected or executed**.
-    :param query: a SQL string.  Supported clauses:
-        ``SELECT``, ``FROM``, ``[INNER|LEFT|RIGHT|FULL] JOIN … ON``,
-        ``WHERE``, ``GROUP BY``.
-        Custom Python functions can be called by name in the ``SELECT`` and
-        ``WHERE`` clauses when registered via *custom_functions*.
+    There are two calling conventions:
+
+    **Query-embedded** (preferred): pass a ``LazyFrame`` that was produced by
+    calling :meth:`polars.LazyFrame.sql` on a source frame.  The SQL query
+    and input schema are extracted automatically from the frame's logical plan.
+    No *query* argument is required::
+
+        import polars as pl
+        from yobx.sql import to_onnx
+
+        src = pl.LazyFrame({"a": pl.Series([1.0, 2.0, 3.0], dtype=pl.Float32),
+                            "b": pl.Series([4.0, 5.0, 6.0], dtype=pl.Float32)})
+        onx = to_onnx(src.sql("SELECT a + b AS total FROM self WHERE a > 1"))
+
+    **Explicit query**: pass the source frame together with a SQL string.  The
+    frame is used only for schema inference (never collected)::
+
+        onx = to_onnx(src, "SELECT a + b AS total FROM t WHERE a > 1")
+
+    :param frame: a ``polars.LazyFrame`` or ``polars.DataFrame``.  When
+        *query* is ``None`` the frame must have been created with
+        ``.sql(...)`` so that its logical plan encodes the query.  When
+        *query* is supplied the frame provides the input column schema.
+    :param query: an optional SQL string.  When ``None`` the query is
+        extracted from *frame*'s logical plan (see above).  When given,
+        *frame* must be the *source* frame that defines the input dtypes.
+        Supported clauses: ``SELECT``, ``FROM``,
+        ``[INNER|LEFT|RIGHT|FULL] JOIN … ON``, ``WHERE``, ``GROUP BY``.
+        Custom Python functions may be called by name when registered via
+        *custom_functions*.
     :param right_frame: an optional second ``polars.LazyFrame`` or
         ``polars.DataFrame`` whose schema defines the *right-table* column
-        dtypes for a ``JOIN`` query.  When ``None`` the left-table schema is
-        reused (matching the behaviour of :func:`sql_to_onnx`).
+        dtypes for an explicit JOIN *query*.  Ignored when *query* is
+        ``None`` (the join info is inferred from the plan).
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
     :param n_rows: optional static number of rows; used to fix the first
-        dimension of every input tensor.  When ``None`` the first dimension is
-        symbolic (``"N"``).
+        dimension of every input tensor.  When ``None`` the first dimension
+        is symbolic (``"N"``).
     :param custom_functions: an optional mapping from function name (as it
         appears in the SQL string) to a Python callable.  Each callable must
         accept one or more numpy arrays and return a numpy array.  The
@@ -295,15 +314,8 @@ def to_onnx(
         :class:`~yobx.xbuilder.GraphBuilder`.
     :return: a :class:`onnx.ModelProto` ready for inference.
     :raises ImportError: if *polars* is not installed.
-
-    Example::
-
-        import polars as pl
-        from yobx.sql import to_onnx
-
-        lf = pl.LazyFrame({"a": pl.Series([1.0, 2.0, 3.0], dtype=pl.Float32),
-                           "b": pl.Series([4.0, 5.0, 6.0], dtype=pl.Float32)})
-        onx = to_onnx(lf, "SELECT a + b AS total FROM t WHERE a > 1")
+    :raises ValueError: if *query* is ``None`` and the plan cannot be
+        converted to SQL.
 
     .. note::
 
@@ -312,10 +324,16 @@ def to_onnx(
         key) would require an ONNX ``Loop`` or custom kernel and are not
         yet supported.
     """
-    input_dtypes = polars_schema_to_input_dtypes(frame)
-    right_input_dtypes: Optional[Dict[str, np.dtype]] = None
-    if right_frame is not None:
-        right_input_dtypes = polars_schema_to_input_dtypes(right_frame)
+    if query is None:
+        # Extract SQL and input schema from the LazyFrame's logical plan
+        query, input_dtypes = polars_frame_to_sql(frame)
+        right_input_dtypes: Optional[Dict[str, np.dtype]] = None
+    else:
+        # Explicit query: frame provides input schema only
+        input_dtypes = polars_schema_to_input_dtypes(frame)
+        right_input_dtypes = None
+        if right_frame is not None:
+            right_input_dtypes = polars_schema_to_input_dtypes(right_frame)
     return sql_to_onnx(
         query,
         input_dtypes,

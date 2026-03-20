@@ -15,8 +15,13 @@ Public API
 * :func:`sql_to_onnx` — high-level entry point: SQL string → ONNX model
 * :func:`sql_to_onnx_graph` — low-level entry point: SQL string → nodes added
   to an existing :class:`~yobx.typing.GraphBuilderProtocol`
-* :func:`to_onnx` — convenience wrapper: ``polars.LazyFrame`` + SQL string →
-  ONNX model (dtypes are inferred from the frame schema)
+* :func:`to_onnx` — convenience wrapper: ``polars.LazyFrame`` → ONNX model.
+  The query is extracted automatically from the frame when the frame was
+  produced by :meth:`polars.LazyFrame.sql`, or can be supplied explicitly
+  as a second argument.
+* :func:`polars_frame_to_sql` — extract a SQL string and dtype map from a
+  ``polars.LazyFrame`` produced by ``.sql(...)`` (used internally by
+  :func:`to_onnx`, also available as a standalone utility)
 * :func:`polars_schema_to_input_dtypes` — extract a column-dtype mapping from
   a ``polars.LazyFrame`` or ``polars.DataFrame`` (used internally by
   :func:`to_onnx`, also available as a standalone utility)
@@ -56,13 +61,16 @@ polars example
     from yobx.sql import to_onnx
     from yobx.reference import ExtendedReferenceEvaluator
 
-    lf = pl.LazyFrame({"a": pl.Series([1.0, -2.0, 3.0], dtype=pl.Float32),
+    src = pl.LazyFrame({"a": pl.Series([1.0, -2.0, 3.0], dtype=pl.Float32),
                        "b": pl.Series([4.0,  5.0, 6.0], dtype=pl.Float32)})
-    onx = to_onnx(lf, "SELECT a + b AS total FROM t WHERE a > 0")
+    # Query embedded in the LazyFrame via .sql():
+    onx = to_onnx(src.sql("SELECT a + b AS total FROM self WHERE a > 0"))
+    # Or pass the query string explicitly:
+    # onx = to_onnx(src, "SELECT a + b AS total FROM t WHERE a > 0")
 """
 
 from .convert import sql_to_onnx, sql_to_onnx_graph, to_onnx
-from ._polars_helper import polars_schema_to_input_dtypes
+from ._polars_helper import polars_frame_to_sql, polars_schema_to_input_dtypes
 from .parse import (
     AggExpr,
     BinaryExpr,
@@ -93,6 +101,7 @@ __all__ = [
     "SelectItem",
     "SelectOp",
     "parse_sql",
+    "polars_frame_to_sql",
     "polars_schema_to_input_dtypes",
     "sql_to_onnx",
     "sql_to_onnx_graph",
