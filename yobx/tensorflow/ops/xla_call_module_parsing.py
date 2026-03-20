@@ -402,6 +402,32 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         all_special_spans.update(range(m.start(), m.end()))
 
     # ------------------------------------------------------------------
+    # 3g.5  stablehlo.convert  (type cast)
+    # ------------------------------------------------------------------
+    # Two syntactic forms:
+    #   %r = stablehlo.convert %src : (tensor<SRC>) -> tensor<TGT> loc(...)
+    #   %r = stablehlo.convert %src : tensor<TGT>                  loc(...)
+    convert_pattern = (
+        r"(%\w+)\s*=\s*stablehlo\.convert\s+(%\w+)"
+        r"\s*:\s*(?:\([^)]*\)\s*->)?\s*(tensor<[^>]+>)"
+        r"[^\n]*loc\(([^)]*)\)"
+    )
+    for m in re.finditer(convert_pattern, scan_text):
+        all_special_spans.update(range(m.start(), m.end()))
+        res_id = m.group(1)
+        operand = arg_alias.get(m.group(2), m.group(2))
+        tgt_type = m.group(3)
+        layers.append(
+            {
+                "id": res_id,
+                "op": "convert",
+                "operands": [operand],
+                "shape": tgt_type,
+                "loc": m.group(4),
+            }
+        )
+
+    # ------------------------------------------------------------------
     # 3h. stablehlo.compare  (existing logic, extended with span tracking)
     # ------------------------------------------------------------------
     compare_pattern = (
@@ -495,6 +521,8 @@ def parse_mlir(mlir_string: str) -> List[dict]:
       ``axes``.
     * ``"skip"`` – shape-only op (reshape of integer tensors, concatenate of
       integer tensors, get_dimension_size); should be ignored by the converter.
+    * ``"convert"`` – ``stablehlo.convert``; type cast; has ``shape`` set to
+      the target tensor type string (e.g. ``"tensor<f32>"``).
     * Any other name – direct StableHLO→ONNX op name (e.g. ``"sine"``,
       ``"add"``, ``"compare_GT"``).
     """
