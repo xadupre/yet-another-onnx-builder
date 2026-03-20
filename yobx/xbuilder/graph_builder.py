@@ -8797,7 +8797,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         # Let's rename the initializers.
         if fct.function.initializers_dict is not None:
-            assert fct.function.initializers_name, "type consistency"
+            assert fct.function.initializers_name is not None, "type consistency"
             assert len(fct.function.initializers_dict) == len(fct.function.initializers_name), (
                 f"Names mismatch between {fct.function.initializers_name} and "
                 f"{list(fct.function.initializers_dict)}{builder.get_debug_msg()}"
@@ -8809,7 +8809,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 )
                 repl[k] = new_name
             renaming = fct.function.initializers_renaming
-            assert renaming, "type consistency"
+            assert renaming is not None, "type consistency"
             new_inits = []
             for input_name in fct.function.initializers_name:
                 init_name = renaming[input_name]
