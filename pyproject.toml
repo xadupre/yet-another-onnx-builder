@@ -52,39 +52,18 @@ category_encoders = [
     "scikit-learn>=1.4",
     "category-encoders>=2.6",
 ]
-lightgbm = [
-    "scikit-learn>=1.4",
-    "lightgbm>=3.0",
-]
-sklearn = [
-    "scikit-learn>=1.4",
-]
-imblearn = [
-    "scikit-learn>=1.4",
-    "imbalanced-learn>=0.11",
-]
-xgboost = [
-    "scikit-learn>=1.4",
-    "xgboost>=3.0",
-]
-sksurv = [
-    "scikit-learn>=1.4",
-    "scikit-survival>=0.22",
-]
-spox = [
-    "spox>=0.12",
-]
-tensorflow = [
-    "jax",
-    "tensorflow>=2.20",
-]
-litert = [
-    "ai-edge-litert",
-]
-jax = [
-    "jax[cpu]>=0.4",
-    "tensorflow>=2.20",
-]
+
+# packages
+
+imblearn = ["scikit-learn>=1.4", "imbalanced-learn>=0.11"]
+jax = ["jax[cpu]>=0.4", "tensorflow>=2.20"]
+lightgbm = ["scikit-learn>=1.4", "lightgbm>=3.0"]
+litert = ["ai-edge-litert"]
+sklearn = ["scikit-learn>=1.4"]
+sksurv = ["scikit-learn>=1.4", "scikit-survival>=0.22"]
+spox = ["spox>=0.12"]
+statsmodels = ["scikit-learn>=1.4", "statsmodels"]
+tensorflow = ["jax", "tensorflow>=2.20"]
 torch = [
     "accelerate",
     "onnxscript @ git+https://github.com/microsoft/onnxscript.git",
@@ -97,6 +76,7 @@ transformers = [
     "scikit-learn",  # one function requires it to compute ROC curve
     "transformers>=4.45",
 ]
+xgboost = ["scikit-learn>=1.4", "xgboost>=3.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]

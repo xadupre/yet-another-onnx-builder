@@ -126,9 +126,7 @@ class TestStatsmodelsGLMConverter(ExtTestCase):
 
         y = np.abs(self._y_gaussian) + 0.5
         X_const = sm.add_constant(self._X)
-        result = sm.GLM(
-            y, X_const, family=families.Gamma(families.links.Log())
-        ).fit()
+        result = sm.GLM(y, X_const, family=families.Gamma(families.links.Log())).fit()
         self._check_glm(result, self._X)
 
     def test_wrapper_predict_matches_statsmodels(self):
