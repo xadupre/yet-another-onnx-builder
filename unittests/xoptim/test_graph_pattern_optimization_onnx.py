@@ -7877,7 +7877,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(patterns=["ExpandBroadcast"], verbose=10),
+            optimization_options=OptimizationOptions(patterns=["ShapeBasedExpandBroadcast"]),
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(
