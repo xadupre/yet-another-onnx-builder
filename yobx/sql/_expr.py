@@ -214,12 +214,7 @@ class _ExprEmitter:
 
         if func == "avg":
             sum_vals = g.op.ScatterElements(
-                zeros,
-                inv_idx,
-                arg_tensor,
-                reduction="add",
-                axis=0,
-                name=f"{name}_sum",
+                zeros, inv_idx, arg_tensor, reduction="add", axis=0, name=f"{name}_sum"
             )
             # Count per group using float32 ones so that the division stays in float
             n_rows = g.op.Gather(
@@ -238,12 +233,7 @@ class _ExprEmitter:
             )
             zeros_cnt = g.op.ConstantOfShape(n_groups_1d, name=f"{name}_zeros_cnt")
             cnt_vals = g.op.ScatterElements(
-                zeros_cnt,
-                inv_idx,
-                ones_f32,
-                reduction="add",
-                axis=0,
-                name=f"{name}_cnt",
+                zeros_cnt, inv_idx, ones_f32, reduction="add", axis=0, name=f"{name}_cnt"
             )
             sum_f32 = g.op.CastLike(sum_vals, cnt_vals, name=f"{name}_sum_f32")
             return g.op.Div(sum_f32, cnt_vals, name=name)  # type: ignore[return-value]
@@ -253,9 +243,7 @@ class _ExprEmitter:
         # ScatterElements scatters *all* rows (including each first-occurrence row),
         # the result is min/max over the full set of group values regardless of
         # the initial seed.
-        init_vals = g.op.Gather(
-            arg_tensor, first_idx, axis=0, name=f"{name}_init"
-        )
+        init_vals = g.op.Gather(arg_tensor, first_idx, axis=0, name=f"{name}_init")
 
         if func == "min":
             return g.op.ScatterElements(  # type: ignore[return-value]

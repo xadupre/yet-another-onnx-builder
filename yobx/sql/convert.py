@@ -48,7 +48,7 @@ from onnx import TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
-from ..typing import GraphBuilderProtocol
+from ..typing import GraphBuilderExtendedProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
 from .ops import get_sql_op_converter
@@ -76,7 +76,7 @@ def _np_dtype_to_onnx(dt: Union[np.dtype, type, str]) -> int:
 
 
 def sql_to_onnx_graph(
-    g: GraphBuilderProtocol,
+    g: GraphBuilderExtendedProtocol,
     sts: Optional[Dict],
     outputs: List[str],
     query: str,
@@ -269,9 +269,7 @@ def sql_to_onnx(
 
 
 def _build_group_by_tensors(
-    g: GraphBuilderProtocol,
-    group_op: GroupByOp,
-    col_map: Dict[str, str],
+    g: GraphBuilderExtendedProtocol, group_op: GroupByOp, col_map: Dict[str, str]
 ) -> Tuple[str, str, str, Dict[str, str]]:
     """Compute ONNX tensors for GROUP BY and return an updated column map.
 
@@ -348,16 +346,16 @@ def _build_group_by_tensors(
             )
             updated_col_map[c] = col_unique  # type: ignore[assignment]
 
-    return (
-        inverse_indices,  # type: ignore[return-value]
-        first_indices,  # type: ignore[return-value]
-        n_groups,  # type: ignore[return-value]
+    return (  # type: ignore[return-value]
+        inverse_indices,
+        first_indices,
+        n_groups,
         updated_col_map,
     )
 
 
 def _populate_graph(
-    g: GraphBuilderProtocol,
+    g: GraphBuilderExtendedProtocol,
     pq: ParsedQuery,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]],

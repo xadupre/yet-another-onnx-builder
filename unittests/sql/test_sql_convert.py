@@ -279,9 +279,7 @@ class TestSqlToOnnxGroupBy(ExtTestCase):
         dtypes = {"a": np.float32, "b": np.float32}
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([1.0, 2.0, 1.0], dtype=np.float32)
-        b_out, s = self._run(
-            "SELECT b, SUM(a) FROM t GROUP BY b", dtypes, {"a": a, "b": b}
-        )
+        b_out, s = self._run("SELECT b, SUM(a) FROM t GROUP BY b", dtypes, {"a": a, "b": b})
         # Unique b values (sorted): [1.0, 2.0]
         # group b=1 → SUM([1,3])=4, group b=2 → SUM([2])=2
         order = np.argsort(b_out)
@@ -294,9 +292,7 @@ class TestSqlToOnnxGroupBy(ExtTestCase):
         b = np.array([1.0, 2.0, 1.0, 2.0, 1.0], dtype=np.float32)
         c = np.array([1.0, 1.0, 2.0, 1.0, 1.0], dtype=np.float32)
         # Groups: (b=1,c=1)→[1,5]→sum=6, (b=1,c=2)→[3]→sum=3, (b=2,c=1)→[2,4]→sum=6
-        (s,) = self._run(
-            "SELECT SUM(a) FROM t GROUP BY b, c", dtypes, {"a": a, "b": b, "c": c}
-        )
+        (s,) = self._run("SELECT SUM(a) FROM t GROUP BY b, c", dtypes, {"a": a, "b": b, "c": c})
         expected = np.array([6.0, 3.0, 6.0], dtype=np.float32)
         self.assertEqualArray(np.sort(s), np.sort(expected), atol=1e-5)
 
@@ -308,9 +304,7 @@ class TestSqlToOnnxGroupBy(ExtTestCase):
         d = np.array([1.0, 2.0, 1.0, 1.0], dtype=np.float32)
         # Groups: (1,1,1)→[1]→1, (1,1,2)→[2]→2, (2,1,1)→[3]→3, (2,2,1)→[4]→4
         (s,) = self._run(
-            "SELECT SUM(a) FROM t GROUP BY b, c, d",
-            dtypes,
-            {"a": a, "b": b, "c": c, "d": d},
+            "SELECT SUM(a) FROM t GROUP BY b, c, d", dtypes, {"a": a, "b": b, "c": c, "d": d}
         )
         expected = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
         self.assertEqualArray(np.sort(s), np.sort(expected), atol=1e-5)
@@ -321,9 +315,7 @@ class TestSqlToOnnxGroupBy(ExtTestCase):
         b = np.array([1.0, 2.0, 1.0, 2.0, 1.0], dtype=np.float32)
         c = np.array([1.0, 1.0, 2.0, 1.0, 1.0], dtype=np.float32)
         b_out, c_out, s = self._run(
-            "SELECT b, c, SUM(a) FROM t GROUP BY b, c",
-            dtypes,
-            {"a": a, "b": b, "c": c},
+            "SELECT b, c, SUM(a) FROM t GROUP BY b, c", dtypes, {"a": a, "b": b, "c": c}
         )
         # Sort output by (b, c) for stable comparison
         order = np.lexsort((c_out, b_out))
