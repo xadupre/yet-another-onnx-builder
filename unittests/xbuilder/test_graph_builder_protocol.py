@@ -133,9 +133,8 @@ class TestGraphBuilderSatisfiesProtocol(ExtTestCase):
 
     def test_prefix_name_context_nested(self):
         g = GraphBuilder(18, ir_version=9)
-        with g.prefix_name_context("outer"):
-            with g.prefix_name_context("inner"):
-                name = g.unique_name("var")
+        with g.prefix_name_context("outer"), g.prefix_name_context("inner"):
+            name = g.unique_name("var")
         self.assertEqual(name, "outer__inner__var")
 
     def test_prefix_name_context_restores_on_exception(self):

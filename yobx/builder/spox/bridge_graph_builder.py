@@ -1,12 +1,12 @@
 from __future__ import annotations
-
 import collections
+import contextlib
 import importlib
 import inspect
 import typing
 import warnings
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -198,6 +198,7 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
         self._shape_map: Dict[str, DYNAMIC_SHAPE] = {}
         # Counter for auto-generated unique names
         self._unique_names: Set[str] = set()
+        self._prefix_stack: List[str] = []
         self._op = SpoxGraphBuilderOpset(self)
 
     # ------------------------------------------------------------------
@@ -216,6 +217,8 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
 
     def unique_name(self, prefix: str) -> str:
         """Returns a unique name derived from *prefix*."""
+        if self._prefix_stack:
+            prefix = f"{'__'.join(self._prefix_stack)}__{prefix}"
         if prefix not in self._unique_names:
             self._unique_names.add(prefix)
             return prefix
@@ -226,6 +229,23 @@ class SpoxGraphBuilder(GraphBuilderExtendedProtocol):
             candidate = f"{prefix}{i}"
         self._unique_names.add(candidate)
         return candidate
+
+    @contextlib.contextmanager
+    def prefix_name_context(self, prefix: str) -> Generator:
+        """Context manager that pushes *prefix* onto the prefix stack.
+
+        While active, :meth:`unique_name` prepends the joined stack to every
+        requested name so that all tensor names produced inside the block are
+        scoped to the current context.  The prefix is removed when the block
+        exits, even if an exception is raised.
+
+        :param prefix: scope prefix to push (e.g. a pipeline step name)
+        """
+        self._prefix_stack.append(prefix)
+        try:
+            yield
+        finally:
+            self._prefix_stack.pop()
 
     def set_type_shape_unary_op(
         self, name: str, input_name: str, itype: Optional[int] = None

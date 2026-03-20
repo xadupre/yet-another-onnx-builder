@@ -2401,7 +2401,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     def unique_name(self, prefix: str) -> str:
         "Returns a unique result name."
         if self._prefix_stack:
-            prefix = "__".join(self._prefix_stack) + "__" + prefix
+            prefix = f"{'__'.join(self._prefix_stack)}__{prefix}"
         if prefix in self._unique_names:
             i = 2
             sug = f"{prefix}2"
