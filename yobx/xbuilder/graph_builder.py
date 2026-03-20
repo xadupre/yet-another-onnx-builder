@@ -862,7 +862,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 return self.make_key(value.detach().cpu().numpy())
             return None
         if self._has_tensorflow and isinstance(
-            value, (self.tensorflow.Tensor, self.tensorflow.Variable)
+            value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
         ):
             return None
         return None
@@ -1439,7 +1439,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             return v
 
         if self._has_tensorflow and isinstance(
-            value, (self.tensorflow.Tensor, self.tensorflow.Variable)
+            value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
         ):
             raw = value.numpy()
             # Ensure we always return an ndarray (not a numpy scalar)
@@ -2832,7 +2832,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 f"for name {name!r}{self.get_debug_msg()}"
             )
         elif self._has_tensorflow and isinstance(
-            value, (self.tensorflow.Tensor, self.tensorflow.Variable)
+            value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
         ):
             # TensorFlow tensor/variable — keep as-is, convert to numpy at export time
             tf_shape = tuple(value.shape.as_list())
@@ -2888,7 +2888,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 if hasattr(value, "detach"):
                     size = int(np.prod(value.size()))  # type: ignore
                 elif self._has_tensorflow and isinstance(
-                    value, (self.tensorflow.Tensor, self.tensorflow.Variable)
+                    value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
                 ):
                     size = int(np.prod(shape)) if shape else 0
                 else:
@@ -4958,7 +4958,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             vshape = v.shape if hasattr(v, "shape") else tuple(v.dims)  # TensorProto
             # Normalize TF TensorShape to a plain Python tuple for safe comparison
             if self._has_tensorflow and isinstance(
-                v, (self.tensorflow.Tensor, self.tensorflow.Variable)
+                v, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
             ):
                 vshape = tuple(v.shape.as_list())
             assert not is_static_shape(shape) or shape == vshape, (
@@ -5081,7 +5081,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     continue
                 else:
                     if self._has_tensorflow and isinstance(
-                        v, (self.tensorflow.Tensor, self.tensorflow.Variable)
+                        v, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
                     ):
                         # TF tensor/variable — convert to numpy at export time
                         np_v = v.numpy()
@@ -5168,7 +5168,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 res.append(t)
                 continue
             if self._has_tensorflow and isinstance(
-                v, (self.tensorflow.Tensor, self.tensorflow.Variable)
+                v, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
             ):
                 # TF tensor/variable — convert to numpy at export time
                 np_v = v.numpy()

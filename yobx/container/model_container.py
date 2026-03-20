@@ -109,7 +109,9 @@ class ExtendedModelContainer(ModelContainer):
             try:
                 import tensorflow as _tf
 
-                if isinstance(np_tensor, (_tf.Tensor, _tf.Variable)):
+                if hasattr(_tf, "__version__") and isinstance(
+                    np_tensor, (_tf.Tensor, _tf.Variable)
+                ):
                     begin = time.perf_counter()
                     tensor_bytes = np_tensor.numpy().tobytes()
                     self._stats["time_export_tobytes"] += time.perf_counter() - begin

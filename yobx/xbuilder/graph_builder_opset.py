@@ -153,7 +153,7 @@ class Opset:
             if isinstance(i, str):
                 new_inputs.append(i)
             elif self.builder._has_tensorflow and isinstance(  # type: ignore[attr-defined]
-                i, (self.builder.tensorflow.Tensor, self.builder.tensorflow.Variable)
+                i, (self.builder.tensorflow.Tensor, self.builder.tensorflow.Variable)  # type: ignore
             ):  # type: ignore[attr-defined]
                 # TensorFlow tensor/variable — register as initializer, convert at export time
                 tf_shape = tuple(i.shape.as_list())
