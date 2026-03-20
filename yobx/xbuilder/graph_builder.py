@@ -302,6 +302,15 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 self._has_torch = False
                 self.torch = None
 
+        try:
+            import tensorflow as _tf
+
+            self._has_tf = True
+            self.tf = _tf
+        except (ImportError, AttributeError):
+            self._has_tf = False
+            self.tf = None
+
         from . import TEMPLATE_TYPE
 
         self.TEMPLATE_TYPE = TEMPLATE_TYPE
@@ -847,6 +856,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         if self._has_torch and isinstance(value, self.torch.Tensor):  # type: ignore
             if value.dtype == self.torch.int64 and value.numel() < 8:  # type: ignore
                 return self.make_key(value.detach().cpu().numpy())
+            return None
+        if self._has_tf and isinstance(value, (self.tf.Tensor, self.tf.Variable)):  # type: ignore
             return None
         return None
 
@@ -1418,6 +1429,19 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 print(
                     f"[GraphBuilder-{self._hash()}.get_constant] "
                     f"  L: nptorch.Tensor {v.shape}, {v.dtype}"
+                )
+            return v
+
+        if self._has_tf and isinstance(value, (self.tf.Tensor, self.tf.Variable)):  # type: ignore
+            raw = value.numpy()
+            # Ensure we always return an ndarray (not a numpy scalar)
+            v = raw if isinstance(raw, np.ndarray) else np.array(raw)
+            self.constants_computed_[name] = v
+            assert not multiple_outputs, f"Multiple output is not allowed for name={name!r}"
+            if self._debug_get_constant:
+                print(
+                    f"[GraphBuilder-{self._hash()}.get_constant] "
+                    f"  TF: EagerTensor {v.shape}, {v.dtype}"
                 )
             return v
 
@@ -2799,6 +2823,13 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 f"Shape {value.shape} does not match the registered one {self.get_shape(name)} "
                 f"for name {name!r}{self.get_debug_msg()}"
             )
+        elif self._has_tf and isinstance(value, (self.tf.Tensor, self.tf.Variable)):  # type: ignore
+            # TensorFlow tensor/variable — keep as-is, convert to numpy at export time
+            tf_shape = tuple(value.shape.as_list())
+            assert not self.has_shape(name) or self.get_shape(name) == tf_shape, (
+                f"Shape {tf_shape} does not match the registered one {self.get_shape(name)} "
+                f"for name {name!r}{self.get_debug_msg()}"
+            )
         else:
             raise RuntimeError(
                 f"Initializer name={name!r}, "
@@ -2844,7 +2875,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 assert hasattr(
                     value, "shape"
                 ), f"value {name!r} is not a Tensor but {type(value)}"
-                size = int(np.prod(value.size())) if hasattr(value, "detach") else int(value.size)  # type: ignore
+                if hasattr(value, "detach"):
+                    size = int(np.prod(value.size()))  # type: ignore
+                elif self._has_tf and isinstance(value, (self.tf.Tensor, self.tf.Variable)):  # type: ignore
+                    size = int(np.prod(shape)) if shape else 0
+                else:
+                    size = int(value.size)  # type: ignore
                 sh2 = (
                     "_".join(map(str, value.reshape((-1,)).tolist()))  # type: ignore
                     if size <= 5 and value.dtype == np.int64  # type: ignore
@@ -4908,6 +4944,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             itype = self.get_type(k)
             shape = self.get_shape(k)
             vshape = v.shape if hasattr(v, "shape") else tuple(v.dims)  # TensorProto
+            # Normalize TF TensorShape to a plain Python tuple for safe comparison
+            if self._has_tf and isinstance(v, (self.tf.Tensor, self.tf.Variable)):  # type: ignore
+                vshape = tuple(v.shape.as_list())
             assert not is_static_shape(shape) or shape == vshape, (
                 f"Unexpected shape for initializer {k!r}, shape={shape!r}, itype={itype}, "
                 f"initializer shape={v.shape}, dtype={v.dtype}, "
@@ -5027,6 +5066,18 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     initializer.append(t)
                     continue
                 else:
+                    if self._has_tf and isinstance(v, (self.tf.Tensor, self.tf.Variable)):  # type: ignore
+                        # TF tensor/variable — convert to numpy at export time
+                        np_v = v.numpy()
+                        t = TensorProto()
+                        t.name = k
+                        t.dims.extend(np_v.shape)
+                        t.data_type = dtype_to_tensor_dtype(v.dtype)
+                        t.raw_data = np_v.tobytes()
+                        if hasattr(t, "doc_string"):
+                            t.doc_string += doc_string
+                        initializer.append(t)
+                        continue
                     assert self._has_torch and isinstance(
                         v, self.torch.Tensor  # type: ignore
                     ), f"tensor {k!r} has un unexpected type {type(v)}"
@@ -5097,6 +5148,13 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if self._has_torch and isinstance(v, self.torch.Tensor):  # type: ignore
                 # no string tensor
                 t = self.from_array(v, name=k)  # type: ignore[attr-defined]
+                t.doc_string += doc_string
+                res.append(t)
+                continue
+            if self._has_tf and isinstance(v, (self.tf.Tensor, self.tf.Variable)):  # type: ignore
+                # TF tensor/variable — convert to numpy at export time
+                np_v = v.numpy()
+                t = onh.from_array(np_v, name=k)
                 t.doc_string += doc_string
                 res.append(t)
                 continue

@@ -152,6 +152,21 @@ class Opset:
             ), f"Wrong inputs for operator {op_type!r}: {inputs!r}"
             if isinstance(i, str):
                 new_inputs.append(i)
+            elif (
+                self.builder._has_tf  # type: ignore[attr-defined]
+                and isinstance(i, (self.builder.tf.Tensor, self.builder.tf.Variable))  # type: ignore[attr-defined]
+            ):
+                # TensorFlow tensor/variable — register as initializer, convert at export time
+                tf_shape = tuple(i.shape.as_list())
+                has_zero = 0 in tf_shape
+                cst_name = self.builder.make_initializer(
+                    "",
+                    i,
+                    msg=f"tf tensor input of op_type={op_type!r}",
+                    source="Opset.make_node/TF",
+                    allow_empty=allow_empty_shape or has_zero,
+                )
+                new_inputs.append(cst_name)
             elif hasattr(i, "name") and not hasattr(i, "detach"):
                 # torch.fx.Node
                 assert i.name is not None, f"Unexpected name for type {type(i)}"
