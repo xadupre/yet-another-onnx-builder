@@ -24,9 +24,10 @@ so the example runs without a GPU.
 
 Run with pre-trained weights (default) or a randomly initialised model::
 
-    python plot_llm_to_onnx.py                        # pre-trained weights (default)
-    python plot_llm_to_onnx.py --no-trained           # random weights — fast, no large download
-    python plot_llm_to_onnx.py --num-hidden-layers 2  # use only 2 transformer layers
+    python plot_llm_to_onnx.py                                  # pre-trained weights (default)
+    python plot_llm_to_onnx.py --no-trained                     # random weights — fast, no large download
+    python plot_llm_to_onnx.py --num-hidden-layers 2            # use only 2 transformer layers
+    python plot_llm_to_onnx.py --model Qwen/Qwen2-0.5B-Instruct # use a different model
 
 When ``--trained`` is given (the default) the full checkpoint is downloaded
 (~hundreds of MB) and the exported ONNX model produces meaningful text.
@@ -72,8 +73,23 @@ from yobx.torch import (
 # ``--num-hidden-layers`` overrides the number of transformer decoder blocks in
 # the config before the model is built.  Use a small value (e.g. ``2``) to
 # speed up export and reduce memory during development.
+#
+# ``--model`` selects the HuggingFace model ID to use (default:
+# ``arnir0/Tiny-LLM``).  Any :epkg:`AutoModelForCausalLM`-compatible model
+# can be passed here.
+
+_DEFAULT_MODEL = "arnir0/Tiny-LLM"
 
 parser = argparse.ArgumentParser(description="Export a HuggingFace LLM to ONNX.")
+parser.add_argument(
+    "--model",
+    default=_DEFAULT_MODEL,
+    metavar="MODEL_ID",
+    help=(
+        f"HuggingFace model ID to export (default: {_DEFAULT_MODEL!r}). "
+        "Any AutoModelForCausalLM-compatible model can be used."
+    ),
+)
 parser.add_argument(
     "--trained",
     action=argparse.BooleanOptionalAction,
@@ -109,7 +125,7 @@ args, _ = parser.parse_known_args(sys.argv[1:])
 # Pass ``--no-trained`` to use random weights instead (much faster, no large
 # download).
 
-MODEL_NAME = "arnir0/Tiny-LLM"
+MODEL_NAME = args.model
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 config = AutoConfig.from_pretrained(MODEL_NAME)
 
