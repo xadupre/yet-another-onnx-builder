@@ -33,7 +33,7 @@ class TestSklearnLinearSVC(ExtTestCase):
             clf.fit(Xd, y)
             onx = to_onnx(clf, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
 
             sess = self.check_ort(onx)
@@ -74,7 +74,7 @@ class TestSklearnLinearSVR(ExtTestCase):
             reg.fit(Xd, y)
             onx = to_onnx(reg, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
 
             sess = self.check_ort(onx)
@@ -115,7 +115,7 @@ class TestSklearnSVC(ExtTestCase):
         onx = to_onnx(clf, (X,))
 
         expected_n_outputs = 2 if probability else 1
-        output_names = [o.name for o in onx.graph.output]
+        output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(
             len(output_names), expected_n_outputs, f"Expected {expected_n_outputs} outputs"
         )
@@ -177,7 +177,7 @@ class TestSklearnNuSVC(ExtTestCase):
         onx = to_onnx(clf, (X,))
 
         expected_n_outputs = 2 if probability else 1
-        output_names = [o.name for o in onx.graph.output]
+        output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), expected_n_outputs)
 
         sess = self.check_ort(onx)
@@ -212,7 +212,7 @@ class TestSklearnSVR(ExtTestCase):
         reg.fit(X, y)
         onx = to_onnx(reg, (X,))
 
-        output_names = [o.name for o in onx.graph.output]
+        output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 1)
 
         sess = self.check_ort(onx)
@@ -251,7 +251,7 @@ class TestSklearnNuSVR(ExtTestCase):
         reg.fit(X, y)
         onx = to_onnx(reg, (X,))
 
-        output_names = [o.name for o in onx.graph.output]
+        output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 1)
 
         sess = self.check_ort(onx)

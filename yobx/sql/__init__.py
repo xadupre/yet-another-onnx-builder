@@ -12,7 +12,8 @@ containing an ordered list of :class:`~yobx.sql.parse.SqlOperation` objects
 
 Public API
 ----------
-* :func:`sql_to_onnx` — high-level entry point: SQL string → ONNX model
+* :func:`sql_to_onnx` — high-level entry point: SQL string →
+  :class:`~yobx.container.ExportArtifact`
 * :func:`sql_to_onnx_graph` — low-level entry point: SQL string → nodes added
   to an existing :class:`~yobx.typing.GraphBuilderProtocol`
 * :func:`to_onnx` — convenience wrapper: ``polars.LazyFrame`` → ONNX model.
@@ -42,12 +43,12 @@ Example
     from yobx.reference import ExtendedReferenceEvaluator
 
     dtypes = {"a": np.float32, "b": np.float32}
-    onx = sql_to_onnx(
+    artifact = sql_to_onnx(
         "SELECT a + b AS total FROM t WHERE a > 0",
         dtypes,
     )
 
-    ref = ExtendedReferenceEvaluator(onx)
+    ref = ExtendedReferenceEvaluator(artifact)
     a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
     b = np.array([4.0,  5.0, 6.0], dtype=np.float32)
     (total,) = ref.run(None, {"a": a, "b": b})

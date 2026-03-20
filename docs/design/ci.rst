@@ -54,7 +54,10 @@ checks that run on every push:
      - Builds and uploads the Python package (``python -m build``).
    * - ``docs.yml``
      - Builds the Sphinx documentation (triggered by ``.rst`` / ``.md``
-       changes only).
+       changes only).  TensorFlow gallery examples are built first in a
+       dedicated single-threaded pass
+       (``sphinx_gallery_conf.filename_pattern=/tensorflow/``), then the
+       full documentation is built in a second pass.
    * - ``mypy.yml``
      - Static type-checking of the whole ``yobx/`` package.
    * - ``style.yml``

@@ -33,7 +33,7 @@ jobs:
         run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*"
 
       - name: Install dependencies
-        run: pip install -e ".[category_encoders,dev,imblearn,lightgbm,sklearn,sksurv,xgboost]"
+        run: pip install -e ".[category_encoders,dev,imblearn,lightgbm,sklearn,sksurv,statsmodels,xgboost]"
 
       - name: Install scikit-learn==${{ matrix.sklearn-version }} again
         run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*" && pip freeze

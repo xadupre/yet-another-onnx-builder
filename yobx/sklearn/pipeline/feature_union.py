@@ -74,27 +74,30 @@ def sklearn_feature_union(
 
         is_container = isinstance(transformer, (Pipeline, ColumnTransformer, FeatureUnion))
         if function_options and function_options.export_as_function and not is_container:
-            _wrap_step_as_function(
-                g,  # type: ignore
-                function_options,
-                transformer,
-                [X],
-                sub_outputs,
-                fct,
-                step_node_name,
-            )
+            with g.prefix_name_context(step_node_name):
+                _wrap_step_as_function(
+                    g,  # type: ignore
+                    function_options,
+                    transformer,
+                    [X],
+                    sub_outputs,
+                    fct,
+                    step_node_name,
+                )
         elif is_container:
-            fct(
-                g,
-                sts,
-                sub_outputs,
-                transformer,
-                X,
-                name=step_node_name,
-                function_options=function_options,
-            )
+            with g.prefix_name_context(step_node_name):
+                fct(
+                    g,
+                    sts,
+                    sub_outputs,
+                    transformer,
+                    X,
+                    name=step_node_name,
+                    function_options=function_options,
+                )
         else:
-            fct(g, sts, sub_outputs, transformer, X, name=step_node_name)
+            with g.prefix_name_context(step_node_name):
+                fct(g, sts, sub_outputs, transformer, X, name=step_node_name)
         parts.append(sub_outputs[0])
 
     if not parts:
@@ -108,5 +111,4 @@ def sklearn_feature_union(
     else:
         res = g.op.Concat(*parts, axis=-1, name=name, outputs=outputs)
 
-    assert isinstance(res, str)
     return res

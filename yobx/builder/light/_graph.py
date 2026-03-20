@@ -1,7 +1,14 @@
 from enum import IntEnum
 from typing import Any, Dict, List, Optional, Union
 import numpy as np
-from onnx import NodeProto, SparseTensorProto, TensorProto, TensorShapeProto, ValueInfoProto
+from onnx import (
+    ModelProto,
+    NodeProto,
+    SparseTensorProto,
+    TensorProto,
+    TensorShapeProto,
+    ValueInfoProto,
+)
 from onnx.checker import check_model
 from onnx.defs import onnx_opset_version
 from onnx.helper import make_graph, make_model, make_node, make_opsetid, make_tensor_value_info
@@ -352,7 +359,7 @@ class OnnxGraph:
             obj.output.extend(new_outputs)
         return obj
 
-    def to_onnx(self):
+    def to_onnx(self) -> ModelProto:
         """
         Builds and returns the ONNX proto.
 

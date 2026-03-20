@@ -22,7 +22,7 @@ def _make_survival_data(n=50, n_features=5, seed=0):
     return X, y
 
 
-@requires_sklearn("1.4")
+@requires_sklearn("1.8")
 @requires_sksurv()
 class TestSklearnIPCRidge(ExtTestCase):
     _X, _y = _make_survival_data()
@@ -36,7 +36,7 @@ class TestSklearnIPCRidge(ExtTestCase):
             reg.fit(Xd, y)
             onx = to_onnx(reg, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)

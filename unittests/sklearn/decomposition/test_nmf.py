@@ -28,7 +28,7 @@ class TestNMF(ExtTestCase):
 
         onx = to_onnx(nmf, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("MatMul", op_types)
         self.assertIn("Loop", op_types)
 

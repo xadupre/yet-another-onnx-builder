@@ -29,7 +29,7 @@ class TestTfidfVectorizer(ExtTestCase):
         X_padded = _pad_tokens(texts)
         onx = to_onnx(tv, (X_padded,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TfIdfVectorizer", op_types)
         self.assertIn("Mul", op_types)  # IDF weighting
         self.assertIn("ReduceL2", op_types)  # L2 normalisation
@@ -76,7 +76,7 @@ class TestTfidfVectorizer(ExtTestCase):
         X_padded = _pad_tokens(texts)
         onx = to_onnx(tv, (X_padded,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Log", op_types)
         self.assertIn("Where", op_types)
 
@@ -101,7 +101,7 @@ class TestTfidfVectorizer(ExtTestCase):
         X_padded = _pad_tokens(texts)
         onx = to_onnx(tv, (X_padded,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceL1", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)

@@ -15,9 +15,9 @@ Command Lines
     :maxdepth: 1
 
     agg
-    copilot_draft
     dot
     find
     partition
     print
+    render_gallery
     run_doc_examples

@@ -364,7 +364,7 @@ class TestNumpyArray(ExtTestCase):
         g.make_tensor_input("X", TensorProto.FLOAT, ("batch", 3))
         trace_numpy_function(g, {}, ["output_0"], f, ["X"])
         g.make_tensor_output("output_0", indexed=False, allow_untyped_output=True)
-        onx, _ = g.to_onnx(return_optimize_report=True)
+        onx = g.to_onnx(return_optimize_report=True)
 
         X = np.random.randn(4, 3).astype(np.float32)
         ref = ExtendedReferenceEvaluator(onx)

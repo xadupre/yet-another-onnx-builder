@@ -328,7 +328,7 @@ def _make_exporter_onnx(
             opts["decomposition_table"] = "all" if "-decall" in exporter else "default"
         try:
             if verbose >= 2:
-                onx, builder = to_onnx(
+                art = to_onnx(
                     model,
                     inputs,
                     dynamic_shapes=dynamic_shapes,
@@ -340,7 +340,7 @@ def _make_exporter_onnx(
                     contextlib.redirect_stdout(io.StringIO()),
                     contextlib.redirect_stderr(io.StringIO()),
                 ):
-                    onx, builder = to_onnx(
+                    art = to_onnx(
                         model,
                         inputs,
                         dynamic_shapes=dynamic_shapes,
@@ -356,7 +356,7 @@ def _make_exporter_onnx(
                     f"exporter={exporter!r}"
                 ) from e
             return dict(error=str(e), success=0, error_step="export")
-        return onx, builder
+        return art.get_proto(include_weights=True), art.builder
 
     if exporter == "dynamo":
         import torch
@@ -560,7 +560,9 @@ def run_exporter(
                 else pretty_onnx(onx)
             )
         if verbose >= 2:
-            onnx.save(onx, f"evaluation-{model.__class__.__name__}-{dynamic}-{exporter}.onnx")
+            onnx.save(
+                onx.proto, f"evaluation-{model.__class__.__name__}-{dynamic}-{exporter}.onnx"
+            )
 
         names = [i.name for i in onx.graph.input]
         flats = _flatten_inputs(inputs[0]) if len(names) > len(inputs[0]) else inputs[0]
@@ -582,6 +584,7 @@ def run_exporter(
 
         import onnxruntime
 
+        assert hasattr(onx, "SerializeToString"), f"unexpected type {type(onx)} for onx"
         try:
             sess = onnxruntime.InferenceSession(
                 onx.SerializeToString(), providers=["CPUExecutionProvider"]

@@ -16,7 +16,7 @@ class TestSimpleImputer(ExtTestCase):
 
         onx = to_onnx(imp, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("IsNaN", op_types)
         self.assertIn("Where", op_types)
 
@@ -96,7 +96,7 @@ class TestSimpleImputer(ExtTestCase):
 
         onx = to_onnx(imp, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
         self.assertIn("Where", op_types)
         self.assertNotIn("IsNaN", op_types)
@@ -134,7 +134,7 @@ class TestSimpleImputer(ExtTestCase):
 
         onx = to_onnx(pipe, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("IsNaN", op_types)
         self.assertIn("Where", op_types)
         self.assertIn("Gemm", op_types)

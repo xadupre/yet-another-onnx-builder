@@ -29,7 +29,7 @@ class TestCountVectorizer(ExtTestCase):
         X_padded = _pad_tokens(texts)
         onx = to_onnx(cv, (X_padded,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TfIdfVectorizer", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)

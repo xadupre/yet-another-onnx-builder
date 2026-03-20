@@ -1,14 +1,7 @@
-/* Make the logo bigger in piccolo_theme. */
-img.logo {
-  width: 200px;
-  max-width: 100%;
-}
-
-/* Fix sphinx-gallery output visibility in piccolo_theme dark mode.
-   piccolo_theme uses :root[data-mode=dark/darkest] while sphinx-gallery
+/* Fix sphinx-gallery output visibility in pydata_sphinx_theme dark mode.
+   pydata_sphinx_theme sets data-bs-theme="dark" on <html> while sphinx-gallery
    only defines its dark CSS variables for html/body[data-theme=dark]. */
-:root[data-mode=dark],
-:root[data-mode=darkest] {
+html[data-bs-theme=dark] {
   --sg-script-out: rgb(179, 179, 179);
   --sg-script-pre: #2e2e22;
   --sg-pytb-foreground: #fff;
@@ -41,45 +34,36 @@ img.logo {
 /* Mermaid dark-mode node colours.
    These classes are defined via classDef in each diagram and need to be
    overridden here rather than via inline styles so that theme switching works.
-   piccolo_theme signals dark mode via data-mode="dark" or "darkest" on <html>.
+   pydata_sphinx_theme signals dark mode via data-bs-theme="dark" on <html>.
 
    Colour rationale (dark-theme counterparts of the light-theme classDef colours):
      constNode  – deep rose fill / light pink stroke  (light: #f9f pink)
      opNode     – deep navy fill / light blue stroke   (light: #bbf blue)
      ioNode     – deep forest fill / light green stroke (light: #dfd green)
 */
-:root[data-mode=dark] .mermaid .constNode rect,
-:root[data-mode=dark] .mermaid .constNode polygon,
-:root[data-mode=darkest] .mermaid .constNode rect,
-:root[data-mode=darkest] .mermaid .constNode polygon {
+html[data-bs-theme=dark] .mermaid .constNode rect,
+html[data-bs-theme=dark] .mermaid .constNode polygon {
     fill: #5c2040 !important;
     stroke: #cc88aa !important;
 }
 
-:root[data-mode=dark] .mermaid .opNode rect,
-:root[data-mode=dark] .mermaid .opNode polygon,
-:root[data-mode=darkest] .mermaid .opNode rect,
-:root[data-mode=darkest] .mermaid .opNode polygon {
+html[data-bs-theme=dark] .mermaid .opNode rect,
+html[data-bs-theme=dark] .mermaid .opNode polygon {
     fill: #1e2a5e !important;
     stroke: #8898dd !important;
 }
 
-:root[data-mode=dark] .mermaid .ioNode rect,
-:root[data-mode=dark] .mermaid .ioNode polygon,
-:root[data-mode=darkest] .mermaid .ioNode rect,
-:root[data-mode=darkest] .mermaid .ioNode polygon {
+html[data-bs-theme=dark] .mermaid .ioNode rect,
+html[data-bs-theme=dark] .mermaid .ioNode polygon {
     fill: #1a4a1a !important;
     stroke: #88cc88 !important;
 }
 
-:root[data-mode=dark] .mermaid .node .label,
-:root[data-mode=dark] .mermaid .nodeLabel,
-:root[data-mode=darkest] .mermaid .node .label,
-:root[data-mode=darkest] .mermaid .nodeLabel {
+html[data-bs-theme=dark] .mermaid .node .label,
+html[data-bs-theme=dark] .mermaid .nodeLabel {
     color: #ddd !important;
 }
 
-:root[data-mode=dark] .mermaid text,
-:root[data-mode=darkest] .mermaid text {
+html[data-bs-theme=dark] .mermaid text {
     fill: #ddd !important;
 }

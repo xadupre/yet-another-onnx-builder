@@ -126,5 +126,4 @@ def sklearn_patch_extractor(
         new_shape = np.array([-1, ph, pw, c], dtype=np.int64)
 
     result = g.op.Reshape(all_patches, new_shape, name=name, outputs=outputs)
-    assert isinstance(result, str)
     return result

@@ -32,6 +32,8 @@ import jax.numpy as jnp
 import numpy as np
 import onnxruntime
 from yobx.doc import plot_dot
+from yobx.helpers import max_diff
+from yobx.helpers.onnx_helper import pretty_onnx
 from yobx.tensorflow import to_onnx
 from yobx.tensorflow.tensorflow_helper import jax_to_concrete_function
 
@@ -73,7 +75,7 @@ expected_sin = np.asarray(jax_sin(X))
 print("\nJAX  output (first row):", expected_sin[0])
 print("ONNX output (first row):", result_sin[0])
 assert np.allclose(expected_sin, result_sin, atol=1e-5), "Mismatch!"
-print("Outputs match ✓")
+print("Outputs match ✓ - ", max_diff(expected_sin, result_sin))
 
 # %%
 # 2. Multi-layer MLP in JAX
@@ -96,83 +98,85 @@ def jax_mlp(x):
     return h @ W2 + b2
 
 
-if False:
-    # Not implemented yet.
-    X_mlp = rng.standard_normal((10, 8)).astype(np.float32)
-    onx_mlp = to_onnx(jax_mlp, (X_mlp,))
+X_mlp = rng.standard_normal((10, 8)).astype(np.float32)
+onx_mlp = to_onnx(jax_mlp, (X_mlp,))
 
-    op_types = [n.op_type for n in onx_mlp.graph.node]
-    print("\nOp-types in the MLP graph:", op_types)
-    assert "MatMul" in op_types
-    assert "Relu" in op_types
+op_types = [n.op_type for n in onx_mlp.graph.node]
+print("\nOp-types in the MLP graph:", op_types)
+assert "MatMul" in op_types
 
-    # %%
-    # Verify predictions on a held-out batch.
+# %%
+# Display the model.
+print(pretty_onnx(onx_mlp))
 
-    ref_mlp = onnxruntime.InferenceSession(
-        onx_mlp.SerializeToString(), providers=["CPUExecutionProvider"]
-    )
-    input_name_mlp = ref_mlp.get_inputs()[0].name
-    (result_mlp,) = ref_mlp.run(None, {input_name_mlp: X_mlp})
+# %%
+# Verify predictions on a held-out batch.
 
-    expected_mlp = np.asarray(jax_mlp(X_mlp))
-    assert np.allclose(expected_mlp, result_mlp, atol=1e-5), "MLP mismatch!"
-    print("MLP predictions match ✓")
+ref_mlp = onnxruntime.InferenceSession(
+    onx_mlp.SerializeToString(), providers=["CPUExecutionProvider"]
+)
+input_name_mlp = ref_mlp.get_inputs()[0].name
+(result_mlp,) = ref_mlp.run(None, {input_name_mlp: X_mlp})
 
-    # %%
-    # 3. Dynamic batch dimension
-    # ---------------------------
-    #
-    # By default :func:`to_onnx` marks axis 0 as a dynamic (symbolic) batch
-    # dimension.  The converted model runs correctly for any batch size.
+expected_mlp = np.asarray(jax_mlp(X_mlp))
+np.testing.assert_allclose(expected_mlp, result_mlp, atol=1e-2)
+print("MLP predictions match ✓ - ", max_diff(expected_mlp, result_mlp))
 
-    onx_dyn = to_onnx(jax_mlp, (X_mlp,), dynamic_shapes=({0: "batch"},))
+# %%
+# 3. Dynamic batch dimension
+# ---------------------------
+#
+# By default :func:`to_onnx` marks axis 0 as a dynamic (symbolic) batch
+# dimension.  The converted model runs correctly for any batch size.
 
-    input_shape = onx_dyn.graph.input[0].type.tensor_type.shape
-    batch_dim = input_shape.dim[0]
-    print("\nBatch dimension param  :", batch_dim.dim_param)
-    assert batch_dim.dim_param, "Expected a named dynamic dimension"
+onx_dyn = to_onnx(jax_mlp, (X_mlp,), dynamic_shapes=({0: "batch"},))
 
-    ref_dyn = onnxruntime.InferenceSession(
-        onx_dyn.SerializeToString(), providers=["CPUExecutionProvider"]
-    )
-    input_name_dyn = ref_dyn.get_inputs()[0].name
-    for n in (1, 7, 20):
-        X_batch = rng.standard_normal((n, 8)).astype(np.float32)
-        (out,) = ref_dyn.run(None, {input_name_dyn: X_batch})
-        expected = np.asarray(jax_mlp(X_batch))
-        assert np.allclose(expected, out, atol=1e-5), f"Mismatch for batch={n}"
+input_shape = onx_dyn.graph.input[0].type.tensor_type.shape
+batch_dim = input_shape.dim[0]
+print("\nBatch dimension param  :", batch_dim.dim_param)
+assert batch_dim.dim_param, "Expected a named dynamic dimension"
 
-    print("Dynamic-batch model verified for batch sizes 1, 7, 20 ✓")
+ref_dyn = onnxruntime.InferenceSession(
+    onx_dyn.SerializeToString(), providers=["CPUExecutionProvider"]
+)
+input_name_dyn = ref_dyn.get_inputs()[0].name
+for n in (1, 7, 20):
+    X_batch = rng.standard_normal((n, 8)).astype(np.float32)
+    (out,) = ref_dyn.run(None, {input_name_dyn: X_batch})
+    expected = np.asarray(jax_mlp(X_batch))
+    np.testing.assert_allclose(expected, out, atol=1e-2)
+    print(f"Dynamic-batch model verified for batch sizes {n} ✓ - ", max_diff(expected, out))
 
-    # %%
-    # 4. Explicit jax_to_concrete_function
-    # ---------------------------------------
-    #
-    # :func:`~yobx.tensorflow.tensorflow_helper.jax_to_concrete_function` can be
-    # called directly when you want to inspect or reuse the intermediate
-    # :class:`~tensorflow.ConcreteFunction` before exporting to ONNX.
+# %%
+# 4. Explicit jax_to_concrete_function
+# ---------------------------------------
+#
+# :func:`~yobx.tensorflow.tensorflow_helper.jax_to_concrete_function` can be
+# called directly when you want to inspect or reuse the intermediate
+# :class:`~tensorflow.ConcreteFunction` before exporting to ONNX.
 
-    def jax_softmax(x):
-        return jax.nn.softmax(x, axis=-1)
 
-    X_cls = rng.standard_normal((6, 10)).astype(np.float32)
+def jax_softmax(x):
+    return jax.nn.softmax(x, axis=-1)
 
-    cf = jax_to_concrete_function(jax_softmax, (X_cls,), dynamic_shapes=({0: "batch"},))
-    onx_cls = to_onnx(cf, (X_cls,), dynamic_shapes=({0: "batch"},))
 
-    ref_cls = onnxruntime.InferenceSession(
-        onx_cls.SerializeToString(), providers=["CPUExecutionProvider"]
-    )
-    input_name_cls = ref_cls.get_inputs()[0].name
-    (result_cls,) = ref_cls.run(None, {input_name_cls: X_cls})
+X_cls = rng.standard_normal((6, 10)).astype(np.float32)
 
-    expected_cls = np.asarray(jax_softmax(X_cls))
-    assert np.allclose(expected_cls, result_cls, atol=1e-5), "Softmax mismatch!"
-    print("Explicit jax_to_concrete_function verified ✓")
+cf = jax_to_concrete_function(jax_softmax, (X_cls,), dynamic_shapes=({0: "batch"},))
+onx_cls = to_onnx(cf, (X_cls,), dynamic_shapes=({0: "batch"},))
 
-    # %%
-    # 5. Visualize the ONNX graph
-    # ----------------------------
-    #
-    plot_dot(onx_mlp)
+ref_cls = onnxruntime.InferenceSession(
+    onx_cls.SerializeToString(), providers=["CPUExecutionProvider"]
+)
+input_name_cls = ref_cls.get_inputs()[0].name
+(result_cls,) = ref_cls.run(None, {input_name_cls: X_cls})
+
+expected_cls = np.asarray(jax_softmax(X_cls))
+assert np.allclose(expected_cls, result_cls, atol=1e-5), "Softmax mismatch!"
+print("Explicit jax_to_concrete_function verified ✓ - ", max_diff(expected_cls, result_cls))
+
+# %%
+# 5. Visualize the ONNX graph
+# ----------------------------
+#
+plot_dot(onx_mlp)

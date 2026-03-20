@@ -25,7 +25,7 @@ class TestMeanShift(ExtTestCase):
 
         onx = to_onnx(ms, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ArgMin", op_types)
         self.assertIn("MatMul", op_types)
 
@@ -175,10 +175,10 @@ class TestMeanShift(ExtTestCase):
 
         onx = to_onnx(ms, (X,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
-        domains = {oi.domain for oi in onx.opset_import}
+        domains = {oi.domain for oi in onx.proto.opset_import}
         self.assertIn("com.microsoft", domains)
 
         expected_labels = ms.predict(X).astype(np.int64)
@@ -204,7 +204,7 @@ class TestMeanShift(ExtTestCase):
 
         onx = to_onnx(ms, (X,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
         expected_labels = ms.predict(X).astype(np.int64)

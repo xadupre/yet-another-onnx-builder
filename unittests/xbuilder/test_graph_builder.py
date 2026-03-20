@@ -14,7 +14,7 @@ from yobx.ext_test_case import (
 )
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder import GraphBuilder, FunctionOptions, OptimizationOptions
-from yobx.container import ExtendedModelContainer
+from yobx.container import ExtendedModelContainer, ExportArtifact
 
 TFLOAT = TensorProto.FLOAT
 TFLOAT16 = TensorProto.FLOAT16
@@ -947,7 +947,8 @@ class TestGraphBuilder(ExtTestCase):
         gr = GraphBuilder(onnx_model)
         self.assertEqual(len(gr.functions), 1)
         container = gr.to_onnx(inline=False, large_model=True)
-        self.assertIsInstance(container, ExtendedModelContainer)
+        self.assertIsInstance(container, ExportArtifact)
+        self.assertIsInstance(container.container, ExtendedModelContainer)
         filename = self.get_dump_file("test_large_model_onnxscript_ir.onnx")
         container.save(filename, True)
         ref2 = ExtendedReferenceEvaluator(filename)
@@ -955,7 +956,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqualArray(expected, got)
 
         # ir
-        m = container.to_ir()
+        m = container.container.to_ir()
         proto = oir.to_proto(m)
 
         ref3 = ExtendedReferenceEvaluator(proto)

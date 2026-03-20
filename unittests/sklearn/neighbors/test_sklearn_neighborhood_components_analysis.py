@@ -23,7 +23,7 @@ class TestNeighborhoodComponentsAnalysis(ExtTestCase):
 
         onx = to_onnx(nca, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("MatMul", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)

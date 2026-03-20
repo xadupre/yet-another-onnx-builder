@@ -101,10 +101,7 @@ np.testing.assert_allclose(total2, total, atol=1e-6)
 # The polars schema can include integer or boolean columns.
 
 lf3 = pl.LazyFrame(
-    {
-        "x": pl.Series([10, 20, 30], dtype=pl.Int64),
-        "y": pl.Series([1, 2, 3], dtype=pl.Int64),
-    }
+    {"x": pl.Series([10, 20, 30], dtype=pl.Int64), "y": pl.Series([1, 2, 3], dtype=pl.Int64)}
 )
 
 onx3 = to_onnx(lf3.sql("SELECT x * y AS prod FROM self"))
@@ -128,11 +125,7 @@ def safe_sqrt(x):
 
 
 lf4 = pl.LazyFrame({"v": pl.Series([4.0, -1.0, 9.0], dtype=pl.Float32)})
-onx4 = to_onnx(
-    lf4,
-    "SELECT safe_sqrt(v) AS r FROM t",
-    custom_functions={"safe_sqrt": safe_sqrt},
-)
+onx4 = to_onnx(lf4, "SELECT safe_sqrt(v) AS r FROM t", custom_functions={"safe_sqrt": safe_sqrt})
 
 v = np.array([4.0, -1.0, 9.0], dtype=np.float32)
 (r,) = run(onx4, {"v": v})

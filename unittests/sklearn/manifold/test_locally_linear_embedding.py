@@ -22,7 +22,7 @@ class TestLocallyLinearEmbedding(ExtTestCase):
         onx = to_onnx(lle, (X,))
 
         # Verify key ops are present
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TopK", op_types)
         self.assertIn("MatMul", op_types)
 

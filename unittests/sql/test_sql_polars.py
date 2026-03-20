@@ -120,10 +120,7 @@ class TestToOnnxFromLazyFrame(ExtTestCase):
         import polars as pl
 
         lf = pl.LazyFrame(
-            {
-                "x": pl.Series([1.0], dtype=pl.Float32),
-                "y": pl.Series([2.0], dtype=pl.Float32),
-            }
+            {"x": pl.Series([1.0], dtype=pl.Float32), "y": pl.Series([2.0], dtype=pl.Float32)}
         )
         onx = to_onnx(lf, "SELECT x, y FROM t")
         input_names = [inp.name for inp in onx.graph.input]
@@ -327,10 +324,7 @@ class TestPolarsFrameToSql(ExtTestCase):
         import polars as pl
 
         src = pl.LazyFrame(
-            {
-                "x": pl.Series([1.0], dtype=pl.Float32),
-                "y": pl.Series([1], dtype=pl.Int64),
-            }
+            {"x": pl.Series([1.0], dtype=pl.Float32), "y": pl.Series([1], dtype=pl.Int64)}
         )
         _, dtypes = polars_frame_to_sql(src.sql("SELECT x FROM self"))
         self.assertEqual(dtypes["x"], np.dtype("float32"))

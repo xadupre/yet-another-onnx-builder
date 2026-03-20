@@ -38,9 +38,7 @@ _POLARS_DTYPE_TO_NP: Dict[str, np.dtype] = {
 }
 
 
-def polars_schema_to_input_dtypes(
-    frame,
-) -> Dict[str, np.dtype]:
+def polars_schema_to_input_dtypes(frame) -> Dict[str, np.dtype]:
     """Extract a column-name → numpy-dtype mapping from a polars frame.
 
     Accepts a ``polars.LazyFrame`` (schema read via :meth:`collect_schema`,
@@ -57,13 +55,7 @@ def polars_schema_to_input_dtypes(
     ``Int32``, ``Int64``, ``UInt8``, ``UInt16``, ``UInt32``, ``UInt64``,
     ``Boolean``, ``String``, ``Utf8``.
     """
-    try:
-        import polars as pl  # noqa: F401
-    except ImportError as exc:
-        raise ImportError(
-            "polars is required for yobx.sql.to_onnx. "
-            "Install it with: pip install polars"
-        ) from exc
+    import polars as pl  # noqa: F401
 
     if hasattr(frame, "collect_schema"):
         # polars.LazyFrame — cheap, no execution
@@ -72,9 +64,7 @@ def polars_schema_to_input_dtypes(
         # polars.DataFrame
         schema = frame.schema
     else:
-        raise TypeError(
-            f"Expected a polars.LazyFrame or polars.DataFrame, got {type(frame)!r}"
-        )
+        raise TypeError(f"Expected a polars.LazyFrame or polars.DataFrame, got {type(frame)!r}")
 
     result: Dict[str, np.dtype] = {}
     for col_name, dtype in schema.items():
@@ -194,9 +184,7 @@ def _plan_find_source(
         fields, pred, gb, join = _plan_find_source(f["input"])
         # Merge multiple filter predicates with AND
         if pred is not None:
-            new_pred: dict = {
-                "BinaryExpr": {"left": pred, "op": "And", "right": f["predicate"]}
-            }
+            new_pred: dict = {"BinaryExpr": {"left": pred, "op": "And", "right": f["predicate"]}}
         else:
             new_pred = f["predicate"]
         return fields, new_pred, gb, join
@@ -240,10 +228,7 @@ def _schema_fields_to_dtypes(fields: Dict[str, str]) -> Dict[str, np.dtype]:
     return result
 
 
-def polars_frame_to_sql(
-    frame,
-    table_name: str = "t",
-) -> Tuple[str, Dict[str, np.dtype]]:
+def polars_frame_to_sql(frame, table_name: str = "t") -> Tuple[str, Dict[str, np.dtype]]:
     """Extract a SQL string and input-dtype map from a polars ``LazyFrame``.
 
     The *frame* must have been produced by calling
@@ -262,14 +247,6 @@ def polars_frame_to_sql(
     :raises ValueError: if the plan cannot be converted to SQL (e.g. the
         frame was not created via ``.sql()``).
     """
-    try:
-        import polars as pl  # noqa: F401
-    except ImportError as exc:
-        raise ImportError(
-            "polars is required for yobx.sql.to_onnx. "
-            "Install it with: pip install polars"
-        ) from exc
-
     if not hasattr(frame, "_ldf"):
         raise TypeError(
             f"Expected a polars.LazyFrame, got {type(frame)!r}. "
@@ -305,9 +282,7 @@ def polars_frame_to_sql(
         group_clause = ", ".join(key_sqls)
         from_clause = f"FROM {table_name}"
         where_clause = f" WHERE {_plan_expr_to_sql(filter_pred)}" if filter_pred else ""
-        query = (
-            f"SELECT {select_clause} {from_clause}{where_clause} GROUP BY {group_clause}"
-        )
+        query = f"SELECT {select_clause} {from_clause}{where_clause} GROUP BY {group_clause}"
     elif join_node is not None:
         if len(join_node["left_on"]) != 1 or len(join_node["right_on"]) != 1:
             raise ValueError(

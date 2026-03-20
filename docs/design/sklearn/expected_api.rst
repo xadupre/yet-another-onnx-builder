@@ -244,28 +244,13 @@ The canonical pattern at the end of every converter is:
 
 .. code-block:: python
 
-    result = g.op.SomeOp(X, ...)
-    if not sts:
-        g.set_type(result, g.get_type(X))
-        g.set_shape(result, g.get_shape(X))
-        if g.has_device(X):
-            g.set_device(result, g.get_device(X))
-    return result
-
-``sts`` is the shape/type dictionary passed in by :func:`to_onnx
-<yobx.sklearn.to_onnx>` (currently always ``{}``).  The ``if not sts``
-guard leaves room for a future shape-propagation pass to override the
-manually supplied metadata.
-
-The helper :meth:`set_type_shape_unary_op
-<yobx.xbuilder.GraphBuilder.set_type_shape_unary_op>` combines the three
-``set_*`` calls into one:
-
-.. code-block:: python
-
     result = g.op.Relu(X, name=name)
     g.set_type_shape_unary_op(result, X)
     return result
+
+The helper :meth:`set_type_shape_unary_op
+<yobx.xbuilder.GraphBuilder.set_type_shape_unary_op>` combines the three
+``set_*`` calls into one call.
 
 Convert Options
 ===============

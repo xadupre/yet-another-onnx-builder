@@ -3,6 +3,12 @@ yobx.torch
 
 .. toctree::
     :maxdepth: 1
+    :caption: main functions
+
+    to_onnx
+
+.. toctree::
+    :maxdepth: 1
     :caption: modules
 
     _model_eval_cases
@@ -26,8 +32,3 @@ register_flattening_functions
 +++++++++++++++++++++++++++++
 
 .. autofunction:: yobx.torch.register_flattening_functions
-
-to_onnx
-+++++++
-
-.. autofunction:: yobx.torch.to_onnx

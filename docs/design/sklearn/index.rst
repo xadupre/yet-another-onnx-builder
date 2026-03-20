@@ -11,10 +11,14 @@ scikit-learn Export to ONNX
    sklearn_like_converter
    supported_converters
    custom_converter
-   function_transformer_tracing
    contrib_ops
-   copilot_draft
    debug
+
+.. seealso::
+
+    :ref:`l-design-function-transformer-tracing` — the numpy-tracing
+    mechanism used by :class:`~sklearn.preprocessing.FunctionTransformer`
+    is documented in the core design section.
 
 A basic :epkg:`scikit-learn` model may look like the following,
 a scaler following by an estimator. Every model can be converter
@@ -65,13 +69,6 @@ a new one but more to define what the converters expect to find in a class
 classed ``GraphBuilder``. It then becomes possible to create a bridge
 such as :class:`yobx.builder.onnxscript.OnnxScriptGraphBuilder` which implements
 this API for every known way. See :ref:`l-design-expected-api` for further details.
-
-**AI**
-
-Known LLMs now provides a good first draft when it comes to implement a new converter
-for a model not already covered but this library. This package includes
-a function able to query *Copilot* to get that first draft.
-That saves quite some time.
 
 **Opsets**
 

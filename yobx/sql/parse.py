@@ -12,6 +12,8 @@ The parser handles a small but useful subset of SQL:
 * ``GROUP BY`` — column grouping (aggregations ``SUM``, ``COUNT``, ``AVG``,
   ``MIN``, ``MAX`` in the ``SELECT`` list are recognised).
 * ``JOIN`` — ``[INNER] JOIN … ON col1 = col2`` linking two input tables.
+* Subqueries in the ``FROM`` clause:
+  ``SELECT … FROM (SELECT … FROM table) [AS alias]``.
 
 All names are case-insensitive; they are normalised to lower-case by
 :func:`parse_sql`.
@@ -194,14 +196,19 @@ class ParsedQuery:
         from the SQL string.  The order reflects the logical execution
         sequence: ``JoinOp`` (if any) → ``FilterOp`` (if any) → ``GroupByOp``
         (if any) → ``SelectOp``.
-    :param from_table: the primary (left) table name from the ``FROM`` clause.
+    :param from_table: the primary (left) table name from the ``FROM`` clause,
+        or the alias of the subquery when ``subquery`` is set.
     :param columns: all column names referenced in the query, in the order
         they appear (deduped).
+    :param subquery: when the ``FROM`` clause contains a sub-select
+        (``FROM (SELECT …)``), this holds the parsed inner query; otherwise
+        ``None``.
     """
 
     operations: List[SqlOperation] = field(default_factory=list)
     from_table: str = ""
     columns: List[str] = field(default_factory=list)
+    subquery: Optional[ParsedQuery] = None
 
 
 # ---------------------------------------------------------------------------
@@ -453,10 +460,34 @@ class _Parser:
                 break
         return distinct, items
 
-    def _parse_from(self) -> str:
+    def _parse_from(self) -> Tuple[str, Optional[ParsedQuery]]:
+        """Parse the FROM clause.
+
+        Returns a ``(table_name, subquery)`` pair.  When the FROM clause
+        contains a parenthesised sub-select the first element is the alias
+        (may be an empty string) and the second is the parsed inner query.
+        For a plain table name the second element is ``None``.
+        """
         self._expect("from")
+        # Subquery: FROM (SELECT ...)
+        if self._peek() is not None and self._peek() == ("op", "("):
+            self._consume()  # consume '('
+            sub_pq = self._parse_query()
+            self._expect(")")
+            # Optional alias: [AS] alias_name
+            alias = ""
+            if self._maybe("as"):
+                _, alias = self._consume()
+            elif (
+                self._peek() is not None
+                and self._peek()[0] == "id"  # type: ignore[index]
+                and self._peek()[1] not in _KEYWORDS  # type: ignore[index]
+            ):
+                _, alias = self._consume()
+            return alias, sub_pq
+        # Plain table name
         _, table = self._consume()
-        return table
+        return table, None
 
     def _parse_join(self, join_type: str = "inner") -> Optional[JoinOp]:
         """Parse ``[INNER|LEFT|RIGHT|FULL] JOIN … ON …``."""
@@ -481,12 +512,15 @@ class _Parser:
             right_table=right_table, left_key=left_key, right_key=right_key, join_type=join_type
         )
 
-    def parse(self) -> ParsedQuery:
-        """Parse the token stream and return a :class:`ParsedQuery`."""
+    def _parse_query(self) -> ParsedQuery:
+        """Parse a full ``SELECT … FROM … [JOIN] [WHERE] [GROUP BY]`` statement.
+
+        This method is called recursively for subqueries.
+        """
         self._expect("select")
         distinct, select_items = self._parse_select_list()
 
-        from_table = self._parse_from()
+        from_table, subquery = self._parse_from()
 
         operations: List[SqlOperation] = []
 
@@ -533,7 +567,13 @@ class _Parser:
         # Collect all referenced column names
         columns = _collect_columns(operations)
 
-        return ParsedQuery(operations=operations, from_table=from_table, columns=columns)
+        return ParsedQuery(
+            operations=operations, from_table=from_table, columns=columns, subquery=subquery
+        )
+
+    def parse(self) -> ParsedQuery:
+        """Parse the token stream and return a :class:`ParsedQuery`."""
+        return self._parse_query()
 
 
 # ---------------------------------------------------------------------------
@@ -596,6 +636,7 @@ def parse_sql(query: str) -> ParsedQuery:
 
     * ``SELECT [DISTINCT] expr [AS alias], …``
     * ``FROM table``
+    * ``FROM (SELECT …) [AS alias]`` — subquery in the ``FROM`` clause
     * ``[INNER|LEFT|RIGHT|FULL [OUTER]] JOIN table ON col = col``
     * ``WHERE condition [AND|OR condition] …``
     * ``GROUP BY col, …``

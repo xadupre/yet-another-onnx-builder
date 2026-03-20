@@ -13,8 +13,10 @@ from yobx.sql import sql_to_onnx, sql_to_onnx_graph
 def _ort_run(onx, feeds):
     """Run *onx* with onnxruntime and return outputs. Skip if ORT is not installed."""
     from onnxruntime import InferenceSession
+    from yobx.container import ExportArtifact
 
-    sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+    proto = onx.proto if isinstance(onx, ExportArtifact) else onx
+    sess = InferenceSession(proto.SerializeToString(), providers=["CPUExecutionProvider"])
     return sess.run(None, feeds)
 
 
@@ -248,16 +250,20 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
     """Tests verifying properties of the returned ONNX model."""
 
     def test_returns_model_proto(self):
-        from onnx import ModelProto
+        from yobx.container import ExportArtifact
 
         dtypes = {"a": np.float32}
         onx = sql_to_onnx("SELECT a FROM t", dtypes)
-        self.assertIsInstance(onx, ModelProto)
+        self.assertIsInstance(onx, ExportArtifact)
+        # The underlying proto is accessible via the attribute:
+        from onnx import ModelProto
+
+        self.assertIsInstance(onx.proto, ModelProto)
 
     def test_inputs_one_per_column(self):
         dtypes = {"a": np.float32, "b": np.float32, "c": np.float32}
         onx = sql_to_onnx("SELECT a, b, c FROM t", dtypes)
-        input_names = [inp.name for inp in onx.graph.input]
+        input_names = [inp.name for inp in onx.proto.graph.input]
         self.assertIn("a", input_names)
         self.assertIn("b", input_names)
         self.assertIn("c", input_names)
@@ -266,18 +272,18 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
     def test_where_adds_filter_nodes(self):
         dtypes = {"a": np.float32}
         onx = sql_to_onnx("SELECT a FROM t WHERE a > 0", dtypes)
-        op_types = {n.op_type for n in onx.graph.node}
+        op_types = {n.op_type for n in onx.proto.graph.node}
         self.assertIn("Compress", op_types)
 
     def test_aggregation_adds_reduce_nodes(self):
         dtypes = {"a": np.float32}
         onx = sql_to_onnx("SELECT SUM(a) FROM t", dtypes)
-        op_types = {n.op_type for n in onx.graph.node}
+        op_types = {n.op_type for n in onx.proto.graph.node}
         self.assertIn("ReduceSum", op_types)
 
     def test_builder_cls_used(self):
         """builder_cls should be instantiated instead of the default GraphBuilder."""
-        from onnx import ModelProto
+        from yobx.container import ExportArtifact
         from yobx.xbuilder import GraphBuilder
 
         instantiated = []
@@ -289,7 +295,7 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
 
         dtypes = {"a": np.float32}
         onx = sql_to_onnx("SELECT a FROM t", dtypes, builder_cls=TrackingBuilder)
-        self.assertIsInstance(onx, ModelProto)
+        self.assertIsInstance(onx, ExportArtifact)
         self.assertEqual(len(instantiated), 1, "TrackingBuilder was not instantiated")
 
 
@@ -302,7 +308,7 @@ class TestSqlToOnnxGraph(ExtTestCase):
 
         g = GraphBuilder(18, ir_version=10)
         out_names = sql_to_onnx_graph(g, None, [], query, dtypes, right_input_dtypes=right_dtypes)
-        onx, _ = g.to_onnx(return_optimize_report=True)
+        onx = g.to_onnx(return_optimize_report=True)
         ref = ExtendedReferenceEvaluator(onx)
         return out_names, ref.run(None, feeds)
 
@@ -345,7 +351,7 @@ class TestSqlToOnnxGraph(ExtTestCase):
         g = GraphBuilder(18, ir_version=10)
         g.make_tensor_input("a", TensorProto.FLOAT, ("N",))
         sql_to_onnx_graph(g, None, [], "SELECT a FROM t", {"a": np.float32})
-        onx, _ = g.to_onnx(return_optimize_report=True)
+        onx = g.to_onnx(return_optimize_report=True)
         # Exactly one input named "a"
         input_names = [inp.name for inp in onx.graph.input]
         self.assertEqual(input_names.count("a"), 1)
@@ -383,6 +389,84 @@ class TestSqlToOnnxGraph(ExtTestCase):
         out_names = sql_to_onnx_graph(g, None, [], "SELECT a FROM t", dtypes)
         # "a" is already registered as an input, so must fall back to "output_0"
         self.assertEqual(out_names, ["output_0"])
+
+
+class TestSqlToOnnxSubquery(ExtTestCase):
+    """Tests for subquery (``SELECT … FROM (SELECT …)``) conversion."""
+
+    def _run(self, query, dtypes, feeds):
+        """Convert *query*, run with reference evaluator and (when available) ORT."""
+        onx = sql_to_onnx(query, dtypes)
+        ref = ExtendedReferenceEvaluator(onx)
+        ref_outputs = ref.run(None, feeds)
+        if has_onnxruntime():
+            ort_outputs = _ort_run(onx, feeds)
+            self.assertEqual(len(ref_outputs), len(ort_outputs))
+            for ref_out, ort_out in zip(ref_outputs, ort_outputs):
+                np.testing.assert_allclose(ort_out, ref_out, rtol=1e-5, atol=1e-6)
+        return ref_outputs
+
+    def test_subquery_passthrough_single_column(self):
+        dtypes = {"a": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out,) = self._run("SELECT a FROM (SELECT a FROM t)", dtypes, {"a": a})
+        self.assertEqualArray(out, a)
+
+    def test_subquery_passthrough_multiple_columns(self):
+        dtypes = {"a": np.float32, "b": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        out_a, out_b = self._run(
+            "SELECT a, b FROM (SELECT a, b FROM t)", dtypes, {"a": a, "b": b}
+        )
+        self.assertEqualArray(out_a, a)
+        self.assertEqualArray(out_b, b)
+
+    def test_subquery_inner_expression(self):
+        dtypes = {"a": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out,) = self._run("SELECT a FROM (SELECT a + 1 AS a FROM t)", dtypes, {"a": a})
+        self.assertEqualArray(out, a + 1, atol=1e-6)
+
+    def test_subquery_inner_where(self):
+        dtypes = {"a": np.float32}
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        (out,) = self._run("SELECT a FROM (SELECT a FROM t WHERE a > 0)", dtypes, {"a": a})
+        self.assertEqualArray(out, np.array([1.0, 3.0], dtype=np.float32))
+
+    def test_subquery_outer_where(self):
+        dtypes = {"a": np.float32}
+        a = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        (out,) = self._run(
+            "SELECT a FROM (SELECT a + 1 AS a FROM t) WHERE a > 2", dtypes, {"a": a}
+        )
+        # Inner: a+1 = [2, 3, 4, 5]; outer WHERE a > 2 => [3, 4, 5]
+        self.assertEqualArray(out, np.array([3.0, 4.0, 5.0], dtype=np.float32))
+
+    def test_subquery_with_alias(self):
+        dtypes = {"a": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out,) = self._run("SELECT a FROM (SELECT a FROM t) AS sub", dtypes, {"a": a})
+        self.assertEqualArray(out, a)
+
+    def test_subquery_inner_and_outer_where(self):
+        dtypes = {"a": np.float32}
+        a = np.array([-1.0, 1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        (out,) = self._run(
+            "SELECT a FROM (SELECT a FROM t WHERE a > 0) WHERE a < 4", dtypes, {"a": a}
+        )
+        # Inner WHERE: [1, 2, 3, 4]; outer WHERE a < 4: [1, 2, 3]
+        self.assertEqualArray(out, np.array([1.0, 2.0, 3.0], dtype=np.float32))
+
+    def test_subquery_column_rename(self):
+        """Outer query can reference the inner alias."""
+        dtypes = {"a": np.float32, "b": np.float32}
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (out,) = self._run(
+            "SELECT total FROM (SELECT a + b AS total FROM t)", dtypes, {"a": a, "b": b}
+        )
+        self.assertEqualArray(out, a + b, atol=1e-6)
 
 
 if __name__ == "__main__":

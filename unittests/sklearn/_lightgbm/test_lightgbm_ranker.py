@@ -29,7 +29,7 @@ class TestLGBMRanker(ExtTestCase):
 
         onx = to_onnx(ranker, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
             any(t in op_types for t in ("TreeEnsembleRegressor", "TreeEnsemble")),
             f"Expected a tree node, got {op_types}",
@@ -58,7 +58,7 @@ class TestLGBMRanker(ExtTestCase):
 
         onx = to_onnx(ranker, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertNotIn("Exp", op_types)
         self.assertNotIn("Sigmoid", op_types)
 
@@ -111,14 +111,14 @@ class TestLGBMRanker(ExtTestCase):
                     target_opset = {"": 21, "ai.onnx.ml": ml_opset}
                     onx = to_onnx(ranker, (X,), target_opset=target_opset)
 
-                    ml_opsets = {op.domain: op.version for op in onx.opset_import}
+                    ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
                     self.assertEqual(ml_opsets.get("ai.onnx.ml"), ml_opset)
 
                     if ml_opset >= 5:
-                        op_types = [n.op_type for n in onx.graph.node]
+                        op_types = [n.op_type for n in onx.proto.graph.node]
                         self.assertIn("TreeEnsemble", op_types)
                     else:
-                        op_types = [n.op_type for n in onx.graph.node]
+                        op_types = [n.op_type for n in onx.proto.graph.node]
                         self.assertIn("TreeEnsembleRegressor", op_types)
 
                     ref = ExtendedReferenceEvaluator(onx)

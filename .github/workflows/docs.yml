@@ -37,9 +37,14 @@ jobs:
       - name: Install nightly version
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Install dependencies
-        run: pip install -e ".[category_encoders,docs,imblearn,lightgbm,sklearn,sksurv,spox,tensorflow,torch,transformers,xgboost]"
+        run: pip install -e ".[category_encoders,docs,imblearn,lightgbm,sklearn,sksurv,spox,statmodels,tensorflow,torch,transformers,xgboost]"
       - name: pip freeze
         run: pip freeze
+      - name: Build TensorFlow gallery examples
+        run: |
+          UNITTEST_GOING=1 sphinx-build -b html \
+            -D "sphinx_gallery_conf.filename_pattern=/tensorflow/" \
+            docs docs/_build/html -j 1
       - name: Build documentation
         run: |
           UNITTEST_GOING=1 sphinx-build -b html docs docs/_build/html -W -j auto || \

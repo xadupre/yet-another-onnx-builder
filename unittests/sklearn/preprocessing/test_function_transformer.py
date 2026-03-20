@@ -26,7 +26,7 @@ class TestFunctionTransformer(ExtTestCase):
         transformer.fit(X)
 
         onx = to_onnx(transformer, (X,))
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Identity", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -53,7 +53,7 @@ class TestFunctionTransformer(ExtTestCase):
         transformer.fit(X)
 
         onx = to_onnx(transformer, (X,))
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sqrt", op_types)
         self.assertIn("Abs", op_types)
         self.assertIn("Add", op_types)
@@ -79,7 +79,7 @@ class TestFunctionTransformer(ExtTestCase):
         transformer.fit(X)
 
         onx = to_onnx(transformer, (X,))
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Log", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -153,7 +153,7 @@ class TestFunctionTransformer(ExtTestCase):
         pipe.fit(X)
 
         onx = to_onnx(pipe, (X,))
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sqrt", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
