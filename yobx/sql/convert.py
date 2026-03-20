@@ -23,7 +23,7 @@ from .sql_convert import sql_to_onnx, sql_to_onnx_graph  # noqa: F401 – re-exp
 
 
 def to_onnx(
-    dataframe_or_query: Union[str, "polars.LazyFrame"],  # noqa: F821, UP037
+    dataframe_or_query: Union[str, "polars.LazyFrame"],  # type: ignore # noqa: F821, UP037
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,

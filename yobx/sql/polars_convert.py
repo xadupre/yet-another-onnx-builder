@@ -407,7 +407,7 @@ def _plan_to_sql(plan: _PolarsPlan) -> str:
 
 
 def lazyframe_to_onnx(
-    lf: "polars.LazyFrame",  # noqa: F821, UP037
+    lf: "polars.LazyFrame",  # type: ignore # noqa: F821, UP037
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     target_opset: int = DEFAULT_TARGET_OPSET,
     builder_cls: Union[type, Callable] = GraphBuilder,
