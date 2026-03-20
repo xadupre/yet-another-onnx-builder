@@ -10,7 +10,7 @@ import unittest
 import numpy as np
 import onnx
 import onnx.helper as oh
-from yobx.container import ExportArtifact, ExportReport
+from yobx.container import ExportArtifact, ExportReport, FunctionExportArtifact
 from yobx.ext_test_case import ExtTestCase
 
 
@@ -155,7 +155,7 @@ class TestExportArtifact(ExtTestCase):
         np.testing.assert_allclose(total, a + b, rtol=1e-5)
 
     def test_to_onnx_function_returns_artifact(self):
-        """to_onnx with export_as_function=True should return an ExportArtifact."""
+        """to_onnx with export_as_function=True should return a FunctionExportArtifact."""
         from yobx.xbuilder import GraphBuilder, FunctionOptions
         from yobx.reference import ExtendedReferenceEvaluator
 
@@ -171,6 +171,8 @@ class TestExportArtifact(ExtTestCase):
             inline=False,
         )
 
+        self.assertIsInstance(artifact, FunctionExportArtifact)
+        # FunctionExportArtifact is a subclass of ExportArtifact
         self.assertIsInstance(artifact, ExportArtifact)
         self.assertIsInstance(artifact.proto, onnx.FunctionProto)
         self.assertIsNone(artifact.container)
@@ -206,7 +208,7 @@ class TestExportArtifact(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(artifact, ExportArtifact)
+        self.assertIsInstance(artifact, FunctionExportArtifact)
         self.assertIsInstance(artifact.proto, onnx.FunctionProto)
         # Initializer data should be stored in the artifact
         self.assertIsNotNone(artifact.initializers_name)

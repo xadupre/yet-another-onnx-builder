@@ -14,7 +14,7 @@ from yobx.ext_test_case import (
 )
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder import GraphBuilder, FunctionOptions, OptimizationOptions
-from yobx.container import ExtendedModelContainer, ExportArtifact
+from yobx.container import ExtendedModelContainer, ExportArtifact, FunctionExportArtifact
 
 TFLOAT = TensorProto.FLOAT
 TFLOAT16 = TensorProto.FLOAT16
@@ -321,7 +321,7 @@ class TestGraphBuilder(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsInstance(fct, FunctionExportArtifact)
         self.assertIsInstance(fct.proto, FunctionProto)
         self.assertIsInstance(fct.nested_functions, list)
         self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.nested_functions))
@@ -423,7 +423,7 @@ class TestGraphBuilder(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsInstance(fct, FunctionExportArtifact)
         self.assertIsInstance(fct.proto, FunctionProto)
         self.assertIsInstance(fct.nested_functions, list)
         self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.nested_functions))
@@ -543,7 +543,7 @@ class TestGraphBuilder(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsInstance(fct, FunctionExportArtifact)
         self.assertIsInstance(fct.proto, FunctionProto)
         self.assertIsInstance(fct.nested_functions, list)
         self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.nested_functions))
@@ -666,7 +666,7 @@ class TestGraphBuilder(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsInstance(fct, FunctionExportArtifact)
         self.assertIsInstance(fct.proto, FunctionProto)
         self.assertIsInstance(fct.nested_functions, list)
         self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.nested_functions))
@@ -803,7 +803,7 @@ class TestGraphBuilder(ExtTestCase):
             inline=False,
         )
 
-        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsInstance(fct, FunctionExportArtifact)
         self.assertIsInstance(fct.proto, FunctionProto)
         self.assertIsInstance(fct.nested_functions, list)
         self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.nested_functions))
@@ -2695,7 +2695,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         sub.make_tensor_output("Y", is_dimension=False, indexed=False)
 
         fct = sub.to_onnx(function_options=FunctionOptions(name="LinearSub", domain="mydom"))
-        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsInstance(fct, FunctionExportArtifact)
         self.assertIsInstance(fct.proto, FunctionProto)
         self.assertEqual(list(fct.proto.input), ["X", "W"])
         self.assertEqual(list(fct.proto.output), ["Y"])
@@ -2735,7 +2735,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         fct = sub.to_onnx(
             function_options=FunctionOptions(name="SubFunc", domain="subdom"), inline=False
         )
-        self.assertIsInstance(fct, ExportArtifact)
+        self.assertIsInstance(fct, FunctionExportArtifact)
         self.assertIsInstance(fct.proto, FunctionProto)
         self.assertEqual(list(fct.proto.input), ["A"])
         self.assertEqual(list(fct.proto.output), ["C"])

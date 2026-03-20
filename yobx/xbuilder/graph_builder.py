@@ -39,7 +39,7 @@ from onnx.external_data_helper import uses_external_data
 from onnx.model_container import make_large_tensor_proto
 from onnx.shape_inference import infer_shapes as onnx_infer_shapes
 from ..typing import ConvertOptionsProtocol, DefaultConvertOptions
-from ..container import ExportArtifact, ExportReport, ExtendedModelContainer
+from ..container import ExportArtifact, ExportReport, ExtendedModelContainer, FunctionExportArtifact
 from ..container.model_container import _get_type
 from ..helpers.mini_onnx_builder import proto_from_array
 from ..helpers import make_hash, string_signature, string_type
@@ -5565,7 +5565,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
     def _to_onnx_function(
         self, function_options, opsets, mask_outputs
-    ) -> "ExportArtifact":
+    ) -> "FunctionExportArtifact":
         if self._debug_local_function:
             print(f"[GraphBuilder-{self._hash()}.to_onnx] export_as_function {function_options}")
         if self.verbose:
@@ -5613,7 +5613,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         )
 
         if not function_options.return_initializer:
-            return ExportArtifact(proto=proto)
+            return FunctionExportArtifact(proto=proto)
 
         if len(self.initializers_dict) == 0 and len(self.functions) == 0:
             nested = None
@@ -5621,7 +5621,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 used_functions = self._get_used_local_functions()
                 if used_functions:
                     nested = used_functions
-            return ExportArtifact(proto=proto, nested_functions=nested)
+            return FunctionExportArtifact(proto=proto, nested_functions=nested)
 
         # We need to move the initializers as inputs, we sort them by decreasing size
         inits, functions = self._extend_local_function_inputs()
@@ -5629,7 +5629,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         nested_functions = (
             [v for k, v in self.functions.items() if k in functions] if functions else None
         )
-        return ExportArtifact(
+        return FunctionExportArtifact(
             proto=proto,
             initializers_name=inits,
             initializers_dict={
@@ -8715,7 +8715,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         self._check_function_order()
 
         fct = builder.to_onnx(function_options=function_options, optimize=optimize, inline=False)
-        assert isinstance(fct, ExportArtifact), (
+        assert isinstance(fct, FunctionExportArtifact), (
             f"Unexpected type {type(fct)}, function_options={function_options}"
             f"{self.get_debug_msg()}"
         )
