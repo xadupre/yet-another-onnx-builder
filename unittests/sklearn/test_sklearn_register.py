@@ -69,6 +69,7 @@ class TestSklearnRegister(ExtTestCase):
             "lightgbm": (3, 3),
             "category_encoders": (10, 20),
             "sksurv": (10, 30),
+            "statsmodels": (1, 5),
         }
         for lib, (mine, maxe) in boundaries.items():
             with self.subTest(lib=lib):
