@@ -25,7 +25,7 @@ so the example runs without a GPU.
 Run with pre-trained weights (default) or a randomly initialised model::
 
     python plot_llm_to_onnx.py                                  # pre-trained weights (default)
-    python plot_llm_to_onnx.py --no-trained                     # random weights — fast, no large download
+    python plot_llm_to_onnx.py --no-trained                     # random weights — fast
     python plot_llm_to_onnx.py --num-hidden-layers 2            # use only 2 transformer layers
     python plot_llm_to_onnx.py --model Qwen/Qwen2-0.5B-Instruct # use a different model
 
@@ -149,7 +149,10 @@ else:
     print(f"Building randomly initialised model from config for {MODEL_NAME!r} ...")
     model = AutoModelForCausalLM.from_config(config)
 
-print(f"  trained={args.trained}  num_hidden_layers={config.num_hidden_layers}  #params={sum(p.numel() for p in model.parameters()):,}")
+print(
+    f"  trained={args.trained}  num_hidden_layers={config.num_hidden_layers}  "
+    f"#params={sum(p.numel() for p in model.parameters()):,}"
+)
 
 # %%
 # Device selection
