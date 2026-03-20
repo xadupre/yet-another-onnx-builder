@@ -64,7 +64,8 @@ def imblearn_pipeline(
 
         fct = get_sklearn_converter(type(step))
         step_node_name = f"{name}__{step_name}"
-        fct(g, sts, step_outputs, step, *current_input, name=step_node_name)
+        with g.prefix_name_context(step_node_name):
+            fct(g, sts, step_outputs, step, *current_input, name=step_node_name)
         current_input = step_outputs
 
     return current_input[0] if len(current_input) == 1 else tuple(current_input)

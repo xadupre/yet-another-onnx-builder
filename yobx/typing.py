@@ -1,6 +1,7 @@
 from typing import (
     Any,
     Callable,
+    ContextManager,
     Dict,
     Iterable,
     Iterator,
@@ -303,6 +304,20 @@ class GraphBuilderProtocol(Protocol):
 
         :return: a :class:`~onnx.ModelProto`, :class:`~onnx.GraphProto`,
             :class:`~onnx.FunctionProto`, or a model container object
+        """
+        ...
+
+    def prefix_name_context(self, prefix: str) -> ContextManager[None]:
+        """Context manager that scopes all :meth:`unique_name` calls to *prefix*.
+
+        While the context is active, every name returned by :meth:`unique_name`
+        is prefixed with the joined stack of active prefixes so that tensors
+        produced inside the block are clearly associated with their enclosing
+        scope (e.g. a pipeline step name).  Contexts may be nested; each level
+        pushes one entry onto the stack.
+
+        :param prefix: scope prefix to push (e.g. a pipeline step name)
+        :return: a context manager; use as ``with g.prefix_name_context("step"): ...``
         """
         ...
 
