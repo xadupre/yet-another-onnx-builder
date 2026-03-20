@@ -152,10 +152,9 @@ class Opset:
             ), f"Wrong inputs for operator {op_type!r}: {inputs!r}"
             if isinstance(i, str):
                 new_inputs.append(i)
-            elif (
-                self.builder._has_tf  # type: ignore[attr-defined]
-                and isinstance(i, (self.builder.tf.Tensor, self.builder.tf.Variable))  # type: ignore[attr-defined]
-            ):
+            elif self.builder._has_tf and isinstance(  # type: ignore[attr-defined]
+                i, (self.builder.tf.Tensor, self.builder.tf.Variable)
+            ):  # type: ignore[attr-defined]
                 # TensorFlow tensor/variable — register as initializer, convert at export time
                 tf_shape = tuple(i.shape.as_list())
                 has_zero = 0 in tf_shape
