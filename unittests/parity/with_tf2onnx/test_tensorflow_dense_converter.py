@@ -38,10 +38,7 @@ def _tf2onnx_from_keras(model, input_arrays, opset=18):
     import tf2onnx
 
     # Use None for the batch dimension so the ONNX model accepts any batch size.
-    input_sig = [
-        tf.TensorSpec([None, *arr.shape[1:]], dtype=tf.float32)
-        for arr in input_arrays
-    ]
+    input_sig = [tf.TensorSpec([None, *arr.shape[1:]], dtype=tf.float32) for arr in input_arrays]
 
     @tf.function(input_signature=input_sig)
     def model_fn(*args):

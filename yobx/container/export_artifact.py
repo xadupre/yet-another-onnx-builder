@@ -192,9 +192,7 @@ class ExportReport:
                     agg.reset_index().to_excel(writer, sheet_name="stats_agg", index=False)
 
             if self.extra:
-                df_extra = pandas.DataFrame(
-                    list(self.extra.items()), columns=["key", "value"]
-                )
+                df_extra = pandas.DataFrame(list(self.extra.items()), columns=["key", "value"])
                 df_extra.to_excel(writer, sheet_name="extra", index=False)
 
             if self.build_stats:

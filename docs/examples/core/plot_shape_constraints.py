@@ -126,10 +126,7 @@ W = np.random.randn(64, 32).astype(np.float32)
 
 model2 = oh.make_model(
     oh.make_graph(
-        [
-            oh.make_node("Add", ["X", "bias"], ["Z"]),
-            oh.make_node("MatMul", ["Z", "W"], ["Out"]),
-        ],
+        [oh.make_node("Add", ["X", "bias"], ["Z"]), oh.make_node("MatMul", ["Z", "W"], ["Out"])],
         "graph",
         [oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq", "d_model"])],
         [oh.make_tensor_value_info("Out", TFLOAT, [None, None, None])],
