@@ -1075,6 +1075,46 @@ def requires_onnx(version: str, msg: str = "") -> Callable:
     return lambda x: x
 
 
+def has_jax2onnx(version: str = "") -> bool:
+    "Returns True if :epkg:`jax2onnx` is installed and its version is high enough."
+    try:
+        import jax2onnx  # noqa: F401
+    except (ImportError, AttributeError):
+        return False
+    if not version:
+        return True
+    try:
+        from importlib.metadata import version as _meta_version
+
+        installed = _meta_version("jax2onnx")
+    except Exception:
+        return True
+    return PvVersion(installed) >= PvVersion(version)
+
+
+def requires_jax2onnx(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`jax2onnx` is not installed or not recent enough."""
+    try:
+        import jax2onnx  # noqa: F401
+    except (ImportError, AttributeError):
+        return unittest.skip(msg or "jax2onnx not installed")
+
+    if not version:
+        return lambda x: x
+
+    try:
+        from importlib.metadata import version as _meta_version
+
+        installed = _meta_version("jax2onnx")
+    except Exception:
+        return lambda x: x
+
+    if PvVersion(installed) < PvVersion(version):
+        msg = f"jax2onnx version {installed} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def statistics_on_file(filename: str) -> Dict[str, Union[int, float, str]]:
     """
     Computes statistics on a file.
