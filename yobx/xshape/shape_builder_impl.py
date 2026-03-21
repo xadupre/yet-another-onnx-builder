@@ -800,15 +800,23 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         :param functions: a dictionary of functions available to the model
         :param exc: if True, raises an exception when type inference fails
         """
+        known_types: Dict[str, int] = {}
+
         for i in graph.initializer:
+            known_types[i.name] = i.data_type
             self.set_type(i.name, i.data_type)
         for i in graph.input:
             self._input_names.append(i.name)
-            itype = i.type.tensor_type.elem_type if i.type.HasField("tensor_type") else 0
+            itype = (
+                i.type.tensor_type.elem_type
+                if i.type.HasField("tensor_type")
+                else 0
+            )
             if itype:
                 self.set_type(i.name, itype)
+            known_types[i.name] = itype
         for node in graph.node:
-            input_types = [self.get_type(n) for n in node.input]
+            input_types = [known_types.get(n, 0) for n in node.input]
             if functions and (node.domain, node.op_type) in functions:
                 func = functions[(node.domain, node.op_type)]
                 result = infer_types(func, input_types, exc=exc)
@@ -819,10 +827,19 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             for name, itype in zip(node.output, result):
                 if name and itype:
                     self.set_type(name, itype)
+                    known_types[name] = itype
         for i in graph.output:
-            self._output_names.append(i.name)
-            if itype:
-                self.set_type(i.name, itype)
+            if i.name:
+                self._output_names.append(i.name)
+            declared_type = (
+                i.type.tensor_type.elem_type
+                if i.type.HasField("tensor_type")
+                else 0
+            )
+            itype = known_types.get(i.name, declared_type)
+            if itype and i.name:
+                if not self.has_type(i.name):
+                    self.set_type(i.name, itype)
 
     def register_constraint_dimension(self, dim_name: str, value: Any):
         """

@@ -88,12 +88,12 @@ class TestTypeInference(ExtTestCase):
         self.assertEqual(result, (TINT64,))
 
     def test_infer_types_unsupported_no_exc(self):
-        node = oh.make_node("NonMaxSuppression", ["X"], ["Y"])
+        node = oh.make_node("UnknownCustomOp", ["X"], ["Y"])
         result = infer_types(node, [TFLOAT], exc=False)
         self.assertEqual(result, 0)
 
     def test_infer_types_unsupported_exc(self):
-        node = oh.make_node("NonMaxSuppression", ["X"], ["Y"])
+        node = oh.make_node("UnknownCustomOp", ["X"], ["Y"])
         self.assertRaise(lambda: infer_types(node, [TFLOAT], exc=True), RuntimeError)
 
     def test_infer_types_output_name(self):
