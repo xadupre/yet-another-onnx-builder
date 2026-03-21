@@ -6047,7 +6047,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             n_initializers=len(initializers),
             n_large_initializers=len(large_initializers),
             size_initializers=int(
-                sum(
+                sum(  # type: ignore
                     np.prod(t.dims)
                     * size_type(t.data_type if isinstance(t, TensorProto) else t.values.data_type)
                     for t in initializers

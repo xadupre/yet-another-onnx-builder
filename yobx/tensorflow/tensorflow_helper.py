@@ -105,7 +105,8 @@ def jax_to_concrete_function(
             dyn_axes = {}
 
         for axis in dyn_axes:
-            shape[axis] = None
+            # TODO: replace by a dynamic new name (copilot?)
+            shape[axis] = None  # type: ignore
         specs.append(tf.TensorSpec(shape=shape, dtype=tf.as_dtype(arr.dtype), name=name))
 
         # Build the polymorphic_shapes entry required by jax2tf.convert():

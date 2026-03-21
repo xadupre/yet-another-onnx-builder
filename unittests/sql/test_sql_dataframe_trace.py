@@ -495,11 +495,7 @@ class TestDataframeToOnnx(ExtTestCase):
 
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-        out_a, out_b = _run(
-            transform,
-            {"a": np.float32, "b": np.float32},
-            {"a": a, "b": b},
-        )
+        out_a, out_b = _run(transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b})
         self.assertEqualArray(out_a, np.array([2.0, 3.0], dtype=np.float32))
         self.assertEqualArray(out_b, np.array([5.0, 6.0], dtype=np.float32))
 
@@ -553,12 +549,7 @@ class TestDataframeToOnnx(ExtTestCase):
 
     def test_select_multiple_columns(self):
         def transform(df):
-            return df.select(
-                [
-                    (df["a"] + df["b"]).alias("s"),
-                    (df["a"] - df["b"]).alias("d"),
-                ]
-            )
+            return df.select([(df["a"] + df["b"]).alias("s"), (df["a"] - df["b"]).alias("d")])
 
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
@@ -586,9 +577,7 @@ class TestDataframeToOnnx(ExtTestCase):
 
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-        out_a, out_b = _run(
-            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
-        )
+        out_a, out_b = _run(transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b})
         np.testing.assert_allclose(out_a, np.array([2.0], dtype=np.float32))
         np.testing.assert_allclose(out_b, np.array([5.0], dtype=np.float32))
 
@@ -598,9 +587,7 @@ class TestDataframeToOnnx(ExtTestCase):
 
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-        out_a, _out_b = _run(
-            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
-        )
+        out_a, _out_b = _run(transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b})
         np.testing.assert_allclose(out_a, np.array([1.0, 3.0], dtype=np.float32))
 
     def test_filter_via_getitem(self):

@@ -134,7 +134,7 @@ def sklearn_svc(
         support_vectors=support_vectors,
         vectors_per_class=vectors_per_class,
         coefficients=coefficients,
-        rho=[float(v) for v in rho],
+        rho=[float(v) for v in rho],  # type: ignore
         post_transform=post_transform,
         **label_kwargs,
         **proba_kwargs,
@@ -202,7 +202,7 @@ def sklearn_svr(
         support_vectors=support_vectors,
         coefficients=coefficients,
         n_supports=n_supports,
-        rho=[float(v) for v in rho],
+        rho=[float(v) for v in rho],  # type: ignore
         post_transform="NONE",
         one_class=0,
     )

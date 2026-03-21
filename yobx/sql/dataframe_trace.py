@@ -72,7 +72,6 @@ from .parse import (
 )
 from .sql_convert import parsed_query_to_onnx
 
-
 # ---------------------------------------------------------------------------
 # Expression conversion helper
 # ---------------------------------------------------------------------------
@@ -282,10 +281,7 @@ class TracedGroupBy:
         self._df = df
         self._by = by
 
-    def agg(
-        self,
-        exprs: Union[List[TracedSeries], Dict[str, TracedSeries]],
-    ) -> TracedDataFrame:
+    def agg(self, exprs: Union[List[TracedSeries], Dict[str, TracedSeries]]) -> TracedDataFrame:
         """Record aggregation expressions and return a new :class:`TracedDataFrame`.
 
         :param exprs: either a list of :class:`TracedSeries` (each should carry
@@ -304,8 +300,7 @@ class TracedGroupBy:
         new_ops.append(SelectOp(items=select_items))
 
         new_cols = {
-            item.output_name(): TracedSeries(item.expr, item.alias)
-            for item in select_items
+            item.output_name(): TracedSeries(item.expr, item.alias) for item in select_items
         }
         return TracedDataFrame(new_cols, new_ops, list(self._df._source_columns))
 
@@ -347,15 +342,14 @@ class TracedDataFrame:
     # ------------------------------------------------------------------
 
     def __getitem__(
-        self,
-        key: Union[str, List[str], TracedCondition],
+        self, key: Union[str, List[str], TracedCondition]
     ) -> Union[TracedSeries, TracedDataFrame]:
         if isinstance(key, str):
             if key not in self._columns:
                 raise KeyError(f"Column {key!r} not found in traced DataFrame")
             return self._columns[key]
         if isinstance(key, list):
-            return self.select(key)
+            return self.select(key)  # type: ignore
         if isinstance(key, TracedCondition):
             return self.filter(key)
         raise TypeError(
@@ -370,8 +364,7 @@ class TracedDataFrame:
         if name in cols:
             return cols[name]
         raise AttributeError(
-            f"TracedDataFrame has no column {name!r}. "
-            f"Available columns: {list(cols.keys())}"
+            f"TracedDataFrame has no column {name!r}. Available columns: {list(cols.keys())}"
         )
 
     @property
@@ -394,8 +387,7 @@ class TracedDataFrame:
         return TracedDataFrame(dict(self._columns), new_ops, list(self._source_columns))
 
     def select(
-        self,
-        exprs: Union[List[Union[str, TracedSeries]], Dict[str, TracedSeries]],
+        self, exprs: Union[List[Union[str, TracedSeries]], Dict[str, TracedSeries]]
     ) -> TracedDataFrame:
         """Record a column-projection (SELECT) operation.
 
@@ -422,19 +414,15 @@ class TracedDataFrame:
                     series_list.append(e)
                 else:
                     raise TypeError(
-                        f"select() expects strings or TracedSeries, "
-                        f"got {type(e).__name__!r}"
+                        f"select() expects strings or TracedSeries, got {type(e).__name__!r}"
                     )
         else:
-            raise TypeError(
-                f"select() expects a list or dict, not {type(exprs).__name__!r}"
-            )
+            raise TypeError(f"select() expects a list or dict, not {type(exprs).__name__!r}")
 
         select_items = [s.to_select_item() for s in series_list]
         new_ops = [*self._ops, SelectOp(items=select_items)]
         new_cols = {
-            item.output_name(): TracedSeries(item.expr, item.alias)
-            for item in select_items
+            item.output_name(): TracedSeries(item.expr, item.alias) for item in select_items
         }
         return TracedDataFrame(new_cols, new_ops, list(self._source_columns))
 
@@ -482,9 +470,7 @@ class TracedDataFrame:
         """
         ops = list(self._ops)
         if not any(isinstance(op, SelectOp) for op in ops):
-            items = [
-                SelectItem(ColumnRef(col), alias=None) for col in self._columns
-            ]
+            items = [SelectItem(ColumnRef(col), alias=None) for col in self._columns]
             ops.append(SelectOp(items=items))
         columns = _collect_columns(ops)
         return ParsedQuery(operations=ops, from_table="t", columns=columns)
