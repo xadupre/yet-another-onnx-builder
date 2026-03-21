@@ -1,9 +1,11 @@
 from ..pv_version import PvVersion
 from .convert import to_onnx, ConvertOptions
+from .skl2onnx_converter import make_skl2onnx_converter
 
 __all__ = [
     "ConvertOptions",
     "NumericalDiscrepancyWarning",
+    "make_skl2onnx_converter",
     "register_sklearn_converters",
     "to_onnx",
 ]
