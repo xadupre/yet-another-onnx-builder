@@ -76,6 +76,15 @@ class ShapeBuilder:
         print("output names:", builder.output_names)
         print("shape of Z  :", builder.get_shape("Z"))
         print("type of Z   :", builder.get_type("Z"))
+
+    **Constraint mechanism** — When a broadcasting operation aligns a symbolic
+    dimension (e.g. ``"d_model"``) with a concrete integer (e.g. ``64``), the
+    concrete value is used immediately as the output dimension and the equality
+    ``"d_model" = 64`` is stored as a *constraint*.  This avoids the need to
+    backtrack through earlier nodes when the concrete value is later discovered.
+    Constraints are inspected with :meth:`get_registered_constraints` and are
+    used internally for dimension renaming and equality checks.
+    See :ref:`l-design-shape` for details.
     """
 
     _op_type_element_wise_types = element_wise_binary_op_types()
