@@ -70,7 +70,9 @@ choose your own names.
 
 This is work in progress.
 Many packages produce SQL queries. It starts by converting a SQL
-query into ONNX.
+query into ONNX.  A lightweight **DataFrame function tracer**
+(:func:`~yobx.sql.dataframe_to_onnx`) records pandas-inspired
+operations on a virtual DataFrame and compiles them to ONNX directly.
 
 * :ref:`l-design-sql`
 
