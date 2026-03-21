@@ -105,7 +105,7 @@ def sklearn_one_class_svm(
         support_vectors=support_vectors,
         coefficients=coefficients,
         n_supports=n_supports,
-        rho=[float(v) for v in rho],
+        rho=[float(v) for v in rho],  # type: ignore
         post_transform="NONE",
         one_class=0,
     )

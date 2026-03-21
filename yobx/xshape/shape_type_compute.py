@@ -11,16 +11,47 @@ def broadcast_shape(
     sh1: DYNAMIC_SHAPE, sh2: DYNAMIC_SHAPE, graph_builder: Optional[ShapeBuilder] = None
 ) -> DYNAMIC_SHAPE:
     """
-    Computes the shape for many broadcasting operators.
-    This function should be used while converting the graph into ONNX
-    because it assumes the broadcast is possible and adds the necessary constraints
-    on the dynamic in the GraphBuilder shapes to make it work.
+    Computes the output shape for broadcasting operators (e.g. ``Add``, ``Mul``, ``Where``).
 
-    :param sh1: first shape
-    :param sh2: second shape
-    :param graph_builder: if not None, the function register
-        any constraint which might appear while applying the broadcast
-    :return: resulting shape
+    The function follows NumPy/ONNX broadcasting rules.  Shapes are right-aligned
+    and each pair of dimensions ``(a, b)`` is resolved according to the table below:
+
+    +-------------------+-------------------+--------+--------------------------------------+
+    | ``a``             | ``b``             | Result | Side effect                          |
+    +===================+===================+========+======================================+
+    | int (any)         | int (any)         | max    | none                                 |
+    +-------------------+-------------------+--------+--------------------------------------+
+    | int ``n ≠ 0, 1``  | str (symbolic)    | ``n``  | :meth:`register_constraint_dimension\
+                                                         <yobx.xshape.ShapeBuilder.\
+                                                         register_constraint_dimension>`\
+                                                         ``(b, n)`` if *graph_builder*        |
+    +-------------------+-------------------+--------+--------------------------------------+
+    | ``1``             | str (symbolic)    | ``b``  | none                                 |
+    +-------------------+-------------------+--------+--------------------------------------+
+    | str (symbolic)    | int ``n ≠ 0, 1``  | ``n``  | :meth:`register_constraint_dimension\
+                                                         <yobx.xshape.ShapeBuilder.\
+                                                         register_constraint_dimension>`\
+                                                         ``(a, n)`` if *graph_builder*        |
+    +-------------------+-------------------+--------+--------------------------------------+
+    | str (symbolic)    | ``1``             | ``a``  | none                                 |
+    +-------------------+-------------------+--------+--------------------------------------+
+    | str ``a == b``    | str ``a == b``    | ``a``  | none                                 |
+    +-------------------+-------------------+--------+--------------------------------------+
+    | str ``a != b``    | str ``a != b``    | ``a^b``| none (``^`` means ``max``)           |
+    +-------------------+-------------------+--------+--------------------------------------+
+
+    When a symbolic dimension is paired with a concrete integer ``n ≠ 1``, the concrete
+    value is chosen as the output dimension *and* the equality is stored as a constraint
+    via :meth:`register_constraint_dimension
+    <yobx.xshape.ShapeBuilder.register_constraint_dimension>`.  This avoids the need to
+    backtrack through earlier nodes when the concrete value is discovered later:
+    downstream operations immediately see a precise integer shape.
+
+    :param sh1: first shape (tuple of ints and/or symbolic strings)
+    :param sh2: second shape (tuple of ints and/or symbolic strings)
+    :param graph_builder: if not None, constraints are registered on this builder
+        whenever a symbolic dimension is equated to a concrete integer
+    :return: resulting broadcast shape
     """
     if sh1 == sh2:
         return sh1

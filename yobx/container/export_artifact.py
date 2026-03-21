@@ -69,6 +69,138 @@ class ExportReport:
         """
         return {"stats": self.stats, "extra": self.extra, "build_stats": self.build_stats}
 
+    def to_string(self) -> str:
+        """Return a human-readable text summary of this report.
+
+        The output includes:
+
+        * Any extra key/value pairs stored in :attr:`extra`.
+        * A per-pattern optimization table built from :attr:`stats` (when
+          non-empty), grouped and sorted by the number of nodes removed.
+        * Timing entries from :attr:`build_stats` (when available).
+
+        :return: multi-line string suitable for printing.
+
+        .. runpython::
+            :showcode:
+
+            from yobx.container import ExportReport
+
+            report = ExportReport(
+                stats=[
+                    {"pattern": "p1", "added": 1, "removed": 2, "time_in": 0.01},
+                    {"pattern": "p1", "added": 0, "removed": 1, "time_in": 0.02},
+                ],
+                extra={"time_total": 0.42},
+            )
+            print(report.to_string())
+        """
+        lines: List[str] = []
+
+        if self.extra:
+            lines.append("-- extra --")
+            for k, v in sorted(self.extra.items()):
+                lines.append(f"  {k}: {v}")
+
+        if self.stats:
+            import pandas
+
+            df = pandas.DataFrame(self.stats)
+            for col in ["added", "removed"]:
+                if col in df.columns:
+                    df[col] = df[col].fillna(0).astype(int)
+            num_cols = [c for c in ["added", "removed", "time_in"] if c in df.columns]
+            if "pattern" in df.columns and num_cols:
+                agg = df.groupby("pattern")[num_cols].sum()
+                mask = pandas.Series(False, index=agg.index)
+                for col in ["added", "removed"]:
+                    if col in agg.columns:
+                        mask |= agg[col] > 0
+                agg = agg[mask]
+                if "removed" in agg.columns:
+                    agg = agg.sort_values("removed", ascending=False)
+                if not agg.empty:
+                    lines.append("-- stats (aggregated by pattern) --")
+                    lines.append(agg.to_string())
+            else:
+                lines.append("-- stats --")
+                lines.append(df.to_string())
+
+        if self.build_stats:
+            d = self.build_stats.to_dict()
+            if d:
+                lines.append("-- build_stats --")
+                for k, v in sorted(d.items()):
+                    lines.append(f"  {k}: {v}")
+
+        return "\n".join(lines)
+
+    def to_excel(self, path: str) -> None:
+        """Write the report contents to an Excel workbook at *path*.
+
+        The workbook contains up to four sheets:
+
+        ``stats``
+            Every row from :attr:`stats` as a raw :class:`~pandas.DataFrame`.
+            Only written when :attr:`stats` is non-empty.
+        ``stats_agg``
+            The same data aggregated (summed) by ``"pattern"``, sorted by the
+            number of removed nodes in descending order.  Only written when
+            :attr:`stats` is non-empty and contains a ``"pattern"`` column.
+        ``extra``
+            :attr:`extra` rendered as a two-column table (``key``, ``value``).
+            Only written when :attr:`extra` is non-empty.
+        ``build_stats``
+            :attr:`build_stats` rendered as a two-column table (``key``,
+            ``value``).  Only written when :attr:`build_stats` is not ``None``
+            and contains at least one entry.
+
+        :param path: destination file path (e.g. ``"report.xlsx"``).
+
+        .. runpython::
+            :showcode:
+
+            import tempfile, os
+            from yobx.container import ExportReport
+
+            report = ExportReport(
+                stats=[
+                    {"pattern": "p1", "added": 1, "removed": 2, "time_in": 0.01},
+                ],
+                extra={"time_total": 0.42},
+            )
+            with tempfile.TemporaryDirectory() as tmp:
+                path = os.path.join(tmp, "report.xlsx")
+                report.to_excel(path)
+                print(f"Saved to {os.path.basename(path)!r}")
+        """
+        import pandas
+
+        with pandas.ExcelWriter(path, engine="openpyxl") as writer:
+            if self.stats:
+                df_stats = pandas.DataFrame(self.stats)
+                for col in ["added", "removed"]:
+                    if col in df_stats.columns:
+                        df_stats[col] = df_stats[col].fillna(0).astype(int)
+                df_stats.to_excel(writer, sheet_name="stats", index=False)
+
+                num_cols = [c for c in ["added", "removed", "time_in"] if c in df_stats.columns]
+                if "pattern" in df_stats.columns and num_cols:
+                    agg = df_stats.groupby("pattern")[num_cols].sum()
+                    if "removed" in agg.columns:
+                        agg = agg.sort_values("removed", ascending=False)
+                    agg.reset_index().to_excel(writer, sheet_name="stats_agg", index=False)
+
+            if self.extra:
+                df_extra = pandas.DataFrame(list(self.extra.items()), columns=["key", "value"])
+                df_extra.to_excel(writer, sheet_name="extra", index=False)
+
+            if self.build_stats:
+                d = self.build_stats.to_dict()
+                if d:
+                    df_bs = pandas.DataFrame(list(d.items()), columns=["key", "value"])
+                    df_bs.to_excel(writer, sheet_name="build_stats", index=False)
+
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}("
@@ -219,6 +351,15 @@ class ExportArtifact(ExportArtifactProtocol):
             self.report = ExportReport()
         self.report.update(data)
 
+    def save_report(self, onnx_path: str) -> None:
+        """Save the report as an Excel file alongside *onnx_path* when available."""
+        if self.report is None:
+            return
+        import os
+
+        excel_path = os.path.splitext(onnx_path)[0] + ".xlsx"
+        self.report.to_excel(excel_path)
+
     def save(self, file_path: str, all_tensors_to_one_file: bool = True) -> Any:
         """Save the exported model to *file_path*.
 
@@ -245,12 +386,14 @@ class ExportArtifact(ExportArtifactProtocol):
                 file_path, all_tensors_to_one_file=all_tensors_to_one_file
             )
             self.filename = file_path
+            self.save_report(file_path)
             return result
         import onnx
 
         if isinstance(self.proto, onnx.ModelProto):
             onnx.save_model(self.proto, file_path)
             self.filename = file_path
+            self.save_report(file_path)
             return self.proto
         raise TypeError(
             f"Cannot save a proto of type {type(self.proto).__name__}. "

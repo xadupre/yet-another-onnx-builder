@@ -12,7 +12,11 @@ input** tensor.  See :ref:`l-design-sql` for the full design discussion.
 
     sql_to_onnx
     sql_to_onnx_graph
+    parsed_query_to_onnx
+    parsed_query_to_onnx_graph
     lazyframe_to_onnx
+    dataframe_to_onnx
+    trace_dataframe
     to_onnx
 
 .. toctree::
@@ -22,6 +26,7 @@ input** tensor.  See :ref:`l-design-sql` for the full design discussion.
     parse
     sql_convert
     polars_convert
+    dataframe_trace
     convert
     _expr
     ops/index

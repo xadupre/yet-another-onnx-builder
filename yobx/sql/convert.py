@@ -1,11 +1,13 @@
 """
-Unified SQL / polars LazyFrame → ONNX dispatcher.
+Unified SQL / polars LazyFrame / DataFrame-function → ONNX dispatcher.
 
-:func:`to_onnx` is the single entry point that accepts either a plain SQL
-query string or a :class:`polars.LazyFrame` and returns a self-contained
-:class:`~yobx.container.ExportArtifact`.  Internally it delegates to
-:func:`~yobx.sql.sql_convert.sql_to_onnx` or
-:func:`~yobx.sql.polars_convert.lazyframe_to_onnx` depending on the type of
+:func:`to_onnx` is the single entry point that accepts a plain SQL query
+string, a :class:`polars.LazyFrame`, or a Python callable that operates on a
+:class:`~yobx.sql.dataframe_trace.TracedDataFrame`, and returns a
+self-contained :class:`~yobx.container.ExportArtifact`.  Internally it
+delegates to :func:`~yobx.sql.sql_convert.sql_to_onnx`,
+:func:`~yobx.sql.polars_convert.lazyframe_to_onnx`, or
+:func:`~yobx.sql.dataframe_trace.dataframe_to_onnx` depending on the type of
 the first argument.
 """
 
@@ -18,35 +20,48 @@ import numpy as np
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
 from ..xbuilder import GraphBuilder
+from .dataframe_trace import TracedDataFrame, dataframe_to_onnx
 from .polars_convert import lazyframe_to_onnx
 from .sql_convert import sql_to_onnx, sql_to_onnx_graph  # noqa: F401 – re-exported
 
 
 def to_onnx(
-    dataframe_or_query: Union[str, "polars.LazyFrame"],  # type: ignore # noqa: F821, UP037
+    dataframe_or_query: Union[  # type: ignore
+        str,
+        Callable[["TracedDataFrame"], "TracedDataFrame"],  # type: ignore # noqa: UP037
+        "polars.LazyFrame",  # type: ignore # noqa: F821, UP037
+    ],
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
 ) -> ExportArtifact:
-    """Convert either a SQL query string or a :class:`polars.LazyFrame` to ONNX.
+    """Convert a SQL string, a DataFrame-tracing function, or a polars LazyFrame to ONNX.
 
-    This is the unified entry point that dispatches to :func:`sql_to_onnx`
-    when *dataframe_or_query* is a string, or to :func:`lazyframe_to_onnx`
-    when it is a :class:`polars.LazyFrame`.
+    This is the unified entry point that dispatches to:
+
+    * :func:`sql_to_onnx` — when *dataframe_or_query* is a **string**.
+    * :func:`~yobx.sql.dataframe_trace.dataframe_to_onnx` — when
+      *dataframe_or_query* is a **callable** (a Python function that accepts a
+      :class:`~yobx.sql.dataframe_trace.TracedDataFrame` and returns one).
+    * :func:`lazyframe_to_onnx` — for any other value (expected to be a
+      :class:`polars.LazyFrame`).
 
     Each *source* column is represented as a **separate 1-D ONNX input**
-    tensor.  The model outputs correspond to the ``SELECT`` expressions (SQL)
-    or the ``select`` / ``agg`` step of the LazyFrame plan.
+    tensor.  The model outputs correspond to the ``SELECT`` expressions (SQL /
+    callable) or the ``select`` / ``agg`` step of the LazyFrame plan.
 
-    :param dataframe_or_query: a SQL query string **or** a
-        :class:`polars.LazyFrame`.
+    :param dataframe_or_query: one of:
 
         * **SQL string** — supported clauses: ``SELECT``, ``FROM``,
           ``[INNER|LEFT|RIGHT|FULL] JOIN … ON``, ``WHERE``, ``GROUP BY``.
           Custom Python functions can be called by name in the ``SELECT`` and
           ``WHERE`` clauses when registered via *custom_functions*.
+        * **callable** — a Python function ``(df: TracedDataFrame) ->
+          TracedDataFrame``.  The function is traced to capture all
+          ``filter``, ``select``, and aggregation operations it performs,
+          which are then compiled to ONNX.
         * **polars.LazyFrame** — the execution plan is extracted via
           :meth:`polars.LazyFrame.explain` and translated into SQL before
           conversion.  See :func:`lazyframe_to_onnx` for details of supported
@@ -60,7 +75,7 @@ def to_onnx(
     :param right_input_dtypes: if *dataframe_or_query* is a SQL string that
         contains a ``JOIN``, a mapping from *right-table* column name to numpy
         dtype.  Defaults to *input_dtypes* when ``None``.  Ignored when
-        *dataframe_or_query* is a :class:`polars.LazyFrame`.
+        *dataframe_or_query* is a callable or a :class:`polars.LazyFrame`.
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
     :param custom_functions: an optional mapping from function name (as it
@@ -103,6 +118,25 @@ def to_onnx(
         (total,) = ref.run(None, {"a": a, "b": b})
         # total == array([5., 9.], dtype=float32)  (rows where a > 0)
 
+    Example — from a DataFrame-tracing callable::
+
+        import numpy as np
+        from yobx.sql import to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        def transform(df):
+            df = df.filter(df["a"] > 0)
+            return df.select([(df["a"] + df["b"]).alias("total")])
+
+        dtypes = {"a": np.float32, "b": np.float32}
+        artifact = to_onnx(transform, dtypes)
+
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0,  5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        # total == array([5., 9.], dtype=float32)  (rows where a > 0)
+
     Example — from a polars LazyFrame::
 
         import numpy as np
@@ -131,6 +165,14 @@ def to_onnx(
         cast to ``float64`` internally, which may lose precision for integers
         larger than 2^53.
     """
+    if callable(dataframe_or_query) and not isinstance(dataframe_or_query, str):
+        return dataframe_to_onnx(
+            dataframe_or_query,  # type: ignore
+            input_dtypes,
+            target_opset=target_opset,
+            custom_functions=custom_functions,
+            builder_cls=builder_cls,
+        )
     if isinstance(dataframe_or_query, str):
         return sql_to_onnx(
             dataframe_or_query,
