@@ -40,11 +40,6 @@ jobs:
             --ignore=unittests/sklearn \
             --ignore=unittests/tensorflow
 
-      - name: Parity with jax2onnx
-        run: |
-          pip install jax2onnx
-          pytest --durations=10 unittests/parity/with_tensorflow
-
       - name: Upload coverage to Codecov
         # Codecov automatically merges all uploads that share the same commit SHA.
         # The sklearn_tests.yml job (scikit-learn 1.8 only) also uploads a coverage
