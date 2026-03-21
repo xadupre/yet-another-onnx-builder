@@ -51,6 +51,7 @@ import onnxruntime
 from sklearn.neural_network import MLPClassifier
 from skl2onnx._supported_operators import sklearn_operator_name_map
 from skl2onnx.common._registration import get_converter
+from skl2onnx.common.data_types import FloatTensorType
 
 from yobx import doc
 from yobx.typing import GraphBuilderExtendedProtocol
@@ -210,7 +211,7 @@ print("\nAll predictions match ✓")
 # factory, and you're done.
 
 skl2onnx_mlp_fn = get_converter(sklearn_operator_name_map[MLPClassifier])
-converter = make_skl2onnx_converter(skl2onnx_mlp_fn)
+converter = make_skl2onnx_converter(skl2onnx_mlp_fn, FloatTensorType([None, None]))
 onx_b = to_onnx(mlp, (X,), extra_converters={MLPClassifier: converter})
 
 ref_b = onnxruntime.InferenceSession(

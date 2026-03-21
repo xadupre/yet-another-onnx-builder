@@ -264,7 +264,7 @@ class _MockContainer:
 # ---------------------------------------------------------------------------
 
 
-def make_skl2onnx_converter(skl2onnx_op_converter: Callable) -> Callable:
+def make_skl2onnx_converter(skl2onnx_op_converter: Callable, input_type: object) -> Callable:
     """
     Wrap a skl2onnx-style converter function so it can be used with
     :func:`yobx.sklearn.to_onnx` via the ``extra_converters`` parameter.
@@ -283,19 +283,26 @@ def make_skl2onnx_converter(skl2onnx_op_converter: Callable) -> Callable:
     imports required) and then injecting the collected nodes and initializers
     directly into the enclosing :class:`~yobx.xbuilder.GraphBuilder`.
 
-    The converter function can be obtained from skl2onnx's registry::
+    The converter function and input type can be obtained from skl2onnx::
 
         from skl2onnx._supported_operators import sklearn_operator_name_map
         from skl2onnx.common._registration import get_converter
+        from skl2onnx.common.data_types import FloatTensorType
         from sklearn.neural_network import MLPClassifier
         from yobx.sklearn import to_onnx, make_skl2onnx_converter
 
         skl2onnx_fn = get_converter(sklearn_operator_name_map[MLPClassifier])
-        converter = make_skl2onnx_converter(skl2onnx_fn)
+        converter = make_skl2onnx_converter(skl2onnx_fn, FloatTensorType([None, None]))
         artifact = to_onnx(mlp, (X,), extra_converters={MLPClassifier: converter})
 
     :param skl2onnx_op_converter: the skl2onnx converter function for the
         target estimator type (obtained from skl2onnx's registry).
+    :param input_type: a skl2onnx type instance (e.g.
+        ``FloatTensorType([None, None])`` or ``DoubleTensorType([None, n_features])``)
+        that will be assigned to the mock input variable's ``.type`` attribute.
+        skl2onnx converter functions typically call ``guess_proto_type()`` /
+        ``guess_numpy_type()`` on this value to determine the ONNX element type, so
+        the correct skl2onnx type class must be used.
     :return: a yobx-compatible converter function with the signature
         ``(g, sts, outputs, estimator, X, *, name) -> str | tuple[str, ...]``.
 
@@ -303,7 +310,8 @@ def make_skl2onnx_converter(skl2onnx_op_converter: Callable) -> Callable:
 
         This module contains **no** skl2onnx imports.  Only :mod:`onnx` and
         :mod:`numpy` (both core :mod:`yobx` dependencies) are used inside the
-        mock helper classes.
+        mock helper classes.  The caller is responsible for importing skl2onnx
+        to obtain both *skl2onnx_op_converter* and *input_type*.
     """
 
     def _converter(
@@ -314,38 +322,10 @@ def make_skl2onnx_converter(skl2onnx_op_converter: Callable) -> Callable:
         X: str,
         name: str = "skl2onnx",
     ) -> Tuple:
-        # Import skl2onnx data types lazily (skl2onnx is an optional dependency).
-        # These types are needed because skl2onnx converter functions call
-        # ``guess_proto_type(operator.inputs[0].type)`` / ``guess_numpy_type(...)``
-        # which do ``isinstance`` checks against FloatTensorType / DoubleTensorType.
-        import onnx
-        from skl2onnx.common.data_types import DoubleTensorType, FloatTensorType
-
-        itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT  # type: ignore[attr-defined]
-        if hasattr(estimator, "n_features_in_"):
-            n_features = int(estimator.n_features_in_)  # type: ignore[attr-defined]
-        elif g.has_shape(X):  # type: ignore[attr-defined]
-            shape = g.get_shape(X)  # type: ignore[attr-defined]
-            n_features = (
-                int(shape[1]) if len(shape) > 1 and isinstance(shape[1], int) else None
-            )
-        else:
-            n_features = None
-
-        if itype == onnx.TensorProto.FLOAT:
-            skl_type = FloatTensorType([None, n_features])
-        elif itype == onnx.TensorProto.DOUBLE:
-            skl_type = DoubleTensorType([None, n_features])
-        else:
-            raise NotImplementedError(
-                f"make_skl2onnx_converter: unsupported elem_type {itype!r}. "
-                "Only FLOAT (1) and DOUBLE (11) are currently supported."
-            )
-
         scope = _MockScope(g.main_opset)  # type: ignore[attr-defined]
 
         input_var = _MockVariable(X, X)
-        input_var.type = skl_type  # required by skl2onnx guess_proto_type / guess_numpy_type
+        input_var.type = input_type  # set by caller — no skl2onnx import needed here
         output_vars = [_MockVariable(out, out) for out in outputs]
 
         operator = _MockOperator(

@@ -97,6 +97,7 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
         from sklearn.neural_network import MLPClassifier
         from skl2onnx._supported_operators import sklearn_operator_name_map
         from skl2onnx.common._registration import get_converter
+        from skl2onnx.common.data_types import FloatTensorType
         from yobx.sklearn import make_skl2onnx_converter
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -107,7 +108,7 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
         mlp.fit(X, y)
 
         skl2onnx_fn = get_converter(sklearn_operator_name_map[MLPClassifier])
-        converter = make_skl2onnx_converter(skl2onnx_fn)
+        converter = make_skl2onnx_converter(skl2onnx_fn, FloatTensorType([None, None]))
         onx = to_onnx(mlp, (X,), extra_converters={MLPClassifier: converter})
 
         op_types = [n.op_type for n in onx.graph.node]
@@ -133,6 +134,7 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
         from sklearn.linear_model import LinearRegression
         from skl2onnx._supported_operators import sklearn_operator_name_map
         from skl2onnx.common._registration import get_converter
+        from skl2onnx.common.data_types import FloatTensorType
         from yobx.sklearn import make_skl2onnx_converter
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -140,7 +142,7 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
         reg = LinearRegression().fit(X, y)
 
         skl2onnx_fn = get_converter(sklearn_operator_name_map[LinearRegression])
-        converter = make_skl2onnx_converter(skl2onnx_fn)
+        converter = make_skl2onnx_converter(skl2onnx_fn, FloatTensorType([None, None]))
         onx = to_onnx(reg, (X,), extra_converters={LinearRegression: converter})
 
         ref = ExtendedReferenceEvaluator(onx)
