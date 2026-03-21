@@ -75,6 +75,39 @@ class TestCommandLines(ExtTestCase):
         text = st.getvalue()
         self.assertIn("-- done", text)
 
+    def test_g_render_gallery_to_auto_folder(self):
+        example = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "docs",
+                "examples",
+                "core",
+                "plot_dot_graph.py",
+            )
+        )
+        if not os.path.isfile(example):
+            self.skipTest("gallery example not found")
+        # Determine the expected output path
+        from yobx._command_lines_parser import _gallery_auto_output_path
+
+        out_path = _gallery_auto_output_path(example)
+        self.assertIn("auto_examples_core", out_path)
+        self.assertTrue(out_path.endswith("plot_dot_graph.rst"))
+
+        # Run the command
+        st = StringIO()
+        with redirect_stdout(st):
+            main(["render-gallery", example, "-v", "1"])
+
+        # Output file must exist with expected content
+        self.assertTrue(os.path.isfile(out_path), f"Expected {out_path!r} to exist")
+        with open(out_path, encoding="utf-8") as fh:
+            content = fh.read()
+        self.assertIn(".. _l-plot-dot-graph:", content)
+        self.assertIn(".. code-block:: python", content)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

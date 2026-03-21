@@ -569,11 +569,9 @@ def _sklearn_decision_tree_classifier_v5(
         aggregate_function=1,  # SUM
         **attrs,  # type: ignore
     )
-    assert isinstance(scores, str)
 
     # Rename scores to the desired probabilities output name.
-    proba = g.op.Identity(scores, name=f"{name}_proba", outputs=outputs[1:2])
-    assert isinstance(proba, str)
+    g.op.Identity(scores, name=f"{name}_proba", outputs=outputs[1:2])
 
     # Derive the predicted label via ArgMax over the class axis.
     label_idx = g.op.ArgMax(scores, axis=1, keepdims=0, name=f"{name}_argmax")
@@ -584,17 +582,13 @@ def _sklearn_decision_tree_classifier_v5(
         label = g.op.Gather(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.INT64)
+        g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.STRING)
+        g.set_type(label, onnx.TensorProto.STRING)
 
     # Emit optional extra outputs requested via sts["options"].
     extra_idx = 2

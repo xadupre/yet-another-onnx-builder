@@ -36,7 +36,7 @@ docs = [
     "onnx-diagnostic",
     "openpyxl",
     "pandas",
-    "piccolo-theme",
+    "pydata-sphinx-theme",
     "skl2onnx",  # for one example
     "sphinx>=7",
     "sphinxcontrib-mermaid",
@@ -52,36 +52,19 @@ category_encoders = [
     "scikit-learn>=1.4",
     "category-encoders>=2.6",
 ]
-lightgbm = [
-    "scikit-learn>=1.4",
-    "lightgbm>=3.0",
-]
-sklearn = [
-    "scikit-learn>=1.4",
-]
-imblearn = [
-    "scikit-learn>=1.4",
-    "imbalanced-learn>=0.11",
-]
-xgboost = [
-    "scikit-learn>=1.4",
-    "xgboost>=3.0",
-]
-sksurv = [
-    "scikit-learn>=1.4",
-    "scikit-survival>=0.22",
-]
-spox = [
-    "spox>=0.12",
-]
-tensorflow = [
-    "jax",
-    "tensorflow>=2.20",
-]
-jax = [
-    "jax[cpu]>=0.4",
-    "tensorflow>=2.20",
-]
+
+# packages
+
+imblearn = ["scikit-learn>=1.4", "imbalanced-learn>=0.11"]
+jax = ["jax[cpu]>=0.4", "tensorflow>=2.20"]
+lightgbm = ["scikit-learn>=1.4", "lightgbm>=3.0"]
+litert = ["ai-edge-litert"]
+polars = ["polars"]
+sklearn = ["scikit-learn>=1.4"]
+sksurv = ["scikit-learn>=1.4", "scikit-survival>=0.22"]
+spox = ["spox>=0.12"]
+statsmodels = ["scikit-learn>=1.4", "statsmodels"]
+tensorflow = ["jax", "tensorflow>=2.20"]
 torch = [
     "accelerate",
     "onnxscript @ git+https://github.com/microsoft/onnxscript.git",
@@ -94,6 +77,7 @@ transformers = [
     "scikit-learn",  # one function requires it to compute ROC curve
     "transformers>=4.45",
 ]
+xgboost = ["scikit-learn>=1.4", "xgboost>=3.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -159,7 +143,7 @@ select = [
     "UP006", "UP007", "UP015", "UP027", "UP031", "UP032", "UP034", "UP035", "UP045",
 ]
 "*/__init__.py" = ["F401"]
-"docs/**" = ["RUF001"]
+"docs/**" = ["RUF001", "SIM105"]
 "unittests/**" = ["B023", "B904", "E731", "SIM300"]
 "unittests/helpers/test_dot_helper.py" = ["B904", "E501"]
 "yobx/builder/light/*" = ["PYI032", "UP037"]
@@ -179,25 +163,31 @@ module = [
     "yobx.builder.spox.*",
     "yobx.container.*",
     "yobx.helpers._excel_helper",
+    "yobx.litert.ops.*",
     "yobx.helpers.helper",
     "yobx.reference.ops.*",
     "yobx.sklearn.calibration.*",
     "yobx.sklearn.category_encoders.*",
     "yobx.sklearn.cluster.*",
-    "yobx.sklearn.coveriance.*",
+    "yobx.sklearn.compose.*",
+    "yobx.sklearn.covariance.*",
     "yobx.sklearn.cross_decomposition.*",
     "yobx.sklearn.decomposition.*",
     "yobx.sklearn.discriminant_analysis.*",
+    "yobx.sklearn.dummy.*",
     "yobx.sklearn.ensemble.*",
     "yobx.sklearn.feature_extraction.*",
+    "yobx.sklearn.feature_selection.*",
     "yobx.sklearn.gaussian_process.*",
     "yobx.sklearn.imblearn.*",
     "yobx.sklearn.impute.*",
     "yobx.sklearn.isotonic.*",
+    "yobx.sklearn.kernel_approximation.*",
     "yobx.sklearn.kernel_ridge.*",
     "yobx.sklearn.linear_model.*",
     "yobx.sklearn.lightgbm.*",
     "yobx.sklearn.manifold.*",
+    "yobx.sklearn.mixture.*",
     "yobx.sklearn.model_selection.*",
     "yobx.sklearn.multiclass.*",
     "yobx.sklearn.multioutput.*",
@@ -205,12 +195,16 @@ module = [
     "yobx.sklearn.neighbors.*",
     "yobx.sklearn.neural_network.*",
     "yobx.sklearn.preprocessing.*",
+    "yobx.sklearn.pipeline.*",
     "yobx.sklearn.sksurv.*",
     "yobx.sklearn.svm.*",
     "yobx.sklearn.tree.*",
+    "yobx.sklearn.variance_threshold.*",
     "yobx.sklearn.xgboost.*",
     "yobx.reference.torch_ops.*",
     "yobx.tensorflow.ops.*",
+    "yobx.litert.ops.*",
+    "yobx.sql._expr.*",
     "yobx.torch._model_eval_cases",
     "yobx.torch.tracing.*",
     "yobx.torch.in_transformers._patches_model_rope_utils",
@@ -240,6 +234,7 @@ project-excludes = [
     "yobx/helpers/_excel_helper.py",
     "yobx/helpers/_onnx_simple_text_plot.py",
     "yobx/helpers/helper.py",
+    "yobx/litert/ops/*.py",
     "yobx/reference/ops/*",
     "yobx/reference/torch_ops/*",
     "yobx/reference/_inference_session.py",

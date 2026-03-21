@@ -23,7 +23,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
         onx = to_onnx(fu, (X,))
 
         # Both transformers run on full X and are concatenated
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Concat", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -131,7 +131,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
         onx = to_onnx(fu, (X,), function_options=fopts)
 
         # Both sub-transformers must appear as local functions.
-        func_names = [f.name for f in onx.functions]
+        func_names = [f.name for f in onx.proto.functions]
         self.assertIn("StandardScaler", func_names)
         self.assertIn("MinMaxScaler", func_names)
         # FeatureUnion itself is not wrapped as a function.
@@ -139,7 +139,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
 
         # The main graph still has Concat (FeatureUnion orchestration) but
         # no raw ops from the individual converters.
-        graph_ops = [n.op_type for n in onx.graph.node]
+        graph_ops = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Concat", graph_ops)
         self.assertNotIn("Sub", graph_ops)
 
@@ -169,7 +169,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
         )
         onx = to_onnx(pipe, (X,), function_options=fopts)
 
-        func_names = [f.name for f in onx.functions]
+        func_names = [f.name for f in onx.proto.functions]
         self.assertIn("StandardScaler", func_names)
         self.assertIn("MinMaxScaler", func_names)
         self.assertIn("LogisticRegression", func_names)

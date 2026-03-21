@@ -103,6 +103,14 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=True,
         )
 
+    @requires_torch("2.7", "scan")
+    def test_run_exporter_vmap_python_nostrict(self):
+        evaluation(cases="VmapPython", exporters="export-nostrict", quiet=False, dynamic=True)
+
+    @requires_torch("2.7", "scan")
+    def test_run_exporter_vmap_python_yobx(self):
+        evaluation(cases="VmapPython", exporters="yobx", quiet=False, dynamic=True)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

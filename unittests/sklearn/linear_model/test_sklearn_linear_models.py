@@ -63,7 +63,7 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
             est.fit(Xd, y)
             onx = to_onnx(est, (Xd,))
 
-            op_types = [n.op_type for n in onx.graph.node]
+            op_types = [n.op_type for n in onx.proto.graph.node]
             self.assertIn("Gemm", op_types)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -200,7 +200,7 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
             m.fit(Xd, y)
 
             onx = to_onnx(m, (Xd,))
-            op_types = [n.op_type for n in onx.graph.node]
+            op_types = [n.op_type for n in onx.proto.graph.node]
             self.assertIn("Gemm", op_types)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -249,7 +249,7 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
             est.fit(X, y)
             onx = to_onnx(est, (X,))
 
-            op_types = [n.op_type for n in onx.graph.node]
+            op_types = [n.op_type for n in onx.proto.graph.node]
             self.assertIn("Gemm", op_types)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -287,7 +287,7 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
             m = TweedieRegressor(power=0)
             m.fit(X, y)
             onx = to_onnx(m, (X,))
-            op_types = [n.op_type for n in onx.graph.node]
+            op_types = [n.op_type for n in onx.proto.graph.node]
             self.assertIn("Gemm", op_types)
             self.assertNotIn("Exp", op_types)
 
@@ -299,7 +299,7 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
             m = PoissonRegressor()
             m.fit(X, y)
             onx = to_onnx(m, (X,))
-            op_types = [n.op_type for n in onx.graph.node]
+            op_types = [n.op_type for n in onx.proto.graph.node]
             self.assertIn("Exp", op_types)
 
 
@@ -321,7 +321,7 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
             onx = to_onnx(est, (Xd,))
 
             # Should only produce a single (label) output
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -379,7 +379,7 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
             onx = to_onnx(m, (Xd,))
 
             # Should produce two outputs: label + probabilities
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -405,7 +405,7 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
 
             onx = to_onnx(m, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)

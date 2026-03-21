@@ -22,7 +22,7 @@ class TestSplineTransformer(ExtTestCase):
         onx = to_onnx(st, (X,))
 
         # Check graph structure includes polynomial evaluation ops.
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Pow", op_types)
         self.assertIn("MatMul", op_types)
         self.assertIn("Gather", op_types)

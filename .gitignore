@@ -217,6 +217,7 @@ docs/sg_execution_times.rst
 # tests
 dump_test*
 onnxruntime_profile*
+*.xlsx
 *.data
 *.onnx
 *.pb

@@ -20,7 +20,7 @@ class TestOAS(ExtTestCase):
         estimator.fit(X)
         onx = to_onnx(estimator, (X,))
 
-        output_names = [o.name for o in onx.graph.output]
+        output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -97,7 +97,7 @@ class TestOAS(ExtTestCase):
         oas.fit(X)
         onx = to_onnx(oas, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("MatMul", op_types)
         self.assertIn("Mul", op_types)

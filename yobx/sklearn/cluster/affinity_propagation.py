@@ -101,21 +101,16 @@ def sklearn_affinity_propagation(
     # Distances output (optional second output).
     if n_outputs >= 2:
         distances = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt", outputs=outputs[1:2])
-        assert isinstance(distances, str)
-        if not sts:
-            g.set_type(distances, itype)
+        g.set_type(distances, itype)
     else:
         distances = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt")
-        assert isinstance(distances, str)
 
     # Labels: nearest centre index → (N,)
     label_idx = g.op.ArgMin(sq_dists_clipped, axis=1, keepdims=0, name=f"{name}_argmin")
     labels = g.op.Cast(
         label_idx, to=onnx.TensorProto.INT64, name=f"{name}_cast", outputs=outputs[:1]
     )
-    assert isinstance(labels, str)
-    if not sts:
-        g.set_type(labels, onnx.TensorProto.INT64)
+    g.set_type(labels, onnx.TensorProto.INT64)
 
     if n_outputs >= 2:
         return labels, distances

@@ -136,7 +136,7 @@ class TestSklearnOutputCodeClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (self._X_multi,), target_opset=18)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         # One Slice per sub-estimator
         self.assertIn("Slice", op_types)
         # Distance computation (standard path, no com.microsoft)
@@ -159,10 +159,10 @@ class TestSklearnOutputCodeClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (self._X_multi,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
-        domains = {oi.domain for oi in onx.opset_import}
+        domains = {oi.domain for oi in onx.proto.opset_import}
         self.assertIn("com.microsoft", domains)
 
         expected_label = clf.predict(self._X_multi)
@@ -181,7 +181,7 @@ class TestSklearnOutputCodeClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (X64,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
         expected_label = clf.predict(X64)

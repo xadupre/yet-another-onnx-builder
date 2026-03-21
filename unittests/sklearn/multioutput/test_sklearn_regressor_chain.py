@@ -144,7 +144,7 @@ class TestSklearnRegressorChain(ExtTestCase):
 
         onx = to_onnx(rc, (self._X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         # Three sub-estimators → three Gemm nodes (Ridge → Gemm)
         self.assertEqual(op_types.count("Gemm"), 3)
         # Three Reshape ops (one per chain step)
@@ -159,7 +159,7 @@ class TestSklearnRegressorChain(ExtTestCase):
 
         onx = to_onnx(rc, (self._X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         # Three sub-estimators → three Gemm nodes
         self.assertEqual(op_types.count("Gemm"), 3)
         # A Gather node reorders the columns

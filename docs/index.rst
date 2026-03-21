@@ -36,7 +36,17 @@ yet-another-onnx-builder documentation
 
 **yet-another-onnx-builder** (``yobx``) proposes a unique API to convert machine learning models
 to `ONNX <https://onnx.ai>`_ format and manipulating ONNX graphs programmatically.
-It can export from many libraries:
+It can export from many libraries. Each converters relies on a common GraphBuider API
+(:class:`~yobx.typing.GraphBuiderExtendedProtocol`)
+to build the final ONNX model. One default implementation is provided but
+it can also be replaced by any implementation of your own.
+Any user can implement its own. You can see
+:class:`~yobx.builder.onnxscript.bridge_graph_builder.OnnxScriptGraphBuilder`
+or :class:`yobx.builder.spox.gridge_graph_spox.SpoxGraphBuilder` for a reference.
+These API are close to :epkg:`onnx` API, using `NodeProto` for nodes
+and strings for names. This is on purpose: what this API produces is
+what you see in the final ONNX model. You can add your own metadata,
+choose your own names.
 
 **standard machine learning**
 
@@ -51,10 +61,20 @@ It can export from many libraries:
 +---------------------------------------+------------------------------+
 | :epkg:`scikit-survival`               | :ref:`l-sklearn-converter`   |
 +---------------------------------------+------------------------------+
+| :epkg:`statsmodels`                   | :ref:`l-sklearn-converter`   |
++---------------------------------------+------------------------------+
 | :epkg:`xgboost`                       | :ref:`l-sklearn-converter`   |
 +---------------------------------------+------------------------------+
 
-**deeplearning**
+**data manipulations**
+
+This is work in progress.
+Many packages produce SQL queries. It starts by converting a SQL
+query into ONNX.
+
+* :ref:`l-design-sql`
+
+**deep learning**
 
 +---------------------------------------+----------------------------------------+
 | :epkg:`jax` *in progress*             | :ref:`l-plot-jax-to-onnx`              |
@@ -62,6 +82,8 @@ It can export from many libraries:
 | :epkg:`tensorflow`                    | :ref:`l-design-tensorflow-converter`   |
 +---------------------------------------+----------------------------------------+
 | :epkg:`torch`                         | :ref:`l-torch-converter`               |
++---------------------------------------+----------------------------------------+
+| TFLite / :epkg:`LiteRT`               | :ref:`l-design-litert-converter`       |
 +---------------------------------------+----------------------------------------+
 
 It also provides:
@@ -87,34 +109,15 @@ Its unique API:
 
 .. toctree::
    :maxdepth: 1
-   :caption: Contents
-
-   design/sklearn/index
-   design/tensorflow/index
-   design/torch/index
-   design/index
-   cmds/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Galleries
-
-   auto_examples_core/index
-   auto_examples_sklearn/index
-   auto_examples_torch/index
-   auto_examples_tensorflow/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: API
 
    api/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: misc
-
-   index_stats
+   converters
+   core
+   galleries
+   cmds/index
+   install
+   getting_started
+   misc
 
 Indices and tables
 ==================

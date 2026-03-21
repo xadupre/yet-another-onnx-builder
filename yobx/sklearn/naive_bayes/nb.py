@@ -19,7 +19,6 @@ def _emit_label_and_proba(
 ) -> Tuple[str, str]:
     """Shared helper: argmax(jll) → label, softmax(jll) → proba."""
     proba = g.op.Softmax(jll, axis=1, name=name, outputs=outputs[1:])
-    assert isinstance(proba, str)
 
     label_idx = g.op.ArgMax(jll, axis=1, keepdims=0, name=name)
     label_idx_cast = g.op.Cast(label_idx, to=onnx.TensorProto.INT64, name=name)
@@ -29,17 +28,13 @@ def _emit_label_and_proba(
         label = g.op.Gather(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.INT64)
+        g.set_type(label, onnx.TensorProto.INT64)
     else:
         classes_arr = np.array(classes.astype(str))
         label = g.op.Gather(
             classes_arr, label_idx_cast, axis=0, name=f"{name}_label_string", outputs=outputs[:1]
         )
-        assert isinstance(label, str)
-        if not sts:
-            g.set_type(label, onnx.TensorProto.STRING)
+        g.set_type(label, onnx.TensorProto.STRING)
 
     return label, proba
 

@@ -106,7 +106,7 @@ class TestSklearnMultiOutputRegressor(ExtTestCase):
 
         onx = to_onnx(reg, (self._X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         # One Gemm per sub-estimator (Ridge → Gemm)
         self.assertEqual(op_types.count("Gemm"), 2)
         # Two Reshape ops (one per target)
@@ -223,7 +223,7 @@ class TestSklearnMultiOutputClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (self._X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         # One Gemm per sub-estimator (LogisticRegression → Gemm)
         self.assertEqual(op_types.count("Gemm"), 2)
         # ArgMax to derive label indices (one per sub-estimator)

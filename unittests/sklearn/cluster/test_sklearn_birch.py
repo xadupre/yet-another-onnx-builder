@@ -21,7 +21,7 @@ class TestBirch(ExtTestCase):
 
         onx = to_onnx(model, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ArgMin", op_types)
         self.assertIn("MatMul", op_types)
 
@@ -90,7 +90,7 @@ class TestBirch(ExtTestCase):
 
         onx = to_onnx(model, (X,), target_opset={"": 18, "com.microsoft": 1})
 
-        op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+        op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("CDist", "com.microsoft"), op_types)
 
         sess = self.check_ort(onx)
@@ -162,7 +162,7 @@ class TestBirch(ExtTestCase):
                 model.fit(X)
                 onx = to_onnx(model, (X,), target_opset={"": 18, "com.microsoft": 1})
 
-                op_types = [(n.op_type, n.domain) for n in onx.graph.node]
+                op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
                 self.assertIn(("CDist", "com.microsoft"), op_types)
 
                 sess = self.check_ort(onx)

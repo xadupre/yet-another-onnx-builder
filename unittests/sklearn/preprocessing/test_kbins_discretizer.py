@@ -24,7 +24,7 @@ class TestKBinsDiscretizer(ExtTestCase):
         onx = to_onnx(kbd, (X,))
 
         # Graph should use GreaterOrEqual and ReduceSum for bin indexing
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("GreaterOrEqual", op_types)
         self.assertIn("ReduceSum", op_types)
 
@@ -84,7 +84,7 @@ class TestKBinsDiscretizer(ExtTestCase):
         onx = to_onnx(kbd, (X,))
 
         # Graph should contain OneHot and Concat nodes
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("OneHot", op_types)
         self.assertIn("Concat", op_types)
 

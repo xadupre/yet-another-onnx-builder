@@ -133,7 +133,7 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         onx = to_onnx(clf, (self._X_multi,), target_opset=18)
 
         # Each sub-estimator should produce a TreeEnsembleClassifier node.
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertEqual(op_types.count("TreeEnsembleClassifier"), 3)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -158,7 +158,7 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         onx = to_onnx(clf, (self._X_multi,), target_opset=21)
 
         # Each sub-estimator should produce a TreeEnsembleClassifier node.
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertEqual(op_types.count("TreeEnsemble"), 3)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -182,7 +182,7 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
 
         onx = to_onnx(clf, (self._X_multi,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         # One Gemm per sub-estimator (3 for 3 classes)
         self.assertEqual(op_types.count("Gemm"), 3)
         # One Slice per sub-estimator

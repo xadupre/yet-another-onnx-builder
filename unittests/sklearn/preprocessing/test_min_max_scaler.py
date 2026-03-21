@@ -21,7 +21,7 @@ class TestMinMaxScaler(ExtTestCase):
         onx = to_onnx(mms, (X,))
 
         # Check graph structure: default (0,1) range uses Sub + Div + Identity
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("Div", op_types)
 
@@ -46,7 +46,7 @@ class TestMinMaxScaler(ExtTestCase):
         onx = to_onnx(mms, (X,))
 
         # Non-default feature_range adds Mul + Add on top of Sub + Div
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("Div", op_types)
         self.assertIn("Mul", op_types)
@@ -74,7 +74,7 @@ class TestMinMaxScaler(ExtTestCase):
 
         onx = to_onnx(pipe, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("Div", op_types)
         self.assertIn("Gemm", op_types)

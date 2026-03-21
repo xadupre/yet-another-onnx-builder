@@ -27,11 +27,11 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
 
         onx = to_onnx(est, (X,), target_opset=18)
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleRegressor", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -56,7 +56,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
 
         onx = to_onnx(est, (X,), target_opset=18)
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
 
@@ -82,10 +82,10 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
 
         onx = to_onnx(est, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertEqual(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleRegressor", op_types)
 
@@ -111,10 +111,10 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
 
         onx = to_onnx(est, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertEqual(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleRegressor", op_types)
 
@@ -144,11 +144,11 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
 
         onx = to_onnx(est, (X,), target_opset=18)
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsembleRegressor", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -177,7 +177,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         onx = to_onnx(est, (X,), target_opset=18)
         self.dump_onnx("test_hgb_classifier_binary_float64.onnx", onx)
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertIn("ai.onnx.ml", ml_opsets)
         self.assertLess(ml_opsets["ai.onnx.ml"], 5)
 
@@ -206,10 +206,10 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
 
         onx = to_onnx(est, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertEqual(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
         self.assertNotIn("TreeEnsembleRegressor", op_types)
 
@@ -238,10 +238,10 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
 
         onx = to_onnx(est, (X,), target_opset={"": 20, "ai.onnx.ml": 5})
 
-        ml_opsets = {op.domain: op.version for op in onx.opset_import}
+        ml_opsets = {op.domain: op.version for op in onx.proto.opset_import}
         self.assertEqual(ml_opsets["ai.onnx.ml"], 5)
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)

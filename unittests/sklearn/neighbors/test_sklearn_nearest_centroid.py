@@ -23,7 +23,7 @@ class TestNearestCentroid(ExtTestCase):
 
         onx = to_onnx(clf, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ArgMin", op_types)
         self.assertIn("Gather", op_types)
 
@@ -134,7 +134,7 @@ class TestNearestCentroid(ExtTestCase):
 
         onx = to_onnx(clf, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ArgMax", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)

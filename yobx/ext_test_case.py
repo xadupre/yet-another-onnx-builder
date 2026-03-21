@@ -374,6 +374,7 @@ def statistics_on_folder(
         level = len(spl)
         stat = statistics_on_file(os.path.join(folder, name))
         stat["name"] = name
+        stat["files"] = 1
         if aggregation <= 0:
             rows.append(stat)
             continue
@@ -723,6 +724,38 @@ def requires_sksurv(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
+def has_statsmodels(version: str = "") -> bool:
+    "Returns True if :epkg:`statsmodels` is available and recent enough."
+    try:
+        import statsmodels
+    except (ImportError, AttributeError):
+        return False
+    if not hasattr(statsmodels, "__version__"):
+        return False
+    if not version:
+        return True
+    return PvVersion(statsmodels.__version__) >= PvVersion(version)
+
+
+def requires_statsmodels(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`statsmodels` is not installed or not recent enough."""
+    try:
+        import statsmodels
+    except (AttributeError, ImportError):
+        return unittest.skip(msg or "statsmodels not installed")
+
+    if not hasattr(statsmodels, "__version__"):
+        return unittest.skip(msg or "statsmodels not installed")
+
+    if not version:
+        return lambda x: x
+
+    if PvVersion(statsmodels.__version__) < PvVersion(version):
+        msg = f"statsmodels version {statsmodels.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def requires_onnx_diagnostic(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx-diagnostic` is not recent enough."""
     try:
@@ -996,6 +1029,36 @@ def requires_onnxruntime_training(
         except (AttributeError, ImportError):  # pragma: no cover
             msg = msg or "ortmodule is missing in onnxruntime-training"
             return unittest.skip(msg)
+    return lambda x: x
+
+
+def has_litert(version: str = "") -> bool:
+    """Returns True if ``ai_edge_litert`` or ``tensorflow.lite`` is available."""
+    try:
+        import ai_edge_litert  # noqa: F401
+
+        if not version:
+            return True
+        return PvVersion(ai_edge_litert.__version__) >= PvVersion(version)
+    except (ImportError, AttributeError):
+        pass
+    try:
+        import tensorflow as tf  # noqa: F401
+
+        if not version:
+            return True
+        return PvVersion(tf.__version__) >= PvVersion(version)
+    except (ImportError, AttributeError):
+        return False
+
+
+def requires_litert(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if neither :epkg:`ai_edge_litert` nor
+    :epkg:`tensorflow` (which ships ``tf.lite``) is installed."""
+    if not has_litert(version):
+        return unittest.skip(
+            msg or "ai_edge_litert / tensorflow not installed or version too old"
+        )
     return lambda x: x
 
 
@@ -1472,6 +1535,10 @@ class ExtTestCase(unittest.TestCase):
         self, proto: Union["onnx.ModelProto", str], cpu: bool = False  # noqa: F821
     ) -> "onnxruntime.InferenceSession":  # noqa: F821
         from onnxruntime import InferenceSession, get_available_providers
+        from .container.export_artifact import ExportArtifact
+
+        if isinstance(proto, ExportArtifact):
+            proto = proto.proto
 
         providers = ["CPUExecutionProvider"]
         if not cpu and "CUDAExecutionProvider" in get_available_providers():

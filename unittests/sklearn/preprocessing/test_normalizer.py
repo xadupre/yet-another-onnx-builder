@@ -19,7 +19,7 @@ class TestNormalizer(ExtTestCase):
 
         onx = to_onnx(normalizer, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceL2", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -40,7 +40,7 @@ class TestNormalizer(ExtTestCase):
 
         onx = to_onnx(normalizer, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceL1", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -61,7 +61,7 @@ class TestNormalizer(ExtTestCase):
 
         onx = to_onnx(normalizer, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceMax", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -127,7 +127,7 @@ class TestNormalizer(ExtTestCase):
 
         onx = to_onnx(pipe, (X,))
 
-        op_types = [n.op_type for n in onx.graph.node]
+        op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceL2", op_types)
         self.assertIn("Gemm", op_types)
 

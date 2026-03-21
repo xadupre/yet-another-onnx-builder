@@ -18,6 +18,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.linkcode",
     "sphinx.ext.mathjax",
+    "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx_copybutton",
     "sphinx_gallery.gen_gallery",
@@ -36,11 +37,10 @@ graphviz_dot_args = ["-Gbgcolor=transparent"]
 
 mermaid_init_js = """
 document.addEventListener("DOMContentLoaded", function () {
-    // piccolo_theme sets data-mode="dark" or "darkest" on <html> for dark variants.
-    const darkModes = ["dark", "darkest"];
+    // pydata_sphinx_theme sets data-bs-theme="dark" on <html> for dark mode.
     function getMermaidTheme() {
-        const mode = document.documentElement.getAttribute("data-mode");
-        return darkModes.includes(mode) ? "dark" : "default";
+        return document.documentElement.getAttribute("data-bs-theme") === "dark"
+            ? "dark" : "default";
     }
     mermaid.initialize({ startOnLoad: true, theme: getMermaidTheme() });
     new MutationObserver(function () {
@@ -52,19 +52,22 @@ document.addEventListener("DOMContentLoaded", function () {
         mermaid.run();
     }).observe(document.documentElement, {
         attributes: true,
-        attributeFilter: ["data-mode"],
+        attributeFilter: ["data-bs-theme"],
     });
 });
 """
 
-templates_path = ["_templates"]
+# templates_path = ["_templates"]
 exclude_patterns = ["_build"]
-html_theme = "piccolo_theme"
+html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
 html_logo = "_static/logo.svg"
 html_favicon = "_static/logo.svg"
-html_theme_options = {"source_url": "https://github.com/xadupre/yet-another-onnx-builder"}
+html_theme_options = {
+    "github_url": "https://github.com/xadupre/yet-another-onnx-builder",
+    "logo": {"image_light": "_static/logo.svg", "image_dark": "_static/logo.svg"},
+}
 
 
 def linkcode_resolve(domain, info):
@@ -109,16 +112,22 @@ sphinx_gallery_conf = {
     # path to your examples scripts
     "examples_dirs": [
         os.path.join(os.path.dirname(__file__), "examples", "core"),
+        os.path.join(os.path.dirname(__file__), "examples", "sql"),
         os.path.join(os.path.dirname(__file__), "examples", "sklearn"),
         os.path.join(os.path.dirname(__file__), "examples", "torch"),
         os.path.join(os.path.dirname(__file__), "examples", "tensorflow"),
+        os.path.join(os.path.dirname(__file__), "examples", "litert"),
+        os.path.join(os.path.dirname(__file__), "examples", "transformers"),
     ],
     # path where to save gallery generated examples
     "gallery_dirs": [
         "auto_examples_core",
+        "auto_examples_sql",
         "auto_examples_sklearn",
         "auto_examples_torch",
         "auto_examples_tensorflow",
+        "auto_examples_litert",
+        "auto_examples_transformers",
     ],
     # no parallelization to avoid conflict with environment variables
     "parallel": 1,
@@ -137,7 +146,7 @@ sphinx_gallery_conf = {
 
 substring_to_disable = []
 if int(os.environ.get("UNITTEST_GOING", "0")):
-    substring_to_disable = ["tiny_llm"]
+    substring_to_disable = ["tiny_llm", "examples.transformers.plot_"]
 substring = "|".join(f"({s})" for s in substring_to_disable)
 if substring:
     sphinx_gallery_conf["ignore_pattern"] = f".*({substring}).*"
@@ -162,6 +171,7 @@ epkg_dictionary = {
     "HuggingFace": "https://huggingface.co/docs/hub/en/index",
     "huggingface_hub": "https://github.com/huggingface/huggingface_hub",
     "imbalanced-learn": "https://imbalanced-learn.org/stable/",
+    "ai_edge_litert": "https://pypi.org/project/ai-edge-litert/",
     "flax": "https://flax.readthedocs.io/en/latest/",
     "equinox": "https://docs.kidger.site/equinox/",
     "ir-py": "https://onnx.ai/ir-py/",
@@ -171,6 +181,7 @@ epkg_dictionary = {
     "lightgbm": "https://lightgbm.readthedocs.io/en/latest/",
     "LightGBM": "https://lightgbm.readthedocs.io/en/latest/",
     "Linux": "https://www.linux.org/",
+    "LiteRT": "https://ai.google.dev/edge/litert/",
     "ml_dtypes": "https://github.com/jax-ml/ml_dtypes",
     "ModelBuilder": "https://onnxruntime.ai/docs/genai/howto/build-model.html",
     "monai": "https://github.com/Project-MONAI/MONAI",
@@ -208,10 +219,12 @@ epkg_dictionary = {
     "spox": "https://spox.readthedocs.io/en/latest/",
     "Supported Operators and Data Types": "https://github.com/microsoft/onnxruntime/blob/main/docs/OperatorKernels.md",
     "sympy": "https://www.sympy.org/en/index.html",
+    "statsmodels": "https://www.statsmodels.org/",
     "Keras": "https://keras.io/",
     "tensorflow": "https://www.tensorflow.org/",
     "TensorFlow": "https://www.tensorflow.org/",
     "tensorflow-onnx": "https://github.com/onnx/tensorflow-onnx",
+    "TFLite": "https://ai.google.dev/edge/litert",
     "timm": "https://github.com/huggingface/pytorch-image-models",
     "torch": "https://docs.pytorch.org/docs/stable/torch.html",
     "torchbench": "https://github.com/pytorch/benchmark",

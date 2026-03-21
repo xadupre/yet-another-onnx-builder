@@ -117,5 +117,4 @@ def sklearn_one_hot_encoder(
     else:
         res = g.op.Concat(*parts, axis=1, name=name, outputs=outputs)
 
-    assert isinstance(res, str)  # type happiness
     return res

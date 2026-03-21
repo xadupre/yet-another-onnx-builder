@@ -111,9 +111,7 @@ def sklearn_kbins_discretizer(
 
     if encode == "ordinal":
         res = g.op.Cast(bin_indices, to=itype, name=f"{name}_cast_out", outputs=outputs)
-        assert isinstance(res, str)
-        if not sts:
-            g.set_type_shape_unary_op(res, X)
+        g.set_type_shape_unary_op(res, X)
         return res
 
     # onehot / onehot-dense — one-hot encode each feature then concatenate.
@@ -140,13 +138,11 @@ def sklearn_kbins_discretizer(
         res = g.op.Identity(one_hot_cols[0], name=f"{name}_identity", outputs=outputs)
     else:
         res = g.op.Concat(*one_hot_cols, axis=1, name=f"{name}_concat", outputs=outputs)
-    assert isinstance(res, str)
-    if not sts:
-        g.set_type(res, itype)
-        total_bins = int(n_bins.sum())
-        if g.has_shape(X):
-            shape = g.get_shape(X)
-            g.set_shape(res, (shape[0], total_bins))
-        elif g.has_rank(X):
-            g.set_rank(res, 2)
+    g.set_type(res, itype)
+    total_bins = int(n_bins.sum())
+    if g.has_shape(X):
+        shape = g.get_shape(X)
+        g.set_shape(res, (shape[0], total_bins))
+    elif g.has_rank(X):
+        g.set_rank(res, 2)
     return res

@@ -70,6 +70,7 @@ def register_sklearn_converters():
     from .pipeline import register as register_pipeline
     from .preprocessing import register as register_preprocessing
     from .sksurv import register as register_sksurv
+    from .statsmodels import register as register_statsmodels
     from .svm import register as register_svm
     from .tree import register as register_tree
     from .xgboost import register as register_xgboost
@@ -105,6 +106,7 @@ def register_sklearn_converters():
     register_pipeline()
     register_preprocessing()
     register_sksurv()
+    register_statsmodels()
     register_svm()
     register_tree()
     register_xgboost()

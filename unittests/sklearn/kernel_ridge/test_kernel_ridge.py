@@ -38,7 +38,7 @@ class TestSklearnKernelRidge(ExtTestCase):
                 estimator.fit(X, y)
             onx = to_onnx(estimator, (Xd,))
 
-            output_names = [o.name for o in onx.graph.output]
+            output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
 
             ref = ExtendedReferenceEvaluator(onx)

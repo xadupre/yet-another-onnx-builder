@@ -145,8 +145,6 @@ def sklearn_kneighbors_transformer(
         zeros, topk_indices, scatter_vals, axis=1, name=f"{name}_scatter", outputs=outputs[:1]
     )
 
-    assert isinstance(output, str)
-    if not sts:
-        g.set_type(output, itype)
+    g.set_type(output, itype)
 
     return output

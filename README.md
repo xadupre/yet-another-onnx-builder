@@ -17,7 +17,13 @@ Yet another onnx builder, patches, flattening functions...
 **[Documentation](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/index.html)**
 
 **yet-another-onnx-builder** (`yobx`) proposes a unique API to convert machine learning models
-to [ONNX](https://onnx.ai) format from many libraries:
+to [ONNX](https://onnx.ai) format from many libraries. Each converters relies on a common GraphBuider API
+to build the final ONNX model. One default implementation is provided but
+it can also be replaced by any implementation of your own.
+These API are close to `onnx` API, using `NodeProto` for nodes
+and strings for names. This is on purpose: what this API produces is
+what you see in the final ONNX model. You can add your own metadata,
+choose your own names.
 
 **standard machine learning**
 
@@ -26,10 +32,18 @@ to [ONNX](https://onnx.ai) format from many libraries:
 * [lightgbm](https://lightgbm.readthedocs.io)
 * [scikit-learn](https://scikit-learn.org)
 * [scikit-survival](https://scikit-survival.readthedocs.io)
+* [statsmodels](https://www.statsmodels.org)
 * [xgboost](https://xgboost.readthedocs.io)
+
+**data manipulation**
+
+This is work in progress.
+Many packages produce SQL queries. It starts by converting a SQL
+query into ONNX.
 
 **deeplearning**
 
+* [litert](https://ai.google.dev/edge/litert/)
 * [jax](https://jax.readthedocs.io/en/latest/) *in progress*
 * [tensorflow](https://www.tensorflow.org)
 * [torch](https://pytorch.org)
