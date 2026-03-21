@@ -673,11 +673,23 @@ class TestOnnxExportSubModules(ExtTestCase):
         model_id = "arnir0/Tiny-LLM"
         data = get_tiny_model(model_id)
         model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
+        filename1 = self.get_dump_file("test_submodule_local_functions_tiny_llm.1.onnx")
+        filename2 = self.get_dump_file("test_submodule_local_functions_tiny_llm.2.onnx")
 
         with (
             apply_patches_for_model(patch_torch=True, patch_transformers=True, model=model),
             register_flattening_functions(patch_transformers=True),
         ):
+            to_onnx(
+                model,
+                (),
+                kwargs=inputs,
+                dynamic_shapes=ds,
+                inline=False,
+                optimize=False,
+                verbose=0,
+                filename=filename1,
+            )
             onx = to_onnx(
                 model,
                 (),
@@ -687,6 +699,7 @@ class TestOnnxExportSubModules(ExtTestCase):
                 inline=False,
                 optimize=False,
                 verbose=0,
+                filename=filename2,
             )
         check_model(onx)
         self.assertGreater(len(onx.functions), 0)
