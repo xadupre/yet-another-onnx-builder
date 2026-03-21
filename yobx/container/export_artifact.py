@@ -353,6 +353,15 @@ class ExportArtifact(ExportArtifactProtocol):
             self.report = ExportReport()
         self.report.update(data)
 
+    def _save_report(self, onnx_path: str) -> None:
+        """Save the report as an Excel file alongside *onnx_path* when available."""
+        if self.report is None:
+            return
+        import os
+
+        excel_path = os.path.splitext(onnx_path)[0] + ".xlsx"
+        self.report.to_excel(excel_path)
+
     def save(self, file_path: str, all_tensors_to_one_file: bool = True) -> Any:
         """Save the exported model to *file_path*.
 
@@ -393,15 +402,6 @@ class ExportArtifact(ExportArtifactProtocol):
             "Only ModelProto is directly saveable; for FunctionProto or "
             "GraphProto embed it in a ModelProto first."
         )
-
-    def _save_report(self, onnx_path: str) -> None:
-        """Save the report as an Excel file alongside *onnx_path* when available."""
-        if self.report is None:
-            return
-        import os
-
-        excel_path = os.path.splitext(onnx_path)[0] + ".xlsx"
-        self.report.to_excel(excel_path)
 
     def get_proto(self, include_weights: bool = True) -> Any:
         """Return the ONNX proto, optionally with all weights inlined.
