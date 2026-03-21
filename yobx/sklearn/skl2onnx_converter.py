@@ -6,32 +6,34 @@ This module contains **no** :epkg:`sklearn-onnx` imports.  All interface
 objects required by a skl2onnx converter function
 (``scope``, ``operator``, ``container``) are provided as lightweight
 pure-Python mocks defined in this file.  Only :mod:`onnx` and :mod:`numpy`
-(both core :mod:`yobx` dependencies) are imported inside the mock methods.
+(both core :mod:`yobx` dependencies) are imported.
 """
 
 from __future__ import annotations
 
 from typing import Callable, Dict, List, Optional, Tuple
 
+import numpy as np
+import onnx
+import onnx.helper
+import onnx.numpy_helper
+
 # Mapping from ONNX TensorProto element-type integers to NumPy dtypes.
 # Defined at module level to avoid rebuilding it on every add_initializer call.
-# Note: importing numpy at module level is fine — it is a core yobx dependency.
-import numpy as _np
-
 _ONNX_DTYPE_TO_NUMPY: Dict[int, type] = {
-    1: _np.float32,    # FLOAT
-    2: _np.uint8,      # UINT8
-    3: _np.int8,       # INT8
-    4: _np.uint16,     # UINT16
-    5: _np.int16,      # INT16
-    6: _np.int32,      # INT32
-    7: _np.int64,      # INT64
-    10: _np.float16,   # FLOAT16
-    11: _np.float64,   # DOUBLE
-    12: _np.uint32,    # UINT32
-    13: _np.uint64,    # UINT64
-    14: _np.complex64,    # COMPLEX64
-    15: _np.complex128,   # COMPLEX128
+    1: np.float32,    # FLOAT
+    2: np.uint8,      # UINT8
+    3: np.int8,       # INT8
+    4: np.uint16,     # UINT16
+    5: np.int16,      # INT16
+    6: np.int32,      # INT32
+    7: np.int64,      # INT64
+    10: np.float16,   # FLOAT16
+    11: np.float64,   # DOUBLE
+    12: np.uint32,    # UINT32
+    13: np.uint64,    # UINT64
+    14: np.complex64,    # COMPLEX64
+    15: np.complex128,   # COMPLEX128
 }
 
 
@@ -40,7 +42,7 @@ _ONNX_DTYPE_TO_NUMPY: Dict[int, type] = {
 # ---------------------------------------------------------------------------
 
 
-class _MockScope:
+class MockScope:
     """
     Minimal mock for skl2onnx's ``Scope``.
 
@@ -67,7 +69,7 @@ class _MockScope:
         return self.get_unique_variable_name(seed)
 
 
-class _MockVariable:
+class MockVariable:
     """
     Minimal mock for skl2onnx's ``Variable``.
 
@@ -100,12 +102,12 @@ class _MockVariable:
             self._is_fed = is_fed
 
 
-class _MockOperator:
+class MockOperator:
     """
     Minimal mock for skl2onnx's ``Operator``.
 
     Holds the fitted sklearn estimator and the input / output
-    :class:`_MockVariable` objects so a skl2onnx converter can read
+    :class:`MockVariable` objects so a skl2onnx converter can read
     tensor names via ``operator.inputs[i].onnx_name`` and
     ``operator.output_full_names``.
     """
@@ -116,15 +118,15 @@ class _MockOperator:
         op_type: str,
         onnx_name: str,
         target_opset: int,
-        scope: _MockScope,
+        scope: MockScope,
     ) -> None:
         self.raw_operator = raw_operator
         self.type = op_type
         self.onnx_name = onnx_name
         self.target_opset = target_opset
         self.scope = scope
-        self.inputs: List[_MockVariable] = []
-        self.outputs: List[_MockVariable] = []
+        self.inputs: List[MockVariable] = []
+        self.outputs: List[MockVariable] = []
 
     @property
     def input_full_names(self) -> List[str]:
@@ -135,25 +137,25 @@ class _MockOperator:
         return [v.onnx_name for v in self.outputs]
 
 
-class _MockContainer:
+class MockContainer:
     """
     Minimal mock for skl2onnx's ``ModelComponentContainer``.
 
-    Collects :class:`onnx.NodeProto` nodes and
-    :class:`onnx.TensorProto` initializers emitted by a skl2onnx
-    converter so they can later be injected into a
-    :class:`~yobx.xbuilder.GraphBuilder`.
+    Instead of accumulating nodes and initializers, this class delegates
+    every :meth:`add_node` / :meth:`add_initializer` call directly to the
+    :class:`~yobx.xbuilder.GraphBuilder` (*g*) that was provided at
+    construction time.
     """
 
-    def __init__(self, target_opset: int) -> None:
+    def __init__(self, target_opset: int, g: object) -> None:
         self.target_opset = target_opset
+        self._g = g
+        self._node_count = 0
         # Some converters query per-domain opsets.
         self.target_opset_all: Dict[str, int] = {
             "": target_opset,
             "ai.onnx.ml": 5,
         }
-        self.nodes: list = []
-        self.initializers: list = []
         self.options: Dict = {}
 
     @property
@@ -179,7 +181,17 @@ class _MockContainer:
     def is_allowed(self, op_set: object) -> bool:
         return True
 
-    # ---- node and initializer collection ----
+    # ---- node and initializer delegation ----
+
+    def _delegate_node(self, node: object) -> None:
+        self._g.make_node(  # type: ignore[attr-defined]
+            node.op_type,
+            list(node.input),
+            list(node.output),
+            domain=node.domain,
+            name=node.name,
+            attributes=list(node.attribute),
+        )
 
     def add_node(
         self,
@@ -191,10 +203,7 @@ class _MockContainer:
         name: Optional[str] = None,
         **attrs: object,
     ) -> None:
-        """Create an ONNX ``NodeProto`` and append it to :attr:`nodes`."""
-        import numpy as np
-        import onnx.helper
-
+        """Build an ONNX ``NodeProto`` and delegate it directly to the GraphBuilder."""
         # Some skl2onnx helpers pass a bare string instead of a list.
         if isinstance(inputs, str):
             inputs = [inputs]
@@ -214,19 +223,24 @@ class _MockContainer:
             else:
                 clean[k] = v
 
+        node_name = name or f"N{self._node_count}"
+        self._node_count += 1
         node = onnx.helper.make_node(
             op_type,
             inputs=list(inputs),
             outputs=list(outputs),
             domain=op_domain or "",
-            name=name or f"N{len(self.nodes)}",
+            name=node_name,
             **clean,
         )
-        self.nodes.append(node)
+        self._delegate_node(node)
 
     def add_onnx_node(self, node: object) -> None:
-        """Append a pre-built ``NodeProto`` directly."""
-        self.nodes.append(node)
+        """Delegate a pre-built ``NodeProto`` directly to the GraphBuilder."""
+        self._delegate_node(node)
+
+    def _delegate_initializer(self, name: str, tensor: object) -> None:
+        self._g.make_initializer(name, tensor)  # type: ignore[attr-defined]
 
     def add_initializer(
         self,
@@ -235,11 +249,7 @@ class _MockContainer:
         shape: object,
         content: object,
     ) -> None:
-        """Create an ONNX ``TensorProto`` and append it to :attr:`initializers`."""
-        import numpy as np
-        import onnx
-        import onnx.numpy_helper
-
+        """Build an ONNX ``TensorProto`` and delegate it directly to the GraphBuilder."""
         if isinstance(content, onnx.TensorProto):
             tensor = onnx.TensorProto()
             tensor.CopyFrom(content)
@@ -252,11 +262,11 @@ class _MockContainer:
             tensor = onnx.numpy_helper.from_array(arr)
             tensor.name = name
 
-        self.initializers.append(tensor)
+        self._delegate_initializer(name, tensor)
 
     def add_onnx_initializer(self, tensor: object) -> None:
-        """Append a pre-built ``TensorProto`` directly."""
-        self.initializers.append(tensor)
+        """Delegate a pre-built ``TensorProto`` directly to the GraphBuilder."""
+        self._delegate_initializer(tensor.name, tensor)
 
 
 # ---------------------------------------------------------------------------
@@ -322,13 +332,13 @@ def make_skl2onnx_converter(skl2onnx_op_converter: Callable, input_type: object)
         X: str,
         name: str = "skl2onnx",
     ) -> Tuple:
-        scope = _MockScope(g.main_opset)  # type: ignore[attr-defined]
+        scope = MockScope(g.main_opset)  # type: ignore[attr-defined]
 
-        input_var = _MockVariable(X, X)
+        input_var = MockVariable(X, X)
         input_var.type = input_type  # set by caller — no skl2onnx import needed here
-        output_vars = [_MockVariable(out, out) for out in outputs]
+        output_vars = [MockVariable(out, out) for out in outputs]
 
-        operator = _MockOperator(
+        operator = MockOperator(
             estimator,
             type(estimator).__name__,
             f"{name}_{id(estimator)}",
@@ -339,20 +349,8 @@ def make_skl2onnx_converter(skl2onnx_op_converter: Callable, input_type: object)
         for var in output_vars:
             operator.outputs.append(var)
 
-        container = _MockContainer(g.main_opset)  # type: ignore[attr-defined]
+        container = MockContainer(g.main_opset, g)  # type: ignore[attr-defined]
         skl2onnx_op_converter(scope, operator, container)
-
-        for init in container.initializers:
-            g.make_initializer(init.name, init)  # type: ignore[attr-defined]
-        for node in container.nodes:
-            g.make_node(  # type: ignore[attr-defined]
-                node.op_type,
-                list(node.input),
-                list(node.output),
-                domain=node.domain,
-                name=node.name,
-                attributes=list(node.attribute),
-            )
 
         return tuple(outputs) if len(outputs) > 1 else outputs[0]
 

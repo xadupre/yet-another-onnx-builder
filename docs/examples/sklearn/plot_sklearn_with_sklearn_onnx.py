@@ -57,10 +57,10 @@ from yobx import doc
 from yobx.typing import GraphBuilderExtendedProtocol
 from yobx.sklearn import to_onnx, make_skl2onnx_converter
 from yobx.sklearn.skl2onnx_converter import (
-    _MockContainer,
-    _MockOperator,
-    _MockScope,
-    _MockVariable,
+    MockContainer,
+    MockOperator,
+    MockScope,
+    MockVariable,
 )
 
 # %%
@@ -78,8 +78,8 @@ from yobx.sklearn.skl2onnx_converter import (
 # 1. Looking up the skl2onnx converter function from skl2onnx's registry.
 # 2. Creating lightweight mock objects whose names match the actual tensors
 #    in the enclosing GraphBuilder.
-# 3. Running ``converter(scope, operator, container)`` to accumulate nodes.
-# 4. Injecting those nodes and initializers into the GraphBuilder directly.
+# 3. Running ``converter(scope, operator, container)`` — the container
+#    delegates each emitted node/initializer directly to the GraphBuilder.
 
 
 def convert_sklearn_mlp_classifier(
@@ -120,30 +120,18 @@ def convert_sklearn_mlp_classifier(
     skl2onnx_fn = get_converter(op_name)
 
     # Build mock objects with the correct tensor names.
-    scope = _MockScope(g.main_opset)
+    scope = MockScope(g.main_opset)
 
-    input_var = _MockVariable(X, X)
-    output_vars = [_MockVariable(out, out) for out in outputs]
+    input_var = MockVariable(X, X)
+    output_vars = [MockVariable(out, out) for out in outputs]
 
-    operator = _MockOperator(estimator, op_name, f"{name}_op", g.main_opset, scope)
+    operator = MockOperator(estimator, op_name, f"{name}_op", g.main_opset, scope)
     operator.inputs.append(input_var)
     for var in output_vars:
         operator.outputs.append(var)
 
-    container = _MockContainer(g.main_opset)
+    container = MockContainer(g.main_opset, g)
     skl2onnx_fn(scope, operator, container)
-
-    for init in container.initializers:
-        g.make_initializer(init.name, init)
-    for node in container.nodes:
-        g.make_node(
-            node.op_type,
-            list(node.input),
-            list(node.output),
-            domain=node.domain,
-            name=node.name,
-            attributes=list(node.attribute),
-        )
 
     return tuple(outputs)
 
