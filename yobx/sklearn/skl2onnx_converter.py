@@ -15,7 +15,6 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import onnx
-import onnx.numpy_helper
 
 # Mapping from ONNX TensorProto element-type integers to NumPy dtypes.
 # Defined at module level to avoid rebuilding it on every add_initializer call.
@@ -234,20 +233,15 @@ class MockContainer:
         shape: object,
         content: object,
     ) -> None:
-        """Build an ONNX ``TensorProto`` and forward it directly to the GraphBuilder."""
+        """Forward content directly to the GraphBuilder as a new initializer."""
         if isinstance(content, onnx.TensorProto):
-            tensor = onnx.TensorProto()
-            tensor.CopyFrom(content)
-            tensor.name = name
+            self._g.make_initializer(name, content)  # type: ignore[attr-defined]
         else:
             np_dtype = _ONNX_DTYPE_TO_NUMPY.get(onnx_type, np.float32)
             arr = np.array(content, dtype=np_dtype)
             if shape is not None and arr.shape != tuple(shape):
                 arr = arr.reshape(shape)
-            tensor = onnx.numpy_helper.from_array(arr)
-            tensor.name = name
-
-        self._g.make_initializer(name, tensor)  # type: ignore[attr-defined]
+            self._g.make_initializer(name, arr)  # type: ignore[attr-defined]
 
     def add_onnx_initializer(self, tensor: object) -> None:
         """Forward a pre-built ``TensorProto`` directly to the GraphBuilder."""
