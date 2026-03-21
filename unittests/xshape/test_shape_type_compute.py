@@ -231,6 +231,67 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(broadcast_shape((5,), (1,)), (5,))
         self.assertEqual(broadcast_shape((1,), (5,)), (5,))
 
+    def test_broadcast_shape_registers_constraint_str_vs_int(self):
+        # When a symbolic dimension meets a non-1 integer, the integer wins
+        # and a constraint is registered: symbolic_dim = concrete_int.
+        # Here (64,) is right-aligned with ("batch", "d_model"):
+        #   batch vs 1  -> batch (1 broadcasts to anything)
+        #   d_model vs 64 -> 64 (concrete int wins), constraint d_model=64 recorded
+        b = BasicShapeBuilder()
+        result = broadcast_shape(("batch", "d_model"), (64,), graph_builder=b)
+        self.assertEqual(result, ("batch", 64))
+        constraints = b.get_registered_constraints()
+        self.assertIn("d_model", constraints)
+        self.assertIn(64, constraints["d_model"])
+
+    def test_broadcast_shape_registers_constraint_int_vs_str(self):
+        # Same scenario but concrete integer is in the first shape.
+        b = BasicShapeBuilder()
+        result = broadcast_shape((64,), ("batch", "d_model"), graph_builder=b)
+        self.assertEqual(result, ("batch", 64))
+        constraints = b.get_registered_constraints()
+        self.assertIn("d_model", constraints)
+        self.assertIn(64, constraints["d_model"])
+
+    def test_broadcast_shape_no_constraint_when_int_is_one(self):
+        # A concrete dimension of 1 broadcasts to the symbolic dimension;
+        # no constraint should be registered in this case.
+        b = BasicShapeBuilder()
+        result = broadcast_shape(("batch", "seq"), (1, 1), graph_builder=b)
+        self.assertEqual(result, ("batch", "seq"))
+        self.assertEqual(b.get_registered_constraints(), {})
+
+    def test_broadcast_shape_without_graph_builder_no_constraint_stored(self):
+        # When no graph_builder is provided, the result is still correct but
+        # no constraint object is available for inspection.
+        result = broadcast_shape(("batch", "d_model"), (64,))
+        self.assertEqual(result, ("batch", 64))
+
+    def test_broadcast_shape_constraint_propagated_through_model(self):
+        # Full end-to-end: broadcast a symbolic-shaped input against a
+        # constant bias; verify both the output shape and the constraint.
+        import onnx.numpy_helper as onh
+
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Add", ["X", "bias"], ["Z"])],
+                "graph",
+                [oh.make_tensor_value_info("X", TFLOAT, ["batch", "d_model"])],
+                [oh.make_tensor_value_info("Z", TFLOAT, [None, None])],
+                [onh.from_array(np.zeros((64,), dtype=np.float32), name="bias")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        # The concrete size 64 wins over the symbolic "d_model".
+        self.assertEqual(b.get_shape("Z"), ("batch", 64))
+        # The constraint records the relationship d_model = 64.
+        constraints = b.get_registered_constraints()
+        self.assertIn("d_model", constraints)
+        self.assertIn(64, constraints["d_model"])
+
     # ------------------------------------------------------------------
     # set_type_shape_reshape
     # ------------------------------------------------------------------
