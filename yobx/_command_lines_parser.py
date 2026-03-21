@@ -886,7 +886,7 @@ def _cmd_stats(argv: List[Any]):
         ), f"Unexpected extension for outname={outname!r}"
         import pandas
 
-        df = pandas.DataFrame(stats).sort_values()
+        df = pandas.DataFrame(stats).sort_values()  # type: ignore
         if outname.endswith(".csv"):
             df.to_csv(outname, index=False)
         else:
