@@ -200,8 +200,13 @@ class MockContainer:
                 clean[k] = v
 
         node_name = self._g.unique_node_name(name or "skl2onnx_node")  # type: ignore[attr-defined]
-        self._g.make_node(  # type: ignore[attr-defined]
-            op_type, list(inputs), list(outputs), domain=op_domain or "", name=node_name, **clean
+        self._g.make_node(  # type: ignore
+            op_type,
+            list(inputs),  # type: ignore
+            list(outputs),  # type: ignore
+            domain=op_domain or "",
+            name=node_name,
+            **clean,
         )
 
     def add_onnx_node(self, node: object) -> None:
@@ -223,7 +228,7 @@ class MockContainer:
             np_dtype = _ONNX_DTYPE_TO_NUMPY.get(onnx_type, np.float32)
             arr = np.array(content, dtype=np_dtype)
             if shape is not None and arr.shape != tuple(shape):
-                arr = arr.reshape(shape)
+                arr = arr.reshape(shape)  # type: ignore
             self._g.make_initializer(name, arr)  # type: ignore[attr-defined]
 
     def add_onnx_initializer(self, tensor: object) -> None:
