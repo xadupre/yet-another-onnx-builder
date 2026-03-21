@@ -104,7 +104,7 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
         )
         mlp.fit(X, y)
 
-        converter = make_skl2onnx_converter(options={"zipmap": False})
+        converter = make_skl2onnx_converter()
         onx = to_onnx(mlp, (X,), extra_converters={MLPClassifier: converter})
 
         op_types = [n.op_type for n in onx.graph.node]

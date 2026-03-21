@@ -14,8 +14,10 @@ This example shows two ways to write such a custom converter for
 :class:`~sklearn.neural_network.MLPClassifier` using
 :epkg:`sklearn-onnx` (``skl2onnx``) as the conversion back-end.
 
-**Option A — low-level**: write the converter function by hand, calling
-:func:`skl2onnx.convert_sklearn` directly.
+**Option A — low-level**: write the converter function by hand, directly
+calling the skl2onnx converter function with mocked ``Scope``, ``Operator``
+and ``ModelComponentContainer`` objects and injecting the resulting nodes
+into the enclosing :class:`~yobx.xbuilder.GraphBuilder`.
 
 **Option B — factory** *(recommended)*: use
 :func:`~yobx.sklearn.make_skl2onnx_converter` to generate the converter
@@ -24,24 +26,21 @@ automatically.  Option B requires only one line of setup code.
 The strategy
 -------------
 
-1. Call :func:`skl2onnx.convert_sklearn` to obtain a self-contained
-   :class:`onnx.ModelProto` for the estimator alone.
-2. Wrap that sub-model as a **local ONNX function** inside the
-   enclosing :class:`~yobx.xbuilder.GraphBuilder` using
-   :class:`~yobx.xbuilder.FunctionOptions`.  The function groups the MLP
-   nodes under a single named call during graph *construction*, and its
-   weight tensors are stored as ``Constant`` nodes inside the function body
-   rather than as top-level graph initializers.
-3. Emit a ``make_node`` call for the freshly registered function so the
-   MLP plugs into the rest of the pipeline graph.
-
-The yobx optimizer (invoked by :func:`yobx.sklearn.to_onnx` at export
-time) inlines local functions into the enclosing graph, so the final
-:class:`onnx.ModelProto` contains the individual ``MatMul``, ``Add``,
-``Relu``, and ``Sigmoid`` nodes rather than a single call-node.  The
-local-function wrapping is therefore a *construction-time* organisational
-pattern that keeps converter code clean and composable even when the
-emitted sub-graph is ultimately inlined.
+1. Look up the converter registered in :epkg:`sklearn-onnx` for the
+   estimator's type via :data:`skl2onnx._supported_operators.sklearn_operator_name_map`
+   and :func:`skl2onnx.common._registration.get_converter`.
+2. Create lightweight mock objects
+   (:class:`~skl2onnx.common._topology.Scope`,
+   :class:`~skl2onnx.common._topology.Operator`,
+   :class:`~skl2onnx.common._topology.Variable`) whose names match the
+   input and output tensors already registered in the enclosing
+   :class:`~yobx.xbuilder.GraphBuilder`.
+3. Create a :class:`~skl2onnx.common._container.ModelComponentContainer`
+   that accumulates ONNX nodes and initializers.
+4. Call the skl2onnx converter function directly:
+   ``converter(scope, operator, container)``.
+5. Inject all collected nodes and initializers straight into the enclosing
+   :class:`~yobx.xbuilder.GraphBuilder`.
 """
 
 from typing import Dict, List, Tuple
@@ -50,48 +49,15 @@ import numpy as np
 import onnx
 import onnxruntime
 from sklearn.neural_network import MLPClassifier
-from skl2onnx import convert_sklearn
+from skl2onnx._supported_operators import sklearn_operator_name_map
+from skl2onnx.common._container import ModelComponentContainer
+from skl2onnx.common._registration import _converter_pool, get_converter
+from skl2onnx.common._topology import Operator, Scope, Variable
 from skl2onnx.common.data_types import DoubleTensorType, FloatTensorType
 
 from yobx import doc
 from yobx.typing import GraphBuilderExtendedProtocol
-from yobx.xbuilder import FunctionOptions
 from yobx.sklearn import to_onnx, make_skl2onnx_converter
-
-# %%
-# Helper: map ONNX element type to a skl2onnx input-type descriptor
-# ------------------------------------------------------------------
-#
-# :func:`skl2onnx.convert_sklearn` requires an ``initial_types`` list that
-# describes the shape and dtype of each model input using skl2onnx
-# type objects such as :class:`~skl2onnx.common.data_types.FloatTensorType`.
-# The helper below translates an ONNX ``elem_type`` integer (as returned by
-# :meth:`~yobx.xbuilder.GraphBuilder.get_type`) into the matching skl2onnx
-# descriptor.
-
-
-def to_skl2onnx_input_type(elem_type: int, n_features: int):
-    """
-    Convert an ONNX ``TensorProto`` element-type code into the matching
-    :epkg:`sklearn-onnx` input-type object.
-
-    :param elem_type: ONNX element type integer (e.g.
-        ``onnx.TensorProto.FLOAT == 1``).
-    :param n_features: number of input features (second dimension of the
-        2-D feature matrix).
-    :return: a skl2onnx type descriptor suitable for ``initial_types``.
-    :raises NotImplementedError: for element types other than ``FLOAT``
-        and ``DOUBLE``.
-    """
-    if elem_type == onnx.TensorProto.FLOAT:
-        return FloatTensorType([None, n_features])
-    if elem_type == onnx.TensorProto.DOUBLE:
-        return DoubleTensorType([None, n_features])
-    raise NotImplementedError(
-        f"Input elem_type {elem_type} is not supported. "
-        "Only FLOAT (1) and DOUBLE (11) are supported by the skl2onnx MLP converter."
-    )
-
 
 # %%
 # Option A — low-level custom converter
@@ -105,16 +71,11 @@ def to_skl2onnx_input_type(elem_type: int, n_features: int):
 #
 # Here we implement this contract by:
 #
-# 1. Asking skl2onnx to convert the estimator to a stand-alone ONNX model
-#    (``zipmap=False`` so probabilities come out as a plain float tensor
-#    instead of a sequence-of-maps).
-# 2. Fixing the opset version in the generated model to match the opset
-#    already in use by the enclosing graph — skl2onnx may pick a lower
-#    version than the one we need.
-# 3. Loading the generated model into a temporary :class:`GraphBuilder`,
-#    then registering it as a **local ONNX function** in the enclosing
-#    graph via :class:`~yobx.xbuilder.FunctionOptions`.
-# 4. Emitting a single call-node for that function.
+# 1. Looking up the skl2onnx converter registered for the estimator type.
+# 2. Creating lightweight ``Scope``, ``Operator``, ``Variable`` mock objects
+#    whose names match the actual tensors in the enclosing GraphBuilder.
+# 3. Running ``converter(scope, operator, container)`` to accumulate nodes.
+# 4. Injecting those nodes and initializers into the GraphBuilder directly.
 
 
 def convert_sklearn_mlp_classifier(
@@ -129,11 +90,9 @@ def convert_sklearn_mlp_classifier(
     Convert a fitted :class:`~sklearn.neural_network.MLPClassifier` into
     ONNX nodes inside an existing :class:`~yobx.xbuilder.GraphBuilder`.
 
-    The conversion delegates to :func:`skl2onnx.convert_sklearn` for the
-    actual graph construction, wraps the result in a local ONNX function
-    to keep the converter code composable, and emits a single call-node
-    for that function.  The yobx optimizer will inline the function when
-    :func:`~yobx.sklearn.to_onnx` finalises the model.
+    The conversion invokes the skl2onnx converter directly through mock
+    ``Scope``, ``Operator``, and ``ModelComponentContainer`` objects, then
+    injects the resulting nodes and initializers straight into *g*.
 
     :param g: the :class:`~yobx.xbuilder.GraphBuilder` that is currently
         being populated.
@@ -153,43 +112,57 @@ def convert_sklearn_mlp_classifier(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
-    n_features = estimator.coefs_[0].shape[0]
+    if hasattr(estimator, "n_features_in_"):
+        n_features = estimator.n_features_in_
+    elif g.has_shape(X):
+        shape = g.get_shape(X)
+        n_features = int(shape[1]) if len(shape) > 1 and isinstance(shape[1], int) else None
+    else:
+        n_features = None
 
-    # Step 1 — obtain a stand-alone ONNX model from skl2onnx.
-    # ``zipmap=False`` makes the probability output a plain [N, n_classes]
-    # float tensor instead of the default sequence-of-maps representation.
-    onx = convert_sklearn(
-        estimator,
-        initial_types=[("X", to_skl2onnx_input_type(itype, n_features))],
-        options={"zipmap": False},
-        target_opset=g.main_opset,
-    )
+    if itype == onnx.TensorProto.FLOAT:
+        skl2onnx_type = FloatTensorType([None, n_features])
+    elif itype == onnx.TensorProto.DOUBLE:
+        skl2onnx_type = DoubleTensorType([None, n_features])
+    else:
+        raise NotImplementedError(f"Unsupported elem_type {itype!r}.")
 
-    # Step 2 — normalise the opset version.
-    # skl2onnx may select a lower opset than the one required by the
-    # enclosing graph (it picks the lowest version whose op-set covers
-    # every node it emitted).  Overwrite it so the sub-model is compatible.
-    del onx.opset_import[:]
-    d = onx.opset_import.add()
-    d.domain = ""
-    d.version = g.main_opset
+    op_name = sklearn_operator_name_map[type(estimator)]
+    converter = get_converter(op_name)
+    registered_models = {"aliases": sklearn_operator_name_map, "conv": _converter_pool}
 
-    # Step 3 — load the sub-model into a temporary GraphBuilder, then
-    # register it as a local ONNX function inside *g*.
-    # ``move_initializer_to_constant=True`` converts weight initializers
-    # into ``Constant`` nodes so they travel with the function definition
-    # rather than being stored as top-level graph initializers.
-    builder = g.__class__(onx)
-    f_options = FunctionOptions(
-        export_as_function=True,
-        name=g.unique_function_name("MLPClassifier"),
-        domain="sklearn_onnx_functions",
-        move_initializer_to_constant=True,
-    )
-    g.make_local_function(builder, f_options)
+    scope = Scope("root", target_opset=g.main_opset)
 
-    # Step 4 — emit a single call-node for the registered function.
-    return g.make_node(f_options.name, [X], outputs, domain=f_options.domain, name=name)
+    input_var = Variable(X, X, scope="root", type=skl2onnx_type)
+    input_var.init_status(is_fed=True, is_root=True, is_leaf=False)
+
+    output_vars = []
+    for out_name in outputs:
+        var = Variable(out_name, out_name, scope="root")
+        var.init_status(is_fed=False, is_root=False, is_leaf=True)
+        output_vars.append(var)
+
+    operator = Operator(f"{name}_op", "root", op_name, estimator, g.main_opset, scope)
+    operator.inputs.append(input_var)
+    for var in output_vars:
+        operator.outputs.append(var)
+
+    container = ModelComponentContainer(g.main_opset, registered_models=registered_models)
+    converter(scope, operator, container)
+
+    for init in container.initializers:
+        g.make_initializer(init.name, init)
+    for node in container.nodes:
+        g.make_node(
+            node.op_type,
+            list(node.input),
+            list(node.output),
+            domain=node.domain,
+            name=node.name,
+            attributes=list(node.attribute),
+        )
+
+    return tuple(outputs)
 
 
 # %%
@@ -224,10 +197,6 @@ print("\nTop-level graph nodes:")
 for node in onx.graph.node:
     print(f"  op_type={node.op_type!r}  domain={node.domain!r}  name={node.name!r}")
 
-print("\nLocal functions defined in the model:")
-for func in onx.functions:
-    print(f"  {func.domain}::{func.name}  ({len(func.node)} nodes)")
-
 # %%
 # 3. Run with ONNX Runtime and verify
 # ------------------------------------
@@ -255,11 +224,10 @@ print("\nAll predictions match ✓")
 # ----------------------------------------------------------------------
 #
 # :func:`~yobx.sklearn.make_skl2onnx_converter` creates the boilerplate
-# converter automatically.  Pass the same ``options`` dict you would pass
-# to :func:`skl2onnx.convert_sklearn`.  The factory handles type detection,
-# opset normalisation, and local-function wrapping transparently.
+# converter automatically.  The factory handles type detection, feature
+# inference, and node injection transparently.
 
-converter = make_skl2onnx_converter(options={"zipmap": False})
+converter = make_skl2onnx_converter()
 onx_b = to_onnx(mlp, (X,), extra_converters={MLPClassifier: converter})
 
 ref_b = onnxruntime.InferenceSession(
@@ -277,9 +245,7 @@ print("Option B predictions also match ✓")
 # -------------------------------------
 #
 # :func:`yobx.doc.plot_dot` renders the :class:`onnx.ModelProto` as a
-# directed graph using Graphviz.  The yobx optimizer inlines the local
-# function during export, so the graph shows the individual ``MatMul``,
-# ``Add``, ``Relu``, and ``Sigmoid`` nodes that make up the MLP rather
-# than a single call-node.
+# directed graph using Graphviz.  The nodes emitted by the skl2onnx
+# converter are injected directly into the enclosing graph.
 
 doc.plot_dot(onx)

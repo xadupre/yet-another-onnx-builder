@@ -3,16 +3,14 @@ Factory for creating :mod:`yobx`-compatible converters that delegate to
 :epkg:`sklearn-onnx` (``skl2onnx``).
 """
 
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Tuple
 
 
-def make_skl2onnx_converter(
-    options: Optional[Dict] = None,
-    domain: str = "sklearn_onnx_functions",
-) -> Callable:
+def make_skl2onnx_converter() -> Callable:
     """
-    Return a :mod:`yobx`-compatible converter function that uses
-    :func:`skl2onnx.convert_sklearn` as the conversion back-end.
+    Return a :mod:`yobx`-compatible converter function that directly invokes
+    the converter registered in :epkg:`sklearn-onnx` (``skl2onnx``) for the
+    target estimator.
 
     The returned converter can be passed directly to
     :func:`yobx.sklearn.to_onnx` via the ``extra_converters`` parameter::
@@ -21,37 +19,29 @@ def make_skl2onnx_converter(
         from yobx.sklearn import to_onnx
         from yobx.sklearn.skl2onnx_converter import make_skl2onnx_converter
 
-        converter = make_skl2onnx_converter(options={"zipmap": False})
+        converter = make_skl2onnx_converter()
         artifact = to_onnx(
             mlp, (X,), extra_converters={MLPClassifier: converter}
         )
 
     The returned function:
 
-    1. Determines the ONNX element type and the number of input features from
-       the graph builder and the fitted estimator, then calls
-       :func:`skl2onnx.convert_sklearn` to produce a stand-alone
-       :class:`onnx.ModelProto`.
-    2. Normalises the opset of the sub-model to match the enclosing graph.
-    3. Loads the sub-model into a temporary
-       :class:`~yobx.xbuilder.GraphBuilder` and registers it as a local
-       ONNX function (via
-       :meth:`~yobx.xbuilder.GraphBuilder.make_local_function`).
-    4. Emits a single call-node for that function, connecting the main
-       graph's input tensor to the function.
+    1. Looks up the skl2onnx converter registered for the estimator's type via
+       :data:`skl2onnx._supported_operators.sklearn_operator_name_map` and
+       :func:`skl2onnx.common._registration.get_converter`.
+    2. Creates lightweight mock objects (:class:`~skl2onnx.common._topology.Scope`,
+       :class:`~skl2onnx.common._topology.Operator`,
+       :class:`~skl2onnx.common._topology.Variable`) using the actual input and
+       output tensor names already present in the enclosing
+       :class:`~yobx.xbuilder.GraphBuilder`.
+    3. Creates a :class:`~skl2onnx.common._container.ModelComponentContainer` that
+       collects ONNX nodes and initializers emitted by the converter.
+    4. Calls the skl2onnx converter function directly:
+       ``converter(scope, operator, container)``.
+    5. Injects all collected nodes and initializers straight into the enclosing
+       :class:`~yobx.xbuilder.GraphBuilder`, without creating an intermediate
+       :class:`onnx.ModelProto` or a local function wrapper.
 
-    The :mod:`yobx` optimiser inlines local functions when
-    :func:`~yobx.sklearn.to_onnx` finalises the model, so the returned
-    :class:`onnx.ModelProto` contains the individual nodes rather than a
-    single call-node.
-
-    :param options: mapping passed to :func:`skl2onnx.convert_sklearn` as the
-        ``options`` argument (e.g. ``{"zipmap": False}`` to get a plain float
-        probability tensor from classifiers instead of the default
-        sequence-of-maps representation).
-    :param domain: ONNX domain name used when registering the local function
-        in the enclosing graph builder.  Defaults to
-        ``"sklearn_onnx_functions"``.
     :return: a converter function with the signature
         ``(g, sts, outputs, estimator, X, *, name) -> str | tuple[str, ...]``
         accepted by :func:`yobx.sklearn.to_onnx`.
@@ -60,8 +50,12 @@ def make_skl2onnx_converter(
 
         Only ``FLOAT`` (element type 1) and ``DOUBLE`` (element type 11)
         inputs are supported because those are the only types for which
-        :mod:`skl2onnx` provides generic tensor descriptors.  For other
-        element types, raise ``NotImplementedError`` at conversion time.
+        :mod:`skl2onnx` provides generic tensor-type descriptors.  For other
+        element types a ``NotImplementedError`` is raised at conversion time.
+
+        The estimator's class must be registered in skl2onnx's converter
+        registry (``sklearn_operator_name_map``).  If it is not, a
+        ``KeyError`` is raised.
     """
 
     def _converter(
@@ -73,16 +67,14 @@ def make_skl2onnx_converter(
         name: str = "skl2onnx",
     ) -> Tuple:
         import onnx
-        from skl2onnx import convert_sklearn
+        from skl2onnx._supported_operators import sklearn_operator_name_map
+        from skl2onnx.common._container import ModelComponentContainer
+        from skl2onnx.common._registration import _converter_pool, get_converter
+        from skl2onnx.common._topology import Operator, Scope, Variable
         from skl2onnx.common.data_types import DoubleTensorType, FloatTensorType
 
-        from ..xbuilder.function_options import FunctionOptions
-
-        # Determine the ONNX element type of the input tensor.
+        # Determine ONNX element type and number of features.
         itype = g.get_type(X) if g.has_type(X) else onnx.TensorProto.FLOAT
-
-        # Determine the number of input features.
-        # sklearn >=1.0 exposes n_features_in_ on all fitted estimators.
         if hasattr(estimator, "n_features_in_"):
             n_features = int(estimator.n_features_in_)
         elif g.has_shape(X):
@@ -91,7 +83,7 @@ def make_skl2onnx_converter(
         else:
             n_features = None
 
-        # Map ONNX element type to a skl2onnx tensor descriptor.
+        # Map ONNX element type to a skl2onnx tensor-type descriptor.
         if itype == onnx.TensorProto.FLOAT:
             skl2onnx_type = FloatTensorType([None, n_features])
         elif itype == onnx.TensorProto.DOUBLE:
@@ -102,33 +94,64 @@ def make_skl2onnx_converter(
                 "Only FLOAT (1) and DOUBLE (11) are currently supported."
             )
 
-        # Convert the estimator to a stand-alone ONNX model.
-        onx = convert_sklearn(
-            estimator,
-            initial_types=[("X", skl2onnx_type)],
-            options=options,
-            target_opset=g.main_opset,
+        # Look up the registered skl2onnx converter for this estimator type.
+        cls = type(estimator)
+        if cls not in sklearn_operator_name_map:
+            raise KeyError(
+                f"make_skl2onnx_converter: no skl2onnx converter is registered for "
+                f"{cls.__qualname__!r}. Only estimator types listed in "
+                "'skl2onnx._supported_operators.sklearn_operator_name_map' are supported."
+            )
+        op_name = sklearn_operator_name_map[cls]
+        converter = get_converter(op_name)
+
+        # registered_models is required so that ModelComponentContainer can
+        # validate and retrieve converter options.
+        registered_models = {
+            "aliases": sklearn_operator_name_map,
+            "conv": _converter_pool,
+        }
+
+        # Build mock Scope/Operator/Variable objects.
+        # The input Variable uses the actual tensor name already in yobx's
+        # graph; output Variables use the caller-supplied output names.
+        # All of these names flow directly into the emitted NodeProtos.
+        scope = Scope("root", target_opset=g.main_opset)
+
+        input_var = Variable(X, X, scope="root", type=skl2onnx_type)
+        input_var.init_status(is_fed=True, is_root=True, is_leaf=False)
+
+        output_vars = []
+        for out_name in outputs:
+            var = Variable(out_name, out_name, scope="root")
+            var.init_status(is_fed=False, is_root=False, is_leaf=True)
+            output_vars.append(var)
+
+        operator = Operator(
+            f"{name}_{id(estimator)}_op", "root", op_name, estimator, g.main_opset, scope
         )
+        operator.inputs.append(input_var)
+        for var in output_vars:
+            operator.outputs.append(var)
 
-        # skl2onnx picks the lowest opset compatible with the nodes it emits.
-        # Overwrite it so the sub-model is compatible with the enclosing graph.
-        del onx.opset_import[:]
-        d = onx.opset_import.add()
-        d.domain = ""
-        d.version = g.main_opset
+        # Collect nodes and initializers emitted by the skl2onnx converter.
+        container = ModelComponentContainer(g.main_opset, registered_models=registered_models)
+        converter(scope, operator, container)
 
-        # Load the sub-model into a fresh GraphBuilder and register it as a
-        # local ONNX function inside the enclosing graph.
-        builder = g.__class__(onx)
-        f_options = FunctionOptions(
-            export_as_function=True,
-            name=g.unique_function_name(type(estimator).__name__),
-            domain=domain,
-            move_initializer_to_constant=True,
-        )
-        g.make_local_function(builder, f_options)
+        # Inject initializers and nodes directly into yobx's GraphBuilder.
+        for init in container.initializers:
+            g.make_initializer(init.name, init)
+        for node in container.nodes:
+            g.make_node(
+                node.op_type,
+                list(node.input),
+                list(node.output),
+                domain=node.domain,
+                name=node.name,
+                attributes=list(node.attribute),
+            )
 
-        # Emit a call-node for the registered function.
-        return g.make_node(f_options.name, [X], outputs, domain=f_options.domain, name=name)
+        # Return the output name(s) to the yobx conversion framework.
+        return tuple(outputs) if len(outputs) > 1 else outputs[0]
 
     return _converter
