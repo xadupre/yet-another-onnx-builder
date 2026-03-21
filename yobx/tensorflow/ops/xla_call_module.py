@@ -146,13 +146,29 @@ def _process_call_layer(
     # Build a local scope mapping function param IDs to caller args.
     inline_results: Dict[str, str] = {}
     for (param_id, is_shape_only), call_arg_id in zip(func_param_info, call_args):
-        if is_shape_only:
+        # Shape-only parameters (integer scalars injected by jax2tf for dynamic
+        # shapes) are normally skipped because the caller typically does not
+        # have them in local_results.  However, when the caller *does* have the
+        # value available (e.g., an integer constant passed as a computation
+        # argument), we should still map it so that the callee can use it.
+        if is_shape_only and call_arg_id not in local_results:
             continue
         if call_arg_id in local_results:
             inline_results[param_id] = local_results[call_arg_id]
 
     # Parse the function body (scan only the body, with no arg alias).
     func_layers = _parse_body(func_body, {})
+
+    # Sort compute layers by their source position so they are processed in
+    # execution order.  (parse_mlir does the same for the top-level body; we
+    # must replicate the sort here for inlined private functions.)
+    from .xla_call_module_parsing import _get_layer_pos
+
+    input_layers = [la for la in func_layers if la["op"] == "Input"]
+    compute_layers = [la for la in func_layers if la["op"] not in ("Input", "return")]
+    return_layers = [la for la in func_layers if la["op"] == "return"]
+    compute_layers.sort(key=lambda la: _get_layer_pos(la, func_body))
+    func_layers = input_layers + compute_layers + return_layers
 
     # Process function body layers (stops at return layer).
     _process_layers(func_layers, inline_results, g, decoded_module)
@@ -168,6 +184,43 @@ def _process_call_layer(
 
     if ret_val is not None:
         local_results[layer["id"]] = ret_val
+
+
+def _process_convert_layer(
+    layer: dict, local_results: Dict[str, str], g: GraphBuilderExtendedProtocol
+) -> None:
+    """Emit a Cast ONNX op for a ``convert`` StableHLO layer.
+
+    When the source and target types are identical this is a no-op
+    (pass-through).
+
+    :param layer: layer dict with keys ``id``, ``operands``, and ``shape``
+        (the target tensor-type string, e.g. ``"tensor<f32>"``).
+    :param local_results: mutable id→tensor-name mapping for the current scope.
+    :param g: ONNX graph builder.
+    """
+    from ...helpers.onnx_helper import np_dtype_to_tensor_dtype
+
+    inp_id = layer["operands"][0]
+    if inp_id not in local_results:
+        return
+    tgt_type_str = layer.get("shape", "")
+    _, tgt_dtype = _parse_tensor_type(tgt_type_str)
+    if tgt_dtype is None:
+        # Unknown target type – pass operand through unchanged.
+        local_results[layer["id"]] = local_results[inp_id]
+        return
+    to_dtype = np_dtype_to_tensor_dtype(np.dtype(tgt_dtype))
+    # If source dtype is already known and matches target, skip the Cast.
+    try:
+        src_dtype_int = g.get_type(local_results[inp_id])
+        if src_dtype_int == to_dtype:
+            local_results[layer["id"]] = local_results[inp_id]
+            return
+    except (AssertionError, KeyError):
+        pass
+    res = g.op.Cast(local_results[inp_id], to=to_dtype, name="XlaCallModule")
+    local_results[layer["id"]] = res if isinstance(res, str) else res[0]
 
 
 def _process_layers(
@@ -218,6 +271,10 @@ def _process_layers(
             _process_call_layer(layer, local_results, g, decoded_module)
             continue
 
+        if op_type == "convert":
+            _process_convert_layer(layer, local_results, g)
+            continue
+
         # Generic elementwise op via get_jax_cvt.
         fct = get_jax_cvt(decoded_module, g, op_type)
         args_list = []
@@ -242,7 +299,8 @@ def convert_exp(
     Supports the following StableHLO ops: unary/binary elementwise,
     ``dot_general`` (matrix multiply), ``broadcast_in_dim``,
     ``dynamic_broadcast_in_dim``, ``constant``, ``reduce`` (max/sum),
-    ``call`` (to private functions), and comparison ops.
+    ``call`` (to private functions), ``convert`` (type cast), and
+    comparison ops.
     """
     import jax.extend.mlir
 
