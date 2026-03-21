@@ -245,6 +245,23 @@ Key classes and functions
 Example
 -------
 
+The following example traces the function and prints the list of captured
+operations before compiling to ONNX:
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from yobx.sql import trace_dataframe
+
+    def transform(df):
+        df = df.filter(df["a"] > 0)
+        return df.select([(df["a"] + df["b"]).alias("total")])
+
+    pq = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+    for op in pq.operations:
+        print(type(op).__name__, "—", op)
+
 .. runpython::
     :showcode:
 

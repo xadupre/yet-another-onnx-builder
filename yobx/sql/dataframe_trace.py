@@ -527,7 +527,10 @@ def trace_dataframe(
             return df.select([(df["a"] + df["b"]).alias("total")])
 
         pq = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
-        # pq.operations contains [FilterOp(...), SelectOp(...)]
+        for op in pq.operations:
+            print(type(op).__name__, "—", op)
+        # FilterOp — FilterOp(condition=Condition(left=ColumnRef(column='a', ...
+        # SelectOp — SelectOp(items=[SelectItem(expr=BinaryExpr(...), alias='total')], ...
     """
     columns = {name: TracedSeries(ColumnRef(name)) for name in input_dtypes}
     df = TracedDataFrame(columns, source_columns=list(input_dtypes.keys()))
