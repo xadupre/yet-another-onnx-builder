@@ -381,6 +381,133 @@ detailed text dump of the builder's internal state (known shapes, types,
 constants, ranks, and the sequence of calls) which can be printed or logged
 whenever an assertion fails.
 
+Constraint Mechanism
+====================
+
+When :class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+processes a broadcasting operation (e.g. ``Add``, ``Mul``, ``Where``) it computes
+the output shape with
+:func:`broadcast_shape <yobx.xshape.shape_type_compute.broadcast_shape>`.
+If one input dimension is a symbolic string (unknown at graph-construction time)
+and the other is a concrete integer that is not ``1``, the builder registers a
+**constraint** equating the symbolic name to the concrete value.
+
+Why constraints are needed
+--------------------------
+
+Without constraints, the shape of the broadcast result would be left as the
+symbolic name (e.g. ``"d_model"``), and any operation that follows would inherit
+this uncertainty.  Later, when a downstream node reveals the concrete value, the
+builder would have to *backtrack* and update all earlier shapes — an expensive
+and error-prone operation that is not implemented.
+
+With constraints, the concrete value is used **immediately** as the output
+dimension, and the equality ``symbolic_name = concrete_value`` is stored.
+Downstream operations can propagate the concrete shape without revisiting
+previous nodes.
+
+How constraints are registered
+--------------------------------
+
+:func:`broadcast_shape <yobx.xshape.shape_type_compute.broadcast_shape>` applies
+the following rules for each pair of aligned dimensions ``(a, b)``:
+
++-------------------------+---------------------------+--------+----------------------------------+
+| ``a``                   | ``b``                     | Result | Constraint registered            |
++=========================+===========================+========+==================================+
+| symbolic string         | concrete int ``n ≠ 0, 1`` | ``n``  | ``a = n``                        |
++-------------------------+---------------------------+--------+----------------------------------+
+| concrete int ``n ≠ 0, 1`` | symbolic string         | ``n``  | ``b = n``                        |
++-------------------------+---------------------------+--------+----------------------------------+
+| symbolic string         | ``1``                     | ``a``  | *(none — 1 broadcasts freely)*   |
++-------------------------+---------------------------+--------+----------------------------------+
+| two symbolic strings    | ``a == b``                | ``a``  | *(none — already equal)*         |
++-------------------------+---------------------------+--------+----------------------------------+
+| two symbolic strings    | ``a != b``                | ``a^b``| *(none — max expression)*        |
++-------------------------+---------------------------+--------+----------------------------------+
+
+The concrete integer is always chosen as the output dimension so that subsequent
+operations see a precise shape immediately.
+
+Example: broadcasting after an unknown dimension
+-------------------------------------------------
+
+.. runpython::
+    :showcode:
+
+    import onnx
+    import onnx.helper as oh
+    import onnx.numpy_helper as onh
+    import numpy as np
+    from yobx.xshape import BasicShapeBuilder
+    from yobx.xshape.shape_type_compute import broadcast_shape
+
+    TFLOAT = onnx.TensorProto.FLOAT
+
+    # X has dynamic last dimension "d_model"; bias has static size 64.
+    model = oh.make_model(
+        oh.make_graph(
+            [
+                oh.make_node("Add", ["X", "bias"], ["Z"]),
+                oh.make_node("MatMul", ["Z", "W"], ["Out"]),
+            ],
+            "graph",
+            [oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq", "d_model"])],
+            [oh.make_tensor_value_info("Out", TFLOAT, [None, None, None])],
+            [
+                onh.from_array(np.zeros((64,), dtype=np.float32), name="bias"),
+                onh.from_array(np.random.randn(64, 32).astype(np.float32), name="W"),
+            ],
+        ),
+        opset_imports=[oh.make_opsetid("", 18)],
+        ir_version=10,
+    )
+
+    builder = BasicShapeBuilder()
+    builder.run_model(model)
+
+    for name in ["X", "Z", "Out"]:
+        print(f"{name:5s}  shape={builder.get_shape(name)}")
+
+    # The constraint records that d_model equals 64
+    print("constraints:", builder.get_registered_constraints())
+
+When the ``Add`` node is processed, ``broadcast_shape`` aligns
+``("batch", "seq", "d_model")`` with ``(64,)`` (right-padded to
+``(1, 1, 64)``).  The pair ``("d_model", 64)`` triggers the constraint
+``"d_model" = 64``.  The output shape ``Z`` therefore becomes
+``("batch", "seq", 64)`` rather than ``("batch", "seq", "d_model")``, and
+the ``MatMul`` handler can propagate the shape of ``Out`` immediately as
+``("batch", "seq", 32)`` without any backtracking.
+
+Constraint API
+--------------
+
+Three methods on :class:`ShapeBuilder <yobx.xshape.shape_builder.ShapeBuilder>`
+expose the constraint registry:
+
+* :meth:`register_constraint_dimension(dim_name, value)
+  <yobx.xshape.ShapeBuilder.register_constraint_dimension>` — record that the
+  symbolic dimension ``dim_name`` is equal to ``value`` (an integer or another
+  symbolic name).  Called automatically by ``broadcast_shape`` when needed.
+* :meth:`add_to_constraints(dim_name, value)
+  <yobx.xshape.ShapeBuilder.add_to_constraints>` — lower-level helper that
+  accepts a set of values as well as a single value.
+* :meth:`get_registered_constraints()
+  <yobx.xshape.ShapeBuilder.get_registered_constraints>` — returns the full
+  mapping ``{dim_name: {values}}`` accumulated so far.
+
+The registry is also used by
+:meth:`_improves_dynamic_dimension_naming
+<yobx.xshape.ShapeBuilder._improves_dynamic_dimension_naming>` to replace
+internal opaque tokens (e.g. ``"s0"``, ``"DYN0"``) with user-visible names
+once the relationships between them are known.
+
+.. seealso::
+
+    :ref:`l-plot-shape-constraints` — sphinx-gallery example demonstrating the
+    constraint mechanism end-to-end.
+
 Implementing a new shape function
 ==================================
 
