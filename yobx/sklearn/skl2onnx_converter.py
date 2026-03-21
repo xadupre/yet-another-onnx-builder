@@ -19,19 +19,19 @@ import onnx
 # Mapping from ONNX TensorProto element-type integers to NumPy dtypes.
 # Defined at module level to avoid rebuilding it on every add_initializer call.
 _ONNX_DTYPE_TO_NUMPY: Dict[int, type] = {
-    1: np.float32,    # FLOAT
-    2: np.uint8,      # UINT8
-    3: np.int8,       # INT8
-    4: np.uint16,     # UINT16
-    5: np.int16,      # INT16
-    6: np.int32,      # INT32
-    7: np.int64,      # INT64
-    10: np.float16,   # FLOAT16
-    11: np.float64,   # DOUBLE
-    12: np.uint32,    # UINT32
-    13: np.uint64,    # UINT64
-    14: np.complex64,    # COMPLEX64
-    15: np.complex128,   # COMPLEX128
+    1: np.float32,  # FLOAT
+    2: np.uint8,  # UINT8
+    3: np.int8,  # INT8
+    4: np.uint16,  # UINT16
+    5: np.int16,  # INT16
+    6: np.int32,  # INT32
+    7: np.int64,  # INT64
+    10: np.float16,  # FLOAT16
+    11: np.float64,  # DOUBLE
+    12: np.uint32,  # UINT32
+    13: np.uint64,  # UINT64
+    14: np.complex64,  # COMPLEX64
+    15: np.complex128,  # COMPLEX128
 }
 
 
@@ -144,10 +144,7 @@ class MockContainer:
         self.target_opset = target_opset
         self._g = g
         # Some converters query per-domain opsets.
-        self.target_opset_all: Dict[str, int] = {
-            "": target_opset,
-            "ai.onnx.ml": 5,
-        }
+        self.target_opset_all: Dict[str, int] = {"": target_opset, "ai.onnx.ml": 5}
         self.options: Dict = {}
 
     @property
@@ -160,10 +157,7 @@ class MockContainer:
         return {}
 
     def get_options(
-        self,
-        model: object,
-        default_values: Optional[Dict] = None,
-        fail: bool = True,
+        self, model: object, default_values: Optional[Dict] = None, fail: bool = True
     ) -> Dict:
         return default_values if default_values is not None else {}
 
@@ -208,8 +202,8 @@ class MockContainer:
         node_name = self._g.unique_node_name(name or "skl2onnx_node")  # type: ignore[attr-defined]
         self._g.make_node(  # type: ignore[attr-defined]
             op_type,
-            list(inputs),
-            list(outputs),
+            list(inputs),  # type: ignore
+            list(outputs),  # type: ignore
             domain=op_domain or "",
             name=node_name,
             **clean,
@@ -226,13 +220,7 @@ class MockContainer:
             attributes=list(node.attribute),
         )
 
-    def add_initializer(
-        self,
-        name: str,
-        onnx_type: int,
-        shape: object,
-        content: object,
-    ) -> None:
+    def add_initializer(self, name: str, onnx_type: int, shape: object, content: object) -> None:
         """Forward content directly to the GraphBuilder as a new initializer."""
         if isinstance(content, onnx.TensorProto):
             self._g.make_initializer(name, content)  # type: ignore[attr-defined]
@@ -240,7 +228,7 @@ class MockContainer:
             np_dtype = _ONNX_DTYPE_TO_NUMPY.get(onnx_type, np.float32)
             arr = np.array(content, dtype=np_dtype)
             if shape is not None and arr.shape != tuple(shape):
-                arr = arr.reshape(shape)
+                arr = arr.reshape(shape)  # type: ignore
             self._g.make_initializer(name, arr)  # type: ignore[attr-defined]
 
     def add_onnx_initializer(self, tensor: object) -> None:

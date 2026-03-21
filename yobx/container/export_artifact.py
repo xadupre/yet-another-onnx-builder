@@ -115,7 +115,7 @@ class ExportReport:
                 mask = pandas.Series(False, index=agg.index)
                 for col in ["added", "removed"]:
                     if col in agg.columns:
-                        mask |= agg[col] > 0
+                        mask |= agg[col] > 0  # type: ignore
                 agg = agg[mask]
                 if "removed" in agg.columns:
                     agg = agg.sort_values("removed", ascending=False)
