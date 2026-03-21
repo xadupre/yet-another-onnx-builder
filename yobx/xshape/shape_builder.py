@@ -514,7 +514,8 @@ class ShapeBuilder:
                 f"{self.get_type(name)}, got {dtype} in "
                 f"{string_type(tensor, with_shape=True)}"
             )
-            return {}
+            if not do_shape:
+                return {}
         if do_shape:
             assert self.has_shape(name), f"Missing shape for {name!r}{self.get_debug_msg()}"
             res = {}
@@ -534,6 +535,7 @@ class ShapeBuilder:
                         f"expecting {dim}, got {string_type(tensor, with_shape=True)}"
                     )
             return res
+        raise AssertionError(f"unexpected values {do_type=}, {do_shape=}")
 
     def evaluate_shape(self, name: str, context: Dict[str, int]) -> Tuple[int, ...]:
         shape = self.get_shape(name)

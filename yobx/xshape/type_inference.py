@@ -340,9 +340,7 @@ def _infer_type_topk(node: NodeProto, input_types: Sequence[int]) -> Tuple[int, 
     return (input_types[0], TensorProto.INT64)
 
 
-def _infer_type_batch_normalization(
-    node: NodeProto, input_types: Sequence[int]
-) -> List[int]:
+def _infer_type_batch_normalization(node: NodeProto, input_types: Sequence[int]) -> List[int]:
     """Returns output types for BatchNormalization."""
     types = [input_types[0]]
     for _ in range(len(node.output) - 1):
@@ -357,9 +355,7 @@ def _infer_type_onehot(node: NodeProto, input_types: Sequence[int]) -> Tuple[int
     return (TensorProto.FLOAT,)
 
 
-def _infer_type_mel_weight_matrix(
-    node: NodeProto, input_types: Sequence[int]
-) -> Tuple[int]:
+def _infer_type_mel_weight_matrix(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
     """Returns output type for MelWeightMatrix."""
     for att in node.attribute:
         if att.name == "output_datatype":
