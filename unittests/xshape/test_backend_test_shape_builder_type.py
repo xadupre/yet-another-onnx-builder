@@ -17,7 +17,7 @@ from yobx.helpers.onnx_helper import (
 )
 
 
-class ShapeBuilderBackendRep(onnx.backend.base.BackendRep):
+class ShapeBuilderTypeRep(onnx.backend.base.BackendRep):
     def __init__(self, model: onnx.ModelProto):
         op_type = model.graph.node[0].op_type
         self._model = overwrite_shape_in_model_proto(
@@ -62,9 +62,9 @@ class ShapeBuilderBackendRep(onnx.backend.base.BackendRep):
 
         # static
         shape_builder = BasicShapeBuilder(verbose=int(os.environ.get("VERBOSE", "0")))
-        shape_builder.run_model(self._dyn_model, exc=True)
+        shape_builder.run_model(self._dyn_model, exc=True, inference="type")
         try:
-            shape_builder.compare_with_true_inputs(feeds, outs, exc=True)
+            shape_builder.compare_with_true_inputs(feeds, outs, exc=True, do_shape=False)
         except NameError as e:
             raise unittest.SkipTest(  # noqa: B904
                 f"shape function was found but only the rank could be set: {e}"
@@ -79,9 +79,9 @@ class ShapeBuilderBackendRep(onnx.backend.base.BackendRep):
 
         # dynamic
         shape_builder = BasicShapeBuilder(verbose=int(os.environ.get("VERBOSE", "0")))
-        shape_builder.run_model(self._model, exc=True)
+        shape_builder.run_model(self._model, exc=True, inference="type")
         try:
-            shape_builder.compare_with_true_inputs(feeds, outs, exc=True)
+            shape_builder.compare_with_true_inputs(feeds, outs, exc=True, do_shape=False)
         except NameError as e:
             raise unittest.SkipTest(  # noqa: B904
                 f"shape function was found but only the rank could be set: {e}"
@@ -98,7 +98,7 @@ class ShapeBuilderBackendRep(onnx.backend.base.BackendRep):
         return outs
 
 
-class ShapeBuilderBackend(onnx.backend.base.Backend):
+class ShapeBuilderType(onnx.backend.base.Backend):
     @classmethod
     def is_opset_supported(cls, model):  # pylint: disable=unused-argument
         return True, ""
@@ -111,12 +111,12 @@ class ShapeBuilderBackend(onnx.backend.base.Backend):
     @classmethod
     def prepare(
         cls, model: onnx.ModelProto, device: str = "CPU", **kwargs: Any
-    ) -> ShapeBuilderBackendRep:
+    ) -> ShapeBuilderTypeRep:
         assert isinstance(model, ModelProto), f"Unexpected type {type(model)} for model."
-        return ShapeBuilderBackendRep(model)
+        return ShapeBuilderTypeRep(model)
 
 
-backend_test = onnx.backend.test.BackendTest(ShapeBuilderBackend())
+backend_test = onnx.backend.test.BackendTest(ShapeBuilderType())
 
 # The following tests are too slow with the reference implementation (Conv).
 backend_test.exclude(

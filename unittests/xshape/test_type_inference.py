@@ -274,10 +274,7 @@ class TestRunModelTypeInference(ExtTestCase):
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
         b = BasicShapeBuilder()
-        self.assertRaise(
-            lambda: b.run_model(model, inference="unknown"),
-            ValueError,
-        )
+        self.assertRaise(lambda: b.run_model(model, inference="unknown"), ValueError)
 
 
 if __name__ == "__main__":

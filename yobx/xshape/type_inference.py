@@ -2,6 +2,7 @@ from typing import List, NoReturn, Optional, Sequence, Tuple, Union
 from onnx import FunctionProto, NodeProto, TensorProto
 
 _i1_o1_node_types = {
+    "Abs",
     "Acos",
     "Acosh",
     "Asin",

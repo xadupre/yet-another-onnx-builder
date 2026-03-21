@@ -398,32 +398,37 @@ class ShapeBuilder:
             return f"{s}{' ' * (110 - len(s))}- {node.name}"
         return f"{text}|{' '.join(info)}"
 
-    def map_value_info_dimension_with_true_values(self, name: str, tensor: np.ndarray):
-        assert self.has_type(name), f"Missing type for {name!r}."
-        assert self.has_shape(name), f"Missing shape for {name!r}."
-        dtype = dtype_to_tensor_dtype(tensor.dtype)
-        assert dtype == self.get_type(name), (
-            f"Type mismatch for {name!r}, expecting "
-            f"{self.get_type(name)}, got {dtype} in "
-            f"{string_type(tensor, with_shape=True)}"
-        )
-        res = {}
-        shape = self.get_shape(name)
-        for i, (value, dim) in enumerate(zip(tensor.shape, shape)):
-            if isinstance(dim, str):
-                if dim in res:
-                    assert res[dim] == value, (
+    def map_value_info_dimension_with_true_values(
+        self, name: str, tensor: np.ndarray, do_type: bool = True, do_shape: bool = True
+    ):
+        if do_type:
+            assert self.has_type(name), f"Missing type for {name!r}{self.get_debug_msg()}"
+            dtype = dtype_to_tensor_dtype(tensor.dtype)
+            assert dtype == self.get_type(name), (
+                f"Type mismatch for {name!r}, expecting "
+                f"{self.get_type(name)}, got {dtype} in "
+                f"{string_type(tensor, with_shape=True)}"
+            )
+            return {}
+        if do_shape:
+            assert self.has_shape(name), f"Missing shape for {name!r}{self.get_debug_msg()}"
+            res = {}
+            shape = self.get_shape(name)
+            for i, (value, dim) in enumerate(zip(tensor.shape, shape)):
+                if isinstance(dim, str):
+                    if dim in res:
+                        assert res[dim] == value, (
+                            f"Shape mismatch for {name!r} for dimension {i}, "
+                            f"known dimensions are {shape}, got "
+                            f"{string_type(tensor, with_shape=True)}"
+                        )
+                    res[dim] = value
+                else:
+                    assert dim == value, (
                         f"Shape mismatch for {name!r} for dimension {i}, "
-                        f"known dimensions are {shape}, got "
-                        f"{string_type(tensor, with_shape=True)}"
+                        f"expecting {dim}, got {string_type(tensor, with_shape=True)}"
                     )
-                res[dim] = value
-            else:
-                assert dim == value, (
-                    f"Shape mismatch for {name!r} for dimension {i}, "
-                    f"expecting {dim}, got {string_type(tensor, with_shape=True)}"
-                )
-        return res
+            return res
 
     def evaluate_shape(self, name: str, context: Dict[str, int]) -> Tuple[int, ...]:
         shape = self.get_shape(name)
@@ -436,24 +441,35 @@ class ShapeBuilder:
         return d1 == d2
 
     def compare_computed_shape_with_tensor(
-        self, name: str, tensor: np.ndarray, context: Dict[str, int]
+        self,
+        name: str,
+        tensor: np.ndarray,
+        context: Dict[str, int],
+        do_shape: bool = True,
+        do_type: bool = True,
     ) -> Tuple[Tuple[str, int, int], ...]:
-        assert self.has_type(name), f"Missing type for {name!r}."
-        assert self.has_shape(name), f"Missing shape for {name!r}."
-        dtype = dtype_to_tensor_dtype(tensor.dtype)
-        assert dtype == self.get_type(name), (
-            f"Type mismatch for {name!r}, expecting "
-            f"{self.get_type(name)}, got {dtype} in "
-            f"{string_type(tensor, with_shape=True)}"
-        )
-        computed = self.evaluate_shape(name, context=context)
-        return tuple(zip(self.get_shape(name), tensor.shape, computed))
+        if do_type:
+            assert self.has_type(name), f"Missing type for {name!r}."
+            dtype = dtype_to_tensor_dtype(tensor.dtype)
+            assert dtype == self.get_type(name), (
+                f"Type mismatch for {name!r}, expecting "
+                f"{self.get_type(name)}, got {dtype} in "
+                f"{string_type(tensor, with_shape=True)}"
+            )
+            if not do_shape:
+                return ((self.get_type(name), dtype, self.get_type(name)),)
+        if do_shape:
+            assert self.has_shape(name), f"Missing shape for {name!r}."
+            computed = self.evaluate_shape(name, context=context)
+            return tuple(zip(self.get_shape(name), tensor.shape, computed))
 
     def compare_with_true_inputs(
         self,
         inputs: Union[Dict[str, np.ndarray], List[np.ndarray]],
         outputs: Union[Dict[str, np.ndarray], List[np.ndarray]],
         exc: bool = True,
+        do_shape: bool = True,
+        do_type: bool = True,
     ) -> Dict[str, Tuple[Tuple[str, int, int], ...]]:
         """
         Compares the shape of the outputs with what the output shapes would return.
@@ -461,6 +477,8 @@ class ShapeBuilder:
         :param inputs: inputs
         :param outputs: outputs
         :param exc: raises an exception when a discrepancy is met
+        :param do_type: compares types
+        :param do_shape: compares shapes
         :return: list of expression, expected value, computed value
         """
         if isinstance(inputs, list):
@@ -470,7 +488,9 @@ class ShapeBuilder:
 
         context = {}
         for name in self.input_names:
-            res = self.map_value_info_dimension_with_true_values(name, inputs[name])
+            res = self.map_value_info_dimension_with_true_values(
+                name, inputs[name], do_type=do_type, do_shape=do_shape
+            )
             for k, v in res.items():
                 if k not in context:
                     context[k] = v
@@ -483,7 +503,9 @@ class ShapeBuilder:
 
         final = {}
         for name, tensor in outputs.items():
-            res = self.compare_computed_shape_with_tensor(name, tensor, context)
+            res = self.compare_computed_shape_with_tensor(
+                name, tensor, context, do_type=do_type, do_shape=do_shape
+            )
             for dim, expected, got in res:
                 assert not exc or expected == got, (
                     f"Output dimension mismatch for {dim!r} for results {name!r}, "
