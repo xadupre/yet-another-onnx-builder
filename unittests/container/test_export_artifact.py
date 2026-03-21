@@ -11,7 +11,7 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 from yobx.container import ExportArtifact, ExportReport, FunctionPieces
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, skipif_ci_windows
 
 
 def _make_simple_model():
@@ -117,7 +117,7 @@ class TestExportReport(ExtTestCase):
             self.assertIn("key", df_extra.columns)
             self.assertIn("value", df_extra.columns)
 
-    @unittest.skipif_ci_windows("issue with excel")
+    @skipif_ci_windows("issue with excel")
     def test_to_excel_with_build_stats(self):
         try:
             import openpyxl  # noqa: F401
