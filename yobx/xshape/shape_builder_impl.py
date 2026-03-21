@@ -17,6 +17,7 @@ from ._builder_runtime import _BuilderRuntime
 from ._shape_runtime import _ShapeRuntime
 from ._inference_runtime import _InferenceRuntime, _OptimizationOptions
 from .shape_builder import ShapeBuilder
+from .type_inference import infer_types
 
 
 class InferenceMode(IntEnum):
@@ -797,8 +798,6 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         :param functions: a dictionary of functions available to the model
         :param exc: if True, raises an exception when type inference fails
         """
-        from .type_inference import infer_types
-
         known_types: Dict[str, int] = {}
 
         for i in graph.initializer:
