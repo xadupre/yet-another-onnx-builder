@@ -10,8 +10,9 @@ from yobx.helpers import string_type
 from yobx.helpers.onnx_helper import pretty_onnx
 from yobx.helpers.rt_helper import make_feeds
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.xshape import BasicShapeBuilder
+from yobx.xshape import BasicShapeBuilder, InferenceMode
 from yobx.helpers.onnx_helper import (
+    np_dtype_to_tensor_dtype,
     overwrite_shape_in_model_proto,
     replace_static_dimensions_by_strings,
 )
@@ -91,6 +92,31 @@ class ShapeBuilderShapeRep(onnx.backend.base.BackendRep):
                 f"Unable to handle a model due to {str(e)}\n---\n"
                 f"inputs: {string_type(feeds, with_shape=True)}\n---\n"
                 f"{shape_builder.get_debug_msg()}\n---\n"
+                f"{pretty_onnx(self._model)}"
+            ) from e
+
+        # type inference
+        type_builder = BasicShapeBuilder(verbose=int(os.environ.get("VERBOSE", "0")))
+        try:
+            type_builder.run_model(self._model, inference=InferenceMode.TYPE, exc=False)
+            all_tensors = {**feeds, **dict(zip(type_builder.output_names, outs))}
+            for name, tensor in all_tensors.items():
+                if not type_builder.has_type(name):
+                    continue
+                inferred = type_builder.get_type(name)
+                expected = np_dtype_to_tensor_dtype(tensor.dtype)
+                if inferred != expected:
+                    raise AssertionError(
+                        f"Type mismatch for {name!r}: inferred {inferred}, "
+                        f"expected {expected}."
+                    )
+        except AssertionError:
+            raise
+        except Exception as e:
+            raise AssertionError(
+                f"Unable to handle type inference for a model due to {str(e)}\n---\n"
+                f"inputs: {string_type(feeds, with_shape=True)}\n---\n"
+                f"{type_builder.get_debug_msg()}\n---\n"
                 f"{pretty_onnx(self._model)}"
             ) from e
 
