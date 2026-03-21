@@ -708,7 +708,6 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("T1", result)
         self.assertIn("4", result)
 
-
     def test_get_registered_constraints(self):
         b = BasicShapeBuilder()
         self.assertEqual(b.get_registered_constraints(), {})
@@ -764,10 +763,7 @@ class TestShapeBuilder(ExtTestCase):
             oh.make_graph(
                 [oh.make_node("Add", ["X", "Y"], ["Z"])],
                 "g",
-                [
-                    _mkv_("X", TFLOAT, ["batch", "seq"]),
-                    _mkv_("Y", TFLOAT, ["batch", "seq"]),
-                ],
+                [_mkv_("X", TFLOAT, ["batch", "seq"]), _mkv_("Y", TFLOAT, ["batch", "seq"])],
                 [_mkv_("Z", TFLOAT, ["batch", "seq"])],
             ),
             opset_imports=[oh.make_opsetid("", 18)],
@@ -778,7 +774,7 @@ class TestShapeBuilder(ExtTestCase):
         # No additional constraints are needed.
         self.assertEqual(b.get_shape("X"), ("batch", "seq"))
         # Since these names are already the "originals", renaming is identity.
-        replacements = b._improves_dynamic_dimension_naming({"batch", "seq"})
+        b._improves_dynamic_dimension_naming({"batch", "seq"})
         self.assertEqual(b.get_shape_renamed("Z"), ("batch", "seq"))
 
     def test_improves_dynamic_dimension_naming_partial(self):
