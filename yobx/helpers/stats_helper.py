@@ -490,11 +490,16 @@ class ModelStatistics:
         if isinstance(model, GraphBuilderExtendedProtocol):
             self._builder: Any = model
             onnx_model = model.to_onnx()
+            # to_onnx() may return an ExportArtifact wrapping the ModelProto
             if not isinstance(onnx_model, onnx.ModelProto):
-                raise TypeError(
-                    f"GraphBuilderExtendedProtocol.to_onnx() returned "
-                    f"{type(onnx_model).__name__!r}, expected ModelProto"
-                )
+                proto = getattr(onnx_model, "proto", None)
+                if isinstance(proto, onnx.ModelProto):
+                    onnx_model = proto
+                else:
+                    raise TypeError(
+                        f"GraphBuilderExtendedProtocol.to_onnx() returned "
+                        f"{type(onnx_model).__name__!r}, expected ModelProto"
+                    )
             self.model: onnx.ModelProto = onnx_model
         else:
             self._builder = None
@@ -621,7 +626,7 @@ class ModelStatistics:
     # Public API
     # ------------------------------------------------------------------
 
-    def compute(self) -> List[Dict[str, Any]]:
+    def compute(self) -> Dict[str, Any]:
         """
         Runs the full analysis and returns a statistics dictionary.
 
@@ -637,12 +642,35 @@ class ModelStatistics:
         """
         self._build_shape_map()
         self._collect_nodes(self.model.graph)
-        return self._node_stats
+
+        # Aggregate FLOPs per op_type
+        flops_per_op: Dict[str, Optional[int]] = {}
+        total: Optional[int] = 0
+        for op, values in self._flops_by_op.items():
+            op_total: Optional[int] = 0
+            for v in values:
+                if v is None or not isinstance(v, int):
+                    op_total = None
+                    break
+                op_total += v  # type: ignore
+            flops_per_op[op] = op_total
+            if op_total is None:
+                total = None
+            elif total is not None:
+                total += op_total
+
+        return {
+            "n_nodes": sum(self._node_count.values()),
+            "node_count_per_op_type": self._node_count,
+            "total_estimated_flops": total,
+            "flops_per_op_type": flops_per_op,
+            "node_stats": self._node_stats,
+        }
 
 
 def model_statistics(
     model: Union[onnx.ModelProto, GraphBuilderExtendedProtocol], verbose: int = 0
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     Computes statistics on an ONNX model.
 
