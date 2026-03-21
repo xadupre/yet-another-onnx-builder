@@ -2141,11 +2141,6 @@ def _set_shape_type_op_any_mel_weight_matrix(self: ShapeBuilder, node: NodeProto
     return True
 
 
-def _set_shape_type_op_any_loop(self: ShapeBuilder, node: NodeProto):
-    "Minimal handler for Loop - marks as handled."
-    return True
-
-
 _set_shape_type_op_any_known = {
     "ArgMax": _set_shape_type_op_any_arg_max_min,
     "ArgMin": _set_shape_type_op_any_arg_max_min,
@@ -2178,7 +2173,6 @@ _set_shape_type_op_any_known = {
     "IsInf": lambda *args: _set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
     "IsNaN": lambda *args: _set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
     "LayerNormalization": _set_shape_type_op_any_layer_normalization,
-    "Loop": _set_shape_type_op_any_loop,
     "LpNormalization": _set_shape_type_op_any_lp_normalization,
     "Log": _set_shape_type_op_any_unary,
     "LogSoftmax": _set_shape_type_op_any_unary,
