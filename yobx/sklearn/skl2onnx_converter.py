@@ -46,26 +46,21 @@ class MockScope:
     Minimal mock for skl2onnx's ``Scope``.
 
     Provides :meth:`get_unique_variable_name`, the only method called by
-    typical skl2onnx converter functions.
+    typical skl2onnx converter functions.  Name uniqueness is guaranteed by
+    delegating to the :class:`~yobx.xbuilder.GraphBuilder` instance (*g*).
     """
 
-    def __init__(self, target_opset: int) -> None:
+    def __init__(self, target_opset: int, g: object) -> None:
         self.target_opset = target_opset
-        self._used: set = set()
-        self._ctr: int = 0
+        self._g = g
 
     def get_unique_variable_name(self, seed: str) -> str:
-        """Return a name derived from *seed* that has not been used before."""
-        candidate = seed
-        while candidate in self._used:
-            self._ctr += 1
-            candidate = f"{seed}_{self._ctr}"
-        self._used.add(candidate)
-        return candidate
+        """Return a unique result name via the GraphBuilder."""
+        return self._g.unique_name(seed)  # type: ignore[attr-defined]
 
     def get_unique_operator_name(self, seed: str) -> str:
-        """Return a unique operator name (same logic as variable names)."""
-        return self.get_unique_variable_name(seed)
+        """Return a unique node name via the GraphBuilder."""
+        return self._g.unique_node_name(seed)  # type: ignore[attr-defined]
 
 
 class MockVariable:
@@ -149,7 +144,6 @@ class MockContainer:
     def __init__(self, target_opset: int, g: object) -> None:
         self.target_opset = target_opset
         self._g = g
-        self._node_count = 0
         # Some converters query per-domain opsets.
         self.target_opset_all: Dict[str, int] = {
             "": target_opset,
@@ -182,16 +176,6 @@ class MockContainer:
 
     # ---- node and initializer delegation ----
 
-    def _delegate_node(self, node: object) -> None:
-        self._g.make_node(  # type: ignore[attr-defined]
-            node.op_type,
-            list(node.input),
-            list(node.output),
-            domain=node.domain,
-            name=node.name,
-            attributes=list(node.attribute),
-        )
-
     def add_node(
         self,
         op_type: str,
@@ -222,8 +206,7 @@ class MockContainer:
             else:
                 clean[k] = v
 
-        node_name = name or f"N{self._node_count}"
-        self._node_count += 1
+        node_name = self._g.unique_node_name(name or "skl2onnx_node")  # type: ignore[attr-defined]
         self._g.make_node(  # type: ignore[attr-defined]
             op_type,
             list(inputs),
@@ -235,10 +218,14 @@ class MockContainer:
 
     def add_onnx_node(self, node: object) -> None:
         """Delegate a pre-built ``NodeProto`` directly to the GraphBuilder."""
-        self._delegate_node(node)
-
-    def _delegate_initializer(self, name: str, tensor: object) -> None:
-        self._g.make_initializer(name, tensor)  # type: ignore[attr-defined]
+        self._g.make_node(  # type: ignore[attr-defined]
+            node.op_type,
+            list(node.input),
+            list(node.output),
+            domain=node.domain,
+            name=node.name,
+            attributes=list(node.attribute),
+        )
 
     def add_initializer(
         self,
@@ -247,7 +234,7 @@ class MockContainer:
         shape: object,
         content: object,
     ) -> None:
-        """Build an ONNX ``TensorProto`` and delegate it directly to the GraphBuilder."""
+        """Build an ONNX ``TensorProto`` and forward it directly to the GraphBuilder."""
         if isinstance(content, onnx.TensorProto):
             tensor = onnx.TensorProto()
             tensor.CopyFrom(content)
@@ -260,11 +247,11 @@ class MockContainer:
             tensor = onnx.numpy_helper.from_array(arr)
             tensor.name = name
 
-        self._delegate_initializer(name, tensor)
+        self._g.make_initializer(name, tensor)  # type: ignore[attr-defined]
 
     def add_onnx_initializer(self, tensor: object) -> None:
-        """Delegate a pre-built ``TensorProto`` directly to the GraphBuilder."""
-        self._delegate_initializer(tensor.name, tensor)
+        """Forward a pre-built ``TensorProto`` directly to the GraphBuilder."""
+        self._g.make_initializer(tensor.name, tensor)  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -330,7 +317,7 @@ def make_skl2onnx_converter(skl2onnx_op_converter: Callable, input_type: object)
         X: str,
         name: str = "skl2onnx",
     ) -> Tuple:
-        scope = MockScope(g.main_opset)  # type: ignore[attr-defined]
+        scope = MockScope(g.main_opset, g)  # type: ignore[attr-defined]
 
         input_var = MockVariable(X, X)
         input_var.type = input_type  # set by caller — no skl2onnx import needed here
