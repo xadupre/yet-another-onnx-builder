@@ -49,12 +49,18 @@ jobs:
               --ignore=unittests/xoptim/test_torch_untrained_models.py \
               --ignore=unittests/parity \
               --ignore=unittests/sklearn \
+              --ignore=unittests/sql \
               --ignore=unittests/torch
 
       - name: Parity with tf2onnx
         run: |
           pip install tf2onnx
           pytest --durations=10 unittests/parity/with_tf2onnx
+
+      - name: Parity with jax2onnx
+        run: |
+          pip install jax2onnx
+          pytest --durations=10 unittests/parity/with_jax2onnx
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
