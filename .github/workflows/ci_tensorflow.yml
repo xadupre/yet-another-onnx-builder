@@ -55,7 +55,7 @@ jobs:
       - name: Parity with jax2onnx
         run: |
           pip install jax2onnx
-          pytest --durations=10 unittests/parity/with_tensorflow
+          pytest --durations=10 unittests/parity/with_jax2onnx
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
