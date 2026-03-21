@@ -386,6 +386,7 @@ _dict_type_inference = {
     "ArgMax": _infer_type_arg_max_min,
     "ArgMin": _infer_type_arg_max_min,
     "BatchNormalization": _infer_type_batch_normalization,
+    "BitCast": _infer_type_cast,
     "BlackmanWindow": _infer_type_window,
     "Cast": _infer_type_cast,
     "CastLike": _infer_type_cast_like,

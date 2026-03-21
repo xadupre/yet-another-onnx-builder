@@ -2,6 +2,7 @@ from collections import Counter
 from typing import List, Optional, Sequence, Tuple
 import numpy as np
 from onnx import NodeProto, TensorProto
+from ..helpers.onnx_helper import pretty_onnx
 from ..xexpressions import simplify_expression
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape, all_int, all_int_or_str
 from .shape_builder import ShapeBuilder
@@ -480,9 +481,13 @@ def _set_shape_type_op_any_lp_normalization(self: ShapeBuilder, node: NodeProto)
 
 def _set_shape_type_op_any_cast(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Cast."
-    return set_type_shape_unary_op(
+    r = set_type_shape_unary_op(
         self, node.output[0], node.input[0], itype=self.get_attribute(node, "to").i
     )
+    assert not self.has_type(node.input[0]) or self.has_type(
+        node.output[0]
+    ), f"Missing output for node {pretty_onnx(node)}."
+    return r
 
 
 def _set_shape_type_op_any_dropout(self: ShapeBuilder, node: NodeProto):
@@ -2148,6 +2153,7 @@ _set_shape_type_op_any_known = {
     "BatchNormalization": _set_shape_type_op_any_batch_normalization,
     "BlackmanWindow": _set_shape_type_op_any_window,
     "Cast": _set_shape_type_op_any_cast,
+    "BitCast": _set_shape_type_op_any_cast,
     "Compress": _set_shape_type_op_any_compress,
     "Concat": _set_shape_type_op_any_concat,
     "ConstantOfShape": _set_shape_type_op_any_constantofshape,
@@ -2216,7 +2222,8 @@ def set_shape_type_op_any(self: ShapeBuilder, node: NodeProto, exc: bool = False
     if node.op_type.startswith("Reduce"):
         return _set_shape_type_op_any_reduce(self, node)
     if node.op_type in _set_shape_type_op_any_known:
-        return _set_shape_type_op_any_known[node.op_type](self, node)
+        fct = _set_shape_type_op_any_known[node.op_type]
+        return fct(self, node)
     if node.op_type in self._op_type_element_wise_cmp_types:
         r = set_type_shape_binary_op(self, node.output[0], *node.input, cmp_op=True)
         assert r is not None or not self._debug_shape_missing, (

@@ -9,7 +9,7 @@ import onnx.numpy_helper as onh
 from onnx.external_data_helper import uses_external_data
 from onnx.reference import ReferenceEvaluator
 from ..helpers import string_type
-from ..helpers.onnx_helper import np_dtype_to_tensor_dtype, str_tensor_proto_type
+from ..helpers.onnx_helper import np_dtype_to_tensor_dtype, str_tensor_proto_type, pretty_onnx
 from ..xexpressions import simplify_expression
 from ..xexpressions.rename_expressions import parse_expression_tokens
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape
@@ -808,7 +808,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             if itype:
                 self.set_type(i.name, itype)
         for node in graph.node:
-            input_types = [self.get_type.get(n) for n in node.input]
+            input_types = [self.get_type(n) for n in node.input]
             if functions and (node.domain, node.op_type) in functions:
                 func = functions[(node.domain, node.op_type)]
                 result = infer_types(func, input_types, exc=exc)
@@ -824,10 +824,11 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
                 continue
             self._output_names.append(i.name)
             declared_type = i.type.tensor_type.elem_type if i.type.HasField("tensor_type") else 0
-            itype = self.get_type(i.name)
-            assert (
-                itype == declared_type
-            ), f"Type mismatch {itype} != {declared_type} for output {i.name!r}."
+            itype = self.get_type(i.name) if self.has_type(i.name) else 0
+            assert itype == declared_type, (
+                f"Type mismatch {itype} != {declared_type} for output {i.name!r}"
+                f"\n{pretty_onnx(graph)}"
+            )
             if itype:
                 self.set_type(i.name, itype)
 
