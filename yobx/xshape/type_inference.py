@@ -217,8 +217,8 @@ def _infer_type_eye_like(node: NodeProto, input_types: Sequence[int]) -> Tuple[i
 
 
 def _infer_type_pow(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
-    """Returns the output type for a node Where."""
-    raise AssertionError(f"Not implemented yet for node={node} and input_types={input_types}")
+    """Returns the output type for a Pow node (same type as first input)."""
+    return (input_types[0],)
 
 
 def _infer_type_range(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
