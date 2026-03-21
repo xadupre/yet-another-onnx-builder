@@ -92,6 +92,58 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
         self.assertEqualArray(expected_label, ort_results[0])
         self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
+    def test_make_skl2onnx_converter_mlp(self):
+        """Test make_skl2onnx_converter factory with MLPClassifier."""
+        from sklearn.neural_network import MLPClassifier
+        from yobx.sklearn import make_skl2onnx_converter
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        mlp = MLPClassifier(
+            hidden_layer_sizes=(4,), activation="relu", random_state=0, max_iter=2000
+        )
+        mlp.fit(X, y)
+
+        converter = make_skl2onnx_converter(options={"zipmap": False})
+        onx = to_onnx(mlp, (X,), extra_converters={MLPClassifier: converter})
+
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("MatMul", op_types)
+        self.assertIn("Sigmoid", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        label, proba = results[0], results[1]
+
+        expected_label = mlp.predict(X)
+        expected_proba = mlp.predict_proba(X).astype(np.float32)
+        self.assertEqualArray(expected_label, label)
+        self.assertEqualArray(expected_proba, proba, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected_label, ort_results[0])
+        self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
+
+    def test_make_skl2onnx_converter_linear_regression(self):
+        """Test make_skl2onnx_converter factory with LinearRegression."""
+        from sklearn.linear_model import LinearRegression
+        from yobx.sklearn import make_skl2onnx_converter
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        reg = LinearRegression().fit(X, y)
+
+        converter = make_skl2onnx_converter()
+        onx = to_onnx(reg, (X,), extra_converters={LinearRegression: converter})
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        (pred,) = results
+
+        expected = reg.predict(X).astype(np.float32)
+        self.assertEqualArray(expected, pred.ravel(), atol=1e-5)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

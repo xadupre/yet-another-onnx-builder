@@ -10,11 +10,16 @@ set of :epkg:`scikit-learn` estimators (``StandardScaler``,
 For any estimator that is *not* covered by the built-in registry, you can
 supply your own converter through the ``extra_converters`` keyword argument.
 
-This example shows how to write such a custom converter for
+This example shows two ways to write such a custom converter for
 :class:`~sklearn.neural_network.MLPClassifier` using
-:epkg:`sklearn-onnx` (``skl2onnx``) as the conversion back-end.  The
-approach generalises to any scikit-learn estimator that ``skl2onnx``
-supports.
+:epkg:`sklearn-onnx` (``skl2onnx``) as the conversion back-end.
+
+**Option A — low-level**: write the converter function by hand, calling
+:func:`skl2onnx.convert_sklearn` directly.
+
+**Option B — factory** *(recommended)*: use
+:func:`~yobx.sklearn.make_skl2onnx_converter` to generate the converter
+automatically.  Option B requires only one line of setup code.
 
 The strategy
 -------------
@@ -51,7 +56,7 @@ from skl2onnx.common.data_types import DoubleTensorType, FloatTensorType
 from yobx import doc
 from yobx.typing import GraphBuilderExtendedProtocol
 from yobx.xbuilder import FunctionOptions
-from yobx.sklearn import to_onnx
+from yobx.sklearn import to_onnx, make_skl2onnx_converter
 
 # %%
 # Helper: map ONNX element type to a skl2onnx input-type descriptor
@@ -89,8 +94,8 @@ def to_skl2onnx_input_type(elem_type: int, n_features: int):
 
 
 # %%
-# Custom converter: MLPClassifier via skl2onnx + local function
-# -------------------------------------------------------------
+# Option A — low-level custom converter
+# --------------------------------------
 #
 # A yobx *converter* is a plain Python function that receives the active
 # :class:`~yobx.xbuilder.GraphBuilder`, a shape-tracking dict (*sts*), the
@@ -206,8 +211,8 @@ print(f"  activation    : {mlp.activation}")
 print(f"  n_layers_     : {mlp.n_layers_}")
 
 # %%
-# 2. Convert to ONNX using the custom converter
-# ----------------------------------------------
+# 2a. Convert to ONNX using the low-level custom converter (Option A)
+# -------------------------------------------------------------------
 #
 # We pass our custom converter function through ``extra_converters``.
 # The yobx framework will call it whenever it encounters an
@@ -244,6 +249,28 @@ print("Predicted labels  (ONNX)   :", label_onnx)
 np.testing.assert_array_equal(label_sk, label_onnx)
 np.testing.assert_allclose(proba_sk, proba_onnx, atol=1e-5)
 print("\nAll predictions match ✓")
+
+# %%
+# 2b. Convert to ONNX using the factory helper (Option B — recommended)
+# ----------------------------------------------------------------------
+#
+# :func:`~yobx.sklearn.make_skl2onnx_converter` creates the boilerplate
+# converter automatically.  Pass the same ``options`` dict you would pass
+# to :func:`skl2onnx.convert_sklearn`.  The factory handles type detection,
+# opset normalisation, and local-function wrapping transparently.
+
+converter = make_skl2onnx_converter(options={"zipmap": False})
+onx_b = to_onnx(mlp, (X,), extra_converters={MLPClassifier: converter})
+
+ref_b = onnxruntime.InferenceSession(
+    onx_b.SerializeToString(), providers=["CPUExecutionProvider"]
+)
+results_b = ref_b.run(None, {"X": X})
+label_b, proba_b = results_b[0], results_b[1]
+
+np.testing.assert_array_equal(label_sk, label_b)
+np.testing.assert_allclose(proba_sk, proba_b, atol=1e-5)
+print("Option B predictions also match ✓")
 
 # %%
 # 4. Visualise the exported ONNX graph
