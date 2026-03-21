@@ -398,20 +398,11 @@ def to_onnx(
             inline=(not function_options) or not function_options.export_as_function,
             return_optimize_report=True,
         )
-        if verbose and onx.report and onx.report.stats:
-            import pandas
-
+        if verbose and onx.report:
             print(f"[yobx.sklearn.to_onnx] done, output type is {type(onx)}")
-
-            df = pandas.DataFrame(onx.report.stats)
-            for c in ["added", "removed"]:
-                df[c] = df[c].fillna(0).astype(int)
-            agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
-            agg = agg[(agg["added"] > 0) | (agg["removed"] > 0)].sort_values(
-                "removed", ascending=False
-            )
-            if agg.shape[0]:
-                print(agg.to_string())
+            text = onx.report.to_string()
+            if text:
+                print(text)
         assert isinstance(onx, ExportArtifact), f"Unexpected type {type(onx)} for onx."
         return onx
     onx = g.to_onnx(
