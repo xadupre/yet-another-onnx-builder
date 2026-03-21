@@ -942,6 +942,43 @@ def has_tensorflow(version: str = "") -> bool:
     return PvVersion(tensorflow.__version__) >= PvVersion(version)
 
 
+def has_tf2onnx(version: str = "") -> bool:
+    """Returns ``True`` if :epkg:`tf2onnx` is installed and recent enough."""
+    try:
+        import tf2onnx
+    except (ImportError, AttributeError):
+        return False
+
+    if not version:
+        return True
+
+    if not hasattr(tf2onnx, "__version__"):
+        # development version
+        return True
+
+    return PvVersion(tf2onnx.__version__) >= PvVersion(version)
+
+
+def requires_tf2onnx(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`tf2onnx` is not installed or not recent enough."""
+    try:
+        import tf2onnx
+    except (ImportError, AttributeError):
+        return unittest.skip(msg or "tf2onnx not installed")
+
+    if not version:
+        return lambda x: x
+
+    if not hasattr(tf2onnx, "__version__"):
+        # development version
+        return lambda x: x
+
+    if PvVersion(tf2onnx.__version__) < PvVersion(version):
+        msg = f"tf2onnx version {tf2onnx.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def requires_onnxruntime(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not recent enough."""
     try:
