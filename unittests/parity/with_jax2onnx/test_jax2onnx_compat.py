@@ -15,7 +15,6 @@ import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_jax, requires_jax2onnx
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -29,9 +28,7 @@ def _run_jax2onnx(fn, *arrays):
 
     input_specs = [jax.ShapeDtypeStruct(a.shape, a.dtype) for a in arrays]
     model = to_onnx(fn, input_specs)
-    sess = InferenceSession(
-        model.SerializeToString(), providers=["CPUExecutionProvider"]
-    )
+    sess = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
     input_names = [i.name for i in sess.get_inputs()]
     outputs = sess.run(None, dict(zip(input_names, arrays)))
     return model, outputs
@@ -46,9 +43,7 @@ def _run_yobx(fn, *arrays, dynamic_shapes=None):
     if dynamic_shapes is not None:
         kwargs["dynamic_shapes"] = dynamic_shapes
     artifact = to_onnx(fn, tuple(arrays), **kwargs)
-    sess = InferenceSession(
-        artifact.SerializeToString(), providers=["CPUExecutionProvider"]
-    )
+    sess = InferenceSession(artifact.SerializeToString(), providers=["CPUExecutionProvider"])
     input_names = [i.name for i in sess.get_inputs()]
     outputs = sess.run(None, dict(zip(input_names, arrays)))
     return artifact, outputs
@@ -229,7 +224,6 @@ class TestJax2OnnxCompositeCompat(ExtTestCase):
     def test_mlp(self):
         """Two-layer MLP with ReLU activation: compare converters end-to-end."""
         import jax
-        import jax.numpy as jnp
 
         key = jax.random.PRNGKey(0)
         k1, k2 = jax.random.split(key)
