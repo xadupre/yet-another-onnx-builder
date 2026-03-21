@@ -27,15 +27,29 @@ def _ort_run(onnx_model, feeds):
 def _tf2onnx_from_keras(model, input_arrays, opset=18):
     """Convert a Keras model to ONNX using tf2onnx.
 
+    ``tf2onnx.convert.from_keras`` does not support Keras 3.x (shipped with
+    TF 2.16+) because its internal name-lookup fails for ``keras_tensor_*``
+    outputs.  We work around this by wrapping the model in a ``@tf.function``
+    and using ``tf2onnx.convert.from_function`` instead, which is the approach
+    recommended for Keras 3.x.
+
     Returns the onnx ModelProto.
     """
     import tf2onnx
 
+    # Use None for the batch dimension so the ONNX model accepts any batch size.
     input_sig = [
-        tf.TensorSpec(arr.shape, dtype=tf.float32, name=f"input_{i}")
-        for i, arr in enumerate(input_arrays)
+        tf.TensorSpec([None, *arr.shape[1:]], dtype=tf.float32)
+        for arr in input_arrays
     ]
-    onnx_proto, _ = tf2onnx.convert.from_keras(model, input_signature=input_sig, opset=opset)
+
+    @tf.function(input_signature=input_sig)
+    def model_fn(*args):
+        return model(*args)
+
+    onnx_proto, _ = tf2onnx.convert.from_function(
+        model_fn, input_signature=input_sig, opset=opset
+    )
     return onnx_proto
 
 
