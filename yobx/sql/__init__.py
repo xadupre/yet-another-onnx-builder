@@ -26,8 +26,8 @@ Public API
   function → :class:`~yobx.container.ExportArtifact`
 * :func:`trace_dataframe` — trace a DataFrame function →
   :class:`~yobx.sql.parse.ParsedQuery`
-* :func:`to_onnx` — unified entry point: SQL string **or** ``polars.LazyFrame`` →
-  :class:`~yobx.container.ExportArtifact`
+* :func:`to_onnx` — unified entry point: SQL string, DataFrame-tracing callable,
+  **or** ``polars.LazyFrame`` → :class:`~yobx.container.ExportArtifact`
 * :func:`~yobx.sql.parse.parse_sql` — parse a SQL string into a
   :class:`~yobx.sql.parse.ParsedQuery`
 * :class:`~yobx.sql.parse.ParsedQuery` — parsed query container
