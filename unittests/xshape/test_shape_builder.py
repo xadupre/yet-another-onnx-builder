@@ -18,7 +18,11 @@ class TestShapeBuilder(ExtTestCase):
         builder = ShapeBuilder()
         for me in dir(builder):
             if me.startswith("get_") and not me.startswith("get_att"):
-                self.assertRaise(lambda me=me: getattr(builder, me)(""), NotImplementedError)
+                if me == "get_registered_constraints":
+                    # no-arg method – call without arguments
+                    self.assertRaise(lambda: builder.get_registered_constraints(), NotImplementedError)
+                else:
+                    self.assertRaise(lambda me=me: getattr(builder, me)(""), NotImplementedError)
             if me.startswith("set_"):
                 self.assertRaise(
                     lambda me=me: getattr(builder, me)("", None), NotImplementedError
@@ -702,6 +706,103 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("Squeeze", result)
         self.assertIn("T1", result)
         self.assertIn("4", result)
+
+
+    def test_get_registered_constraints(self):
+        b = BasicShapeBuilder()
+        self.assertEqual(b.get_registered_constraints(), {})
+        b.register_constraint_dimension("batch", "s0")
+        b.register_constraint_dimension("s0", "batch")
+        constraints = b.get_registered_constraints()
+        self.assertIn("batch", constraints)
+        self.assertIn("s0", constraints)
+        self.assertIn("s0", constraints["batch"])
+        self.assertIn("batch", constraints["s0"])
+
+    def test_get_shape_renamed_without_renaming(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", ("s0", "s1"))
+        # Before any renaming, get_shape_renamed falls back to get_shape.
+        self.assertEqual(b.get_shape_renamed("X"), ("s0", "s1"))
+
+    def test_improves_dynamic_dimension_naming_basic(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", ("s0", "s1"))
+        b.set_type("Y", TFLOAT)
+        b.set_shape("Y", ("s0", "s1"))
+        # Register constraints linking internal names to user-visible names.
+        b.register_constraint_dimension("batch", "s0")
+        b.register_constraint_dimension("s0", "batch")
+        b.register_constraint_dimension("seq_length", "s1")
+        b.register_constraint_dimension("s1", "seq_length")
+        replacements = b._improves_dynamic_dimension_naming({"batch", "seq_length"})
+        self.assertIn("s0", replacements)
+        self.assertEqual(replacements["s0"], "batch")
+        self.assertIn("s1", replacements)
+        self.assertEqual(replacements["s1"], "seq_length")
+        self.assertEqual(b.get_shape_renamed("X"), ("batch", "seq_length"))
+        self.assertEqual(b.get_shape_renamed("Y"), ("batch", "seq_length"))
+
+    def test_improves_dynamic_dimension_naming_no_constraints(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", ("s0", "s1"))
+        # With no constraints linking s0/s1 to the original names, no renaming happens
+        # for s0/s1 even though identity mappings are returned for the original names.
+        replacements = b._improves_dynamic_dimension_naming({"batch", "seq_length"})
+        # s0 and s1 are not constrained to batch/seq_length, so they stay unchanged.
+        self.assertNotIn("s0", replacements)
+        self.assertNotIn("s1", replacements)
+        # Falls back to the original shape.
+        self.assertEqual(b.get_shape_renamed("X"), ("s0", "s1"))
+
+    def test_improves_dynamic_dimension_naming_from_model(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Add", ["X", "Y"], ["Z"])],
+                "g",
+                [
+                    _mkv_("X", TFLOAT, ["batch", "seq"]),
+                    _mkv_("Y", TFLOAT, ["batch", "seq"]),
+                ],
+                [_mkv_("Z", TFLOAT, ["batch", "seq"])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model)
+        # The model uses "batch" and "seq" as symbolic names from the start.
+        # No additional constraints are needed.
+        self.assertEqual(b.get_shape("X"), ("batch", "seq"))
+        # Since these names are already the "originals", renaming is identity.
+        replacements = b._improves_dynamic_dimension_naming({"batch", "seq"})
+        self.assertEqual(b.get_shape_renamed("Z"), ("batch", "seq"))
+
+    def test_improves_dynamic_dimension_naming_partial(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", ("s0", 128))
+        # Only the first dimension has a preferred name.
+        b.register_constraint_dimension("batch", "s0")
+        b.register_constraint_dimension("s0", "batch")
+        replacements = b._improves_dynamic_dimension_naming({"batch"})
+        self.assertIn("s0", replacements)
+        self.assertEqual(replacements["s0"], "batch")
+        # Static dimension 128 is unchanged.
+        self.assertEqual(b.get_shape_renamed("X"), ("batch", 128))
+
+    def test_improves_dynamic_dimension_naming_idempotent(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", ("s0",))
+        b.register_constraint_dimension("batch", "s0")
+        b.register_constraint_dimension("s0", "batch")
+        b._improves_dynamic_dimension_naming({"batch"})
+        # Calling again should not raise and should return consistent results.
+        b._improves_dynamic_dimension_naming({"batch"})
+        self.assertEqual(b.get_shape_renamed("X"), ("batch",))
 
 
 if __name__ == "__main__":

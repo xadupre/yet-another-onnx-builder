@@ -753,3 +753,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             self.constraints_[dim_name] |= value
         else:
             self.constraints_[dim_name].add(value)
+
+    def get_registered_constraints(self):
+        """Returns the constraints registered so far."""
+        return self.constraints_
