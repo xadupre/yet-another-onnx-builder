@@ -1,15 +1,17 @@
-name: Documentation Verbose
+name: ci-10-gallery-transformers
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * *"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  doc_examples:
-    name: doc verbose (ubuntu-latest, py3.13)
+  gallery_transformers:
+    name: gallery-transformers (ubuntu-latest, py3.13, torch-nightly)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -20,18 +22,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-
-      - name: Install graphviz
-        uses: ts-graphviz/setup-graphviz@v2
-
       - name: Install nightly pytorch
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
-
       - name: Install dependencies
-        run: pip install -e ".[category_encoders,dev,docs,imblearn,lightgbm,polars,sklearn,sksurv,spox,statmodels,tensorflow,torch,transformers,xgboost]"
-
+        run: pip install -e ".[dev,torch,transformers]"
       - name: pip freeze
         run: pip freeze
-
-      - name: Run documentation verbose
-        run: python -m sphinx docs dist/html -v
+      - name: Run transformers gallery examples (pre-trained weights)
+        run: |
+          for f in docs/examples/transformers/plot_*.py; do
+            echo "Running $f --trained ..."
+            python "$f" --trained
+          done

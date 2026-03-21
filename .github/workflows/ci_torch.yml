@@ -36,8 +36,9 @@ jobs:
         run: |
           pytest --cov=yobx --cov-report=xml --durations=10 \
             --ignore=unittests/parity \
-            --ignore=unittests/tensorflow \
-            --ignore=unittests/sklearn
+            --ignore=unittests/sql \
+            --ignore=unittests/sklearn \
+            --ignore=unittests/tensorflow
 
       - name: Parity with jax2onnx
         run: |

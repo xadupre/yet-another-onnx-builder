@@ -12,12 +12,16 @@ input** tensor.  See :ref:`l-design-sql` for the full design discussion.
 
     sql_to_onnx
     sql_to_onnx_graph
+    lazyframe_to_onnx
+    to_onnx
 
 .. toctree::
     :maxdepth: 1
     :caption: modules
 
     parse
+    sql_convert
+    polars_convert
     convert
     _expr
     ops/index

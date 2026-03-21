@@ -1,5 +1,5 @@
 """
-Unit tests for :mod:`yobx.sql.convert` — SQL-to-ONNX converter.
+Unit tests for :mod:`yobx.sql.sql_convert` — SQL-to-ONNX converter.
 """
 
 import unittest
