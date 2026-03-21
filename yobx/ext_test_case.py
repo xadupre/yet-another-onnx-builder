@@ -942,6 +942,43 @@ def has_tensorflow(version: str = "") -> bool:
     return PvVersion(tensorflow.__version__) >= PvVersion(version)
 
 
+def has_tf2onnx(version: str = "") -> bool:
+    """Returns ``True`` if :epkg:`tf2onnx` is installed and recent enough."""
+    try:
+        import tf2onnx
+    except (ImportError, AttributeError):
+        return False
+
+    if not version:
+        return True
+
+    if not hasattr(tf2onnx, "__version__"):
+        # development version
+        return True
+
+    return PvVersion(tf2onnx.__version__) >= PvVersion(version)
+
+
+def requires_tf2onnx(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`tf2onnx` is not installed or not recent enough."""
+    try:
+        import tf2onnx
+    except (ImportError, AttributeError):
+        return unittest.skip(msg or "tf2onnx not installed")
+
+    if not version:
+        return lambda x: x
+
+    if not hasattr(tf2onnx, "__version__"):
+        # development version
+        return lambda x: x
+
+    if PvVersion(tf2onnx.__version__) < PvVersion(version):
+        msg = f"tf2onnx version {tf2onnx.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def requires_onnxruntime(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not recent enough."""
     try:
@@ -1071,6 +1108,46 @@ def requires_onnx(version: str, msg: str = "") -> Callable:
 
     if PvVersion(onnx.__version__) < PvVersion(version):
         msg = f"onnx version {onnx.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
+def has_jax2onnx(version: str = "") -> bool:
+    "Returns True if :epkg:`jax2onnx` is installed and its version is high enough."
+    try:
+        import jax2onnx  # noqa: F401
+    except (ImportError, AttributeError):
+        return False
+    if not version:
+        return True
+    try:
+        from importlib.metadata import version as _meta_version
+
+        installed = _meta_version("jax2onnx")
+    except Exception:
+        return True
+    return PvVersion(installed) >= PvVersion(version)
+
+
+def requires_jax2onnx(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`jax2onnx` is not installed or not recent enough."""
+    try:
+        import jax2onnx  # noqa: F401
+    except (ImportError, AttributeError):
+        return unittest.skip(msg or "jax2onnx not installed")
+
+    if not version:
+        return lambda x: x
+
+    try:
+        from importlib.metadata import version as _meta_version
+
+        installed = _meta_version("jax2onnx")
+    except Exception:
+        return lambda x: x
+
+    if PvVersion(installed) < PvVersion(version):
+        msg = f"jax2onnx version {installed} < {version}: {msg}"
         return unittest.skip(msg)
     return lambda x: x
 

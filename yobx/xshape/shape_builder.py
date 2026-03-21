@@ -1,11 +1,12 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import numpy as np
 import onnx
 import onnx.helper as oh
 from ..helpers import string_type
 from ..helpers.onnx_helper import dtype_to_tensor_dtype
 from ._shape_helper import DYNAMIC_SHAPE
-from ..xexpressions import evaluate_expression
+from ..xexpressions import evaluate_expression, simplify_expression
+from ..xexpressions.rename_expressions import rename_dynamic_dimensions, rename_dynamic_expression
 from ..helpers.onnx_helper import (
     element_wise_binary_op_types,
     element_wise_op_cmp_types,
@@ -216,6 +217,26 @@ class ShapeBuilder:
         """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
+    def _ensure_constraints_initialized(self):
+        """Initializes ``constraints_`` if it has not been set yet by a subclass constructor."""
+        if not hasattr(self, "constraints_"):
+            self.constraints_: Dict[str, Set[Union[str, int]]] = {}
+
+    def add_to_constraints(self, dim_name: str, value: Union[str, int, Set[Union[str, int]]]):
+        """
+        Adds a constraint associating a symbolic dimension name with a value or set of values.
+
+        :param dim_name: symbolic dimension name (e.g. ``"batch"``)
+        :param value: the value, name, or set of values/names to associate with that dimension
+        """
+        self._ensure_constraints_initialized()
+        if dim_name not in self.constraints_:
+            self.constraints_[dim_name] = set()
+        if isinstance(value, set):
+            self.constraints_[dim_name] |= value
+        else:
+            self.constraints_[dim_name].add(value)
+
     def register_constraint_dimension(self, dim_name: str, value: Any):
         """
         Registers a constraint associating a symbolic dimension name with a value.
@@ -223,7 +244,82 @@ class ShapeBuilder:
         :param dim_name: symbolic dimension name (e.g. ``"batch"``)
         :param value: the value or set of values to associate with that dimension
         """
-        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+        self.add_to_constraints(dim_name, value)
+
+    def get_registered_constraints(self) -> Dict[str, Set[Union[str, int]]]:
+        """
+        Returns the constraints registered so far.
+
+        :return: mapping from dimension name to the set of values/names
+                 it is constrained to be equal to
+        """
+        self._ensure_constraints_initialized()
+        return self.constraints_
+
+    def get_shape_renamed(self, name: str) -> DYNAMIC_SHAPE:
+        """
+        Returns the shape of result *name* using user-visible dimension names.
+
+        After :meth:`_improves_dynamic_dimension_naming` has been called, symbolic
+        dimension names that were given by the user (e.g. ``"batch"``, ``"seq_length"``)
+        are substituted for the internal names (e.g. ``"s0"``, ``"s1"``).  When no
+        renaming has been computed yet this falls back to :meth:`get_shape`.
+
+        :param name: result name
+        :return: shape tuple with user dimension names where available
+        """
+        if hasattr(self, "replacements_dimensions_") and name in self.replacements_dimensions_:
+            return self.replacements_dimensions_[name]
+        return self.get_shape(name)
+
+    def _improves_dynamic_dimension_naming(self, original: Set[str]) -> Dict[str, str]:
+        """
+        Renames internal dynamic-dimension tokens (e.g. ``"s0"``, ``"DYN0"``) to
+        user-visible names wherever the registered constraints allow it.
+
+        After this method has been called :meth:`get_shape_renamed` will return
+        the shapes with the preferred names.
+
+        .. note::
+            This method accesses ``self._known_shapes`` which must be a
+            ``dict`` mapping result names to shape tuples.  This attribute
+            is provided by concrete subclasses such as
+            :class:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder`.
+
+        :param original: set of preferred (user-visible) dimension names to
+                         try to substitute into the shapes
+        :return: replacement dictionary mapping old token names to new names
+        """
+        constraints = self.get_registered_constraints()
+
+        # Expand constraints: make every equality fully symmetric and transitive.
+        expanded_constraints: Dict[str, Set[Union[str, int]]] = {}
+        for k, v in constraints.items():
+            expanded_constraints[k] = v.copy()
+            for i in v:
+                if i not in expanded_constraints:
+                    expanded_constraints[i] = set()
+                expanded_constraints[i] |= v
+                expanded_constraints[i] |= {k}
+
+        replacements = rename_dynamic_dimensions(expanded_constraints, original)
+
+        if replacements:
+            if not hasattr(self, "replacements_dimensions_"):
+                self.replacements_dimensions_: Dict[str, DYNAMIC_SHAPE] = {}
+                self.replacements_for_replacements_dimensions_ = replacements
+            for k, v in self._known_shapes.items():  # type: ignore[attr-defined]
+                if v is None:
+                    continue
+                self.replacements_dimensions_[k] = tuple(
+                    (
+                        simplify_expression(rename_dynamic_expression(_, replacements))
+                        if isinstance(_, str)
+                        else _
+                    )
+                    for _ in v
+                )
+        return replacements
 
     def _hash(self) -> str:
         return make_hash(self)

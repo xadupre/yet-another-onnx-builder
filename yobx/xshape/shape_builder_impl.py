@@ -735,21 +735,6 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         for i in graph.output:
             self.run_value_info(i, False)
 
-    def register_constraint_dimension(self, dim_name: str, value: Any):
-        """
-        Registers a constraint on a dimension.
-
-        :param dim_name: dimension name
-        :param value: value to register
-        """
-        if self._debug_dyn_dim and dim_name in self._debug_dyn_dim:
-            print(
-                f"[GraphBuilder.register_constraint_dimension] "
-                f"dim_name={dim_name!r}, value={value!r}"
-            )
-        if dim_name not in self.constraints_:
-            self.constraints_[dim_name] = set()
-        if isinstance(value, set):
-            self.constraints_[dim_name] |= value
-        else:
-            self.constraints_[dim_name].add(value)
+    def get_registered_constraints(self):
+        """Returns the constraints registered so far."""
+        return self.constraints_
