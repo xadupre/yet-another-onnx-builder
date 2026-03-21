@@ -14,50 +14,53 @@ This example shows two ways to write such a custom converter for
 :class:`~sklearn.neural_network.MLPClassifier` using
 :epkg:`sklearn-onnx` (``skl2onnx``) as the conversion back-end.
 
-**Option A — low-level**: write the converter function by hand, directly
-calling the skl2onnx converter function with mocked ``Scope``, ``Operator``
-and ``ModelComponentContainer`` objects and injecting the resulting nodes
-into the enclosing :class:`~yobx.xbuilder.GraphBuilder`.
+**Option A — low-level**: write the converter function by hand.  Obtain
+the skl2onnx converter function from skl2onnx's registry, pass pure-Python
+mock objects for ``Scope``, ``Operator``, and ``ModelComponentContainer``
+(provided by :mod:`yobx.sklearn.skl2onnx_converter`), and inject the
+resulting nodes into the enclosing :class:`~yobx.xbuilder.GraphBuilder`.
 
 **Option B — factory** *(recommended)*: use
-:func:`~yobx.sklearn.make_skl2onnx_converter` to generate the converter
-automatically.  Option B requires only one line of setup code.
+:func:`~yobx.sklearn.make_skl2onnx_converter`.  One line of setup after
+looking up the skl2onnx converter function.
 
 The strategy
 -------------
 
 1. Look up the converter registered in :epkg:`sklearn-onnx` for the
-   estimator's type via :data:`skl2onnx._supported_operators.sklearn_operator_name_map`
-   and :func:`skl2onnx.common._registration.get_converter`.
+   estimator's type.
 2. Create lightweight mock objects
-   (:class:`~skl2onnx.common._topology.Scope`,
-   :class:`~skl2onnx.common._topology.Operator`,
-   :class:`~skl2onnx.common._topology.Variable`) whose names match the
-   input and output tensors already registered in the enclosing
+   (:class:`~yobx.sklearn.skl2onnx_converter._MockScope`,
+   :class:`~yobx.sklearn.skl2onnx_converter._MockOperator`,
+   :class:`~yobx.sklearn.skl2onnx_converter._MockVariable`,
+   :class:`~yobx.sklearn.skl2onnx_converter._MockContainer`)
+   whose tensor names match the ones already registered in the enclosing
    :class:`~yobx.xbuilder.GraphBuilder`.
-3. Create a :class:`~skl2onnx.common._container.ModelComponentContainer`
-   that accumulates ONNX nodes and initializers.
-4. Call the skl2onnx converter function directly:
-   ``converter(scope, operator, container)``.
-5. Inject all collected nodes and initializers straight into the enclosing
+3. Call the skl2onnx converter function: ``converter(scope, operator, container)``.
+4. Inject all collected nodes and initializers straight into the enclosing
    :class:`~yobx.xbuilder.GraphBuilder`.
+
+These mock classes are **pure Python** — :mod:`yobx.sklearn.skl2onnx_converter`
+contains no skl2onnx imports.
 """
 
 from typing import Dict, List, Tuple
 
 import numpy as np
-import onnx
 import onnxruntime
 from sklearn.neural_network import MLPClassifier
 from skl2onnx._supported_operators import sklearn_operator_name_map
-from skl2onnx.common._container import ModelComponentContainer
-from skl2onnx.common._registration import _converter_pool, get_converter
-from skl2onnx.common._topology import Operator, Scope, Variable
-from skl2onnx.common.data_types import DoubleTensorType, FloatTensorType
+from skl2onnx.common._registration import get_converter
 
 from yobx import doc
 from yobx.typing import GraphBuilderExtendedProtocol
 from yobx.sklearn import to_onnx, make_skl2onnx_converter
+from yobx.sklearn.skl2onnx_converter import (
+    _MockContainer,
+    _MockOperator,
+    _MockScope,
+    _MockVariable,
+)
 
 # %%
 # Option A — low-level custom converter
@@ -71,9 +74,9 @@ from yobx.sklearn import to_onnx, make_skl2onnx_converter
 #
 # Here we implement this contract by:
 #
-# 1. Looking up the skl2onnx converter registered for the estimator type.
-# 2. Creating lightweight ``Scope``, ``Operator``, ``Variable`` mock objects
-#    whose names match the actual tensors in the enclosing GraphBuilder.
+# 1. Looking up the skl2onnx converter function from skl2onnx's registry.
+# 2. Creating lightweight mock objects whose names match the actual tensors
+#    in the enclosing GraphBuilder.
 # 3. Running ``converter(scope, operator, container)`` to accumulate nodes.
 # 4. Injecting those nodes and initializers into the GraphBuilder directly.
 
@@ -90,9 +93,9 @@ def convert_sklearn_mlp_classifier(
     Convert a fitted :class:`~sklearn.neural_network.MLPClassifier` into
     ONNX nodes inside an existing :class:`~yobx.xbuilder.GraphBuilder`.
 
-    The conversion invokes the skl2onnx converter directly through mock
-    ``Scope``, ``Operator``, and ``ModelComponentContainer`` objects, then
-    injects the resulting nodes and initializers straight into *g*.
+    Uses :mod:`yobx`'s pure-Python mock objects to call the skl2onnx
+    converter function directly, then injects the resulting nodes and
+    initializers straight into *g*.
 
     :param g: the :class:`~yobx.xbuilder.GraphBuilder` that is currently
         being populated.
@@ -102,7 +105,7 @@ def convert_sklearn_mlp_classifier(
         ``[label, probabilities]``.
     :param estimator: a fitted ``MLPClassifier`` instance.
     :param X: name of the input tensor already present in *g*.
-    :param name: base name used for the emitted call-node.
+    :param name: base name used for the emitted nodes.
     :return: tuple ``(label_name, probabilities_name)`` — the names of the
         two output tensors in *g*.
     """
@@ -111,44 +114,23 @@ def convert_sklearn_mlp_classifier(
     ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
-    itype = g.get_type(X)
-    if hasattr(estimator, "n_features_in_"):
-        n_features = estimator.n_features_in_
-    elif g.has_shape(X):
-        shape = g.get_shape(X)
-        n_features = int(shape[1]) if len(shape) > 1 and isinstance(shape[1], int) else None
-    else:
-        n_features = None
-
-    if itype == onnx.TensorProto.FLOAT:
-        skl2onnx_type = FloatTensorType([None, n_features])
-    elif itype == onnx.TensorProto.DOUBLE:
-        skl2onnx_type = DoubleTensorType([None, n_features])
-    else:
-        raise NotImplementedError(f"Unsupported elem_type {itype!r}.")
-
+    # Look up the registered skl2onnx converter for MLPClassifier.
     op_name = sklearn_operator_name_map[type(estimator)]
-    converter = get_converter(op_name)
-    registered_models = {"aliases": sklearn_operator_name_map, "conv": _converter_pool}
+    skl2onnx_fn = get_converter(op_name)
 
-    scope = Scope("root", target_opset=g.main_opset)
+    # Build mock objects with the correct tensor names.
+    scope = _MockScope(g.main_opset)
 
-    input_var = Variable(X, X, scope="root", type=skl2onnx_type)
-    input_var.init_status(is_fed=True, is_root=True, is_leaf=False)
+    input_var = _MockVariable(X, X)
+    output_vars = [_MockVariable(out, out) for out in outputs]
 
-    output_vars = []
-    for out_name in outputs:
-        var = Variable(out_name, out_name, scope="root")
-        var.init_status(is_fed=False, is_root=False, is_leaf=True)
-        output_vars.append(var)
-
-    operator = Operator(f"{name}_op", "root", op_name, estimator, g.main_opset, scope)
+    operator = _MockOperator(estimator, op_name, f"{name}_op", g.main_opset, scope)
     operator.inputs.append(input_var)
     for var in output_vars:
         operator.outputs.append(var)
 
-    container = ModelComponentContainer(g.main_opset, registered_models=registered_models)
-    converter(scope, operator, container)
+    container = _MockContainer(g.main_opset)
+    skl2onnx_fn(scope, operator, container)
 
     for init in container.initializers:
         g.make_initializer(init.name, init)
@@ -223,11 +205,12 @@ print("\nAll predictions match ✓")
 # 2b. Convert to ONNX using the factory helper (Option B — recommended)
 # ----------------------------------------------------------------------
 #
-# :func:`~yobx.sklearn.make_skl2onnx_converter` creates the boilerplate
-# converter automatically.  The factory handles type detection, feature
-# inference, and node injection transparently.
+# :func:`~yobx.sklearn.make_skl2onnx_converter` eliminates the mock
+# boilerplate.  Look up the skl2onnx converter function, pass it to the
+# factory, and you're done.
 
-converter = make_skl2onnx_converter()
+skl2onnx_mlp_fn = get_converter(sklearn_operator_name_map[MLPClassifier])
+converter = make_skl2onnx_converter(skl2onnx_mlp_fn)
 onx_b = to_onnx(mlp, (X,), extra_converters={MLPClassifier: converter})
 
 ref_b = onnxruntime.InferenceSession(
