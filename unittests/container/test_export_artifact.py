@@ -11,7 +11,7 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 from yobx.container import ExportArtifact, ExportReport, FunctionPieces
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, skipif_ci_windows
 
 
 def _make_simple_model():
@@ -55,11 +55,98 @@ class TestExportReport(ExtTestCase):
         self.assertIn("ExportReport", text)
         self.assertIn("n_stats=2", text)
 
+    def test_to_string_empty(self):
+        r = ExportReport()
+        text = r.to_string()
+        self.assertIsInstance(text, str)
+
+    def test_to_string_with_extra(self):
+        r = ExportReport(extra={"time_total": 0.42, "source": "test"})
+        text = r.to_string()
+        self.assertIn("extra", text)
+        self.assertIn("time_total", text)
+        self.assertIn("0.42", text)
+
+    def test_to_string_with_stats(self):
+        stats = [
+            {"pattern": "p1", "added": 1, "removed": 2, "time_in": 0.01},
+            {"pattern": "p1", "added": 0, "removed": 1, "time_in": 0.02},
+            {"pattern": "p2", "added": 2, "removed": 0, "time_in": 0.005},
+        ]
+        r = ExportReport(stats=stats)
+        text = r.to_string()
+        self.assertIn("stats", text)
+        self.assertIn("p1", text)
+
+    def test_to_string_with_build_stats(self):
+        from yobx.container import BuildStats
+
+        bs = BuildStats()
+        bs["time_export_write_model"] = 0.5
+        r = ExportReport(build_stats=bs)
+        text = r.to_string()
+        self.assertIn("build_stats", text)
+        self.assertIn("time_export_write_model", text)
+
+    def test_to_excel(self):
+        try:
+            import openpyxl  # noqa: F401
+        except ImportError:
+            return
+        import pandas
+
+        stats = [
+            {"pattern": "p1", "added": 1, "removed": 2, "time_in": 0.01},
+            {"pattern": "p2", "added": 0, "removed": 1, "time_in": 0.02},
+        ]
+        r = ExportReport(stats=stats, extra={"time_total": 0.42})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "report.xlsx")
+            r.to_excel(path)
+            self.assertTrue(os.path.exists(path))
+            # Verify sheets
+            sheets = pandas.ExcelFile(path).sheet_names
+            self.assertIn("stats", sheets)
+            self.assertIn("stats_agg", sheets)
+            self.assertIn("extra", sheets)
+            # Read back stats
+            df = pandas.read_excel(path, sheet_name="stats")
+            self.assertEqual(len(df), 2)
+            # Read back extra
+            df_extra = pandas.read_excel(path, sheet_name="extra")
+            self.assertIn("key", df_extra.columns)
+            self.assertIn("value", df_extra.columns)
+
+    @skipif_ci_windows("issue with excel")
+    def test_to_excel_with_build_stats(self):
+        try:
+            import openpyxl  # noqa: F401
+        except ImportError:
+            return
+        import pandas
+        from yobx.container import BuildStats
+
+        bs = BuildStats()
+        bs["time_export_write_model"] = 0.5
+        r = ExportReport(extra={"k": "v"}, build_stats=bs)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "report_bs.xlsx")
+            r.to_excel(path)
+            self.assertTrue(os.path.exists(path))
+            sheets = pandas.ExcelFile(path).sheet_names
+            self.assertIn("build_stats", sheets)
+            df_bs = pandas.read_excel(path, sheet_name="build_stats")
+            self.assertEqual(list(df_bs.columns), ["key", "value"])
+
 
 class TestExportArtifact(ExtTestCase):
     def _artifact(self):
         model = _make_simple_model()
-        return ExportArtifact(proto=model, report=ExportReport())
+        report = ExportReport(
+            stats=[{"pattern": "p1", "added": 1, "removed": 2, "time_in": 0.01}],
+            extra={"time_total": 0.1},
+        )
+        return ExportArtifact(proto=model, report=report)
 
     def test_attributes(self):
         artifact = self._artifact()
@@ -93,6 +180,9 @@ class TestExportArtifact(ExtTestCase):
             self.assertTrue(os.path.exists(path))
             self.assertIsInstance(returned, onnx.ModelProto)
             self.assertEqual(artifact.filename, path)
+            # A report Excel file should be produced alongside the .onnx file.
+            excel_path = os.path.join(tmp, "model.xlsx")
+            self.assertTrue(os.path.exists(excel_path))
 
     def test_save_non_model_proto_raises(self):
         """Saving a FunctionProto directly should raise TypeError."""

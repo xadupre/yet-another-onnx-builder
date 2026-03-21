@@ -39,7 +39,25 @@ choose your own names.
 
 This is work in progress.
 Many packages produce SQL queries. It starts by converting a SQL
-query into ONNX.
+query into ONNX. A lightweight **DataFrame function tracer**
+([`dataframe_to_onnx`](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/api/sql/dataframe_to_onnx.html))
+records pandas-inspired operations on a virtual DataFrame and compiles them to ONNX:
+
+```python
+import numpy as np
+from yobx.sql import dataframe_to_onnx
+from yobx.reference import ExtendedReferenceEvaluator
+
+def transform(df):
+    df = df.filter(df["a"] > 0)
+    return df.select([(df["a"] + df["b"]).alias("total")])
+
+artifact = dataframe_to_onnx(transform, {"a": np.float32, "b": np.float32})
+ref = ExtendedReferenceEvaluator(artifact)
+(total,) = ref.run(None, {"a": np.array([1., -2., 3.], np.float32),
+                           "b": np.array([4.,  5., 6.], np.float32)})
+# total == [5., 9.]
+```
 
 **deeplearning**
 

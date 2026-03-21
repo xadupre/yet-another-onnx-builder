@@ -14,6 +14,7 @@ yobx.sklearn
 
     convert
     register
+    skl2onnx_converter
     sklearn_helper
     tests_helper
 
