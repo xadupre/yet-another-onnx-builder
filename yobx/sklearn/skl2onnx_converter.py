@@ -15,7 +15,6 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import onnx
-import onnx.helper
 import onnx.numpy_helper
 
 # Mapping from ONNX TensorProto element-type integers to NumPy dtypes.
@@ -203,7 +202,7 @@ class MockContainer:
         name: Optional[str] = None,
         **attrs: object,
     ) -> None:
-        """Build an ONNX ``NodeProto`` and delegate it directly to the GraphBuilder."""
+        """Delegate a node directly to the GraphBuilder."""
         # Some skl2onnx helpers pass a bare string instead of a list.
         if isinstance(inputs, str):
             inputs = [inputs]
@@ -225,15 +224,14 @@ class MockContainer:
 
         node_name = name or f"N{self._node_count}"
         self._node_count += 1
-        node = onnx.helper.make_node(
+        self._g.make_node(  # type: ignore[attr-defined]
             op_type,
-            inputs=list(inputs),
-            outputs=list(outputs),
+            list(inputs),
+            list(outputs),
             domain=op_domain or "",
             name=node_name,
             **clean,
         )
-        self._delegate_node(node)
 
     def add_onnx_node(self, node: object) -> None:
         """Delegate a pre-built ``NodeProto`` directly to the GraphBuilder."""
