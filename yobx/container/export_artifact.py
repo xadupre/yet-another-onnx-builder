@@ -353,7 +353,7 @@ class ExportArtifact(ExportArtifactProtocol):
             self.report = ExportReport()
         self.report.update(data)
 
-    def _save_report(self, onnx_path: str) -> None:
+    def save_report(self, onnx_path: str) -> None:
         """Save the report as an Excel file alongside *onnx_path* when available."""
         if self.report is None:
             return
@@ -388,14 +388,14 @@ class ExportArtifact(ExportArtifactProtocol):
                 file_path, all_tensors_to_one_file=all_tensors_to_one_file
             )
             self.filename = file_path
-            self._save_report(file_path)
+            self.save_report(file_path)
             return result
         import onnx
 
         if isinstance(self.proto, onnx.ModelProto):
             onnx.save_model(self.proto, file_path)
             self.filename = file_path
-            self._save_report(file_path)
+            self.save_report(file_path)
             return self.proto
         raise TypeError(
             f"Cannot save a proto of type {type(self.proto).__name__}. "
