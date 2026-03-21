@@ -81,7 +81,10 @@ class ExportReport:
 
         :return: multi-line string suitable for printing.
 
-        Example::
+        .. runpython::
+            :showcode:
+
+            from yobx.container import ExportReport
 
             report = ExportReport(
                 stats=[
@@ -158,7 +161,11 @@ class ExportReport:
 
         :param path: destination file path (e.g. ``"report.xlsx"``).
 
-        Example::
+        .. runpython::
+            :showcode:
+
+            import tempfile, os
+            from yobx.container import ExportReport
 
             report = ExportReport(
                 stats=[
@@ -166,7 +173,10 @@ class ExportReport:
                 ],
                 extra={"time_total": 0.42},
             )
-            report.to_excel("report.xlsx")
+            with tempfile.TemporaryDirectory() as tmp:
+                path = os.path.join(tmp, "report.xlsx")
+                report.to_excel(path)
+                print(f"Saved to {os.path.basename(path)!r}")
         """
         import pandas
 
