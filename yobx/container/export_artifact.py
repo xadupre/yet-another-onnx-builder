@@ -103,32 +103,28 @@ class ExportReport:
                 lines.append(f"  {k}: {v}")
 
         if self.stats:
-            try:
-                import pandas
+            import pandas
 
-                df = pandas.DataFrame(self.stats)
+            df = pandas.DataFrame(self.stats)
+            for col in ["added", "removed"]:
+                if col in df.columns:
+                    df[col] = df[col].fillna(0).astype(int)
+            num_cols = [c for c in ["added", "removed", "time_in"] if c in df.columns]
+            if "pattern" in df.columns and num_cols:
+                agg = df.groupby("pattern")[num_cols].sum()
+                mask = pandas.Series(False, index=agg.index)
                 for col in ["added", "removed"]:
-                    if col in df.columns:
-                        df[col] = df[col].fillna(0).astype(int)
-                num_cols = [c for c in ["added", "removed", "time_in"] if c in df.columns]
-                if "pattern" in df.columns and num_cols:
-                    agg = df.groupby("pattern")[num_cols].sum()
-                    mask = pandas.Series(False, index=agg.index)
-                    for col in ["added", "removed"]:
-                        if col in agg.columns:
-                            mask |= agg[col] > 0
-                    agg = agg[mask]
-                    if "removed" in agg.columns:
-                        agg = agg.sort_values("removed", ascending=False)
-                    if not agg.empty:
-                        lines.append("-- stats (aggregated by pattern) --")
-                        lines.append(agg.to_string())
-                else:
-                    lines.append("-- stats --")
-                    lines.append(df.to_string())
-            except ImportError:
+                    if col in agg.columns:
+                        mask |= agg[col] > 0
+                agg = agg[mask]
+                if "removed" in agg.columns:
+                    agg = agg.sort_values("removed", ascending=False)
+                if not agg.empty:
+                    lines.append("-- stats (aggregated by pattern) --")
+                    lines.append(agg.to_string())
+            else:
                 lines.append("-- stats --")
-                lines.append(repr(self.stats))
+                lines.append(df.to_string())
 
         if self.build_stats:
             d = self.build_stats.to_dict()
@@ -383,18 +379,29 @@ class ExportArtifact(ExportArtifactProtocol):
                 file_path, all_tensors_to_one_file=all_tensors_to_one_file
             )
             self.filename = file_path
+            self._save_report(file_path)
             return result
         import onnx
 
         if isinstance(self.proto, onnx.ModelProto):
             onnx.save_model(self.proto, file_path)
             self.filename = file_path
+            self._save_report(file_path)
             return self.proto
         raise TypeError(
             f"Cannot save a proto of type {type(self.proto).__name__}. "
             "Only ModelProto is directly saveable; for FunctionProto or "
             "GraphProto embed it in a ModelProto first."
         )
+
+    def _save_report(self, onnx_path: str) -> None:
+        """Save the report as an Excel file alongside *onnx_path* when available."""
+        if self.report is None:
+            return
+        import os
+
+        excel_path = os.path.splitext(onnx_path)[0] + ".xlsx"
+        self.report.to_excel(excel_path)
 
     def get_proto(self, include_weights: bool = True) -> Any:
         """Return the ONNX proto, optionally with all weights inlined.

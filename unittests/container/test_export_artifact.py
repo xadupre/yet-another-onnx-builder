@@ -141,7 +141,11 @@ class TestExportReport(ExtTestCase):
 class TestExportArtifact(ExtTestCase):
     def _artifact(self):
         model = _make_simple_model()
-        return ExportArtifact(proto=model, report=ExportReport())
+        report = ExportReport(
+            stats=[{"pattern": "p1", "added": 1, "removed": 2, "time_in": 0.01}],
+            extra={"time_total": 0.1},
+        )
+        return ExportArtifact(proto=model, report=report)
 
     def test_attributes(self):
         artifact = self._artifact()
@@ -175,6 +179,9 @@ class TestExportArtifact(ExtTestCase):
             self.assertTrue(os.path.exists(path))
             self.assertIsInstance(returned, onnx.ModelProto)
             self.assertEqual(artifact.filename, path)
+            # A report Excel file should be produced alongside the .onnx file.
+            excel_path = os.path.join(tmp, "model.xlsx")
+            self.assertTrue(os.path.exists(excel_path))
 
     def test_save_non_model_proto_raises(self):
         """Saving a FunctionProto directly should raise TypeError."""
