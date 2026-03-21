@@ -1,6 +1,7 @@
 import contextlib
 import os
 import pprint
+from enum import IntEnum
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 import numpy as np
 import onnx
@@ -16,6 +17,22 @@ from ._builder_runtime import _BuilderRuntime
 from ._shape_runtime import _ShapeRuntime
 from ._inference_runtime import _InferenceRuntime, _OptimizationOptions
 from .shape_builder import ShapeBuilder
+
+
+class InferenceMode(IntEnum):
+    """
+    Controls which inference is performed by
+    :meth:`BasicShapeBuilder.run_model`.
+
+    * ``SHAPE`` — full shape **and** type inference using symbolic
+      expressions (default, existing behaviour).
+    * ``TYPE`` — lightweight type-only inference via
+      :func:`~yobx.xshape.type_inference.infer_types`; shapes are not
+      computed.
+    """
+
+    SHAPE = 0
+    TYPE = 1
 
 
 @contextlib.contextmanager
@@ -706,7 +723,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         model: Union[onnx.ModelProto, onnx.GraphProto],
         functions: Optional[Dict[Tuple[str, str], onnx.FunctionProto]] = None,
         exc: bool = False,
-        inference: str = "shape",
+        inference: Union[InferenceMode, str] = InferenceMode.SHAPE,
     ):
         """
         Runs inference over a model or a graph.
@@ -714,15 +731,24 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         :param model: an ONNX model or graph
         :param functions: a dictionary of functions available to the model
         :param exc: if True, raises an exception when inference fails
-        :param inference: ``"shape"`` (default) runs the full shape and type
-            inference using symbolic expressions; ``"type"`` runs a lighter
-            type-only inference via
+        :param inference: :class:`InferenceMode` value (or its string name,
+            case-insensitive).  ``InferenceMode.SHAPE`` (default) runs the
+            full shape and type inference using symbolic expressions;
+            ``InferenceMode.TYPE`` runs a lighter type-only inference via
             :func:`type_inference.infer_types
             <yobx.xshape.type_inference.infer_types>` that only propagates
             element types without computing shapes
         """
 
         self.time_evaluation_constants_ = 0
+        if isinstance(inference, str):
+            try:
+                inference = InferenceMode[inference.upper()]
+            except KeyError:
+                raise ValueError(
+                    f"Unsupported inference mode {inference!r}, "
+                    f"expected one of {[m.name for m in InferenceMode]}."
+                ) from None
         if isinstance(model, onnx.ModelProto):
             self.opsets.clear()
             for opset in model.opset_import:
@@ -739,12 +765,8 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
                 inference=inference,
             )
         assert isinstance(model, onnx.GraphProto), f"Unexpected type {type(model)} for model"
-        if inference not in ("shape", "type"):
-            raise ValueError(
-                f"Unsupported inference mode {inference!r}, expected 'shape' or 'type'."
-            )
         graph = model
-        if inference == "type":
+        if inference == InferenceMode.TYPE:
             self._run_model_type_inference(graph, functions=functions, exc=exc)
         else:
             for i in graph.initializer:

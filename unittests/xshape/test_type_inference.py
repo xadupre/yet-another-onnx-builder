@@ -2,7 +2,7 @@ import unittest
 import onnx
 import onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape import BasicShapeBuilder
+from yobx.xshape import BasicShapeBuilder, InferenceMode
 from yobx.xshape.type_inference import infer_types
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -190,7 +190,7 @@ class TestRunModelTypeInference(ExtTestCase):
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
         b = BasicShapeBuilder()
-        b.run_model(model, inference="type")
+        b.run_model(model, inference=InferenceMode.TYPE)
         self.assertEqual(b.get_type("X"), TFLOAT)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertFalse(b.has_shape("Y"))
@@ -202,7 +202,7 @@ class TestRunModelTypeInference(ExtTestCase):
             [_mkv_("Y", TINT64, [3, 4])],
         )
         b = BasicShapeBuilder()
-        b.run_model(model, inference="type")
+        b.run_model(model, inference=InferenceMode.TYPE)
         self.assertEqual(b.get_type("X"), TFLOAT)
         self.assertEqual(b.get_type("Y"), TINT64)
 
@@ -213,21 +213,33 @@ class TestRunModelTypeInference(ExtTestCase):
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
         b = BasicShapeBuilder()
-        b.run_model(model, inference="type")
+        b.run_model(model, inference=InferenceMode.TYPE)
         self.assertEqual(b.input_names, ["X"])
         self.assertEqual(b.output_names, ["Y"])
 
     def test_run_model_type_only_with_shape_inference(self):
-        """Verify that 'shape' mode still works and infers shapes."""
+        """Verify that SHAPE mode still works and infers shapes."""
         model = self._make_model(
             [oh.make_node("Relu", ["X"], ["Y"])],
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
         b = BasicShapeBuilder()
-        b.run_model(model, inference="shape")
+        b.run_model(model, inference=InferenceMode.SHAPE)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertTrue(b.has_shape("Y"))
+
+    def test_run_model_type_only_string_compat(self):
+        """Verify that string values are still accepted for backward compat."""
+        model = self._make_model(
+            [oh.make_node("Relu", ["X"], ["Y"])],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Y", TFLOAT, [3, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model, inference="type")
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertFalse(b.has_shape("Y"))
 
     def test_run_model_type_only_with_function(self):
         relu_node = oh.make_node("Relu", ["X"], ["Y"])
@@ -251,7 +263,7 @@ class TestRunModelTypeInference(ExtTestCase):
             functions=[func],
         )
         b = BasicShapeBuilder()
-        b.run_model(model, inference="type")
+        b.run_model(model, inference=InferenceMode.TYPE)
         self.assertEqual(b.get_type("A"), TFLOAT)
         self.assertEqual(b.get_type("B"), TFLOAT)
 
