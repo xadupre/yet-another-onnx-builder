@@ -25,6 +25,7 @@ class InferenceMode(IntEnum):
     Controls which inference is performed by
     :meth:`BasicShapeBuilder.run_model`.
 
+    * ``NOTHING`` — no inference; neither shapes nor types are propagated.
     * ``SHAPE`` — full shape **and** type inference using symbolic
       expressions (default, existing behaviour).
     * ``TYPE`` — lightweight type-only inference via
@@ -32,8 +33,9 @@ class InferenceMode(IntEnum):
       computed.
     """
 
-    SHAPE = 0
-    TYPE = 1
+    NOTHING = 0
+    SHAPE = 1
+    TYPE = 2
 
 
 @contextlib.contextmanager
