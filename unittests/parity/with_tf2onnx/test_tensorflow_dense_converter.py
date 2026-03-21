@@ -14,20 +14,17 @@ import numpy as np
 import tensorflow as tf
 from onnxruntime import InferenceSession
 
-from yobx import DEFAULT_TARGET_OPSET
 from yobx.ext_test_case import ExtTestCase, requires_tensorflow, requires_tf2onnx
 from yobx.tensorflow import to_onnx
 
 
 def _ort_run(onnx_model, feeds):
     """Run an ONNX model through onnxruntime and return all outputs."""
-    sess = InferenceSession(
-        onnx_model.SerializeToString(), providers=["CPUExecutionProvider"]
-    )
+    sess = InferenceSession(onnx_model.SerializeToString(), providers=["CPUExecutionProvider"])
     return sess.run(None, feeds)
 
 
-def _tf2onnx_from_keras(model, input_arrays, opset=DEFAULT_TARGET_OPSET):
+def _tf2onnx_from_keras(model, input_arrays, opset=18):
     """Convert a Keras model to ONNX using tf2onnx.
 
     Returns the onnx ModelProto.
@@ -38,9 +35,7 @@ def _tf2onnx_from_keras(model, input_arrays, opset=DEFAULT_TARGET_OPSET):
         tf.TensorSpec(arr.shape, dtype=tf.float32, name=f"input_{i}")
         for i, arr in enumerate(input_arrays)
     ]
-    onnx_proto, _ = tf2onnx.convert.from_keras(
-        model, input_signature=input_sig, opset=opset
-    )
+    onnx_proto, _ = tf2onnx.convert.from_keras(model, input_signature=input_sig, opset=opset)
     return onnx_proto
 
 
@@ -129,10 +124,7 @@ class TestTensorflowDenseConverterParity(ExtTestCase):
         """Two stacked linear Dense layers without activation."""
         np.random.seed(5)
         model = tf.keras.Sequential(
-            [
-                tf.keras.layers.Dense(4, input_shape=(3,)),
-                tf.keras.layers.Dense(2),
-            ]
+            [tf.keras.layers.Dense(4, input_shape=(3,)), tf.keras.layers.Dense(2)]
         )
         X = np.random.rand(5, 3).astype(np.float32)
         self._compare(model, X)
