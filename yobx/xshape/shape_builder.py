@@ -217,6 +217,26 @@ class ShapeBuilder:
         """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
+    def _ensure_constraints_initialized(self):
+        """Initializes ``constraints_`` if it has not been set yet by a subclass constructor."""
+        if not hasattr(self, "constraints_"):
+            self.constraints_: Dict[str, Set[Union[str, int]]] = {}
+
+    def add_to_constraints(self, dim_name: str, value: Union[str, int, Set[Union[str, int]]]):
+        """
+        Adds a constraint associating a symbolic dimension name with a value or set of values.
+
+        :param dim_name: symbolic dimension name (e.g. ``"batch"``)
+        :param value: the value, name, or set of values/names to associate with that dimension
+        """
+        self._ensure_constraints_initialized()
+        if dim_name not in self.constraints_:
+            self.constraints_[dim_name] = set()
+        if isinstance(value, set):
+            self.constraints_[dim_name] |= value
+        else:
+            self.constraints_[dim_name].add(value)
+
     def register_constraint_dimension(self, dim_name: str, value: Any):
         """
         Registers a constraint associating a symbolic dimension name with a value.
@@ -224,7 +244,7 @@ class ShapeBuilder:
         :param dim_name: symbolic dimension name (e.g. ``"batch"``)
         :param value: the value or set of values to associate with that dimension
         """
-        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+        self.add_to_constraints(dim_name, value)
 
     def get_registered_constraints(self) -> Dict[str, Set[Union[str, int]]]:
         """
@@ -233,7 +253,8 @@ class ShapeBuilder:
         :return: mapping from dimension name to the set of values/names
                  it is constrained to be equal to
         """
-        raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
+        self._ensure_constraints_initialized()
+        return self.constraints_
 
     def get_shape_renamed(self, name: str) -> DYNAMIC_SHAPE:
         """

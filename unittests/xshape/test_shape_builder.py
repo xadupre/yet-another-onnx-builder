@@ -15,14 +15,15 @@ _mkv_ = oh.make_tensor_value_info
 
 class TestShapeBuilder(ExtTestCase):
     def test_shape_builder(self):
+        # Concrete methods in ShapeBuilder that should NOT raise NotImplementedError.
+        _concrete_get = {"get_registered_constraints", "get_shape_renamed"}
         builder = ShapeBuilder()
         for me in dir(builder):
             if me.startswith("get_") and not me.startswith("get_att"):
-                if me == "get_registered_constraints":
-                    # no-arg method – call without arguments
-                    self.assertRaise(lambda: builder.get_registered_constraints(), NotImplementedError)
-                else:
-                    self.assertRaise(lambda me=me: getattr(builder, me)(""), NotImplementedError)
+                if me in _concrete_get:
+                    # These are now concrete – they must not raise NotImplementedError.
+                    continue
+                self.assertRaise(lambda me=me: getattr(builder, me)(""), NotImplementedError)
             if me.startswith("set_"):
                 self.assertRaise(
                     lambda me=me: getattr(builder, me)("", None), NotImplementedError
