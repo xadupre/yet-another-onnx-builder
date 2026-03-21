@@ -52,7 +52,7 @@ jobs:
       - name: Parity with sklearn-onnx
         run: |
           pip install skl2onnx
-          pytest --durations=10 unittests/parity
+          pytest --durations=10 unittests/parity/with_skl2onnx
 
       - name: Upload coverage to Codecov
         if: matrix.sklearn-version == '1.8'
