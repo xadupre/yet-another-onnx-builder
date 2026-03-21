@@ -16,8 +16,16 @@ Public API
   :class:`~yobx.container.ExportArtifact`
 * :func:`sql_to_onnx_graph` — low-level entry point: SQL string → nodes added
   to an existing :class:`~yobx.typing.GraphBuilderProtocol`
+* :func:`parsed_query_to_onnx` — high-level entry point: parsed query →
+  :class:`~yobx.container.ExportArtifact`
+* :func:`parsed_query_to_onnx_graph` — low-level entry point: parsed query →
+  nodes added to an existing :class:`~yobx.typing.GraphBuilderProtocol`
 * :func:`lazyframe_to_onnx` — high-level entry point: ``polars.LazyFrame`` →
   :class:`~yobx.container.ExportArtifact`
+* :func:`dataframe_to_onnx` — high-level entry point: traced DataFrame
+  function → :class:`~yobx.container.ExportArtifact`
+* :func:`trace_dataframe` — trace a DataFrame function →
+  :class:`~yobx.sql.parse.ParsedQuery`
 * :func:`to_onnx` — unified entry point: SQL string **or** ``polars.LazyFrame`` →
   :class:`~yobx.container.ExportArtifact`
 * :func:`~yobx.sql.parse.parse_sql` — parse a SQL string into a
@@ -27,6 +35,9 @@ Public API
 * :class:`~yobx.sql.parse.FilterOp` — WHERE / filter clause operation
 * :class:`~yobx.sql.parse.GroupByOp` — GROUP BY clause operation
 * :class:`~yobx.sql.parse.JoinOp` — JOIN clause operation
+* :class:`~yobx.sql.dataframe_trace.TracedDataFrame` — proxy DataFrame for tracing
+* :class:`~yobx.sql.dataframe_trace.TracedSeries` — proxy column series for tracing
+* :class:`~yobx.sql.dataframe_trace.TracedCondition` — proxy boolean condition
 
 Example
 -------
@@ -49,9 +60,22 @@ Example
     # total == array([5., 9.], dtype=float32)  (rows where a > 0)
 """
 
-from .sql_convert import sql_to_onnx, sql_to_onnx_graph
+from .sql_convert import (
+    sql_to_onnx,
+    sql_to_onnx_graph,
+    parsed_query_to_onnx,
+    parsed_query_to_onnx_graph,
+)
 from .polars_convert import lazyframe_to_onnx
 from .convert import to_onnx
+from .dataframe_trace import (
+    TracedCondition,
+    TracedDataFrame,
+    TracedGroupBy,
+    TracedSeries,
+    dataframe_to_onnx,
+    trace_dataframe,
+)
 from .parse import (
     AggExpr,
     BinaryExpr,
@@ -81,9 +105,17 @@ __all__ = [
     "ParsedQuery",
     "SelectItem",
     "SelectOp",
+    "TracedCondition",
+    "TracedDataFrame",
+    "TracedGroupBy",
+    "TracedSeries",
+    "dataframe_to_onnx",
     "lazyframe_to_onnx",
     "parse_sql",
+    "parsed_query_to_onnx",
+    "parsed_query_to_onnx_graph",
     "sql_to_onnx",
     "sql_to_onnx_graph",
     "to_onnx",
+    "trace_dataframe",
 ]

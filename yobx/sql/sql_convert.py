@@ -241,6 +241,94 @@ def sql_to_onnx(
     return g.to_onnx(return_optimize_report=True)
 
 
+def parsed_query_to_onnx_graph(
+    g: GraphBuilderExtendedProtocol,
+    sts: Optional[Dict],
+    outputs: List[str],
+    pq: ParsedQuery,
+    input_dtypes: Dict[str, Union[np.dtype, type, str]],
+    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
+) -> List[str]:
+    """
+    Build ONNX nodes for an already-parsed :class:`~yobx.sql.parse.ParsedQuery`
+    into an existing graph builder *g*.
+
+    This is the low-level companion to :func:`sql_to_onnx_graph` for callers
+    that have already obtained a :class:`~yobx.sql.parse.ParsedQuery` (e.g.
+    via :func:`~yobx.sql.dataframe_trace.trace_dataframe`) and do not want to
+    re-serialise it to a SQL string.
+
+    :param g: an existing graph builder.
+    :param sts: context dictionary; may contain a ``"custom_functions"`` key.
+    :param outputs: expected output column names (may be empty).
+    :param pq: the parsed query to convert.
+    :param input_dtypes: mapping from left-table column name to numpy dtype.
+    :param right_input_dtypes: mapping for right-table columns (JOIN queries).
+    :return: list of output tensor names added to *g*.
+    """
+    custom_functions = (sts or {}).get("custom_functions", {})
+    return _populate_graph(
+        g,
+        pq,
+        input_dtypes=input_dtypes,
+        right_input_dtypes=right_input_dtypes,
+        custom_functions=custom_functions,
+        desired_outputs=outputs or None,
+    )
+
+
+def parsed_query_to_onnx(
+    pq: ParsedQuery,
+    input_dtypes: Dict[str, Union[np.dtype, type, str]],
+    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
+    target_opset: int = DEFAULT_TARGET_OPSET,
+    custom_functions: Optional[Dict[str, Callable]] = None,
+    builder_cls: Union[type, Callable] = GraphBuilder,
+) -> ExportArtifact:
+    """
+    Convert an already-parsed :class:`~yobx.sql.parse.ParsedQuery` to ONNX.
+
+    This is the companion to :func:`sql_to_onnx` for callers that already have
+    a :class:`~yobx.sql.parse.ParsedQuery` object (produced by
+    :func:`~yobx.sql.parse.parse_sql` or by
+    :func:`~yobx.sql.dataframe_trace.trace_dataframe`) and do not need to
+    re-serialise it to a SQL string.
+
+    :param pq: a :class:`~yobx.sql.parse.ParsedQuery` produced by
+        :func:`~yobx.sql.parse.parse_sql` or
+        :func:`~yobx.sql.dataframe_trace.trace_dataframe`.
+    :param input_dtypes: mapping from left-table column name to numpy dtype.
+    :param right_input_dtypes: mapping for right-table columns (JOIN queries).
+    :param target_opset: ONNX opset version to target.
+    :param custom_functions: optional mapping from function name to Python
+        callable.  Each callable is traced via
+        :func:`~yobx.xtracing.trace_numpy_function`.
+    :param builder_cls: graph-builder class or factory callable.
+    :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
+        ONNX model together with an :class:`~yobx.container.ExportReport`.
+
+    Example::
+
+        import numpy as np
+        from yobx.sql import parse_sql
+        from yobx.sql.sql_convert import parsed_query_to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        pq = parse_sql("SELECT a + b AS total FROM t WHERE a > 0")
+        dtypes = {"a": np.float32, "b": np.float32}
+        artifact = parsed_query_to_onnx(pq, dtypes)
+
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0,  5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+    """
+    g = builder_cls(target_opset, ir_version=10)
+    sts = {"custom_functions": custom_functions or {}}
+    parsed_query_to_onnx_graph(g, sts, [], pq, input_dtypes, right_input_dtypes)
+    return g.to_onnx(return_optimize_report=True)
+
+
 # ---------------------------------------------------------------------------
 # Internal ONNX graph builder
 # ---------------------------------------------------------------------------
