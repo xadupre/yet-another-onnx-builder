@@ -249,7 +249,7 @@ class MockContainer:
             "ArrayFeatureExtraction",
         }
         if ai_onnx_ml_op_types & op_types:
-            return "ai.onnx.ml" in self._g.opsets
+            return self._g.has_opset("ai.onnx.ml")
         return True
 
     @property
@@ -317,7 +317,7 @@ class MockContainer:
             self._g.make_initializer(name, content)  # type: ignore[attr-defined]
         else:
             np_dtype = _ONNX_DTYPE_TO_NUMPY.get(onnx_type, np.float32)
-            arr = np.array(content, dtype=np_dtype)
+            arr = np.array(content, dtype=np_dtype)  # type: ignore
             if shape is not None and arr.shape != tuple(shape):
                 arr = arr.reshape(shape)  # type: ignore
             self._g.make_initializer(name, arr)  # type: ignore[attr-defined]
@@ -336,7 +336,7 @@ def wrap_skl2onnx_converter(skl2onnx_op_converter: Callable) -> Callable:
     """
 
     def _converter(
-        g: object,
+        g: GraphBuilderExtendedProtocol,
         sts: Dict,
         outputs: List[str],
         estimator: BaseEstimator,
