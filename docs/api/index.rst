@@ -5,6 +5,7 @@ API
    :maxdepth: 1
    :caption: Core
 
+   convert
    typing
    builder/index
    container/index
