@@ -376,6 +376,56 @@ class TestTracedDataFrameAssign(ExtTestCase):
 
 
 # ---------------------------------------------------------------------------
+# TracedDataFrame.pipe
+# ---------------------------------------------------------------------------
+
+
+class TestTracedDataFramePipe(ExtTestCase):
+    def _make(self):
+        columns = {c: TracedSeries(ColumnRef(c)) for c in ("a", "b")}
+        return TracedDataFrame(columns, source_columns=["a", "b"])
+
+    def test_pipe_returns_traced_dataframe(self):
+        df = self._make()
+
+        def identity(d):
+            return d
+
+        result = df.pipe(identity)
+        self.assertIsInstance(result, TracedDataFrame)
+
+    def test_pipe_applies_function(self):
+        df = self._make()
+
+        def add_col(d):
+            return d.assign(total=d["a"] + d["b"])
+
+        result = df.pipe(add_col)
+        self.assertIn("total", result.columns)
+
+    def test_pipe_chaining(self):
+        df = self._make()
+
+        def step1(d):
+            return d.assign(total=d["a"] + d["b"])
+
+        def step2(d):
+            return d.select(["total"])
+
+        result = df.pipe(step1).pipe(step2)
+        self.assertEqual(result.columns, ["total"])
+
+    def test_pipe_with_extra_args(self):
+        df = self._make()
+
+        def scale(d, factor):
+            return d.assign(a=(d["a"] * factor).alias("a"))
+
+        result = df.pipe(scale, factor=2.0)
+        self.assertIn("a", result.columns)
+
+
+# ---------------------------------------------------------------------------
 # TracedDataFrame.groupby / TracedGroupBy.agg
 # ---------------------------------------------------------------------------
 
@@ -676,6 +726,56 @@ class TestDataframeToOnnx(ExtTestCase):
         from yobx.sql import trace_dataframe as td  # noqa: F401
 
         self.assertTrue(callable(td))
+
+    # ------------------------------------------------------------------
+    # pipe — calling other functions that process a dataframe
+    # ------------------------------------------------------------------
+
+    def test_pipe_single(self):
+        """A function using .pipe() to call another dataframe function."""
+
+        def preprocess(df):
+            return df.filter(df["a"] > 0)
+
+        def transform(df):
+            return df.pipe(preprocess).select([(df["a"] + df["b"]).alias("total")])
+
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = _run(transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b})
+        np.testing.assert_allclose(total, np.array([5.0, 9.0], dtype=np.float32))
+
+    def test_pipe_chained(self):
+        """Multiple .pipe() calls chaining two sub-functions."""
+
+        def preprocess(df):
+            return df.filter(df["a"] > 0)
+
+        def project(df):
+            return df.select([(df["a"] + df["b"]).alias("total")])
+
+        def pipeline(df):
+            return df.pipe(preprocess).pipe(project)
+
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = _run(pipeline, {"a": np.float32, "b": np.float32}, {"a": a, "b": b})
+        np.testing.assert_allclose(total, np.array([5.0, 9.0], dtype=np.float32))
+
+    def test_pipe_with_extra_args(self):
+        """pipe() forwards extra positional and keyword arguments to the function."""
+
+        def scale(df, factor):
+            return df.assign(a=(df["a"] * factor).alias("a"))
+
+        def pipeline(df):
+            df2 = df.pipe(scale, factor=2.0)
+            return df2.select([(df2["a"] + df2["b"]).alias("total")])
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = _run(pipeline, {"a": np.float32, "b": np.float32}, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a * 2.0 + b)
 
 
 # ---------------------------------------------------------------------------
