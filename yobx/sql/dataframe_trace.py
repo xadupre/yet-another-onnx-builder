@@ -25,6 +25,7 @@ Supported operations
   ``.count()`` on a :class:`TracedSeries`
 * **Column alias**: ``.alias(name)`` on a :class:`TracedSeries`
 * **Group-by**: :meth:`TracedDataFrame.groupby` + :meth:`TracedGroupBy.agg`
+* **Function chaining**: :meth:`TracedDataFrame.pipe`
 
 Example
 -------
@@ -444,6 +445,34 @@ class TracedDataFrame:
             new_cols[name] = TracedSeries(expr._expr, alias=name)
         return TracedDataFrame(new_cols, list(self._ops), list(self._source_columns))
 
+    def pipe(
+        self,
+        func: Callable[..., "TracedDataFrame"],  # noqa: UP037
+        *args: object,
+        **kwargs: object,
+    ) -> "TracedDataFrame":  # noqa: UP037
+        """Apply *func* to this frame (pandas ``pipe`` idiom).
+
+        Equivalent to ``func(self, *args, **kwargs)``.  Useful for chaining
+        transformations written as standalone functions::
+
+            def preprocess(df):
+                return df.filter(df["a"] > 0)
+
+            def add_feature(df):
+                return df.assign(c=(df["a"] + df["b"]).alias("c"))
+
+            def pipeline(df):
+                return df.pipe(preprocess).pipe(add_feature)
+
+        :param func: callable that accepts a :class:`TracedDataFrame` as its
+            first argument and returns a :class:`TracedDataFrame`.
+        :param args: additional positional arguments forwarded to *func*.
+        :param kwargs: additional keyword arguments forwarded to *func*.
+        :return: the result of ``func(self, *args, **kwargs)``.
+        """
+        return func(self, *args, **kwargs)
+
     def groupby(self, by: Union[str, List[str]]) -> TracedGroupBy:
         """Begin a group-by aggregation.
 
@@ -535,6 +564,8 @@ def dataframe_to_onnx(
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
+    filename: Optional[str] = None,
+    verbose: int = 0,
 ) -> ExportArtifact:
     """Trace *func* and convert the resulting computation to ONNX.
 
@@ -552,6 +583,10 @@ def dataframe_to_onnx(
         function constructs them directly (advanced usage).
     :param builder_cls: graph-builder class or factory callable.  Defaults to
         :class:`~yobx.xbuilder.GraphBuilder`.
+    :param filename: if set, the exported ONNX model is saved to this path and
+        the :class:`~yobx.container.ExportReport` is written as a companion
+        Excel file (same base name with ``.xlsx`` extension).
+    :param verbose: verbosity level (0 = silent).
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -581,4 +616,6 @@ def dataframe_to_onnx(
         target_opset=target_opset,
         custom_functions=custom_functions,
         builder_cls=builder_cls,
+        filename=filename,
+        verbose=verbose,
     )

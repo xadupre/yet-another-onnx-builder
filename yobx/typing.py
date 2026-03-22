@@ -442,7 +442,7 @@ class GraphBuilderTorchProtocol(GraphBuilderExtendedProtocol, Protocol):
     * **Tensor-sequence support** — :meth:`is_sequence`, :meth:`get_sequence`,
       :meth:`set_sequence`, :meth:`make_tensor_sequence_input`.
     * **Dynamic-shape helpers** — :meth:`is_dynamic_shape`,
-      :meth:`get_input_dynamic_shape`, :meth:`get_is_dimension`,
+      :meth:`get_input_dynamic_shape`,
       :meth:`verify_dynamic_shape`, :meth:`register_dynamic_objects_from_shape`,
       :meth:`make_dynamic_object`, :meth:`add_dynamic_object`,
       :meth:`make_new_dynamic_shape`.
@@ -660,25 +660,6 @@ class GraphBuilderTorchProtocol(GraphBuilderExtendedProtocol, Protocol):
         :param example_value: one example tensor value
         :return: shape tuple (mixing ``int`` for static dimensions and
             ``str`` for dynamic ones)
-        """
-        ...
-
-    def get_is_dimension(
-        self,
-        name: str,
-        elem_type: Optional[int] = None,
-        shape: Optional[Any] = None,
-        n_outputs: Optional[int] = None,
-        exc: bool = True,
-    ) -> bool:
-        """Returns ``True`` when *name* represents a scalar dynamic-dimension
-        value (e.g. the result of ``aten.sym_size``).
-
-        :param name: tensor name
-        :param elem_type: expected ONNX element type hint
-        :param shape: expected shape hint
-        :param n_outputs: number of outputs produced by the enclosing node
-        :param exc: raise when ambiguous
         """
         ...
 
