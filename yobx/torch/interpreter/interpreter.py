@@ -546,7 +546,6 @@ class DynamoInterpreter:
         name: str,
         elem_type: Any,
         shape: DYNAMIC_SHAPE,
-        is_dimension: bool,
         users: Iterable[str],
         fake_tensor: bool = False,
         default_initializer: Optional[Any] = None,
@@ -562,7 +561,6 @@ class DynamoInterpreter:
             name,
             elem_type,
             shape,
-            is_dimension=is_dimension,
             default_initializer=default_initializer,
             device=device,
             marker="DynamoInterpreter._make_tensor_input",
@@ -614,7 +612,6 @@ class DynamoInterpreter:
                 node.name,
                 elem_type=node.dtype,
                 shape=node.shape,
-                is_dimension=False,
                 device=node.device,
                 users=None,
             )
@@ -641,7 +638,7 @@ class DynamoInterpreter:
 
             if self.builder.as_function and example_value is None:
                 return self._make_tensor_input(
-                    node.name, None, None, is_dimension=False, users=node.users
+                    node.name, None, None, users=node.users
                 )
 
             if example_value is None:
@@ -659,7 +656,6 @@ class DynamoInterpreter:
                     node.name,
                     elem_type=self.builder.torch.int64,
                     shape=(1,),
-                    is_dimension=True,
                     users=node.users,
                     device=-1,  # cpu
                 )
@@ -674,7 +670,6 @@ class DynamoInterpreter:
                         else self.builder.torch.float32
                     ),
                     shape=(1,),
-                    is_dimension=False,
                     users=node.users,
                     device=-1,  # cpu
                 )
@@ -683,7 +678,6 @@ class DynamoInterpreter:
                     node.name,
                     elem_type=example_value.dtype,
                     shape=example_value.shape,
-                    is_dimension=False,
                     users=node.users,
                     device=example_value.get_device(),
                 )
@@ -705,7 +699,6 @@ class DynamoInterpreter:
                         node.name,
                         elem_type=np.float32,
                         shape=(1,),
-                        is_dimension=False,
                         users=None,
                         default_initializer=np.array([0], dtype=np.float32),
                     )
@@ -728,7 +721,6 @@ class DynamoInterpreter:
                         node.name,
                         elem_type=val.dtype,
                         shape=val.shape,
-                        is_dimension=False,
                         users=node.users,
                         fake_tensor=isinstance(
                             val, self.torch._subclasses.fake_tensor.FakeTensor
@@ -743,7 +735,6 @@ class DynamoInterpreter:
                             node.name,
                             elem_type=val.dtype,
                             shape=val.shape,
-                            is_dimension=False,
                             users=node.users,
                         )
                 else:
@@ -754,7 +745,6 @@ class DynamoInterpreter:
                             node.target,
                             elem_type=val.dtype,
                             shape=val.shape,
-                            is_dimension=False,
                             users=node.users,
                         )
 
@@ -766,7 +756,6 @@ class DynamoInterpreter:
                         node.name,
                         dtype,
                         shape,
-                        False,
                         users=node.users,
                         fake_tensor=True,
                         device=val.get_device(),
@@ -809,7 +798,6 @@ class DynamoInterpreter:
                     else (TensorProto.INT64 if isinstance(val, int) else TensorProto.FLOAT)
                 ),
                 shape=tuple(),  # scalar should have no dimension
-                is_dimension=False,
                 users=node.users,
                 device=-1,  # cpu
             )
@@ -819,7 +807,6 @@ class DynamoInterpreter:
                 node.name,
                 elem_type=val.dtype,
                 shape=val.shape,
-                is_dimension=False,
                 users=node.users,
                 device=val.get_device(),
             )
@@ -891,10 +878,7 @@ class DynamoInterpreter:
                 else:
                     cst = None
                     a_name = a if isinstance(a, str) else a.name
-                    if self.builder.get_is_dimension(a_name, n_outputs=len(output)):
-                        o = self._make_name(node, f"{output_name}_dim_{i}", is_dim=True, index=i)
-                    else:
-                        o = self._make_name(node, f"{output_name}_{i}", index=i)
+                    o = self._make_name(node, f"{output_name}_{i}", index=i)
 
                 if a_name is None:
                     # the gradient may need unused output
@@ -975,18 +959,12 @@ class DynamoInterpreter:
                             self.builder.make_dynamic_object(d, self.torch.SymInt(d))
                         ns.append(d)
                     shape = tuple(ns)
-                    is_dimension = self.builder.get_is_dimension(
-                        a or o, elem_type=elem_type, shape=shape, n_outputs=len(outputs)
-                    )
-                else:
-                    is_dimension = False
 
                 self.builder.make_tensor_output(
                     o,
                     elem_type=elem_type,
                     shape=shape,
                     indexed=False,
-                    is_dimension=is_dimension,
                     allow_untyped_output=self.export_options.allow_untyped_output,
                     doc_string=f"#A:{a}-{o}",
                 )
@@ -1839,7 +1817,6 @@ class DynamoInterpreter:
             new_builder.make_tensor_output(
                 o,
                 indexed=False,
-                is_dimension=self.builder.get_is_dimension(o, exc=False),
                 doc_string=f"#C:{o}",
             )
         new_builder._check_function_order()

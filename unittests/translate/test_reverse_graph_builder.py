@@ -86,7 +86,7 @@ class TestReverseGraphBuilder(ExtTestCase):
                 "op.ConstantOfShape(shape, value=onh.from_array"
                 "(np.array([0.0], dtype=np.float32), name='value'), outputs=['cst'])",
             )
-            .replace("__LONG2__", ", is_dimension=False, indexed=False")
+            .replace("__LONG2__", ", indexed=False")
         )
         self.maxDiff = None
         self.assertEqual(expected, code.strip("\n"))
@@ -153,7 +153,7 @@ class TestReverseGraphBuilder(ExtTestCase):
                 "op.ConstantOfShape(shape, value=onh.from_array"
                 "(np.array([0.0], dtype=np.float32), name='value'), outputs=['cst'])",
             )
-            .replace("__LONG2__", ", is_dimension=False, indexed=False")
+            .replace("__LONG2__", ", indexed=False")
         )
         self.maxDiff = None
         self.assertEqual(expected, code.strip("\n"))
@@ -244,7 +244,7 @@ class TestReverseGraphBuilder(ExtTestCase):
 
 
             model = build_model()
-        """).strip("\n").replace("__SUFFIX__", ", is_dimension=False, indexed=False")
+        """).strip("\n").replace("__SUFFIX__", ", indexed=False")
         self.maxDiff = None
         self.assertEqual(expected, code.strip("\n"))
 
@@ -281,7 +281,7 @@ class TestReverseGraphBuilder(ExtTestCase):
             g.make_tensor_input("A", TFLOAT, (None, None))
             g.make_tensor_input("B", TFLOAT, (None, None))
             example(g.op, "X", "A", "B")
-            g.make_tensor_output("Y", TFLOAT, (None, None), is_dimension=False, indexed=False)
+            g.make_tensor_output("Y", TFLOAT, (None, None), indexed=False)
             model = g.to_onnx()
             return model
 

@@ -372,7 +372,6 @@ class TestGraphBuilderTorchProtocol(ExtTestCase):
         # dynamic-shape helpers
         "is_dynamic_shape",
         "get_input_dynamic_shape",
-        "get_is_dimension",
         "verify_dynamic_shape",
         "register_dynamic_objects_from_shape",
         "make_dynamic_object",
