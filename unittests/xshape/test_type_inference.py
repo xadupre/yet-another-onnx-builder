@@ -2,6 +2,7 @@ import unittest
 import onnx
 import onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
+from yobx.xshape import BasicShapeBuilder, InferenceMode
 from yobx.xshape.type_inference import infer_types
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -87,12 +88,12 @@ class TestTypeInference(ExtTestCase):
         self.assertEqual(result, (TINT64,))
 
     def test_infer_types_unsupported_no_exc(self):
-        node = oh.make_node("NonMaxSuppression", ["X"], ["Y"])
+        node = oh.make_node("UnknownCustomOp", ["X"], ["Y"])
         result = infer_types(node, [TFLOAT], exc=False)
         self.assertEqual(result, 0)
 
     def test_infer_types_unsupported_exc(self):
-        node = oh.make_node("NonMaxSuppression", ["X"], ["Y"])
+        node = oh.make_node("UnknownCustomOp", ["X"], ["Y"])
         self.assertRaise(lambda: infer_types(node, [TFLOAT], exc=True), RuntimeError)
 
     def test_infer_types_output_name(self):
@@ -169,6 +170,111 @@ class TestTypeInference(ExtTestCase):
         node = oh.make_node("Dropout", ["X"], ["Y", "mask"])
         result = infer_types(node, [TFLOAT])
         self.assertEqual(result, [TFLOAT, TBOOL])
+
+
+_mkv_ = oh.make_tensor_value_info
+
+
+class TestRunModelTypeInference(ExtTestCase):
+    def _make_model(self, nodes, inputs, outputs):
+        return oh.make_model(
+            oh.make_graph(nodes, "g", inputs, outputs),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+
+    def test_run_model_type_only_relu(self):
+        model = self._make_model(
+            [oh.make_node("Relu", ["X"], ["Y"])],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Y", TFLOAT, [3, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model, inference=InferenceMode.TYPE)
+        self.assertEqual(b.get_type("X"), TFLOAT)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertFalse(b.has_shape("Y"))
+
+    def test_run_model_type_only_cast(self):
+        model = self._make_model(
+            [oh.make_node("Cast", ["X"], ["Y"], to=TINT64)],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Y", TINT64, [3, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model, inference=InferenceMode.TYPE)
+        self.assertEqual(b.get_type("X"), TFLOAT)
+        self.assertEqual(b.get_type("Y"), TINT64)
+
+    def test_run_model_type_only_input_output_names(self):
+        model = self._make_model(
+            [oh.make_node("Relu", ["X"], ["Y"])],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Y", TFLOAT, [3, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model, inference=InferenceMode.TYPE)
+        self.assertEqual(b.input_names, ["X"])
+        self.assertEqual(b.output_names, ["Y"])
+
+    def test_run_model_type_only_with_shape_inference(self):
+        """Verify that SHAPE mode still works and infers shapes."""
+        model = self._make_model(
+            [oh.make_node("Relu", ["X"], ["Y"])],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Y", TFLOAT, [3, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model, inference=InferenceMode.SHAPE)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertTrue(b.has_shape("Y"))
+
+    def test_run_model_type_only_string_compat(self):
+        """Verify that string values are still accepted for backward compat."""
+        model = self._make_model(
+            [oh.make_node("Relu", ["X"], ["Y"])],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Y", TFLOAT, [3, 4])],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model, inference="type")
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertFalse(b.has_shape("Y"))
+
+    def test_run_model_type_only_with_function(self):
+        relu_node = oh.make_node("Relu", ["X"], ["Y"])
+        func = oh.make_function(
+            domain="test",
+            fname="MyRelu",
+            inputs=["X"],
+            outputs=["Y"],
+            nodes=[relu_node],
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("MyRelu", ["A"], ["B"], domain="test")],
+                "g",
+                [_mkv_("A", TFLOAT, [3, 4])],
+                [_mkv_("B", TFLOAT, [3, 4])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("test", 1)],
+            ir_version=10,
+            functions=[func],
+        )
+        b = BasicShapeBuilder()
+        b.run_model(model, inference=InferenceMode.TYPE)
+        self.assertEqual(b.get_type("A"), TFLOAT)
+        self.assertEqual(b.get_type("B"), TFLOAT)
+
+    def test_run_model_invalid_inference_mode(self):
+        model = self._make_model(
+            [oh.make_node("Relu", ["X"], ["Y"])],
+            [_mkv_("X", TFLOAT, [3, 4])],
+            [_mkv_("Y", TFLOAT, [3, 4])],
+        )
+        b = BasicShapeBuilder()
+        self.assertRaise(lambda: b.run_model(model, inference="unknown"), ValueError)
 
 
 if __name__ == "__main__":

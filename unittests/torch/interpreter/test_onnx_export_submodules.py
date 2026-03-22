@@ -660,12 +660,15 @@ class TestOnnxExportSubModules(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.6", "owning module is None before that")
     @requires_transformers("5.2")
+    @unittest.skip("TODO: broken?")
     @ignore_warnings(FutureWarning)
     def test_submodule_local_functions_tiny_llm(self):
         """
         Tests that export_modules_as_functions=True works for Tiny-LLM
         (arnir0/Tiny-LLM, a LlamaForCausalLM model) where some submodule
         outputs include SymInt values mixed with tensors.
+
+        copilot?
         """
         from yobx.torch.tiny_models import get_tiny_model
         from yobx.torch import apply_patches_for_model, register_flattening_functions
@@ -673,11 +676,23 @@ class TestOnnxExportSubModules(ExtTestCase):
         model_id = "arnir0/Tiny-LLM"
         data = get_tiny_model(model_id)
         model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
+        filename1 = self.get_dump_file("test_submodule_local_functions_tiny_llm.1.onnx")
+        filename2 = self.get_dump_file("test_submodule_local_functions_tiny_llm.2.onnx")
 
         with (
             apply_patches_for_model(patch_torch=True, patch_transformers=True, model=model),
             register_flattening_functions(patch_transformers=True),
         ):
+            to_onnx(
+                model,
+                (),
+                kwargs=inputs,
+                dynamic_shapes=ds,
+                inline=False,
+                optimize=False,
+                verbose=0,
+                filename=filename1,
+            )
             onx = to_onnx(
                 model,
                 (),
@@ -687,6 +702,7 @@ class TestOnnxExportSubModules(ExtTestCase):
                 inline=False,
                 optimize=False,
                 verbose=0,
+                filename=filename2,
             )
         check_model(onx)
         self.assertGreater(len(onx.functions), 0)

@@ -1,6 +1,7 @@
 import contextlib
 import os
 import pprint
+from enum import IntEnum
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 import numpy as np
 import onnx
@@ -8,7 +9,7 @@ import onnx.numpy_helper as onh
 from onnx.external_data_helper import uses_external_data
 from onnx.reference import ReferenceEvaluator
 from ..helpers import string_type
-from ..helpers.onnx_helper import np_dtype_to_tensor_dtype, str_tensor_proto_type
+from ..helpers.onnx_helper import np_dtype_to_tensor_dtype, str_tensor_proto_type, pretty_onnx
 from ..xexpressions import simplify_expression
 from ..xexpressions.rename_expressions import parse_expression_tokens
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape
@@ -16,6 +17,25 @@ from ._builder_runtime import _BuilderRuntime
 from ._shape_runtime import _ShapeRuntime
 from ._inference_runtime import _InferenceRuntime, _OptimizationOptions
 from .shape_builder import ShapeBuilder
+from .type_inference import infer_types
+
+
+class InferenceMode(IntEnum):
+    """
+    Controls which inference is performed by
+    :meth:`BasicShapeBuilder.run_model`.
+
+    * ``NOTHING`` — no inference; neither shapes nor types are propagated.
+    * ``SHAPE`` — full shape **and** type inference using symbolic
+      expressions (default, existing behaviour).
+    * ``TYPE`` — lightweight type-only inference via
+      :func:`~yobx.xshape.type_inference.infer_types`; shapes are not
+      computed.
+    """
+
+    NOTHING = 0
+    SHAPE = 1
+    TYPE = 2
 
 
 @contextlib.contextmanager
@@ -706,10 +726,32 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         model: Union[onnx.ModelProto, onnx.GraphProto],
         functions: Optional[Dict[Tuple[str, str], onnx.FunctionProto]] = None,
         exc: bool = False,
+        inference: Union[InferenceMode, str] = InferenceMode.SHAPE,
     ):
-        """Runs inference over a model or a graph."""
+        """
+        Runs inference over a model or a graph.
+
+        :param model: an ONNX model or graph
+        :param functions: a dictionary of functions available to the model
+        :param exc: if True, raises an exception when inference fails
+        :param inference: :class:`InferenceMode` value (or its string name,
+            case-insensitive).  ``InferenceMode.SHAPE`` (default) runs the
+            full shape and type inference using symbolic expressions;
+            ``InferenceMode.TYPE`` runs a lighter type-only inference via
+            :func:`type_inference.infer_types
+            <yobx.xshape.type_inference.infer_types>` that only propagates
+            element types without computing shapes
+        """
 
         self.time_evaluation_constants_ = 0
+        if isinstance(inference, str):
+            try:
+                inference = InferenceMode[inference.upper()]
+            except KeyError:
+                raise ValueError(
+                    f"Unsupported inference mode {inference!r}, "
+                    f"expected one of {[m.name for m in InferenceMode]}."
+                ) from None
         if isinstance(model, onnx.ModelProto):
             self.opsets.clear()
             for opset in model.opset_import:
@@ -720,20 +762,77 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
                 self.opsets[""] = DEFAULT_TARGET_OPSET
             self.main_opset = self.opsets[""]
             return self.run_model(
-                model.graph, functions={(f.domain, f.name): f for f in model.functions}
+                model.graph,
+                functions={(f.domain, f.name): f for f in model.functions},
+                exc=exc,
+                inference=inference,
             )
         assert isinstance(model, onnx.GraphProto), f"Unexpected type {type(model)} for model"
         graph = model
+        if inference == InferenceMode.TYPE:
+            self._run_model_type_inference(graph, functions=functions, exc=exc)
+        else:
+            for i in graph.initializer:
+                self.set_constant(i.name, i)
+            for i in graph.sparse_initializer:
+                self.set_constant(i.values.name, i)
+            for i in graph.input:
+                self.run_value_info(i, True)
+            for node in graph.node:
+                self.run_node(node, exc=exc)
+            for i in graph.output:
+                self.run_value_info(i, False)
+
+    def _run_model_type_inference(
+        self,
+        graph: onnx.GraphProto,
+        functions: Optional[Dict[Tuple[str, str], onnx.FunctionProto]] = None,
+        exc: bool = False,
+    ):
+        """
+        Runs type-only inference over a graph using
+        :func:`type_inference.infer_types
+        <yobx.xshape.type_inference.infer_types>`.
+
+        Only element types are propagated; shapes are not inferred.
+
+        :param graph: an ONNX graph
+        :param functions: a dictionary of functions available to the model
+        :param exc: if True, raises an exception when type inference fails
+        """
         for i in graph.initializer:
-            self.set_constant(i.name, i)
-        for i in graph.sparse_initializer:
-            self.set_constant(i.values.name, i)
+            self.set_type(i.name, i.data_type)
         for i in graph.input:
-            self.run_value_info(i, True)
+            if not i.name:
+                continue
+            self._input_names.append(i.name)
+            itype = i.type.tensor_type.elem_type if i.type.HasField("tensor_type") else 0
+            if itype:
+                self.set_type(i.name, itype)
         for node in graph.node:
-            self.run_node(node, exc=exc)
+            input_types = [(self.get_type(n) if n else 0) for n in node.input]
+            if functions and (node.domain, node.op_type) in functions:
+                func = functions[(node.domain, node.op_type)]
+                result = infer_types(func, input_types, exc=exc)
+            else:
+                result = infer_types(node, input_types, exc=exc)
+            if isinstance(result, int):
+                result = (result,)
+            for name, itype in zip(node.output, result):
+                if name and itype:
+                    self.set_type(name, itype)
         for i in graph.output:
-            self.run_value_info(i, False)
+            if not i.name:
+                continue
+            self._output_names.append(i.name)
+            declared_type = i.type.tensor_type.elem_type if i.type.HasField("tensor_type") else 0
+            itype = self.get_type(i.name) if self.has_type(i.name) else 0
+            assert itype == declared_type, (
+                f"Type mismatch {itype} != {declared_type} for output {i.name!r}"
+                f"\n{pretty_onnx(graph)}"
+            )
+            if itype:
+                self.set_type(i.name, itype)
 
     def get_registered_constraints(self):
         """Returns the constraints registered so far."""
