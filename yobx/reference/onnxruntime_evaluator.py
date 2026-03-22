@@ -546,7 +546,7 @@ class OnnxruntimeEvaluator:
             "providers" not in self.session_kwargs or not self.session_kwargs["providers"]
         ) and any(hasattr(t, "is_cuda") and t.is_cuda for t in inputs):
             sess_kwargs = self.session_kwargs.copy()
-            sess_kwargs["providers"] = ["CUDAExecutionProvider"]
+            sess_kwargs["providers"] = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         else:
             sess_kwargs = self.session_kwargs or {}
         if on_cpu and "CUDAExecutionProvider" in (sess_kwargs.get("providers", []) or []):

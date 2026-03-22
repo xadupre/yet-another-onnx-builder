@@ -143,6 +143,12 @@ class InferenceSessionForTorch(_InferenceSession):
         if self.use_training_api:
             inputs = [feeds[i] for i in self.input_names]
             return self.run_training_api(*inputs, output_names=output_names)
+        # If feeds contain CUDA tensors but the session has no CUDAExecutionProvider
+        # (e.g. plain onnxruntime without GPU support is installed), move tensors to
+        # CPU to avoid a device mismatch inside run_dlpack.
+        has_cuda_tensors = any(isinstance(v, torch.Tensor) and v.is_cuda for v in feeds.values())
+        if has_cuda_tensors and "CUDAExecutionProvider" not in self.sess.get_providers():
+            feeds = {k: v.cpu() if getattr(v, "is_cuda", False) else v for k, v in feeds.items()}
         return self._post_process_inplace(list(self.run_dlpack(output_names, feeds)))
 
     def run_training_api(
