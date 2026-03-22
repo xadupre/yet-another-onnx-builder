@@ -26,7 +26,6 @@ class TestJaxToConcreteFunction(ExtTestCase):
         expected = np.sin(x)
         self.assertEqualArray(expected, result, atol=1e-6)
 
-    @unittest.skip("not implemented yet")
     def test_dynamic_batch_default(self):
         """Without explicit dynamic_shapes, batch dim (axis 0) is made dynamic."""
         import jax.nn as jnn
@@ -60,7 +59,6 @@ class TestJaxToConcreteFunction(ExtTestCase):
             expected = np.sin(xi)
             self.assertEqualArray(expected, result, atol=1e-6)
 
-    @unittest.skip("not implemented yet")
     def test_export_to_onnx_dynamic_shapes(self):
         """to_onnx() accepts a ConcreteFunction from jax_to_concrete_function.
 
@@ -113,7 +111,6 @@ class TestJaxToConcreteFunction(ExtTestCase):
         spec = cf.structured_input_signature[0][0]
         self.assertEqual(spec.name, "my_input")
 
-    @unittest.skip("not implemented yet")
     def test_to_onnx_auto_detects_jax_function(self):
         """to_onnx() automatically calls jax_to_concrete_function for JAX callables.
 
