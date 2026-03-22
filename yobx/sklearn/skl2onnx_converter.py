@@ -311,16 +311,18 @@ class MockContainer:
             **clean,
         )
 
-    def add_initializer(self, name: str, onnx_type: int, shape: object, content: object) -> None:
+    def add_initializer(
+        self, name: str, onnx_type: int, shape: Tuple[int, ...], content: Any
+    ) -> None:
         """Forward content directly to the GraphBuilder as a new initializer."""
         if isinstance(content, onnx.TensorProto):
-            self._g.make_initializer(name, content)  # type: ignore[attr-defined]
+            self._g.make_initializer(name, content)
         else:
             np_dtype = _ONNX_DTYPE_TO_NUMPY.get(onnx_type, np.float32)
-            arr = np.array(content, dtype=np_dtype)  # type: ignore
+            arr = np.array(content, dtype=np_dtype)
             if shape is not None and arr.shape != tuple(shape):
-                arr = arr.reshape(shape)  # type: ignore
-            self._g.make_initializer(name, arr)  # type: ignore[attr-defined]
+                arr = arr.reshape(shape)
+            self._g.make_initializer(name, arr)
 
 
 def wrap_skl2onnx_converter(skl2onnx_op_converter: Callable) -> Callable:
