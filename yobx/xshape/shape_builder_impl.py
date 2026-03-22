@@ -837,3 +837,33 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
     def get_registered_constraints(self):
         """Returns the constraints registered so far."""
         return self.constraints_
+
+    def estimate_node_flops(self, node: onnx.NodeProto) -> "Optional[DIM_TYPE]":
+        """
+        Estimates the number of floating-point operations for *node* using the
+        shapes already inferred by :meth:`run_model`.
+
+        Uses :func:`~yobx.xshape.cost_inference.estimate_node_flops` internally,
+        providing this builder's :meth:`get_shape` and :meth:`get_constant`
+        implementations as the *shape_fn* and *literal_fn* callbacks.
+
+        :param node: ONNX node to estimate
+        :return: estimated FLOPs count, or ``None`` when shapes are unknown or
+            the op_type is not supported
+        """
+        from .cost_inference import estimate_node_flops as _est
+
+        def _shape_fn(name: str):
+            if not name or not self.has_shape(name):
+                return None
+            return self.get_shape(name)
+
+        def _literal_fn(name: str):
+            if not name or not self.is_constant(name):
+                return None
+            val = self.get_constant(name, exc=False, computed_value=True, as_shape=True)
+            if val is None:
+                return None
+            return tuple(int(v) for v in val)  # type: ignore[union-attr]
+
+        return _est(node, _shape_fn, _literal_fn)
