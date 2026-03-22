@@ -2223,7 +2223,7 @@ def _set_shape_type_op_any_loop(self: ShapeBuilder, node: NodeProto):
             else:
                 # scan output: prepend an unknown leading dimension
                 scan_dim = self.unique_dimension_name(f"loop_{out_name}_iters")
-                self.set_shape(out_name, (scan_dim,) + body_shape)
+                self.set_shape(out_name, (scan_dim, *body_shape))
 
     return True
 

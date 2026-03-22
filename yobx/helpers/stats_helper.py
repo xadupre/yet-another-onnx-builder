@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import onnx
 from ..xexpressions.operations import DIM_TYPE
-from ..xshape.cost_inference import _estimate_node_flops, _ShapeFn, _LiteralFn
+from ..xshape.cost_inference import estimate_node_flops
 from ..typing import GraphBuilderExtendedProtocol
 
 
@@ -145,7 +145,7 @@ class ModelStatistics:
             op = node.op_type
             self._node_count[op] = self._node_count.get(op, 0) + 1
 
-            f = _estimate_node_flops(node, self.shape_fn, self.literal_fn)
+            f = estimate_node_flops(node, self.shape_fn, self.literal_fn)
             if op not in self._flops_by_op:
                 self._flops_by_op[op] = []
             self._flops_by_op[op].append(f)

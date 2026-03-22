@@ -448,7 +448,8 @@ def _infer_type_loop(node: NodeProto, input_types: Sequence[int]) -> List[int]:
                     body_input_types = [
                         TensorProto.INT64,  # iter
                         TensorProto.BOOL,  # cond_in
-                    ] + list(input_types[2:])
+                        *input_types[2:],
+                    ]
                     inferred = _infer_types_body(body, body_input_types)
                     body_out_types = [
                         inferred.get(

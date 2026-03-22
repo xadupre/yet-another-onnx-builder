@@ -11,6 +11,7 @@ from onnx.reference import ReferenceEvaluator
 from ..helpers import string_type
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype, str_tensor_proto_type, pretty_onnx
 from ..xexpressions import simplify_expression
+from ..xexpressions.operations import DIM_TYPE
 from ..xexpressions.rename_expressions import parse_expression_tokens
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape
 from ._builder_runtime import _BuilderRuntime
@@ -838,7 +839,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         """Returns the constraints registered so far."""
         return self.constraints_
 
-    def estimate_node_flops(self, node: onnx.NodeProto) -> "Optional[DIM_TYPE]":
+    def estimate_node_flops(self, node: onnx.NodeProto) -> Optional[DIM_TYPE]:
         """
         Estimates the number of floating-point operations for *node* using the
         shapes already inferred by :meth:`run_model`.

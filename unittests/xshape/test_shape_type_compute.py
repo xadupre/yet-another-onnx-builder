@@ -2865,7 +2865,7 @@ class TestLoopShapeInference(ExtTestCase):
         body = oh.make_graph(nodes, "body", body_inputs, body_outputs)
         node = oh.make_node(
             "Loop",
-            inputs=["max_iter", "cond"] + v_inputs,
+            inputs=["max_iter", "cond", *v_inputs],
             outputs=v_outs + [f"stacked_{s}" for s in scan_outs],
             body=body,
         )
@@ -2901,8 +2901,6 @@ class TestLoopShapeInference(ExtTestCase):
         self.assertEqual(scan_shape[1:], (3, 4))
 
     def test_loop_type_inference_no_body_returns_none(self):
-        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_loop
-
         node = oh.make_node("Loop", inputs=["max_iter", "cond", "v0"], outputs=["v_final"])
         b = _MockShapeBuilder()
         result = _set_shape_type_op_any_loop(b, node)

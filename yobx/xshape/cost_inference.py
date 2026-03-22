@@ -17,7 +17,7 @@ node using the shapes already inferred during a
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import numpy as np
 import onnx
@@ -483,7 +483,3 @@ def estimate_node_flops(
     if handler is None:
         return None
     return handler(node, shape_fn, literal_fn)
-
-
-# Keep the private alias for internal use by stats_helper and other callers
-_estimate_node_flops = estimate_node_flops
