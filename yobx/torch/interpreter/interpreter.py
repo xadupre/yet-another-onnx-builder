@@ -2447,21 +2447,21 @@ class DynamoInterpreter:
             )
             for i in range(len(val)):
                 name = builder.outputs[i].name
-                if not builder.has_shape(name):
-                    builder.set_shape(name, val[i].shape)
-                if not builder.has_type(name):
-                    builder.set_type(name, val[i].dtype)
                 if isinstance(val[i], self.builder.torch.Tensor):
+                    if not builder.has_shape(name):
+                        builder.set_shape(name, val[i].shape)
+                    if not builder.has_type(name):
+                        builder.set_type(name, val[i].dtype)
                     self.builder.set_shapes_types(
                         source_node.name, "call_module", (val[i].dtype, val[i].shape)
                     )
                     if not builder.has_device(name):
                         builder.set_device(name, val[i].get_device())
-                elif isinstance(val[i], (self.builder.torch.SymInt)):
+                elif isinstance(val[i], self.builder.torch.SymInt):
                     self.builder.set_shapes_types(
                         source_node.name, "call_module", (self.builder.torch.SymInt, tuple())
                     )
-                elif isinstance(val[i], (self.builder.torch.SymFloat)):
+                elif isinstance(val[i], self.builder.torch.SymFloat):
                     self.builder.set_shapes_types(
                         source_node.name, "call_module", (self.builder.torch.SymFloat, tuple())
                     )
