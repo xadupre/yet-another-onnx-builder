@@ -7,6 +7,7 @@ from ..helpers.onnx_helper import pretty_onnx
 from ..xexpressions import simplify_expression
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape, all_int, all_int_or_str
 from .shape_builder import ShapeBuilder
+from .type_inference import _infer_types_body
 
 
 def broadcast_shape(
@@ -2177,17 +2178,45 @@ def _set_shape_type_op_any_loop(self: ShapeBuilder, node: NodeProto):
     # skip cond_out at index 0
     mapped_body_outputs = body_outputs[1:]
 
+    # Pre-infer body output types when any are missing (elem_type == 0).
+    # Body inputs: iter→INT64, cond_in→BOOL, loop-carried→from node inputs[2+]
+    body_out_elem_types = [
+        bo.type.tensor_type.elem_type if bo.type.HasField("tensor_type") else 0
+        for bo in body_graph.output
+    ]
+    # body_out_elem_types[0] is cond_out (always BOOL); check the remaining
+    # output types (index 1+) which map directly to Loop node outputs.
+    if any(t == 0 for t in body_out_elem_types[1:]):
+        body_input_types = [
+            TensorProto.INT64,  # iter
+            TensorProto.BOOL,   # cond_in
+        ] + [
+            # inp may be "" for optional omitted inputs; treat those as unknown (0)
+            self.get_type(inp) if inp else 0
+            for inp in list(node.input)[2:]
+        ]
+        inferred = _infer_types_body(body_graph, body_input_types)
+        body_out_elem_types = [
+            inferred.get(
+                bo.name,
+                bo.type.tensor_type.elem_type if bo.type.HasField("tensor_type") else 0,
+            )
+            for bo in body_graph.output
+        ]
+    # mapped_body_elem_types[i] → elem type for Loop output[i]
+    mapped_body_elem_types = body_out_elem_types[1:]
+
     for i, out_name in enumerate(node.output):
         if not out_name:
             continue
         if i >= len(mapped_body_outputs):
             break
         body_out = mapped_body_outputs[i]
-        elem_type = body_out.type.tensor_type.elem_type
+        elem_type = mapped_body_elem_types[i] if i < len(mapped_body_elem_types) else 0
         if elem_type:
             self.set_type(out_name, elem_type)
 
-        if body_out.type.tensor_type.HasField("shape"):
+        if body_out.type.HasField("tensor_type") and body_out.type.tensor_type.HasField("shape"):
             body_shape = tuple(
                 d.dim_param if d.dim_param else d.dim_value
                 for d in body_out.type.tensor_type.shape.dim

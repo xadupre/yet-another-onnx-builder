@@ -2919,6 +2919,44 @@ class TestLoopShapeInference(ExtTestCase):
         result = _set_shape_type_op_any_loop(b, node)
         self.assertIsNone(result)
 
+    def test_loop_type_inferred_from_body_graph_when_missing(self):
+        """When body output elem_types are undeclared (0), they should be
+        inferred by propagating types through the body graph nodes."""
+        body = oh.make_graph(
+            [
+                oh.make_node("Add", ["v", "v"], ["v_out"]),
+                oh.make_node("Identity", ["v"], ["scan_out"]),
+            ],
+            "loop_body",
+            [
+                oh.make_tensor_value_info("iter", TINT64, []),
+                oh.make_tensor_value_info("cond_in", TBOOL, []),
+                # input type declared as FLOAT
+                oh.make_tensor_value_info("v", TFLOAT, [3, 4]),
+            ],
+            [
+                oh.make_tensor_value_info("cond_out", TBOOL, []),
+                # output types intentionally undeclared (0)
+                oh.make_tensor_value_info("v_out", 0, None),
+                oh.make_tensor_value_info("scan_out", 0, None),
+            ],
+        )
+        node = oh.make_node(
+            "Loop",
+            inputs=["max_iter", "cond", "v_in"],
+            outputs=["v_final", "scan"],
+            body=body,
+        )
+        b = _TestShapeBuilder()
+        b.set_type("max_iter", TINT64)
+        b.set_type("cond", TBOOL)
+        b.set_type("v_in", TFLOAT)
+        b.set_shape("v_in", (3, 4))
+        b.run_node(node)
+        # types should be inferred even though undeclared in the body outputs
+        self.assertEqual(b.get_type("v_final"), TFLOAT)
+        self.assertEqual(b.get_type("scan"), TFLOAT)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
