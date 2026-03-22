@@ -564,6 +564,8 @@ def dataframe_to_onnx(
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
+    filename: Optional[str] = None,
+    verbose: int = 0,
 ) -> ExportArtifact:
     """Trace *func* and convert the resulting computation to ONNX.
 
@@ -581,6 +583,10 @@ def dataframe_to_onnx(
         function constructs them directly (advanced usage).
     :param builder_cls: graph-builder class or factory callable.  Defaults to
         :class:`~yobx.xbuilder.GraphBuilder`.
+    :param filename: if set, the exported ONNX model is saved to this path and
+        the :class:`~yobx.container.ExportReport` is written as a companion
+        Excel file (same base name with ``.xlsx`` extension).
+    :param verbose: verbosity level (0 = silent).
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -610,4 +616,6 @@ def dataframe_to_onnx(
         target_opset=target_opset,
         custom_functions=custom_functions,
         builder_cls=builder_cls,
+        filename=filename,
+        verbose=verbose,
     )

@@ -197,6 +197,7 @@ def to_onnx(
     external_threshold: int = 1024,
     function_options: Optional[FunctionOptions] = None,
     convert_options: Optional[ConvertOptionsProtocol] = None,
+    filename: Optional[str] = None,
 ) -> ExportArtifact:
     """
     Converts a :epkg:`scikit-learn` estimator into ONNX.
@@ -247,6 +248,9 @@ def to_onnx(
         function wrapping and produce a flat graph.
         when *large_model* is True
     :param convert_options: see :class:`yobx.sklearn.ConvertOptions`
+    :param filename: if set, the exported ONNX model is saved to this path and
+        the :class:`~yobx.container.ExportReport` is written as a companion
+        Excel file (same base name with ``.xlsx`` extension).
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
@@ -404,6 +408,10 @@ def to_onnx(
             if text:
                 print(text)
         assert isinstance(onx, ExportArtifact), f"Unexpected type {type(onx)} for onx."
+        if filename:
+            if verbose:
+                print(f"[yobx.sklearn.to_onnx] saving model to {filename!r}")
+            onx.save(filename)
         return onx
     onx = g.to_onnx(
         large_model=large_model,
@@ -411,4 +419,8 @@ def to_onnx(
         inline=(not function_options) or not function_options.export_as_function,
     )
     assert isinstance(onx, ExportArtifact), f"Unexpected type {type(onx)} for onx."
+    if filename:
+        if verbose:
+            print(f"[yobx.sklearn.to_onnx] saving model to {filename!r}")
+        onx.save(filename)
     return onx

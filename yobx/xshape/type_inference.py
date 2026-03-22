@@ -1,5 +1,6 @@
-from typing import List, NoReturn, Optional, Sequence, Tuple, Union
-from onnx import FunctionProto, NodeProto, TensorProto
+from typing import Dict, List, NoReturn, Optional, Sequence, Tuple, Union
+import onnx
+from onnx import FunctionProto, GraphProto, NodeProto, TensorProto
 
 _i1_o1_node_types = {
     "Abs",
@@ -377,8 +378,89 @@ def _infer_type_rnn(node: NodeProto, input_types: Sequence[int]) -> List[int]:
     return [itype for _ in node.output]
 
 
+def _infer_types_body(
+    body: GraphProto, input_types: Sequence[int], exc: bool = False
+) -> Dict[str, int]:
+    """
+    Propagates element types through a body subgraph (GraphProto).
+
+    :param body: body subgraph
+    :param input_types: element types for the body graph inputs (in order)
+    :param exc: raise an exception if a node type cannot be inferred
+    :return: mapping from result name to element type
+    """
+    current: Dict[str, int] = {}
+    # Initializer types
+    for init in body.initializer:
+        current[init.name] = init.data_type
+    # Body input types: prefer explicitly declared type; fall back to input_types
+    for i, inp in enumerate(body.input):
+        try:
+            declared = inp.type.tensor_type.elem_type if inp.type.HasField("tensor_type") else 0
+        except AttributeError:
+            declared = 0
+        itype = declared or (input_types[i] if i < len(input_types) else 0)
+        if itype:
+            current[inp.name] = itype
+    # Propagate through nodes
+    for node in body.node:
+        node_input_types = [current.get(n, 0) for n in node.input]
+        out = _infer_types_node(node, node_input_types, None, exc=exc)
+        if isinstance(out, int):
+            out = [out]
+        for name, t in zip(node.output, out):
+            if name and t:
+                current[name] = t
+    return current
+
+
 def _infer_type_loop(node: NodeProto, input_types: Sequence[int]) -> List[int]:
-    """Returns placeholder output types for Loop (0 = unknown)."""
+    """Returns output types for Loop inferred from the body subgraph outputs.
+
+    The body subgraph outputs are ordered as:
+    [cond_out, v_out_0, ..., v_out_K-1, scan_0, ..., scan_S-1]
+
+    The Loop node outputs are:
+    [v_final_0, ..., v_final_K-1, scan_0, ..., scan_S-1]
+
+    So Loop output[i] has the same element type as body output[i+1].
+
+    When body output element types are not explicitly declared (0), type
+    inference is propagated through the body graph nodes.  Loop body inputs
+    are mapped as follows:
+    - body.input[0] (iteration counter) → INT64
+    - body.input[1] (condition)         → BOOL
+    - body.input[2+] (loop-carried vars) → input_types[2+]
+    """
+    for att in node.attribute:
+        if att.type == onnx.AttributeProto.GRAPH:
+            body = att.g
+            # body.output[0] is cond_out (BOOL), skip it
+            # body.output[1..] match loop outputs one-to-one
+            body_out_types = [
+                o.type.tensor_type.elem_type if o.type.HasField("tensor_type") else 0
+                for o in body.output
+            ]
+            if len(body_out_types) > 1:
+                # If any type is still unknown (0), propagate types through the
+                # body graph to fill them in.
+                if any(t == 0 for t in body_out_types[1:]):
+                    body_input_types = [
+                        TensorProto.INT64,  # iter
+                        TensorProto.BOOL,   # cond_in
+                    ] + list(input_types[2:])
+                    inferred = _infer_types_body(body, body_input_types)
+                    body_out_types = [
+                        inferred.get(
+                            o.name,
+                            o.type.tensor_type.elem_type
+                            if o.type.HasField("tensor_type")
+                            else 0,
+                        )
+                        for o in body.output
+                    ]
+                return body_out_types[1:]
+            break
     return [0 for _ in node.output]
 
 
