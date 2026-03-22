@@ -187,10 +187,14 @@ def to_onnx(
             if agg.shape[0]:
                 print(agg.to_string())
         if filename:
+            if verbose:
+                print(f"[yobx.tensorflow.to_onnx] saving model to {filename!r}")
             onx.save(filename)
         return onx
     onx = g.to_onnx(large_model=large_model, external_threshold=external_threshold)
     if filename:
+        if verbose:
+            print(f"[yobx.tensorflow.to_onnx] saving model to {filename!r}")
         onx.save(filename)
     return onx
 

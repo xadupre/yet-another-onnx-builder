@@ -156,6 +156,7 @@ def sql_to_onnx(
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
     filename: Optional[str] = None,
+    verbose: int = 0,
 ) -> ExportArtifact:
     """
     Convert a SQL *query* to a self-contained ONNX model.
@@ -213,6 +214,7 @@ def sql_to_onnx(
     :param filename: if set, the exported ONNX model is saved to this path and
         the :class:`~yobx.container.ExportReport` is written as a companion
         Excel file (same base name with ``.xlsx`` extension).
+    :param verbose: verbosity level (0 = silent).
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
@@ -243,6 +245,8 @@ def sql_to_onnx(
     sql_to_onnx_graph(g, sts, [], query, input_dtypes, right_input_dtypes=right_input_dtypes)
     artifact = g.to_onnx(return_optimize_report=True)
     if filename:
+        if verbose:
+            print(f"[yobx.sql.sql_to_onnx] saving model to {filename!r}")
         artifact.save(filename)
     return artifact
 
@@ -291,6 +295,7 @@ def parsed_query_to_onnx(
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
     filename: Optional[str] = None,
+    verbose: int = 0,
 ) -> ExportArtifact:
     """
     Convert an already-parsed :class:`~yobx.sql.parse.ParsedQuery` to ONNX.
@@ -314,6 +319,7 @@ def parsed_query_to_onnx(
     :param filename: if set, the exported ONNX model is saved to this path and
         the :class:`~yobx.container.ExportReport` is written as a companion
         Excel file (same base name with ``.xlsx`` extension).
+    :param verbose: verbosity level (0 = silent).
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -338,6 +344,8 @@ def parsed_query_to_onnx(
     parsed_query_to_onnx_graph(g, sts, [], pq, input_dtypes, right_input_dtypes)
     artifact = g.to_onnx(return_optimize_report=True)
     if filename:
+        if verbose:
+            print(f"[yobx.sql.parsed_query_to_onnx] saving model to {filename!r}")
         artifact.save(filename)
     return artifact
 

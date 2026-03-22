@@ -412,6 +412,7 @@ def lazyframe_to_onnx(
     target_opset: int = DEFAULT_TARGET_OPSET,
     builder_cls: Union[type, Callable] = GraphBuilder,
     filename: Optional[str] = None,
+    verbose: int = 0,
 ) -> ExportArtifact:
     """Convert a :class:`polars.LazyFrame` into a self-contained ONNX model.
 
@@ -443,6 +444,7 @@ def lazyframe_to_onnx(
     :param filename: if set, the exported ONNX model is saved to this path and
         the :class:`~yobx.container.ExportReport` is written as a companion
         Excel file (same base name with ``.xlsx`` extension).
+    :param verbose: verbosity level (0 = silent).
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -478,5 +480,10 @@ def lazyframe_to_onnx(
     parsed = _parse_polars_plan(plan_str)
     query = _plan_to_sql(parsed)
     return sql_to_onnx(
-        query, input_dtypes, target_opset=target_opset, builder_cls=builder_cls, filename=filename
+        query,
+        input_dtypes,
+        target_opset=target_opset,
+        builder_cls=builder_cls,
+        filename=filename,
+        verbose=verbose,
     )

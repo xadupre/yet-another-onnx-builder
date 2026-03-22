@@ -409,6 +409,8 @@ def to_onnx(
                 print(text)
         assert isinstance(onx, ExportArtifact), f"Unexpected type {type(onx)} for onx."
         if filename:
+            if verbose:
+                print(f"[yobx.sklearn.to_onnx] saving model to {filename!r}")
             onx.save(filename)
         return onx
     onx = g.to_onnx(
@@ -418,5 +420,7 @@ def to_onnx(
     )
     assert isinstance(onx, ExportArtifact), f"Unexpected type {type(onx)} for onx."
     if filename:
+        if verbose:
+            print(f"[yobx.sklearn.to_onnx] saving model to {filename!r}")
         onx.save(filename)
     return onx
