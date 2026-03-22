@@ -249,6 +249,7 @@ class ShapeBuilder:
     def register_constraint_dimension(self, dim_name: str, value: Any):
         """
         Registers a constraint associating a symbolic dimension name with a value.
+        This allows to deal backward constraints after a single pass if the model.
 
         :param dim_name: symbolic dimension name (e.g. ``"batch"``)
         :param value: the value or set of values to associate with that dimension

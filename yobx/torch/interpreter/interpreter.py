@@ -609,11 +609,7 @@ class DynamoInterpreter:
 
         if isinstance(node, VirtualTensor):
             return self._make_tensor_input(
-                node.name,
-                elem_type=node.dtype,
-                shape=node.shape,
-                device=node.device,
-                users=None,
+                node.name, elem_type=node.dtype, shape=node.shape, device=node.device, users=None
             )
 
         val = node.meta.get("val", None)
@@ -637,9 +633,7 @@ class DynamoInterpreter:
                 example_value = self.default_values[node.name]
 
             if self.builder.as_function and example_value is None:
-                return self._make_tensor_input(
-                    node.name, None, None, users=node.users
-                )
+                return self._make_tensor_input(node.name, None, None, users=node.users)
 
             if example_value is None:
                 # The input is not defined.
@@ -732,20 +726,14 @@ class DynamoInterpreter:
                     value = self.retriever(node.target, val, debug={"node": node})
                     if value is None:
                         return self._make_tensor_input(
-                            node.name,
-                            elem_type=val.dtype,
-                            shape=val.shape,
-                            users=node.users,
+                            node.name, elem_type=val.dtype, shape=val.shape, users=node.users
                         )
                 else:
                     value = self.retriever(node.target, val, debug={"node": node}, exc=False)
                     if value is None:
                         # This is probably one input then.
                         return self._make_tensor_input(
-                            node.target,
-                            elem_type=val.dtype,
-                            shape=val.shape,
-                            users=node.users,
+                            node.target, elem_type=val.dtype, shape=val.shape, users=node.users
                         )
 
             if value is None or isinstance(value, self.torch._subclasses.fake_tensor.FakeTensor):
@@ -1814,11 +1802,7 @@ class DynamoInterpreter:
             f"for function {name_fct!r}{self.builder.get_debug_msg()}"
         )
         for o in output_names:
-            new_builder.make_tensor_output(
-                o,
-                indexed=False,
-                doc_string=f"#C:{o}",
-            )
+            new_builder.make_tensor_output(o, indexed=False, doc_string=f"#C:{o}")
         new_builder._check_function_order()
         inits, (fdomain, fname) = self.builder.make_local_function(
             new_builder,

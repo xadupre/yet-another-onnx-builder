@@ -2187,10 +2187,7 @@ def _set_shape_type_op_any_loop(self: ShapeBuilder, node: NodeProto):
     # body_out_elem_types[0] is cond_out (always BOOL); check the remaining
     # output types (index 1+) which map directly to Loop node outputs.
     if any(t == 0 for t in body_out_elem_types[1:]):
-        body_input_types = [
-            TensorProto.INT64,  # iter
-            TensorProto.BOOL,   # cond_in
-        ] + [
+        body_input_types = [TensorProto.INT64, TensorProto.BOOL] + [  # iter  # cond_in
             # inp may be "" for optional omitted inputs; treat those as unknown (0)
             self.get_type(inp) if inp else 0
             for inp in list(node.input)[2:]
@@ -2198,8 +2195,7 @@ def _set_shape_type_op_any_loop(self: ShapeBuilder, node: NodeProto):
         inferred = _infer_types_body(body_graph, body_input_types)
         body_out_elem_types = [
             inferred.get(
-                bo.name,
-                bo.type.tensor_type.elem_type if bo.type.HasField("tensor_type") else 0,
+                bo.name, bo.type.tensor_type.elem_type if bo.type.HasField("tensor_type") else 0
             )
             for bo in body_graph.output
         ]

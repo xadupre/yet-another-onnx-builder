@@ -9,6 +9,7 @@ yobx.xshape
     _inference_runtime
     _shape_runtime
     _shape_helper
+    cost_inference
     shape_builder
     shape_builder_impl
     shape_type_compute
@@ -27,3 +28,8 @@ ShapeBuilder
 .. autoclass:: yobx.xshape.ShapeBuilder
     :members:
     :no-undoc-members:
+
+estimate_node_flops
++++++++++++++++++++
+
+.. autofunction:: yobx.xshape.estimate_node_flops

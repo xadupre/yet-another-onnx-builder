@@ -7,6 +7,7 @@ yobx.xexpressions
 
     expressions_torch
     evaluate_expressions
+    operations
     rename_expressions
     simplify_expressions
 

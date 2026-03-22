@@ -110,11 +110,7 @@ class MockOperator:
     """
 
     def __init__(
-        self,
-        raw_operator: object,
-        op_type: str,
-        onnx_name: str,
-        scope: MockScope,
+        self, raw_operator: object, op_type: str, onnx_name: str, scope: MockScope
     ) -> None:
         self.raw_operator = raw_operator
         self.type = op_type
@@ -159,10 +155,7 @@ class MockContainer:
     @property
     def target_opset_all(self) -> Dict[str, int]:
         """Per-domain opset mapping, derived from the GraphBuilder."""
-        return {
-            "": self._g.main_opset,  # type: ignore[attr-defined]
-            "ai.onnx.ml": 5,
-        }
+        return {"": self._g.main_opset, "ai.onnx.ml": 5}  # type: ignore[attr-defined]
 
     @property
     def main_opset(self) -> int:
@@ -217,7 +210,7 @@ class MockContainer:
                 clean[k] = v
 
         node_name = self._g.unique_node_name(name or "skl2onnx_node")  # type: ignore[attr-defined]
-        self._g.make_node(  # type: ignore[attr-defined]
+        self._g.make_node(  # type: ignore
             op_type,
             list(inputs),  # type: ignore
             list(outputs),  # type: ignore
@@ -323,10 +316,7 @@ def make_skl2onnx_converter(skl2onnx_op_converter: Callable, input_type: object)
         output_vars = [MockVariable(out, out) for out in outputs]
 
         operator = MockOperator(
-            estimator,
-            type(estimator).__name__,
-            f"{name}_{id(estimator)}",
-            scope,
+            estimator, type(estimator).__name__, f"{name}_{id(estimator)}", scope
         )
         operator.inputs.append(input_var)
         for var in output_vars:

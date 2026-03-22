@@ -11,6 +11,7 @@ from yobx._command_lines_parser import (
     get_parser_print,
     get_parser_render_gallery,
     get_parser_run_doc_examples,
+    get_parser_stats,
     process_outputname,
 )
 
@@ -100,6 +101,22 @@ class TestCommandLines(ExtTestCase):
         text = st.getvalue()
         self.assertIn("run-doc-examples", text)
 
+    def test_parser_stats(self):
+        st = StringIO()
+        with redirect_stdout(st):
+            get_parser_stats().print_help()
+        text = st.getvalue()
+        self.assertIn("--output", text)
+        self.assertIn("--verbose", text)
+
+    def test_main_parser_has_stats(self):
+        st = StringIO()
+        with redirect_stdout(st):
+            get_parser_render_gallery().print_help()
+        text = st.getvalue()
+        self.assertNotIn("--output", text)
+        self.assertIn("inputs", text)
+
     def test_parser_render_gallery(self):
         st = StringIO()
         with redirect_stdout(st):
@@ -107,6 +124,7 @@ class TestCommandLines(ExtTestCase):
         text = st.getvalue()
         self.assertNotIn("--output", text)
         self.assertIn("inputs", text)
+        self.assertIn("render-gallery", text)
 
     def test_parser_render_gallery_args(self):
         parser = get_parser_render_gallery()
@@ -120,7 +138,7 @@ class TestCommandLines(ExtTestCase):
         with redirect_stdout(st):
             get_main_parser().print_help()
         text = st.getvalue()
-        self.assertIn("render-gallery", text)
+        self.assertIn("stats", text)
 
 
 if __name__ == "__main__":
