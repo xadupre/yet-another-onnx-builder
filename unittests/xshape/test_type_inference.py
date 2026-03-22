@@ -186,10 +186,7 @@ class TestTypeInference(ExtTestCase):
             ],
         )
         node = oh.make_node(
-            "Loop",
-            inputs=["max_iter", "cond", "v_in"],
-            outputs=["v_final"],
-            body=body,
+            "Loop", inputs=["max_iter", "cond", "v_in"], outputs=["v_final"], body=body
         )
         result = infer_types(node, [TINT64, TBOOL, TFLOAT])
         self.assertEqual(list(result), [TFLOAT])
@@ -213,20 +210,13 @@ class TestTypeInference(ExtTestCase):
             ],
         )
         node = oh.make_node(
-            "Loop",
-            inputs=["max_iter", "cond", "v_in"],
-            outputs=["v_final", "scan"],
-            body=body,
+            "Loop", inputs=["max_iter", "cond", "v_in"], outputs=["v_final", "scan"], body=body
         )
         result = infer_types(node, [TINT64, TBOOL, TFLOAT])
         self.assertEqual(list(result), [TFLOAT, TFLOAT])
 
     def test_infer_types_loop_no_body(self):
-        node = oh.make_node(
-            "Loop",
-            inputs=["max_iter", "cond", "v_in"],
-            outputs=["v_final"],
-        )
+        node = oh.make_node("Loop", inputs=["max_iter", "cond", "v_in"], outputs=["v_final"])
         result = infer_types(node, [TINT64, TBOOL, TFLOAT], exc=False)
         self.assertEqual(list(result), [0])
 
@@ -254,10 +244,7 @@ class TestTypeInference(ExtTestCase):
             ],
         )
         node = oh.make_node(
-            "Loop",
-            inputs=["max_iter", "cond", "v_in"],
-            outputs=["v_final", "scan"],
-            body=body,
+            "Loop", inputs=["max_iter", "cond", "v_in"], outputs=["v_final", "scan"], body=body
         )
         result = infer_types(node, [TINT64, TBOOL, TFLOAT])
         self.assertEqual(list(result), [TFLOAT, TFLOAT])

@@ -7,11 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import onnx
 from ..xexpressions.operations import DIM_TYPE
-from ..xshape.cost_inference import (
-    _estimate_node_flops,
-    _ShapeFn,
-    _LiteralFn,
-)
+from ..xshape.cost_inference import _estimate_node_flops, _ShapeFn, _LiteralFn
 from ..typing import GraphBuilderExtendedProtocol
 
 

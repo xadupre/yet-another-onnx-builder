@@ -447,15 +447,13 @@ def _infer_type_loop(node: NodeProto, input_types: Sequence[int]) -> List[int]:
                 if any(t == 0 for t in body_out_types[1:]):
                     body_input_types = [
                         TensorProto.INT64,  # iter
-                        TensorProto.BOOL,   # cond_in
+                        TensorProto.BOOL,  # cond_in
                     ] + list(input_types[2:])
                     inferred = _infer_types_body(body, body_input_types)
                     body_out_types = [
                         inferred.get(
                             o.name,
-                            o.type.tensor_type.elem_type
-                            if o.type.HasField("tensor_type")
-                            else 0,
+                            o.type.tensor_type.elem_type if o.type.HasField("tensor_type") else 0,
                         )
                         for o in body.output
                     ]

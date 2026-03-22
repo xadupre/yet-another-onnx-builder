@@ -464,9 +464,7 @@ _OP_HANDLERS.update(
 
 
 def estimate_node_flops(
-    node: onnx.NodeProto,
-    shape_fn: _ShapeFn,
-    literal_fn: _LiteralFn,
+    node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
 ) -> Optional[DIM_TYPE]:
     """
     Estimates the number of floating-point operations for a single ONNX node.

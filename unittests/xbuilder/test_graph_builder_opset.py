@@ -478,12 +478,8 @@ class TestOpsetMaxPool(ExtTestCase):
         gr = _builder()
         gr.make_tensor_input("X", TFLOAT, ("n", "c", "h", "w"))
         out, indices = gr.op.MaxPool("X", kernel_shape=[2, 2], outputs=["Y", "indices"])
-        gr.make_tensor_output(
-            out, TFLOAT, ("n", "c", None, None), indexed=False
-        )
-        gr.make_tensor_output(
-            indices, TINT64, ("n", "c", None, None), indexed=False
-        )
+        gr.make_tensor_output(out, TFLOAT, ("n", "c", None, None), indexed=False)
+        gr.make_tensor_output(indices, TINT64, ("n", "c", None, None), indexed=False)
         onx = gr.to_onnx()
         x = np.arange(16, dtype=np.float32).reshape(1, 1, 4, 4)
         result = _run(onx, {"X": x})
@@ -1338,9 +1334,7 @@ class TestDFTAnyOpset(ExtTestCase):
         gr.make_tensor_input("X", TFLOAT, ("batch", "signal_dim", "one"))
         axes = np.array([1], dtype=np.int64)
         out = gr.op.DFTAnyOpset("X", "", axes, outputs=["Y"])
-        gr.make_tensor_output(
-            out, TFLOAT, ("batch", "signal_dim", "two"), indexed=False
-        )
+        gr.make_tensor_output(out, TFLOAT, ("batch", "signal_dim", "two"), indexed=False)
         onx = gr.to_onnx()
         x = np.arange(8, dtype=np.float32).reshape(1, 8, 1)
         (result,) = _run(onx, {"X": x})
@@ -1351,9 +1345,7 @@ class TestDFTAnyOpset(ExtTestCase):
         gr = GraphBuilder(20, ir_version=9)
         gr.make_tensor_input("X", TFLOAT, ("batch", "signal_dim", "one"))
         out = gr.op.DFTAnyOpset("X", "", outputs=["Y"], axis=1)
-        gr.make_tensor_output(
-            out, TFLOAT, ("batch", "signal_dim", "two"), indexed=False
-        )
+        gr.make_tensor_output(out, TFLOAT, ("batch", "signal_dim", "two"), indexed=False)
         onx = gr.to_onnx()
         x = np.arange(8, dtype=np.float32).reshape(1, 8, 1)
         (result,) = _run(onx, {"X": x})

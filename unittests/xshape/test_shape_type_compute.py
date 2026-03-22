@@ -2844,13 +2844,11 @@ class TestLoopShapeInference(ExtTestCase):
             oh.make_tensor_value_info("cond_in", TBOOL, []),
         ] + [oh.make_tensor_value_info(n, TFLOAT, list(body_shape)) for n in v_inputs]
 
-        body_outputs = [
-            oh.make_tensor_value_info("cond_out", TBOOL, []),
-        ] + [
-            oh.make_tensor_value_info(n, TFLOAT, list(body_shape)) for n in v_outs
-        ] + [
-            oh.make_tensor_value_info(n, TFLOAT, list(body_shape)) for n in scan_outs
-        ]
+        body_outputs = (
+            [oh.make_tensor_value_info("cond_out", TBOOL, [])]
+            + [oh.make_tensor_value_info(n, TFLOAT, list(body_shape)) for n in v_outs]
+            + [oh.make_tensor_value_info(n, TFLOAT, list(body_shape)) for n in scan_outs]
+        )
 
         # Build minimal body nodes: always use a Constant as a source so the
         # body is valid even when there are no loop-carried variables.
@@ -2862,13 +2860,7 @@ class TestLoopShapeInference(ExtTestCase):
         else:
             # scan-only body: use ConstantOfShape for every scan output
             for s in scan_outs:
-                nodes.append(
-                    oh.make_node(
-                        "ConstantOfShape",
-                        inputs=["iter"],
-                        outputs=[s],
-                    )
-                )
+                nodes.append(oh.make_node("ConstantOfShape", inputs=["iter"], outputs=[s]))
 
         body = oh.make_graph(nodes, "body", body_inputs, body_outputs)
         node = oh.make_node(
@@ -2910,11 +2902,8 @@ class TestLoopShapeInference(ExtTestCase):
 
     def test_loop_type_inference_no_body_returns_none(self):
         from yobx.xshape.shape_type_compute import _set_shape_type_op_any_loop
-        node = oh.make_node(
-            "Loop",
-            inputs=["max_iter", "cond", "v0"],
-            outputs=["v_final"],
-        )
+
+        node = oh.make_node("Loop", inputs=["max_iter", "cond", "v0"], outputs=["v_final"])
         b = _MockShapeBuilder()
         result = _set_shape_type_op_any_loop(b, node)
         self.assertIsNone(result)
@@ -2942,10 +2931,7 @@ class TestLoopShapeInference(ExtTestCase):
             ],
         )
         node = oh.make_node(
-            "Loop",
-            inputs=["max_iter", "cond", "v_in"],
-            outputs=["v_final", "scan"],
-            body=body,
+            "Loop", inputs=["max_iter", "cond", "v_in"], outputs=["v_final", "scan"], body=body
         )
         b = _TestShapeBuilder()
         b.set_type("max_iter", TINT64)
