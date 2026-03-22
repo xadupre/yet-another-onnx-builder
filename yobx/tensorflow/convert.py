@@ -21,6 +21,7 @@ def to_onnx(
     extra_converters: Optional[Dict[str, Callable]] = None,
     large_model: bool = False,
     external_threshold: int = 1024,
+    filename: Optional[str] = None,
 ) -> ExportArtifact:
     """
     Converts a :epkg:`TensorFlow`/:epkg:`Keras` model into ONNX.
@@ -54,6 +55,9 @@ def to_onnx(
         an :class:`~yobx.container.ExtendedModelContainer`
     :param external_threshold: if ``large_model`` is True, every tensor whose
         element count exceeds this threshold is stored as external data
+    :param filename: if set, the exported ONNX model is saved to this path and
+        the :class:`~yobx.container.ExportReport` is written as a companion
+        Excel file (same base name with ``.xlsx`` extension).
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
@@ -182,8 +186,13 @@ def to_onnx(
             )
             if agg.shape[0]:
                 print(agg.to_string())
+        if filename:
+            onx.save(filename)
         return onx
-    return g.to_onnx(large_model=large_model, external_threshold=external_threshold)
+    onx = g.to_onnx(large_model=large_model, external_threshold=external_threshold)
+    if filename:
+        onx.save(filename)
+    return onx
 
 
 # ---------------------------------------------------------------------------

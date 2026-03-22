@@ -36,6 +36,7 @@ def to_onnx(
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
+    filename: Optional[str] = None,
 ) -> ExportArtifact:
     """Convert a SQL string, a DataFrame-tracing function, or a polars LazyFrame to ONNX.
 
@@ -100,6 +101,9 @@ def to_onnx(
         Defaults to :class:`~yobx.xbuilder.GraphBuilder`.  Any class that
         implements the :ref:`builder-api` can be supplied here, e.g. a custom
         subclass that adds extra optimisation passes.
+    :param filename: if set, the exported ONNX model is saved to this path and
+        the :class:`~yobx.container.ExportReport` is written as a companion
+        Excel file (same base name with ``.xlsx`` extension).
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -172,6 +176,7 @@ def to_onnx(
             target_opset=target_opset,
             custom_functions=custom_functions,
             builder_cls=builder_cls,
+            filename=filename,
         )
     if isinstance(dataframe_or_query, str):
         return sql_to_onnx(
@@ -181,7 +186,12 @@ def to_onnx(
             target_opset=target_opset,
             custom_functions=custom_functions,
             builder_cls=builder_cls,
+            filename=filename,
         )
     return lazyframe_to_onnx(
-        dataframe_or_query, input_dtypes, target_opset=target_opset, builder_cls=builder_cls
+        dataframe_or_query,
+        input_dtypes,
+        target_opset=target_opset,
+        builder_cls=builder_cls,
+        filename=filename,
     )

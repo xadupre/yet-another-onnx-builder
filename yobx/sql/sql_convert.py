@@ -155,6 +155,7 @@ def sql_to_onnx(
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
+    filename: Optional[str] = None,
 ) -> ExportArtifact:
     """
     Convert a SQL *query* to a self-contained ONNX model.
@@ -209,7 +210,9 @@ def sql_to_onnx(
         :class:`~yobx.xbuilder.GraphBuilder`.  Any class that implements
         the :ref:`builder-api` can be supplied here, e.g. a custom subclass
         that adds extra optimisation passes.
-
+    :param filename: if set, the exported ONNX model is saved to this path and
+        the :class:`~yobx.container.ExportReport` is written as a companion
+        Excel file (same base name with ``.xlsx`` extension).
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
@@ -238,7 +241,10 @@ def sql_to_onnx(
     g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
     sql_to_onnx_graph(g, sts, [], query, input_dtypes, right_input_dtypes=right_input_dtypes)
-    return g.to_onnx(return_optimize_report=True)
+    artifact = g.to_onnx(return_optimize_report=True)
+    if filename:
+        artifact.save(filename)
+    return artifact
 
 
 def parsed_query_to_onnx_graph(
@@ -284,6 +290,7 @@ def parsed_query_to_onnx(
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
+    filename: Optional[str] = None,
 ) -> ExportArtifact:
     """
     Convert an already-parsed :class:`~yobx.sql.parse.ParsedQuery` to ONNX.
@@ -304,6 +311,9 @@ def parsed_query_to_onnx(
         callable.  Each callable is traced via
         :func:`~yobx.xtracing.trace_numpy_function`.
     :param builder_cls: graph-builder class or factory callable.
+    :param filename: if set, the exported ONNX model is saved to this path and
+        the :class:`~yobx.container.ExportReport` is written as a companion
+        Excel file (same base name with ``.xlsx`` extension).
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -326,7 +336,10 @@ def parsed_query_to_onnx(
     g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
     parsed_query_to_onnx_graph(g, sts, [], pq, input_dtypes, right_input_dtypes)
-    return g.to_onnx(return_optimize_report=True)
+    artifact = g.to_onnx(return_optimize_report=True)
+    if filename:
+        artifact.save(filename)
+    return artifact
 
 
 # ---------------------------------------------------------------------------
