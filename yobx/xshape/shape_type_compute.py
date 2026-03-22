@@ -1,6 +1,7 @@
 from collections import Counter
 from typing import List, Optional, Sequence, Tuple
 import numpy as np
+import onnx
 from onnx import NodeProto, TensorProto
 from ..helpers.onnx_helper import pretty_onnx
 from ..xexpressions import simplify_expression
@@ -2146,6 +2147,62 @@ def _set_shape_type_op_any_mel_weight_matrix(self: ShapeBuilder, node: NodeProto
     return True
 
 
+def _set_shape_type_op_any_loop(self: ShapeBuilder, node: NodeProto):
+    """Sets output types and shapes for the Loop operator from its body subgraph.
+
+    The Loop body subgraph has the following output order:
+    ``[cond_out, v_out_0, ..., v_out_K-1, scan_0, ..., scan_S-1]``
+
+    The Loop node outputs are:
+    ``[v_final_0, ..., v_final_K-1, scan_0_stacked, ..., scan_S-1_stacked]``
+
+    Loop-carried output ``v_final_i`` has the same type and shape as
+    ``body.output[i+1]``.  Each scan output has the same element type as the
+    corresponding body scan output but with an extra leading dimension (the
+    number of iterations, which is usually unknown at compile time).
+    """
+    body_graph = None
+    for att in node.attribute:
+        if att.type == onnx.AttributeProto.GRAPH:
+            body_graph = att.g
+            break
+    if body_graph is None:
+        return None
+
+    # Number of loop-carried dependencies (excluding M and cond from inputs)
+    n_loop_carried = max(0, len(node.input) - 2)
+
+    # body.output[0] is cond_out; body.output[1..] maps to loop node outputs
+    body_outputs = list(body_graph.output)
+    # skip cond_out at index 0
+    mapped_body_outputs = body_outputs[1:]
+
+    for i, out_name in enumerate(node.output):
+        if not out_name:
+            continue
+        if i >= len(mapped_body_outputs):
+            break
+        body_out = mapped_body_outputs[i]
+        elem_type = body_out.type.tensor_type.elem_type
+        if elem_type:
+            self.set_type(out_name, elem_type)
+
+        if body_out.type.tensor_type.HasField("shape"):
+            body_shape = tuple(
+                d.dim_param if d.dim_param else d.dim_value
+                for d in body_out.type.tensor_type.shape.dim
+            )
+            if i < n_loop_carried:
+                # v_final: same shape as the body output
+                self.set_shape(out_name, body_shape)
+            else:
+                # scan output: prepend an unknown leading dimension
+                scan_dim = self.unique_dimension_name(f"loop_{out_name}_iters")
+                self.set_shape(out_name, (scan_dim,) + body_shape)
+
+    return True
+
+
 _set_shape_type_op_any_known = {
     "ArgMax": _set_shape_type_op_any_arg_max_min,
     "ArgMin": _set_shape_type_op_any_arg_max_min,
@@ -2188,6 +2245,7 @@ _set_shape_type_op_any_known = {
     "MatMul": _set_shape_type_op_any_matmul,
     "MaxPool": _set_shape_type_op_any_conv_max_pool,
     "MelWeightMatrix": _set_shape_type_op_any_mel_weight_matrix,
+    "Loop": _set_shape_type_op_any_loop,
     "NonMaxSuppression": _set_shape_type_op_any_nms,
     "NonZero": _set_shape_type_op_any_non_zero,
     "OneHot": _set_shape_type_op_any_onehot,

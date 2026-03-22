@@ -1,4 +1,5 @@
 from typing import List, NoReturn, Optional, Sequence, Tuple, Union
+import onnx
 from onnx import FunctionProto, NodeProto, TensorProto
 
 _i1_o1_node_types = {
@@ -378,7 +379,28 @@ def _infer_type_rnn(node: NodeProto, input_types: Sequence[int]) -> List[int]:
 
 
 def _infer_type_loop(node: NodeProto, input_types: Sequence[int]) -> List[int]:
-    """Returns placeholder output types for Loop (0 = unknown)."""
+    """Returns output types for Loop inferred from the body subgraph outputs.
+
+    The body subgraph outputs are ordered as:
+    [cond_out, v_out_0, ..., v_out_K-1, scan_0, ..., scan_S-1]
+
+    The Loop node outputs are:
+    [v_final_0, ..., v_final_K-1, scan_0, ..., scan_S-1]
+
+    So Loop output[i] has the same element type as body output[i+1].
+    """
+    for att in node.attribute:
+        if att.type == onnx.AttributeProto.GRAPH:
+            body = att.g
+            # body.output[0] is cond_out (BOOL), skip it
+            # body.output[1..] match loop outputs one-to-one
+            body_out_types = [
+                o.type.tensor_type.elem_type
+                for o in body.output
+            ]
+            if len(body_out_types) > 1:
+                return body_out_types[1:]
+            break
     return [0 for _ in node.output]
 
 

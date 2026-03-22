@@ -29,6 +29,7 @@ from yobx.xshape.shape_type_compute import (
     _set_shape_type_op_any_sequence_empty,
     _set_shape_type_op_any_known,
     _set_shape_type_op_any_attention,
+    _set_shape_type_op_any_loop,
     _set_shape_type_op_any_squeeze,
     _set_shape_type_op_any_unsqueeze,
 )
@@ -2827,6 +2828,96 @@ class TestComputeReshapeShape(ExtTestCase):
         self.assertEqual(result[0], "b")
         self.assertIn("a", result[1])
         self.assertIn("b", result[1])
+
+
+class TestLoopShapeInference(ExtTestCase):
+    """Tests for _set_shape_type_op_any_loop."""
+
+    def _make_loop_node(self, n_loop_carried, n_scan_outputs, body_shape=(3, 4)):
+        """Helper to build a Loop node with a minimal body."""
+        v_inputs = [f"v{i}" for i in range(n_loop_carried)]
+        v_outs = [f"v_out{i}" for i in range(n_loop_carried)]
+        scan_outs = [f"scan{i}" for i in range(n_scan_outputs)]
+
+        body_inputs = [
+            oh.make_tensor_value_info("iter", TINT64, []),
+            oh.make_tensor_value_info("cond_in", TBOOL, []),
+        ] + [oh.make_tensor_value_info(n, TFLOAT, list(body_shape)) for n in v_inputs]
+
+        body_outputs = [
+            oh.make_tensor_value_info("cond_out", TBOOL, []),
+        ] + [
+            oh.make_tensor_value_info(n, TFLOAT, list(body_shape)) for n in v_outs
+        ] + [
+            oh.make_tensor_value_info(n, TFLOAT, list(body_shape)) for n in scan_outs
+        ]
+
+        # Build minimal body nodes: always use a Constant as a source so the
+        # body is valid even when there are no loop-carried variables.
+        nodes = []
+        if v_inputs:
+            nodes.append(oh.make_node("Identity", [v_inputs[0]], [v_outs[0]]))
+            for s in scan_outs:
+                nodes.append(oh.make_node("Identity", [v_inputs[0]], [s]))
+        else:
+            # scan-only body: use ConstantOfShape for every scan output
+            for s in scan_outs:
+                nodes.append(
+                    oh.make_node(
+                        "ConstantOfShape",
+                        inputs=["iter"],
+                        outputs=[s],
+                    )
+                )
+
+        body = oh.make_graph(nodes, "body", body_inputs, body_outputs)
+        node = oh.make_node(
+            "Loop",
+            inputs=["max_iter", "cond"] + v_inputs,
+            outputs=v_outs + [f"stacked_{s}" for s in scan_outs],
+            body=body,
+        )
+        return node
+
+    def test_loop_type_inference_loop_carried_only(self):
+        node = self._make_loop_node(1, 0)
+        b = _TestShapeBuilder()
+        b.set_type("max_iter", TINT64)
+        b.set_type("cond", TBOOL)
+        b.set_type("v0", TFLOAT)
+        b.set_shape("v0", (3, 4))
+        b.run_node(node)
+        self.assertEqual(b.get_type("v_out0"), TFLOAT)
+        self.assertEqual(b.get_shape("v_out0"), (3, 4))
+
+    def test_loop_type_inference_with_scan_output(self):
+        node = self._make_loop_node(1, 1)
+        b = _TestShapeBuilder()
+        b.set_type("max_iter", TINT64)
+        b.set_type("cond", TBOOL)
+        b.set_type("v0", TFLOAT)
+        b.set_shape("v0", (3, 4))
+        b.run_node(node)
+        # loop-carried output
+        self.assertEqual(b.get_type("v_out0"), TFLOAT)
+        self.assertEqual(b.get_shape("v_out0"), (3, 4))
+        # scan output has an extra leading dimension
+        self.assertEqual(b.get_type("stacked_scan0"), TFLOAT)
+        scan_shape = b.get_shape("stacked_scan0")
+        self.assertEqual(len(scan_shape), 3)  # (iters, 3, 4)
+        self.assertIsInstance(scan_shape[0], str)  # symbolic iter dim
+        self.assertEqual(scan_shape[1:], (3, 4))
+
+    def test_loop_type_inference_no_body_returns_none(self):
+        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_loop
+        node = oh.make_node(
+            "Loop",
+            inputs=["max_iter", "cond", "v0"],
+            outputs=["v_final"],
+        )
+        b = _MockShapeBuilder()
+        result = _set_shape_type_op_any_loop(b, node)
+        self.assertIsNone(result)
 
 
 if __name__ == "__main__":

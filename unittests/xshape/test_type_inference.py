@@ -171,6 +171,65 @@ class TestTypeInference(ExtTestCase):
         result = infer_types(node, [TFLOAT])
         self.assertEqual(result, [TFLOAT, TBOOL])
 
+    def test_infer_types_loop_loop_carried(self):
+        body = oh.make_graph(
+            [oh.make_node("Add", ["v", "v"], ["v_out"])],
+            "loop_body",
+            [
+                oh.make_tensor_value_info("iter", TINT64, []),
+                oh.make_tensor_value_info("cond_in", TBOOL, []),
+                oh.make_tensor_value_info("v", TFLOAT, [3, 4]),
+            ],
+            [
+                oh.make_tensor_value_info("cond_out", TBOOL, []),
+                oh.make_tensor_value_info("v_out", TFLOAT, [3, 4]),
+            ],
+        )
+        node = oh.make_node(
+            "Loop",
+            inputs=["max_iter", "cond", "v_in"],
+            outputs=["v_final"],
+            body=body,
+        )
+        result = infer_types(node, [TINT64, TBOOL, TFLOAT])
+        self.assertEqual(list(result), [TFLOAT])
+
+    def test_infer_types_loop_with_scan_output(self):
+        body = oh.make_graph(
+            [
+                oh.make_node("Add", ["v", "v"], ["v_out"]),
+                oh.make_node("Identity", ["v"], ["scan_out"]),
+            ],
+            "loop_body",
+            [
+                oh.make_tensor_value_info("iter", TINT64, []),
+                oh.make_tensor_value_info("cond_in", TBOOL, []),
+                oh.make_tensor_value_info("v", TFLOAT, [3, 4]),
+            ],
+            [
+                oh.make_tensor_value_info("cond_out", TBOOL, []),
+                oh.make_tensor_value_info("v_out", TFLOAT, [3, 4]),
+                oh.make_tensor_value_info("scan_out", TFLOAT, [3, 4]),
+            ],
+        )
+        node = oh.make_node(
+            "Loop",
+            inputs=["max_iter", "cond", "v_in"],
+            outputs=["v_final", "scan"],
+            body=body,
+        )
+        result = infer_types(node, [TINT64, TBOOL, TFLOAT])
+        self.assertEqual(list(result), [TFLOAT, TFLOAT])
+
+    def test_infer_types_loop_no_body(self):
+        node = oh.make_node(
+            "Loop",
+            inputs=["max_iter", "cond", "v_in"],
+            outputs=["v_final"],
+        )
+        result = infer_types(node, [TINT64, TBOOL, TFLOAT], exc=False)
+        self.assertEqual(list(result), [0])
+
 
 _mkv_ = oh.make_tensor_value_info
 
