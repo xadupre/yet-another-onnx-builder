@@ -264,11 +264,15 @@ print(pandas.DataFrame(data))
 # key/value tensors back as *past* key/values on every decoding step.
 # (With random weights the output tokens will be meaningless, but the
 # pipeline itself is exercised end-to-end.)
+#
+# The inputs are explicitly moved to CPU because ONNX Runtime inference
+# typically uses the CPU execution provider.  Passing GPU tensors directly
+# would cause a device mismatch unless ``onnxruntime-gpu`` is installed.
 
 onnx_tokens = onnx_generate(
     filename,
-    input_ids=inputs["input_ids"],
-    attention_mask=inputs["attention_mask"],
+    input_ids=inputs["input_ids"].cpu(),
+    attention_mask=inputs["attention_mask"].cpu(),
     eos_token_id=model.config.eos_token_id,
     max_new_tokens=50,
 )
