@@ -233,7 +233,7 @@ class MockStringTensorType(MockTensorType):
     pass
 
 
-MockTableType: Dict[int, MockTensorType] = {
+MockTableType: Dict[int, Callable[[], MockTensorType]] = {
     onnx.TensorProto.BOOL: MockBooleanTensorType,
     onnx.TensorProto.FLOAT: MockFloatTensorType,
     onnx.TensorProto.DOUBLE: MockDoubleTensorType,
@@ -317,8 +317,8 @@ def patch_skl2onnx_functions(skl2onnx_op_converter):
             patched[name] = mocked
             setattr(module, name, fct)
         if wrap:
-            sklearn_patched[name] = skl2onnx.common_type.data_types.guess_numpy_type
-            setattr(skl2onnx.common_type.data_types, name, fct)
+            sklearn_patched[name] = skl2onnx.common_type.data_types.guess_numpy_type  # type: ignore
+            setattr(skl2onnx.common_type.data_types, name, fct)  # type: ignore
 
     try:
         yield
@@ -326,7 +326,7 @@ def patch_skl2onnx_functions(skl2onnx_op_converter):
         for k, v in patched.items():
             setattr(module, k, v)
         for k, v in sklearn_patched:
-            setattr(skl2onnx.common_type, k, v)
+            setattr(skl2onnx.common_type, k, v)  # type: ignore
 
 
 def wrap_skl2onnx_converter(skl2onnx_op_converter: Callable) -> Callable:
