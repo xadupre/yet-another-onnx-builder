@@ -293,7 +293,7 @@ def mock_guess_proto_type(data_type):
 @contextlib.contextmanager
 def patch_skl2onnx_functions(skl2onnx_op_converter):
     try:
-        import skl2onnx.common_type
+        import skl2onnx.common_type  # type: ignore
 
         wrap = True
     except ImportError:
