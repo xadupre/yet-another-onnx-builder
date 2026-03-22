@@ -49,9 +49,13 @@ class MockScope:
     delegating to the :class:`~yobx.xbuilder.GraphBuilder` instance (*g*).
     """
 
-    def __init__(self, target_opset: int, g: object) -> None:
-        self.target_opset = target_opset
+    def __init__(self, g: object) -> None:
         self._g = g
+
+    @property
+    def target_opset(self) -> int:
+        """The main opset version, derived from the GraphBuilder."""
+        return self._g.main_opset  # type: ignore[attr-defined]
 
     def get_unique_variable_name(self, seed: str) -> str:
         """Return a unique result name via the GraphBuilder."""
@@ -110,16 +114,19 @@ class MockOperator:
         raw_operator: object,
         op_type: str,
         onnx_name: str,
-        target_opset: int,
         scope: MockScope,
     ) -> None:
         self.raw_operator = raw_operator
         self.type = op_type
         self.onnx_name = onnx_name
-        self.target_opset = target_opset
         self.scope = scope
         self.inputs: List[MockVariable] = []
         self.outputs: List[MockVariable] = []
+
+    @property
+    def target_opset(self) -> int:
+        """The main opset version, derived from the scope's GraphBuilder."""
+        return self.scope.target_opset
 
     @property
     def input_full_names(self) -> List[str]:
@@ -140,19 +147,26 @@ class MockContainer:
     construction time.
     """
 
-    def __init__(self, target_opset: int, g: object) -> None:
-        self.target_opset = target_opset
+    def __init__(self, g: object) -> None:
         self._g = g
-        # Some converters query per-domain opsets.
-        self.target_opset_all: Dict[str, int] = {
-            "": target_opset,
-            "ai.onnx.ml": 5,
-        }
         self.options: Dict = {}
 
     @property
+    def target_opset(self) -> int:
+        """The main opset version, derived from the GraphBuilder."""
+        return self._g.main_opset  # type: ignore[attr-defined]
+
+    @property
+    def target_opset_all(self) -> Dict[str, int]:
+        """Per-domain opset mapping, derived from the GraphBuilder."""
+        return {
+            "": self._g.main_opset,  # type: ignore[attr-defined]
+            "ai.onnx.ml": 5,
+        }
+
+    @property
     def main_opset(self) -> int:
-        return self.target_opset
+        return self._g.main_opset  # type: ignore[attr-defined]
 
     # ---- option-related helpers (called by skl2onnx's RegisteredConverter) ----
 
@@ -311,7 +325,7 @@ def make_skl2onnx_converter(skl2onnx_op_converter: Callable, input_type: object)
         X: str,
         name: str = "skl2onnx",
     ) -> Tuple:
-        scope = MockScope(g.main_opset, g)  # type: ignore[attr-defined]
+        scope = MockScope(g)  # type: ignore[attr-defined]
 
         input_var = MockVariable(X, X)
         input_var.type = input_type  # set by caller — no skl2onnx import needed here
@@ -321,14 +335,13 @@ def make_skl2onnx_converter(skl2onnx_op_converter: Callable, input_type: object)
             estimator,
             type(estimator).__name__,
             f"{name}_{id(estimator)}",
-            g.main_opset,  # type: ignore[attr-defined]
             scope,
         )
         operator.inputs.append(input_var)
         for var in output_vars:
             operator.outputs.append(var)
 
-        container = MockContainer(g.main_opset, g)  # type: ignore[attr-defined]
+        container = MockContainer(g)  # type: ignore[attr-defined]
         skl2onnx_op_converter(scope, operator, container)
 
         return tuple(outputs) if len(outputs) > 1 else outputs[0]

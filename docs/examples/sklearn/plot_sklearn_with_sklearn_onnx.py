@@ -120,17 +120,17 @@ def convert_sklearn_mlp_classifier(
     skl2onnx_fn = get_converter(op_name)
 
     # Build mock objects with the correct tensor names.
-    scope = MockScope(g.main_opset)
+    scope = MockScope(g)
 
     input_var = MockVariable(X, X)
     output_vars = [MockVariable(out, out) for out in outputs]
 
-    operator = MockOperator(estimator, op_name, f"{name}_op", g.main_opset, scope)
+    operator = MockOperator(estimator, op_name, f"{name}_op", scope)
     operator.inputs.append(input_var)
     for var in output_vars:
         operator.outputs.append(var)
 
-    container = MockContainer(g.main_opset, g)
+    container = MockContainer(g)
     skl2onnx_fn(scope, operator, container)
 
     return tuple(outputs)
