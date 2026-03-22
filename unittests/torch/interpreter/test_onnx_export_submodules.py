@@ -668,7 +668,6 @@ class TestOnnxExportSubModules(ExtTestCase):
         (arnir0/Tiny-LLM, a LlamaForCausalLM model) where some submodule
         outputs include SymInt values mixed with tensors.
 
-        copilot?
         """
         from yobx.torch.tiny_models import get_tiny_model
         from yobx.torch import apply_patches_for_model, register_flattening_functions
