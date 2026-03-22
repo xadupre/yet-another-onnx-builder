@@ -324,9 +324,9 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
 
     def test_function_cos_sin_cache_float16(self):
         g = GraphBuilder(18, ir_version=9)
-        dim1 = g.make_tensor_input("dim1", TINT64, (1,), is_dimension=False)
-        dim2 = g.make_tensor_input("dim2", TINT64, (1,), is_dimension=False)
-        weights = g.make_tensor_input("weights", TFLOAT, (1, 1, "a"), is_dimension=False)
+        dim1 = g.make_tensor_input("dim1", TINT64, (1,))
+        dim2 = g.make_tensor_input("dim2", TINT64, (1,))
+        weights = g.make_tensor_input("weights", TFLOAT, (1, 1, "a"))
         m1 = g.op.Reshape(
             g.op.Cast(
                 g.op.Unsqueeze(
@@ -340,8 +340,8 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         mul = g.op.Mul(weights, m1)
         cos = g.op.Cast(g.op.Cos(mul), to=onnx.TensorProto.FLOAT16, outputs=["cos_cache"])
         sin = g.op.Cast(g.op.Sin(mul), to=onnx.TensorProto.FLOAT16, outputs=["sin_cache"])
-        g.make_tensor_output(cos, TFLOAT16, (1, "seq", "a"), indexed=False, is_dimension=False)
-        g.make_tensor_output(sin, TFLOAT16, (1, "seq", "a"), indexed=False, is_dimension=False)
+        g.make_tensor_output(cos, TFLOAT16, (1, "seq", "a"), indexed=False)
+        g.make_tensor_output(sin, TFLOAT16, (1, "seq", "a"), indexed=False)
         model = g.to_onnx(optimize=False)
         self.dump_onnx("test_function_cos_sin_cache_float16.onnx", model)
 
@@ -366,8 +366,8 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
 
     def test_function_cos_sin_cache_float16_with_position_ids(self):
         g = GraphBuilder(18, ir_version=9)
-        position_ids = g.make_tensor_input("position_ids", TINT64, ("b",), is_dimension=False)
-        weights = g.make_tensor_input("weights", TFLOAT, (1, 1, "a"), is_dimension=False)
+        position_ids = g.make_tensor_input("position_ids", TINT64, ("b",))
+        weights = g.make_tensor_input("weights", TFLOAT, (1, 1, "a"))
         m1 = g.op.Reshape(
             g.op.Cast(
                 g.op.Unsqueeze(position_ids, np.array([1], dtype=np.int64)),
@@ -378,8 +378,8 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         mul = g.op.Mul(weights, m1)
         cos = g.op.Cast(g.op.Cos(mul), to=onnx.TensorProto.FLOAT16, outputs=["cos_cache"])
         sin = g.op.Cast(g.op.Sin(mul), to=onnx.TensorProto.FLOAT16, outputs=["sin_cache"])
-        g.make_tensor_output(cos, TFLOAT16, (1, "seq", "a"), indexed=False, is_dimension=False)
-        g.make_tensor_output(sin, TFLOAT16, (1, "seq", "a"), indexed=False, is_dimension=False)
+        g.make_tensor_output(cos, TFLOAT16, (1, "seq", "a"), indexed=False)
+        g.make_tensor_output(sin, TFLOAT16, (1, "seq", "a"), indexed=False)
         model = g.to_onnx(optimize=False)
         self.dump_onnx("test_function_cos_sin_cache_float16_position_ids.onnx", model)
 
@@ -403,9 +403,9 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
 
     def test_function_cos_sin_cache_float32(self):
         g = GraphBuilder(18, ir_version=9)
-        dim1 = g.make_tensor_input("dim1", TINT64, (1,), is_dimension=False)
-        dim2 = g.make_tensor_input("dim2", TINT64, (1,), is_dimension=False)
-        weights = g.make_tensor_input("weights", TFLOAT, (1, 1, "a"), is_dimension=False)
+        dim1 = g.make_tensor_input("dim1", TINT64, (1,))
+        dim2 = g.make_tensor_input("dim2", TINT64, (1,))
+        weights = g.make_tensor_input("weights", TFLOAT, (1, 1, "a"))
         m1 = g.op.Reshape(
             g.op.Cast(
                 g.op.Unsqueeze(
@@ -419,8 +419,8 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         mul = g.op.Mul(weights, m1)
         cos = g.op.Cos(mul, outputs=["cos_cache"])
         sin = g.op.Sin(mul, outputs=["sin_cache"])
-        g.make_tensor_output(cos, TFLOAT, (1, "seq", "a"), indexed=False, is_dimension=False)
-        g.make_tensor_output(sin, TFLOAT, (1, "seq", "a"), indexed=False, is_dimension=False)
+        g.make_tensor_output(cos, TFLOAT, (1, "seq", "a"), indexed=False)
+        g.make_tensor_output(sin, TFLOAT, (1, "seq", "a"), indexed=False)
         model = g.to_onnx(optimize=False)
         self.dump_onnx("test_function_cos_sin_cache_float32.onnx", model)
 
@@ -445,9 +445,9 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
 
     def test_function_cos_sin_cache_float32_with_shape_inference(self):
         g = GraphBuilder(18, ir_version=9)
-        dim1 = g.make_tensor_input("dim1", TINT64, (1,), is_dimension=False)
-        dim2 = g.make_tensor_input("dim2", TINT64, (1,), is_dimension=False)
-        weights = g.make_tensor_input("weights", TFLOAT, (1, 1, "a"), is_dimension=False)
+        dim1 = g.make_tensor_input("dim1", TINT64, (1,))
+        dim2 = g.make_tensor_input("dim2", TINT64, (1,))
+        weights = g.make_tensor_input("weights", TFLOAT, (1, 1, "a"))
         m1 = g.op.Reshape(
             g.op.Cast(
                 g.op.Unsqueeze(
@@ -461,8 +461,8 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         mul = g.op.Mul(weights, m1)
         cos = g.op.Exp(g.op.Cos(mul), outputs=["cos_cache"])
         sin = g.op.Exp(g.op.Sin(mul), outputs=["sin_cache"])
-        g.make_tensor_output(cos, TFLOAT, (1, "seq", "a"), indexed=False, is_dimension=False)
-        g.make_tensor_output(sin, TFLOAT, (1, "seq", "a"), indexed=False, is_dimension=False)
+        g.make_tensor_output(cos, TFLOAT, (1, "seq", "a"), indexed=False)
+        g.make_tensor_output(sin, TFLOAT, (1, "seq", "a"), indexed=False)
         model = g.to_onnx(optimize=False)
         self.dump_onnx("test_function_cos_sin_cache_float32.onnx", model)
 

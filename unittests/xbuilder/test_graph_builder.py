@@ -240,7 +240,7 @@ class TestGraphBuilder(ExtTestCase):
         init = g.make_initializer("weights", np_weights)
         bias = g.make_initializer("bias", np_bias)
         g.op.Add(g.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
-        g.make_tensor_output("Y", is_dimension=False, indexed=False)
+        g.make_tensor_output("Y", indexed=False)
         g.move_initializers_to_constant(full_parameter_name=False)
         fct = g.to_onnx(function_options=FunctionOptions(name="linear", domain="mine"))
         feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
@@ -258,7 +258,7 @@ class TestGraphBuilder(ExtTestCase):
         init = g.make_initializer("weights", np_weights)
         bias = g.make_initializer("bias", np_bias)
         g.op.Add(g.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
-        g.make_tensor_output("Y", is_dimension=False, indexed=False)
+        g.make_tensor_output("Y", indexed=False)
         g.move_initializers_to_constant(full_parameter_name=True)
         fct = g.to_onnx(function_options=FunctionOptions(name="linear", domain="mine"))
         feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
@@ -278,7 +278,7 @@ class TestGraphBuilder(ExtTestCase):
         init = gf.make_initializer("weights", np_weights)
         bias = gf.make_initializer("bias", np_bias)
         gf.op.Add(gf.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
-        gf.make_tensor_output("Y", is_dimension=False, indexed=False)
+        gf.make_tensor_output("Y", indexed=False)
         self.assertEqualArray(gf.initializers_dict["weights"], np_weights)
 
         g = GraphBuilder(18, ir_version=9, as_function=True)
@@ -301,7 +301,7 @@ class TestGraphBuilder(ExtTestCase):
             bias2,
             outputs=["Y"],
         )
-        g.make_tensor_output("Y", is_dimension=False, indexed=False)
+        g.make_tensor_output("Y", indexed=False)
         nodes = [(node.domain, node.op_type, node.input, node.output) for node in g.nodes]
         self.assertEqual(
             nodes,
@@ -368,7 +368,7 @@ class TestGraphBuilder(ExtTestCase):
         init = gf.make_initializer("weights", np_weights)
         bias = gf.make_initializer("bias", np_bias)
         gf.op.Add(gf.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
-        gf.make_tensor_output("Y", is_dimension=False, indexed=False)
+        gf.make_tensor_output("Y", indexed=False)
         self.assertEqualArray(gf.initializers_dict["weights"], np_weights)
 
         # second function calling the first one
@@ -390,7 +390,7 @@ class TestGraphBuilder(ExtTestCase):
             bias2,
             outputs=["Y"],
         )
-        g2.make_tensor_output("Y", is_dimension=False, indexed=False)
+        g2.make_tensor_output("Y", indexed=False)
 
         # a last step
         # second function calling the first one
@@ -413,7 +413,7 @@ class TestGraphBuilder(ExtTestCase):
             bias3,
             outputs=["Y"],
         )
-        g.make_tensor_output("Y", is_dimension=False, indexed=False)
+        g.make_tensor_output("Y", indexed=False)
 
         # finally, the conversion to onnx
         self.assertIn("FUNC RegressionBias[custom]", g.pretty_text())
@@ -488,7 +488,7 @@ class TestGraphBuilder(ExtTestCase):
         init = gf.make_initializer("weights", np_weights)
         bias = gf.make_initializer("bias", np_bias)
         gf.op.Add(gf.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
-        gf.make_tensor_output("Y", is_dimension=False, indexed=False)
+        gf.make_tensor_output("Y", indexed=False)
         self.assertEqualArray(gf.initializers_dict["weights"], np_weights)
 
         # main graph
@@ -514,7 +514,7 @@ class TestGraphBuilder(ExtTestCase):
         init = gf.make_initializer("weights", np_weights)
         bias = gf.make_initializer("bias", np_bias)
         gf.op.Sub(gf.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
-        gf.make_tensor_output("Y", is_dimension=False, indexed=False)
+        gf.make_tensor_output("Y", indexed=False)
         self.assertEqualArray(gf.initializers_dict["weights"], np_weights)
 
         self.assertEqual(len(g.functions), 1)
@@ -538,7 +538,7 @@ class TestGraphBuilder(ExtTestCase):
             g.make_node(function_name, ["X", *new_inits_2], name="linear", domain=domain_name),
             outputs=["Y"],
         )
-        g.make_tensor_output("Y", is_dimension=False, indexed=False)
+        g.make_tensor_output("Y", indexed=False)
         self.assertEqual(len(g.functions), 2)
 
         # finally, the conversion to onnx
@@ -598,7 +598,7 @@ class TestGraphBuilder(ExtTestCase):
             init = gf.make_initializer("weights", np_weights)
             bias = gf.make_initializer("bias", np_bias)
             gf.op.Add(gf.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
-            gf.make_tensor_output("Y", is_dimension=False, indexed=False)
+            gf.make_tensor_output("Y", indexed=False)
             self.assertEqualArray(gf.initializers_dict["weights"], np_weights)
 
             # second function calling the first one
@@ -620,7 +620,7 @@ class TestGraphBuilder(ExtTestCase):
                 bias2,
                 outputs=["Y"],
             )
-            g2.make_tensor_output("Y", is_dimension=False, indexed=False)
+            g2.make_tensor_output("Y", indexed=False)
             return g2
 
         np_weights = np.arange(12).reshape((4, 3)).astype(np.float32) / 10
@@ -663,7 +663,7 @@ class TestGraphBuilder(ExtTestCase):
             g.make_node(function_name, ["X", *new_inits_2], name="reg2", domain=domain_name),
             outputs=["Y"],
         )
-        g.make_tensor_output("Y", is_dimension=False, indexed=False)
+        g.make_tensor_output("Y", indexed=False)
 
         # finally, the conversion to onnx
         self.assertIn("FUNC RegressionBias[custom]", g.pretty_text())
@@ -738,7 +738,7 @@ class TestGraphBuilder(ExtTestCase):
             init = gf.make_initializer("weights", np_weights)
             bias = gf.make_initializer("bias", np_bias)
             gf.op.Add(gf.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
-            gf.make_tensor_output("Y", is_dimension=False, indexed=False)
+            gf.make_tensor_output("Y", indexed=False)
             self.assertEqualArray(gf.initializers_dict["weights"], np_weights)
 
             # second function calling the first one
@@ -760,7 +760,7 @@ class TestGraphBuilder(ExtTestCase):
                 bias2,
                 outputs=["Y"],
             )
-            g2.make_tensor_output("Y", is_dimension=False, indexed=False)
+            g2.make_tensor_output("Y", indexed=False)
             return g2
 
         np_weights = np.arange(12).reshape((4, 3)).astype(np.float32) / 10
@@ -803,7 +803,7 @@ class TestGraphBuilder(ExtTestCase):
             g.make_node(function_name, ["X", *new_inits_2], name="reg2", domain=domain_name),
             outputs=["Y"],
         )
-        g.make_tensor_output("Y", is_dimension=False, indexed=False)
+        g.make_tensor_output("Y", indexed=False)
 
         # finally, the conversion to onnx
         self.assertIn("FUNC RegressionBias[custom]", g.pretty_text())
@@ -1636,7 +1636,7 @@ class TestGraphBuilder(ExtTestCase):
         w_init = g.make_initializer("p_layer_weight", np_weights, parameter_name="layer.weight")
         self.assertEqual(g._parameter_renaming, {"p_layer_weight": "layer.weight"})
         g.op.MatMul("X", w_init, outputs=["Y"])
-        g.make_tensor_output("Y", TFLOAT, (2, 3), is_dimension=False, indexed=False)
+        g.make_tensor_output("Y", TFLOAT, (2, 3), indexed=False)
         onx = g.to_onnx()
         # The initializer must carry the external parameter name.
         init_names = [i.name for i in onx.graph.initializer]
@@ -1663,7 +1663,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(g._parameter_renaming, {"p_w": "fc.weight", "p_b": "fc.bias"})
         mm = g.op.MatMul("X", w_init, outputs=["mm"])
         g.op.Add(mm, b_init, outputs=["Y"])
-        g.make_tensor_output("Y", TFLOAT, (2, 3), is_dimension=False, indexed=False)
+        g.make_tensor_output("Y", TFLOAT, (2, 3), indexed=False)
         onx = g.to_onnx()
         init_names = [i.name for i in onx.graph.initializer]
         self.assertIn("fc.weight", init_names)
@@ -1868,14 +1868,14 @@ class TestGetInputDynamicShape(ExtTestCase):
         init_w = sub.make_initializer("weights", np_weights)
         init_b = sub.make_initializer("bias", np_bias)
         sub.op.Add(sub.op.MatMul("X", init_w, name="mm"), init_b, name="add", outputs=["Y"])
-        sub.make_tensor_output("Y", TFLOAT, (2, 3), is_dimension=False, indexed=False)
+        sub.make_tensor_output("Y", TFLOAT, (2, 3), indexed=False)
 
         # Main builder: uses make_nodes to incorporate the sub-builder's computation
         g = GraphBuilder(18, ir_version=9)
         g.make_tensor_input("X", TFLOAT, (2, 4))
         result = g.make_nodes(sub, input_names=["X"], output_names=["output_0"], prefix="sub_")
         self.assertEqual(result, "output_0")
-        g.make_tensor_output("output_0", TFLOAT, (2, 3), is_dimension=False)
+        g.make_tensor_output("output_0", TFLOAT, (2, 3))
         onx = g.to_onnx()
 
         feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
@@ -1895,7 +1895,7 @@ class TestGetInputDynamicShape(ExtTestCase):
         init_w = sub.make_initializer("weights", np_weights)
         init_b = sub.make_initializer("bias", np_bias)
         sub.op.Add(sub.op.MatMul("X", init_w, name="mm"), init_b, name="add", outputs=["Y"])
-        sub.make_tensor_output("Y", TFLOAT, (2, 3), is_dimension=False, indexed=False)
+        sub.make_tensor_output("Y", TFLOAT, (2, 3), indexed=False)
 
         # Main builder: uses make_nodes with function_options to export as a local function
         g = GraphBuilder(18, ir_version=9)
@@ -1909,7 +1909,7 @@ class TestGetInputDynamicShape(ExtTestCase):
             ),
         )
         self.assertEqual(result, "output_0")
-        g.make_tensor_output("output_0", TFLOAT, (2, 3), is_dimension=False)
+        g.make_tensor_output("output_0", TFLOAT, (2, 3))
         onx = g.to_onnx(inline=False)
         self.assertEqual(len(onx.functions), 1)
 
@@ -2305,7 +2305,7 @@ class TestGetInputDynamicShape(ExtTestCase):
 
     def test_make_shape_from_results_dynamic_scalar(self):
         g = GraphBuilder(18, ir_version=9)
-        g.make_tensor_input("X", TFLOAT, ("batch", 3), is_dimension=False)
+        g.make_tensor_input("X", TFLOAT, ("batch", 3))
         shape_X = g.op.Shape("X", outputs=["shape_X"])
         self.assertEqual(shape_X, "shape_X")
         g.set_type("shape_X", TINT64)
@@ -2320,7 +2320,7 @@ class TestGetInputDynamicShape(ExtTestCase):
         self.assertEqual(out, "Y")
         g.set_type("Y", TFLOAT)
         g.set_shape("Y", ("batch", 3))
-        g.make_tensor_output("Y", TFLOAT, ("batch", 3), indexed=False, is_dimension=False)
+        g.make_tensor_output("Y", TFLOAT, ("batch", 3), indexed=False)
         onx = g.to_onnx(optimize=False)
         ref = self.check_ort(onx)
         x = np.arange(6).reshape(2, 3).astype(np.float32)
@@ -2329,7 +2329,7 @@ class TestGetInputDynamicShape(ExtTestCase):
 
     def test_make_shape_from_results_dynamic_scalar_optimize(self):
         g = GraphBuilder(18, ir_version=9)
-        g.make_tensor_input("X", TFLOAT, ("batch", 3), is_dimension=False)
+        g.make_tensor_input("X", TFLOAT, ("batch", 3))
         shape_X = g.op.Shape("X", outputs=["shape_X"])
         self.assertEqual(shape_X, "shape_X")
         g.set_type("shape_X", TINT64)
@@ -2344,7 +2344,7 @@ class TestGetInputDynamicShape(ExtTestCase):
         self.assertEqual(out, "Y")
         g.set_type("Y", TFLOAT)
         g.set_shape("Y", ("batch", 3))
-        g.make_tensor_output("Y", TFLOAT, ("batch", 3), indexed=False, is_dimension=False)
+        g.make_tensor_output("Y", TFLOAT, ("batch", 3), indexed=False)
         onx = g.to_onnx(optimize=True)
         ref = self.check_ort(onx)
         x = np.arange(6).reshape(2, 3).astype(np.float32)
@@ -2353,7 +2353,7 @@ class TestGetInputDynamicShape(ExtTestCase):
 
     def test_make_shape_from_results_all_dynamic(self):
         g = GraphBuilder(18, ir_version=9)
-        g.make_tensor_input("X", TFLOAT, ("batch", "seq", 3), is_dimension=False)
+        g.make_tensor_input("X", TFLOAT, ("batch", "seq", 3))
         shape_X = g.op.Shape("X", outputs=["shape_X"])
         self.assertEqual(shape_X, "shape_X")
         g.set_type("shape_X", TINT64)
@@ -2371,7 +2371,7 @@ class TestGetInputDynamicShape(ExtTestCase):
         self.assertEqual(out, "Y")
         g.set_type("Y", TFLOAT)
         g.set_shape("Y", ("batch", "seq", 3))
-        g.make_tensor_output("Y", TFLOAT, ("batch", "seq", 3), indexed=False, is_dimension=False)
+        g.make_tensor_output("Y", TFLOAT, ("batch", "seq", 3), indexed=False)
         onx = g.to_onnx(optimize=False)
         ref = self.check_ort(onx)
         x = np.arange(12).reshape(2, 2, 3).astype(np.float32)
@@ -2568,57 +2568,6 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         gr.set_shapes_types("w", "run_node", "not_a_tuple")
         self.assertRaises(AssertionError, lambda: gr.get_type_known("w", exc=True))
 
-    def test_get_is_dimension_dynamic_object(self):
-        gr = GraphBuilder(18, verbose=0)
-        gr.dynamic_objects["dim0"] = "wrapped_value"
-        self.assertTrue(gr.get_is_dimension("dim0"))
-
-    def test_get_is_dimension_int_in_name(self):
-        gr = GraphBuilder(18, verbose=0)
-        self.assertFalse(gr.get_is_dimension("result_INT_op"))
-
-    def test_get_is_dimension_float_elem_type(self):
-        gr = GraphBuilder(18, verbose=0)
-        self.assertFalse(gr.get_is_dimension("unknown", elem_type=TensorProto.FLOAT))
-        self.assertFalse(gr.get_is_dimension("unknown", elem_type=TensorProto.FLOAT16))
-        self.assertFalse(gr.get_is_dimension("unknown", elem_type=TensorProto.DOUBLE))
-
-    def test_get_is_dimension_exc_false(self):
-        gr = GraphBuilder(18, verbose=0)
-        self.assertFalse(gr.get_is_dimension("unknown", exc=False))
-
-    def test_get_is_dimension_exc_true(self):
-        gr = GraphBuilder(18, verbose=0)
-        self.assertRaises(RuntimeError, gr.get_is_dimension, "unknown")
-
-    @requires_torch()
-    def test_get_is_dimension_run_node_float(self):
-        import torch
-
-        gr = GraphBuilder(18, verbose=0)
-        gr.set_shapes_types("x", "run_node", (("",), ("op", torch.float32, (2, 3))))
-        self.assertFalse(gr.get_is_dimension("x"))
-        gr.set_shapes_types("y", "run_node", (("",), ("op", torch.float16, (1,))))
-        self.assertFalse(gr.get_is_dimension("y"))
-        gr.set_shapes_types("z", "run_node", (("",), ("op", torch.float64, ())))
-        self.assertFalse(gr.get_is_dimension("z"))
-
-    @requires_torch()
-    def test_get_is_dimension_run_node_scalar_int64(self):
-        import torch
-
-        gr = GraphBuilder(18, verbose=0)
-        gr.set_shapes_types("x", "run_node", (("",), ("op", torch.int64, ())))
-        self.assertTrue(gr.get_is_dimension("x"))
-
-    @requires_torch()
-    def test_get_is_dimension_run_node_multidim_int64(self):
-        import torch
-
-        gr = GraphBuilder(18, verbose=0)
-        gr.set_shapes_types("x", "run_node", (("",), ("op", torch.int64, (2, 3))))
-        self.assertFalse(gr.get_is_dimension("x"))
-
     def test_has_exact_same_constant_in_context_same(self):
         # Child and parent have identical small constants: should return True.
         parent = GraphBuilder(18, ir_version=9)
@@ -2707,7 +2656,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         sub = g.make_subset_builder(["X", "W"], name="LinearSub", domain="mydom")
         self.assertEqual(sub.input_names, ["X", "W"])
         sub.op.MatMul("X", "W", outputs=["Y"])
-        sub.make_tensor_output("Y", is_dimension=False, indexed=False)
+        sub.make_tensor_output("Y", indexed=False)
 
         fct = sub.to_onnx(function_options=FunctionOptions(name="LinearSub", domain="mydom"))
         self.assertIsInstance(fct, ExportArtifact)
@@ -2730,13 +2679,13 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         gf = GraphBuilder(18, ir_version=9, as_function=True)
         gf.make_tensor_input("X", TFLOAT, None, False)
         gf.op.Relu("X", outputs=["Y"])
-        gf.make_tensor_output("Y", is_dimension=False, indexed=False)
+        gf.make_tensor_output("Y", indexed=False)
 
         g = GraphBuilder(18, ir_version=9, as_function=True)
         g.make_tensor_input("A", TFLOAT, (2, 4), False)
         g.make_local_function(gf, function_options=FunctionOptions(name="MyRelu", domain="test"))
         g.anyop.MyRelu("A", outputs=["B"], domain="test")
-        g.make_tensor_output("B", is_dimension=False, indexed=False)
+        g.make_tensor_output("B", indexed=False)
         self.assertEqual(len(g.functions), 1)
 
         sub = g.make_subset_builder(
@@ -2745,7 +2694,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertEqual(sub.input_names, ["A"])
         self.assertEqual(len(sub.functions), 1)
         sub.anyop.MyRelu("A", outputs=["C"], domain="test")
-        sub.make_tensor_output("C", is_dimension=False, indexed=False)
+        sub.make_tensor_output("C", indexed=False)
 
         fct = sub.to_onnx(
             function_options=FunctionOptions(name="SubFunc", domain="subdom"), inline=False
@@ -3302,7 +3251,7 @@ class TestPositionMsg(ExtTestCase):
         g.make_tensor_input("X", TFLOAT, (2, 3))
         g.make_node("Relu", ["X"], ["tmp"], name="relu1")
         g.make_node("Relu", ["tmp"], ["output_0"], name="relu2")
-        g.make_tensor_output("output_0", TFLOAT, (2, 3), is_dimension=False, indexed=True)
+        g.make_tensor_output("output_0", TFLOAT, (2, 3), indexed=True)
         onx = g.to_onnx(optimize=False)
         vi_names = {vi.name for vi in onx.graph.value_info}
         self.assertIn("tmp", vi_names, "intermediate tensor 'tmp' must have shape info")
@@ -3316,7 +3265,7 @@ class TestPositionMsg(ExtTestCase):
         g.make_tensor_input("X", TFLOAT, ("batch", 3))
         g.make_node("Relu", ["X"], ["tmp"], name="relu1")
         g.make_node("Relu", ["tmp"], ["output_0"], name="relu2")
-        g.make_tensor_output("output_0", TFLOAT, ("batch", 3), is_dimension=False, indexed=True)
+        g.make_tensor_output("output_0", TFLOAT, ("batch", 3), indexed=True)
         onx = g.to_onnx(optimize=False)
         vi_names = {vi.name for vi in onx.graph.value_info}
         self.assertIn("tmp", vi_names, "intermediate tensor 'tmp' must have shape info")

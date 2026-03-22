@@ -348,7 +348,7 @@ class EasyPatternOptimization(PatternOptimization):
         g2 = g.builder.empty_copy(as_function=True, constant_size=2**30, _shapable=False)
         for name, ann in zip(args, anns):
             if ann is None or ann is str or ann is inspect._empty:
-                g2.make_tensor_input(name, 0, None, False, marker=f"_build_pattern1_{name}")
+                g2.make_tensor_input(name, 0, None, marker=f"_build_pattern1_{name}")
                 # Type is unknown
                 g2.set_type(name, -1)
                 continue
@@ -356,16 +356,16 @@ class EasyPatternOptimization(PatternOptimization):
                 ann, str
             ), f"Annotation for {name!r} must be a string or None but ann={ann!r}"
             itype = string_to_elem_type(ann)
-            g2.make_tensor_input(name, itype, None, False, marker=f"_build_pattern2_{name}")
+            g2.make_tensor_input(name, itype, None, marker=f"_build_pattern2_{name}")
 
         assert not g2._debug_shape_missing
         self.add_local_functions_to_builder(g2)
         output = fct(g2, *args, **kwargs)
         if isinstance(output, str):
-            g2.make_tensor_output(output, 0, None, is_dimension=False)
+            g2.make_tensor_output(output, 0, None)
         else:
             for name in output:
-                g2.make_tensor_output(name, 0, None, is_dimension=False)
+                g2.make_tensor_output(name, 0, None)
         pat = GraphBuilderPatternOptimization(
             g2, verbose=max(0, g.verbose - 1), processor=g.processor
         )
