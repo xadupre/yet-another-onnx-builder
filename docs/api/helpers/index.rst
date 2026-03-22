@@ -12,6 +12,7 @@ yobx.helpers
     onnx_helper
     patch_helper
     rt_helper
+    stats_helper
 
 Other functions
 +++++++++++++++

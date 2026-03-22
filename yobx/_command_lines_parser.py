@@ -845,6 +845,85 @@ def _cmd_validate(argv: List[Any]):
         print(f":{k},{v};")
 
 
+def get_parser_stats() -> ArgumentParser:
+    parser = ArgumentParser(
+        prog="stats",
+        description=textwrap.dedent("""
+            Computes statistics on an ONNX model:
+            number of nodes per op_type and estimation of computational cost.
+            """),
+        formatter_class=RawTextHelpFormatter,
+    )
+    parser.add_argument("input", type=str, help="onnx model to analyze")
+    parser.add_argument(
+        "-o",
+        "--output",
+        default="",
+        type=str,
+        required=False,
+        help="output file (.xlsx or .csv) or empty to print on standard output",
+    )
+    parser.add_argument("-v", "--verbose", type=int, default=0, required=False, help="verbosity")
+    return parser
+
+
+def _cmd_stats(argv: List[Any]):
+    from .helpers.stats_helper import model_statistics
+
+    parser = get_parser_stats()
+    args = parser.parse_args(argv[1:])
+    if args.verbose:
+        print(f"-- loads {args.input!r}")
+    onx = onnx.load(args.input, load_external_data=False)
+    if args.verbose:
+        print("-- computes statistics")
+    stats = model_statistics(onx, verbose=args.verbose)
+
+    if args.output:
+        outname = process_outputname(args.output, args.input)
+        assert outname.endswith(
+            (".csv", ".xlsx")
+        ), f"Unexpected extension for outname={outname!r}"
+        import pandas
+
+        df = pandas.DataFrame(stats).sort_values()  # type: ignore
+        if outname.endswith(".csv"):
+            df.to_csv(outname, index=False)
+        else:
+            df.to_excel(outname, index=False)
+    else:
+        _print_model_statistics(stats)
+
+
+def _print_model_statistics(stats: Dict[str, Any]) -> None:
+    """Prints two model-statistics reports on standard output."""
+    # Report 1: node counts per op_type
+    print(f"Number of nodes: {stats['n_nodes']}")
+    print("")
+    print("Report 1 — Node counts per op_type:")
+    for op, count in sorted(stats["node_count_per_op_type"].items()):
+        print(f"  {op}: {count}")
+
+    print("")
+
+    # Report 2: estimated FLOPs per op_type
+    print("Report 2 — Estimated FLOPs per op_type:")
+    for op, flops in sorted(stats["flops_per_op_type"].items()):
+        flops_str = str(flops) if flops is not None else "n/a"
+        print(f"  {op}: {flops_str}")
+    print("")
+    total = stats["total_estimated_flops"]
+    if total is not None:
+        print(f"Total estimated FLOPs: {total}")
+    else:
+        print("Total estimated FLOPs: n/a (dynamic shapes or unsupported op_types)")
+
+
+#############
+# main parser
+#############
+
+
 def get_main_parser() -> ArgumentParser:
     parser = ArgumentParser(
         prog="yobx",
@@ -861,6 +940,7 @@ def get_main_parser() -> ArgumentParser:
             print             - prints the model on standard output
             render-gallery    - convert a sphinx-gallery .py example to RST (no execution)
             run-doc-examples  - run all runpython:: and gdot:: examples in RST/Python files
+            stats             - compute statistics on an onnx model
             validate          - validate a model (knowing its model id on HuggingFace Hub)
             """),
     )
@@ -874,6 +954,7 @@ def get_main_parser() -> ArgumentParser:
             "print",
             "render-gallery",
             "run-doc-examples",
+            "stats",
             "validate",
         ],
         help="Selects a command.",
@@ -890,6 +971,7 @@ def main(argv: Optional[List[Any]] = None):
         print=_cmd_print,
         **{"render-gallery": _cmd_render_gallery},
         **{"run-doc-examples": _cmd_run_doc_examples},
+        stats=_cmd_stats,
         validate=_cmd_validate,
     )
 
@@ -908,6 +990,7 @@ def main(argv: Optional[List[Any]] = None):
                 print=get_parser_print,
                 **{"render-gallery": get_parser_render_gallery},
                 **{"run-doc-examples": get_parser_run_doc_examples},
+                stats=get_parser_stats,
                 validate=get_parser_validate,
             )
             cmd = argv[0]

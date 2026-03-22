@@ -302,7 +302,7 @@ class MockContainer:
                 clean[k] = v
 
         node_name = self._g.unique_node_name(name or "skl2onnx_node")  # type: ignore[attr-defined]
-        self._g.make_node(  # type: ignore[attr-defined]
+        self._g.make_node(  # type: ignore
             op_type,
             list(inputs),  # type: ignore
             list(outputs),  # type: ignore
