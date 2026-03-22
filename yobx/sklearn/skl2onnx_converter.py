@@ -2,7 +2,7 @@ from __future__ import annotations
 import contextlib
 import sys
 
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 import onnx
@@ -24,185 +24,6 @@ _ONNX_DTYPE_TO_NUMPY: Dict[int, type] = {
     14: np.complex64,  # COMPLEX64
     15: np.complex128,  # COMPLEX128
 }
-
-
-class MockScope:
-    """
-    Minimal mock for skl2onnx's ``Scope``.
-
-    Provides :meth:`get_unique_variable_name`, the only method called by
-    typical skl2onnx converter functions.  Name uniqueness is guaranteed by
-    delegating to the :class:`~yobx.xbuilder.GraphBuilder` instance (*g*).
-    """
-
-    def __init__(self, g: GraphBuilderExtendedProtocol) -> None:
-        self._g = g
-
-    @property
-    def target_opset(self) -> int:
-        """The main opset version, derived from the GraphBuilder."""
-        return self._g.main_opset
-
-    def get_unique_variable_name(self, seed: str) -> str:
-        """Return a unique result name via the GraphBuilder."""
-        return self._g.unique_name(seed)
-
-    def get_unique_operator_name(self, seed: str) -> str:
-        """Return a unique node name via the GraphBuilder."""
-        return self._g.unique_node_name(seed)
-
-
-class MockVariable:
-    """
-    Minimal mock for skl2onnx's ``Variable``.
-
-    Stores the tensor name that will appear in emitted ``NodeProto``
-    inputs / outputs.
-    """
-
-    def __init__(self, raw_name: str, onnx_name: str) -> None:
-        self.raw_name = raw_name
-        self.onnx_name = onnx_name
-        self.type: Optional[object] = None
-
-    @property
-    def full_name(self) -> str:
-        """Alias for ``onnx_name`` (used by some skl2onnx converters)."""
-        return self.onnx_name
-
-    @property
-    def is_fed(self) -> Optional[bool]:
-        return False
-
-
-class MockOperator:
-    """
-    Minimal mock for skl2onnx's ``Operator``.
-
-    Holds the fitted sklearn estimator and the input / output
-    :class:`MockVariable` objects so a skl2onnx converter can read
-    tensor names via ``operator.inputs[i].onnx_name`` and
-    ``operator.output_full_names``.
-    """
-
-    def __init__(
-        self, raw_operator, inputs: List[MockVariable], outputs: List[MockVariable]
-    ) -> None:
-        self.raw_operator = raw_operator
-        self.inputs: List[MockVariable] = inputs
-        self.outputs: List[MockVariable] = outputs
-
-    @property
-    def target_opset(self) -> int:
-        """The main opset version, derived from the scope's GraphBuilder."""
-        return self.scope.target_opset
-
-    @property
-    def input_full_names(self) -> List[str]:
-        return [v.onnx_name for v in self.inputs]
-
-    @property
-    def output_full_names(self) -> List[str]:
-        return [v.onnx_name for v in self.outputs]
-
-
-class MockContainer:
-    """
-    Minimal mock for skl2onnx's ``ModelComponentContainer``.
-
-    Instead of accumulating nodes and initializers, this class delegates
-    every :meth:`add_node` / :meth:`add_initializer` call directly to the
-    :class:`~yobx.xbuilder.GraphBuilder` (*g*) that was provided at
-    construction time.
-    """
-
-    def __init__(self, g: GraphBuilderExtendedProtocol) -> None:
-        self._g = g
-        self.options: Dict = {}
-
-    def is_allowed(self, op_types: Set[str]):
-        """Tells if this operators are allowed."""
-        ai_onnx_ml_op_types = {
-            "LinearClassifier",
-            "LinearRegressor",
-            "TreeEnsemble",
-            "TreeEnsembleRegressor",
-            "TreeEnsembleClassifier",
-            "ArrayFeatureExtraction",
-        }
-        if ai_onnx_ml_op_types & op_types:
-            return "ai.onnx.ml" in self._g.opsets
-        return True
-
-    @property
-    def target_opset(self) -> int:
-        """The main opset version, derived from the GraphBuilder."""
-        return self._g.main_opset  # type: ignore[attr-defined]
-
-    @property
-    def target_opset_all(self) -> Dict[str, int]:
-        """Per-domain opset mapping, derived from the GraphBuilder."""
-        return {"": self._g.opsets}  # type: ignore[attr-defined]
-
-    @property
-    def main_opset(self) -> int:
-        return self._g.main_opset  # type: ignore[attr-defined]
-
-    def get_options(
-        self, model: object, default_values: Optional[Dict] = None, fail: bool = True
-    ) -> Dict:
-        return default_values if default_values is not None else {}
-
-    def add_node(
-        self,
-        op_type: str,
-        inputs: object,
-        outputs: object,
-        op_domain: str = "",
-        op_version: Optional[int] = None,
-        name: Optional[str] = None,
-        **attrs: object,
-    ) -> None:
-        """Delegate a node directly to the GraphBuilder."""
-        # Some skl2onnx helpers pass a bare string instead of a list.
-        if isinstance(inputs, str):
-            inputs = [inputs]
-        if isinstance(outputs, str):
-            outputs = [outputs]
-
-        clean: Dict = {}
-        for k, v in attrs.items():
-            if v is None:
-                continue
-            if isinstance(v, np.ndarray):
-                clean[k] = v.tolist()
-            elif isinstance(v, np.integer):
-                clean[k] = int(v)
-            elif isinstance(v, np.floating):
-                clean[k] = float(v)
-            else:
-                clean[k] = v
-
-        node_name = self._g.unique_node_name(name or "skl2onnx_node")  # type: ignore[attr-defined]
-        self._g.make_node(  # type: ignore[attr-defined]
-            op_type,
-            list(inputs),  # type: ignore
-            list(outputs),  # type: ignore
-            domain=op_domain or "",
-            name=node_name,
-            **clean,
-        )
-
-    def add_initializer(self, name: str, onnx_type: int, shape: object, content: object) -> None:
-        """Forward content directly to the GraphBuilder as a new initializer."""
-        if isinstance(content, onnx.TensorProto):
-            self._g.make_initializer(name, content)  # type: ignore[attr-defined]
-        else:
-            np_dtype = _ONNX_DTYPE_TO_NUMPY.get(onnx_type, np.float32)
-            arr = np.array(content, dtype=np_dtype)
-            if shape is not None and arr.shape != tuple(shape):
-                arr = arr.reshape(shape)  # type: ignore
-            self._g.make_initializer(name, arr)  # type: ignore[attr-defined]
 
 
 class MockTensorType:
@@ -327,6 +148,179 @@ def patch_skl2onnx_functions(skl2onnx_op_converter):
             setattr(module, k, v)
         for k, v in sklearn_patched:
             setattr(skl2onnx.common_type, k, v)  # type: ignore
+
+
+class MockScope:
+    """
+    Minimal mock for skl2onnx's ``Scope``.
+
+    Provides :meth:`get_unique_variable_name`, the only method called by
+    typical skl2onnx converter functions.  Name uniqueness is guaranteed by
+    delegating to the :class:`~yobx.xbuilder.GraphBuilder` instance (*g*).
+    """
+
+    def __init__(self, g: GraphBuilderExtendedProtocol) -> None:
+        self._g = g
+
+    @property
+    def target_opset(self) -> int:
+        """The main opset version, derived from the GraphBuilder."""
+        return self._g.main_opset
+
+    def get_unique_variable_name(self, seed: str) -> str:
+        """Return a unique result name via the GraphBuilder."""
+        return self._g.unique_name(seed)
+
+    def get_unique_operator_name(self, seed: str) -> str:
+        """Return a unique node name via the GraphBuilder."""
+        return self._g.unique_node_name(seed)  # type: ignore
+
+
+class MockVariable:
+    """
+    Minimal mock for skl2onnx's ``Variable``.
+
+    Stores the tensor name that will appear in emitted ``NodeProto``
+    inputs / outputs.
+    """
+
+    def __init__(self, raw_name: str, onnx_name: str) -> None:
+        self.raw_name = raw_name
+        self.onnx_name = onnx_name
+
+    @property
+    def full_name(self) -> str:
+        """Alias for ``onnx_name`` (used by some skl2onnx converters)."""
+        return self.onnx_name
+
+    @property
+    def is_fed(self) -> Optional[bool]:
+        return False
+
+
+class MockOperator:
+    """
+    Minimal mock for skl2onnx's ``Operator``.
+
+    Holds the fitted sklearn estimator and the input / output
+    :class:`MockVariable` objects so a skl2onnx converter can read
+    tensor names via ``operator.inputs[i].onnx_name`` and
+    ``operator.output_full_names``.
+    """
+
+    def __init__(
+        self, raw_operator, inputs: List[MockVariable], outputs: List[MockVariable]
+    ) -> None:
+        self.raw_operator = raw_operator
+        self.inputs: List[MockVariable] = inputs
+        self.outputs: List[MockVariable] = outputs
+
+    @property
+    def input_full_names(self) -> List[str]:
+        return [v.onnx_name for v in self.inputs]
+
+    @property
+    def output_full_names(self) -> List[str]:
+        return [v.onnx_name for v in self.outputs]
+
+
+class MockContainer:
+    """
+    Minimal mock for skl2onnx's ``ModelComponentContainer``.
+
+    Instead of accumulating nodes and initializers, this class delegates
+    every :meth:`add_node` / :meth:`add_initializer` call directly to the
+    :class:`~yobx.xbuilder.GraphBuilder` (*g*) that was provided at
+    construction time.
+    """
+
+    def __init__(self, g: GraphBuilderExtendedProtocol) -> None:
+        self._g = g
+        self.options: Dict = {}
+
+    def is_allowed(self, op_types: Set[str]):
+        """Tells if this operators are allowed."""
+        ai_onnx_ml_op_types = {
+            "LinearClassifier",
+            "LinearRegressor",
+            "TreeEnsemble",
+            "TreeEnsembleRegressor",
+            "TreeEnsembleClassifier",
+            "ArrayFeatureExtraction",
+        }
+        if ai_onnx_ml_op_types & op_types:
+            return "ai.onnx.ml" in self._g.opsets
+        return True
+
+    @property
+    def target_opset(self) -> int:
+        """The main opset version, derived from the GraphBuilder."""
+        return self._g.main_opset  # type: ignore[attr-defined]
+
+    @property
+    def target_opset_all(self) -> Dict[str, int]:
+        """Per-domain opset mapping, derived from the GraphBuilder."""
+        return self._g.opsets  # type: ignore[attr-defined]
+
+    @property
+    def main_opset(self) -> int:
+        return self._g.get_opset("")
+
+    def get_options(
+        self, model: BaseEstimator, default_values: Optional[Dict] = None, fail: bool = True
+    ) -> Dict:
+        return default_values if default_values is not None else {}
+
+    def add_node(
+        self,
+        op_type: str,
+        inputs: Union[str, List[str]],
+        outputs: Union[str, List[str]],
+        op_domain: str = "",
+        op_version: Optional[int] = None,
+        name: Optional[str] = None,
+        **attrs: Any,
+    ) -> None:
+        """Delegate a node directly to the GraphBuilder."""
+        # Some skl2onnx helpers pass a bare string instead of a list.
+        if isinstance(inputs, str):
+            inputs = [inputs]
+        if isinstance(outputs, str):
+            outputs = [outputs]
+
+        clean: Dict = {}
+        for k, v in attrs.items():
+            if v is None:
+                continue
+            if isinstance(v, np.ndarray):
+                clean[k] = v.tolist()
+            elif isinstance(v, np.integer):
+                clean[k] = int(v)
+            elif isinstance(v, np.floating):
+                clean[k] = float(v)
+            else:
+                clean[k] = v
+
+        node_name = self._g.unique_node_name(name or "skl2onnx_node")  # type: ignore[attr-defined]
+        self._g.make_node(  # type: ignore[attr-defined]
+            op_type,
+            list(inputs),  # type: ignore
+            list(outputs),  # type: ignore
+            domain=op_domain or "",
+            name=node_name,
+            **clean,
+        )
+
+    def add_initializer(self, name: str, onnx_type: int, shape: object, content: object) -> None:
+        """Forward content directly to the GraphBuilder as a new initializer."""
+        if isinstance(content, onnx.TensorProto):
+            self._g.make_initializer(name, content)  # type: ignore[attr-defined]
+        else:
+            np_dtype = _ONNX_DTYPE_TO_NUMPY.get(onnx_type, np.float32)
+            arr = np.array(content, dtype=np_dtype)
+            if shape is not None and arr.shape != tuple(shape):
+                arr = arr.reshape(shape)  # type: ignore
+            self._g.make_initializer(name, arr)  # type: ignore[attr-defined]
 
 
 def wrap_skl2onnx_converter(skl2onnx_op_converter: Callable) -> Callable:
