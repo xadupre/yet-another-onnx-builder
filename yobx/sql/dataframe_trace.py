@@ -447,10 +447,10 @@ class TracedDataFrame:
 
     def pipe(
         self,
-        func: Callable[..., "TracedDataFrame"],
+        func: Callable[..., "TracedDataFrame"],  # noqa: UP037
         *args: object,
         **kwargs: object,
-    ) -> "TracedDataFrame":
+    ) -> "TracedDataFrame":  # noqa: UP037
         """Apply *func* to this frame (pandas ``pipe`` idiom).
 
         Equivalent to ``func(self, *args, **kwargs)``.  Useful for chaining
