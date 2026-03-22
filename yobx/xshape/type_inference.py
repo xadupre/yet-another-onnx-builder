@@ -2,51 +2,107 @@ from typing import List, NoReturn, Optional, Sequence, Tuple, Union
 from onnx import FunctionProto, NodeProto, TensorProto
 
 _i1_o1_node_types = {
+    "Abs",
     "Acos",
     "Acosh",
     "Asin",
     "Asinh",
     "Atan",
     "Atanh",
+    "Ceil",
+    "Celu",
+    "Clip",
     "Cos",
     "Cosh",
+    "CumProd",
+    "CumSum",
+    "DepthToSpace",
+    "Elu",
+    "Erf",
     "Exp",
     "Expand",
     "FastGelu",
+    "Flatten",
     "Floor",
     "Gather",
+    "GatherElements",
+    "GatherND",
     "Gelu",
+    "GlobalMaxPool",
+    "HardSigmoid",
+    "HardSwish",
+    "Identity",
+    "LeakyRelu",
+    "Log",
     "LogSoftmax",
+    "LpNormalization",
+    "LRN",
+    "MeanVarianceNormalization",
+    "Mish",
     "Neg",
+    "PRelu",
     "Reciprocal",
+    "ReduceL1",
+    "ReduceL2",
+    "ReduceLogSum",
+    "ReduceLogSumExp",
+    "ReduceMax",
     "ReduceMean",
+    "ReduceMin",
+    "ReduceProd",
     "ReduceSum",
+    "ReduceSumSquare",
     "Relu",
     "Reshape",
+    "RotaryEmbedding",
+    "Round",
+    "ScatterND",
+    "Selu",
+    "Shrink",
+    "Sign",
     "Sigmoid",
     "Sin",
     "Sinh",
     "Slice",
     "Softmax",
+    "Softplus",
+    "Softsign",
+    "SpaceToDepth",
     "Sqrt",
+    "Squeeze",
+    "Swish",
     "Tan",
     "Tanh",
+    "ThresholdedRelu",
     "Tile",
     "Transpose",
+    "TreeEnsemble",
+    "Trilu",
     "Trunc",
     "Unsqueeze",
+    "Upsample",
 }
 
 _in_o1_node_types = {
     "Add",
+    "BitShift",
+    "BitwiseAnd",
+    "BitwiseNot",
+    "BitwiseOr",
+    "BitwiseXor",
     "Concat",
     "Div",
+    "Einsum",
     "FusedMatMul",
     "Gemm",
     "MatMul",
+    "Max",
+    "Mean",
+    "Min",
+    "Mod",
     "Mul",
-    "Squeeze",
     "Sub",
+    "Sum",
     "Unsqueeze",
 }
 
@@ -205,7 +261,7 @@ def _infer_type_constant_of_shape(node: NodeProto, input_types: Sequence[int]) -
     if len(node.attribute) == 0:
         return (TensorProto.FLOAT,)
     value = node.attribute[0]
-    return (value.data_type,)  # type: ignore[attr-defined]
+    return (value.t.data_type,)
 
 
 def _infer_type_eye_like(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
@@ -217,8 +273,8 @@ def _infer_type_eye_like(node: NodeProto, input_types: Sequence[int]) -> Tuple[i
 
 
 def _infer_type_pow(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
-    """Returns the output type for a node Where."""
-    raise AssertionError(f"Not implemented yet for node={node} and input_types={input_types}")
+    """Returns the output type for a Pow node (same type as first input)."""
+    return (input_types[0],)
 
 
 def _infer_type_range(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
@@ -252,17 +308,117 @@ def _infer_type_dropout(node: NodeProto, input_types: Sequence[int]) -> List[int
     return types
 
 
+def _infer_type_bool_output_unary(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
+    """Returns BOOL for unary bool-output ops (Not, IsInf, IsNaN)."""
+    return (TensorProto.BOOL,)
+
+
+def _infer_type_bool_output_binary(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
+    """Returns BOOL for comparison/logical ops."""
+    return (TensorProto.BOOL,)
+
+
+def _infer_type_arg_max_min(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
+    """Returns INT64 for ArgMax/ArgMin."""
+    return (TensorProto.INT64,)
+
+
+def _infer_type_non_zero(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
+    """Returns INT64 for NonZero."""
+    return (TensorProto.INT64,)
+
+
+def _infer_type_window(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
+    """Returns output type for window functions (BlackmanWindow, HammingWindow, HannWindow)."""
+    for att in node.attribute:
+        if att.name == "output_datatype":
+            return (att.i,)
+    return (TensorProto.FLOAT,)
+
+
+def _infer_type_topk(node: NodeProto, input_types: Sequence[int]) -> Tuple[int, int]:
+    """Returns (same type as input, INT64) for TopK."""
+    return (input_types[0], TensorProto.INT64)
+
+
+def _infer_type_batch_normalization(node: NodeProto, input_types: Sequence[int]) -> List[int]:
+    """Returns output types for BatchNormalization."""
+    types = [input_types[0]]
+    for _ in range(len(node.output) - 1):
+        types.append(input_types[0])
+    return types
+
+
+def _infer_type_onehot(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
+    """Returns the type of the values input (input[2]) for OneHot."""
+    if len(input_types) >= 3 and input_types[2]:
+        return (input_types[2],)
+    return (TensorProto.FLOAT,)
+
+
+def _infer_type_mel_weight_matrix(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
+    """Returns output type for MelWeightMatrix."""
+    for att in node.attribute:
+        if att.name == "output_datatype":
+            return (att.i,)
+    return (TensorProto.FLOAT,)
+
+
+def _infer_type_qlinear_matmul(node: NodeProto, input_types: Sequence[int]) -> Tuple[int]:
+    """Returns output type for QLinearMatMul (type of output scale = input[5])."""
+    if len(input_types) >= 6 and input_types[5]:
+        return (input_types[5],)
+    return (TensorProto.FLOAT,)
+
+
+def _infer_type_rnn(node: NodeProto, input_types: Sequence[int]) -> List[int]:
+    """Returns output types for RNN/GRU/LSTM (same type as input data)."""
+    itype = input_types[0] if input_types else TensorProto.FLOAT
+    return [itype for _ in node.output]
+
+
+def _infer_type_loop(node: NodeProto, input_types: Sequence[int]) -> List[int]:
+    """Returns placeholder output types for Loop (0 = unknown)."""
+    return [0 for _ in node.output]
+
+
 _dict_type_inference = {
+    "And": _infer_type_bool_output_binary,
+    "ArgMax": _infer_type_arg_max_min,
+    "ArgMin": _infer_type_arg_max_min,
+    "BatchNormalization": _infer_type_batch_normalization,
+    "BitCast": _infer_type_cast,
+    "BlackmanWindow": _infer_type_window,
     "Cast": _infer_type_cast,
     "CastLike": _infer_type_cast_like,
     "Constant": _infer_type_constant,
     "ConstantOfShape": _infer_type_constant_of_shape,
     "Dropout": _infer_type_dropout,
+    "Equal": _infer_type_bool_output_binary,
     "EyeLike": _infer_type_eye_like,
+    "Greater": _infer_type_bool_output_binary,
+    "GreaterOrEqual": _infer_type_bool_output_binary,
+    "HammingWindow": _infer_type_window,
+    "HannWindow": _infer_type_window,
+    "IsInf": _infer_type_bool_output_unary,
+    "IsNaN": _infer_type_bool_output_unary,
+    "Less": _infer_type_bool_output_binary,
+    "LessOrEqual": _infer_type_bool_output_binary,
+    "Loop": _infer_type_loop,
+    "MelWeightMatrix": _infer_type_mel_weight_matrix,
+    "NonMaxSuppression": _infer_type_non_zero,
+    "NonZero": _infer_type_non_zero,
+    "Not": _infer_type_bool_output_unary,
+    "OneHot": _infer_type_onehot,
+    "Or": _infer_type_bool_output_binary,
     "Pow": _infer_type_pow,
+    "QLinearMatMul": _infer_type_qlinear_matmul,
     "Range": _infer_type_range,
+    "RNN": _infer_type_rnn,
     "Shape": _infer_type_shape_or_size,
     "Size": _infer_type_shape_or_size,
     "Split": _infer_type_split,
+    "TopK": _infer_type_topk,
     "Where": _infer_type_where,
+    "Xor": _infer_type_bool_output_binary,
 }
