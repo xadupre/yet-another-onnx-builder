@@ -230,6 +230,38 @@ class TestTypeInference(ExtTestCase):
         result = infer_types(node, [TINT64, TBOOL, TFLOAT], exc=False)
         self.assertEqual(list(result), [0])
 
+    def test_infer_types_loop_missing_body_output_types_inferred(self):
+        """When body output types are not declared (0), they should be inferred
+        by propagating types through the body graph nodes."""
+        # Use make_tensor_value_info with no type (0) for body outputs
+        body = oh.make_graph(
+            [
+                oh.make_node("Add", ["v", "v"], ["v_out"]),
+                oh.make_node("Identity", ["v"], ["scan_out"]),
+            ],
+            "loop_body",
+            [
+                oh.make_tensor_value_info("iter", TINT64, []),
+                oh.make_tensor_value_info("cond_in", TBOOL, []),
+                # v input has no declared type - will be supplied via input_types
+                oh.make_tensor_value_info("v", 0, None),
+            ],
+            [
+                oh.make_tensor_value_info("cond_out", TBOOL, []),
+                # output types are intentionally undeclared (0)
+                oh.make_tensor_value_info("v_out", 0, None),
+                oh.make_tensor_value_info("scan_out", 0, None),
+            ],
+        )
+        node = oh.make_node(
+            "Loop",
+            inputs=["max_iter", "cond", "v_in"],
+            outputs=["v_final", "scan"],
+            body=body,
+        )
+        result = infer_types(node, [TINT64, TBOOL, TFLOAT])
+        self.assertEqual(list(result), [TFLOAT, TFLOAT])
+
 
 _mkv_ = oh.make_tensor_value_info
 
