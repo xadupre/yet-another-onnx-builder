@@ -115,7 +115,7 @@ def convert_sklearn_mlp_classifier(
     skl2onnx_fn = get_converter(op_name)
 
     # Build mock objects with the correct tensor names.
-    scope = MockScope(g.main_opset)
+    scope = MockScope(g.main_opset, g)
 
     input_var = MockVariable(X, X)
     output_vars = [MockVariable(out, out) for out in outputs]
