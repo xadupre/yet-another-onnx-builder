@@ -319,7 +319,7 @@ class MockContainer:
             self._g.make_initializer(name, content)
         else:
             np_dtype = _ONNX_DTYPE_TO_NUMPY.get(onnx_type, np.float32)
-            arr = np.array(content, dtype=np_dtype)
+            arr = np.array(content, dtype=np_dtype)  # type: ignore
             if shape is not None and arr.shape != tuple(shape):
                 arr = arr.reshape(shape)
             self._g.make_initializer(name, arr)
@@ -345,13 +345,13 @@ def wrap_skl2onnx_converter(skl2onnx_op_converter: Callable) -> Callable:
         *args: str,
         name: str = "wrap_skl2onnx",
         **kwargs,
-    ) -> Tuple:
+    ) -> Union[str, Tuple[str, ...]]:
         scope = MockScope(g)
 
         input_vars = []
         for a in args:
             input_var = MockVariable(a, a)
-            input_var.type = MockTableType[g.get_type(a)]()
+            input_var.type = MockTableType[g.get_type(a)]()  # type: ignore
             input_vars.append(input_var)
         output_vars = []
         for a in outputs:
@@ -364,6 +364,6 @@ def wrap_skl2onnx_converter(skl2onnx_op_converter: Callable) -> Callable:
         with patch_skl2onnx_functions(skl2onnx_op_converter):
             skl2onnx_op_converter(scope, operator, container)
 
-        return tuple(outputs) if len(outputs) > 1 else outputs[0]
+        return tuple(outputs) if len(outputs) > 1 else outputs[0]  # type: ignore
 
     return _converter
