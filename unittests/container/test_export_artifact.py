@@ -252,7 +252,7 @@ class TestExportArtifact(ExtTestCase):
         g = GraphBuilder(18, ir_version=9, as_function=True)
         g.make_tensor_input("X", None, None, False)
         g.op.Add("X", "X", outputs=["Y"])
-        g.make_tensor_output("Y", is_dimension=False, indexed=False)
+        g.make_tensor_output("Y", indexed=False)
 
         artifact = g.to_onnx(
             function_options=FunctionOptions(
@@ -287,7 +287,7 @@ class TestExportArtifact(ExtTestCase):
         np_weights = np.arange(6).reshape((2, 3)).astype(np.float32)
         init = g.make_initializer("weights", np_weights)
         g.op.MatMul("X", init, outputs=["Y"])
-        g.make_tensor_output("Y", is_dimension=False, indexed=False)
+        g.make_tensor_output("Y", indexed=False)
 
         artifact = g.to_onnx(
             function_options=FunctionOptions(

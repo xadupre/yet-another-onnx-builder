@@ -50,7 +50,7 @@ class BuilderEmitter(BaseEmitter):
         for inp, stype, shape in self.outputs_full_:
             outputs.append(
                 f'g.make_tensor_output("{inp}", onnx.TensorProto.{stype}, '
-                f"{shape}, is_dimension=False, indexed=False)"
+                f"{shape}, indexed=False)"
             )
         rows = [
             "",

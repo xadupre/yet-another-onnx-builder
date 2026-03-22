@@ -598,7 +598,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 n,
                 self.get_type(n),
                 self.get_shape(n) if self.has_shape(n) else None,
-                is_dimension=self.get_is_dimension(n),
                 marker=f"make_subset_builder-{name}",
             )
         if add_local_functions:
@@ -1619,157 +1618,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     return False
         return True
 
-    def get_is_dimension(
-        self,
-        name: str,
-        elem_type: Optional[int] = None,
-        shape: Optional[DYNAMIC_SHAPE] = None,
-        n_outputs: Optional[int] = None,
-        exc: bool = True,
-    ) -> bool:
-        """Tells if a result is a dynamic dimension or not."""
-        if name in self.dynamic_objects:
-            res = True
-        elif name in self._known_torch_value:
-            value = self._known_torch_value[name]
-            if value[0] == "run_node":
-                val1 = value[1]
-                _exa, val = val1
-                if val is not None and len(val) == 3:
-                    el_type, size = val[1:]
-                    if self._has_torch and el_type in (
-                        self.torch.float32,  # type: ignore
-                        self.torch.float64,  # type: ignore
-                        self.torch.float16,  # type: ignore
-                        self.torch.bfloat16,  # type: ignore
-                        self.torch.bool,  # type: ignore
-                    ):
-                        return False
-                    if len(size) >= 2:
-                        return False
-                    if (
-                        self._has_torch
-                        and el_type in (self.torch.int64, self.torch.int32)  # type: ignore
-                        and len(size) == 0
-                    ):
-                        # A single integer with no shape, it looks like a dimension.
-                        # Let's assume it is. It is more efficient to consider it as
-                        # a dimension.
-                        return True
-                    # In another case, let's assume it is not.
-                    return False
-                else:
-                    if (
-                        elem_type is not None
-                        and self._has_torch
-                        and elem_type
-                        in (
-                            self.torch.float32,  # type: ignore
-                            self.torch.float64,  # type: ignore
-                            self.torch.float16,  # type: ignore
-                            self.torch.bfloat16,  # type: ignore
-                            self.torch.bool,  # type: ignore
-                        )
-                    ):
-                        return False
-                    if not self.has_type(name) or (shape is not None and len(shape) >= 2):
-                        return False
-                    dtype = self.get_type(name)
-                    if dtype in {
-                        TensorProto.FLOAT16,
-                        TensorProto.FLOAT,
-                        TensorProto.DOUBLE,
-                        TensorProto.BFLOAT16,
-                        TensorProto.BOOL,
-                    }:
-                        return False
-                    if self.has_shape(name):
-                        shape = self.get_shape(name)
-                        if dtype == TensorProto.INT64 and shape == (1,):
-                            return True
-                    elif self.has_rank(name):
-                        if self.get_rank(name) > 1:
-                            return False
-                if isinstance(val1[0], tuple) and len(val1[0]) >= 1:
-                    v = val1[0]
-                    if (
-                        isinstance(v, tuple)
-                        and len(v) == 3
-                        and v[0] == "example_value"
-                        and len(self.dynamic_objects) == 0
-                    ):
-                        # No dynamic shape as input, so there
-                        # should not be any dynamic shape as output.
-                        return False
-                if val1 == ("", ""):
-                    # Another case where it seems False.
-                    return False
-                raise RuntimeError(
-                    f"Not implemented for name={name!r}, value={value!r} ({type(value)}), "
-                    f"val1={val1}, elem_type={elem_type}, shape={shape}, n_outputs={n_outputs}"
-                    f"{self.get_debug_msg()}"
-                )
-            elif value[0] == "call_module":
-                if isinstance(value[1], tuple) and len(value[1]) == 2:
-                    el_type, size = value[1]
-                    if self._has_torch and el_type in (
-                        self.torch.float32,  # type: ignore
-                        self.torch.float64,  # type: ignore
-                        self.torch.float16,  # type: ignore
-                        self.torch.bfloat16,  # type: ignore
-                    ):
-                        return False
-                    if len(size) >= 2:
-                        return False
-            if n_outputs == 1:
-                # We may assume a model would not output just one dimension.
-                return False
-            raise RuntimeError(
-                f"Not implemented for name={name!r}, value={value!r} ({type(value)}), "
-                f"elem_type={elem_type}, shape={shape}, n_outputs={n_outputs}"
-                f"{self.get_debug_msg()}"
-            )
-        elif "_INT_" in name:
-            # This is most likely a dimension but not marked as such for the time being.
-            return False
-        else:
-            if elem_type is None and self.has_type(name):
-                elem_type = self.get_type(name)
-            if elem_type in {
-                TensorProto.FLOAT16,
-                TensorProto.FLOAT,
-                TensorProto.DOUBLE,
-                TensorProto.BFLOAT16,
-                TensorProto.BOOL,
-            }:
-                return False
-            if not exc:
-                # We return false by default.
-                return False
-            raise RuntimeError(
-                f"Unable to guess if {name!r}, elem_type={elem_type}, "
-                f"shape={shape} is a dimension{self.get_debug_msg()}"
-            )
-        assert not res or (
-            (
-                elem_type is None
-                or elem_type
-                in {
-                    TensorProto.INT64,
-                    TensorProto.INT32,
-                    TensorProto.UINT64,
-                    TensorProto.UINT32,
-                    # not a dimension but a result of a computation involving a dimension
-                    TensorProto.FLOAT,
-                }
-            )
-            and (shape is None or (isinstance(shape, tuple) and len(shape) == 0))
-        ), (
-            f"Inconsistent result type for name={name!r}, is_dimension={res}, "
-            f"elem_type={elem_type}, shape={shape}{self.get_debug_msg()}"
-        )
-        return res
-
     def reset_types_and_shapes(self):
         """Removes shapes, and types if not an initializer."""
         for k in self._known_names:
@@ -2577,7 +2425,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                         else TensorProto.FLOAT
                     ),
                     tuple(),
-                    is_dimension=True,
                     marker="make_dynamic_object",
                 ),
             )
@@ -3561,7 +3408,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         name: Union[str, Tuple[str]],
         elem_type: Optional[Any] = None,
         shape: Optional[DYNAMIC_SHAPE] = None,
-        is_dimension: bool = False,
         marker: str = "",
         default_initializer: Optional[Any] = None,
         device: Optional[int] = None,
@@ -3573,8 +3419,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             with the same element type and shape
         :param elem_type: element type
         :param shape: shape
-        :param is_dimension: torch is using ``torch.SymInt`` to add a dynamic input
-            to the graph
         :param marker: to known from this input was created
         :param default_initializer: add an initializer with the same name of the input
         :param device: device if known
@@ -3590,7 +3434,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                             n,
                             elem_type,
                             shape,
-                            is_dimension=is_dimension,
                             marker=marker,
                             default_initializer=default_initializer,
                         ),
@@ -3611,18 +3454,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     "Identity", [input_name], [name], name="make_tensor_input_id"
                 )
         else:
-            if is_dimension:
-                # The convention is to have _dim_ in the name to tell
-                # it is a dimension.
-                input_name = f"{name}_dim_"
-                if input_name != name:
-                    add_node = lambda: self.make_node(  # noqa: E731
-                        "Identity", [input_name], [name], name="make_tensor_input_id"
-                    )
-                self.input_names.append(input_name)
-            else:
-                self.input_names.append(name)
-                input_name = name
+            self.input_names.append(name)
+            input_name = name
 
         self.current_input += 1
         elem_type = _get_type(elem_type)
@@ -3928,7 +3761,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         elem_type: Optional[int] = None,
         shape: Optional[DYNAMIC_SHAPE] = None,
         indexed: bool = True,
-        is_dimension: Optional[bool] = None,
         allow_untyped_output: bool = False,
         doc_string: str = "",
         device: Optional[int] = None,
@@ -3940,15 +3772,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         :param elem_type: element type
         :param shape: shape
         :param indexed: the name must be indexed?
-        :param is_dimension: torch is using torch.SymInt to add a dynamic input
-            to the graph
         :param allow_untyped_output: allow untyped output even if it is not a function
         :param doc_string: doc string
         :param device: device if known
         :return: output name
         """
         if isinstance(name, list):
-            assert not is_dimension, f"name={name!r} not compatible with is_dimension=True"
             res: List[str] = []
             for n in name:
                 res.append(cast(str, self.make_tensor_output(n, elem_type, shape)))
@@ -3960,11 +3789,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         assert (
             self.as_function or not indexed or "_" in name
         ), f"Name {name!r} is not indexed like 'output_0'{self.get_debug_msg()}"
-        assert (is_dimension and "_dim_" in name) or (not is_dimension and "_dim_" not in name), (
-            f"Inconsistence for input {name!r}, "
-            f"elem_type={elem_type}, shape={shape!r}, "
-            f"is_dimension={is_dimension}"
-        )
 
         elem_type = _get_type(elem_type)
         if not self.as_function and not allow_untyped_output and elem_type == 0:
