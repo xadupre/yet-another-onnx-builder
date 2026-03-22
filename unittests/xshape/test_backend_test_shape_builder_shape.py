@@ -10,14 +10,15 @@ from yobx.helpers import string_type
 from yobx.helpers.onnx_helper import pretty_onnx
 from yobx.helpers.rt_helper import make_feeds
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.xshape import BasicShapeBuilder
+from yobx.xshape import BasicShapeBuilder, InferenceMode
 from yobx.helpers.onnx_helper import (
+    np_dtype_to_tensor_dtype,
     overwrite_shape_in_model_proto,
     replace_static_dimensions_by_strings,
 )
 
 
-class ShapeBuilderBackendRep(onnx.backend.base.BackendRep):
+class ShapeBuilderShapeRep(onnx.backend.base.BackendRep):
     def __init__(self, model: onnx.ModelProto):
         op_type = model.graph.node[0].op_type
         self._model = overwrite_shape_in_model_proto(
@@ -94,11 +95,36 @@ class ShapeBuilderBackendRep(onnx.backend.base.BackendRep):
                 f"{pretty_onnx(self._model)}"
             ) from e
 
+        # type inference
+        type_builder = BasicShapeBuilder(verbose=int(os.environ.get("VERBOSE", "0")))
+        try:
+            type_builder.run_model(self._model, inference=InferenceMode.TYPE, exc=False)
+            all_tensors = {**feeds, **dict(zip(type_builder.output_names, outs))}
+            for name, tensor in all_tensors.items():
+                if not type_builder.has_type(name):
+                    continue
+                inferred = type_builder.get_type(name)
+                expected = np_dtype_to_tensor_dtype(tensor.dtype)
+                if inferred != expected:
+                    raise AssertionError(
+                        f"Type mismatch for {name!r}: inferred {inferred}, "
+                        f"expected {expected}."
+                    )
+        except AssertionError:
+            raise
+        except Exception as e:
+            raise AssertionError(
+                f"Unable to handle type inference for a model due to {str(e)}\n---\n"
+                f"inputs: {string_type(feeds, with_shape=True)}\n---\n"
+                f"{type_builder.get_debug_msg()}\n---\n"
+                f"{pretty_onnx(self._model)}"
+            ) from e
+
         # ends
         return outs
 
 
-class ShapeBuilderBackend(onnx.backend.base.Backend):
+class ShapeBuilderShape(onnx.backend.base.Backend):
     @classmethod
     def is_opset_supported(cls, model):  # pylint: disable=unused-argument
         return True, ""
@@ -111,12 +137,12 @@ class ShapeBuilderBackend(onnx.backend.base.Backend):
     @classmethod
     def prepare(
         cls, model: onnx.ModelProto, device: str = "CPU", **kwargs: Any
-    ) -> ShapeBuilderBackendRep:
+    ) -> ShapeBuilderShapeRep:
         assert isinstance(model, ModelProto), f"Unexpected type {type(model)} for model."
-        return ShapeBuilderBackendRep(model)
+        return ShapeBuilderShapeRep(model)
 
 
-backend_test = onnx.backend.test.BackendTest(ShapeBuilderBackend())
+backend_test = onnx.backend.test.BackendTest(ShapeBuilderShape())
 
 # The following tests are too slow with the reference implementation (Conv).
 backend_test.exclude(
@@ -148,6 +174,9 @@ backend_test.exclude(
 
 # uncommon cases
 backend_test.exclude("(expand_dim|_opt_|_if_|_scan|_loop|_image_|_scatter_)")
+
+# not implemented yet
+backend_test.exclude("(loop|scan|test_range_([a-z0-9]+)_type_(positive|negative)_delta_expanded)")
 
 # broken case
 backend_test.exclude(

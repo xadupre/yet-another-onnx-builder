@@ -56,12 +56,7 @@ from skl2onnx.common.data_types import FloatTensorType
 from yobx import doc
 from yobx.typing import GraphBuilderExtendedProtocol
 from yobx.sklearn import to_onnx, make_skl2onnx_converter
-from yobx.sklearn.skl2onnx_converter import (
-    MockContainer,
-    MockOperator,
-    MockScope,
-    MockVariable,
-)
+from yobx.sklearn.skl2onnx_converter import MockContainer, MockOperator, MockScope, MockVariable
 
 # %%
 # Option A — low-level custom converter

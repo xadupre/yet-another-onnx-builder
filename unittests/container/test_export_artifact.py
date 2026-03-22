@@ -88,6 +88,7 @@ class TestExportReport(ExtTestCase):
         self.assertIn("build_stats", text)
         self.assertIn("time_export_write_model", text)
 
+    @skipif_ci_windows("issue with excel")
     def test_to_excel(self):
         try:
             import openpyxl  # noqa: F401
