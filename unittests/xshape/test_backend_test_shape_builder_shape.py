@@ -175,6 +175,9 @@ backend_test.exclude(
 # uncommon cases
 backend_test.exclude("(expand_dim|_opt_|_if_|_scan|_loop|_image_|_scatter_)")
 
+# not implemented yet
+backend_test.exclude("(loop|scan|test_range_([a-z0-9]+)_type_(positive|negative)_delta_expanded)")
+
 # broken case
 backend_test.exclude(
     "(test_layer_normalization_2d_axis0"

@@ -14,6 +14,7 @@ _i1_o1_node_types = {
     "Clip",
     "Cos",
     "Cosh",
+    "CumProd",
     "CumSum",
     "DepthToSpace",
     "Elu",

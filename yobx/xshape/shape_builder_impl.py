@@ -803,12 +803,14 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         for i in graph.initializer:
             self.set_type(i.name, i.data_type)
         for i in graph.input:
+            if not i.name:
+                continue
             self._input_names.append(i.name)
             itype = i.type.tensor_type.elem_type if i.type.HasField("tensor_type") else 0
             if itype:
                 self.set_type(i.name, itype)
         for node in graph.node:
-            input_types = [self.get_type(n) for n in node.input]
+            input_types = [(self.get_type(n) if n else 0) for n in node.input]
             if functions and (node.domain, node.op_type) in functions:
                 func = functions[(node.domain, node.op_type)]
                 result = infer_types(func, input_types, exc=exc)
