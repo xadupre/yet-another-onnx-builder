@@ -96,7 +96,7 @@ class TestStatsHelper(ExtTestCase):
             self.assertIn("inputs", ns)
             self.assertIn("outputs", ns)
 
-    def test_reshape_zero_flops(self):
+    def test_reshape_flops(self):
         X = oh.make_tensor_value_info("X", TFLOAT, [4, 8])
         Z = oh.make_tensor_value_info("Z", TFLOAT, [32])
         shape = onh.from_array(np.array([32], dtype=np.int64), name="shape")
@@ -104,8 +104,8 @@ class TestStatsHelper(ExtTestCase):
         graph = oh.make_graph(nodes, "reshape_test", [X], [Z], [shape])
         model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 17)])
         stats = model_statistics(model)
-        self.assertEqual(stats["flops_per_op_type"]["Reshape"], 0)
-        self.assertEqual(stats["total_estimated_flops"], 0)
+        self.assertEqual(stats["flops_per_op_type"]["Reshape"], 32)
+        self.assertEqual(stats["total_estimated_flops"], 32)
 
     def test_gemm_flops(self):
         # Gemm [M,K] @ [K,N] + bias: 2*M*K*N + M*N
@@ -136,8 +136,8 @@ class TestStatsHelper(ExtTestCase):
         graph = oh.make_graph(nodes, "literal_test", [X], [Z], [reshape_shape, W])
         model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 17)])
         stats = model_statistics(model)
-        # Reshape is zero-cost; MatMul [1,32] @ [32,16] → 2*1*32*16 = 1024
-        self.assertEqual(stats["flops_per_op_type"]["Reshape"], 0)
+        # Reshape has data-movement cost (32 elements); MatMul [1,32] @ [32,16] → 2*1*32*16 = 1024
+        self.assertEqual(stats["flops_per_op_type"]["Reshape"], 32)
         self.assertEqual(stats["flops_per_op_type"]["MatMul"], 2 * 1 * 32 * 16)
 
     def test_model_statistics_class_node_count(self):
@@ -195,6 +195,36 @@ class TestStatsHelper(ExtTestCase):
         # MatMul [4,8] @ [8,16] → 2*4*8*16 = 1024
         self.assertEqual(stats["flops_per_op_type"]["MatMul"], 2 * 4 * 8 * 16)
         self.assertEqual(stats["total_estimated_flops"], 2 * 4 * 8 * 16)
+
+    def test_no_op_handler_returns_zero_except_identity(self):
+        """
+        Every registered op handler must return a non-zero cost for a fixed
+        non-empty input, except ``Identity`` which is the only allowed zero-cost op.
+        """
+        import onnx.helper as _oh
+        from yobx.xshape.cost_inference import _OP_HANDLERS
+
+        # A fixed non-empty shape used for all inputs.
+        _SHAPE = (4, 8)
+
+        def _shape_fn(name: str):
+            return _SHAPE
+
+        def _literal_fn(name: str):
+            return _SHAPE
+
+        zero_cost_ops = []
+        for op_type, handler in sorted(_OP_HANDLERS.items()):
+            node = _oh.make_node(op_type, inputs=["X"], outputs=["Y"])
+            result = handler(node, _shape_fn, _literal_fn)
+            if result == 0:
+                zero_cost_ops.append(op_type)
+
+        self.assertEqual(
+            zero_cost_ops,
+            ["Identity"],
+            f"Only Identity should have cost=0, but got: {zero_cost_ops}",
+        )
 
 
 if __name__ == "__main__":

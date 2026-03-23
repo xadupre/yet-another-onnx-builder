@@ -126,7 +126,9 @@ _REDUCE_OPS: frozenset = frozenset(
     }
 )
 
-_ZERO_COST_OPS: frozenset = frozenset(
+_ZERO_COST_OPS: frozenset = frozenset({"Identity"})
+
+_DATA_MOVEMENT_OPS: frozenset = frozenset(
     {
         "Cast",
         "CastLike",
@@ -138,7 +140,6 @@ _ZERO_COST_OPS: frozenset = frozenset(
         "Gather",
         "GatherElements",
         "GatherND",
-        "Identity",
         "OneHot",
         "Pad",
         "Reshape",
@@ -421,8 +422,21 @@ def _flops_rnn(
 def _flops_zero_cost(
     node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
 ) -> DIM_TYPE:
-    """Data movement ops: 0 FLOPs."""
+    """Identity op: 0 FLOPs."""
     return 0
+
+
+def _flops_data_movement(
+    node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
+) -> Optional[DIM_TYPE]:
+    """Data movement ops: element count of the first output (or first input)."""
+    if node.output:
+        s = _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
+        if s is not None:
+            return s
+    if node.input:
+        return _literal_size(_resolve_shape(node.input[0], shape_fn, literal_fn))
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -441,6 +455,8 @@ for _op in _REDUCE_OPS:
     _OP_HANDLERS[_op] = _flops_reduce
 for _op in _ZERO_COST_OPS:
     _OP_HANDLERS[_op] = _flops_zero_cost
+for _op in _DATA_MOVEMENT_OPS:
+    _OP_HANDLERS[_op] = _flops_data_movement
 
 _OP_HANDLERS.update(
     {
