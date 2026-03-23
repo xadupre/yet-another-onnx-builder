@@ -75,7 +75,12 @@ class ExportReport:
 
         :return: dictionary with keys ``"stats"`` and ``"extra"``.
         """
-        return {"stats": self.stats, "extra": self.extra, "build_stats": self.build_stats, "node_stats": self.node_stats}
+        return {
+            "stats": self.stats,
+            "extra": self.extra,
+            "build_stats": self.build_stats,
+            "node_stats": self.node_stats,
+        }
 
     def to_string(self) -> str:
         """Return a human-readable text summary of this report.
@@ -224,11 +229,7 @@ class ExportReport:
                 df_ns = pandas.DataFrame(self.node_stats)
                 df_ns.to_excel(writer, sheet_name="node_stats", index=False)
 
-    def compute_node_stats(
-        self,
-        model: "onnx.ModelProto",
-        verbose: int = 0,
-    ) -> "ExportReport":
+    def compute_node_stats(self, model: "onnx.ModelProto", verbose: int = 0) -> "ExportReport":
         """Compute per-op-type node counts and estimated FLOPs from *model*.
 
         Delegates to :func:`~yobx.helpers.stats_helper.model_statistics` for
@@ -274,11 +275,7 @@ class ExportReport:
         flops = result["flops_per_op_type"]
 
         rows = [
-            {
-                "op_type": op_type,
-                "count": counts[op_type],
-                "flops": flops.get(op_type),
-            }
+            {"op_type": op_type, "count": counts[op_type], "flops": flops.get(op_type)}
             for op_type in counts
         ]
         rows.sort(key=lambda r: -r["count"])
