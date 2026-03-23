@@ -45,6 +45,7 @@ records pandas-inspired operations on a virtual DataFrame and compiles them to O
 
 ```python
 import numpy as np
+from onnxruntime import InferenceSession
 from yobx.sql import dataframe_to_onnx
 from yobx.reference import ExtendedReferenceEvaluator
 
@@ -53,7 +54,7 @@ def transform(df):
     return df.select([(df["a"] + df["b"]).alias("total")])
 
 artifact = dataframe_to_onnx(transform, {"a": np.float32, "b": np.float32})
-ref = ExtendedReferenceEvaluator(artifact)
+ref = InferenceSession(artifact.SerializeToString(), providers=["CPUExecutionProvider"])
 (total,) = ref.run(None, {"a": np.array([1., -2., 3.], np.float32),
                            "b": np.array([4.,  5., 6.], np.float32)})
 # total == [5., 9.]

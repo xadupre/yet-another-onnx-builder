@@ -50,9 +50,10 @@ def convert_join_op(
     rk_2d = g.op.Unsqueeze(right_key_tensor, np.array([0], dtype=np.int64), name="join_rk2d")
     match_matrix = g.op.Equal(lk_2d, rk_2d, name="join_match")
 
-    # Cast bool → int32 to use ArgMax; pick the first matching right index
+    # Cast bool → int32 to use ArgMax; pick the first matching right index.
+    # keepdims=0 so that right_indices has shape (N,) rather than (N, 1).
     match_int = g.op.Cast(match_matrix, to=TensorProto.INT32, name="join_match_int")
-    right_indices = g.op.ArgMax(match_int, axis=1, name="join_ridx")
+    right_indices = g.op.ArgMax(match_int, axis=1, keepdims=0, name="join_ridx")
 
     # Filter left to rows that have at least one match
     any_match = g.op.ReduceMax(

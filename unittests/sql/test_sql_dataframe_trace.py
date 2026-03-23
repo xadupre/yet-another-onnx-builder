@@ -779,6 +779,142 @@ class TestDataframeToOnnx(ExtTestCase):
 
 
 # ---------------------------------------------------------------------------
+# Multiple-dataframe support
+# ---------------------------------------------------------------------------
+
+
+def _run_multi(func, dtypes_list, feeds):
+    """Trace *func* with a list of dtype dicts, convert to ONNX, run."""
+    artifact = dataframe_to_onnx(func, dtypes_list)
+    ref = ExtendedReferenceEvaluator(artifact)
+    ref_outputs = ref.run(None, feeds)
+    if has_onnxruntime():
+        ort_outputs = _ort_run(artifact, feeds)
+        assert len(ref_outputs) == len(ort_outputs)
+        for ro, oo in zip(ref_outputs, ort_outputs):
+            np.testing.assert_allclose(oo, ro, rtol=1e-5, atol=1e-6)
+    return ref_outputs
+
+
+class TestMultiDataframe(ExtTestCase):
+    """Tests for functions that accept multiple :class:`TracedDataFrame` arguments."""
+
+    # ------------------------------------------------------------------
+    # Basic multi-frame column access (no join)
+    # ------------------------------------------------------------------
+
+    def test_two_frames_add(self):
+        """Columns from two independent frames combined with +."""
+
+        def transform(df1, df2):
+            return df1.select([(df1["a"] + df2["b"]).alias("total")])
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = _run_multi(transform, [{"a": np.float32}, {"b": np.float32}], {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+
+    def test_two_frames_filter_and_select(self):
+        """Filter on df1 column, select combined expression."""
+
+        def transform(df1, df2):
+            filtered = df1.filter(df1["a"] > 0)
+            return filtered.select([(filtered["a"] + df2["b"]).alias("total")])
+
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = _run_multi(transform, [{"a": np.float32}, {"b": np.float32}], {"a": a, "b": b})
+        np.testing.assert_allclose(total, np.array([5.0, 9.0], dtype=np.float32))
+
+    def test_three_frames(self):
+        """Three independent frames, columns summed together."""
+
+        def transform(df1, df2, df3):
+            return df1.select([(df1["a"] + df2["b"] + df3["c"]).alias("total")])
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        c = np.array([10.0, 20.0, 30.0], dtype=np.float32)
+        (total,) = _run_multi(
+            transform,
+            [{"a": np.float32}, {"b": np.float32}, {"c": np.float32}],
+            {"a": a, "b": b, "c": c},
+        )
+        np.testing.assert_allclose(total, a + b + c)
+
+    def test_trace_dataframe_multi(self):
+        """trace_dataframe with a list of dtype dicts returns ParsedQuery."""
+
+        def transform(df1, df2):
+            return df1.select([(df1["x"] - df2["y"]).alias("diff")])
+
+        pq = trace_dataframe(transform, [{"x": np.float32}, {"y": np.float32}])
+        self.assertIsInstance(pq, ParsedQuery)
+
+    # ------------------------------------------------------------------
+    # Join two frames
+    # ------------------------------------------------------------------
+
+    def test_join_two_frames(self):
+        """Inner join on different key column names."""
+
+        def transform(df1, df2):
+            return df1.join(df2, left_key="cid", right_key="id")
+
+        cid = np.array([1, 2, 3], dtype=np.int64)
+        a = np.array([10.0, 20.0, 30.0], dtype=np.float32)
+        id_ = np.array([2, 3], dtype=np.int64)
+        b = np.array([200.0, 300.0], dtype=np.float32)
+
+        dtypes1 = {"cid": np.int64, "a": np.float32}
+        dtypes2 = {"id": np.int64, "b": np.float32}
+        artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
+        ref = ExtendedReferenceEvaluator(artifact)
+        cid_out, a_out, _id_out, b_out = ref.run(None, {"cid": cid, "a": a, "id": id_, "b": b})
+        # Rows where cid matches id: (cid=2,a=20), (cid=3,a=30)
+        np.testing.assert_array_equal(cid_out, np.array([2, 3], dtype=np.int64))
+        np.testing.assert_allclose(a_out, np.array([20.0, 30.0], dtype=np.float32))
+        np.testing.assert_allclose(b_out, np.array([200.0, 300.0], dtype=np.float32))
+
+    def test_join_with_select(self):
+        """Join two frames then select expressions involving both sides."""
+
+        def transform(df1, df2):
+            joined = df1.join(df2, left_key="cid", right_key="id")
+            return joined.select([(joined["a"] + joined["b"]).alias("sum_ab")])
+
+        cid = np.array([1, 2, 3], dtype=np.int64)
+        a = np.array([10.0, 20.0, 30.0], dtype=np.float32)
+        id_ = np.array([2, 3], dtype=np.int64)
+        b = np.array([200.0, 300.0], dtype=np.float32)
+
+        dtypes1 = {"cid": np.int64, "a": np.float32}
+        dtypes2 = {"id": np.int64, "b": np.float32}
+        artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
+        ref = ExtendedReferenceEvaluator(artifact)
+        (sum_ab,) = ref.run(None, {"cid": cid, "a": a, "id": id_, "b": b})
+        np.testing.assert_allclose(sum_ab, np.array([220.0, 330.0], dtype=np.float32))
+
+    # ------------------------------------------------------------------
+    # to_onnx dispatcher (callable path)
+    # ------------------------------------------------------------------
+
+    def test_to_onnx_multi_frame(self):
+        """to_onnx() correctly dispatches multi-frame callables."""
+        from yobx.sql import to_onnx
+
+        def transform(df1, df2):
+            return df1.select([(df1["a"] + df2["b"]).alias("total")])
+
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        artifact = to_onnx(transform, [{"a": np.float32}, {"b": np.float32}])
+        ref = ExtendedReferenceEvaluator(artifact)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+
+
+# ---------------------------------------------------------------------------
 # parsed_query_to_onnx
 # ---------------------------------------------------------------------------
 

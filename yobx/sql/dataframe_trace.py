@@ -65,6 +65,7 @@ from .parse import (
     Condition,
     FilterOp,
     GroupByOp,
+    JoinOp,
     Literal,
     ParsedQuery,
     SelectItem,
@@ -446,11 +447,8 @@ class TracedDataFrame:
         return TracedDataFrame(new_cols, list(self._ops), list(self._source_columns))
 
     def pipe(
-        self,
-        func: Callable[..., "TracedDataFrame"],  # noqa: UP037
-        *args: object,
-        **kwargs: object,
-    ) -> "TracedDataFrame":  # noqa: UP037
+        self, func: Callable[..., "TracedDataFrame"], *args: object, **kwargs: object
+    ) -> "TracedDataFrame":
         """Apply *func* to this frame (pandas ``pipe`` idiom).
 
         Equivalent to ``func(self, *args, **kwargs)``.  Useful for chaining
@@ -472,6 +470,48 @@ class TracedDataFrame:
         :return: the result of ``func(self, *args, **kwargs)``.
         """
         return func(self, *args, **kwargs)
+
+    def join(
+        self, right: "TracedDataFrame", left_key: str, right_key: str, join_type: str = "inner"
+    ) -> "TracedDataFrame":
+        """Record an equi-join with another :class:`TracedDataFrame`.
+
+        :param right: the right-hand :class:`TracedDataFrame` to join with.
+        :param left_key: column name from *this* (left) frame used in the join
+            predicate.
+        :param right_key: column name from *right* frame used in the join
+            predicate.
+        :param join_type: join type — ``'inner'`` (default), ``'left'``,
+            ``'right'``, or ``'full'``.
+        :return: a new :class:`TracedDataFrame` containing columns from both
+            sides with a :class:`~yobx.sql.parse.JoinOp` recorded.
+
+        Example::
+
+            import numpy as np
+            from yobx.sql.dataframe_trace import dataframe_to_onnx
+
+            def transform(df1, df2):
+                return df1.join(df2, left_key="cid", right_key="id")
+
+            dtypes1 = {"cid": np.int64, "a": np.float32}
+            dtypes2 = {"id": np.int64, "b": np.float32}
+            artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
+        """
+        join_op = JoinOp(
+            right_table="r", left_key=left_key, right_key=right_key, join_type=join_type
+        )
+        # Merge columns: left columns take priority on name collision.
+        merged_cols = dict(self._columns)
+        for name, series in right._columns.items():
+            if name not in merged_cols:
+                merged_cols[name] = series
+        new_ops = [*self._ops, join_op]
+        left_source_set = set(self._source_columns)
+        all_source_cols = list(self._source_columns) + [
+            col for col in right._source_columns if col not in left_source_set
+        ]
+        return TracedDataFrame(merged_cols, new_ops, all_source_cols)
 
     def groupby(self, by: Union[str, List[str]]) -> TracedGroupBy:
         """Begin a group-by aggregation.
@@ -514,25 +554,35 @@ class TracedDataFrame:
 
 
 def trace_dataframe(
-    func: Callable[[TracedDataFrame], TracedDataFrame],
-    input_dtypes: Dict[str, Union[np.dtype, type, str]],
+    func: Callable,
+    input_dtypes: Union[
+        Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]
+    ],
 ) -> ParsedQuery:
     """Trace *func* and return the equivalent :class:`~yobx.sql.parse.ParsedQuery`.
 
-    Constructs a :class:`TracedDataFrame` whose columns correspond to
-    *input_dtypes*, calls *func* with it, and converts the resulting frame's
-    recorded operations into a :class:`~yobx.sql.parse.ParsedQuery`.
+    Constructs one or more :class:`TracedDataFrame` objects whose columns
+    correspond to *input_dtypes*, calls *func* with them, and converts the
+    resulting frame's recorded operations into a
+    :class:`~yobx.sql.parse.ParsedQuery`.
 
-    :param func: a callable that accepts a :class:`TracedDataFrame` and returns
-        a :class:`TracedDataFrame`.  The function may apply any combination of
-        ``filter``, ``select``, arithmetic on columns, and aggregations.
-    :param input_dtypes: mapping from source column name to numpy dtype.  The
-        dtypes are not used during tracing itself; they are used only when the
-        returned query is subsequently compiled to ONNX.
+    :param func: a callable that accepts one or more :class:`TracedDataFrame`
+        objects and returns a :class:`TracedDataFrame`.  The function may apply
+        any combination of ``filter``, ``select``, arithmetic on columns,
+        ``join``, and aggregations.
+    :param input_dtypes: either
+
+        * a single ``{column: dtype}`` mapping — *func* is called with one
+          :class:`TracedDataFrame`; or
+        * a **list** of ``{column: dtype}`` mappings — *func* is called with
+          one :class:`TracedDataFrame` per mapping, in order.
+
+        The dtypes are not used during tracing itself; they are used only when
+        the returned query is subsequently compiled to ONNX.
     :return: a :class:`~yobx.sql.parse.ParsedQuery` representing the operations
         performed by *func*.
 
-    Example::
+    Example — single dataframe::
 
         import numpy as np
         from yobx.sql.dataframe_trace import trace_dataframe
@@ -546,10 +596,29 @@ def trace_dataframe(
             print(type(op).__name__, "—", op)
         # FilterOp — FilterOp(condition=Condition(left=ColumnRef(column='a', ...
         # SelectOp — SelectOp(items=[SelectItem(expr=BinaryExpr(...), alias='total')], ...
+
+    Example — two dataframes::
+
+        import numpy as np
+        from yobx.sql.dataframe_trace import trace_dataframe
+
+        def transform(df1, df2):
+            return df1.select([(df1["a"] + df2["b"]).alias("total")])
+
+        pq = trace_dataframe(transform, [{"a": np.float32}, {"b": np.float32}])
     """
-    columns = {name: TracedSeries(ColumnRef(name)) for name in input_dtypes}
-    df = TracedDataFrame(columns, source_columns=list(input_dtypes.keys()))
-    result = func(df)
+    if isinstance(input_dtypes, list):
+        dfs = [
+            TracedDataFrame(
+                {name: TracedSeries(ColumnRef(name)) for name in d}, source_columns=list(d.keys())
+            )
+            for d in input_dtypes
+        ]
+        result = func(*dfs)
+    else:
+        columns = {name: TracedSeries(ColumnRef(name)) for name in input_dtypes}
+        df = TracedDataFrame(columns, source_columns=list(input_dtypes.keys()))
+        result = func(df)
     if not isinstance(result, TracedDataFrame):
         raise TypeError(
             f"trace_dataframe: function must return a TracedDataFrame, "
@@ -559,8 +628,10 @@ def trace_dataframe(
 
 
 def dataframe_to_onnx(
-    func: Callable[[TracedDataFrame], TracedDataFrame],
-    input_dtypes: Dict[str, Union[np.dtype, type, str]],
+    func: Callable,
+    input_dtypes: Union[
+        Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]
+    ],
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
@@ -572,9 +643,20 @@ def dataframe_to_onnx(
     Combines :func:`trace_dataframe` and
     :func:`~yobx.sql.sql_convert.parsed_query_to_onnx` into a single call.
 
-    :param func: a callable that accepts a :class:`TracedDataFrame` and returns
-        a :class:`TracedDataFrame`.
-    :param input_dtypes: mapping from source column name to numpy dtype.
+    :param func: a callable that accepts one or more :class:`TracedDataFrame`
+        objects and returns a :class:`TracedDataFrame`.
+    :param input_dtypes: either
+
+        * a single ``{column: dtype}`` mapping — *func* is called with one
+          :class:`TracedDataFrame`; or
+        * a **list** of ``{column: dtype}`` mappings — *func* is called with
+          one :class:`TracedDataFrame` per mapping, in order.  When the traced
+          function contains a :class:`~yobx.sql.parse.JoinOp`, the first
+          mapping is used as the *left-table* dtypes and the second as the
+          *right-table* dtypes.  For functions that simply share columns
+          across multiple frames without a join, all mappings are merged into
+          a single input-dtype dict.
+
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
     :param custom_functions: optional mapping from function name to Python
@@ -590,7 +672,7 @@ def dataframe_to_onnx(
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
-    Example::
+    Example — single dataframe::
 
         import numpy as np
         from yobx.sql.dataframe_trace import dataframe_to_onnx
@@ -608,8 +690,61 @@ def dataframe_to_onnx(
         b = np.array([4.0,  5.0, 6.0], dtype=np.float32)
         (total,) = ref.run(None, {"a": a, "b": b})
         # total == array([5., 9.], dtype=float32)  (rows where a > 0)
+
+    Example — two independent dataframes (no join)::
+
+        import numpy as np
+        from yobx.sql.dataframe_trace import dataframe_to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        def transform(df1, df2):
+            return df1.select([(df1["a"] + df2["b"]).alias("total")])
+
+        artifact = dataframe_to_onnx(transform, [{"a": np.float32}, {"b": np.float32}])
+
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        # total == array([5., 7., 9.], dtype=float32)
+
+    Example — two dataframes joined on a key column::
+
+        import numpy as np
+        from yobx.sql.dataframe_trace import dataframe_to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        def transform(df1, df2):
+            return df1.join(df2, left_key="cid", right_key="id")
+
+        dtypes1 = {"cid": np.int64, "a": np.float32}
+        dtypes2 = {"id": np.int64, "b": np.float32}
+        artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
     """
     pq = trace_dataframe(func, input_dtypes)
+    if isinstance(input_dtypes, list):
+        has_join = any(isinstance(op, JoinOp) for op in pq.operations)
+        if has_join:
+            left_dtypes: Dict[str, Union[np.dtype, type, str]] = input_dtypes[0]
+            right_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = (
+                input_dtypes[1] if len(input_dtypes) > 1 else None
+            )
+        else:
+            # Merge all dtype dicts — columns come from a flat table.
+            left_dtypes = {}
+            for d in input_dtypes:
+                left_dtypes.update(d)
+            right_dtypes = None
+        return parsed_query_to_onnx(
+            pq,
+            left_dtypes,
+            right_input_dtypes=right_dtypes,
+            target_opset=target_opset,
+            custom_functions=custom_functions,
+            builder_cls=builder_cls,
+            filename=filename,
+            verbose=verbose,
+        )
     return parsed_query_to_onnx(
         pq,
         input_dtypes,
