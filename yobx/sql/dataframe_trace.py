@@ -611,10 +611,7 @@ class TracedDataFrame:
         """
         ops = list(self._ops)
         if not any(isinstance(op, SelectOp) for op in ops):
-            items = [
-                SelectItem(series._expr, alias=col)
-                for col, series in self._columns.items()
-            ]
+            items = [SelectItem(series._expr, alias=col) for col, series in self._columns.items()]
             ops.append(SelectOp(items=items))
         columns = _collect_columns(ops)
         return ParsedQuery(operations=ops, from_table="t", columns=columns)

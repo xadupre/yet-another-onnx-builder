@@ -34,7 +34,6 @@ def to_onnx(
     input_dtypes: Union[
         Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]
     ],
-    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
@@ -80,10 +79,6 @@ def to_onnx(
         For SQL queries this maps *left-table* columns; for a ``LazyFrame``
         it maps the source DataFrame columns referenced in the plan.  Only
         columns that actually appear in the query / plan need to be listed.
-    :param right_input_dtypes: if *dataframe_or_query* is a SQL string that
-        contains a ``JOIN``, a mapping from *right-table* column name to numpy
-        dtype.  Defaults to *input_dtypes* when ``None``.  Ignored when
-        *dataframe_or_query* is a callable or a :class:`polars.LazyFrame`.
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
     :param custom_functions: an optional mapping from function name (as it
@@ -191,7 +186,6 @@ def to_onnx(
         return sql_to_onnx(
             dataframe_or_query,
             input_dtypes,  # type: ignore
-            right_input_dtypes=right_input_dtypes,
             target_opset=target_opset,
             custom_functions=custom_functions,
             builder_cls=builder_cls,
