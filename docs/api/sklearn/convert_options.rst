@@ -1,6 +1,7 @@
-yobx.sklearn.ConvertOptions
-===========================
+yobx.sklearn.convert_options
+============================
 
-.. autoclass:: yobx.sklearn.ConvertOptions
+.. automodule:: yobx.sklearn.convert_options
     :members:
     :undoc-members:
+    :exclude-members: ConvertOptions
