@@ -634,10 +634,10 @@ class TestSklearnToOnnxTupleSpec(ExtTestCase):
 @requires_sklearn("1.4")
 @requires_pandas()
 class TestSklearnToOnnxDataFrame(ExtTestCase):
-    """Tests that to_onnx accepts pandas DataFrames as input descriptors."""
+    """Tests that to_onnx exposes each DataFrame column as a separate ONNX input."""
 
     def test_standard_scaler_dataframe(self):
-        """DataFrame with uniform float32 dtype is accepted as input to to_onnx."""
+        """Each column of a float32 DataFrame becomes a separate 1-D ONNX graph input."""
         import pandas as pd
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -647,20 +647,24 @@ class TestSklearnToOnnxDataFrame(ExtTestCase):
 
         onx = to_onnx(ss, (df,))
 
-        # Input should be registered as a 2-D float32 tensor.
-        inp = onx.proto.graph.input[0]
-        self.assertEqual(inp.type.tensor_type.elem_type, 1)  # FLOAT = 1
-        shape = inp.type.tensor_type.shape
-        self.assertEqual(shape.dim[1].dim_value, 2)
+        # ONNX graph should have two 1-D float32 inputs named after the columns.
+        graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
+        self.assertIn("a", graph_inputs)
+        self.assertIn("b", graph_inputs)
+        for col in ("a", "b"):
+            inp = graph_inputs[col]
+            self.assertEqual(inp.type.tensor_type.elem_type, 1)  # FLOAT = 1
+            shape = inp.type.tensor_type.shape
+            self.assertEqual(len(shape.dim), 1)  # 1-D column
 
-        # Numerical output should match sklearn.
+        # Numerical output should match sklearn when feeding per-column 1-D arrays.
         ref = ExtendedReferenceEvaluator(onx)
-        result = ref.run(None, {"X": X})[0]
-        expected = ss.transform(X).astype(np.float32)
+        result = ref.run(None, {"a": X[:, 0], "b": X[:, 1]})[0]
+        expected = ss.transform(df).astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-5)
 
     def test_standard_scaler_dataframe_float64(self):
-        """DataFrame with float64 dtype is accepted and produces a float64 ONNX input."""
+        """DataFrame with float64 dtype exposes 1-D float64 ONNX inputs per column."""
         import pandas as pd
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float64)
@@ -670,8 +674,11 @@ class TestSklearnToOnnxDataFrame(ExtTestCase):
 
         onx = to_onnx(ss, (df,))
 
-        inp = onx.proto.graph.input[0]
-        self.assertEqual(inp.type.tensor_type.elem_type, 11)  # DOUBLE = 11
+        graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
+        self.assertIn("a", graph_inputs)
+        self.assertIn("b", graph_inputs)
+        for col in ("a", "b"):
+            self.assertEqual(graph_inputs[col].type.tensor_type.elem_type, 11)  # DOUBLE = 11
 
     def test_pipeline_dataframe(self):
         """DataFrame works as input to to_onnx for a Pipeline (scaler + LR)."""
@@ -685,8 +692,13 @@ class TestSklearnToOnnxDataFrame(ExtTestCase):
 
         onx = to_onnx(pipe, (df,))
 
+        # ONNX graph should have per-column inputs.
+        graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
+        self.assertIn("a", graph_inputs)
+        self.assertIn("b", graph_inputs)
+
         ref = ExtendedReferenceEvaluator(onx)
-        label, _ = ref.run(None, {"X": X})
+        label, _ = ref.run(None, {"a": X[:, 0], "b": X[:, 1]})
         expected = pipe.predict(df)
         self.assertEqualArray(expected, label)
 
