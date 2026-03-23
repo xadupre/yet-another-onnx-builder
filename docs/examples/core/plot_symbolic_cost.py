@@ -239,10 +239,7 @@ def _aggregate(cost_list):
 agg_before = _aggregate(cost_concrete_before)
 agg_after = _aggregate(cost_concrete_after)
 
-# Keep only ops with non-zero FLOPs in either model
-all_ops = sorted(
-    op for op in set(agg_before) | set(agg_after) if agg_before.get(op, 0) or agg_after.get(op, 0)
-)
+all_ops = sorted(op for op in set(agg_before) | set(agg_after))
 
 vals_before = [agg_before.get(op, 0) for op in all_ops]
 vals_after = [agg_after.get(op, 0) for op in all_ops]
