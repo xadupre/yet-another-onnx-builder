@@ -2070,15 +2070,10 @@ class DynamoInterpreter:
                                 # A new shape may be given to a result.
                                 self.builder.add_dynamic_object(expr, t, parse=True)
 
-                    if self.builder.is_dynamic_shape(shape) or (
-                        self._has_torch
-                        and any(isinstance(t, self.torch.SymInt) for t in shape)
-                    ):
+                    if self.builder.is_dynamic_shape(shape):
                         # sets shape coming from the original model
                         # we must not set the existing shape as static,
                         # if it was dynamic before
-                        # Note: set_shape internally converts SymInts to strings via
-                        # verify_shape, so passing SymInt shapes is safe here.
                         self.builder.set_shape(
                             r,
                             shape,
@@ -2545,6 +2540,20 @@ class DynamoInterpreter:
 
             self.builder._check_constants("before-make_nodes")
 
+            # Pre-register output shapes from the inner builder BEFORE make_nodes.
+            # This prevents set_shape_type_custom (called inside make_node during
+            # make_nodes) from locking in an incorrect shape computed by re-running
+            # infer_shapes on a shared function builder (e.g. when q_proj and k_proj
+            # share the same "Linear" function but have different output sizes due to
+            # GQA). Once the correct shape is set here, the set_shape call inside
+            # set_shape_type_custom becomes a silent no-op.
+            if len(output_names) == len(builder.outputs):
+                for _name, _out_name in zip(builder.output_names, output_names):
+                    if builder.has_shape(_name):
+                        _existing = builder.get_shape(_name)
+                        self.builder.register_dynamic_objects_from_shape(_existing)
+                        self.builder.set_shape(_out_name, _existing)
+
             # let's create a function under the appropriate name
             prefix = f"_sub_IM_{node.name}__"
             self.builder.make_nodes(
@@ -2567,33 +2576,20 @@ class DynamoInterpreter:
 
             self.builder._check_constants("after-make_nodes")
 
-            # Set shape/type from node.meta["val"] first (authoritative source from
-            # torch.export), then fall back to the inner builder's propagated shapes.
-            # This ordering ensures that for InterpreterModules where the inner builder
-            # may compute a shape based on mismatched SymInt aliases, the metadata shape
-            # takes precedence and the inner builder shape is used only as a fallback.
-            self._set_shape_and_type(
-                node,
-                output_names[0] if len(output_names) == 1 else tuple(output_names),
-                allow_new_dynamic_dimension=True,
-            )
-
             if len(output_names) == len(builder.outputs):
                 # One output, both tensor
                 for name, out_name in zip(builder.output_names, output_names):
-                    if builder.has_type(name) and not self.builder.has_type(out_name):
+                    if builder.has_type(name):
                         self.builder.set_type(out_name, builder.get_type(name))
-                    if builder.has_device(name) and not self.builder.has_device(out_name):
+                    if builder.has_device(name):
                         self.builder.set_device(out_name, builder.get_device(name))
                     if builder.has_shape(name):
                         existing_shape = builder.get_shape(name)
                         # We need to move any dynamic objects necessary from the submodules
                         # to the parent module.
                         self.builder.register_dynamic_objects_from_shape(existing_shape)
-                        # set_shape with set_if_more_precise=False (default) will not
-                        # override a shape that was already set by _set_shape_and_type above.
                         self.builder.set_shape(out_name, existing_shape)
-                    elif builder.has_rank(name) and not self.builder.has_rank(out_name):
+                    elif builder.has_rank(name):
                         self.builder.set_rank(out_name, builder.get_rank(name))
             elif len(output_names) == 1 and len(builder.outputs) > 1:
                 # The module outputs more than one output
@@ -2613,6 +2609,11 @@ class DynamoInterpreter:
                     f"{builder.get_debug_msg()}\n--\n--\n--"
                     f"{self.builder.get_debug_msg()}\n------\n"
                 )
+            self._set_shape_and_type(
+                node,
+                output_names[0] if len(output_names) == 1 else tuple(output_names),
+                allow_new_dynamic_dimension=True,
+            )
             return output_names
 
         prefix = f"_sub_ime__{node.name}_"
