@@ -1,8 +1,7 @@
-import contextlib
 import os
 import pprint
 from enum import IntEnum
-from typing import Any, Dict, Generator, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import onnx
 import onnx.numpy_helper as onh
@@ -14,7 +13,7 @@ from ..xexpressions import simplify_expression
 from ..xexpressions.operations import DIM_TYPE
 from ..xexpressions.rename_expressions import parse_expression_tokens
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape
-from ._builder_runtime import _BuilderRuntime
+from ._builder_runtime import _BuilderRuntime, _ExtraPackages
 from ._shape_runtime import _ShapeRuntime
 from ._inference_runtime import _InferenceRuntime, _OptimizationOptions
 from .shape_builder import ShapeBuilder
@@ -37,17 +36,12 @@ class InferenceMode(IntEnum):
     NOTHING = 0
     SHAPE = 1
     TYPE = 2
+    COST = 16
 
 
-@contextlib.contextmanager
-def _maybe_disable_fake_tensor_mode() -> Generator:
-    try:
-        yield
-    finally:
-        pass
-
-
-class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
+class BasicShapeBuilder(
+    ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPackages
+):
     """
     Implements a basic class doing shape inference in an ONNX model.
 
@@ -62,6 +56,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
     """
 
     def __init__(self, verbose: int = 0, opset: Optional[int] = None):
+        _ExtraPackages.__init__(self)
         self.verbose = verbose
         self._input_names = []
         self._output_names = []
@@ -91,23 +86,6 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         self.main_opset = self.opsets[""]
         self.time_evaluation_constants_ = 0
         self.optimization_options = _OptimizationOptions()
-
-        self.maybe_disable_fake_tensor_mode = contextlib.nullcontext
-        if os.environ.get("NOTORCH", "0") in ("1", "true"):
-            self._has_torch = False
-            self.torch = None
-        else:
-            try:
-                import torch
-                import torch._subclasses
-
-                self._has_torch = True
-                self.torch = torch
-                self.torch_subclasses = torch._subclasses
-                self.maybe_disable_fake_tensor_mode = _maybe_disable_fake_tensor_mode
-            except (NameError, ImportError, AttributeError):
-                self._has_torch = False
-                self.torch = None
 
     @property
     def input_names(self) -> List[str]:
@@ -687,11 +665,14 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             rows.append("--NOCALLS--")
         return "\n".join(rows)
 
-    def run_node(self, node: onnx.NodeProto, exc: bool = False):
+    def run_node(self, node: onnx.NodeProto, exc: bool = False, cost: bool = True):
         """
         Uses shapes availables in the ShapeBuilder to infer the output shapes
         and types.
         """
+        if cost:
+            self.run_node(node, exc=exc, cost=False)
+            return self.estimate_node_flops(node)
         if node.op_type == "Constant" and node.domain == "":
             self.set_constant(node.output[0], node)
             self.simple_update_value_shape_with_node(node)
@@ -773,6 +754,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         if inference == InferenceMode.TYPE:
             self._run_model_type_inference(graph, functions=functions, exc=exc)
         else:
+            res = []
             for i in graph.initializer:
                 self.set_constant(i.name, i)
             for i in graph.sparse_initializer:
@@ -780,9 +762,22 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             for i in graph.input:
                 self.run_value_info(i, True)
             for node in graph.node:
-                self.run_node(node, exc=exc)
+                r = self.run_node(node, exc=exc, cost=inference == InferenceMode.COST)
+                if inference == InferenceMode.COST:
+                    res.append(
+                        (
+                            node.op_type,
+                            r,
+                            tuple(
+                                self.get_shape(i) if i and self.has_shape(i) else "?"
+                                for i in node.input
+                            ),
+                        )
+                    )
             for i in graph.output:
                 self.run_value_info(i, False)
+            if inference == InferenceMode.COST:
+                return res
 
     def _run_model_type_inference(
         self,
@@ -838,6 +833,54 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
     def get_registered_constraints(self):
         """Returns the constraints registered so far."""
         return self.constraints_
+
+    def evaluate_cost_with_true_inputs(
+        self,
+        feeds: Dict[str, np.ndarray],
+        cost: List[Tuple[str, Optional[DIM_TYPE], Tuple]],
+        exc: bool = False,
+    ) -> List[Tuple[str, Optional[int], Tuple]]:
+        """
+        Evaluates symbolic FLOPs expressions in *cost* using actual tensor
+        shapes from *feeds*.
+
+        When :meth:`run_model` is called with ``InferenceMode.COST`` on a
+        model that has symbolic (dynamic) input shapes, the returned FLOPs
+        values may be symbolic expressions (strings such as
+        ``"(DIM1)*(DIM2)*(3)"``).  This method substitutes the true dimension
+        values extracted from *feeds* to produce concrete integer FLOPs.
+
+        :param feeds: mapping ``{name: array}`` of actual input tensors
+        :param cost: list of ``(op_type, flops, input_shapes)`` tuples as
+            returned by ``run_model(..., inference=InferenceMode.COST)``
+        :param exc: if ``True``, re-raise any evaluation error; otherwise the
+            FLOPs entry is set to ``None`` for that node
+        :return: list of ``(op_type, evaluated_flops, input_shapes)`` tuples
+        """
+        from ..xexpressions.evaluate_expressions import evaluate_expression
+
+        # Build a symbol-name → integer-value mapping by comparing the
+        # symbolic shapes stored in this builder for the model inputs against
+        # the actual shapes of the tensors in *feeds*.
+        context: Dict[str, int] = {}
+        for name, array in feeds.items():
+            if not self.has_shape(name):
+                continue
+            symbolic_shape = self.get_shape(name)
+            actual_shape = array.shape
+            for sym, val in zip(symbolic_shape, actual_shape):
+                if isinstance(sym, str):
+                    context[sym] = int(val)
+
+        result: List[Tuple[str, Optional[int], Tuple]] = []
+        for op_type, flops, input_shapes in cost:
+            if flops is None or isinstance(flops, int):
+                result.append((op_type, flops, input_shapes))
+                continue
+            # flops is a symbolic string expression — evaluate it.
+            evaluated = evaluate_expression(flops, context)
+            result.append((op_type, evaluated, input_shapes))
+        return result
 
     def estimate_node_flops(self, node: onnx.NodeProto) -> Optional[DIM_TYPE]:
         """

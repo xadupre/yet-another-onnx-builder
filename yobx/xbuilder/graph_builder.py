@@ -79,7 +79,7 @@ from ..xshape.shape_type_compute import (
     set_shape_type_custom,
     set_type_shape_unary_op,
 )
-from ..xshape._builder_runtime import _BuilderRuntime
+from ..xshape._builder_runtime import _BuilderRuntime, _ExtraPackages
 from ..xshape._shape_runtime import _ShapeRuntime
 from ..xshape._inference_runtime import _InferenceRuntime
 from .graph_builder_opset import Opset
@@ -115,7 +115,7 @@ def _unset_fake_temporarily() -> Generator:
             torch._C._set_dispatch_mode(old)
 
 
-class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
+class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPackages):
     """
     Simplifies the creation of a model.
 
@@ -286,35 +286,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         _parent: Optional[Union["GraphBuilder", Tuple["GraphBuilder", NodeProto]]] = None,
         convert_options: Optional[ConvertOptionsProtocol] = None,
     ):
-        self.maybe_disable_fake_tensor_mode = contextlib.nullcontext
-        if os.environ.get("NOTORCH", "0") in ("1", "true"):
-            self._has_torch = False
-            self.torch = None
-        else:
-            try:
-                import torch
-                import torch._subclasses
-
-                self._has_torch = True
-                self.torch = torch
-                self.torch_subclasses = torch._subclasses
-                self.maybe_disable_fake_tensor_mode = _unset_fake_temporarily  # type: ignore
-            except (NameError, ImportError, AttributeError):
-                self._has_torch = False
-                self.torch = None
-
-        if os.environ.get("NOTF", "0") in ("1", "true"):
-            self._has_tensorflow = False
-            self.tensorflow = None
-        else:
-            try:
-                import tensorflow
-
-                self._has_tensorflow = bool(tensorflow.__version__)
-                self.tensorflow = tensorflow
-            except (ImportError, AttributeError):
-                self._has_tensorflow = False
-                self.tensorflow = None
+        _ExtraPackages.__init__(self)
 
         from . import TEMPLATE_TYPE
 
@@ -864,8 +836,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             if value.dtype == self.torch.int64 and value.numel() < 8:  # type: ignore
                 return self.make_key(value.detach().cpu().numpy())
             return None
-        if self._has_tensorflow and isinstance(
-            value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+        if (
+            hasattr(value, "ref")
+            and self._has_tensorflow
+            and isinstance(
+                value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+            )
         ):
             return None
         return None
@@ -1441,8 +1417,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 )
             return v
 
-        if self._has_tensorflow and isinstance(
-            value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+        if (
+            hasattr(value, "ref")
+            and self._has_tensorflow
+            and isinstance(
+                value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+            )
         ):
             raw = value.numpy()
             # Ensure we always return an ndarray (not a numpy scalar)
@@ -1648,6 +1628,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             return value
         if hasattr(value, "node") and isinstance(value.node, str):
             return f"{value.node}"
+        if not self._has_torch:
+            raise AssertionError(f"Unable to convert {value!r} into string")
 
         from torch.fx.experimental.sym_node import SymNode
 
@@ -1706,11 +1688,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 if isinstance(d1, self.torch.SymInt):  # type: ignore
                     d1 = self._torch_sym_int_to_str(d1)
                 elif isinstance(d1, self.torch.export.dynamic_shapes._Dim):  # type: ignore
-                    d1 = self._torch_sym_int_to_str(d1)
+                    d1 = self._torch_sym_int_to_str(d1)  # type: ignore
                 if isinstance(d2, self.torch.SymInt):  # type: ignore
                     d2 = self._torch_sym_int_to_str(d2)
                 elif isinstance(d2, self.torch.export.dynamic_shapes._Dim):  # type: ignore
-                    d2 = self._torch_sym_int_to_str(d2)
+                    d2 = self._torch_sym_int_to_str(d2)  # type: ignore
 
             if isinstance(d1, (int, str)) and isinstance(d2, (int, str)):
                 if d1 == d2:
@@ -2682,8 +2664,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 f"Shape {value.shape} does not match the registered one {self.get_shape(name)} "
                 f"for name {name!r}{self.get_debug_msg()}"
             )
-        elif self._has_tensorflow and isinstance(
-            value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+        elif (
+            hasattr(value, "ref")
+            and self._has_tensorflow
+            and isinstance(
+                value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+            )
         ):
             # TensorFlow tensor/variable — keep as-is, convert to numpy at export time
             tf_shape = tuple(value.shape.as_list())
@@ -2726,7 +2712,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             shape = tuple(value.dims)
         else:
             itype = _get_type(value.dtype)
-            shape = tuple(value.shape)
+            shape = tuple(value.shape)  # type: ignore
 
         if name == "" or give_unique_name:
             if name:
@@ -2738,8 +2724,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 ), f"value {name!r} is not a Tensor but {type(value)}"
                 if hasattr(value, "detach"):
                     size = int(np.prod(value.size()))  # type: ignore
-                elif self._has_tensorflow and isinstance(
-                    value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+                elif (
+                    hasattr(value, "ref")
+                    and self._has_tensorflow
+                    and isinstance(
+                        value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+                    )
                 ):
                     size = int(np.prod(shape)) if shape else 0
                 else:
@@ -4785,8 +4775,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             shape = self.get_shape(k)
             vshape = v.shape if hasattr(v, "shape") else tuple(v.dims)  # TensorProto
             # Normalize TF TensorShape to a plain Python tuple for safe comparison
-            if self._has_tensorflow and isinstance(
-                v, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+            if (
+                hasattr(v, "ref")
+                and self._has_tensorflow
+                and isinstance(
+                    v, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+                )
             ):
                 vshape = tuple(v.shape.as_list())
             assert not is_static_shape(shape) or shape == vshape, (
@@ -4795,12 +4789,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 f"{self.get_debug_msg()}"
             )
             shape = vshape
-            size = np.prod(shape) * self.elem_size(itype)
+            size = int(np.prod(shape)) * self.elem_size(itype)  # type: ignore
             if size < external_threshold:
                 new_inits[k] = v
             else:
                 location = f"#{k}"
-                nt = make_large_tensor_proto(location, k, itype, shape)
+                nt = make_large_tensor_proto(location, k, itype, shape)  # type: ignore
                 nt.doc_string += doc_string
                 new_inits[k] = nt
                 large_inits[location] = v
@@ -4908,8 +4902,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                     initializer.append(t)
                     continue
                 else:
-                    if self._has_tensorflow and isinstance(
-                        v, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+                    if (
+                        hasattr(v, "ref")
+                        and self._has_tensorflow
+                        and isinstance(
+                            v, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+                        )
                     ):
                         # TF tensor/variable — convert to numpy at export time
                         np_v = v.numpy()
@@ -4995,8 +4993,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 t.doc_string += doc_string
                 res.append(t)
                 continue
-            if self._has_tensorflow and isinstance(
-                v, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+            if (
+                hasattr(v, "ref")
+                and self._has_tensorflow
+                and isinstance(
+                    v, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
+                )
             ):
                 # TF tensor/variable — convert to numpy at export time
                 np_v = v.numpy()

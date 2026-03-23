@@ -1014,7 +1014,11 @@ def to_onnx(
         interpreter.register_named_modules(
             None, export_modules_as_functions, dict(mod.named_modules())
         )
-        if isinstance(graph_module, builder.torch.export.ExportedProgram):
+        if (
+            graph_module.__class__.__name__ == "ExportedProgram"
+            and builder._has_torch
+            and isinstance(graph_module, builder.torch.export.ExportedProgram)
+        ):
             if verbose > 1:
                 disp = sorted(
                     (c if isinstance(c, str) else getattr(c, "__name__", str(c)))
@@ -1028,7 +1032,11 @@ def to_onnx(
             add_stats["time_export_unflatten"] = time.perf_counter() - a
 
     if filename:
-        if isinstance(graph_module, builder.torch.export.ExportedProgram):
+        if (
+            graph_module.__class__.__name__ == "ExportedProgram"
+            and builder._has_torch
+            and isinstance(graph_module, builder.torch.export.ExportedProgram)
+        ):
             filename_root = os.path.splitext(filename)[0]
             ep_filename = f"{filename_root}.txt.ep"
             with open(ep_filename, "w") as f:
@@ -1036,7 +1044,11 @@ def to_onnx(
             ep_filename = f"{filename_root}.txt.ep.graph"
             with open(ep_filename, "w") as f:
                 f.write(str(graph_module.graph))
-        elif isinstance(graph_module, builder.torch.export.UnflattenedModule):
+        elif (
+            graph_module.__class__.__name__ == "UnflattenedModule"
+            and builder._has_torch
+            and isinstance(graph_module, builder.torch.export.UnflattenedModule)
+        ):
             filename_root = os.path.splitext(filename)[0]
             ep_filename = f"{filename_root}.txt.ep.unflat.graph"
             with open(ep_filename, "w") as f:
