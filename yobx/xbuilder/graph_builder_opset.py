@@ -152,27 +152,6 @@ class Opset:
             ), f"Wrong inputs for operator {op_type!r}: {inputs!r}"
             if isinstance(i, str):
                 new_inputs.append(i)
-            elif self.builder._has_tensorflow and isinstance(  # type: ignore[attr-defined]
-                i, (self.builder.tensorflow.Tensor, self.builder.tensorflow.Variable)  # type: ignore
-            ):  # type: ignore[attr-defined]
-                # TensorFlow tensor/variable — register as initializer, convert at export time
-                tf_shape = tuple(i.shape.as_list())
-                has_zero = 0 in tf_shape
-                cst_name = self.builder.make_initializer(
-                    "",
-                    i,
-                    msg=f"tf tensor input of op_type={op_type!r}",
-                    source="Opset.make_node/TF",
-                    allow_empty=allow_empty_shape or has_zero,
-                )
-                new_inputs.append(cst_name)
-            elif hasattr(i, "name") and not hasattr(i, "detach"):
-                # torch.fx.Node
-                assert i.name is not None, f"Unexpected name for type {type(i)}"
-                new_inputs.append(i.name)
-            elif i is None:
-                # Optional input
-                new_inputs.append("")
             elif isinstance(i, np.ndarray):
                 assert (
                     allow_empty_shape
@@ -198,6 +177,31 @@ class Opset:
                     allow_empty=allow_empty_shape or i.size == 0,
                 )
                 new_inputs.append(cst_name)
+            elif hasattr(i, "name") and not hasattr(i, "detach"):
+                # torch.fx.Node
+                assert i.name is not None, f"Unexpected name for type {type(i)}"
+                new_inputs.append(i.name)
+            elif (
+                hasattr(i, "ref")
+                and self.builder._has_tensorflow
+                and isinstance(  # type: ignore[attr-defined]
+                    i, (self.builder.tensorflow.Tensor, self.builder.tensorflow.Variable)  # type: ignore
+                )
+            ):  # type: ignore[attr-defined]
+                # TensorFlow tensor/variable — register as initializer, convert at export time
+                tf_shape = tuple(i.shape.as_list())
+                has_zero = 0 in tf_shape
+                cst_name = self.builder.make_initializer(
+                    "",
+                    i,
+                    msg=f"tf tensor input of op_type={op_type!r}",
+                    source="Opset.make_node/TF",
+                    allow_empty=allow_empty_shape or has_zero,
+                )
+                new_inputs.append(cst_name)
+            elif i is None:
+                # Optional input
+                new_inputs.append("")
             else:
                 raise AssertionError(
                     f"Not implemented for type(i)={type(i)}, i={i}, "

@@ -9,7 +9,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from yobx.ext_test_case import ExtTestCase, requires_sklearn, hide_stdout
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_pandas, hide_stdout
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
 
@@ -629,6 +629,78 @@ class TestSklearnToOnnxTupleSpec(ExtTestCase):
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
         self.assertEqualArray(ss.transform(X).astype(np.float32), result, atol=1e-5)
+
+
+@requires_sklearn("1.4")
+@requires_pandas()
+class TestSklearnToOnnxDataFrame(ExtTestCase):
+    """Tests that to_onnx exposes each DataFrame column as a separate ONNX input."""
+
+    def test_standard_scaler_dataframe(self):
+        """Each column of a float32 DataFrame becomes a separate 1-D ONNX graph input."""
+        import pandas as pd
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        df = pd.DataFrame(X, columns=["a", "b"])
+        ss = StandardScaler()
+        ss.fit(df)
+
+        onx = to_onnx(ss, (df,))
+
+        # ONNX graph should have two 1-D float32 inputs named after the columns.
+        graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
+        self.assertIn("a", graph_inputs)
+        self.assertIn("b", graph_inputs)
+        for col in ("a", "b"):
+            inp = graph_inputs[col]
+            self.assertEqual(inp.type.tensor_type.elem_type, 1)  # FLOAT = 1
+            shape = inp.type.tensor_type.shape
+            self.assertEqual(len(shape.dim), 1)  # 1-D column
+
+        # Numerical output should match sklearn when feeding per-column 1-D arrays.
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"a": X[:, 0], "b": X[:, 1]})[0]
+        expected = ss.transform(df).astype(np.float32)
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_standard_scaler_dataframe_float64(self):
+        """DataFrame with float64 dtype exposes 1-D float64 ONNX inputs per column."""
+        import pandas as pd
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float64)
+        df = pd.DataFrame(X, columns=["a", "b"])
+        ss = StandardScaler()
+        ss.fit(df)
+
+        onx = to_onnx(ss, (df,))
+
+        graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
+        self.assertIn("a", graph_inputs)
+        self.assertIn("b", graph_inputs)
+        for col in ("a", "b"):
+            self.assertEqual(graph_inputs[col].type.tensor_type.elem_type, 11)  # DOUBLE = 11
+
+    def test_pipeline_dataframe(self):
+        """DataFrame works as input to to_onnx for a Pipeline (scaler + LR)."""
+        import pandas as pd
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        df = pd.DataFrame(X, columns=["a", "b"])
+        pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression())])
+        pipe.fit(df, y)
+
+        onx = to_onnx(pipe, (df,))
+
+        # ONNX graph should have per-column inputs.
+        graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
+        self.assertIn("a", graph_inputs)
+        self.assertIn("b", graph_inputs)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        label, _ = ref.run(None, {"a": X[:, 0], "b": X[:, 1]})
+        expected = pipe.predict(df)
+        self.assertEqualArray(expected, label)
 
 
 if __name__ == "__main__":

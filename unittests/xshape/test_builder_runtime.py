@@ -704,18 +704,15 @@ class TestApplyWhere(ExtTestCase):
         expected = torch.tensor([1.0, 20.0, 3.0])
         self.assertEqualArray(expected, result[0])
 
-    @requires_torch()
-    def test_where_numpy_inputs_with_torch(self):
-        import torch
-
+    def test_where_numpy_inputs(self):
         node = oh.make_node("Where", ["cond", "x", "y"], ["z"])
         cond = np.array([True, False, True])
         x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         y = np.array([10.0, 20.0, 30.0], dtype=np.float32)
         result = self.b_torch._apply_where(node, {"cond": cond, "x": x, "y": y})
         self.assertEqual(len(result), 1)
-        self.assertIsInstance(result[0], torch.Tensor)
-        expected = torch.tensor([1.0, 20.0, 3.0])
+        self.assertIsInstance(result[0], np.ndarray)
+        expected = np.array([1.0, 20.0, 3.0], dtype=np.float32)
         self.assertEqualArray(expected, result[0])
 
 

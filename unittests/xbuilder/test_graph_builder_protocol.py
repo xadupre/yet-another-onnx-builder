@@ -57,6 +57,9 @@ class TestGraphBuilderProtocolExists(ExtTestCase):
             "make_initializer",
             "make_node",
             "to_onnx",
+            "is_sequence",
+            "get_sequence",
+            "set_sequence",
         ]
         for name in required:
             self.assertIn(
@@ -98,6 +101,9 @@ class TestGraphBuilderSatisfiesProtocol(ExtTestCase):
             "make_initializer",
             "make_node",
             "to_onnx",
+            "is_sequence",
+            "get_sequence",
+            "set_sequence",
         ]:
             self.assertTrue(hasattr(g, attr), msg=f"GraphBuilder missing '{attr}'")
 
@@ -263,7 +269,15 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
 class TestGraphBuilderExtendedProtocol(ExtTestCase):
     """GraphBuilder satisfies GraphBuilderExtendedProtocol."""
 
-    EXTENDED_ATTRS = ["main_opset", "unique_name", "op", "set_type_shape_unary_op"]
+    EXTENDED_ATTRS = [
+        "main_opset",
+        "unique_name",
+        "op",
+        "set_type_shape_unary_op",
+        "is_constant",
+        "get_constant",
+        "value_as_shape",
+    ]
 
     def test_extended_protocol_has_required_methods(self):
         for name in self.EXTENDED_ATTRS:
@@ -365,9 +379,6 @@ class TestGraphBuilderTorchProtocol(ExtTestCase):
         "get_type_known",
         "set_shapes_types",
         # sequence support
-        "is_sequence",
-        "get_sequence",
-        "set_sequence",
         "make_tensor_sequence_input",
         # dynamic-shape helpers
         "is_dynamic_shape",
