@@ -139,9 +139,9 @@ class OnnxruntimeEvaluator:
             whole or not dump_onnx_model
         ), f"whole must be True for dump_onnx_model={dump_onnx_model!r}"
 
-        self._cache: Dict[
-            Any, Tuple[Proto, Union["OnnxruntimeEvaluator", _InferenceSession]]  # noqa: UP037
-        ] = {}
+        self._cache: Dict[Any, Tuple[Proto, Union["OnnxruntimeEvaluator", _InferenceSession]]] = (
+            {}
+        )
         self.ir_version = ir_version
         self.opsets = opsets
         self.session_kwargs: Dict[str, Any] = dict(
@@ -192,7 +192,7 @@ class OnnxruntimeEvaluator:
             )
             self.rt_nodes_ = self.nodes.copy()
 
-        self.local_functions: Dict[Tuple[str, str], "OnnxruntimeEvaluator"] = (  # noqa: UP037
+        self.local_functions: Dict[Tuple[str, str], "OnnxruntimeEvaluator"] = (
             {(f.domain, f.name): self.__class__(f) for f in self.proto.functions}
             if hasattr(self.proto, "functions")
             else {}

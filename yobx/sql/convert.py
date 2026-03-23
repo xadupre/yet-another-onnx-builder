@@ -28,12 +28,11 @@ from .sql_convert import sql_to_onnx, sql_to_onnx_graph  # noqa: F401 – re-exp
 def to_onnx(
     dataframe_or_query: Union[  # type: ignore
         str,
-        Callable[["TracedDataFrame"], "TracedDataFrame"],  # type: ignore # noqa: UP037
-        "polars.LazyFrame",  # type: ignore # noqa: F821, UP037
+        Callable[["TracedDataFrame"], "TracedDataFrame"],  # type: ignore
+        "polars.LazyFrame",  # type: ignore # noqa: F821
     ],
     input_dtypes: Union[
-        Dict[str, Union[np.dtype, type, str]],
-        List[Dict[str, Union[np.dtype, type, str]]],
+        Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]
     ],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
@@ -191,7 +190,7 @@ def to_onnx(
     if isinstance(dataframe_or_query, str):
         return sql_to_onnx(
             dataframe_or_query,
-            input_dtypes,
+            input_dtypes,  # type: ignore
             right_input_dtypes=right_input_dtypes,
             target_opset=target_opset,
             custom_functions=custom_functions,
@@ -201,7 +200,7 @@ def to_onnx(
         )
     return lazyframe_to_onnx(
         dataframe_or_query,
-        input_dtypes,
+        input_dtypes,  # type: ignore
         target_opset=target_opset,
         builder_cls=builder_cls,
         filename=filename,

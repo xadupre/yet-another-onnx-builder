@@ -811,11 +811,7 @@ class TestMultiDataframe(ExtTestCase):
 
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-        (total,) = _run_multi(
-            transform,
-            [{"a": np.float32}, {"b": np.float32}],
-            {"a": a, "b": b},
-        )
+        (total,) = _run_multi(transform, [{"a": np.float32}, {"b": np.float32}], {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b)
 
     def test_two_frames_filter_and_select(self):
@@ -827,11 +823,7 @@ class TestMultiDataframe(ExtTestCase):
 
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-        (total,) = _run_multi(
-            transform,
-            [{"a": np.float32}, {"b": np.float32}],
-            {"a": a, "b": b},
-        )
+        (total,) = _run_multi(transform, [{"a": np.float32}, {"b": np.float32}], {"a": a, "b": b})
         np.testing.assert_allclose(total, np.array([5.0, 9.0], dtype=np.float32))
 
     def test_three_frames(self):
@@ -878,9 +870,7 @@ class TestMultiDataframe(ExtTestCase):
         dtypes2 = {"id": np.int64, "b": np.float32}
         artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
         ref = ExtendedReferenceEvaluator(artifact)
-        cid_out, a_out, id_out, b_out = ref.run(
-            None, {"cid": cid, "a": a, "id": id_, "b": b}
-        )
+        cid_out, a_out, _id_out, b_out = ref.run(None, {"cid": cid, "a": a, "id": id_, "b": b})
         # Rows where cid matches id: (cid=2,a=20), (cid=3,a=30)
         np.testing.assert_array_equal(cid_out, np.array([2, 3], dtype=np.int64))
         np.testing.assert_allclose(a_out, np.array([20.0, 30.0], dtype=np.float32))
@@ -891,9 +881,7 @@ class TestMultiDataframe(ExtTestCase):
 
         def transform(df1, df2):
             joined = df1.join(df2, left_key="cid", right_key="id")
-            return joined.select(
-                [(joined["a"] + joined["b"]).alias("sum_ab")]
-            )
+            return joined.select([(joined["a"] + joined["b"]).alias("sum_ab")])
 
         cid = np.array([1, 2, 3], dtype=np.int64)
         a = np.array([10.0, 20.0, 30.0], dtype=np.float32)

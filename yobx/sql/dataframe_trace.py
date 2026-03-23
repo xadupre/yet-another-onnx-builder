@@ -447,11 +447,8 @@ class TracedDataFrame:
         return TracedDataFrame(new_cols, list(self._ops), list(self._source_columns))
 
     def pipe(
-        self,
-        func: Callable[..., "TracedDataFrame"],  # noqa: UP037
-        *args: object,
-        **kwargs: object,
-    ) -> "TracedDataFrame":  # noqa: UP037
+        self, func: Callable[..., "TracedDataFrame"], *args: object, **kwargs: object
+    ) -> "TracedDataFrame":
         """Apply *func* to this frame (pandas ``pipe`` idiom).
 
         Equivalent to ``func(self, *args, **kwargs)``.  Useful for chaining
@@ -475,11 +472,7 @@ class TracedDataFrame:
         return func(self, *args, **kwargs)
 
     def join(
-        self,
-        right: "TracedDataFrame",
-        left_key: str,
-        right_key: str,
-        join_type: str = "inner",
+        self, right: "TracedDataFrame", left_key: str, right_key: str, join_type: str = "inner"
     ) -> "TracedDataFrame":
         """Record an equi-join with another :class:`TracedDataFrame`.
 
@@ -506,10 +499,7 @@ class TracedDataFrame:
             artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
         """
         join_op = JoinOp(
-            right_table="r",
-            left_key=left_key,
-            right_key=right_key,
-            join_type=join_type,
+            right_table="r", left_key=left_key, right_key=right_key, join_type=join_type
         )
         # Merge columns: left columns take priority on name collision.
         merged_cols = dict(self._columns)
@@ -565,7 +555,9 @@ class TracedDataFrame:
 
 def trace_dataframe(
     func: Callable,
-    input_dtypes: Union[Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]],
+    input_dtypes: Union[
+        Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]
+    ],
 ) -> ParsedQuery:
     """Trace *func* and return the equivalent :class:`~yobx.sql.parse.ParsedQuery`.
 
@@ -618,8 +610,7 @@ def trace_dataframe(
     if isinstance(input_dtypes, list):
         dfs = [
             TracedDataFrame(
-                {name: TracedSeries(ColumnRef(name)) for name in d},
-                source_columns=list(d.keys()),
+                {name: TracedSeries(ColumnRef(name)) for name in d}, source_columns=list(d.keys())
             )
             for d in input_dtypes
         ]
@@ -639,8 +630,7 @@ def trace_dataframe(
 def dataframe_to_onnx(
     func: Callable,
     input_dtypes: Union[
-        Dict[str, Union[np.dtype, type, str]],
-        List[Dict[str, Union[np.dtype, type, str]]],
+        Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]
     ],
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,

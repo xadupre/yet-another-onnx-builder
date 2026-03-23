@@ -84,7 +84,7 @@ class ReportResultComparison:
             if key not in self.mapping:
                 continue
             # pyrefly: ignore[unknown-name]
-            cache: Dict["torch.device", "torch.Tensor"] = {}  # type: ignore[name-defined] # noqa: F821, UP037
+            cache: Dict["torch.device", "torch.Tensor"] = {}  # type: ignore[name-defined] # noqa: F821
             for held_key in self.mapping[key]:
                 t2 = self.tensors[held_key]
                 if hasattr(t2, "device") and hasattr(tensor, "device"):
