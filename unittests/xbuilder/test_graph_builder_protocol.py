@@ -274,6 +274,8 @@ class TestGraphBuilderExtendedProtocol(ExtTestCase):
         "unique_name",
         "op",
         "set_type_shape_unary_op",
+        "is_constant",
+        "get_constant",
         "value_as_shape",
     ]
 

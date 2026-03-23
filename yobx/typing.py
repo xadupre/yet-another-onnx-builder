@@ -452,6 +452,35 @@ class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
         """
         ...
 
+    def is_constant(self, name: str) -> bool:
+        """Returns ``True`` when *name* is a known constant in the graph.
+
+        :param name: result name
+        :return: ``True`` if the result is a constant
+        """
+        ...
+
+    def get_constant(
+        self,
+        name: str,
+        exc: bool = True,
+        computed_value: bool = False,
+        as_shape: bool = False,
+        multiple_outputs: bool = False,
+    ) -> Optional[Any]:
+        """Returns the constant value for *name*.
+
+        :param name: constant name
+        :param exc: raise an exception if the constant cannot be retrieved
+        :param computed_value: if ``True``, evaluate ``NodeProto`` constants
+            using a reference runtime
+        :param as_shape: if ``True``, return a tuple of integers (a shape)
+        :param multiple_outputs: allow the constant to have multiple outputs
+        :return: the constant value, or ``None`` when *exc* is ``False`` and
+            the value cannot be determined
+        """
+        ...
+
     def get_debug_msg(self) -> str:
         """Returns any information useful to understand where an error
         could come from. This message is expected to be part of any
