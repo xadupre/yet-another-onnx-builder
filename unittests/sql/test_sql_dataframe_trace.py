@@ -960,12 +960,12 @@ class TestMultiDataFrame(ExtTestCase):
             neg = not_null.filter(df["a"] < 0).select([df["a"].alias("a_neg")])
             return pos, neg
 
-        a = np.array([10.0, 20.0, 30.0], dtype=np.float32)
+        a = np.array([-1.0, 2.0, -3.0, 4.0], dtype=np.float32)
         artifact = dataframe_to_onnx(transform, [{"a": np.float32}])
         ref = ExtendedReferenceEvaluator(artifact)
-        sum_ab, sum_ab_1 = ref.run(None, {"a": a})
-        np.testing.assert_allclose(sum_ab, np.array([220.0, 330.0], dtype=np.float32))
-        np.testing.assert_allclose(sum_ab_1, np.array([221.0, 331.0], dtype=np.float32))
+        a_pos, a_neg = ref.run(None, {"a": a})
+        np.testing.assert_allclose(a_pos, np.array([2.0, 4.0], dtype=np.float32))
+        np.testing.assert_allclose(a_neg, np.array([-1.0, -3.0], dtype=np.float32))
 
 
 if __name__ == "__main__":

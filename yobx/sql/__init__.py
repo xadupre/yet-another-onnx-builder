@@ -20,6 +20,8 @@ Public API
   :class:`~yobx.container.ExportArtifact`
 * :func:`parsed_query_to_onnx_graph` — low-level entry point: parsed query →
   nodes added to an existing :class:`~yobx.typing.GraphBuilderProtocol`
+* :func:`parsed_queries_to_onnx` — high-level entry point: list of parsed queries
+  (multiple output frames) → :class:`~yobx.container.ExportArtifact`
 * :func:`lazyframe_to_onnx` — high-level entry point: ``polars.LazyFrame`` →
   :class:`~yobx.container.ExportArtifact`
 * :func:`dataframe_to_onnx` — high-level entry point: traced DataFrame
@@ -65,6 +67,7 @@ from .sql_convert import (
     sql_to_onnx_graph,
     parsed_query_to_onnx,
     parsed_query_to_onnx_graph,
+    parsed_queries_to_onnx,
 )
 from .polars_convert import lazyframe_to_onnx
 from .convert import to_onnx
@@ -114,6 +117,7 @@ __all__ = [
     "parse_sql",
     "parsed_query_to_onnx",
     "parsed_query_to_onnx_graph",
+    "parsed_queries_to_onnx",
     "sql_to_onnx",
     "sql_to_onnx_graph",
     "to_onnx",

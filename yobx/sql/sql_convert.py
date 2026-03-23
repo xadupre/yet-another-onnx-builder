@@ -350,6 +350,87 @@ def parsed_query_to_onnx(
     return artifact
 
 
+def parsed_queries_to_onnx(
+    queries: List[ParsedQuery],
+    input_dtypes: Dict[str, Union[np.dtype, type, str]],
+    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
+    target_opset: int = DEFAULT_TARGET_OPSET,
+    custom_functions: Optional[Dict[str, Callable]] = None,
+    builder_cls: Union[type, Callable] = GraphBuilder,
+    filename: Optional[str] = None,
+    verbose: int = 0,
+) -> ExportArtifact:
+    """
+    Convert a list of :class:`~yobx.sql.parse.ParsedQuery` objects into a single
+    ONNX model with multiple outputs — one group of output tensors per query.
+
+    All queries share the same input tensors (columns are deduplicated).  This
+    is used when a traced DataFrame function returns a *tuple* of
+    :class:`~yobx.sql.dataframe_trace.TracedDataFrame` objects, producing an
+    ONNX model whose outputs are the concatenation of each frame's SELECT
+    columns.
+
+    :param queries: list of :class:`~yobx.sql.parse.ParsedQuery` objects, one
+        per output frame.  Each query is processed independently into the shared
+        graph builder; shared input tensors are only registered once.
+    :param input_dtypes: mapping from column name to numpy dtype for all input
+        columns referenced across all queries.
+    :param right_input_dtypes: optional right-table dtype mapping (for JOIN
+        queries).
+    :param target_opset: ONNX opset version to target.
+    :param custom_functions: optional mapping from function name to Python
+        callable.
+    :param builder_cls: graph-builder class or factory callable.
+    :param filename: if set, the exported ONNX model is saved to this path and
+        the :class:`~yobx.container.ExportReport` is written as a companion
+        Excel file (same base name with ``.xlsx`` extension).
+    :param verbose: verbosity level (0 = silent).
+    :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
+        ONNX model together with an :class:`~yobx.container.ExportReport`.
+
+    Example::
+
+        import numpy as np
+        from yobx.sql.dataframe_trace import dataframe_to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        def transform(df):
+            pos = df.filter(df["a"] > 0).select([df["a"].alias("a_pos")])
+            neg = df.filter(df["a"] < 0).select([df["a"].alias("a_neg")])
+            return pos, neg
+
+        artifact = dataframe_to_onnx(transform, {"a": np.float32})
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([-1.0, 2.0, -3.0, 4.0], dtype=np.float32)
+        a_pos, a_neg = ref.run(None, {"a": a})
+        # a_pos == array([2., 4.], dtype=float32)
+        # a_neg == array([-1., -3.], dtype=float32)
+    """
+    if not queries:
+        raise ValueError("parsed_queries_to_onnx: queries list must not be empty")
+    if len(queries) == 1:
+        return parsed_query_to_onnx(
+            queries[0],
+            input_dtypes,
+            right_input_dtypes=right_input_dtypes,
+            target_opset=target_opset,
+            custom_functions=custom_functions,
+            builder_cls=builder_cls,
+            filename=filename,
+            verbose=verbose,
+        )
+    g = builder_cls(target_opset, ir_version=10)
+    sts: Dict[str, object] = {"custom_functions": custom_functions or {}}
+    for pq in queries:
+        parsed_query_to_onnx_graph(g, sts, [], pq, input_dtypes, right_input_dtypes)
+    artifact = g.to_onnx(return_optimize_report=True)
+    if filename:
+        if verbose:
+            print(f"[yobx.sql.parsed_queries_to_onnx] saving model to {filename!r}")
+        artifact.save(filename)
+    return artifact
+
+
 # ---------------------------------------------------------------------------
 # Internal ONNX graph builder
 # ---------------------------------------------------------------------------

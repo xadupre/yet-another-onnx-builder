@@ -2706,6 +2706,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 assert new_name in self.initializers_dict, f"Unable to find {new_name!r}"
                 self._append_initializer_source(new_name, source, existing=True)
                 return new_name
+            if give_unique_name:
+                # Caller doesn't require a specific name; reuse the existing tensor.
+                existing_name = self._values[key]
+                self._append_initializer_source(existing_name, source, existing=True)
+                return existing_name
             self._append_initializer_source(name, source, same_as=key)
             res = self.make_node(
                 "Identity",

@@ -72,7 +72,7 @@ from .parse import (
     SelectOp,
     _collect_columns,
 )
-from .sql_convert import parsed_query_to_onnx
+from .sql_convert import parsed_queries_to_onnx, parsed_query_to_onnx
 
 
 def _to_ast(value: object) -> object:
@@ -501,35 +501,32 @@ class TracedDataFrame:
         columns = _collect_columns(ops)
         return ParsedQuery(operations=ops, from_table="t", columns=columns)
 
-    def to_parsed_queries(self, *additional_traced_df: TracedDataFrame) -> ParsedQuery:
-        """Assemble a :class:`~yobx.sql.parse.ParsedQuery` from the recorded ops.
+    def to_parsed_queries(self, *additional_traced_df: TracedDataFrame) -> List[ParsedQuery]:
+        """Assemble a list of :class:`~yobx.sql.parse.ParsedQuery` objects, one per output frame.
+
+        Each frame gets its own independent full query (all ops preserved) so that
+        multiple output paths from the same input can be compiled into a single ONNX
+        graph with several output tensors.
 
         If no ``SelectOp`` has been recorded yet (e.g. only a filter was
         applied), a pass-through ``SELECT`` of all current columns is appended
         automatically.
 
-        :param additional_traced_df: addition dataframe to export
-        :return: a :class:`~yobx.sql.parse.ParsedQuery` ready for ONNX
-            conversion via :func:`~yobx.sql.sql_convert.parsed_query_to_onnx`.
+        :param additional_traced_df: additional output dataframes to export
+        :return: list of :class:`~yobx.sql.parse.ParsedQuery` objects, one per
+            output frame, ready for ONNX conversion via
+            :func:`~yobx.sql.sql_convert.parsed_queries_to_onnx`.
         """
-        ops = list(self._ops)
-        if not any(isinstance(op, SelectOp) for op in ops):
-            items = [SelectItem(ColumnRef(col), alias=None) for col in self._columns]
-            ops.append(SelectOp(items=items))
-        columns = _collect_columns(ops)
-        first_query = ParsedQuery(operations=ops, from_table="t", columns=columns)
 
-        set_id_ops = {id(op) for op in self._ops}
-        for tdf in additional_traced_df:
-            ops = [op for op in tdf._ops if id(op) not in set_id_ops]
-
+        def _frame_to_query(tdf: TracedDataFrame) -> ParsedQuery:
+            ops = list(tdf._ops)
             if not any(isinstance(op, SelectOp) for op in ops):
-                items = [SelectItem(ColumnRef(col), alias=None) for col in self._columns]
+                items = [SelectItem(ColumnRef(col), alias=None) for col in tdf._columns]
                 ops.append(SelectOp(items=items))
             columns = _collect_columns(ops)
-            first_query.append(ParsedQuery(operations=ops, from_table="t", columns=columns))
+            return ParsedQuery(operations=ops, from_table="t", columns=columns)
 
-        return first_query
+        return [_frame_to_query(self)] + [_frame_to_query(tdf) for tdf in additional_traced_df]
 
     def __repr__(self) -> str:
         return f"TracedDataFrame(columns={list(self._columns.keys())!r})"
@@ -545,7 +542,7 @@ def trace_dataframe(
     input_dtypes: Union[
         Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]
     ],
-) -> ParsedQuery:
+) -> Union[ParsedQuery, List[ParsedQuery]]:
     """Trace *func* and return the equivalent :class:`~yobx.sql.parse.ParsedQuery`.
 
     Constructs one or more :class:`TracedDataFrame` objects whose columns
@@ -554,9 +551,10 @@ def trace_dataframe(
     :class:`~yobx.sql.parse.ParsedQuery`.
 
     :param func: a callable that accepts one or more :class:`TracedDataFrame`
-        objects and returns a :class:`TracedDataFrame`.  The function may apply
-        any combination of ``filter``, ``select``, arithmetic on columns,
-        ``join``, and aggregations.
+        objects and returns a :class:`TracedDataFrame` **or** a tuple of
+        :class:`TracedDataFrame` objects (for multiple-output models).  The
+        function may apply any combination of ``filter``, ``select``,
+        arithmetic on columns, ``join``, and aggregations.
     :param input_dtypes: either
 
         * a single ``{column: dtype}`` mapping — *func* is called with one
@@ -566,8 +564,9 @@ def trace_dataframe(
 
         The dtypes are not used during tracing itself; they are used only when
         the returned query is subsequently compiled to ONNX.
-    :return: a :class:`~yobx.sql.parse.ParsedQuery` representing the operations
-        performed by *func*.
+    :return: a single :class:`~yobx.sql.parse.ParsedQuery` when *func* returns
+        one frame, or a ``list`` of :class:`~yobx.sql.parse.ParsedQuery` objects
+        (one per output frame) when *func* returns a tuple.
 
     Example — single dataframe::
 
@@ -718,8 +717,16 @@ def dataframe_to_onnx(
         artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
     """
     pq = trace_dataframe(func, input_dtypes)
+    # Resolve the dtype dicts for the left and right tables.
     if isinstance(input_dtypes, list):
-        has_join = any(isinstance(op, JoinOp) for op in pq.operations)
+        # Check whether any query involves a join.
+        all_ops: List[object] = []
+        if isinstance(pq, list):
+            for q in pq:
+                all_ops.extend(q.operations)
+        else:
+            all_ops = list(pq.operations)
+        has_join = any(isinstance(op, JoinOp) for op in all_ops)
         if has_join:
             left_dtypes: Dict[str, Union[np.dtype, type, str]] = input_dtypes[0]
             right_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = (
@@ -731,7 +738,13 @@ def dataframe_to_onnx(
             for d in input_dtypes:
                 left_dtypes.update(d)
             right_dtypes = None
-        return parsed_query_to_onnx(
+    else:
+        assert isinstance(input_dtypes, dict)
+        left_dtypes = input_dtypes
+        right_dtypes = None
+
+    if isinstance(pq, list):
+        return parsed_queries_to_onnx(
             pq,
             left_dtypes,
             right_input_dtypes=right_dtypes,
@@ -743,7 +756,8 @@ def dataframe_to_onnx(
         )
     return parsed_query_to_onnx(
         pq,
-        input_dtypes,
+        left_dtypes,
+        right_input_dtypes=right_dtypes,
         target_opset=target_opset,
         custom_functions=custom_functions,
         builder_cls=builder_cls,
