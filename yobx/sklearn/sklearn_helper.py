@@ -36,6 +36,10 @@ def get_n_expected_outputs(estimator: BaseEstimator) -> int:
         OutlierMixin is not None and isinstance(estimator, OutlierMixin)
     ):
         return 2
+    # Estimators that declare the number of ONNX outputs explicitly (e.g.
+    # DataFrameTransformer sets this in fit()).
+    if hasattr(estimator, "n_onnx_outputs_"):
+        return int(estimator.n_onnx_outputs_)
     # For Pipelines, check the last step explicitly (mirrors get_output_names fallback).
     if isinstance(estimator, Pipeline):
         last = estimator.steps[-1][1]

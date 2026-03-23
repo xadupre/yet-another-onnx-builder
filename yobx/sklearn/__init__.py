@@ -4,11 +4,24 @@ from .skl2onnx_converter import wrap_skl2onnx_converter
 
 __all__ = [
     "ConvertOptions",
+    "DataFrameTransformer",
     "NumericalDiscrepancyWarning",
     "register_sklearn_converters",
     "to_onnx",
     "wrap_skl2onnx_converter",
 ]
+
+
+def __getattr__(name: str):
+    # Lazy import so that importing DataFrameTransformer does NOT trigger the
+    # @register_sklearn_converter decorator before register_sklearn_converters()
+    # is called (which would cause the early-exit guard to skip all other
+    # converters).
+    if name == "DataFrameTransformer":
+        from .preprocessing.dataframe_function_transformer import DataFrameTransformer
+
+        return DataFrameTransformer
+    raise AttributeError(f"module 'yobx.sklearn' has no attribute {name!r}")
 
 
 def has_sklearn(version: str = ""):
