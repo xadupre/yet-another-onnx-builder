@@ -110,7 +110,8 @@ cost_before = builder_before.run_model(model, inference=InferenceMode.COST)
 
 print("Symbolic FLOPs per node (before optimization):")
 for op_type, flops, _ in cost_before:
-    print(f"  {op_type:12s}  {flops}")
+    if flops:
+        print(f"  {op_type:12s}  {flops}")
 
 
 # %%
@@ -136,7 +137,8 @@ print("Concrete FLOPs per node (before optimization):")
 total_before = 0
 for op_type, flops, _ in cost_concrete_before:
     total_before += flops or 0
-    print(f"  {op_type:12s}  {flops:>10,}")
+    if flops:
+        print(f"  {op_type:12s}  {flops:>10,}")
 print(f"  {'TOTAL':12s}  {total_before:>10,}")
 
 
@@ -184,7 +186,8 @@ cost_after = builder_after.run_model(opt_model, inference=InferenceMode.COST)
 
 print("Symbolic FLOPs per node (after optimization):")
 for op_type, flops, _ in cost_after:
-    print(f"  {op_type:12s}  {flops}")
+    if flops:
+        print(f"  {op_type:12s}  {flops}")
 
 
 # %%
@@ -200,7 +203,8 @@ print("Concrete FLOPs per node (after optimization):")
 total_after = 0
 for op_type, flops, _ in cost_concrete_after:
     total_after += flops or 0
-    print(f"  {op_type:12s}  {flops:>10,}")
+    if flops:
+        print(f"  {op_type:12s}  {flops:>10,}")
 print(f"  {'TOTAL':12s}  {total_after:>10,}")
 print(
     f"\nFLOPs saved: {total_before - total_after:,}  "
@@ -235,8 +239,8 @@ def _aggregate(cost_list):
 agg_before = _aggregate(cost_concrete_before)
 agg_after = _aggregate(cost_concrete_after)
 
-# Keep only ops that appear in either model
-all_ops = sorted(set(agg_before) | set(agg_after))
+# Keep only ops with non-zero FLOPs in either model
+all_ops = sorted(op for op in set(agg_before) | set(agg_after) if agg_before.get(op, 0) or agg_after.get(op, 0))
 
 vals_before = [agg_before.get(op, 0) for op in all_ops]
 vals_after = [agg_after.get(op, 0) for op in all_ops]
