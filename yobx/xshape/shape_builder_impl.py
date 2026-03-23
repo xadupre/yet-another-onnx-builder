@@ -37,6 +37,7 @@ class InferenceMode(IntEnum):
     NOTHING = 0
     SHAPE = 1
     TYPE = 2
+    COST = 16
 
 
 @contextlib.contextmanager
@@ -687,11 +688,14 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             rows.append("--NOCALLS--")
         return "\n".join(rows)
 
-    def run_node(self, node: onnx.NodeProto, exc: bool = False):
+    def run_node(self, node: onnx.NodeProto, exc: bool = False, cost: bool = True):
         """
         Uses shapes availables in the ShapeBuilder to infer the output shapes
         and types.
         """
+        if cost:
+            self.run_node(node, exc=exc, cost=False)
+            return self.estimate_node_flops(node)
         if node.op_type == "Constant" and node.domain == "":
             self.set_constant(node.output[0], node)
             self.simple_update_value_shape_with_node(node)
@@ -773,6 +777,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         if inference == InferenceMode.TYPE:
             self._run_model_type_inference(graph, functions=functions, exc=exc)
         else:
+            res = []
             for i in graph.initializer:
                 self.set_constant(i.name, i)
             for i in graph.sparse_initializer:
@@ -780,9 +785,22 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
             for i in graph.input:
                 self.run_value_info(i, True)
             for node in graph.node:
-                self.run_node(node, exc=exc)
+                r = self.run_node(node, exc=exc, cost=inference == InferenceMode.COST)
+                if inference == InferenceMode.COST:
+                    res.append(
+                        (
+                            node.op_type,
+                            r,
+                            tuple(
+                                self.get_shape(i) if i and self.has_shape(i) else "?"
+                                for i in node.input
+                            ),
+                        )
+                    )
             for i in graph.output:
                 self.run_value_info(i, False)
+            if inference == InferenceMode.COST:
+                return res
 
     def _run_model_type_inference(
         self,
