@@ -1,4 +1,4 @@
-from typing import Set, Union
+from typing import Callable, Set, Union
 from sklearn.base import BaseEstimator
 from ..typing import ConvertOptionsProtocol
 
@@ -57,12 +57,15 @@ class ConvertOptions(ConvertOptionsProtocol):
         trees and ensemble models.
     """
 
-    OPTIONS = ["decision_leaf", "decision_path"]
+    OPTIONS = {
+        "decision_leaf": lambda est: hasattr(est, "decision_path"),
+        "decision_path": lambda est: hasattr(est, "decision_path"),
+    }
 
     def __init__(
         self,
-        decision_leaf: Union[bool, Set[str]] = False,
-        decision_path: Union[bool, Set[str]] = False,
+        decision_leaf: Union[bool, Set[Union[str, type, int, Callable]]] = False,
+        decision_path: Union[bool, Set[Union[str, type, int, Callable]]] = False,
     ):
         self.decision_leaf = decision_leaf
         self.decision_path = decision_path
@@ -94,12 +97,16 @@ class ConvertOptions(ConvertOptionsProtocol):
         """
         assert hasattr(
             self, option_name
-        ), f"Missing option {option_name!r}. Allowed {self.OPTIONS}."
+        ), f"Missing option {option_name!r}. Allowed {sorted(self.OPTIONS)}."
         value = getattr(self, option_name)
         if not value:
             return False
         if value is True:
-            return True
+            return self.OPTIONS[option_name](piece)
+        if isinstance(value, set):
+            if callable(value):
+                return value(piece)
+            return type(piece) in value or id(piece) in value
         raise NotImplementedError(
             f"Not implemented with {option_name!r} is not a boolean but {value!r}."
         )

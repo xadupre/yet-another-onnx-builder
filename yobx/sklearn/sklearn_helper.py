@@ -56,16 +56,17 @@ def post_process_output_names(
 ) -> Sequence[str]:
     """Makes sures the number of outputs is expected."""
     n_outputs = get_n_expected_outputs(estimator)
+    if n_outputs == 1 and len(output_names) != 1:
+        output_names = [longest_prefix(output_names)]
     if len(output_names) != n_outputs:
         raise NotImplementedError(
             f"Not implemented with {output_names=}, {n_outputs=} "
             f"and estimator is {type(estimator)}."
         )
-    if n_outputs == 1:
-        output_names = [longest_prefix(output_names)]
     if convert_options:
         for _extra_opt in ConvertOptions.OPTIONS:
             if convert_options.has(_extra_opt, estimator):
+                print("***", _extra_opt)
                 output_names.append(_extra_opt)
     return output_names
 
@@ -77,50 +78,40 @@ def get_output_names(
 
     # Append extra output names requested by convert_options so that converters
     # can detect them via len(outputs) > extra_idx and emit the extra nodes.
-    if hasattr(estimator, "get_feature_names_out"):
-        if isinstance(estimator, Pipeline):
-            last_step = estimator.steps[-1][1]
-            if _should_use_feature_names(last_step):
-                try:
-                    return post_process_output_names(
-                        last_step, list(last_step.get_feature_names_out(), convert_options)
-                    )
-                except AttributeError:
-                    pass
-        elif _should_use_feature_names(estimator):
-            try:
-                return post_process_output_names(
-                    estimator, list(estimator.get_feature_names_out(), convert_options)
-                )
-            except AttributeError:
-                pass
+    if isinstance(estimator, Pipeline):
+        last_step = estimator.steps[-1][1]
+    else:
+        last_step = estimator
+    if hasattr(last_step, "get_feature_names_out") and _should_use_feature_names(last_step):
+        outnames = estimator.get_feature_names_out()
+        return post_process_output_names(last_step, list(outnames), convert_options)
 
-    if SelectorMixin is not None and isinstance(estimator, SelectorMixin):
-        return post_process_output_names(estimator, ["Y"], convert_options)
-    if is_classifier(estimator):
-        if hasattr(estimator, "predict_proba"):
+    if SelectorMixin is not None and isinstance(last_step, SelectorMixin):
+        return post_process_output_names(last_step, ["Y"], convert_options)
+    if is_classifier(last_step):
+        if hasattr(last_step, "predict_proba"):
             return post_process_output_names(
-                estimator, ["label", "probabilities"], convert_options
+                last_step, ["label", "probabilities"], convert_options
             )
-        return post_process_output_names(estimator, ["label"], convert_options)
-    if OutlierMixin is not None and isinstance(estimator, OutlierMixin):
-        return post_process_output_names(estimator, ["label", "scores"], convert_options)
-    if isinstance(estimator, BaseMixture):
-        return post_process_output_names(estimator, ["label", "probabilities"], convert_options)
-    if isinstance(estimator, OutlierMixin):
-        return post_process_output_names(estimator, ["label", "scores"], convert_options)
-    if is_regressor(estimator):
-        return post_process_output_names(estimator, ["predictions"], convert_options)
-    last = estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
+        return post_process_output_names(last_step, ["label"], convert_options)
+    if OutlierMixin is not None and isinstance(last_step, OutlierMixin):
+        return post_process_output_names(last_step, ["label", "scores"], convert_options)
+    if isinstance(last_step, BaseMixture):
+        return post_process_output_names(last_step, ["label", "probabilities"], convert_options)
+    if isinstance(last_step, OutlierMixin):
+        return post_process_output_names(last_step, ["label", "scores"], convert_options)
+    if is_regressor(last_step):
+        return post_process_output_names(last_step, ["predictions"], convert_options)
+    last = estimator.steps[-1][1] if isinstance(last_step, Pipeline) else estimator
     if OutlierMixin is not None and isinstance(last, OutlierMixin):
-        return post_process_output_names(estimator, ["label", "scores"], convert_options)
+        return post_process_output_names(last_step, ["label", "scores"], convert_options)
     if isinstance(last, ClusterMixin) and not isinstance(last, FeatureAgglomeration):
-        return post_process_output_names(estimator, ["label", "distances"], convert_options)
+        return post_process_output_names(last_step, ["label", "distances"], convert_options)
     if isinstance(last, BaseMixture):
-        return post_process_output_names(estimator, ["label", "probabilities"], convert_options)
+        return post_process_output_names(last_step, ["label", "probabilities"], convert_options)
     if isinstance(last, OutlierMixin):
-        return post_process_output_names(estimator, ["label", "scores"], convert_options)
-    return post_process_output_names(estimator, ["Y"], convert_options)
+        return post_process_output_names(last_step, ["label", "scores"], convert_options)
+    return post_process_output_names(last_step, ["Y"], convert_options)
 
 
 def _longest_prefix(s1: str, s2: str) -> str:

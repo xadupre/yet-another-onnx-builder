@@ -265,14 +265,19 @@ def category_encoders_binary_encoder(
         )
 
     if len(col_tensors) == 1:
+        assert (
+            len(outputs) == 1
+        ), f"Inconsistencies {col_tensors=} and {outputs=}{g.get_debug_msg()}"
         res = g.op.Identity(col_tensors[0], name=name, outputs=outputs)
-    else:
+    elif len(outputs) == 1:
         res = g.op.Concat(*col_tensors, axis=1, name=name, outputs=outputs)
-
-    g.set_type(res, itype)
-    if g.has_shape(X):
-        shape = g.get_shape(X)
-        g.set_shape(res, (shape[0], n_out))
-    elif g.has_rank(X):
-        g.set_rank(res, 2)
+    elif len(outputs) == len(col_tensors):
+        assert len(outputs) == len(
+            col_tensors
+        ), f"Inconsistencies {col_tensors=} and {outputs=}{g.get_debug_msg()}"
+        res = tuple(
+            g.op.Identity(c, name=name, outputs=[o]) for c, o in zip(col_tensors, outputs)
+        )
+    else:
+        raise AssertionError(f"Inconsistencies {col_tensors=} and {outputs=}{g.get_debug_msg()}")
     return res
