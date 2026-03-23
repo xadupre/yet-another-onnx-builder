@@ -121,6 +121,80 @@ class TestSklearnColumnTransformer(ExtTestCase):
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
+    def test_column_transformer_string_columns_dataframe(self):
+        """ColumnTransformer fitted with string column names on a DataFrame."""
+        import pandas as pd
+
+        X = np.array(
+            [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+                [2, 3, 4, 5],
+                [6, 7, 8, 9],
+            ],
+            dtype=np.float32,
+        )
+        df = pd.DataFrame(X, columns=["age", "income", "score", "balance"])
+        ct = ColumnTransformer(
+            [("std", StandardScaler(), ["age", "income"]), ("mm", MinMaxScaler(), ["score", "balance"])]
+        )
+        ct.fit(df)
+
+        onx = to_onnx(ct, (df,))
+
+        graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
+        for col in ["age", "income", "score", "balance"]:
+            self.assertIn(col, graph_inputs)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {col: df[col].to_numpy() for col in df.columns})[0]
+        expected = ct.transform(df).astype(np.float32)
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {col: df[col].to_numpy() for col in df.columns})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
+    def test_pipeline_with_column_transformer_dataframe(self):
+        """Pipeline with ColumnTransformer (string column names) and DataFrame input."""
+        import pandas as pd
+
+        X = np.array(
+            [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+                [2, 3, 4, 5],
+                [6, 7, 8, 9],
+            ],
+            dtype=np.float32,
+        )
+        y = np.array([0, 0, 1, 1, 0, 1])
+        df = pd.DataFrame(X, columns=["age", "income", "score", "balance"])
+        ct = ColumnTransformer(
+            [("std", StandardScaler(), ["age", "income"]), ("mm", MinMaxScaler(), ["score", "balance"])]
+        )
+        pipe = Pipeline([("preprocessor", ct), ("clf", LogisticRegression())])
+        pipe.fit(df, y)
+
+        onx = to_onnx(pipe, (df,))
+
+        graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
+        for col in ["age", "income", "score", "balance"]:
+            self.assertIn(col, graph_inputs)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        label, _ = ref.run(None, {col: df[col].to_numpy() for col in df.columns})
+        expected_label = pipe.predict(df)
+        self.assertEqualArray(expected_label, label)
+
+        sess = self.check_ort(onx)
+        ort_label, _ = sess.run(None, {col: df[col].to_numpy() for col in df.columns})
+        self.assertEqualArray(expected_label, ort_label)
+
     def test_pipeline_with_column_transformer(self):
         X = np.array(
             [
