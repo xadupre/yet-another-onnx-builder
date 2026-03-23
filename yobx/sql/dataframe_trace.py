@@ -74,10 +74,6 @@ from .parse import (
 )
 from .sql_convert import parsed_query_to_onnx
 
-# ---------------------------------------------------------------------------
-# Expression conversion helper
-# ---------------------------------------------------------------------------
-
 
 def _to_ast(value: object) -> object:
     """Convert a Python scalar or :class:`TracedSeries` to an AST expression.
@@ -101,11 +97,6 @@ def _to_ast(value: object) -> object:
     )
 
 
-# ---------------------------------------------------------------------------
-# TracedSeries
-# ---------------------------------------------------------------------------
-
-
 class TracedSeries:
     """Proxy for a single column or computed expression in a traced DataFrame.
 
@@ -124,10 +115,6 @@ class TracedSeries:
         self._expr = expr
         self._alias = alias
 
-    # ------------------------------------------------------------------
-    # Column alias
-    # ------------------------------------------------------------------
-
     def alias(self, name: str) -> TracedSeries:
         """Return a copy tagged with *name* as the output alias.
 
@@ -135,10 +122,6 @@ class TracedSeries:
         :return: a new :class:`TracedSeries` carrying the alias.
         """
         return TracedSeries(self._expr, alias=name)
-
-    # ------------------------------------------------------------------
-    # Arithmetic operators
-    # ------------------------------------------------------------------
 
     def __add__(self, other: object) -> TracedSeries:
         return TracedSeries(BinaryExpr(self._expr, "+", _to_ast(other)))
@@ -164,10 +147,6 @@ class TracedSeries:
     def __rtruediv__(self, other: object) -> TracedSeries:
         return TracedSeries(BinaryExpr(_to_ast(other), "/", self._expr))
 
-    # ------------------------------------------------------------------
-    # Comparison operators — return TracedCondition
-    # ------------------------------------------------------------------
-
     def __gt__(self, other: object) -> TracedCondition:  # type: ignore[override]
         return TracedCondition(Condition(self._expr, ">", _to_ast(other)))
 
@@ -185,10 +164,6 @@ class TracedSeries:
 
     def __ne__(self, other: object) -> TracedCondition:  # type: ignore[override]
         return TracedCondition(Condition(self._expr, "<>", _to_ast(other)))
-
-    # ------------------------------------------------------------------
-    # Aggregation methods
-    # ------------------------------------------------------------------
 
     def sum(self) -> TracedSeries:
         """Record a ``SUM(...)`` aggregation."""
@@ -210,10 +185,6 @@ class TracedSeries:
         """Record a ``COUNT(...)`` aggregation."""
         return TracedSeries(AggExpr("count", self._expr))
 
-    # ------------------------------------------------------------------
-    # Conversion helper
-    # ------------------------------------------------------------------
-
     def to_select_item(self) -> SelectItem:
         """Convert to a :class:`~yobx.sql.parse.SelectItem` for use in a query."""
         return SelectItem(expr=self._expr, alias=self._alias)
@@ -227,11 +198,6 @@ class TracedSeries:
     # __hash__ = None making TracedSeries unhashable.  Restore identity-based
     # hashing so that instances can be used in sets / as dict keys.
     __hash__ = object.__hash__  # type: ignore[assignment]
-
-
-# ---------------------------------------------------------------------------
-# TracedCondition
-# ---------------------------------------------------------------------------
 
 
 class TracedCondition:
@@ -262,11 +228,6 @@ class TracedCondition:
 
     def __repr__(self) -> str:
         return f"TracedCondition({self._condition!r})"
-
-
-# ---------------------------------------------------------------------------
-# TracedGroupBy
-# ---------------------------------------------------------------------------
 
 
 class TracedGroupBy:
@@ -305,11 +266,6 @@ class TracedGroupBy:
             item.output_name(): TracedSeries(item.expr, item.alias) for item in select_items
         }
         return TracedDataFrame(new_cols, new_ops, list(self._df._source_columns))
-
-
-# ---------------------------------------------------------------------------
-# TracedDataFrame
-# ---------------------------------------------------------------------------
 
 
 class TracedDataFrame:
@@ -534,6 +490,7 @@ class TracedDataFrame:
         applied), a pass-through ``SELECT`` of all current columns is appended
         automatically.
 
+        :param additional_traced_df:
         :return: a :class:`~yobx.sql.parse.ParsedQuery` ready for ONNX
             conversion via :func:`~yobx.sql.sql_convert.parsed_query_to_onnx`.
         """
@@ -543,6 +500,36 @@ class TracedDataFrame:
             ops.append(SelectOp(items=items))
         columns = _collect_columns(ops)
         return ParsedQuery(operations=ops, from_table="t", columns=columns)
+
+    def to_parsed_queries(self, *additional_traced_df: TracedDataFrame) -> ParsedQuery:
+        """Assemble a :class:`~yobx.sql.parse.ParsedQuery` from the recorded ops.
+
+        If no ``SelectOp`` has been recorded yet (e.g. only a filter was
+        applied), a pass-through ``SELECT`` of all current columns is appended
+        automatically.
+
+        :param additional_traced_df: addition dataframe to export
+        :return: a :class:`~yobx.sql.parse.ParsedQuery` ready for ONNX
+            conversion via :func:`~yobx.sql.sql_convert.parsed_query_to_onnx`.
+        """
+        ops = list(self._ops)
+        if not any(isinstance(op, SelectOp) for op in ops):
+            items = [SelectItem(ColumnRef(col), alias=None) for col in self._columns]
+            ops.append(SelectOp(items=items))
+        columns = _collect_columns(ops)
+        first_query = ParsedQuery(operations=ops, from_table="t", columns=columns)
+
+        set_id_ops = {id(op) for op in self._ops}
+        for tdf in additional_traced_df:
+            ops = [op for op in tdf._ops if id(op) not in set_id_ops]
+
+            if not any(isinstance(op, SelectOp) for op in ops):
+                items = [SelectItem(ColumnRef(col), alias=None) for col in self._columns]
+                ops.append(SelectOp(items=items))
+            columns = _collect_columns(ops)
+            first_query.append(ParsedQuery(operations=ops, from_table="t", columns=columns))
+
+        return first_query
 
     def __repr__(self) -> str:
         return f"TracedDataFrame(columns={list(self._columns.keys())!r})"
@@ -619,6 +606,15 @@ def trace_dataframe(
         columns = {name: TracedSeries(ColumnRef(name)) for name in input_dtypes}
         df = TracedDataFrame(columns, source_columns=list(input_dtypes.keys()))
         result = func(df)
+
+    if isinstance(result, tuple):
+        if not all(isinstance(r, TracedDataFrame) for r in result):
+            raise TypeError(
+                f"trace_dataframe: function must return a tuple of TracedDataFrame, "
+                f"got {tuple(type(r).__name__ for r in result)}"
+            )
+        return result[0].to_parsed_queries(*result[1:])
+
     if not isinstance(result, TracedDataFrame):
         raise TypeError(
             f"trace_dataframe: function must return a TracedDataFrame, "

@@ -895,10 +895,6 @@ class TestMultiDataframe(ExtTestCase):
         (sum_ab,) = ref.run(None, {"cid": cid, "a": a, "id": id_, "b": b})
         np.testing.assert_allclose(sum_ab, np.array([220.0, 330.0], dtype=np.float32))
 
-    # ------------------------------------------------------------------
-    # to_onnx dispatcher (callable path)
-    # ------------------------------------------------------------------
-
     def test_to_onnx_multi_frame(self):
         """to_onnx() correctly dispatches multi-frame callables."""
         from yobx.sql import to_onnx
@@ -912,11 +908,6 @@ class TestMultiDataframe(ExtTestCase):
         ref = ExtendedReferenceEvaluator(artifact)
         (total,) = ref.run(None, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b)
-
-
-# ---------------------------------------------------------------------------
-# parsed_query_to_onnx
-# ---------------------------------------------------------------------------
 
 
 class TestParsedQueryToOnnx(ExtTestCase):
@@ -957,6 +948,24 @@ class TestParsedQueryToOnnx(ExtTestCase):
         from yobx.sql import parsed_query_to_onnx_graph  # noqa: F401
 
         self.assertTrue(callable(parsed_query_to_onnx_graph))
+
+
+class TestMultiDataFrame(ExtTestCase):
+    """Tests for :func:`~yobx.sql.sql_convert.parsed_query_to_onnx`."""
+
+    def test_multi_dataframe_as_output(self):
+        def transform(df):
+            not_null = df.filter(df["a"] != 0)
+            pos = not_null.filter(df["a"] > 0).select([df["a"].alias("a_pos")])
+            neg = not_null.filter(df["a"] < 0).select([df["a"].alias("a_neg")])
+            return pos, neg
+
+        a = np.array([10.0, 20.0, 30.0], dtype=np.float32)
+        artifact = dataframe_to_onnx(transform, [{"a": np.float32}])
+        ref = ExtendedReferenceEvaluator(artifact)
+        sum_ab, sum_ab_1 = ref.run(None, {"a": a})
+        np.testing.assert_allclose(sum_ab, np.array([220.0, 330.0], dtype=np.float32))
+        np.testing.assert_allclose(sum_ab_1, np.array([221.0, 331.0], dtype=np.float32))
 
 
 if __name__ == "__main__":
