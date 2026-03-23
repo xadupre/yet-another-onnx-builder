@@ -53,6 +53,37 @@ def is_arg_tuple_spec(arg: Any) -> bool:
     return True
 
 
+def _dataframe_to_numpy(arg: Any) -> np.ndarray:
+    """Convert a pandas DataFrame to a numpy array.
+
+    Uses duck typing so that pandas is not a hard dependency.  The resulting
+    array dtype is determined by :meth:`pandas.DataFrame.to_numpy`; when all
+    columns share the same numeric dtype the result preserves that dtype,
+    otherwise numpy promotes to a common type (typically ``float64``).
+
+    :param arg: a :class:`pandas.DataFrame` instance.
+    :return: 2-D numpy array with shape ``(n_rows, n_cols)``.
+    :raises TypeError: when *arg* does not expose a ``to_numpy`` method.
+    """
+    if not hasattr(arg, "to_numpy"):
+        raise TypeError(
+            f"Expected a pandas DataFrame (with a to_numpy method), got {type(arg)}"
+        )
+    return arg.to_numpy()
+
+
+def _is_dataframe(arg: Any) -> bool:
+    """Return ``True`` when *arg* is a pandas DataFrame (duck-type check).
+
+    The check avoids importing pandas directly so that pandas remains an
+    optional dependency.  A DataFrame is identified by the presence of a
+    ``dtypes`` attribute (per-column dtype series) combined with the absence
+    of a plain ``dtype`` attribute (which numpy arrays carry) and the
+    presence of a ``to_numpy`` method.
+    """
+    return hasattr(arg, "dtypes") and not hasattr(arg, "dtype") and hasattr(arg, "to_numpy")
+
+
 def register_inputs(
     g: GraphBuilderExtendedProtocol,
     args: Tuple[Any, ...],
@@ -62,8 +93,11 @@ def register_inputs(
     """Resolve *input_names* and register each input with the graph builder *g*.
 
     :param g: graph builder (:class:`~yobx.typing.GraphBuilderExtendedProtocol`)
-    :param args: input descriptors — numpy arrays,
-        :class:`onnx.ValueInfoProto` objects, or ``(name, dtype, shape)`` tuples
+    :param args: input descriptors — numpy arrays, pandas DataFrames,
+        :class:`onnx.ValueInfoProto` objects, or ``(name, dtype, shape)`` tuples.
+        A pandas :class:`~pandas.DataFrame` is automatically converted to its
+        numpy representation via :meth:`~pandas.DataFrame.to_numpy`; the
+        element dtype is inferred from the resulting array.
     :param input_names: optional explicit names; overrides names embedded in
         :class:`~onnx.ValueInfoProto` / tuple descriptors when provided
     :param dynamic_shapes: per-input axis-to-symbol mapping used only for
@@ -98,6 +132,9 @@ def register_inputs(
             elem_type = np_dtype_to_tensor_dtype(np.dtype(arg_dtype))
             g.make_tensor_input(name, elem_type, tuple(arg_shape), device=-1)
         else:
+            if _is_dataframe(arg):
+                # Convert pandas DataFrame to numpy for dtype/shape inspection.
+                arg = _dataframe_to_numpy(arg)
             if dynamic_shapes:
                 ds = dynamic_shapes[i]
             else:

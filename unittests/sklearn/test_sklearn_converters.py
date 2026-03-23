@@ -9,7 +9,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from yobx.ext_test_case import ExtTestCase, requires_sklearn, hide_stdout
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_pandas, hide_stdout
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
 
@@ -629,6 +629,66 @@ class TestSklearnToOnnxTupleSpec(ExtTestCase):
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
         self.assertEqualArray(ss.transform(X).astype(np.float32), result, atol=1e-5)
+
+
+@requires_sklearn("1.4")
+@requires_pandas()
+class TestSklearnToOnnxDataFrame(ExtTestCase):
+    """Tests that to_onnx accepts pandas DataFrames as input descriptors."""
+
+    def test_standard_scaler_dataframe(self):
+        """DataFrame with uniform float32 dtype is accepted as input to to_onnx."""
+        import pandas as pd
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        df = pd.DataFrame(X, columns=["a", "b"])
+        ss = StandardScaler()
+        ss.fit(df)
+
+        onx = to_onnx(ss, (df,))
+
+        # Input should be registered as a 2-D float32 tensor.
+        inp = onx.proto.graph.input[0]
+        self.assertEqual(inp.type.tensor_type.elem_type, 1)  # FLOAT = 1
+        shape = inp.type.tensor_type.shape
+        self.assertEqual(shape.dim[1].dim_value, 2)
+
+        # Numerical output should match sklearn.
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X": X})[0]
+        expected = ss.transform(X).astype(np.float32)
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_standard_scaler_dataframe_float64(self):
+        """DataFrame with float64 dtype is accepted and produces a float64 ONNX input."""
+        import pandas as pd
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float64)
+        df = pd.DataFrame(X, columns=["a", "b"])
+        ss = StandardScaler()
+        ss.fit(df)
+
+        onx = to_onnx(ss, (df,))
+
+        inp = onx.proto.graph.input[0]
+        self.assertEqual(inp.type.tensor_type.elem_type, 11)  # DOUBLE = 11
+
+    def test_pipeline_dataframe(self):
+        """DataFrame works as input to to_onnx for a Pipeline (scaler + LR)."""
+        import pandas as pd
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        df = pd.DataFrame(X, columns=["a", "b"])
+        pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression())])
+        pipe.fit(df, y)
+
+        onx = to_onnx(pipe, (df,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        label, _ = ref.run(None, {"X": X})
+        expected = pipe.predict(df)
+        self.assertEqualArray(expected, label)
 
 
 if __name__ == "__main__":

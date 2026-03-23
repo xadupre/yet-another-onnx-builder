@@ -180,10 +180,14 @@ def to_onnx(
     the others are static.
 
     :param estimator: estimator
-    :param args: dummy inputs; each element may be a numpy array, an
+    :param args: dummy inputs; each element may be a numpy array, a
+        :class:`pandas.DataFrame`, an
         :class:`onnx.ValueInfoProto` that explicitly describes the input
         tensor's name, element type and shape, **or** a
-        ``(name, dtype, shape)`` tuple.  When a
+        ``(name, dtype, shape)`` tuple.  A :class:`~pandas.DataFrame` is
+        automatically converted to its numpy representation via
+        :meth:`~pandas.DataFrame.to_numpy`; the element dtype is inferred
+        from the resulting array.  When a
         :class:`~onnx.ValueInfoProto` or a ``(name, dtype, shape)`` tuple is
         provided no actual data is required, and the ``dynamic_shapes``
         parameter is ignored for that input (the shape is taken directly from
