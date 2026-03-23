@@ -23,6 +23,10 @@ class ExportReport:
     Additional arbitrary key-value pairs can be recorded via the
     :meth:`update` method and are stored in :attr:`extra`.
 
+    Node-level statistics (op-type counts and estimated FLOPs) are stored in
+    :attr:`node_stats` and can be populated by calling
+    :meth:`compute_node_stats`.
+
     Example::
 
         report = ExportReport()
@@ -35,10 +39,12 @@ class ExportReport:
         stats: Optional[List[Dict[str, Any]]] = None,
         extra: Optional[Dict[str, Any]] = None,
         build_stats: Optional[BuildStats] = None,
+        node_stats: Optional[List[Dict[str, Any]]] = None,
     ):
         self.stats: List[Dict[str, Any]] = stats if stats is not None else []
         self.extra: Dict[str, Any] = extra if extra is not None else {}
         self.build_stats = build_stats
+        self.node_stats: List[Dict[str, Any]] = node_stats if node_stats is not None else []
 
     def update(self, data: Any):
         """
@@ -58,8 +64,10 @@ class ExportReport:
             self.update(data.extra)
             if data.build_stats:
                 self.update(data.build_stats)
+            if data.node_stats:
+                self.node_stats.extend(data.node_stats)
         else:
-            raise TypeError(f"Unexpected tppe {type(data)} for data.")
+            raise TypeError(f"Unexpected type {type(data)} for data.")
         return self
 
     def to_dict(self) -> Dict[str, Any]:
@@ -67,7 +75,12 @@ class ExportReport:
 
         :return: dictionary with keys ``"stats"`` and ``"extra"``.
         """
-        return {"stats": self.stats, "extra": self.extra, "build_stats": self.build_stats}
+        return {
+            "stats": self.stats,
+            "extra": self.extra,
+            "build_stats": self.build_stats,
+            "node_stats": self.node_stats,
+        }
 
     def to_string(self) -> str:
         """Return a human-readable text summary of this report.
@@ -133,12 +146,19 @@ class ExportReport:
                 for k, v in sorted(d.items()):
                     lines.append(f"  {k}: {v}")
 
+        if self.node_stats:
+            import pandas
+
+            df_ns = pandas.DataFrame(self.node_stats)
+            lines.append("-- node_stats --")
+            lines.append(df_ns.to_string(index=False))
+
         return "\n".join(lines)
 
     def to_excel(self, path: str) -> None:
         """Write the report contents to an Excel workbook at *path*.
 
-        The workbook contains up to four sheets:
+        The workbook contains up to five sheets:
 
         ``stats``
             Every row from :attr:`stats` as a raw :class:`~pandas.DataFrame`.
@@ -154,6 +174,10 @@ class ExportReport:
             :attr:`build_stats` rendered as a two-column table (``key``,
             ``value``).  Only written when :attr:`build_stats` is not ``None``
             and contains at least one entry.
+        ``node_stats``
+            Per-op-type node counts and estimated FLOPs from
+            :attr:`node_stats`.  Only written when :attr:`node_stats` is
+            non-empty.  Populated by :meth:`compute_node_stats`.
 
         :param path: destination file path (e.g. ``"report.xlsx"``).
 
@@ -201,12 +225,70 @@ class ExportReport:
                     df_bs = pandas.DataFrame(list(d.items()), columns=["key", "value"])
                     df_bs.to_excel(writer, sheet_name="build_stats", index=False)
 
+            if self.node_stats:
+                df_ns = pandas.DataFrame(self.node_stats)
+                df_ns.to_excel(writer, sheet_name="node_stats", index=False)
+
+    def compute_node_stats(self, model: "onnx.ModelProto", verbose: int = 0) -> "ExportReport":
+        """Compute per-op-type node counts and estimated FLOPs from *model*.
+
+        Delegates to :func:`~yobx.helpers.stats_helper.model_statistics` for
+        shape inference and FLOPs estimation.  Results are stored in
+        :attr:`node_stats` as a list of dicts with the keys:
+
+        ``op_type``
+            ONNX operator type name (e.g. ``"MatMul"``).
+        ``count``
+            Number of nodes with this op_type.
+        ``flops``
+            Estimated total floating-point operations for all nodes of this
+            type.  ``None`` when the estimate is unavailable (shapes not
+            fully known or the op is not covered by the estimator).
+
+        The rows are sorted by ``count`` descending.
+
+        :param model: exported ONNX model proto.
+        :param verbose: verbosity level passed to
+            :class:`~yobx.helpers.stats_helper.ModelStatistics`.
+        :return: ``self``, to allow method chaining.
+
+        Example::
+
+            import onnx.helper as oh
+            import onnx
+            from yobx.container import ExportReport
+
+            X = oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [4, 8])
+            Y = oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [4, 8])
+            node = oh.make_node("Relu", ["X"], ["Y"])
+            graph = oh.make_graph([node], "g", [X], [Y])
+            model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 18)])
+
+            report = ExportReport()
+            report.compute_node_stats(model)
+            print(report.node_stats)
+        """
+        from ..helpers.stats_helper import model_statistics
+
+        result = model_statistics(model, verbose=verbose)
+        counts = result["node_count_per_op_type"]
+        flops = result["flops_per_op_type"]
+
+        rows = [
+            {"op_type": op_type, "count": counts[op_type], "flops": flops.get(op_type)}
+            for op_type in counts
+        ]
+        rows.sort(key=lambda r: -r["count"])
+        self.node_stats = rows
+        return self
+
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}("
             f"n_stats={len(self.stats)}, "
             f"extra={sorted(self.extra)}, "
-            f"has_build_stats={self.build_stats is not None})"
+            f"has_build_stats={self.build_stats is not None}, "
+            f"n_node_stats={len(self.node_stats)})"
         )
 
 
@@ -350,6 +432,24 @@ class ExportArtifact(ExportArtifactProtocol):
         if not self.report:
             self.report = ExportReport()
         self.report.update(data)
+
+    def compute_node_stats(self, verbose: int = 0) -> "ExportArtifact":
+        """Compute per-op-type node counts and estimated FLOPs and store them in the report.
+
+        Delegates to :meth:`ExportReport.compute_node_stats` using this
+        artifact's :attr:`proto`.  Does nothing when :attr:`proto` is not a
+        :class:`~onnx.ModelProto`.
+
+        :param verbose: verbosity level passed to
+            :class:`~yobx.helpers.stats_helper.ModelStatistics`.
+        :return: ``self``, to allow method chaining.
+        """
+        if not isinstance(self.proto, onnx.ModelProto):
+            return self
+        if self.report is None:
+            self.report = ExportReport()
+        self.report.compute_node_stats(self.proto, verbose=verbose)
+        return self
 
     def save_report(self, onnx_path: str) -> None:
         """Save the report as an Excel file alongside *onnx_path* when available."""
