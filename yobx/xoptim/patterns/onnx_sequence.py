@@ -216,10 +216,7 @@ class SplitToSequenceSequenceAtPattern(PatternOptimization):
         return MatchResult(self, [node, *next_nodes], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        node_seq: NodeProto,
-        *node_ats: NodeProto,
+        self, g: "GraphBuilder", node_seq: NodeProto, *node_ats: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         keepdims = g.get_attribute_with_default(node_seq, "keepdims", default_value=1)
         axis = g.get_attribute_with_default(node_seq, "axis", default_value=0)
@@ -242,21 +239,22 @@ class SplitToSequenceSequenceAtPattern(PatternOptimization):
         inputs = [node_seq.input[0]]
         if len(node_seq.input) > 1:
             inputs.append(node_seq.input[1])
+            kwargs = {}
+        else:
+            kwargs = dict(num_outputs=n)
 
         split_node = g.make_node(
             "Split",
             inputs,
             outputs,
             axis=axis,
-            num_outputs=n,
             name=f"{self.__class__.__name__}--{node_seq.name}",
+            **kwargs,
         )
 
         if not keepdims:
             axis_init = g.make_initializer(
-                "",
-                np.array([axis], dtype=np.int64),
-                source=f"{self.__class__.__name__}.axes",
+                "", np.array([axis], dtype=np.int64), source=f"{self.__class__.__name__}.axes"
             )
             post_nodes = [
                 g.make_node(

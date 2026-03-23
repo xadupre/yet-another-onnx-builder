@@ -4614,7 +4614,6 @@ class TestGraphPatternOptimization(ExtTestCase):
         self.assertEqualArray(expected[1], got[1], atol=1e-5)
         self.assertEqualArray(expected[2], got[2], atol=1e-5)
 
-
         model = oh.make_model(
             oh.make_graph(
                 [

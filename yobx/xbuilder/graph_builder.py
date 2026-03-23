@@ -8361,7 +8361,6 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 if seq["ranks"] is None:
                     new_nodes.append(node)
                     continue
-                print("***", seq, position)
                 rank = seq["ranks"][int(position)]  # type: ignore
                 self.set_rank(node.output[0], rank)
                 new_nodes.append(node)
