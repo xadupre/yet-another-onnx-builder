@@ -53,6 +53,23 @@ def is_arg_tuple_spec(arg: Any) -> bool:
     return True
 
 
+def _dataframe_columns(arg: Any) -> List[Any]:
+    """Return the list of column names of a DataFrame (duck-type, no pandas import)."""
+    return list(arg.columns)
+
+
+def _is_dataframe(arg: Any) -> bool:
+    """Return ``True`` when *arg* is a pandas DataFrame (duck-type check).
+
+    The check avoids importing pandas directly so that pandas remains an
+    optional dependency.  A DataFrame is identified by the presence of a
+    ``dtypes`` attribute (per-column dtype series) combined with the absence
+    of a plain ``dtype`` attribute (which numpy arrays carry) and the
+    presence of a ``to_numpy`` method.
+    """
+    return hasattr(arg, "dtypes") and not hasattr(arg, "dtype") and hasattr(arg, "to_numpy")
+
+
 def register_inputs(
     g: GraphBuilderExtendedProtocol,
     args: Tuple[Any, ...],
@@ -62,12 +79,19 @@ def register_inputs(
     """Resolve *input_names* and register each input with the graph builder *g*.
 
     :param g: graph builder (:class:`~yobx.typing.GraphBuilderExtendedProtocol`)
-    :param args: input descriptors — numpy arrays,
-        :class:`onnx.ValueInfoProto` objects, or ``(name, dtype, shape)`` tuples
+    :param args: input descriptors — numpy arrays, pandas DataFrames,
+        :class:`onnx.ValueInfoProto` objects, or ``(name, dtype, shape)`` tuples.
+        A pandas :class:`~pandas.DataFrame` is expanded column-by-column: each
+        column is registered as a separate 1-D ONNX graph input (named after
+        the column), and an ONNX ``Unsqueeze`` + ``Concat`` node sequence
+        assembles them back into a 2-D matrix ``(batch, n_cols)`` that is
+        passed to the converter under the resolved input name.
     :param input_names: optional explicit names; overrides names embedded in
-        :class:`~onnx.ValueInfoProto` / tuple descriptors when provided
+        :class:`~onnx.ValueInfoProto` / tuple descriptors when provided.  For
+        DataFrame args this controls the name of the assembled 2-D tensor, not
+        the per-column input names.
     :param dynamic_shapes: per-input axis-to-symbol mapping used only for
-        numpy-array inputs; ``None`` defaults to ``{0: "batch"}``
+        numpy-array and DataFrame inputs; ``None`` defaults to ``{0: "batch"}``
     :return: the resolved list of input names (same length as *args*)
     """
     if input_names:
@@ -97,6 +121,30 @@ def register_inputs(
             _, arg_dtype, arg_shape = arg
             elem_type = np_dtype_to_tensor_dtype(np.dtype(arg_dtype))
             g.make_tensor_input(name, elem_type, tuple(arg_shape), device=-1)
+        elif _is_dataframe(arg):
+            # Each DataFrame column becomes a separate 1-D ONNX graph input.
+            # They are then assembled into a 2-D matrix passed to the converter.
+            ds = dynamic_shapes[i] if dynamic_shapes else {0: "batch"}
+            batch_dim = ds.get(0, "batch")
+            col_shape = (batch_dim,)
+
+            columns = _dataframe_columns(arg)
+            col_tensor_names = []
+            for col in columns:
+                col_arr = arg[col].to_numpy()
+                col_elem_type = np_dtype_to_tensor_dtype(col_arr.dtype)
+                g.make_tensor_input(str(col), col_elem_type, col_shape, device=-1)
+                col_tensor_names.append(str(col))
+
+            # Unsqueeze each 1-D column to (batch, 1), then concat to (batch, n_cols).
+            axes = np.array([1], dtype=np.int64)
+            parts_2d = [
+                g.op.Unsqueeze(c, axes, name=f"_df_unsqueeze_{c}") for c in col_tensor_names
+            ]
+            if len(parts_2d) == 1:
+                g.op.Identity(parts_2d[0], outputs=[name], name=f"_df_assembled_{name}")
+            else:
+                g.op.Concat(*parts_2d, axis=1, outputs=[name], name=f"_df_assembled_{name}")
         else:
             if dynamic_shapes:
                 ds = dynamic_shapes[i]
