@@ -6,6 +6,7 @@ import numpy as np
 import onnx
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
+from ..helpers.onnx_helper import normalize_input_arg
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from .litert_helper import BuiltinOperator, TFLiteOperator, TFLiteSubgraph, parse_tflite_model
 from .register import get_litert_op_converter
@@ -83,6 +84,10 @@ def to_onnx(
             dict_target_opset[""] = DEFAULT_TARGET_OPSET
 
     register_litert_converters()
+
+    # Normalize each arg so that torch.Tensor, tf.Tensor, numpy dtypes, and other
+    # array-like types are accepted alongside numpy arrays and ValueInfoProtos.
+    args = tuple(normalize_input_arg(arg, idx=j) for j, arg in enumerate(args))
 
     tflite_model = parse_tflite_model(model)
 

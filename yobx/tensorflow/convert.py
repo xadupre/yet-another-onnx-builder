@@ -4,7 +4,7 @@ from onnx import ValueInfoProto
 import tensorflow as tf
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
-from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
+from ..helpers.onnx_helper import tensor_dtype_to_np_dtype, normalize_input_arg
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from .register import get_tf_op_converter
 from .tensorflow_helper import tf_dtype_to_np_dtype
@@ -86,6 +86,10 @@ def to_onnx(
             dict_target_opset[""] = 21
 
     register_tensorflow_converters()
+
+    # Normalize each arg so that torch.Tensor, numpy dtypes, and other array-like
+    # types are accepted alongside numpy arrays and ValueInfoProtos.
+    args = tuple(normalize_input_arg(arg, idx=j) for j, arg in enumerate(args))
 
     if input_names is not None and len(input_names) != len(args):
         raise ValueError(f"Length mismatch: {len(args)=} but input_names={input_names!r}")

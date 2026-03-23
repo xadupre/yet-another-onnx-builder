@@ -1623,3 +1623,77 @@ def attr_proto_to_python(attr: onnx.AttributeProto) -> Any:
     if t == onnx.AttributeProto.STRINGS:
         return [s.decode("utf-8") if isinstance(s, bytes) else s for s in attr.strings]
     raise NotImplementedError(f"Unsupported AttributeProto type: {t}")
+
+
+def normalize_input_arg(
+    arg: Any,
+    name: str = "",
+    idx: int = 0,
+) -> Union[np.ndarray, onnx.ValueInfoProto]:
+    """
+    Normalizes a single element of the *args* tuple passed to any ``to_onnx``
+    function into either a :class:`numpy.ndarray` (when actual data are
+    available) or an :class:`onnx.ValueInfoProto` (when only type information
+    is available).
+
+    This helper is the single place where all supported arg types are
+    mapped to a canonical form, making every ``to_onnx`` function consistent:
+
+    * :class:`numpy.ndarray` — returned as-is.
+    * :class:`numpy.dtype` instance or numpy scalar type
+      (e.g. ``np.float32``, ``np.dtype("float32")``) — converted to a
+      :class:`~onnx.ValueInfoProto` with the corresponding element type and
+      no shape (unranked tensor descriptor).
+    * :class:`onnx.ValueInfoProto` — returned as-is.
+    * :class:`torch.Tensor` — converted to :class:`numpy.ndarray` via
+      ``.detach().cpu().numpy()``.
+    * TensorFlow / LiteRT eager tensor (``tf.Tensor``) — converted to
+      :class:`numpy.ndarray` via ``.numpy()``.
+
+    :param arg: input argument to normalize.
+    :param name: optional name hint used when creating a
+        :class:`~onnx.ValueInfoProto` from a dtype-only descriptor.
+    :param idx: positional index used to construct a default name when
+        *name* is empty (``"X{idx}"`` if *idx* > 0, else ``"X"``).
+    :return: :class:`numpy.ndarray` or :class:`onnx.ValueInfoProto`.
+    """
+    if isinstance(arg, np.ndarray):
+        return arg
+    if isinstance(arg, onnx.ValueInfoProto):
+        return arg
+    # numpy scalar type (e.g. np.float32) or np.dtype instance
+    if isinstance(arg, np.dtype) or (isinstance(arg, type) and issubclass(arg, np.generic)):
+        elem_type = np_dtype_to_tensor_dtype(np.dtype(arg))
+        vip_name = name or ("X" if idx == 0 else f"X{idx}")
+        return oh.make_tensor_value_info(vip_name, elem_type, None)
+    # torch.Tensor — lazy import to avoid a hard dependency on torch.
+    # Guard against namespace packages or stub modules that expose no Tensor.
+    try:
+        import torch
+
+        if hasattr(torch, "Tensor") and isinstance(arg, torch.Tensor):
+            return arg.detach().cpu().numpy()
+    except ImportError:
+        pass
+    # TensorFlow / LiteRT eager tensor — lazy import to avoid hard dependency
+    try:
+        import tensorflow as tf
+
+        if hasattr(tf, "Tensor") and isinstance(arg, tf.Tensor):
+            return arg.numpy()
+    except ImportError:
+        pass
+    # Generic array-like fallback (e.g. Python lists, other array wrappers).
+    # numpy raises a descriptive error if `arg` cannot be converted, so we let
+    # it propagate directly rather than wrapping it in a less informative
+    # message.  This path intentionally handles only types that numpy can
+    # consume (numeric lists, tuples, scalar values, etc.).
+    try:
+        return np.asarray(arg)
+    except (TypeError, ValueError) as exc:
+        raise TypeError(
+            f"Cannot normalize argument of type {type(arg).__name__!r} for to_onnx.  "
+            "Supported types: numpy.ndarray, numpy.dtype, numpy scalar type "
+            "(e.g. np.float32), onnx.ValueInfoProto, torch.Tensor, tf.Tensor, "
+            "or any array-like object accepted by numpy.asarray()."
+        ) from exc

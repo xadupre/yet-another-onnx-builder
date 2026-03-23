@@ -7,7 +7,7 @@ from sklearn.utils.validation import check_is_fitted
 from .. import DEFAULT_TARGET_OPSET
 from ..typing import ConvertOptionsProtocol
 from ..container import ExportArtifact
-from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
+from ..helpers.onnx_helper import np_dtype_to_tensor_dtype, normalize_input_arg
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from ..xbuilder.function_options import FunctionOptions
 from .register import get_sklearn_converter, sklearn_exportable_methods
@@ -330,6 +330,10 @@ def to_onnx(
         fct = extra_converters[cls]
     else:
         fct = get_sklearn_converter(cls)
+
+    # Normalize each arg so that torch.Tensor, tf.Tensor, and numpy dtypes are
+    # all transparently accepted alongside numpy arrays and ValueInfoProtos.
+    args = tuple(normalize_input_arg(arg, idx=j) for j, arg in enumerate(args))
 
     if input_names:
         if len(input_names) != len(args):

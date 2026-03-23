@@ -222,3 +222,68 @@ def to_tensor(tensor: onnx.TensorProto, base_dir: str = "") -> "torch.Tensor":
     # Other cases, it should be small tensor. We use numpy.
     np_tensor = onh.to_array(tensor)
     return torch.from_numpy(np_tensor)
+
+
+def normalize_torch_input_arg(arg: Any) -> "torch.Tensor":
+    """
+    Normalizes a single element of the *args* tuple passed to the torch
+    ``to_onnx`` function into a :class:`torch.Tensor`.
+
+    This helper is the counterpart of
+    :func:`yobx.helpers.onnx_helper.normalize_input_arg` for the PyTorch
+    converter, which requires actual :class:`torch.Tensor` objects to drive
+    ``torch.export.export``.
+
+    Accepted input types:
+
+    * :class:`torch.Tensor` — returned as-is.
+    * :class:`numpy.ndarray` — converted via :func:`torch.from_numpy`
+      (the array is copied so the resulting tensor owns its storage).
+    * :class:`onnx.ValueInfoProto` — a zero-filled tensor whose dtype and
+      shape are read from the proto.  Dynamic or unknown dimensions are
+      replaced by ``1``.
+    * :class:`numpy.dtype` / numpy scalar type (e.g. ``np.float32``) —
+      raises :exc:`ValueError` because a shape is required to build a
+      :class:`torch.Tensor` from type information alone.  Pass a
+      :class:`numpy.ndarray` or an :class:`~onnx.ValueInfoProto` instead.
+
+    :param arg: input argument to normalize.
+    :return: :class:`torch.Tensor`.
+    :raises ValueError: when *arg* is a numpy dtype without shape information.
+    :raises TypeError: when *arg* cannot be converted to a
+        :class:`torch.Tensor`.
+    """
+    if isinstance(arg, torch.Tensor):
+        return arg
+    if isinstance(arg, np.ndarray):
+        # torch.from_numpy shares memory with the numpy array, so the tensor
+        # becomes invalid if the array is later freed or reshaped.  We make a
+        # copy to give the tensor independent ownership of its storage, which
+        # is the safe default for an export-helper utility.
+        return torch.from_numpy(arg.copy())
+    if isinstance(arg, onnx.ValueInfoProto):
+        tt = arg.type.tensor_type
+        torch_dtype = onnx_dtype_to_torch_dtype(tt.elem_type)
+        if tt.HasField("shape"):
+            # Dynamic or unknown dimensions (dim_param set, or dim_value == 0)
+            # are replaced by 1 so we can create a concrete zeros tensor.
+            shape = tuple(
+                1 if d.dim_param or d.dim_value <= 0 else d.dim_value
+                for d in tt.shape.dim
+            )
+        else:
+            shape = ()
+        return torch.zeros(shape, dtype=torch_dtype)
+    if isinstance(arg, np.dtype) or (isinstance(arg, type) and issubclass(arg, np.generic)):
+        raise ValueError(
+            f"Cannot convert a numpy dtype ({arg!r}) to a torch.Tensor without shape "
+            "information.  Pass a numpy array or an onnx.ValueInfoProto instead."
+        )
+    # Generic fallback: try converting via numpy
+    try:
+        return torch.from_numpy(np.asarray(arg).copy())
+    except Exception as exc:
+        raise TypeError(
+            f"Cannot convert {type(arg)} to a torch.Tensor.  "
+            "Supported types: torch.Tensor, numpy.ndarray, onnx.ValueInfoProto."
+        ) from exc

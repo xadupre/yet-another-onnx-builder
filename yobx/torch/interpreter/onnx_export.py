@@ -949,6 +949,18 @@ def to_onnx(
         options, OptimizationOptions
     ), f"Unexpected type {type(options)} for options"
     from ... import DEFAULT_TARGET_OPSET
+    from ..torch_helper import normalize_torch_input_arg
+
+    # Normalize each *scalar* arg so that numpy arrays, ValueInfoProtos, and
+    # other array-like types are accepted alongside torch.Tensor objects.
+    # Collection types (list, tuple, dict) are left intact because torch.export
+    # supports structured inputs (e.g. a list of tensors or a named-tensor dict)
+    # that must be passed through as-is.
+    if args is not None:
+        args = tuple(
+            normalize_torch_input_arg(a) if not isinstance(a, (list, tuple, dict)) else a
+            for a in args
+        )
 
     if target_opset is None:
         target_opset = min(DEFAULT_TARGET_OPSET, onnx_opset_version() - 1)
