@@ -274,12 +274,9 @@ class TestGraphBuilderExtendedProtocol(ExtTestCase):
         "unique_name",
         "op",
         "set_type_shape_unary_op",
-<<<<<<< copilot/add-is-constant-get-constant
         "is_constant",
         "get_constant",
-=======
         "value_as_shape",
->>>>>>> main
     ]
 
     def test_extended_protocol_has_required_methods(self):
