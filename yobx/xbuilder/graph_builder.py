@@ -23,6 +23,7 @@ from typing import (
 )
 import numpy as np
 from onnx import (
+    load as onnx_load,
     AttributeProto,
     FunctionProto,
     GraphProto,
@@ -261,7 +262,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
     def __init__(
         self,
         target_opset_or_existing_proto: Union[
-            int, Dict[str, int], GraphProto, ModelProto, FunctionProto
+            int, Dict[str, int], GraphProto, ModelProto, FunctionProto, str
         ],
         input_names: Optional[Sequence[str]] = None,
         as_function: bool = False,
@@ -434,6 +435,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
             infer_shapes_options = (
                 InferShapesOptions.ONNX if infer_shapes_options else InferShapesOptions.NONE
             )
+        if isinstance(target_opset_or_existing_proto, str):
+            # This is a file.
+            target_opset_or_existing_proto = onnx_load(target_opset_or_existing_proto)
         if isinstance(target_opset_or_existing_proto, (int, dict)):
             # starts a model from nothing
             assert (
@@ -8323,6 +8327,21 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 new_nodes.append(node)
                 continue
 
+            if node.op_type == "SplitToSequence":
+                if not self.has_name(node.output[0]):
+                    self.set_name(
+                        node.output[0], f"_update_structures_with_proto_SC2_{node.output[0]}"
+                    )
+                self.set_sequence(
+                    node.output[0],
+                    self.get_type(node.input[0]) if self.has_type(node.input[0]) else 0,
+                    shapes=None,
+                    ranks=None,
+                    unknown=True,
+                )
+                new_nodes.append(node)
+                continue
+
             if node.op_type == "SequenceAt":
                 position = self.get_constant(node.input[1], computed_value=True)
                 seq = self.get_sequence(node.input[0])
@@ -8342,15 +8361,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
                 if seq["ranks"] is None:
                     new_nodes.append(node)
                     continue
+                print("***", seq, position)
                 rank = seq["ranks"][int(position)]  # type: ignore
                 self.set_rank(node.output[0], rank)
                 new_nodes.append(node)
                 continue
-
-            assert node.op_type not in {"SplitToSequence", "SequenceErase"}, (
-                f"Sequence operators are not supported yet and op_type={node.op_type!r}"
-                f"(name={node.name!r})."
-            )
 
             if node.op_type == "Constant":
                 exist = self.is_exact_same_constant(node)

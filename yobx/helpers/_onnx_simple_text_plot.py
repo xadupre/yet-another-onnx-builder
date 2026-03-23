@@ -723,7 +723,7 @@ def onnx_simple_text_plot(
         main_model = None
 
     # inputs
-    assert hasattr(model, "input"), "type checking"
+    assert hasattr(model, "input"), f"type checking {type(model)}"
     line_name_new = {}
     line_name_in = {}  # type: ignore[var-annotated]
     if level == 0:
