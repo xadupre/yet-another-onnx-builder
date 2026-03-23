@@ -801,6 +801,23 @@ def requires_numpy(version: str, msg: str = "") -> Callable:
     return lambda x: x
 
 
+def requires_pandas(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`pandas` is not installed or not recent enough."""
+    try:
+        import pandas
+    except ImportError:
+        return unittest.skip(msg or "pandas not installed")
+
+    if not hasattr(pandas, "__version__"):
+        return lambda x: x
+    if not version:
+        return lambda x: x
+    if PvVersion(pandas.__version__) < PvVersion(version):
+        msg = f"pandas version {pandas.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
 def requires_transformers(
     version: str, msg: str = "", or_older_than: Optional[str] = None
 ) -> Callable:
