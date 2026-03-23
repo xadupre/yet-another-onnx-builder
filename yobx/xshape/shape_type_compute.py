@@ -984,6 +984,8 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
         )
         if pads is None:
             return
+        if isinstance(pads, onnx.TensorProto):
+            pads = onnx.numpy_helper.to_array(pads)
         pads = pads.tolist()
         if len(node.input) > 3 and node.input[3]:
             axes = self.compute_constant(node.input[3])[0]
@@ -991,6 +993,8 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
                 f"Unable to evaluate axes={node.input[3]!r}: "
                 f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
             )
+            if isinstance(axes, onnx.TensorProto):
+                axes = onnx.numpy_helper.to_array(axes)
             axes = axes.tolist()
         else:
             axes = list(range(len(pads) // 2))
