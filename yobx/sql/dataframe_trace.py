@@ -15,7 +15,9 @@ existing SQL converter.
 Supported operations
 --------------------
 * **Column access**: ``df["col"]`` or ``df.col``
-* **Arithmetic**: ``+``, ``-``, ``*``, ``/`` between columns and/or scalars
+* **Arithmetic**: ``+``, ``-``, ``*``, ``/`` between columns and/or scalars,
+  or applied element-wise across all columns of a :class:`TracedDataFrame`
+  (e.g. ``df + 1``, ``df * 2.0``)
 * **Comparison**: ``>``, ``<``, ``>=``, ``<=``, ``==``, ``!=``
 * **Boolean combination**: ``&`` (AND), ``|`` (OR) on :class:`TracedCondition`
 * **Row filtering**: :meth:`TracedDataFrame.filter` or ``df[condition]``
@@ -524,6 +526,74 @@ class TracedDataFrame:
         return TracedGroupBy(self, list(by))
 
     # ------------------------------------------------------------------
+    # Arithmetic operators (element-wise across all columns)
+    # ------------------------------------------------------------------
+
+    def _apply_elementwise(
+        self, op: str, other: object, reversed: bool = False
+    ) -> "TracedDataFrame":
+        """Apply a binary arithmetic operation element-wise to every column.
+
+        :param op: the operator string (``'+'``, ``'-'``, ``'*'``, or
+            ``'/'``).
+        :param other: a scalar (``int`` or ``float``) or another
+            :class:`TracedDataFrame` with the same column names.
+        :param reversed: when ``True`` the operands are swapped so that
+            ``other op self`` is computed instead of ``self op other``.
+        :return: a new :class:`TracedDataFrame` whose column expressions
+            embed the arithmetic.
+        """
+        new_cols: Dict[str, TracedSeries] = {}
+        for name, series in self._columns.items():
+            if isinstance(other, TracedDataFrame):
+                if name not in other._columns:
+                    raise KeyError(
+                        f"Column {name!r} not found in right DataFrame. "
+                        f"Available columns: {list(other._columns.keys())}"
+                    )
+                right_expr = other._columns[name]._expr
+            else:
+                right_expr = _to_ast(other)
+            if reversed:
+                expr: object = BinaryExpr(right_expr, op, series._expr)
+            else:
+                expr = BinaryExpr(series._expr, op, right_expr)
+            new_cols[name] = TracedSeries(expr)
+        return TracedDataFrame(new_cols, list(self._ops), list(self._source_columns))
+
+    def __add__(self, other: object) -> "TracedDataFrame":
+        """Return a new frame with *other* added to every column (``df + other``)."""
+        return self._apply_elementwise("+", other)
+
+    def __radd__(self, other: object) -> "TracedDataFrame":
+        """Return a new frame with every column added to *other* (``other + df``)."""
+        return self._apply_elementwise("+", other, reversed=True)
+
+    def __sub__(self, other: object) -> "TracedDataFrame":
+        """Return a new frame with *other* subtracted from every column (``df - other``)."""
+        return self._apply_elementwise("-", other)
+
+    def __rsub__(self, other: object) -> "TracedDataFrame":
+        """Return a new frame with every column subtracted from *other* (``other - df``)."""
+        return self._apply_elementwise("-", other, reversed=True)
+
+    def __mul__(self, other: object) -> "TracedDataFrame":
+        """Return a new frame with every column multiplied by *other* (``df * other``)."""
+        return self._apply_elementwise("*", other)
+
+    def __rmul__(self, other: object) -> "TracedDataFrame":
+        """Return a new frame with *other* multiplied by every column (``other * df``)."""
+        return self._apply_elementwise("*", other, reversed=True)
+
+    def __truediv__(self, other: object) -> "TracedDataFrame":
+        """Return a new frame with every column divided by *other* (``df / other``)."""
+        return self._apply_elementwise("/", other)
+
+    def __rtruediv__(self, other: object) -> "TracedDataFrame":
+        """Return a new frame with *other* divided by every column (``other / df``)."""
+        return self._apply_elementwise("/", other, reversed=True)
+
+    # ------------------------------------------------------------------
     # Query assembly
     # ------------------------------------------------------------------
 
@@ -531,15 +601,20 @@ class TracedDataFrame:
         """Assemble a :class:`~yobx.sql.parse.ParsedQuery` from the recorded ops.
 
         If no ``SelectOp`` has been recorded yet (e.g. only a filter was
-        applied), a pass-through ``SELECT`` of all current columns is appended
-        automatically.
+        applied, or element-wise arithmetic was applied to the whole frame),
+        a ``SELECT`` is generated from the current column expressions.  This
+        correctly captures any arithmetic embedded in the column expressions
+        (e.g. from ``df + 1``).
 
         :return: a :class:`~yobx.sql.parse.ParsedQuery` ready for ONNX
             conversion via :func:`~yobx.sql.sql_convert.parsed_query_to_onnx`.
         """
         ops = list(self._ops)
         if not any(isinstance(op, SelectOp) for op in ops):
-            items = [SelectItem(ColumnRef(col), alias=None) for col in self._columns]
+            items = [
+                SelectItem(series._expr, alias=col)
+                for col, series in self._columns.items()
+            ]
             ops.append(SelectOp(items=items))
         columns = _collect_columns(ops)
         return ParsedQuery(operations=ops, from_table="t", columns=columns)
