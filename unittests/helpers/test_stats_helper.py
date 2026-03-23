@@ -104,8 +104,9 @@ class TestStatsHelper(ExtTestCase):
         graph = oh.make_graph(nodes, "reshape_test", [X], [Z], [shape])
         model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 17)])
         stats = model_statistics(model)
-        self.assertEqual(stats["flops_per_op_type"]["Reshape"], 32)
-        self.assertEqual(stats["total_estimated_flops"], 32)
+        # Reshape cost = rank of output shape [32] → rank = 1
+        self.assertEqual(stats["flops_per_op_type"]["Reshape"], 1)
+        self.assertEqual(stats["total_estimated_flops"], 1)
 
     def test_gemm_flops(self):
         # Gemm [M,K] @ [K,N] + bias: 2*M*K*N + M*N
@@ -136,8 +137,8 @@ class TestStatsHelper(ExtTestCase):
         graph = oh.make_graph(nodes, "literal_test", [X], [Z], [reshape_shape, W])
         model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 17)])
         stats = model_statistics(model)
-        # Reshape has data-movement cost (32 elements); MatMul [1,32] @ [32,16] → 2*1*32*16 = 1024
-        self.assertEqual(stats["flops_per_op_type"]["Reshape"], 32)
+        # Reshape cost = rank of output [1,32] → rank 2; MatMul [1,32] @ [32,16] → 2*1*32*16 = 1024
+        self.assertEqual(stats["flops_per_op_type"]["Reshape"], 2)
         self.assertEqual(stats["flops_per_op_type"]["MatMul"], 2 * 1 * 32 * 16)
 
     def test_model_statistics_class_node_count(self):

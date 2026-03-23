@@ -142,19 +142,17 @@ _DATA_MOVEMENT_OPS: frozenset = frozenset(
         "GatherND",
         "OneHot",
         "Pad",
-        "Reshape",
         "Scatter",
         "ScatterElements",
         "ScatterND",
-        "Shape",
         "Slice",
         "Split",
-        "Squeeze",
         "Tile",
         "Transpose",
-        "Unsqueeze",
     }
 )
+
+_RANK_COST_OPS: frozenset = frozenset({"Reshape", "Shape", "Squeeze", "Unsqueeze"})
 
 
 # ---------------------------------------------------------------------------
@@ -439,6 +437,30 @@ def _flops_data_movement(
     return None
 
 
+def _flops_rank_cost(
+    node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
+) -> Optional[DIM_TYPE]:
+    """Shape-manipulation ops: cost = rank (number of dimensions) of the output.
+
+    For ``Shape``, the relevant rank is that of the *input* tensor (the op reads
+    one value per dimension).  For ``Reshape``, ``Squeeze``, and ``Unsqueeze``
+    the rank of the output shape is used.
+    """
+    if node.op_type == "Shape":
+        # Shape reads one value per input dimension.
+        if node.input:
+            sh = _resolve_shape(node.input[0], shape_fn, literal_fn)
+            if sh is not None:
+                return len(sh)
+        return None
+    # Reshape / Squeeze / Unsqueeze: rank of output.
+    if node.output:
+        sh = _resolve_shape(node.output[0], shape_fn, literal_fn)
+        if sh is not None:
+            return len(sh)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher: maps op_type → handler function
 # ---------------------------------------------------------------------------
@@ -457,6 +479,8 @@ for _op in _ZERO_COST_OPS:
     _OP_HANDLERS[_op] = _flops_zero_cost
 for _op in _DATA_MOVEMENT_OPS:
     _OP_HANDLERS[_op] = _flops_data_movement
+for _op in _RANK_COST_OPS:
+    _OP_HANDLERS[_op] = _flops_rank_cost
 
 _OP_HANDLERS.update(
     {
