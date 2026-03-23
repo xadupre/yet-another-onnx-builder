@@ -129,9 +129,16 @@ class _ShapeRuntime:
                 isinstance(y, tuple)
                 and (
                     isinstance(i, np.ndarray)
-                    or (self._has_torch and isinstance(i, self.torch.Tensor))
+                    or (
+                        hasattr(i, "detach")
+                        and self._has_torch
+                        and isinstance(i, self.torch.Tensor)
+                    )
                 )
-                and (i.dtype == np.int64 or (self._has_torch and i.dtype == self.torch.int64))
+                and (
+                    i.dtype == np.int64
+                    or (hasattr(i, "detach") and self._has_torch and i.dtype == self.torch.int64)
+                )
                 and tuple(i.shape) in ((1,), tuple())
             ):
                 ishape = tuple(i.shape)

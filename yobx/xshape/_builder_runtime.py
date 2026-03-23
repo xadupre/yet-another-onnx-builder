@@ -61,7 +61,7 @@ class _ExtraPackages:
             import torch
             import torch._subclasses
 
-            self._has_torch_ = True
+            self._has_torch_ = hasattr(torch, "__version__")
             self.torch = torch
             self.torch_subclasses = torch._subclasses
             self.maybe_disable_fake_tensor_mode = _maybe_disable_fake_tensor_mode
@@ -79,7 +79,7 @@ class _ExtraPackages:
         try:
             import tensorflow
 
-            self._has_tensorflow_ = True
+            self._has_tensorflow_ = hasattr(tensorflow, "__version__")
             self.tensorflow = tensorflow
         except (NameError, ImportError, AttributeError):
             self._has_tensorflow_ = False
@@ -317,7 +317,7 @@ class _BuilderRuntime:
             f"Shape mismatch between x.shape={x.shape} and perm={perm!r}, "
             f"node is {self.pretty_node(node)}{self.get_debug_msg()}"
         )
-        if self._has_torch:
+        if hasattr(x, "detach") and self._has_torch:
             if isinstance(x, np.ndarray):
                 # Type conversion between numpy and torch is not robust.
                 itype = dtype_to_tensor_dtype(x.dtype)
@@ -331,7 +331,7 @@ class _BuilderRuntime:
     ) -> "torch.Tensor":  # noqa: F821
         x = feeds[node.input[0]]
         new_shape = feeds[node.input[1]]
-        if self._has_torch and isinstance(x, self.torch.Tensor):
+        if hasattr(x, "detach") and self._has_torch and isinstance(x, self.torch.Tensor):
             if len(x.shape) == 0:
                 if len(new_shape) == 0:
                     return x
@@ -394,7 +394,9 @@ class _BuilderRuntime:
     ) -> "torch.Tensor":  # noqa: F821
         x = feeds[node.input[0]]
         if not isinstance(x, np.ndarray) and (
-            not self._has_torch or not isinstance(x, self.torch.Tensor)
+            not hasattr(x, "detach")
+            or not self._has_torch
+            or not isinstance(x, self.torch.Tensor)
         ):
             # Maybe a float, then we process it as a float, tensor.to only works
             # on tensors.
@@ -431,7 +433,9 @@ class _BuilderRuntime:
             )
             ttype = self.onnx_dtype_to_torch_dtype(to)
             return [x.to(ttype)]
-        assert self._has_torch and isinstance(x, self.torch.Tensor), "unexpected configuration"
+        assert (
+            hasattr(x, "detach") and self._has_torch and isinstance(x, self.torch.Tensor)
+        ), "unexpected configuration"
         ttype = self.onnx_dtype_to_torch_dtype(to)
         return [x.to(ttype)]
 
@@ -482,7 +486,7 @@ class _BuilderRuntime:
             f"x cannot be empty but shape is {x.shape}, execution of Trilu "
             f"failed{self.get_debug_msg()}"
         )
-        if self._has_torch and isinstance(x, self.torch.Tensor):
+        if hasattr(x, "detach") and self._has_torch and isinstance(x, self.torch.Tensor):
             assert isinstance(k, self.torch.Tensor), (
                 f"Expecting a tensor for {node.input[1]!r} but got "
                 f"{type(k)}{self.get_debug_msg()}"
@@ -534,7 +538,7 @@ class _BuilderRuntime:
     ) -> "torch.Tensor":  # noqa: F821
         new_feeds = {}
         for k, v in feeds.items():
-            if self._has_torch and isinstance(v, np.ndarray):
+            if hasattr(v, "detach") and self._has_torch and isinstance(v, np.ndarray):
                 # Type conversion between numpy and torch is not robust.
                 itype = dtype_to_tensor_dtype(v.dtype)
                 ttype = self.onnx_dtype_to_torch_dtype(itype)
@@ -558,7 +562,7 @@ class _BuilderRuntime:
     ) -> "torch.Tensor":  # noqa: F821
         new_feeds = {}
         for k, v in feeds.items():
-            if self._has_torch and isinstance(v, np.ndarray):
+            if hasattr(v, "detach") and self._has_torch and isinstance(v, np.ndarray):
                 # Type conversion between numpy and torch is not robust.
                 itype = dtype_to_tensor_dtype(v.dtype)
                 ttype = self.onnx_dtype_to_torch_dtype(itype)
