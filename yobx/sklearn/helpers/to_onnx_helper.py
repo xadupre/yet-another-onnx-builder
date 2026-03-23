@@ -5,7 +5,7 @@ from ...helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ...typing import GraphBuilderExtendedProtocol
 
 
-def _extract_value_info_proto(vip: ValueInfoProto) -> Tuple[str, int, Optional[Tuple]]:
+def extract_value_info_proto(vip: ValueInfoProto) -> Tuple[str, int, Optional[Tuple]]:
     """Extract ``(name, elem_type, shape)`` from a :class:`onnx.ValueInfoProto`.
 
     :param vip: an ONNX value-info descriptor
@@ -29,7 +29,7 @@ def _extract_value_info_proto(vip: ValueInfoProto) -> Tuple[str, int, Optional[T
     return name, elem_type, shape
 
 
-def _is_arg_tuple_spec(arg: Any) -> bool:
+def is_arg_tuple_spec(arg: Any) -> bool:
     """Return True if *arg* is a ``(name, dtype, shape)`` input specification.
 
     Supported format::
@@ -53,7 +53,7 @@ def _is_arg_tuple_spec(arg: Any) -> bool:
     return True
 
 
-def _register_inputs(
+def register_inputs(
     g: GraphBuilderExtendedProtocol,
     args: Tuple[Any, ...],
     input_names: Optional[Sequence[str]],
@@ -81,7 +81,7 @@ def _register_inputs(
         for j, arg in enumerate(args):
             if isinstance(arg, ValueInfoProto):
                 default_names.append(arg.name or (f"X{j}" if len(args) > 1 else "X"))
-            elif _is_arg_tuple_spec(arg):
+            elif is_arg_tuple_spec(arg):
                 default_names.append(arg[0])
             else:
                 default_names.append("X" if len(args) == 1 else f"X{j}")
@@ -90,9 +90,9 @@ def _register_inputs(
     for i, (name, arg) in enumerate(zip(resolved_names, args)):
         if isinstance(arg, ValueInfoProto):
             # Use name/type/shape directly from the ValueInfoProto.
-            _, elem_type, shape = _extract_value_info_proto(arg)
+            _, elem_type, shape = extract_value_info_proto(arg)
             g.make_tensor_input(name, elem_type, shape, device=-1)
-        elif _is_arg_tuple_spec(arg):
+        elif is_arg_tuple_spec(arg):
             # Use name/dtype/shape directly from the (name, dtype, shape) tuple.
             _, arg_dtype, arg_shape = arg
             elem_type = np_dtype_to_tensor_dtype(np.dtype(arg_dtype))
