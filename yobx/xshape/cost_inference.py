@@ -126,7 +126,9 @@ _REDUCE_OPS: frozenset = frozenset(
     }
 )
 
-_ZERO_COST_OPS: frozenset = frozenset(
+_ZERO_COST_OPS: frozenset = frozenset({"Identity"})
+
+_DATA_MOVEMENT_OPS: frozenset = frozenset(
     {
         "Cast",
         "CastLike",
@@ -138,22 +140,19 @@ _ZERO_COST_OPS: frozenset = frozenset(
         "Gather",
         "GatherElements",
         "GatherND",
-        "Identity",
         "OneHot",
         "Pad",
-        "Reshape",
         "Scatter",
         "ScatterElements",
         "ScatterND",
-        "Shape",
         "Slice",
         "Split",
-        "Squeeze",
         "Tile",
         "Transpose",
-        "Unsqueeze",
     }
 )
+
+_RANK_COST_OPS: frozenset = frozenset({"Reshape", "Shape", "Squeeze", "Unsqueeze"})
 
 
 # ---------------------------------------------------------------------------
@@ -421,8 +420,45 @@ def _flops_rnn(
 def _flops_zero_cost(
     node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
 ) -> DIM_TYPE:
-    """Data movement ops: 0 FLOPs."""
+    """Identity op: 0 FLOPs."""
     return 0
+
+
+def _flops_data_movement(
+    node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
+) -> Optional[DIM_TYPE]:
+    """Data movement ops: element count of the first output (or first input)."""
+    if node.output:
+        s = _literal_size(_resolve_shape(node.output[0], shape_fn, literal_fn))
+        if s is not None:
+            return s
+    if node.input:
+        return _literal_size(_resolve_shape(node.input[0], shape_fn, literal_fn))
+    return None
+
+
+def _flops_rank_cost(
+    node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
+) -> Optional[DIM_TYPE]:
+    """Shape-manipulation ops: cost = rank (number of dimensions) of the output.
+
+    For ``Shape``, the relevant rank is that of the *input* tensor (the op reads
+    one value per dimension).  For ``Reshape``, ``Squeeze``, and ``Unsqueeze``
+    the rank of the output shape is used.
+    """
+    if node.op_type == "Shape":
+        # Shape reads one value per input dimension.
+        if node.input:
+            sh = _resolve_shape(node.input[0], shape_fn, literal_fn)
+            if sh is not None:
+                return len(sh)
+        return None
+    # Reshape / Squeeze / Unsqueeze: rank of output.
+    if node.output:
+        sh = _resolve_shape(node.output[0], shape_fn, literal_fn)
+        if sh is not None:
+            return len(sh)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -441,6 +477,10 @@ for _op in _REDUCE_OPS:
     _OP_HANDLERS[_op] = _flops_reduce
 for _op in _ZERO_COST_OPS:
     _OP_HANDLERS[_op] = _flops_zero_cost
+for _op in _DATA_MOVEMENT_OPS:
+    _OP_HANDLERS[_op] = _flops_data_movement
+for _op in _RANK_COST_OPS:
+    _OP_HANDLERS[_op] = _flops_rank_cost
 
 _OP_HANDLERS.update(
     {
