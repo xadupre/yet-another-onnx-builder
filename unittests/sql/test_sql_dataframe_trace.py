@@ -1179,9 +1179,7 @@ class TestDataframeArithmetic(ExtTestCase):
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         # Both frames reference column "a", so there is a single ONNX input "a".
         # The result is a + a.
-        (out_a,) = _run_multi(
-            transform, [{"a": np.float32}, {"a": np.float32}], {"a": a}
-        )
+        (out_a,) = _run_multi(transform, [{"a": np.float32}, {"a": np.float32}], {"a": a})
         np.testing.assert_allclose(out_a, a + a, rtol=1e-5)
 
     def test_df_add_scalar_two_columns_onnx(self):
@@ -1192,9 +1190,7 @@ class TestDataframeArithmetic(ExtTestCase):
 
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-        out_a, out_b = _run(
-            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
-        )
+        out_a, out_b = _run(transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b})
         np.testing.assert_allclose(out_a, a + 1.0, rtol=1e-5)
         np.testing.assert_allclose(out_b, b + 1.0, rtol=1e-5)
 
@@ -1206,9 +1202,7 @@ class TestDataframeArithmetic(ExtTestCase):
 
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-        out_a, out_b = _run(
-            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
-        )
+        out_a, out_b = _run(transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b})
         np.testing.assert_allclose(out_a, a * 2.0, rtol=1e-5)
         np.testing.assert_allclose(out_b, b * 2.0, rtol=1e-5)
 
@@ -1220,9 +1214,7 @@ class TestDataframeArithmetic(ExtTestCase):
 
         a = np.array([2.0, 3.0, 4.0], dtype=np.float32)
         b = np.array([5.0, 6.0, 7.0], dtype=np.float32)
-        out_a, out_b = _run(
-            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
-        )
+        out_a, out_b = _run(transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b})
         np.testing.assert_allclose(out_a, a - 1.0, rtol=1e-5)
         np.testing.assert_allclose(out_b, b - 1.0, rtol=1e-5)
 
@@ -1234,9 +1226,7 @@ class TestDataframeArithmetic(ExtTestCase):
 
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-        out_a, out_b = _run(
-            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
-        )
+        out_a, out_b = _run(transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b})
         np.testing.assert_allclose(out_a, (a + 1.0) * 2.0, rtol=1e-5)
         np.testing.assert_allclose(out_b, (b + 1.0) * 2.0, rtol=1e-5)
 

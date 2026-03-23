@@ -984,6 +984,8 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
         )
         if pads is None:
             return
+        if isinstance(pads, onnx.TensorProto):
+            pads = onnx.numpy_helper.to_array(pads)
         pads = pads.tolist()
         if len(node.input) > 3 and node.input[3]:
             axes = self.compute_constant(node.input[3])[0]
@@ -991,6 +993,8 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
                 f"Unable to evaluate axes={node.input[3]!r}: "
                 f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
             )
+            if isinstance(axes, onnx.TensorProto):
+                axes = onnx.numpy_helper.to_array(axes)
             axes = axes.tolist()
         else:
             axes = list(range(len(pads) // 2))
@@ -1015,8 +1019,8 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_range(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for for node type Range."
-    if self.has_device(node.input[0]):
-        self.set_device(node.output[0], self.get_device(node.input[0]))
+    # device for Range is not necessary known. It makes to host the inputs
+    # on CPU but produce the output on CUDA.
     types = [self.get_type(i) for i in node.input if self.has_type(i)]
     assert types and len(set(types)) == 1, (
         f"Mixed type for node {self.pretty_node(node)}, types={types}, "
@@ -1405,7 +1409,22 @@ def _set_shape_type_op_any_split(self: ShapeBuilder, node: NodeProto):
     if self.has_shape(node.input[0]) and len(node.input) > 1:
         _splits_cst = None
         if self.is_constant(node.input[1]):
-            _splits_cst = list(self.get_constant(node.input[1]))
+            spl_cst = self.get_constant(node.input[1])
+            if len(spl_cst.shape) == 1:
+                _splits_cst = list(self.get_constant(node.input[1]))
+            else:
+                split_size = int(spl_cst)
+                if not self.has_shape(node.input[0]):
+                    _splits_cst = None
+                else:
+                    shape = self.get_shape(node.input[0])
+                    if isinstance(shape[axis], int):
+                        div = shape[axis] // split_size
+                        _splits_cst = [split_size for _ in range(div)]
+                        if shape[axis] % split_size > 0:
+                            _splits_cst.append(shape[axis] - div * split_size)
+                    else:
+                        _splits_cst = None
         else:
             sv = self.value_as_shape(node.input[1])
             if isinstance(sv, tuple) and all(isinstance(x, int) for x in sv):

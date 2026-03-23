@@ -28,7 +28,7 @@ from .onnx_cast import (
 from .onnx_clip import ClipClipPattern
 from .onnx_concat import ConcatEmptyPattern, ConcatGatherPattern, ConcatTwiceUnaryPattern
 from .onnx_constants import ConstantToInitializerPattern  # noqa: F401
-from .onnx_conv import ConvBiasNullPattern
+from .onnx_conv import ConvBiasNullPattern, PadConvPattern
 from .onnx_dropout import DropoutPattern
 from .onnx_equal import UnsqueezeEqualPattern
 from .onnx_expand import (
@@ -96,7 +96,7 @@ from .onnx_rotary import (
     RotaryConcatPartPattern,
     RotaryEmbeddingPattern,
 )
-from .onnx_sequence import SequenceConstructAtPattern
+from .onnx_sequence import SequenceConstructAtPattern, SplitToSequenceSequenceAtPattern
 from .onnx_shape import ShapeBasedShapeShapeAddPattern
 from .onnx_slice import SliceSlicePattern
 from .onnx_split import GathersSplitPattern, SplitConcatPattern, SlicesSplitPattern
@@ -178,6 +178,7 @@ def get_default_patterns(verbose: int = 0) -> List[PatternOptimization]:
         ConcatTwiceUnaryPattern(verbose=verbose),
         ConstantToInitializerPattern(verbose=verbose),
         ConvBiasNullPattern(verbose=verbose),
+        PadConvPattern(verbose=verbose),
         DropoutPattern(verbose=verbose),
         ExpandPattern(verbose=verbose),
         ExpandBroadcastPattern(verbose=verbose),
@@ -223,6 +224,7 @@ def get_default_patterns(verbose: int = 0) -> List[PatternOptimization]:
         SameChildrenPattern(verbose=verbose),
         SameChildrenFromInputPattern(verbose=verbose),
         SequenceConstructAtPattern(verbose=verbose),
+        SplitToSequenceSequenceAtPattern(verbose=verbose),
         SliceSlicePattern(verbose=verbose),
         SlicesSplitPattern(verbose=verbose),
         SoftmaxCrossEntropyLossCastPattern(verbose=verbose),
