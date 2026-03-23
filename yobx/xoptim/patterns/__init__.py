@@ -28,7 +28,7 @@ from .onnx_cast import (
 from .onnx_clip import ClipClipPattern
 from .onnx_concat import ConcatEmptyPattern, ConcatGatherPattern, ConcatTwiceUnaryPattern
 from .onnx_constants import ConstantToInitializerPattern  # noqa: F401
-from .onnx_conv import ConvBiasNullPattern
+from .onnx_conv import ConvBiasNullPattern, PadConvPattern
 from .onnx_dropout import DropoutPattern
 from .onnx_equal import UnsqueezeEqualPattern
 from .onnx_expand import (
@@ -178,6 +178,7 @@ def get_default_patterns(verbose: int = 0) -> List[PatternOptimization]:
         ConcatTwiceUnaryPattern(verbose=verbose),
         ConstantToInitializerPattern(verbose=verbose),
         ConvBiasNullPattern(verbose=verbose),
+        PadConvPattern(verbose=verbose),
         DropoutPattern(verbose=verbose),
         ExpandPattern(verbose=verbose),
         ExpandBroadcastPattern(verbose=verbose),

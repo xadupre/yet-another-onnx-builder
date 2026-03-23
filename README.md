@@ -17,9 +17,11 @@ Yet another onnx builder, patches, flattening functions...
 **[Documentation](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/index.html)**
 
 **yet-another-onnx-builder** (`yobx`) proposes a unique API to convert machine learning models
-to [ONNX](https://onnx.ai) format from many libraries. Each converters relies on a common GraphBuider API
+to [ONNX](https://onnx.ai) format from many libraries. Each converter relies on a common GraphBuider API
 to build the final ONNX model. One default implementation is provided but
-it can also be replaced by any implementation of your own.
+it can also be replaced by any implementation of your own
+([onnxscript](https://microsoft.github.io/onnxscript/)/[ir-py](https://onnx.ai/ir-py/), [Spox](https://spox.readthedocs.io/en/latest/)).
+
 These API are close to `onnx` API, using `NodeProto` for nodes
 and strings for names. This is on purpose: what this API produces is
 what you see in the final ONNX model. You can add your own metadata,
@@ -42,6 +44,10 @@ Many packages produce SQL queries. It starts by converting a SQL
 query into ONNX. A lightweight **DataFrame function tracer**
 ([`dataframe_to_onnx`](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/api/sql/dataframe_to_onnx.html))
 records pandas-inspired operations on a virtual DataFrame and compiles them to ONNX:
+
+* [SQL](https://fr.wikipedia.org/wiki/Structured_Query_Language)
+* [polars](https://pola.rs/)
+* [pandas](https://pandas.pydata.org/)
 
 ```python
 import numpy as np
@@ -67,24 +73,12 @@ ref = InferenceSession(artifact.SerializeToString(), providers=["CPUExecutionPro
 * [tensorflow](https://www.tensorflow.org)
 * [torch](https://pytorch.org)
 
-It provides:
-
-- A **graph builder API** for constructing and optimizing ONNX graphs, with built-in shape
-  inference and a pattern-based graph optimizer : every converter creates nodes into a class
-  of your choice as long as it follows one protocol. One GraphBuilder is provided with
-  optimization included but other implementations are also made based on
-  [onnxscript](https://microsoft.github.io/onnxscript/) / 
-  [ir-py](https://onnx.ai/ir-py/) and [spox](https://spox.readthedocs.io/en/latest/).
-- A **symbolic shape expression system** for dynamic shape handling at export time (`yobx.xshape`).
-- A **translation tool** that converts ONNX graphs back to executable Python code (`yobx.translate`).
-- **Optimization functions** to make the model more efficient.
-- It supports multiple opsets and multiple domains.
-- It allows the user to directly onnx model with [Spox](https://spox.readthedocs.io/en/latest/) or [onnxscript](https://microsoft.github.io/onnxscript/)/[ir-py](https://onnx.ai/ir-py/).
-
 Its unique API across all converters:
 
 ```python
 # the model is called 
+from yobx import to_onnx
+
 expected = model(*args, **kwargs)
 onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, target_opset=22, **options)
 ```

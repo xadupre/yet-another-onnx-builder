@@ -984,6 +984,8 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
         )
         if pads is None:
             return
+        if isinstance(pads, onnx.TensorProto):
+            pads = onnx.numpy_helper.to_array(pads)
         pads = pads.tolist()
         if len(node.input) > 3 and node.input[3]:
             axes = self.compute_constant(node.input[3])[0]
@@ -991,6 +993,8 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
                 f"Unable to evaluate axes={node.input[3]!r}: "
                 f"{self.pretty_node(node, shape=True)}{self.get_debug_msg()}"
             )
+            if isinstance(axes, onnx.TensorProto):
+                axes = onnx.numpy_helper.to_array(axes)
             axes = axes.tolist()
         else:
             axes = list(range(len(pads) // 2))
@@ -1015,8 +1019,8 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_range(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for for node type Range."
-    if self.has_device(node.input[0]):
-        self.set_device(node.output[0], self.get_device(node.input[0]))
+    # device for Range is not necessary known. It makes to host the inputs
+    # on CPU but produce the output on CUDA.
     types = [self.get_type(i) for i in node.input if self.has_type(i)]
     assert types and len(set(types)) == 1, (
         f"Mixed type for node {self.pretty_node(node)}, types={types}, "
