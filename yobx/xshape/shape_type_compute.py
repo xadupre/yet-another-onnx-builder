@@ -1015,8 +1015,8 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_range(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for for node type Range."
-    if self.has_device(node.input[0]):
-        self.set_device(node.output[0], self.get_device(node.input[0]))
+    # device for Range is not necessary known. It makes to host the inputs
+    # on CPU but produce the output on CUDA.
     types = [self.get_type(i) for i in node.input if self.has_type(i)]
     assert types and len(set(types)) == 1, (
         f"Mixed type for node {self.pretty_node(node)}, types={types}, "
