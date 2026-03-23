@@ -1,7 +1,7 @@
 import contextlib
 from itertools import zip_longest
 import os
-from typing import Dict, Generator, List, Tuple
+from typing import Any, Dict, Generator, List, Tuple
 import numpy as np
 from onnx import NodeProto
 from ..helpers import string_type
@@ -40,17 +40,26 @@ class _ExtraPackages:
 
         if os.environ.get("NOTORCH", "0") in ("1", "true"):
             self._has_torch_ = False
-            self.torch = None
+            self._torch = None
         else:
             self._has_torch_ = None
-            self.torch = None
+            self._torch = None
 
         if os.environ.get("NOTF", "0") in ("1", "true"):
             self._has_tensorflow_ = False
-            self.tensorflow = None
+            self._tensorflow = None
         else:
             self._has_tensorflow_ = None
-            self.tensorflow = None
+            self._tensorflow = None
+
+    @property
+    def torch(self):
+        assert self._has_torch, "torch is missing"
+        if self._torch is None:
+            import torch
+
+            self._torch = torch
+        return self._torch
 
     @property
     def _has_torch(self) -> bool:
@@ -62,14 +71,23 @@ class _ExtraPackages:
             import torch._subclasses
 
             self._has_torch_ = hasattr(torch, "__version__")
-            self.torch = torch
+            self._torch = torch
             self.torch_subclasses = torch._subclasses
             self.maybe_disable_fake_tensor_mode = _maybe_disable_fake_tensor_mode
         except (NameError, ImportError, AttributeError):
             self._has_torch_ = False
-            self.torch = None
+            self._torch = None
 
         return self._has_torch_
+
+    @property
+    def tensorflow(self):
+        assert self._has_tensorflow, "tensorflow is missing"
+        if self._tensorflow is None:
+            import tensorflow
+
+            self._tensorflow = tensorflow
+        return self._tensorflow
 
     @property
     def _has_tensorflow(self) -> bool:
@@ -80,10 +98,10 @@ class _ExtraPackages:
             import tensorflow
 
             self._has_tensorflow_ = hasattr(tensorflow, "__version__")
-            self.tensorflow = tensorflow
+            self._tensorflow = tensorflow
         except (NameError, ImportError, AttributeError):
             self._has_tensorflow_ = False
-            self.tensorflow = None
+            self._tensorflow = None
 
         return self._has_tensorflow_
 
@@ -107,6 +125,44 @@ class _BuilderRuntime:
         from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
 
         return tensor_dtype_to_np_dtype(itype)
+
+    def container_type(self, v) -> str:
+        if isinstance(v, np.ndarray):
+            return "numpy"
+        if hasattr(v, "detach") and self._has_torch and isinstance(v, self.torch.Tensor):
+            return "torch"
+        if hasattr(v, "ref") and self._has_tensorflow and isinstance(v, self.tensorflow.Tensor):
+            return "tensorflow"
+        raise TypeError(f"Unexpected type {type(v)} for a value.")
+
+    def consistent_tensor_feeds(
+        self, feeds: Dict[str, Any], node: NodeProto
+    ) -> Tuple[str, Dict[str, Any]]:
+        types = {self.container_type(v) for v in feeds.values() if v is not None}
+        if len(types) == 1:
+            return types.pop(), feeds
+        if types == {"numpy", "torch"}:
+            res = {}
+            for k, v in feeds.items():
+                if isinstance(v, np.ndarray):
+                    itype = dtype_to_tensor_dtype(v.dtype)
+                    ttype = self.onnx_dtype_to_torch_dtype(itype)
+                    x = self.make_torch_tensor_from_np_array(v.copy()).to(ttype)
+                    assert "FakeTensor" not in str(type(x)), (
+                        f"FakeTensor {node.output[0]!r} cannot be a constant {type(x)}, "
+                        f"node.op_type={node.op_type!r}, type={self.torch.Tensor}"
+                        f"{self.get_debug_msg()}"
+                    )
+                    res[k] = x
+                else:
+                    res[k] = v
+            return "torch", res
+        if types == {"numpy", "tensorflow"}:
+            return "tensorflow", {
+                k: self.tensorflow.convert_to_tensor(v) if isinstance(v, np.ndarray) else v
+                for k, v in feeds.items()
+            }
+        raise ValueError(f"Not implemented for {types=}.")
 
     def _apply_slice_to_shape(
         self, shape: STATIC_SHAPE, indices: List[slice], axes: List[int], expand_axes: List[int]
@@ -536,26 +592,14 @@ class _BuilderRuntime:
     def _apply_where(
         self, node: NodeProto, feeds: Dict[str, "torch.Tensor"]  # noqa: F821
     ) -> "torch.Tensor":  # noqa: F821
-        new_feeds = {}
-        for k, v in feeds.items():
-            if hasattr(v, "detach") and self._has_torch and isinstance(v, np.ndarray):
-                # Type conversion between numpy and torch is not robust.
-                itype = dtype_to_tensor_dtype(v.dtype)
-                ttype = self.onnx_dtype_to_torch_dtype(itype)
-                x = self.make_torch_tensor_from_np_array(v.copy()).to(ttype)
-                assert "FakeTensor" not in str(type(x)), (
-                    f"FakeTensor {node.output[0]!r} cannot be a constant {type(x)}, "
-                    f"node.op_type={node.op_type!r}, type={self.torch.Tensor}"
-                    f"{self.get_debug_msg()}"
-                )
-                new_feeds[k] = x
-            else:
-                new_feeds[k] = v
-        if not self._has_torch:
+        engine, new_feeds = self.consistent_tensor_feeds(feeds, node)
+        if engine == "numpy":
             y = np.where(*[new_feeds[k] for k in node.input])
             return [y]
-        y = self.torch.where(*[new_feeds[k] for k in node.input])
-        return [y]
+        if engine == "torch":
+            y = self.torch.where(*[new_feeds[k] for k in node.input])
+            return [y]
+        raise RuntimeError(f"engine {engine!r} not implemented")
 
     def _apply_slice(
         self, node: NodeProto, feeds: Dict[str, "torch.Tensor"]  # noqa: F821
