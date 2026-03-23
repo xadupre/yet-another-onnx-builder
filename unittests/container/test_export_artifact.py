@@ -169,7 +169,7 @@ class TestExportReport(ExtTestCase):
         self.assertEqual(r.node_stats, [])
 
     def test_node_stats_init(self):
-        rows = [{"op_type": "Relu", "domain": "", "count": 2, "flops": 16}]
+        rows = [{"op_type": "Relu", "count": 2, "flops": 16}]
         r = ExportReport(node_stats=rows)
         self.assertEqual(len(r.node_stats), 1)
         self.assertEqual(r.node_stats[0]["op_type"], "Relu")
@@ -183,7 +183,6 @@ class TestExportReport(ExtTestCase):
         self.assertIn("Identity", op_types)
         identity_row = next(row for row in r.node_stats if row["op_type"] == "Identity")
         self.assertEqual(identity_row["count"], 1)
-        self.assertEqual(identity_row["domain"], "")
 
     def test_compute_node_stats_relu_static(self):
         """Relu on a fully static shape should give a non-None flops estimate."""
@@ -217,13 +216,13 @@ class TestExportReport(ExtTestCase):
         self.assertIs(result, r)
 
     def test_repr_includes_n_node_stats(self):
-        rows = [{"op_type": "Relu", "domain": "", "count": 1, "flops": 32}]
+        rows = [{"op_type": "Relu", "count": 1, "flops": 32}]
         r = ExportReport(node_stats=rows)
         text = repr(r)
         self.assertIn("n_node_stats=1", text)
 
     def test_to_dict_includes_node_stats(self):
-        rows = [{"op_type": "Add", "domain": "", "count": 3, "flops": 96}]
+        rows = [{"op_type": "Add", "count": 3, "flops": 96}]
         r = ExportReport(node_stats=rows)
         d = r.to_dict()
         self.assertIn("node_stats", d)
@@ -237,8 +236,8 @@ class TestExportReport(ExtTestCase):
         self.assertIn("Relu", text)
 
     def test_update_merges_node_stats(self):
-        r1 = ExportReport(node_stats=[{"op_type": "Relu", "domain": "", "count": 1, "flops": 32}])
-        r2 = ExportReport(node_stats=[{"op_type": "Add", "domain": "", "count": 2, "flops": 64}])
+        r1 = ExportReport(node_stats=[{"op_type": "Relu", "count": 1, "flops": 32}])
+        r2 = ExportReport(node_stats=[{"op_type": "Add", "count": 2, "flops": 64}])
         r1.update(r2)
         self.assertEqual(len(r1.node_stats), 2)
 

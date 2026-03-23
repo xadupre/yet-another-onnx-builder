@@ -227,22 +227,18 @@ class ExportReport:
     def compute_node_stats(
         self,
         model: "onnx.ModelProto",
-        exc: bool = False,
+        verbose: int = 0,
     ) -> "ExportReport":
         """Compute per-op-type node counts and estimated FLOPs from *model*.
 
-        Uses :class:`~yobx.xshape.BasicShapeBuilder` to run shape inference
-        and then calls
-        :func:`~yobx.xshape.cost_inference.estimate_node_flops` for every
-        graph node.  Results are stored in :attr:`node_stats` as a list of
-        dicts with the keys:
+        Delegates to :func:`~yobx.helpers.stats_helper.model_statistics` for
+        shape inference and FLOPs estimation.  Results are stored in
+        :attr:`node_stats` as a list of dicts with the keys:
 
         ``op_type``
             ONNX operator type name (e.g. ``"MatMul"``).
-        ``domain``
-            Operator domain (empty string for the standard ONNX domain).
         ``count``
-            Number of nodes with this ``(op_type, domain)`` pair.
+            Number of nodes with this op_type.
         ``flops``
             Estimated total floating-point operations for all nodes of this
             type.  ``None`` when the estimate is unavailable (shapes not
@@ -251,8 +247,8 @@ class ExportReport:
         The rows are sorted by ``count`` descending.
 
         :param model: exported ONNX model proto.
-        :param exc: when ``True`` propagate shape-inference errors;
-            when ``False`` (default) silently skip nodes that fail.
+        :param verbose: verbosity level passed to
+            :class:`~yobx.helpers.stats_helper.ModelStatistics`.
         :return: ``self``, to allow method chaining.
 
         Example::
@@ -271,46 +267,19 @@ class ExportReport:
             report.compute_node_stats(model)
             print(report.node_stats)
         """
-        from collections import defaultdict
+        from ..helpers.stats_helper import model_statistics
 
-        from ..xshape import BasicShapeBuilder, InferenceMode
-
-        builder = BasicShapeBuilder()
-        try:
-            builder.run_model(model, inference=InferenceMode.SHAPE, exc=exc)
-        except Exception:
-            if exc:
-                raise
-
-        counts: Dict[Tuple[str, str], int] = defaultdict(int)
-        flops_map: Dict[Tuple[str, str], Any] = {}
-
-        graph = model.graph if isinstance(model, onnx.ModelProto) else model
-        for node in graph.node:
-            key = (node.op_type, node.domain or "")
-            counts[key] += 1
-            cost = builder.estimate_node_flops(node)
-            if key not in flops_map:
-                flops_map[key] = cost
-            elif cost is not None and flops_map[key] is not None:
-                # Accumulate FLOPs; both may be int or symbolic str
-                prev = flops_map[key]
-                if isinstance(prev, int) and isinstance(cost, int):
-                    flops_map[key] = prev + cost
-                else:
-                    flops_map[key] = f"{prev}+{cost}"
-            else:
-                # At least one is None — mark total as unknown
-                flops_map[key] = None
+        result = model_statistics(model, verbose=verbose)
+        counts = result["node_count_per_op_type"]
+        flops = result["flops_per_op_type"]
 
         rows = [
             {
                 "op_type": op_type,
-                "domain": domain,
-                "count": counts[(op_type, domain)],
-                "flops": flops_map.get((op_type, domain)),
+                "count": counts[op_type],
+                "flops": flops.get(op_type),
             }
-            for op_type, domain in counts
+            for op_type in counts
         ]
         rows.sort(key=lambda r: -r["count"])
         self.node_stats = rows
@@ -467,21 +436,22 @@ class ExportArtifact(ExportArtifactProtocol):
             self.report = ExportReport()
         self.report.update(data)
 
-    def compute_node_stats(self, exc: bool = False) -> "ExportArtifact":
+    def compute_node_stats(self, verbose: int = 0) -> "ExportArtifact":
         """Compute per-op-type node counts and estimated FLOPs and store them in the report.
 
         Delegates to :meth:`ExportReport.compute_node_stats` using this
         artifact's :attr:`proto`.  Does nothing when :attr:`proto` is not a
         :class:`~onnx.ModelProto`.
 
-        :param exc: when ``True`` propagate shape-inference errors.
+        :param verbose: verbosity level passed to
+            :class:`~yobx.helpers.stats_helper.ModelStatistics`.
         :return: ``self``, to allow method chaining.
         """
         if not isinstance(self.proto, onnx.ModelProto):
             return self
         if self.report is None:
             self.report = ExportReport()
-        self.report.compute_node_stats(self.proto, exc=exc)
+        self.report.compute_node_stats(self.proto, verbose=verbose)
         return self
 
     def save_report(self, onnx_path: str) -> None:
