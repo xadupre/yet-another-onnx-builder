@@ -9,7 +9,11 @@ from ..register import register_sklearn_converter, get_sklearn_converter
 from ..convert import _wrap_step_as_function
 
 
-def _resolve_columns(columns: Union[list, slice, np.ndarray], n_features: int) -> np.ndarray:
+def _resolve_columns(
+    columns: Union[list, slice, np.ndarray],
+    n_features: int,
+    feature_names_in: Optional[np.ndarray] = None,
+) -> np.ndarray:
     """
     Converts various column specifications to a 1-D ``int64`` numpy array.
 
@@ -18,17 +22,34 @@ def _resolve_columns(columns: Union[list, slice, np.ndarray], n_features: int) -
     * A Python :class:`slice` (e.g. ``slice(0, 3)``).
     * A boolean array / list of booleans.
     * A list or array of integer indices.
+    * A list or array of string column names (requires *feature_names_in*).
 
     :param columns: the column specification as stored in
         :attr:`sklearn.compose.ColumnTransformer.transformers_`.
     :param n_features: total number of input features (used to resolve slices).
+    :param feature_names_in: feature names as stored in
+        :attr:`sklearn.compose.ColumnTransformer.feature_names_in_`; required
+        when *columns* contains string names rather than integer positions.
     :return: 1-D ``int64`` array of column indices.
+    :raises ValueError: when *columns* contains string names but
+        *feature_names_in* is ``None``.
     """
     if isinstance(columns, slice):
         return np.arange(*columns.indices(n_features), dtype=np.int64)
     col_array = np.asarray(columns)
     if col_array.dtype == bool:
         return np.where(col_array)[0].astype(np.int64)
+    if col_array.dtype.kind in ("U", "S", "O"):
+        # dtype.kind "U" = Unicode string, "S" = byte string, "O" = object
+        # (pandas stores string columns as object arrays).
+        # Map column names to integer positions.
+        if feature_names_in is None:
+            raise ValueError(
+                "ColumnTransformer was fitted with string column names but "
+                "feature_names_in_ is not available on the estimator."
+            )
+        name_to_idx = {name: idx for idx, name in enumerate(feature_names_in)}
+        return np.array([name_to_idx[c] for c in col_array], dtype=np.int64)
     return col_array.astype(np.int64)
 
 
@@ -101,13 +122,14 @@ def sklearn_column_transformer(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     n_features = estimator.n_features_in_
+    feature_names_in = getattr(estimator, "feature_names_in_", None)
 
     parts: List[str] = []
     for trans_name, transformer, columns in estimator.transformers_:
         if transformer == "drop":
             continue
 
-        col_indices = _resolve_columns(columns, n_features)
+        col_indices = _resolve_columns(columns, n_features, feature_names_in)
 
         # Select the subset of features for this transformer.
         X_sub = g.op.Gather(X, col_indices, axis=1, name=f"{name}__{trans_name}")
