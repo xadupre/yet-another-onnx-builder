@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 from onnx import ValueInfoProto
 from ...helpers.onnx_helper import np_dtype_to_tensor_dtype
+from ...typing import GraphBuilderExtendedProtocol
 
 
 def _extract_value_info_proto(vip: ValueInfoProto) -> Tuple[str, int, Optional[Tuple]]:
@@ -53,14 +54,14 @@ def _is_arg_tuple_spec(arg: Any) -> bool:
 
 
 def _register_inputs(
-    g: Any,
+    g: GraphBuilderExtendedProtocol,
     args: Tuple[Any, ...],
     input_names: Optional[Sequence[str]],
     dynamic_shapes: Optional[Tuple[Dict[int, str]]],
 ) -> List[str]:
     """Resolve *input_names* and register each input with the graph builder *g*.
 
-    :param g: graph builder (any object exposing ``make_tensor_input``)
+    :param g: graph builder (:class:`~yobx.typing.GraphBuilderExtendedProtocol`)
     :param args: input descriptors — numpy arrays,
         :class:`onnx.ValueInfoProto` objects, or ``(name, dtype, shape)`` tuples
     :param input_names: optional explicit names; overrides names embedded in
