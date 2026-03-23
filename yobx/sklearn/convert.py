@@ -1,5 +1,4 @@
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
-import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline, FeatureUnion
@@ -9,11 +8,7 @@ from ..typing import ConvertOptionsProtocol
 from ..container import ExportArtifact
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from ..xbuilder.function_options import FunctionOptions
-from .helpers.to_onnx_helper import (
-    extract_value_info_proto,
-    is_arg_tuple_spec,
-    register_inputs,
-)
+from .helpers.to_onnx_helper import register_inputs
 from .register import get_sklearn_converter, sklearn_exportable_methods
 from .sklearn_helper import get_output_names
 
