@@ -59,7 +59,7 @@ def imblearn_pipeline(
         if i == len(inference_steps) - 1:
             step_outputs = outputs
         else:
-            step_output_names = list(get_output_names(step))
+            step_output_names = list(get_output_names(step, g.convert_options))
             step_outputs = [g.unique_name(n) for n in step_output_names]
 
         fct = get_sklearn_converter(type(step))
