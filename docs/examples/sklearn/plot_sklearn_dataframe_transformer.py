@@ -27,7 +27,6 @@ This example covers:
 
 import numpy as np
 import pandas as pd
-import onnxruntime
 
 from yobx.doc import plot_dot
 from yobx.sklearn import DataFrameTransformer, to_onnx

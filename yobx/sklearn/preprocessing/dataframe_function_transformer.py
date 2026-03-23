@@ -259,7 +259,9 @@ def sklearn_dataframe_function_transformer(
     :return: name of the first output tensor.
     """
     assert isinstance(estimator, DataFrameTransformer), (
-        f"Unexpected type {type(estimator)} for estimator."
+        f"sklearn_dataframe_function_transformer: expected a DataFrameTransformer "
+        f"but received {type(estimator).__name__!r}. Make sure the correct converter "
+        f"is registered for this estimator type."
     )
 
     from ...sql.dataframe_trace import trace_dataframe
