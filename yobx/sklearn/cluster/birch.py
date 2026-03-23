@@ -17,7 +17,7 @@ def sklearn_birch(
     estimator: Birch,
     X: str,
     name: str = "birch",
-) -> Union[str, Tuple[str, str]]:
+) -> Tuple[str, str]:
     """
     Converts a :class:`sklearn.cluster.Birch` into ONNX.
 
@@ -76,11 +76,10 @@ def sklearn_birch(
     :param sts: shapes defined by :epkg:`scikit-learn`
     :param estimator: a fitted ``Birch``
     :param outputs: desired output names; ``outputs[0]`` receives the cluster
-        labels and ``outputs[1]`` (if present) receives the distances matrix
+        labels and ``outputs[1]`` receives the distances matrix
     :param X: input tensor name
     :param name: prefix names for the added nodes
-    :return: tuple ``(labels, distances)`` when two outputs are requested,
-        otherwise just ``labels``
+    :return: tuple ``(labels, distances)``
     """
     assert isinstance(estimator, Birch), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
@@ -129,15 +128,10 @@ def sklearn_birch(
         sq_dists_clipped = g.op.Max(sq_dists, zero, name=f"{name}_sq_clip")
         distances_clipped = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt_tmp")
 
-    n_outputs = len(outputs)
-
-    # Distances output (optional second output).
-    if n_outputs >= 2:
-        distances = g.op.Identity(
-            distances_clipped, name=f"{name}_distances", outputs=outputs[1:2]
-        )
-    else:
-        distances = distances_clipped
+    # Distances: Euclidean distance from each sample to every subcluster centre → (N, K).
+    distances = g.op.Identity(
+        distances_clipped, name=f"{name}_distances", outputs=outputs[1:2]
+    )
 
     # Nearest subcluster index → (N,)
     subcluster_idx = g.op.ArgMin(distances_clipped, axis=1, keepdims=0, name=f"{name}_argmin")
@@ -151,6 +145,4 @@ def sklearn_birch(
     )
     g.set_type(labels, onnx.TensorProto.INT64)
 
-    if n_outputs >= 2:
-        return labels, distances
-    return labels
+    return labels, distances

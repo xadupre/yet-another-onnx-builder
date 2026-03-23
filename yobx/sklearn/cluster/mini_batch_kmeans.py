@@ -17,7 +17,7 @@ def sklearn_mini_batch_kmeans(
     estimator: MiniBatchKMeans,
     X: str,
     name: str = "mini_batch_kmeans",
-) -> Union[str, Tuple[str, str]]:
+) -> Tuple[str, str]:
     """
     Converts a :class:`sklearn.cluster.MiniBatchKMeans` into ONNX.
 
@@ -58,11 +58,10 @@ def sklearn_mini_batch_kmeans(
     :param sts: shapes defined by :epkg:`scikit-learn`
     :param estimator: a fitted ``MiniBatchKMeans``
     :param outputs: desired output names; ``outputs[0]`` receives the cluster
-        labels and ``outputs[1]`` (if present) receives the distances matrix
+        labels and ``outputs[1]`` receives the distances matrix
     :param X: input tensor name
     :param name: name prefix for the added nodes
-    :return: tuple ``(labels, distances)`` when two outputs are requested,
-        otherwise just ``labels``
+    :return: tuple ``(labels, distances)``
     """
     assert isinstance(
         estimator, MiniBatchKMeans
@@ -114,14 +113,9 @@ def sklearn_mini_batch_kmeans(
         sq_dists_clipped = g.op.Max(sq_dists, zero, name=f"{name}_clip")
         eucl_dists = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt")
 
-    n_outputs = len(outputs)
-
-    # Distances output (optional second output).
-    if n_outputs >= 2:
-        distances = g.op.Identity(eucl_dists, name=f"{name}_distances", outputs=outputs[1:2])
-        g.set_type(distances, itype)
-    else:
-        distances = eucl_dists
+    # Distances: Euclidean distance from each sample to every cluster centre → (N, K).
+    distances = g.op.Identity(eucl_dists, name=f"{name}_distances", outputs=outputs[1:2])
+    g.set_type(distances, itype)
 
     # Labels: nearest centre index → (N,)
     label_idx = g.op.ArgMin(eucl_dists, axis=1, keepdims=0, name=f"{name}_argmin")
@@ -130,6 +124,4 @@ def sklearn_mini_batch_kmeans(
     )
     g.set_type(labels, onnx.TensorProto.INT64)
 
-    if n_outputs >= 2:
-        return labels, distances
-    return labels
+    return labels, distances

@@ -59,6 +59,23 @@ class TestSklearnRegister(ExtTestCase):
         self.assertIn("**Coverage**", rst)
         self.assertRaise(lambda: get_sklearn_estimator_coverage(libraries=("nolib",)), ValueError)
 
+    def test_check_converter_output_alignment(self):
+        from yobx.sklearn.register import check_converter_output_alignment
+
+        register_sklearn_converters()
+        issues = check_converter_output_alignment()
+        self.assertEmpty(
+            issues,
+            msg=lambda: (
+                "The following converters have return-type annotations that are "
+                "not aligned with the expected number of outputs for their class:\n"
+                + "\n".join(
+                    f"  {cls.__name__}: expected={expected}, annotation={ret}"
+                    for cls, _fct, expected, ret in issues
+                )
+            ),
+        )
+
     @requires_sklearn("1.8")
     def test_get_sklearn_estimator_coverage_per_lib(self):
         register_sklearn_converters()

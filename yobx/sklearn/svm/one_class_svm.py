@@ -17,7 +17,7 @@ def sklearn_one_class_svm(
     estimator: OneClassSVM,
     X: str,
     name: str = "one_class_svm",
-) -> Union[str, Tuple[str, str]]:
+) -> Tuple[str, str]:
     """
     Converts a :class:`sklearn.svm.OneClassSVM` into ONNX using the
     ``SVMRegressor`` operator from the ``ai.onnx.ml`` domain.
@@ -63,12 +63,11 @@ def sklearn_one_class_svm(
     :param g: the graph builder to add nodes to
     :param sts: shapes defined by :epkg:`scikit-learn`
     :param outputs: desired output names; ``outputs[0]`` receives the predicted
-        labels and ``outputs[1]`` (if present) receives the decision function
-        values
+        labels and ``outputs[1]`` receives the decision function values
     :param estimator: a fitted ``OneClassSVM``
     :param X: input tensor name
     :param name: prefix for added node names
-    :return: label tensor name, or tuple ``(label, scores)``
+    :return: tuple ``(label, scores)``
     """
     assert isinstance(estimator, OneClassSVM), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
@@ -116,23 +115,16 @@ def sklearn_one_class_svm(
     )
 
     # Cast to float64 if the input was float64.
-    emit_scores = len(outputs) > 1
     if is_double:
-        if emit_scores:
-            scores = g.op.Cast(
-                scores_f32,
-                to=onnx.TensorProto.DOUBLE,
-                name=f"{name}_cast_f64",
-                outputs=outputs[1:2],
-            )
-        else:
-            scores = g.op.Cast(scores_f32, to=onnx.TensorProto.DOUBLE, name=f"{name}_cast_f64")
+        scores = g.op.Cast(
+            scores_f32,
+            to=onnx.TensorProto.DOUBLE,
+            name=f"{name}_cast_f64",
+            outputs=outputs[1:2],
+        )
         zero = np.array([0], dtype=np.float64)
     else:
-        if emit_scores:
-            scores = g.op.Identity(scores_f32, name=f"{name}_scores", outputs=outputs[1:2])
-        else:
-            scores = scores_f32
+        scores = g.op.Identity(scores_f32, name=f"{name}_scores", outputs=outputs[1:2])
         zero = np.array([0], dtype=np.float32)
 
     # label = 1 if decision_function >= 0 else -1
@@ -145,6 +137,4 @@ def sklearn_one_class_svm(
         outputs=outputs[:1],
     )
 
-    if emit_scores:
-        return label, scores
-    return label
+    return label, scores

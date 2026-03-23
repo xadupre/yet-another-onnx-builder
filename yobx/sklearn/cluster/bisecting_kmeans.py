@@ -41,7 +41,7 @@ def sklearn_bisecting_kmeans(
     estimator: BisectingKMeans,
     X: str,
     name: str = "bisecting_kmeans",
-) -> Union[str, Tuple[str, str]]:
+) -> Tuple[str, str]:
     """
     Converts a :class:`sklearn.cluster.BisectingKMeans` into ONNX.
 
@@ -109,11 +109,10 @@ def sklearn_bisecting_kmeans(
     :param sts: shapes defined by :epkg:`scikit-learn`
     :param estimator: a fitted ``BisectingKMeans``
     :param outputs: desired output names; ``outputs[0]`` receives the cluster
-        labels and ``outputs[1]`` (if present) receives the distances matrix
+        labels and ``outputs[1]`` receives the distances matrix
     :param X: input tensor name
     :param name: prefix names for the added nodes
-    :return: tuple ``(labels, distances)`` when two outputs are requested,
-        otherwise just ``labels``
+    :return: tuple ``(labels, distances)``
     """
     assert isinstance(
         estimator, BisectingKMeans
@@ -162,13 +161,9 @@ def sklearn_bisecting_kmeans(
         sq_dists_clipped = g.op.Max(sq_dists, zero, name=f"{name}_clip")
         eucl_dists = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt")
 
-    n_outputs = len(outputs)
-
-    if n_outputs >= 2:
-        distances = g.op.Identity(eucl_dists, name=f"{name}_distances", outputs=outputs[1:2])
-        g.set_type(distances, itype)
-    else:
-        distances = eucl_dists
+    # Distances: Euclidean distance from each sample to every cluster centre → (N, K).
+    distances = g.op.Identity(eucl_dists, name=f"{name}_distances", outputs=outputs[1:2])
+    g.set_type(distances, itype)
 
     # ------------------------------------------------------------------
     # Labels output: bisection-tree traversal
@@ -268,6 +263,4 @@ def sklearn_bisecting_kmeans(
     labels = g.op.Identity(label_sum, name=f"{name}_labels", outputs=outputs[:1])
     g.set_type(labels, onnx.TensorProto.INT64)
 
-    if n_outputs >= 2:
-        return labels, distances
-    return labels
+    return labels, distances

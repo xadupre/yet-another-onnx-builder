@@ -1,8 +1,17 @@
-from typing import Sequence
-from sklearn.base import BaseEstimator, ClusterMixin, OutlierMixin, is_classifier, is_regressor
+from typing import Optional, Sequence, Type
+from sklearn.base import (
+    BaseEstimator,
+    ClassifierMixin,
+    ClusterMixin,
+    MetaEstimatorMixin,
+    OutlierMixin,
+    is_classifier,
+    is_regressor,
+)
 from sklearn.cluster import FeatureAgglomeration
+from sklearn.compose import ColumnTransformer
 from sklearn.mixture._base import BaseMixture
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import FeatureUnion, Pipeline
 
 try:
     from sklearn.feature_selection._base import SelectorMixin
@@ -45,6 +54,39 @@ def get_n_expected_outputs(estimator: BaseEstimator) -> int:
             OutlierMixin is not None and isinstance(last, OutlierMixin)
         ):
             return 2
+    return 1
+
+
+def n_outputs_for_class(cls: Type) -> Optional[int]:
+    """Returns the expected number of outputs for an estimator *class*.
+
+    Unlike :func:`get_n_expected_outputs` this function works on a class
+    rather than a fitted instance, so it cannot inspect instance attributes
+    such as ``predict_proba``.
+
+    Returns:
+        ``1`` – the class always produces exactly one output.
+        ``2`` – the class always produces exactly two outputs (cluster,
+            outlier detector, or mixture model).
+        ``None`` – the number of outputs depends on the specific instance
+            (e.g. classifiers whose ``predict_proba`` availability varies,
+            or container estimators like :class:`~sklearn.pipeline.Pipeline`
+            that delegate to a wrapped estimator).
+    """
+    if SelectorMixin is not None and issubclass(cls, SelectorMixin):
+        return 1
+    if issubclass(cls, FeatureAgglomeration):
+        return 1
+    if issubclass(cls, (ClusterMixin, BaseMixture)) or (
+        OutlierMixin is not None and issubclass(cls, OutlierMixin)
+    ):
+        return 2
+    # Classifiers: output count depends on predict_proba (instance-level attribute).
+    if issubclass(cls, ClassifierMixin):
+        return None
+    # Container/meta types: output count depends on the wrapped estimator.
+    if issubclass(cls, (Pipeline, ColumnTransformer, FeatureUnion, MetaEstimatorMixin)):
+        return None
     return 1
 
 

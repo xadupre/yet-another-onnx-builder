@@ -17,7 +17,7 @@ def sklearn_kmeans(
     estimator: KMeans,
     X: str,
     name: str = "kmeans",
-) -> Union[str, Tuple[str, str]]:
+) -> Tuple[str, str]:
     """
     Converts a :class:`sklearn.cluster.KMeans` into ONNX.
 
@@ -53,11 +53,10 @@ def sklearn_kmeans(
     :param sts: shapes defined by :epkg:`scikit-learn`
     :param estimator: a fitted ``KMeans``
     :param outputs: desired output names; ``outputs[0]`` receives the cluster
-        labels and ``outputs[1]`` (if present) receives the distances matrix
+        labels and ``outputs[1]`` receives the distances matrix
     :param X: input tensor name
     :param name: prefix names for the added nodes
-    :return: tuple ``(labels, distances)`` when two outputs are requested,
-        otherwise just ``labels``
+    :return: tuple ``(labels, distances)``
     """
     assert isinstance(estimator, KMeans), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
@@ -90,14 +89,9 @@ def sklearn_kmeans(
     zero = np.array([0], dtype=dtype)
     sq_dists_clipped = g.op.Max(sq_dists, zero, name=f"{name}_clip")
 
-    n_outputs = len(outputs)
-
-    # Distances output (optional second output).
-    if n_outputs >= 2:
-        distances = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt", outputs=outputs[1:2])
-        g.set_type(distances, itype)
-    else:
-        distances = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt")
+    # Distances: Euclidean distance from each sample to every centre → (N, K).
+    distances = g.op.Sqrt(sq_dists_clipped, name=f"{name}_sqrt", outputs=outputs[1:2])
+    g.set_type(distances, itype)
 
     # Labels: nearest centre index → (N,)
     label_idx = g.op.ArgMin(sq_dists_clipped, axis=1, keepdims=0, name=f"{name}_argmin")
@@ -106,6 +100,4 @@ def sklearn_kmeans(
     )
     g.set_type(labels, onnx.TensorProto.INT64)
 
-    if n_outputs >= 2:
-        return labels, distances
-    return labels
+    return labels, distances

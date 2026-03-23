@@ -17,7 +17,7 @@ def sklearn_local_outlier_factor(
     estimator: LocalOutlierFactor,
     X: str,
     name: str = "lof",
-) -> Union[str, Tuple[str, str]]:
+) -> Tuple[str, str]:
     """
     Converts a :class:`sklearn.neighbors.LocalOutlierFactor` into ONNX.
 
@@ -87,13 +87,13 @@ def sklearn_local_outlier_factor(
 
     :param g: the graph builder to add nodes to
     :param sts: shapes and types defined by :epkg:`scikit-learn`
-    :param outputs: desired output tensor names; two entries
-        ``(label, scores)`` or one entry ``(label,)``
+    :param outputs: desired output tensor names; ``outputs[0]`` receives the
+        predicted labels and ``outputs[1]`` the anomaly scores
     :param estimator: a fitted :class:`~sklearn.neighbors.LocalOutlierFactor`
         with ``novelty=True``
     :param X: name of the input tensor
     :param name: prefix used for names of nodes added by this converter
-    :return: label tensor name, or tuple ``(label, scores)``
+    :return: tuple ``(label, scores)``
     :raises ValueError: if ``estimator.novelty`` is ``False``
     :raises NotImplementedError: if the opset is below 18 (required for
         ``ReduceMean`` with axes as input) or the metric is unsupported
@@ -190,9 +190,5 @@ def sklearn_local_outlier_factor(
         outputs=outputs[:1],
     )
 
-    emit_scores = len(outputs) > 1
-    if emit_scores:
-        scores_out = g.op.Identity(decision, name=f"{name}_scores", outputs=outputs[1:])
-        return label, scores_out
-
-    return label
+    scores_out = g.op.Identity(decision, name=f"{name}_scores", outputs=outputs[1:2])
+    return label, scores_out

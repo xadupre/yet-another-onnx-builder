@@ -16,7 +16,7 @@ def sklearn_sgd_one_class_svm(
     estimator: SGDOneClassSVM,
     X: str,
     name: str = "sgd_one_class_svm",
-) -> Union[str, Tuple[str, str]]:
+) -> Tuple[str, str]:
     """
     Converts a :class:`sklearn.linear_model.SGDOneClassSVM` into ONNX.
 
@@ -43,11 +43,12 @@ def sklearn_sgd_one_class_svm(
 
     :param g: the graph builder to add nodes to
     :param sts: shapes defined by :epkg:`scikit-learn`
-    :param outputs: desired output names; two entries ``(label, scores)``
+    :param outputs: desired output names; ``outputs[0]`` receives the predicted
+        labels and ``outputs[1]`` the decision function scores
     :param estimator: a fitted :class:`~sklearn.linear_model.SGDOneClassSVM`
     :param X: input tensor name
     :param name: prefix for added node names
-    :return: label tensor name, or tuple ``(label, scores)``
+    :return: tuple ``(label, scores)``
     """
     assert isinstance(
         estimator, SGDOneClassSVM
@@ -80,9 +81,5 @@ def sklearn_sgd_one_class_svm(
         outputs=outputs[:1],
     )
 
-    emit_scores = len(outputs) > 1
-    if emit_scores:
-        scores_out = g.op.Identity(decision, name=f"{name}_scores", outputs=outputs[1:])
-        return label, scores_out
-
-    return label
+    scores_out = g.op.Identity(decision, name=f"{name}_scores", outputs=outputs[1:2])
+    return label, scores_out

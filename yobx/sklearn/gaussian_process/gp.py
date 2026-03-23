@@ -497,7 +497,7 @@ def sklearn_gaussian_process_regressor(
     estimator: GaussianProcessRegressor,
     X: str,
     name: str = "gpr",
-) -> Union[str, Tuple[str, ...]]:
+) -> str:
     """
     Converts a :class:`sklearn.gaussian_process.GaussianProcessRegressor`
     into ONNX (mean prediction only).

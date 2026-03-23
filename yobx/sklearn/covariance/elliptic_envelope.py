@@ -16,7 +16,7 @@ def sklearn_elliptic_envelope(
     estimator: EllipticEnvelope,
     X: str,
     name: str = "elliptic_envelope",
-) -> Union[str, Tuple[str, str]]:
+) -> Tuple[str, str]:
     """
     Converts a :class:`sklearn.covariance.EllipticEnvelope` into ONNX.
 
@@ -67,8 +67,7 @@ def sklearn_elliptic_envelope(
     :param g: the graph builder to add nodes to
     :param sts: shapes defined by :epkg:`scikit-learn`
     :param outputs: desired output names; ``outputs[0]`` receives the predicted
-        labels and ``outputs[1]`` (if present) receives the decision function
-        values
+        labels and ``outputs[1]`` receives the decision function values
     :param estimator: a fitted ``EllipticEnvelope``
     :param X: input tensor name
     :param name: prefix for added node names
@@ -102,13 +101,9 @@ def sklearn_elliptic_envelope(
     score_samples = g.op.Neg(mahal_sq, name=f"{name}_neg")  # (N,)
 
     # decision_function = score_samples - offset_
-    n_outputs = len(outputs)
-    if n_outputs >= 2:
-        decision = g.op.Sub(
-            score_samples, offset, name=f"{name}_decision", outputs=outputs[1:2]
-        )  # (N,)
-    else:
-        decision = g.op.Sub(score_samples, offset, name=f"{name}_decision")  # (N,)
+    decision = g.op.Sub(
+        score_samples, offset, name=f"{name}_decision", outputs=outputs[1:2]
+    )  # (N,)
 
     # predict: 1 where decision >= 0, else -1
     zero = np.array([0], dtype=dtype)
@@ -118,6 +113,4 @@ def sklearn_elliptic_envelope(
     minus_one = np.array([-1], dtype=np.int64)
     label = g.op.Where(mask, one, minus_one, name=f"{name}_where", outputs=outputs[:1])  # (N,)
 
-    if n_outputs >= 2:
-        return label, decision
-    return label
+    return label, decision

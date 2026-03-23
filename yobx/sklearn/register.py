@@ -1,4 +1,4 @@
-from typing import Dict, Callable, Optional, Tuple, Union
+from typing import Dict, Callable, List, Optional, Tuple, Union
 
 SKLEARN_CONVERTERS: Dict[type, Callable] = {}
 VERSION_CONVERTERS: Dict[type, Dict[str, str]] = {}
@@ -85,6 +85,86 @@ def sklearn_exportable_methods() -> Tuple[str, ...]:
     """
     return "transform", "predict", "predict_proba", "mahalanobis", "score_samples"
 
+
+def check_converter_output_alignment() -> List:
+    """Check that every registered converter's return-type annotation is
+    consistent with the number of outputs expected for its estimator class.
+
+    Uses :func:`~yobx.sklearn.sklearn_helper.n_outputs_for_class` to
+    determine how many outputs a class always produces:
+
+    * ``1`` → the converter must **never** return a :class:`tuple`; its
+      return annotation must be ``str``.
+    * ``2`` → the converter must **always** return two values; its return
+      annotation must be exactly ``Tuple[str, str]``.  A ``Union[str,
+      Tuple[str, str]]`` annotation is **rejected** because it allows the
+      converter to return only one output (the plain-``str`` arm), which
+      conflicts with the guarantee that this class always produces two outputs.
+    * ``None`` → the number of outputs depends on the instance (e.g.
+      classifiers, pipelines, meta-estimators); *any* return annotation is
+      accepted.
+
+    Returns a :class:`list` of
+    ``(cls, converter_function, expected_n_outputs, return_annotation)``
+    tuples for every converter whose annotation is considered misaligned.
+    An empty list means all converters are aligned.
+    """
+    import typing
+
+    from .sklearn_helper import n_outputs_for_class
+
+    misaligned: List = []
+
+    for cls, fct in SKLEARN_CONVERTERS.items():
+        expected = n_outputs_for_class(cls)
+        if expected is None:
+            # Variable — we cannot enforce a single annotation.
+            continue
+
+        hints = typing.get_type_hints(fct)
+        ret = hints.get("return", None)
+        if ret is None:
+            # No annotation — cannot check.
+            continue
+
+        origin = getattr(ret, "__origin__", None)
+
+        if expected == 1:
+            # The return type must be exactly `str` — a Tuple or a Union
+            # that includes a Tuple would indicate more outputs than expected.
+            is_tuple = origin is tuple
+            is_union_with_tuple = origin is typing.Union and any(
+                getattr(a, "__origin__", None) is tuple for a in ret.__args__
+            )
+            if is_tuple or is_union_with_tuple:
+                misaligned.append((cls, fct, expected, ret))
+
+        elif expected == 2:
+            # The return type must be exactly `Tuple[str, str]`.
+            is_plain_str = ret is str
+            is_tuple = origin is tuple
+            is_union = origin is typing.Union
+            if is_plain_str:
+                # Annotation says "always 1 output", but 2 are expected.
+                misaligned.append((cls, fct, expected, ret))
+            elif is_union:
+                has_plain_str = str in ret.__args__
+                has_tuple = any(
+                    getattr(a, "__origin__", None) is tuple for a in ret.__args__
+                )
+                if not has_tuple:
+                    # No Tuple arm — annotation can never produce 2 outputs.
+                    misaligned.append((cls, fct, expected, ret))
+                elif has_plain_str:
+                    # Union includes a plain-str arm — the converter may
+                    # sometimes return only 1 output, violating the guarantee
+                    # of always producing 2 outputs for this class.
+                    misaligned.append((cls, fct, expected, ret))
+            elif not is_tuple:
+                # Some other non-Tuple type — misaligned.
+                misaligned.append((cls, fct, expected, ret))
+
+    return misaligned
 
 def get_sklearn_estimator_coverage(
     libraries: Union[str, Tuple[str, ...]] = "all", rst: bool = False
