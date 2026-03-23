@@ -280,6 +280,7 @@ def to_onnx(
     # is passed explicitly to container converters below.
     sts: Dict[str, Any] = {}
     output_names = list(get_output_names(estimator, g.convert_options))
+    output_names = [g.unique_name(n) for n in output_names]
 
     is_container = isinstance(estimator, (Pipeline, ColumnTransformer, FeatureUnion))
 

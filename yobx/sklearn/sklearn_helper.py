@@ -83,7 +83,12 @@ def get_output_names(
     else:
         last_step = estimator
     if hasattr(last_step, "get_feature_names_out") and _should_use_feature_names(last_step):
-        outnames = estimator.get_feature_names_out()
+        try:
+            outnames = estimator.get_feature_names_out()
+        except AttributeError:
+            # No get_feature_names_out available (FunctionTransformer for example).
+            # Let's assume it is one output.
+            return post_process_output_names(last_step, ["Y"], convert_options)
         return post_process_output_names(last_step, list(outnames), convert_options)
 
     if SelectorMixin is not None and isinstance(last_step, SelectorMixin):
