@@ -74,7 +74,6 @@ class AddColumnsTransformer(BaseEstimator, TransformerMixin):
 
     def fit(self, X=None, y=None):
         self.input_dtypes_ = {k: np.dtype(v) for k, v in self._INPUT_DTYPES.items()}
-        self.n_onnx_outputs_ = 1  # needed by yobx.sklearn.sklearn_helper.get_n_expected_outputs()
         return self
 
     def transform(self, df):
@@ -124,7 +123,6 @@ class MultiOutTransformer(BaseEstimator, TransformerMixin):
 
     def fit(self, X=None, y=None):
         self.input_dtypes_ = {k: np.dtype(v) for k, v in self._INPUT_DTYPES.items()}
-        self.n_onnx_outputs_ = 2
         return self
 
     def transform(self, df):
@@ -171,7 +169,6 @@ class FilterTransformer(BaseEstimator, TransformerMixin):
 
     def fit(self, X=None, y=None):
         self.input_dtypes_ = {k: np.dtype(v) for k, v in self._INPUT_DTYPES.items()}
-        self.n_onnx_outputs_ = 1
         return self
 
     def get_feature_names_out(self, input_features=None):
