@@ -321,6 +321,45 @@ class GraphBuilderProtocol(Protocol):
         """
         ...
 
+    # ------------------------------------------------------------------
+    # Tensor-sequence support
+    # ------------------------------------------------------------------
+
+    def is_sequence(self, name: str) -> bool:
+        """Returns ``True`` when *name* has been registered as a tensor
+        sequence.
+
+        :param name: tensor name
+        """
+        ...
+
+    def get_sequence(self, name: str) -> Dict[str, Any]:
+        """Returns sequence metadata for *name*.
+
+        :param name: tensor name
+        :return: dictionary with keys such as ``"dtype"``, ``"shapes"``,
+            ``"ranks"``
+        """
+        ...
+
+    def set_sequence(
+        self,
+        name: str,
+        dtype: Any,
+        shapes: Optional[Any] = None,
+        ranks: Optional[Any] = None,
+        unknown: bool = False,
+    ) -> None:
+        """Marks *name* as a tensor sequence.
+
+        :param name: tensor name
+        :param dtype: element type (ONNX integer or tuple of integers)
+        :param shapes: optional tuple of per-element shapes
+        :param ranks: optional tuple of per-element ranks
+        :param unknown: set ``True`` when sequence contents are unknown
+        """
+        ...
+
 
 @runtime_checkable
 class OpsetProtocol(Protocol):
@@ -439,8 +478,7 @@ class GraphBuilderTorchProtocol(GraphBuilderExtendedProtocol, Protocol):
       :meth:`set_device`.
     * **Extended type / shape** — :meth:`get_type_known`,
       :meth:`set_shapes_types`.
-    * **Tensor-sequence support** — :meth:`is_sequence`, :meth:`get_sequence`,
-      :meth:`set_sequence`, :meth:`make_tensor_sequence_input`.
+    * **Tensor-sequence support** — :meth:`make_tensor_sequence_input`.
     * **Dynamic-shape helpers** — :meth:`is_dynamic_shape`,
       :meth:`get_input_dynamic_shape`,
       :meth:`verify_dynamic_shape`, :meth:`register_dynamic_objects_from_shape`,
@@ -567,45 +605,6 @@ class GraphBuilderTorchProtocol(GraphBuilderExtendedProtocol, Protocol):
         :param name: tensor name (or a :class:`torch.fx.Node`)
         :param where: source label (e.g. ``"run_node"``)
         :param value: annotation value (a tuple describing type / shape)
-        """
-        ...
-
-    # ------------------------------------------------------------------
-    # Tensor-sequence support
-    # ------------------------------------------------------------------
-
-    def is_sequence(self, name: str) -> bool:
-        """Returns ``True`` when *name* has been registered as a tensor
-        sequence.
-
-        :param name: tensor name
-        """
-        ...
-
-    def get_sequence(self, name: str) -> Dict[str, Any]:
-        """Returns sequence metadata for *name*.
-
-        :param name: tensor name
-        :return: dictionary with keys such as ``"dtype"``, ``"shapes"``,
-            ``"ranks"``
-        """
-        ...
-
-    def set_sequence(
-        self,
-        name: str,
-        dtype: Any,
-        shapes: Optional[Any] = None,
-        ranks: Optional[Any] = None,
-        unknown: bool = False,
-    ) -> None:
-        """Marks *name* as a tensor sequence.
-
-        :param name: tensor name
-        :param dtype: element type (ONNX integer or tuple of integers)
-        :param shapes: optional tuple of per-element shapes
-        :param ranks: optional tuple of per-element ranks
-        :param unknown: set ``True`` when sequence contents are unknown
         """
         ...
 
