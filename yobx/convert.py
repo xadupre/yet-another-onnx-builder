@@ -49,10 +49,16 @@ Example — SQL::
 
 from __future__ import annotations
 
+import importlib.util
 import os
 from typing import Any
 
 from .container import ExportArtifact
+
+
+def _has_package(name: str) -> bool:
+    """Return *True* if *name* is importable (without actually importing it)."""
+    return importlib.util.find_spec(name) is not None
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +67,7 @@ from .container import ExportArtifact
 
 
 def _sklearn_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
-    """Dispatch to :func:`yobx.sklearn.to_onnx` when sklearn is available."""
+    """Dispatch to :func:`yobx.sklearn.to_onnx`."""
     from sklearn.base import BaseEstimator
     from .sklearn import to_onnx as _to_onnx
 
@@ -71,7 +77,7 @@ def _sklearn_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
 
 
 def _tensorflow_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
-    """Dispatch to :func:`yobx.tensorflow.to_onnx` when tensorflow is available."""
+    """Dispatch to :func:`yobx.tensorflow.to_onnx`."""
     import tensorflow as tf
     from .tensorflow import to_onnx as _to_onnx
 
@@ -88,7 +94,7 @@ def _tensorflow_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
 
 
 def _torch_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
-    """Dispatch to :func:`yobx.torch.interpreter.to_onnx` when torch is available."""
+    """Dispatch to :func:`yobx.torch.interpreter.to_onnx`."""
     import torch
     from .torch.interpreter import to_onnx as _to_onnx
 
@@ -204,32 +210,27 @@ def to_onnx(model: Any, args: Any = None, **kwargs: Any) -> ExportArtifact:
         X = np.random.rand(1, 4).astype(np.float32)
         artifact = to_onnx("model.tflite", (X,))
     """
-    # Each private helper returns NotImplemented when the model type does not
-    # match, and raises ImportError (caught here) when the framework is absent.
+    # Each private helper returns NotImplemented when the model type does not match.
+    # Framework availability is checked with importlib.util.find_spec before calling
+    # the helper, so the imports inside the helpers are always expected to succeed.
 
     # 1. scikit-learn BaseEstimator
-    try:
+    if _has_package("sklearn"):
         result = _sklearn_to_onnx(model, args, **kwargs)
         if result is not NotImplemented:
             return result
-    except ImportError:
-        pass
 
     # 2. TensorFlow / Keras model
-    try:
+    if _has_package("tensorflow"):
         result = _tensorflow_to_onnx(model, args, **kwargs)
         if result is not NotImplemented:
             return result
-    except ImportError:
-        pass
 
     # 3. PyTorch nn.Module / fx.GraphModule
-    try:
+    if _has_package("torch"):
         result = _torch_to_onnx(model, args, **kwargs)
         if result is not NotImplemented:
             return result
-    except ImportError:
-        pass
 
     # 4. TFLite / LiteRT — file path ending in .tflite or raw bytes
     result = _litert_to_onnx(model, args, **kwargs)
