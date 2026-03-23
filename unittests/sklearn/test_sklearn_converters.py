@@ -560,5 +560,76 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-5)
 
 
+class TestSklearnToOnnxTupleSpec(ExtTestCase):
+    """Tests that to_onnx accepts ``(name, dtype, shape)`` tuples as input descriptors."""
+
+    def test_standard_scaler_tuple_spec(self):
+        """(name, dtype, shape) tuple replaces the numpy array as input specification."""
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        ss = StandardScaler()
+        ss.fit(X)
+
+        onx = to_onnx(ss, (("features", np.float32, ("N", 2)),))
+
+        # The ONNX graph input must use the name from the tuple.
+        self.assertEqual(onx.proto.graph.input[0].name, "features")
+        # Shape dim 0 should be symbolic ("N"), dim 1 should be static 2.
+        shape = onx.proto.graph.input[0].type.tensor_type.shape
+        self.assertEqual(shape.dim[0].dim_param, "N")
+        self.assertEqual(shape.dim[1].dim_value, 2)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"features": X})[0]
+        self.assertEqualArray(ss.transform(X).astype(np.float32), result, atol=1e-5)
+
+    def test_standard_scaler_tuple_spec_with_input_names_override(self):
+        """input_names overrides the name embedded in a (name, dtype, shape) tuple."""
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        ss = StandardScaler()
+        ss.fit(X)
+
+        onx = to_onnx(ss, (("features", np.float32, ("N", 2)),), input_names=["my_input"])
+
+        self.assertEqual(onx.proto.graph.input[0].name, "my_input")
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"my_input": X})[0]
+        self.assertEqualArray(ss.transform(X).astype(np.float32), result, atol=1e-5)
+
+    def test_pipeline_tuple_spec(self):
+        """(name, dtype, shape) tuple works with a Pipeline (scaler + regressor)."""
+        from sklearn.linear_model import LinearRegression
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        pipe = Pipeline([("scaler", StandardScaler()), ("reg", LinearRegression())])
+        pipe.fit(X, y)
+
+        onx = to_onnx(pipe, (("X", np.float32, ("N", 2)),))
+
+        self.assertEqual(onx.proto.graph.input[0].name, "X")
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X": X})[0]
+        expected = pipe.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected, result, atol=1e-5)
+
+    def test_tuple_spec_with_static_first_dim(self):
+        """(name, dtype, shape) tuple with all static dims is supported."""
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        ss = StandardScaler()
+        ss.fit(X)
+
+        onx = to_onnx(ss, (("X", np.float32, (4, 2)),))
+
+        shape = onx.proto.graph.input[0].type.tensor_type.shape
+        self.assertEqual(shape.dim[0].dim_value, 4)
+        self.assertEqual(shape.dim[1].dim_value, 2)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X": X})[0]
+        self.assertEqualArray(ss.transform(X).astype(np.float32), result, atol=1e-5)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

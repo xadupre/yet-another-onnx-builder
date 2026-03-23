@@ -1,5 +1,4 @@
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
-from onnx import ValueInfoProto
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline, FeatureUnion
@@ -7,9 +6,9 @@ from sklearn.utils.validation import check_is_fitted
 from .. import DEFAULT_TARGET_OPSET
 from ..typing import ConvertOptionsProtocol
 from ..container import ExportArtifact
-from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from ..xbuilder.function_options import FunctionOptions
+from ..helpers.to_onnx_helper import register_inputs
 from .register import get_sklearn_converter, sklearn_exportable_methods
 from .sklearn_helper import get_output_names
 
@@ -57,30 +56,6 @@ class ConvertOptions(ConvertOptionsProtocol):
         raise NotImplementedError(
             f"Not implemented with {option_name!r} is not a boolean but {value!r}."
         )
-
-
-def _extract_value_info_proto(vip: ValueInfoProto) -> Tuple[str, int, Optional[Tuple]]:
-    """Extract ``(name, elem_type, shape)`` from a :class:`onnx.ValueInfoProto`.
-
-    :param vip: an ONNX value-info descriptor
-    :return: tuple ``(name, elem_type, shape)`` where *shape* is ``None`` when
-        no shape information is present, and otherwise a tuple whose elements
-        are ``int`` for static dimensions, a non-empty ``str`` for symbolic
-        dimensions, and an auto-generated name such as ``"_unk_0_"`` for
-        dimensions with no value and no symbolic name.
-    """
-    name = vip.name
-    tt = vip.type.tensor_type
-    elem_type = tt.elem_type
-    if tt.HasField("shape"):
-        shape_dims = [
-            (dim.dim_param if dim.dim_param else (dim.dim_value or f"dim_{name}_{idim}"))
-            for idim, dim in enumerate(tt.shape.dim)
-        ]
-        shape: Optional[Tuple] = tuple(shape_dims)
-    else:
-        shape = None
-    return name, elem_type, shape
 
 
 def _default_ai_onnx_ml(main_opset: int) -> int:
@@ -205,12 +180,20 @@ def to_onnx(
     the others are static.
 
     :param estimator: estimator
-    :param args: dummy inputs; each element may be a numpy array **or** an
+    :param args: dummy inputs; each element may be a numpy array, an
         :class:`onnx.ValueInfoProto` that explicitly describes the input
-        tensor's name, element type and shape.  When a
-        :class:`~onnx.ValueInfoProto` is provided no actual data is required,
-        and the ``dynamic_shapes`` parameter is ignored for that input (the
-        shape is taken directly from the proto).
+        tensor's name, element type and shape, **or** a
+        ``(name, dtype, shape)`` tuple.  When a
+        :class:`~onnx.ValueInfoProto` or a ``(name, dtype, shape)`` tuple is
+        provided no actual data is required, and the ``dynamic_shapes``
+        parameter is ignored for that input (the shape is taken directly from
+        the descriptor).  The ``(name, dtype, shape)`` tuple format uses a
+        plain string for the name, a numpy dtype (or scalar-type class such
+        as ``np.float32``) for the element type, and a sequence of ints
+        and/or strings for the shape (strings denote symbolic / dynamic
+        dimensions).  Example::
+
+            to_onnx(estimator, (('x', np.float32, ('N', 4)),))
     :param dynamic_shapes: dynamic shapes, if not specified, the first dimension
         is dynamic, the others are static
     :param target_opset: opset to use; either an integer for the default domain
@@ -331,34 +314,7 @@ def to_onnx(
     else:
         fct = get_sklearn_converter(cls)
 
-    if input_names:
-        if len(input_names) != len(args):
-            raise ValueError(f"Length mismatch: {len(args)=} but input_names={input_names!r}")
-    else:
-        # Derive default input names; for ValueInfoProto use the embedded name.
-        default_names = []
-        for j, arg in enumerate(args):
-            if isinstance(arg, ValueInfoProto):
-                default_names.append(arg.name or (f"X{j}" if len(args) > 1 else "X"))
-            else:
-                default_names.append("X" if len(args) == 1 else f"X{j}")
-        input_names = default_names
-    for i, (name, arg) in enumerate(zip(input_names, args)):
-        if isinstance(arg, ValueInfoProto):
-            # Use name/type/shape directly from the ValueInfoProto.
-            _, elem_type, shape = _extract_value_info_proto(arg)
-            g.make_tensor_input(name, elem_type, shape, device=-1)
-        else:
-            if dynamic_shapes:
-                ds = dynamic_shapes[i]
-            else:
-                ds = {0: "batch"}
-            shape = list(arg.shape)  # type: ignore
-            for axis, dim in ds.items():
-                shape[axis] = dim  # type: ignore
-            g.make_tensor_input(  # type: ignore
-                name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1  # type: ignore
-            )  # type: ignore
+    input_names = register_inputs(g, args, input_names, dynamic_shapes)
 
     # Build the sts dict (shared state for converters). function_options, if set,
     # is passed explicitly to container converters below.
