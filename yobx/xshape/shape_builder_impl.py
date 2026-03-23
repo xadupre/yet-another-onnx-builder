@@ -1,8 +1,7 @@
-import contextlib
 import os
 import pprint
 from enum import IntEnum
-from typing import Any, Dict, Generator, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import onnx
 import onnx.numpy_helper as onh
@@ -14,7 +13,7 @@ from ..xexpressions import simplify_expression
 from ..xexpressions.operations import DIM_TYPE
 from ..xexpressions.rename_expressions import parse_expression_tokens
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape
-from ._builder_runtime import _BuilderRuntime
+from ._builder_runtime import _BuilderRuntime, _ExtraPackages
 from ._shape_runtime import _ShapeRuntime
 from ._inference_runtime import _InferenceRuntime, _OptimizationOptions
 from .shape_builder import ShapeBuilder
@@ -40,15 +39,9 @@ class InferenceMode(IntEnum):
     COST = 16
 
 
-@contextlib.contextmanager
-def _maybe_disable_fake_tensor_mode() -> Generator:
-    try:
-        yield
-    finally:
-        pass
-
-
-class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
+class BasicShapeBuilder(
+    ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPackages
+):
     """
     Implements a basic class doing shape inference in an ONNX model.
 
@@ -63,6 +56,7 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
     """
 
     def __init__(self, verbose: int = 0, opset: Optional[int] = None):
+        _ExtraPackages.__init__(self)
         self.verbose = verbose
         self._input_names = []
         self._output_names = []
@@ -92,23 +86,6 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         self.main_opset = self.opsets[""]
         self.time_evaluation_constants_ = 0
         self.optimization_options = _OptimizationOptions()
-
-        self.maybe_disable_fake_tensor_mode = contextlib.nullcontext
-        if os.environ.get("NOTORCH", "0") in ("1", "true"):
-            self._has_torch = False
-            self.torch = None
-        else:
-            try:
-                import torch
-                import torch._subclasses
-
-                self._has_torch = True
-                self.torch = torch
-                self.torch_subclasses = torch._subclasses
-                self.maybe_disable_fake_tensor_mode = _maybe_disable_fake_tensor_mode
-            except (NameError, ImportError, AttributeError):
-                self._has_torch = False
-                self.torch = None
 
     @property
     def input_names(self) -> List[str]:
@@ -901,13 +878,8 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
                 result.append((op_type, flops, input_shapes))
                 continue
             # flops is a symbolic string expression — evaluate it.
-            try:
-                evaluated = evaluate_expression(flops, context)
-                result.append((op_type, evaluated, input_shapes))
-            except Exception:
-                if exc:
-                    raise
-                result.append((op_type, None, input_shapes))
+            evaluated = evaluate_expression(flops, context)
+            result.append((op_type, evaluated, input_shapes))
         return result
 
     def estimate_node_flops(self, node: onnx.NodeProto) -> Optional[DIM_TYPE]:

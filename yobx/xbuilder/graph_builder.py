@@ -78,7 +78,7 @@ from ..xshape.shape_type_compute import (
     set_shape_type_custom,
     set_type_shape_unary_op,
 )
-from ..xshape._builder_runtime import _BuilderRuntime
+from ..xshape._builder_runtime import _BuilderRuntime, _ExtraPackages
 from ..xshape._shape_runtime import _ShapeRuntime
 from ..xshape._inference_runtime import _InferenceRuntime
 from .graph_builder_opset import Opset
@@ -114,7 +114,7 @@ def _unset_fake_temporarily() -> Generator:
             torch._C._set_dispatch_mode(old)
 
 
-class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
+class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPackages):
     """
     Simplifies the creation of a model.
 
@@ -285,35 +285,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
         _parent: Optional[Union["GraphBuilder", Tuple["GraphBuilder", NodeProto]]] = None,
         convert_options: Optional[ConvertOptionsProtocol] = None,
     ):
-        self.maybe_disable_fake_tensor_mode = contextlib.nullcontext
-        if os.environ.get("NOTORCH", "0") in ("1", "true"):
-            self._has_torch = False
-            self.torch = None
-        else:
-            try:
-                import torch
-                import torch._subclasses
-
-                self._has_torch = True
-                self.torch = torch
-                self.torch_subclasses = torch._subclasses
-                self.maybe_disable_fake_tensor_mode = _unset_fake_temporarily  # type: ignore
-            except (NameError, ImportError, AttributeError):
-                self._has_torch = False
-                self.torch = None
-
-        if os.environ.get("NOTF", "0") in ("1", "true"):
-            self._has_tensorflow = False
-            self.tensorflow = None
-        else:
-            try:
-                import tensorflow
-
-                self._has_tensorflow = bool(tensorflow.__version__)
-                self.tensorflow = tensorflow
-            except (ImportError, AttributeError):
-                self._has_tensorflow = False
-                self.tensorflow = None
+        _ExtraPackages.__init__(self)
 
         from . import TEMPLATE_TYPE
 

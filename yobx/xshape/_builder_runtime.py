@@ -1,5 +1,6 @@
 import contextlib
 from itertools import zip_longest
+import os
 from typing import Dict, Generator, List, Tuple
 import numpy as np
 from onnx import NodeProto
@@ -23,6 +24,68 @@ def _unset_fake_temporarily() -> Generator:
     finally:
         if old is not None:
             torch._C._set_dispatch_mode(old)
+
+
+@contextlib.contextmanager
+def _maybe_disable_fake_tensor_mode() -> Generator:
+    try:
+        yield
+    finally:
+        pass
+
+
+class _ExtraPackages:
+    def __init__(self):
+        self.maybe_disable_fake_tensor_mode = contextlib.nullcontext
+
+        if os.environ.get("NOTORCH", "0") in ("1", "true"):
+            self._has_torch_ = False
+            self.torch = None
+        else:
+            self._has_torch_ = None
+            self.torch = None
+
+        if os.environ.get("NOTF", "0") in ("1", "true"):
+            self._has_tensorflow_ = False
+            self.tensorflow = None
+        else:
+            self._has_tensorflow_ = None
+            self.tensorflow = None
+
+    @property
+    def _has_torch(self) -> bool:
+        if self._has_torch_ is None:
+            return False
+
+        try:
+            import torch
+            import torch._subclasses
+
+            self._has_torch_ = True
+            self.torch = torch
+            self.torch_subclasses = torch._subclasses
+            self.maybe_disable_fake_tensor_mode = _maybe_disable_fake_tensor_mode
+        except (NameError, ImportError, AttributeError):
+            self._has_torch_ = False
+            self.torch = None
+
+        return self._has_torch_
+
+    @property
+    def _has_tensorflow(self) -> bool:
+        if self._has_tensorflow_ is None:
+            return False
+
+        try:
+            import tensorflow
+
+            self._has_tensorflow_ = True
+            self.tensorflow = tensorflow
+        except (NameError, ImportError, AttributeError):
+            self._has_tensorflow_ = False
+            self.tensorflow = None
+
+        return self._has_tensorflow_
 
 
 class _BuilderRuntime:
