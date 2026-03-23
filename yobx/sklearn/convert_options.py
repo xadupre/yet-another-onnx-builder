@@ -14,16 +14,15 @@ class ConvertOptions(ConvertOptionsProtocol):
     :param decision_leaf: when ``True``, an extra ``int64`` output tensor is
         appended containing the zero-based leaf node index reached by each
         input sample.  The shape is ``(N, 1)`` for single trees and
-        ``(N, n_estimators)`` for ensembles.  Passing a :class:`set` of
-        estimator class names is reserved for future use (currently raises
-        :exc:`NotImplementedError`).
+        ``(N, n_estimators)`` for ensembles. The option triggers for every
+        estimator which implements `decision_path` method.
     :param decision_path: when ``True``, an extra ``object`` (string) output
         tensor is appended containing the binary root-to-leaf path for each
         input sample.  Each value is a byte-string whose *i*-th character is
         ``'1'`` if node *i* was visited and ``'0'`` otherwise.  The shape is
         ``(N, 1)`` for single trees and ``(N, n_estimators)`` for ensembles.
-        Passing a :class:`set` of estimator class names is reserved for future
-        use (currently raises :exc:`NotImplementedError`).
+        The option triggers for every estimator which implements
+        `decision_path` method.
 
     **Class attributes**
 
@@ -92,8 +91,6 @@ class ConvertOptions(ConvertOptionsProtocol):
             falsy value).
         :raises AssertionError: if *option_name* is not a member of
             :attr:`OPTIONS`.
-        :raises NotImplementedError: if the option attribute is a
-            :class:`set` (per-estimator filtering is reserved for future use).
         """
         assert hasattr(
             self, option_name
