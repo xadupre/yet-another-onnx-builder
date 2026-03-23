@@ -4688,7 +4688,59 @@ class TestGraphPatternOptimization(ExtTestCase):
         self.assertEqualArray(expected[1], got[1], atol=1e-5)
 
     @hide_stdout()
-    def test_shape_eval_no_data_prop(self):
+    def test_split_to_sequence_sequence_at(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("SplitToSequence", ["X", "split"], ["seq"], axis=1),
+                    oh.make_node("SequenceAt", ["seq", "i0"], ["Y1"]),
+                    oh.make_node("SequenceAt", ["seq", "i1"], ["Y2"]),
+                    oh.make_node("SequenceAt", ["seq", "i2"], ["Y3"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", 6])],
+                [
+                    _mkv_("Y1", TFLOAT, ["a", 2]),
+                    _mkv_("Y2", TFLOAT, ["a", 2]),
+                    _mkv_("Y3", TFLOAT, ["a", 2]),
+                ],
+                [
+                    onh.from_array(np.array([2, 2, 2], dtype=np.int64), name="split"),
+                    onh.from_array(np.array(0, dtype=np.int64), name="i0"),
+                    onh.from_array(np.array(1, dtype=np.int64), name="i1"),
+                    onh.from_array(np.array(2, dtype=np.int64), name="i2"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        from onnxruntime import InferenceSession
+
+        feeds = {"X": self._range(3, 6).astype(np.float32)}
+        ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["SplitToSequenceSequenceAt"], verbose=0, constant_folding=True
+            ),
+            verbose=0,
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+
+        self.assertEqual(["Split"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
+        self.assertEqualArray(expected[1], got[1], atol=1e-5)
+        self.assertEqualArray(expected[2], got[2], atol=1e-5)
+
         model = oh.make_model(
             oh.make_graph(
                 [
