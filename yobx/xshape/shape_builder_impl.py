@@ -857,6 +857,59 @@ class BasicShapeBuilder(ShapeBuilder, _BuilderRuntime, _ShapeRuntime, _Inference
         """Returns the constraints registered so far."""
         return self.constraints_
 
+    def evaluate_cost_with_true_inputs(
+        self,
+        feeds: Dict[str, np.ndarray],
+        cost: List[Tuple[str, Optional[DIM_TYPE], Tuple]],
+        exc: bool = False,
+    ) -> List[Tuple[str, Optional[int], Tuple]]:
+        """
+        Evaluates symbolic FLOPs expressions in *cost* using actual tensor
+        shapes from *feeds*.
+
+        When :meth:`run_model` is called with ``InferenceMode.COST`` on a
+        model that has symbolic (dynamic) input shapes, the returned FLOPs
+        values may be symbolic expressions (strings such as
+        ``"(DIM1)*(DIM2)*(3)"``).  This method substitutes the true dimension
+        values extracted from *feeds* to produce concrete integer FLOPs.
+
+        :param feeds: mapping ``{name: array}`` of actual input tensors
+        :param cost: list of ``(op_type, flops, input_shapes)`` tuples as
+            returned by ``run_model(..., inference=InferenceMode.COST)``
+        :param exc: if ``True``, re-raise any evaluation error; otherwise the
+            FLOPs entry is set to ``None`` for that node
+        :return: list of ``(op_type, evaluated_flops, input_shapes)`` tuples
+        """
+        from ..xexpressions.evaluate_expressions import evaluate_expression
+
+        # Build a symbol-name → integer-value mapping by comparing the
+        # symbolic shapes stored in this builder for the model inputs against
+        # the actual shapes of the tensors in *feeds*.
+        context: Dict[str, int] = {}
+        for name, array in feeds.items():
+            if not self.has_shape(name):
+                continue
+            symbolic_shape = self.get_shape(name)
+            actual_shape = array.shape
+            for sym, val in zip(symbolic_shape, actual_shape):
+                if isinstance(sym, str):
+                    context[sym] = int(val)
+
+        result: List[Tuple[str, Optional[int], Tuple]] = []
+        for op_type, flops, input_shapes in cost:
+            if flops is None or isinstance(flops, int):
+                result.append((op_type, flops, input_shapes))
+                continue
+            # flops is a symbolic string expression — evaluate it.
+            try:
+                evaluated = evaluate_expression(flops, context)
+                result.append((op_type, evaluated, input_shapes))
+            except Exception:
+                if exc:
+                    raise
+                result.append((op_type, None, input_shapes))
+        return result
+
     def estimate_node_flops(self, node: onnx.NodeProto) -> Optional[DIM_TYPE]:
         """
         Estimates the number of floating-point operations for *node* using the

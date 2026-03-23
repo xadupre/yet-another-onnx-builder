@@ -92,7 +92,7 @@ class ShapeBuilderCostRep(onnx.backend.base.BackendRep):
         assert all(isinstance(t, tuple) for t in cost), "One cost is missing."
         assert all(len(t) == 3 for t in cost), "One cost is malformed."
         try:
-            shape_builder.evaluate_cost_with_true_inputs(feeds, outs, exc=True)
+            shape_builder.evaluate_cost_with_true_inputs(feeds, cost, exc=True)
         except NameError as e:
             raise unittest.SkipTest(  # noqa: B904
                 f"shape function was found but only the rank could be set: {e}"
