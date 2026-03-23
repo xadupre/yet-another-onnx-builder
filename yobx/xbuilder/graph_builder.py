@@ -1628,6 +1628,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
             return value
         if hasattr(value, "node") and isinstance(value.node, str):
             return f"{value.node}"
+        if not self._has_torch:
+            raise AssertionError(f"Unable to convert {value!r} into string")
 
         from torch.fx.experimental.sym_node import SymNode
 
