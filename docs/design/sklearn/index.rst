@@ -13,6 +13,7 @@ scikit-learn Export to ONNX
    custom_converter
    contrib_ops
    debug
+   dataframe_pipeline
 
 .. seealso::
 
