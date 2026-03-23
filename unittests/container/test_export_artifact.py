@@ -24,6 +24,27 @@ def _make_simple_model():
     return model
 
 
+def _make_relu_model():
+    """Return a ModelProto with a Relu node (static shapes)."""
+    X = oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [4, 8])
+    Y = oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [4, 8])
+    node = oh.make_node("Relu", ["X"], ["Y"])
+    graph = oh.make_graph([node], "g", [X], [Y])
+    return oh.make_model(graph, opset_imports=[oh.make_opsetid("", 18)])
+
+
+def _make_matmul_model():
+    """Return a ModelProto with a MatMul + Add node."""
+    X = oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [3, 4])
+    W = oh.make_tensor_value_info("W", onnx.TensorProto.FLOAT, [4, 2])
+    B = oh.make_tensor_value_info("B", onnx.TensorProto.FLOAT, [3, 2])
+    Z = oh.make_tensor_value_info("Z", onnx.TensorProto.FLOAT, [3, 2])
+    mm = oh.make_node("MatMul", ["X", "W"], ["T"])
+    add = oh.make_node("Add", ["T", "B"], ["Z"])
+    graph = oh.make_graph([mm, add], "g", [X, W, B], [Z])
+    return oh.make_model(graph, opset_imports=[oh.make_opsetid("", 18)])
+
+
 class TestExportReport(ExtTestCase):
     def test_empty(self):
         r = ExportReport()
@@ -138,6 +159,112 @@ class TestExportReport(ExtTestCase):
             self.assertIn("build_stats", sheets)
             df_bs = pandas.read_excel(path, sheet_name="build_stats")
             self.assertEqual(list(df_bs.columns), ["key", "value"])
+
+    # ------------------------------------------------------------------
+    # node_stats tests
+    # ------------------------------------------------------------------
+
+    def test_node_stats_empty_by_default(self):
+        r = ExportReport()
+        self.assertEqual(r.node_stats, [])
+
+    def test_node_stats_init(self):
+        rows = [{"op_type": "Relu", "domain": "", "count": 2, "flops": 16}]
+        r = ExportReport(node_stats=rows)
+        self.assertEqual(len(r.node_stats), 1)
+        self.assertEqual(r.node_stats[0]["op_type"], "Relu")
+
+    def test_compute_node_stats_identity(self):
+        """Identity node should appear in node_stats with count=1."""
+        r = ExportReport()
+        r.compute_node_stats(_make_simple_model())
+        self.assertGreater(len(r.node_stats), 0)
+        op_types = {row["op_type"] for row in r.node_stats}
+        self.assertIn("Identity", op_types)
+        identity_row = next(row for row in r.node_stats if row["op_type"] == "Identity")
+        self.assertEqual(identity_row["count"], 1)
+        self.assertEqual(identity_row["domain"], "")
+
+    def test_compute_node_stats_relu_static(self):
+        """Relu on a fully static shape should give a non-None flops estimate."""
+        r = ExportReport()
+        r.compute_node_stats(_make_relu_model())
+        relu_rows = [row for row in r.node_stats if row["op_type"] == "Relu"]
+        self.assertEqual(len(relu_rows), 1)
+        self.assertEqual(relu_rows[0]["count"], 1)
+        # Relu is elementwise: 4*8 = 32 elements
+        self.assertEqual(relu_rows[0]["flops"], 32)
+
+    def test_compute_node_stats_matmul(self):
+        """MatMul and Add should both appear with correct counts and FLOPs."""
+        r = ExportReport()
+        r.compute_node_stats(_make_matmul_model())
+        op_types = {row["op_type"] for row in r.node_stats}
+        self.assertIn("MatMul", op_types)
+        self.assertIn("Add", op_types)
+        mm_row = next(row for row in r.node_stats if row["op_type"] == "MatMul")
+        add_row = next(row for row in r.node_stats if row["op_type"] == "Add")
+        self.assertEqual(mm_row["count"], 1)
+        self.assertEqual(add_row["count"], 1)
+        # FLOPs should be positive integers for static shapes
+        self.assertIsNotNone(mm_row["flops"])
+        self.assertIsNotNone(add_row["flops"])
+
+    def test_compute_node_stats_chained(self):
+        """compute_node_stats returns self (method chaining)."""
+        r = ExportReport()
+        result = r.compute_node_stats(_make_relu_model())
+        self.assertIs(result, r)
+
+    def test_repr_includes_n_node_stats(self):
+        rows = [{"op_type": "Relu", "domain": "", "count": 1, "flops": 32}]
+        r = ExportReport(node_stats=rows)
+        text = repr(r)
+        self.assertIn("n_node_stats=1", text)
+
+    def test_to_dict_includes_node_stats(self):
+        rows = [{"op_type": "Add", "domain": "", "count": 3, "flops": 96}]
+        r = ExportReport(node_stats=rows)
+        d = r.to_dict()
+        self.assertIn("node_stats", d)
+        self.assertEqual(len(d["node_stats"]), 1)
+
+    def test_to_string_includes_node_stats(self):
+        r = ExportReport()
+        r.compute_node_stats(_make_relu_model())
+        text = r.to_string()
+        self.assertIn("node_stats", text)
+        self.assertIn("Relu", text)
+
+    def test_update_merges_node_stats(self):
+        r1 = ExportReport(node_stats=[{"op_type": "Relu", "domain": "", "count": 1, "flops": 32}])
+        r2 = ExportReport(node_stats=[{"op_type": "Add", "domain": "", "count": 2, "flops": 64}])
+        r1.update(r2)
+        self.assertEqual(len(r1.node_stats), 2)
+
+    @skipif_ci_windows("issue with excel")
+    def test_to_excel_with_node_stats(self):
+        try:
+            import openpyxl  # noqa: F401
+        except ImportError:
+            return
+        import pandas
+
+        r = ExportReport()
+        r.compute_node_stats(_make_matmul_model())
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "report_ns.xlsx")
+            r.to_excel(path)
+            self.assertTrue(os.path.exists(path))
+            sheets = pandas.ExcelFile(path).sheet_names
+            self.assertIn("node_stats", sheets)
+            df_ns = pandas.read_excel(path, sheet_name="node_stats")
+            self.assertIn("op_type", df_ns.columns)
+            self.assertIn("count", df_ns.columns)
+            self.assertIn("flops", df_ns.columns)
+            op_types = set(df_ns["op_type"].tolist())
+            self.assertIn("MatMul", op_types)
+            self.assertIn("Add", op_types)
 
 
 class TestExportArtifact(ExtTestCase):
@@ -308,6 +435,26 @@ class TestExportArtifact(ExtTestCase):
         self.assertIsNotNone(artifact.function.initializers_dict)
         self.assertIsNotNone(artifact.function.initializers_renaming)
         self.assertGreater(len(artifact.function.initializers_name), 0)
+
+    def test_compute_node_stats_on_artifact(self):
+        """ExportArtifact.compute_node_stats populates report.node_stats."""
+        artifact = ExportArtifact(proto=_make_matmul_model())
+        result = artifact.compute_node_stats()
+        self.assertIs(result, artifact)
+        self.assertIsNotNone(artifact.report)
+        self.assertIsInstance(artifact.report, ExportReport)
+        self.assertGreater(len(artifact.report.node_stats), 0)
+        op_types = {row["op_type"] for row in artifact.report.node_stats}
+        self.assertIn("MatMul", op_types)
+        self.assertIn("Add", op_types)
+
+    def test_compute_node_stats_no_op_on_function_proto(self):
+        """compute_node_stats on a FunctionProto artifact does nothing."""
+        artifact = ExportArtifact(proto=onnx.FunctionProto())
+        artifact.compute_node_stats()
+        # report stays None (or empty node_stats) — no crash
+        if artifact.report is not None:
+            self.assertEqual(artifact.report.node_stats, [])
 
 
 if __name__ == "__main__":
