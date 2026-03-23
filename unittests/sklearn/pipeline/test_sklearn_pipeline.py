@@ -73,7 +73,9 @@ class TestSklearnPipelineConvertOptions(ExtTestCase):
     def test_pipeline_convert_options_decision_leaf(self):
         """ConvertOptions(decision_leaf=True) should add a leaf-index output for a Pipeline
         ending with a DecisionTreeClassifier."""
-        onx = to_onnx(self.pipe, (self.X_train,), convert_options=ConvertOptions(decision_leaf=True))
+        onx = to_onnx(
+            self.pipe, (self.X_train,), convert_options=ConvertOptions(decision_leaf=True)
+        )
 
         # Three outputs: label, probabilities, decision_leaf
         self.assertEqual(len(onx.graph.output), 3)
@@ -104,9 +106,11 @@ class TestSklearnPipelineConvertOptions(ExtTestCase):
         np.testing.assert_array_equal(ort_out[2], expected_leaves)
 
     def test_pipeline_convert_options_decision_path(self):
-        """ConvertOptions(decision_path=True) should add a binary path-string output for a Pipeline
-        ending with a DecisionTreeClassifier."""
-        onx = to_onnx(self.pipe, (self.X_train,), convert_options=ConvertOptions(decision_path=True))
+        """ConvertOptions(decision_path=True) should add a binary
+        path-string output for a Pipeline ending with a DecisionTreeClassifier."""
+        onx = to_onnx(
+            self.pipe, (self.X_train,), convert_options=ConvertOptions(decision_path=True)
+        )
 
         # Three outputs: label, probabilities, decision_path
         self.assertEqual(len(onx.graph.output), 3)

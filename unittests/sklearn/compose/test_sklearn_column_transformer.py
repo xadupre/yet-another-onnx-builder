@@ -173,10 +173,7 @@ class TestSklearnColumnTransformerConvertOptions(ExtTestCase):
             [("std", StandardScaler(), [0, 1]), ("mm", MinMaxScaler(), [2, 3])]
         )
         self.pipe = Pipeline(
-            [
-                ("preprocessor", ct),
-                ("clf", DecisionTreeClassifier(max_depth=3, random_state=0)),
-            ]
+            [("preprocessor", ct), ("clf", DecisionTreeClassifier(max_depth=3, random_state=0))]
         )
         self.pipe.fit(self.X_train, y_train)
 
@@ -247,4 +244,3 @@ class TestSklearnColumnTransformerConvertOptions(ExtTestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-
