@@ -54,8 +54,8 @@ class _ExtraPackages:
 
     @property
     def _has_torch(self) -> bool:
-        if self._has_torch_ is None:
-            return False
+        if self._has_torch_ is not None:
+            return self._has_torch_
 
         try:
             import torch
@@ -73,8 +73,8 @@ class _ExtraPackages:
 
     @property
     def _has_tensorflow(self) -> bool:
-        if self._has_tensorflow_ is None:
-            return False
+        if self._has_tensorflow_ is not None:
+            return self._has_tensorflow_
 
         try:
             import tensorflow

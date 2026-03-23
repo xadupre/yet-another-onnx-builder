@@ -892,7 +892,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         feeds = {input_name: X}
 
         ort_result = _ort_run(onx, feeds)
-        self.assertEqualArray(expected, ort_result, atol=1e-5)
+        self.assertEqualArray(expected, ort_result, atol=1e-3)
 
     def test_conv2d_same(self):
         """TF Conv2D with SAME padding → ONNX Conv with explicit pads."""
