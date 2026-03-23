@@ -1,7 +1,6 @@
 def register():
     from . import (
         binarizer,
-        dataframe_function_transformer,
         function_transformer,
         kbins_discretizer,
         kernel_centerer,

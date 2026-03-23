@@ -1,14 +1,30 @@
 """
-Unit tests for :class:`~yobx.sklearn.preprocessing.DataFrameTransformer` and
-its ONNX converter.
+Unit tests demonstrating how a user-defined scikit-learn transformer that
+processes :class:`pandas.DataFrame` objects can be converted to ONNX.
+
+The pattern shown here uses:
+
+* A plain ``BaseEstimator`` / ``TransformerMixin`` subclass (no wrapper class
+  required — the type is resolved by ``extra_converters`` at export time).
+* A tracing function written with the :class:`~yobx.sql.TracedDataFrame` API.
+* :func:`~yobx.sql.sql_convert.parsed_query_to_onnx_graph` with
+  ``_finalize=False`` to embed the dataframe query in the caller-managed graph.
+* :func:`~yobx.sklearn.to_onnx` with ``extra_converters`` to wire the
+  user-defined transformer to the converter.
 """
 
 import unittest
 
 import numpy as np
+from sklearn.base import BaseEstimator, TransformerMixin
 
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
+
+
+# ---------------------------------------------------------------------------
+# Module-level helpers shared by multiple tests
+# ---------------------------------------------------------------------------
 
 
 def _run_onnx(onx, feeds):
@@ -31,117 +47,147 @@ def _run_onnx(onx, feeds):
     return ref_outputs
 
 
-@requires_sklearn("1.4")
-class TestDataFrameTransformer(ExtTestCase):
-    """Tests for DataFrameTransformer and its ONNX converter."""
+# ---------------------------------------------------------------------------
+# A sample user-defined transformer: computes total = a + b
+# ---------------------------------------------------------------------------
 
-    # ------------------------------------------------------------------
-    # fit / transform
-    # ------------------------------------------------------------------
 
-    def test_fit_sets_output_names(self):
-        """fit() must discover output column names via tracing."""
-        from yobx.sklearn import DataFrameTransformer
+class _AddColumnsTransformer(BaseEstimator, TransformerMixin):
+    """User-defined transformer: adds two float32 columns a and b -> total."""
 
-        def func(df):
-            return df.select([(df["a"] + df["b"]).alias("total")])
+    _INPUT_DTYPES = {"a": np.float32, "b": np.float32}
 
-        t = DataFrameTransformer(func, {"a": np.float32, "b": np.float32})
-        t.fit()
-        self.assertEqual(list(t.output_names_), ["total"])
+    def fit(self, X=None, y=None):
+        self.input_dtypes_ = {k: np.dtype(v) for k, v in self._INPUT_DTYPES.items()}
+        # Declare the number of ONNX output tensors so that
+        # get_n_expected_outputs() returns the correct value.
+        self.n_onnx_outputs_ = 1
+        return self
 
-    def test_get_feature_names_out(self):
-        """get_feature_names_out() must return the output column names."""
-        from yobx.sklearn import DataFrameTransformer
+    def transform(self, df):
+        import pandas as pd
 
-        def func(df):
-            return df.select(
-                [(df["x"] * 2.0).alias("x2"), (df["y"] - 1.0).alias("y_minus_1")]
-            )
+        return pd.DataFrame({"total": df["a"].values + df["b"].values})
 
-        t = DataFrameTransformer(func, {"x": np.float32, "y": np.float32})
-        t.fit()
-        names = t.get_feature_names_out()
-        self.assertEqual(list(names), ["x2", "y_minus_1"])
+    def get_feature_names_out(self, input_features=None):
+        return np.array(["total"])
 
-    def test_transform_pandas(self):
-        """transform() must apply func to a pandas DataFrame via the ONNX model."""
-        pd = __import__("pandas")
-        from yobx.sklearn import DataFrameTransformer
 
-        def func(df):
-            return df.select([(df["a"] + df["b"]).alias("total")])
+def _add_columns_tracing_func(df):
+    """TracedDataFrame-compatible counterpart of _AddColumnsTransformer.transform."""
+    return df.select([(df["a"] + df["b"]).alias("total")])
 
-        t = DataFrameTransformer(func, {"a": np.float32, "b": np.float32})
-        t.fit()
-        df = pd.DataFrame(
-            {"a": np.array([1.0, 2.0, 3.0], dtype=np.float32),
-             "b": np.array([4.0, 5.0, 6.0], dtype=np.float32)}
+
+def _add_columns_converter(g, sts, outputs, estimator, *inputs, name="add_cols"):
+    """ONNX converter for _AddColumnsTransformer.
+
+    Uses dataframe tracing to emit the ONNX nodes and embeds them in the
+    caller's graph via :func:`~yobx.sql.sql_convert.parsed_query_to_onnx_graph`
+    with ``_finalize=False`` to let the caller register the outputs.
+    """
+    from yobx.sql import trace_dataframe
+    from yobx.sql.sql_convert import parsed_query_to_onnx_graph
+
+    pq = trace_dataframe(_add_columns_tracing_func, estimator.input_dtypes_)
+    out_names = parsed_query_to_onnx_graph(
+        g, sts, list(outputs), pq, estimator.input_dtypes_, _finalize=False
+    )
+    return out_names[0]
+
+
+# ---------------------------------------------------------------------------
+# A multi-output user-defined transformer
+# ---------------------------------------------------------------------------
+
+
+class _MultiOutTransformer(BaseEstimator, TransformerMixin):
+    """User-defined transformer: produces two output columns from two inputs."""
+
+    _INPUT_DTYPES = {"a": np.float32, "b": np.float32}
+
+    def fit(self, X=None, y=None):
+        self.input_dtypes_ = {k: np.dtype(v) for k, v in self._INPUT_DTYPES.items()}
+        self.n_onnx_outputs_ = 2
+        return self
+
+    def transform(self, df):
+        import pandas as pd
+
+        return pd.DataFrame(
+            {
+                "total": df["a"].values + df["b"].values,
+                "a_doubled": df["a"].values * 2.0,
+            }
         )
-        result = t.transform(df)
-        np.testing.assert_allclose(result["total"].values, [5.0, 7.0, 9.0])
 
-    def test_transform_raises_on_non_dataframe(self):
-        """transform() must raise TypeError when X is not a DataFrame."""
-        from yobx.sklearn import DataFrameTransformer
+    def get_feature_names_out(self, input_features=None):
+        return np.array(["total", "a_doubled"])
 
-        def func(df):
-            return df.select([(df["a"] + 1.0).alias("a1")])
 
-        t = DataFrameTransformer(func, {"a": np.float32})
+def _multi_out_tracing_func(df):
+    return df.select(
+        [
+            (df["a"] + df["b"]).alias("total"),
+            (df["a"] * 2.0).alias("a_doubled"),
+        ]
+    )
+
+
+def _multi_out_converter(g, sts, outputs, estimator, *inputs, name="multi_out"):
+    from yobx.sql import trace_dataframe
+    from yobx.sql.sql_convert import parsed_query_to_onnx_graph
+
+    pq = trace_dataframe(_multi_out_tracing_func, estimator.input_dtypes_)
+    out_names = parsed_query_to_onnx_graph(
+        g, sts, list(outputs), pq, estimator.input_dtypes_, _finalize=False
+    )
+    return out_names[0]
+
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+
+@requires_sklearn("1.4")
+class TestCustomDataFrameTransformerOnnx(ExtTestCase):
+    """Converting user-defined DataFrame-processing transformers to ONNX."""
+
+    def _make_args(self, input_dtypes):
+        """Build (name, dtype, shape) arg tuples from an input_dtypes dict."""
+        return tuple((col, dtype, ("N",)) for col, dtype in input_dtypes.items())
+
+    # ------------------------------------------------------------------
+    # fit / get_feature_names_out
+    # ------------------------------------------------------------------
+
+    def test_fit_sets_attributes(self):
+        """fit() must set input_dtypes_ and n_onnx_outputs_."""
+        t = _AddColumnsTransformer()
         t.fit()
-        with self.assertRaises(TypeError):
-            t.transform(np.array([1.0, 2.0]))
-
-    def test_fit_caches_onnx_model(self):
-        """fit() must cache an ONNX model (onnx_model_) for use in transform()."""
-        from yobx.sklearn import DataFrameTransformer
-        import onnx
-
-        def func(df):
-            return df.select([(df["a"] + 1.0).alias("a1")])
-
-        t = DataFrameTransformer(func, {"a": np.float32})
-        t.fit()
-        self.assertIsInstance(t.onnx_model_, onnx.ModelProto)
+        self.assertIsInstance(t.input_dtypes_, dict)
         self.assertEqual(t.n_onnx_outputs_, 1)
 
-    # ------------------------------------------------------------------
-    # onnx_args helper
-    # ------------------------------------------------------------------
-
-    def test_onnx_args(self):
-        """onnx_args() must return one (name, dtype, shape) triple per column."""
-        from yobx.sklearn import DataFrameTransformer
-
-        def func(df):
-            return df.select([(df["a"] + 1.0).alias("a1")])
-
-        t = DataFrameTransformer(func, {"a": np.float32, "b": np.float64})
+    def test_get_feature_names_out(self):
+        """get_feature_names_out() must return output column names."""
+        t = _AddColumnsTransformer()
         t.fit()
-        args = t.onnx_args()
-        self.assertEqual(len(args), 2)
-        self.assertEqual(args[0][0], "a")
-        self.assertEqual(args[0][1], np.dtype(np.float32))
-        self.assertEqual(args[0][2], ("N",))
-        self.assertEqual(args[1][0], "b")
+        self.assertEqual(list(t.get_feature_names_out()), ["total"])
 
     # ------------------------------------------------------------------
-    # ONNX conversion
+    # Single-output ONNX export
     # ------------------------------------------------------------------
 
     def test_single_output_add(self):
-        """Simple column addition exported to ONNX."""
-        from yobx.sklearn import DataFrameTransformer, to_onnx
+        """Simple column addition: user-defined transformer exported to ONNX."""
+        from yobx.sklearn import to_onnx
 
-        def func(df):
-            return df.select([(df["a"] + df["b"]).alias("total")])
-
-        t = DataFrameTransformer(func, {"a": np.float32, "b": np.float32})
+        t = _AddColumnsTransformer()
         t.fit()
+        args = self._make_args(t.input_dtypes_)
+        onx = to_onnx(t, args, extra_converters={_AddColumnsTransformer: _add_columns_converter})
 
-        onx = to_onnx(t, t.onnx_args())
-        input_names = [inp.name for inp in onx.proto.graph.input]
+        input_names = {inp.name for inp in onx.proto.graph.input}
         self.assertIn("a", input_names)
         self.assertIn("b", input_names)
         output_names = [out.name for out in onx.proto.graph.output]
@@ -152,72 +198,164 @@ class TestDataFrameTransformer(ExtTestCase):
         (total,) = _run_onnx(onx, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b, rtol=1e-5)
 
-    def test_multi_output(self):
-        """Multiple output columns exported to ONNX."""
-        from yobx.sklearn import DataFrameTransformer, to_onnx
+    def test_scalar_multiply(self):
+        """Scalar multiplication: user-defined single-column transformer."""
+        from yobx.sklearn import to_onnx
 
-        def func(df):
-            return df.select(
-                [
-                    (df["a"] + df["b"]).alias("total"),
-                    (df["a"] * 2.0).alias("a_doubled"),
-                ]
+        class _ScaleTransformer(BaseEstimator, TransformerMixin):
+            _INPUT_DTYPES = {"x": np.float32}
+
+            def fit(self, X=None, y=None):
+                self.input_dtypes_ = {k: np.dtype(v) for k, v in self._INPUT_DTYPES.items()}
+                self.n_onnx_outputs_ = 1
+                return self
+
+            def transform(self, df):
+                import pandas as pd
+
+                return pd.DataFrame({"x3": df["x"].values * 3.0})
+
+            def get_feature_names_out(self, input_features=None):
+                return np.array(["x3"])
+
+        def _scale_func(df):
+            return df.select([(df["x"] * 3.0).alias("x3")])
+
+        def _scale_converter(g, sts, outputs, estimator, *inputs, name="scale"):
+            from yobx.sql import trace_dataframe
+            from yobx.sql.sql_convert import parsed_query_to_onnx_graph
+
+            pq = trace_dataframe(_scale_func, estimator.input_dtypes_)
+            out_names = parsed_query_to_onnx_graph(
+                g, sts, list(outputs), pq, estimator.input_dtypes_, _finalize=False
             )
+            return out_names[0]
 
-        t = DataFrameTransformer(func, {"a": np.float32, "b": np.float32})
+        t = _ScaleTransformer()
+        t.fit()
+        args = self._make_args(t.input_dtypes_)
+        onx = to_onnx(t, args, extra_converters={_ScaleTransformer: _scale_converter})
+
+        x = np.array([1.0, 2.0, 4.0], dtype=np.float32)
+        (x3,) = _run_onnx(onx, {"x": x})
+        np.testing.assert_allclose(x3, x * 3.0, rtol=1e-5)
+
+    # ------------------------------------------------------------------
+    # Multi-output ONNX export
+    # ------------------------------------------------------------------
+
+    def test_multi_output(self):
+        """Multiple output columns exported to ONNX via extra_converters."""
+        from yobx.sklearn import to_onnx
+
+        t = _MultiOutTransformer()
         t.fit()
         self.assertEqual(list(t.get_feature_names_out()), ["total", "a_doubled"])
 
-        onx = to_onnx(t, t.onnx_args())
+        args = self._make_args(t.input_dtypes_)
+        onx = to_onnx(t, args, extra_converters={_MultiOutTransformer: _multi_out_converter})
+
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
         total, a_doubled = _run_onnx(onx, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b, rtol=1e-5)
         np.testing.assert_allclose(a_doubled, a * 2.0, rtol=1e-5)
 
-    def test_filter_and_select(self):
-        """Filter + select combination exported to ONNX."""
-        from yobx.sklearn import DataFrameTransformer, to_onnx
+    # ------------------------------------------------------------------
+    # Filter + select
+    # ------------------------------------------------------------------
 
-        def func(df):
+    def test_filter_and_select(self):
+        """Row filtering combined with column selection exported to ONNX."""
+        from yobx.sklearn import to_onnx
+
+        class _FilterTransformer(BaseEstimator, TransformerMixin):
+            _INPUT_DTYPES = {"a": np.float32, "b": np.float32}
+
+            def fit(self, X=None, y=None):
+                self.input_dtypes_ = {k: np.dtype(v) for k, v in self._INPUT_DTYPES.items()}
+                self.n_onnx_outputs_ = 1
+                return self
+
+            def transform(self, df):
+                import pandas as pd
+
+                mask = df["a"].values > 0
+                return pd.DataFrame({"total": df["a"].values[mask] + df["b"].values[mask]})
+
+            def get_feature_names_out(self, input_features=None):
+                return np.array(["total"])
+
+        def _filter_func(df):
             df = df.filter(df["a"] > 0)
             return df.select([(df["a"] + df["b"]).alias("total")])
 
-        t = DataFrameTransformer(func, {"a": np.float32, "b": np.float32})
-        t.fit()
+        def _filter_converter(g, sts, outputs, estimator, *inputs, name="filter"):
+            from yobx.sql import trace_dataframe
+            from yobx.sql.sql_convert import parsed_query_to_onnx_graph
 
-        onx = to_onnx(t, t.onnx_args())
+            pq = trace_dataframe(_filter_func, estimator.input_dtypes_)
+            out_names = parsed_query_to_onnx_graph(
+                g, sts, list(outputs), pq, estimator.input_dtypes_, _finalize=False
+            )
+            return out_names[0]
+
+        t = _FilterTransformer()
+        t.fit()
+        args = self._make_args(t.input_dtypes_)
+        onx = to_onnx(t, args, extra_converters={_FilterTransformer: _filter_converter})
+
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
         (total,) = _run_onnx(onx, {"a": a, "b": b})
         np.testing.assert_allclose(total, np.array([5.0, 9.0], dtype=np.float32), rtol=1e-5)
 
-    def test_scalar_multiply(self):
-        """Scalar multiplication exported to ONNX."""
-        from yobx.sklearn import DataFrameTransformer, to_onnx
-
-        def func(df):
-            return df.select([(df["x"] * 3.0).alias("x3")])
-
-        t = DataFrameTransformer(func, {"x": np.float32})
-        t.fit()
-
-        onx = to_onnx(t, t.onnx_args())
-        x = np.array([1.0, 2.0, 4.0], dtype=np.float32)
-        (x3,) = _run_onnx(onx, {"x": x})
-        np.testing.assert_allclose(x3, x * 3.0, rtol=1e-5)
+    # ------------------------------------------------------------------
+    # Three columns
+    # ------------------------------------------------------------------
 
     def test_three_columns(self):
-        """Three input columns — verify all are registered as ONNX inputs."""
-        from yobx.sklearn import DataFrameTransformer, to_onnx
+        """Three input columns: all are registered as ONNX inputs."""
+        from yobx.sklearn import to_onnx
 
-        def func(df):
+        class _ThreeColTransformer(BaseEstimator, TransformerMixin):
+            _INPUT_DTYPES = {"a": np.float32, "b": np.float32, "c": np.float32}
+
+            def fit(self, X=None, y=None):
+                self.input_dtypes_ = {k: np.dtype(v) for k, v in self._INPUT_DTYPES.items()}
+                self.n_onnx_outputs_ = 1
+                return self
+
+            def transform(self, df):
+                import pandas as pd
+
+                return pd.DataFrame(
+                    {"s": df["a"].values + df["b"].values + df["c"].values}
+                )
+
+            def get_feature_names_out(self, input_features=None):
+                return np.array(["s"])
+
+        def _three_col_func(df):
             return df.select([(df["a"] + df["b"] + df["c"]).alias("s")])
 
-        t = DataFrameTransformer(func, {"a": np.float32, "b": np.float32, "c": np.float32})
-        t.fit()
+        def _three_col_converter(g, sts, outputs, estimator, *inputs, name="three"):
+            from yobx.sql import trace_dataframe
+            from yobx.sql.sql_convert import parsed_query_to_onnx_graph
 
-        onx = to_onnx(t, t.onnx_args())
+            pq = trace_dataframe(_three_col_func, estimator.input_dtypes_)
+            out_names = parsed_query_to_onnx_graph(
+                g, sts, list(outputs), pq, estimator.input_dtypes_, _finalize=False
+            )
+            return out_names[0]
+
+        t = _ThreeColTransformer()
+        t.fit()
+        args = self._make_args(t.input_dtypes_)
+        onx = to_onnx(
+            t, args, extra_converters={_ThreeColTransformer: _three_col_converter}
+        )
+
         input_names = {inp.name for inp in onx.proto.graph.input}
         self.assertIn("a", input_names)
         self.assertIn("b", input_names)
@@ -232,3 +370,4 @@ class TestDataFrameTransformer(ExtTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
