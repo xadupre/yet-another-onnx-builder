@@ -422,6 +422,23 @@ class GraphBuilderExtendedProtocol(GraphBuilderProtocol, Protocol):
         """
         ...
 
+    def value_as_shape(self, name: str) -> Any:
+        """Returns the value of a result if it is known to represent a shape.
+
+        A *shape value* is a 1-D ``INT64`` tensor (or symbolic equivalent)
+        whose contents describe the dimensions of another tensor.  The method
+        returns:
+
+        * A ``tuple`` of ``int`` / symbolic-dimension values when the shape
+          value is fully known (e.g. a constant or a previously recorded
+          ``set_value_shape`` call).
+        * ``None`` when the value cannot be determined.
+
+        :param name: result name to query
+        :return: tuple of dimension values, or ``None``
+        """
+        ...
+
 
 @runtime_checkable
 class GraphBuilderTorchProtocol(GraphBuilderExtendedProtocol, Protocol):
