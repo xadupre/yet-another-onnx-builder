@@ -3830,6 +3830,133 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime("1.18")
+    def test_pad_conv_fusion(self):
+        """Pad(X) -> Conv  should be fused into a single Conv with merged pads."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Pad", ["X", "pads"], ["Xp"]),
+                    oh.make_node("Conv", ["Xp", "W"], ["Y"], kernel_shape=[3, 3]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, [1, 3, 6, 6]), _mkv_("W", TFLOAT, [8, 3, 3, 3])],
+                [_mkv_("Y", TFLOAT, [1, 8, 6, 6])],
+                [onh.from_array(np.array([0, 0, 1, 1, 0, 0, 1, 1], dtype=np.int64), name="pads")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {
+            "X": self._range(1, 3, 6, 6).astype(np.float32),
+            "W": self._range(8, 3, 3, 3).astype(np.float32),
+        }
+        from onnxruntime import InferenceSession
+
+        ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["PadConv"], verbose=0),
+            verbose=0,
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Conv"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got, atol=1e-5)
+
+    @requires_onnxruntime("1.18")
+    def test_pad_conv_fusion_with_existing_pads(self):
+        """Pad(X) -> Conv with existing pads: merged pads should be correct."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Pad", ["X", "pads"], ["Xp"]),
+                    oh.make_node(
+                        "Conv", ["Xp", "W"], ["Y"], kernel_shape=[3, 3], pads=[1, 1, 1, 1]
+                    ),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, [1, 3, 6, 6]), _mkv_("W", TFLOAT, [8, 3, 3, 3])],
+                [_mkv_("Y", TFLOAT, [1, 8, 8, 8])],
+                [onh.from_array(np.array([0, 0, 1, 1, 0, 0, 1, 1], dtype=np.int64), name="pads")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {
+            "X": self._range(1, 3, 6, 6).astype(np.float32),
+            "W": self._range(8, 3, 3, 3).astype(np.float32),
+        }
+        from onnxruntime import InferenceSession
+
+        ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["PadConv"], verbose=0),
+            verbose=0,
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Conv"], [n.op_type for n in opt_onx.graph.node])
+
+        # Verify the merged pads in the new node.
+        conv_node = opt_onx.graph.node[0]
+        pads_attr = next((a for a in conv_node.attribute if a.name == "pads"), None)
+        self.assertIsNotNone(pads_attr)
+        self.assertEqual(list(pads_attr.ints), [2, 2, 2, 2])
+
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got, atol=1e-5)
+
+    @requires_onnxruntime("1.18")
+    def test_pad_conv_no_fusion_batch_channel_padded(self):
+        """Pad with non-zero batch/channel dims must NOT be fused."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Pad", ["X", "pads"], ["Xp"]),
+                    oh.make_node("Conv", ["Xp", "W"], ["Y"], kernel_shape=[1, 1]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, [1, 3, 4, 4]), _mkv_("W", TFLOAT, [3, 3, 1, 1])],
+                [_mkv_("Y", TFLOAT, [1, 3, 4, 4])],
+                [
+                    # pad batch dim by 1 – not allowed for fusion
+                    onh.from_array(
+                        np.array([1, 0, 0, 0, 1, 0, 0, 0], dtype=np.int64), name="pads"
+                    )
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["PadConv"], verbose=0),
+            verbose=0,
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Fusion must NOT happen; both nodes must remain.
+        self.assertIn("Pad", [n.op_type for n in opt_onx.graph.node])
+        self.assertIn("Conv", [n.op_type for n in opt_onx.graph.node])
+
     def test_batch_normalization_identity(self):
         model = oh.make_model(
             oh.make_graph(
