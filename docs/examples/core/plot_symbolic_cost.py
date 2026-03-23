@@ -81,10 +81,7 @@ model = oh.make_model(
             oh.make_tensor_value_info("V", TFLOAT, ["batch", "seq", "d_head"]),
         ],
         [oh.make_tensor_value_info("output", TFLOAT, None)],
-        [
-            onh.from_array(scale_q, name="scale_q"),
-            onh.from_array(scale_k, name="scale_k"),
-        ],
+        [onh.from_array(scale_q, name="scale_q"), onh.from_array(scale_k, name="scale_k")],
     ),
     opset_imports=[oh.make_opsetid("", 18)],
     ir_version=10,
@@ -205,7 +202,10 @@ for op_type, flops, _ in cost_concrete_after:
     total_after += flops or 0
     print(f"  {op_type:12s}  {flops:>10,}")
 print(f"  {'TOTAL':12s}  {total_after:>10,}")
-print(f"\nFLOPs saved: {total_before - total_after:,}  ({(total_before - total_after) / total_before:.2%})")
+print(
+    f"\nFLOPs saved: {total_before - total_after:,}  "
+    f"({(total_before - total_after) / total_before:.2%})"
+)
 
 
 # %%
@@ -222,6 +222,7 @@ print(f"\nFLOPs saved: {total_before - total_after:,}  ({(total_before - total_a
 #   ``batch * seq * (2 * d_head − seq)`` FLOPs in total.
 
 import matplotlib.pyplot as plt  # noqa: E402
+
 
 # Aggregate FLOPs by op type
 def _aggregate(cost_list):
@@ -272,6 +273,8 @@ for bar, val in zip(bars_total, [total_before, total_after]):
         fontsize=8,
     )
 
-plt.suptitle("Symbolic cost: scaled dot-product attention (MulMulMatMul optimization)", fontsize=10)
+plt.suptitle(
+    "Symbolic cost: scaled dot-product attention (MulMulMatMul optimization)", fontsize=10
+)
 plt.tight_layout()
 plt.show()
