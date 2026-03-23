@@ -959,5 +959,287 @@ class TestParsedQueryToOnnx(ExtTestCase):
         self.assertTrue(callable(parsed_query_to_onnx_graph))
 
 
+# ---------------------------------------------------------------------------
+# DataFrame element-wise arithmetic
+# ---------------------------------------------------------------------------
+
+
+class TestDataframeArithmetic(ExtTestCase):
+    """Tests for element-wise arithmetic operators on :class:`TracedDataFrame`."""
+
+    # ------------------------------------------------------------------
+    # Unit tests: operator returns updated TracedDataFrame
+    # ------------------------------------------------------------------
+
+    def test_add_scalar_returns_dataframe(self):
+        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        result = df + 1
+        self.assertIsInstance(result, TracedDataFrame)
+        self.assertIn("a", result.columns)
+        expr = result._columns["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "+")
+
+    def test_sub_scalar_returns_dataframe(self):
+        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        result = df - 1
+        self.assertIsInstance(result, TracedDataFrame)
+        expr = result._columns["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "-")
+
+    def test_mul_scalar_returns_dataframe(self):
+        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        result = df * 2
+        expr = result._columns["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "*")
+
+    def test_div_scalar_returns_dataframe(self):
+        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        result = df / 2
+        expr = result._columns["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "/")
+
+    def test_radd_scalar_reversed(self):
+        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        result = 1 + df
+        expr = result._columns["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "+")
+        self.assertIsInstance(expr.left, Literal)
+
+    def test_rsub_scalar_reversed(self):
+        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        result = 10 - df
+        expr = result._columns["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "-")
+        self.assertIsInstance(expr.left, Literal)
+
+    def test_rmul_scalar_reversed(self):
+        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        result = 3 * df
+        expr = result._columns["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "*")
+        self.assertIsInstance(expr.left, Literal)
+
+    def test_rtruediv_scalar_reversed(self):
+        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        result = 1.0 / df
+        expr = result._columns["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "/")
+        self.assertIsInstance(expr.left, Literal)
+
+    def test_add_dataframe_column_wise(self):
+        df1 = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        df2 = TracedDataFrame({"a": TracedSeries(ColumnRef("b"))})
+        result = df1 + df2
+        expr = result._columns["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "+")
+
+    def test_add_dataframe_missing_column_raises(self):
+        df1 = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        df2 = TracedDataFrame({"b": TracedSeries(ColumnRef("b"))})
+        with self.assertRaises(KeyError):
+            _ = df1 + df2
+
+    def test_ops_list_unchanged(self):
+        """Arithmetic should not add SelectOp to the ops list."""
+        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        result = df + 1
+        self.assertEqual(len(result._ops), 0)
+
+    def test_source_columns_preserved(self):
+        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))}, source_columns=["a"])
+        result = df + 1
+        self.assertEqual(result._source_columns, ["a"])
+
+    # ------------------------------------------------------------------
+    # End-to-end: convert to ONNX and run
+    # ------------------------------------------------------------------
+
+    def test_df_add_scalar_onnx(self):
+        """df + scalar: all columns increased by scalar."""
+
+        def transform(df):
+            return df + 1.0
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        out_a, out_b = _run(transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b})
+        np.testing.assert_allclose(out_a, a + 1.0, rtol=1e-5)
+        np.testing.assert_allclose(out_b, b + 1.0, rtol=1e-5)
+
+    def test_df_sub_scalar_onnx(self):
+        """df - scalar: all columns decreased by scalar."""
+
+        def transform(df):
+            return df - 1.0
+
+        a = np.array([2.0, 3.0, 4.0], dtype=np.float32)
+        (out_a,) = _run(transform, {"a": np.float32}, {"a": a})
+        np.testing.assert_allclose(out_a, a - 1.0, rtol=1e-5)
+
+    def test_df_mul_scalar_onnx(self):
+        """df * scalar: all columns multiplied by scalar."""
+
+        def transform(df):
+            return df * 2.0
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out_a,) = _run(transform, {"a": np.float32}, {"a": a})
+        np.testing.assert_allclose(out_a, a * 2.0, rtol=1e-5)
+
+    def test_df_div_scalar_onnx(self):
+        """df / scalar: all columns divided by scalar."""
+
+        def transform(df):
+            return df / 4.0
+
+        a = np.array([4.0, 8.0, 12.0], dtype=np.float32)
+        (out_a,) = _run(transform, {"a": np.float32}, {"a": a})
+        np.testing.assert_allclose(out_a, a / 4.0, rtol=1e-5)
+
+    def test_df_radd_scalar_onnx(self):
+        """scalar + df: all columns added to scalar."""
+
+        def transform(df):
+            return 1.0 + df
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out_a,) = _run(transform, {"a": np.float32}, {"a": a})
+        np.testing.assert_allclose(out_a, 1.0 + a, rtol=1e-5)
+
+    def test_df_rsub_scalar_onnx(self):
+        """scalar - df: scalar minus each column element."""
+
+        def transform(df):
+            return 10.0 - df
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out_a,) = _run(transform, {"a": np.float32}, {"a": a})
+        np.testing.assert_allclose(out_a, 10.0 - a, rtol=1e-5)
+
+    def test_df_rmul_scalar_onnx(self):
+        """scalar * df."""
+
+        def transform(df):
+            return 3.0 * df
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out_a,) = _run(transform, {"a": np.float32}, {"a": a})
+        np.testing.assert_allclose(out_a, 3.0 * a, rtol=1e-5)
+
+    def test_df_rtruediv_scalar_onnx(self):
+        """scalar / df."""
+
+        def transform(df):
+            return 1.0 / df
+
+        a = np.array([1.0, 2.0, 4.0], dtype=np.float32)
+        (out_a,) = _run(transform, {"a": np.float32}, {"a": a})
+        np.testing.assert_allclose(out_a, 1.0 / a, rtol=1e-5)
+
+    def test_df_add_then_filter(self):
+        """df + 1 followed by filter uses computed column values."""
+
+        def transform(df):
+            df2 = df + 1.0
+            return df2.filter(df2["a"] > 2.0)
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out_a,) = _run(transform, {"a": np.float32}, {"a": a})
+        # After +1: [2, 3, 4]. Filter > 2: [3, 4].
+        np.testing.assert_allclose(out_a, np.array([3.0, 4.0], dtype=np.float32), rtol=1e-5)
+
+    def test_df_add_then_select(self):
+        """df + 1 followed by select uses the post-arithmetic column expressions."""
+
+        def transform(df):
+            df2 = df + 1.0
+            return df2.select([(df2["a"] + df2["b"]).alias("total")])
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = _run(transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b})
+        # (a+1) + (b+1)
+        np.testing.assert_allclose(total, (a + 1.0) + (b + 1.0), rtol=1e-5)
+
+    def test_df_add_dataframe_onnx(self):
+        """df1 + df2 adds matching columns element-wise (same column names)."""
+
+        def transform(df1, df2):
+            return df1 + df2
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        # Both frames reference column "a", so there is a single ONNX input "a".
+        # The result is a + a.
+        (out_a,) = _run_multi(
+            transform, [{"a": np.float32}, {"a": np.float32}], {"a": a}
+        )
+        np.testing.assert_allclose(out_a, a + a, rtol=1e-5)
+
+    def test_df_add_scalar_two_columns_onnx(self):
+        """df + scalar with two columns: both columns are incremented."""
+
+        def transform(df):
+            return df + 1.0
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        out_a, out_b = _run(
+            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
+        )
+        np.testing.assert_allclose(out_a, a + 1.0, rtol=1e-5)
+        np.testing.assert_allclose(out_b, b + 1.0, rtol=1e-5)
+
+    def test_df_mul_scalar_two_columns_onnx(self):
+        """df * scalar with two columns: both columns are scaled."""
+
+        def transform(df):
+            return df * 2.0
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        out_a, out_b = _run(
+            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
+        )
+        np.testing.assert_allclose(out_a, a * 2.0, rtol=1e-5)
+        np.testing.assert_allclose(out_b, b * 2.0, rtol=1e-5)
+
+    def test_df_sub_scalar_two_columns_onnx(self):
+        """df - scalar with two columns: scalar subtracted from both columns."""
+
+        def transform(df):
+            return df - 1.0
+
+        a = np.array([2.0, 3.0, 4.0], dtype=np.float32)
+        b = np.array([5.0, 6.0, 7.0], dtype=np.float32)
+        out_a, out_b = _run(
+            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
+        )
+        np.testing.assert_allclose(out_a, a - 1.0, rtol=1e-5)
+        np.testing.assert_allclose(out_b, b - 1.0, rtol=1e-5)
+
+    def test_df_chained_arith_two_columns_onnx(self):
+        """(df + 1) * 2 applied to a two-column frame."""
+
+        def transform(df):
+            return (df + 1.0) * 2.0
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        out_a, out_b = _run(
+            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
+        )
+        np.testing.assert_allclose(out_a, (a + 1.0) * 2.0, rtol=1e-5)
+        np.testing.assert_allclose(out_b, (b + 1.0) * 2.0, rtol=1e-5)
+
+
 if __name__ == "__main__":
     unittest.main()
