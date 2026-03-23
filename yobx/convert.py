@@ -51,7 +51,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
-from typing import Any
+from typing import Any, Optional
 
 from .container import ExportArtifact
 
@@ -66,17 +66,17 @@ def _has_package(name: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _sklearn_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
+def _sklearn_to_onnx(model: Any, args: Any, **kwargs: Any) -> Optional[ExportArtifact]:
     """Dispatch to :func:`yobx.sklearn.to_onnx`."""
     from sklearn.base import BaseEstimator
     from .sklearn import to_onnx as _to_onnx
 
     if isinstance(model, BaseEstimator):
         return _to_onnx(model, args, **kwargs)
-    return NotImplemented  # type: ignore[return-value]
+    return None
 
 
-def _tensorflow_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
+def _tensorflow_to_onnx(model: Any, args: Any, **kwargs: Any) -> Optional[ExportArtifact]:
     """Dispatch to :func:`yobx.tensorflow.to_onnx`."""
     import tensorflow as tf
     from .tensorflow import to_onnx as _to_onnx
@@ -90,20 +90,20 @@ def _tensorflow_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
         ),
     ):
         return _to_onnx(model, args, **kwargs)
-    return NotImplemented  # type: ignore[return-value]
+    return None
 
 
-def _torch_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
+def _torch_to_onnx(model: Any, args: Any, **kwargs: Any) -> Optional[ExportArtifact]:
     """Dispatch to :func:`yobx.torch.interpreter.to_onnx`."""
     import torch
     from .torch.interpreter import to_onnx as _to_onnx
 
     if isinstance(model, (torch.nn.Module, torch.fx.GraphModule)):
         return _to_onnx(model, args, **kwargs)
-    return NotImplemented  # type: ignore[return-value]
+    return None
 
 
-def _litert_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
+def _litert_to_onnx(model: Any, args: Any, **kwargs: Any) -> Optional[ExportArtifact]:
     """Dispatch to :func:`yobx.litert.to_onnx` for TFLite paths or bytes."""
     from .litert import to_onnx as _to_onnx
 
@@ -111,10 +111,10 @@ def _litert_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
         return _to_onnx(model, args, **kwargs)
     if isinstance(model, (str, os.PathLike)) and os.fspath(model).endswith(".tflite"):
         return _to_onnx(model, args, **kwargs)
-    return NotImplemented  # type: ignore[return-value]
+    return None
 
 
-def _sql_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
+def _sql_to_onnx(model: Any, args: Any, **kwargs: Any) -> Optional[ExportArtifact]:
     """Dispatch to :func:`yobx.sql.to_onnx` for SQL strings, callables, and LazyFrames."""
     from .sql import to_onnx as _to_onnx
 
@@ -127,7 +127,7 @@ def _sql_to_onnx(model: Any, args: Any, **kwargs: Any) -> ExportArtifact:
     # polars LazyFrame — duck-typed to avoid a hard polars dependency.
     if hasattr(model, "explain") and hasattr(model, "collect"):
         return _to_onnx(model, args, **kwargs)
-    return NotImplemented  # type: ignore[return-value]
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -210,31 +210,31 @@ def to_onnx(model: Any, args: Any = None, **kwargs: Any) -> ExportArtifact:
         X = np.random.rand(1, 4).astype(np.float32)
         artifact = to_onnx("model.tflite", (X,))
     """
-    # Each private helper returns NotImplemented when the model type does not match.
+    # Each private helper returns None when the model type does not match.
     # Framework availability is checked with importlib.util.find_spec before calling
     # the helper, so the imports inside the helpers are always expected to succeed.
 
     # 1. scikit-learn BaseEstimator
     if _has_package("sklearn"):
         result = _sklearn_to_onnx(model, args, **kwargs)
-        if result is not NotImplemented:
+        if result is not None:
             return result
 
     # 2. TensorFlow / Keras model
     if _has_package("tensorflow"):
         result = _tensorflow_to_onnx(model, args, **kwargs)
-        if result is not NotImplemented:
+        if result is not None:
             return result
 
     # 3. PyTorch nn.Module / fx.GraphModule
     if _has_package("torch"):
         result = _torch_to_onnx(model, args, **kwargs)
-        if result is not NotImplemented:
+        if result is not None:
             return result
 
     # 4. TFLite / LiteRT — file path ending in .tflite or raw bytes
     result = _litert_to_onnx(model, args, **kwargs)
-    if result is not NotImplemented:
+    if result is not None:
         return result
 
     # 5. SQL string, DataFrame-tracing callable, or polars LazyFrame
@@ -243,7 +243,7 @@ def to_onnx(model: Any, args: Any = None, **kwargs: Any) -> ExportArtifact:
     # a SQL query.  File paths to other model formats (e.g. '.pt', '.onnx')
     # are not supported via this dispatcher and will produce a SQL parse error.
     result = _sql_to_onnx(model, args, **kwargs)
-    if result is not NotImplemented:
+    if result is not None:
         return result
 
     raise TypeError(
