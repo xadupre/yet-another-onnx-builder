@@ -1688,11 +1688,11 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
                 if isinstance(d1, self.torch.SymInt):  # type: ignore
                     d1 = self._torch_sym_int_to_str(d1)
                 elif isinstance(d1, self.torch.export.dynamic_shapes._Dim):  # type: ignore
-                    d1 = self._torch_sym_int_to_str(d1)
+                    d1 = self._torch_sym_int_to_str(d1)  # type: ignore
                 if isinstance(d2, self.torch.SymInt):  # type: ignore
                     d2 = self._torch_sym_int_to_str(d2)
                 elif isinstance(d2, self.torch.export.dynamic_shapes._Dim):  # type: ignore
-                    d2 = self._torch_sym_int_to_str(d2)
+                    d2 = self._torch_sym_int_to_str(d2)  # type: ignore
 
             if isinstance(d1, (int, str)) and isinstance(d2, (int, str)):
                 if d1 == d2:
@@ -2712,7 +2712,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
             shape = tuple(value.dims)
         else:
             itype = _get_type(value.dtype)
-            shape = tuple(value.shape)
+            shape = tuple(value.shape)  # type: ignore
 
         if name == "" or give_unique_name:
             if name:
@@ -4789,12 +4789,12 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
                 f"{self.get_debug_msg()}"
             )
             shape = vshape
-            size = np.prod(shape) * self.elem_size(itype)
+            size = int(np.prod(shape)) * self.elem_size(itype)  # type: ignore
             if size < external_threshold:
                 new_inits[k] = v
             else:
                 location = f"#{k}"
-                nt = make_large_tensor_proto(location, k, itype, shape)
+                nt = make_large_tensor_proto(location, k, itype, shape)  # type: ignore
                 nt.doc_string += doc_string
                 new_inits[k] = nt
                 large_inits[location] = v
