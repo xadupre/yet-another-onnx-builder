@@ -55,18 +55,18 @@ def post_process_output_names(
     convert_options: Optional[ConvertOptions] = None,
 ) -> Sequence[str]:
     """Makes sures the number of outputs is expected."""
+    output_names_0 = output_names
     n_outputs = get_n_expected_outputs(estimator)
     if n_outputs == 1 and len(output_names) != 1:
         output_names = [longest_prefix(output_names)]
     if len(output_names) != n_outputs:
         raise NotImplementedError(
             f"Not implemented with {output_names=}, {n_outputs=} "
-            f"and estimator is {type(estimator)}."
+            f"and estimator is {type(estimator)}, {output_names_0=}."
         )
     if convert_options:
         for _extra_opt in ConvertOptions.OPTIONS:
             if convert_options.has(_extra_opt, estimator):
-                print("***", _extra_opt)
                 output_names.append(_extra_opt)
     return output_names
 
@@ -102,14 +102,13 @@ def get_output_names(
         return post_process_output_names(last_step, ["label", "scores"], convert_options)
     if is_regressor(last_step):
         return post_process_output_names(last_step, ["predictions"], convert_options)
-    last = estimator.steps[-1][1] if isinstance(last_step, Pipeline) else estimator
-    if OutlierMixin is not None and isinstance(last, OutlierMixin):
+    if OutlierMixin is not None and isinstance(last_step, OutlierMixin):
         return post_process_output_names(last_step, ["label", "scores"], convert_options)
-    if isinstance(last, ClusterMixin) and not isinstance(last, FeatureAgglomeration):
+    if isinstance(last_step, ClusterMixin) and not isinstance(last_step, FeatureAgglomeration):
         return post_process_output_names(last_step, ["label", "distances"], convert_options)
-    if isinstance(last, BaseMixture):
+    if isinstance(last_step, BaseMixture):
         return post_process_output_names(last_step, ["label", "probabilities"], convert_options)
-    if isinstance(last, OutlierMixin):
+    if isinstance(last_step, OutlierMixin):
         return post_process_output_names(last_step, ["label", "scores"], convert_options)
     return post_process_output_names(last_step, ["Y"], convert_options)
 
