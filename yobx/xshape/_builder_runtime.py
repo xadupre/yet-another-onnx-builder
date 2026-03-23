@@ -35,6 +35,22 @@ def _maybe_disable_fake_tensor_mode() -> Generator:
 
 
 class _ExtraPackages:
+    """Lazy availability checks for optional heavy dependencies (torch, tensorflow).
+
+    Calling ``self._has_torch`` or ``self._has_tensorflow`` performs a one-time
+    import attempt for the respective package and caches the result so that
+    subsequent calls are cheap.  If the environment variable ``NOTORCH=1`` (or
+    ``NOTF=1`` for TensorFlow) is set the import is skipped unconditionally and
+    the property returns ``False``, which is useful in test environments that
+    must not load those frameworks.
+
+    Once a package is confirmed available the corresponding module object is
+    cached in ``self._torch`` / ``self._tensorflow`` and exposed through the
+    ``torch`` / ``tensorflow`` properties.  For torch, ``torch._subclasses``
+    is also cached and :func:`_maybe_disable_fake_tensor_mode` is installed as
+    ``self.maybe_disable_fake_tensor_mode``.
+    """
+
     def __init__(self):
         self.maybe_disable_fake_tensor_mode = contextlib.nullcontext
 
@@ -63,6 +79,14 @@ class _ExtraPackages:
 
     @property
     def _has_torch(self) -> bool:
+        """Return ``True`` if *torch* is importable.
+
+        On the first call the property tries to ``import torch`` and caches
+        the outcome in ``self._has_torch_``.  All subsequent calls return the
+        cached value without touching the import system.  Setting the
+        environment variable ``NOTORCH=1`` before instantiation forces the
+        property to return ``False`` without attempting any import.
+        """
         if self._has_torch_ is not None:
             return self._has_torch_
 
@@ -91,6 +115,14 @@ class _ExtraPackages:
 
     @property
     def _has_tensorflow(self) -> bool:
+        """Return ``True`` if *tensorflow* is importable.
+
+        On the first call the property tries to ``import tensorflow`` and
+        caches the outcome in ``self._has_tensorflow_``.  All subsequent calls
+        return the cached value without touching the import system.  Setting
+        the environment variable ``NOTF=1`` before instantiation forces the
+        property to return ``False`` without attempting any import.
+        """
         if self._has_tensorflow_ is not None:
             return self._has_tensorflow_
 
