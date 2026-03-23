@@ -263,7 +263,13 @@ class TestOnnxScriptGraphBuilderSatisfiesProtocol(ExtTestCase):
 class TestGraphBuilderExtendedProtocol(ExtTestCase):
     """GraphBuilder satisfies GraphBuilderExtendedProtocol."""
 
-    EXTENDED_ATTRS = ["main_opset", "unique_name", "op", "set_type_shape_unary_op", "value_as_shape"]
+    EXTENDED_ATTRS = [
+        "main_opset",
+        "unique_name",
+        "op",
+        "set_type_shape_unary_op",
+        "value_as_shape",
+    ]
 
     def test_extended_protocol_has_required_methods(self):
         for name in self.EXTENDED_ATTRS:
