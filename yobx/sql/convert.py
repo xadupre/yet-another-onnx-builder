@@ -13,7 +13,7 @@ the first argument.
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 
@@ -31,7 +31,10 @@ def to_onnx(
         Callable[["TracedDataFrame"], "TracedDataFrame"],  # type: ignore # noqa: UP037
         "polars.LazyFrame",  # type: ignore # noqa: F821, UP037
     ],
-    input_dtypes: Dict[str, Union[np.dtype, type, str]],
+    input_dtypes: Union[
+        Dict[str, Union[np.dtype, type, str]],
+        List[Dict[str, Union[np.dtype, type, str]]],
+    ],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
@@ -61,19 +64,23 @@ def to_onnx(
           Custom Python functions can be called by name in the ``SELECT`` and
           ``WHERE`` clauses when registered via *custom_functions*.
         * **callable** — a Python function ``(df: TracedDataFrame) ->
-          TracedDataFrame``.  The function is traced to capture all
-          ``filter``, ``select``, and aggregation operations it performs,
-          which are then compiled to ONNX.
+          TracedDataFrame`` or a function that accepts *multiple*
+          :class:`~yobx.sql.dataframe_trace.TracedDataFrame` arguments.  The
+          function is traced to capture all ``filter``, ``select``,
+          aggregation, and ``join`` operations it performs, which are then
+          compiled to ONNX.
         * **polars.LazyFrame** — the execution plan is extracted via
           :meth:`polars.LazyFrame.explain` and translated into SQL before
           conversion.  See :func:`lazyframe_to_onnx` for details of supported
           operations.
 
-    :param input_dtypes: a mapping from *source* column name to numpy dtype
-        (e.g. ``{"a": np.float32, "b": np.float64}``).  For SQL queries this
-        maps *left-table* columns; for a ``LazyFrame`` it maps the source
-        DataFrame columns referenced in the plan.  Only columns that actually
-        appear in the query / plan need to be listed.
+    :param input_dtypes: either a single ``{column: dtype}`` mapping or,
+        when *dataframe_or_query* is a callable that accepts *multiple*
+        :class:`~yobx.sql.dataframe_trace.TracedDataFrame` arguments, a
+        **list** of ``{column: dtype}`` mappings — one per argument.
+        For SQL queries this maps *left-table* columns; for a ``LazyFrame``
+        it maps the source DataFrame columns referenced in the plan.  Only
+        columns that actually appear in the query / plan need to be listed.
     :param right_input_dtypes: if *dataframe_or_query* is a SQL string that
         contains a ``JOIN``, a mapping from *right-table* column name to numpy
         dtype.  Defaults to *input_dtypes* when ``None``.  Ignored when
