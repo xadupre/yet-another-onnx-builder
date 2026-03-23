@@ -1,8 +1,8 @@
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 from onnx import ValueInfoProto
-from ...helpers.onnx_helper import np_dtype_to_tensor_dtype
-from ...typing import GraphBuilderExtendedProtocol
+from ..typing import GraphBuilderExtendedProtocol
+from .onnx_helper import np_dtype_to_tensor_dtype
 
 
 def extract_value_info_proto(vip: ValueInfoProto) -> Tuple[str, int, Optional[Tuple]]:
