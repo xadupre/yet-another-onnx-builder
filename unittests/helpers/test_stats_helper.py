@@ -137,7 +137,8 @@ class TestStatsHelper(ExtTestCase):
         graph = oh.make_graph(nodes, "literal_test", [X], [Z], [reshape_shape, W])
         model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 17)])
         stats = model_statistics(model)
-        # Reshape cost = rank of output [1,32] → rank 2; MatMul [1,32] @ [32,16] → 2*1*32*16 = 1024
+        # Reshape cost = rank of output [1,32] → rank 2;
+        # MatMul [1,32] @ [32,16] → 2*1*32*16 = 1024
         self.assertEqual(stats["flops_per_op_type"]["Reshape"], 2)
         self.assertEqual(stats["flops_per_op_type"]["MatMul"], 2 * 1 * 32 * 16)
 
