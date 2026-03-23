@@ -1184,6 +1184,62 @@ class TestDataframeArithmetic(ExtTestCase):
         )
         np.testing.assert_allclose(out_a, a + a, rtol=1e-5)
 
+    def test_df_add_scalar_two_columns_onnx(self):
+        """df + scalar with two columns: both columns are incremented."""
+
+        def transform(df):
+            return df + 1.0
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        out_a, out_b = _run(
+            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
+        )
+        np.testing.assert_allclose(out_a, a + 1.0, rtol=1e-5)
+        np.testing.assert_allclose(out_b, b + 1.0, rtol=1e-5)
+
+    def test_df_mul_scalar_two_columns_onnx(self):
+        """df * scalar with two columns: both columns are scaled."""
+
+        def transform(df):
+            return df * 2.0
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        out_a, out_b = _run(
+            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
+        )
+        np.testing.assert_allclose(out_a, a * 2.0, rtol=1e-5)
+        np.testing.assert_allclose(out_b, b * 2.0, rtol=1e-5)
+
+    def test_df_sub_scalar_two_columns_onnx(self):
+        """df - scalar with two columns: scalar subtracted from both columns."""
+
+        def transform(df):
+            return df - 1.0
+
+        a = np.array([2.0, 3.0, 4.0], dtype=np.float32)
+        b = np.array([5.0, 6.0, 7.0], dtype=np.float32)
+        out_a, out_b = _run(
+            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
+        )
+        np.testing.assert_allclose(out_a, a - 1.0, rtol=1e-5)
+        np.testing.assert_allclose(out_b, b - 1.0, rtol=1e-5)
+
+    def test_df_chained_arith_two_columns_onnx(self):
+        """(df + 1) * 2 applied to a two-column frame."""
+
+        def transform(df):
+            return (df + 1.0) * 2.0
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        out_a, out_b = _run(
+            transform, {"a": np.float32, "b": np.float32}, {"a": a, "b": b}
+        )
+        np.testing.assert_allclose(out_a, (a + 1.0) * 2.0, rtol=1e-5)
+        np.testing.assert_allclose(out_b, (b + 1.0) * 2.0, rtol=1e-5)
+
 
 if __name__ == "__main__":
     unittest.main()
