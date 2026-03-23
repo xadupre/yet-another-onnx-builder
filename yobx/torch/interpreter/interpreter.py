@@ -892,11 +892,14 @@ class DynamoInterpreter:
                 val = example_value
 
         if isinstance(val, tuple):
-            assert len(val) == 1, (
-                f"output not yet implemented for multiple outputs, node={node}"
-                f"{self.builder.get_debug_msg()}"
-            )
-            val = val[0]
+            if len(val) == 1:
+                val = val[0]
+            else:
+                # Multiple outputs: the builder already has type/shape info from
+                # processing the subgraph nodes (e.g. InterpreterModule from
+                # torch.export.unflatten). Fall through to the val-is-None path
+                # which reads each output's type/shape directly from the builder.
+                val = None
 
         if val is None:
             for a, o in outputs:
@@ -2536,6 +2539,20 @@ class DynamoInterpreter:
             )
 
             self.builder._check_constants("before-make_nodes")
+
+            # Pre-register output shapes from the inner builder BEFORE make_nodes.
+            # This prevents set_shape_type_custom (called inside make_node during
+            # make_nodes) from locking in an incorrect shape computed by re-running
+            # infer_shapes on a shared function builder (e.g. when q_proj and k_proj
+            # share the same "Linear" function but have different output sizes due to
+            # GQA). Once the correct shape is set here, the set_shape call inside
+            # set_shape_type_custom becomes a silent no-op.
+            if len(output_names) == len(builder.outputs):
+                for _name, _out_name in zip(builder.output_names, output_names):
+                    if builder.has_shape(_name):
+                        _existing = builder.get_shape(_name)
+                        self.builder.register_dynamic_objects_from_shape(_existing)
+                        self.builder.set_shape(_out_name, _existing)
 
             # let's create a function under the appropriate name
             prefix = f"_sub_IM_{node.name}__"
