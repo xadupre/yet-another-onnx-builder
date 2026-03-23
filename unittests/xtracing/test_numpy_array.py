@@ -387,6 +387,338 @@ class TestNumpyArray(ExtTestCase):
         with self.assertRaises(ValueError):
             trace_numpy_function(g, {}, ["out0", "out1"], f, ["X"])
 
+    # ------------------------------------------------------------------
+    # Comparison operators
+    # ------------------------------------------------------------------
+
+    def test_lt(self):
+        def f(X):
+            return X < np.float32(0)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_le(self):
+        def f(X):
+            return X <= np.float32(0)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_gt(self):
+        def f(X):
+            return X > np.float32(0)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_ge(self):
+        def f(X):
+            return X >= np.float32(0)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_eq(self):
+        def f(A, B):
+            return A == B
+
+        A = np.random.randn(4, 3).astype(np.float32)
+        B = A.copy()
+        B[0, 0] += 1.0
+        self._run(f, A, B, input_names=["A", "B"])
+
+    def test_ne(self):
+        def f(A, B):
+            return A != B
+
+        A = np.random.randn(4, 3).astype(np.float32)
+        B = A.copy()
+        B[0, 0] += 1.0
+        self._run(f, A, B, input_names=["A", "B"])
+
+    def test_two_inputs_gt(self):
+        """Comparison between two array inputs."""
+
+        def f(A, B):
+            return A > B
+
+        A = np.random.randn(4, 3).astype(np.float32)
+        B = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, A, B, input_names=["A", "B"])
+
+    # ------------------------------------------------------------------
+    # Floor division and modulo
+    # ------------------------------------------------------------------
+
+    def test_floordiv(self):
+        def f(X):
+            return X // np.float32(2.0)
+
+        X = np.abs(np.random.randn(4, 3).astype(np.float32)) + 0.1
+        self._run(f, X)
+
+    def test_rfloordiv(self):
+        def f(X):
+            return np.float32(10.0) // X
+
+        X = np.abs(np.random.randn(4, 3).astype(np.float32)) + 0.1
+        self._run(f, X)
+
+    def test_mod(self):
+        def f(X):
+            return X % np.float32(3.0)
+
+        X = np.abs(np.random.randn(4, 3).astype(np.float32)) + 0.1
+        self._run(f, X)
+
+    def test_rmod(self):
+        def f(X):
+            return np.float32(5.0) % X
+
+        X = np.abs(np.random.randn(4, 3).astype(np.float32)) + 0.1
+        self._run(f, X)
+
+    # ------------------------------------------------------------------
+    # Reverse arithmetic operators
+    # ------------------------------------------------------------------
+
+    def test_rtruediv(self):
+        def f(X):
+            return np.float32(1.0) / X
+
+        X = np.abs(np.random.randn(4, 3).astype(np.float32)) + 0.1
+        self._run(f, X)
+
+    def test_rpow(self):
+        def f(X):
+            return np.float32(2.0) ** X
+
+        X = np.random.randn(4, 3).astype(np.float32) * np.float32(0.5)
+        self._run(f, X, atol=1e-4)
+
+    # ------------------------------------------------------------------
+    # More ufuncs
+    # ------------------------------------------------------------------
+
+    def test_ufunc_sin(self):
+        def f(X):
+            return np.sin(X)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_ufunc_cos(self):
+        def f(X):
+            return np.cos(X)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_ufunc_floor(self):
+        def f(X):
+            return np.floor(X)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_ufunc_ceil(self):
+        def f(X):
+            return np.ceil(X)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_ufunc_sign(self):
+        def f(X):
+            return np.sign(X)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_ufunc_reciprocal(self):
+        def f(X):
+            return np.reciprocal(X)
+
+        X = np.abs(np.random.randn(4, 3).astype(np.float32)) + 0.1
+        self._run(f, X)
+
+    def test_ufunc_maximum(self):
+        def f(A, B):
+            return np.maximum(A, B)
+
+        A = np.random.randn(4, 3).astype(np.float32)
+        B = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, A, B, input_names=["A", "B"])
+
+    def test_ufunc_minimum(self):
+        def f(A, B):
+            return np.minimum(A, B)
+
+        A = np.random.randn(4, 3).astype(np.float32)
+        B = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, A, B, input_names=["A", "B"])
+
+    def test_ufunc_not_equal(self):
+        def f(X):
+            return np.not_equal(X, np.float32(0.0))
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_ufunc_greater(self):
+        def f(A, B):
+            return np.greater(A, B)
+
+        A = np.random.randn(4, 3).astype(np.float32)
+        B = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, A, B, input_names=["A", "B"])
+
+    def test_ufunc_less(self):
+        def f(A, B):
+            return np.less(A, B)
+
+        A = np.random.randn(4, 3).astype(np.float32)
+        B = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, A, B, input_names=["A", "B"])
+
+    # ------------------------------------------------------------------
+    # Logical ufuncs (boolean arrays)
+    # ------------------------------------------------------------------
+
+    def test_ufunc_logical_and(self):
+        def f(A, B):
+            return np.logical_and(A, B)
+
+        A = np.random.randn(4, 3).astype(np.float32) > 0
+        B = np.random.randn(4, 3).astype(np.float32) > 0
+        self._run(f, A, B, input_names=["A", "B"])
+
+    def test_ufunc_logical_or(self):
+        def f(A, B):
+            return np.logical_or(A, B)
+
+        A = np.random.randn(4, 3).astype(np.float32) > 0
+        B = np.random.randn(4, 3).astype(np.float32) > 0
+        self._run(f, A, B, input_names=["A", "B"])
+
+    def test_ufunc_logical_xor(self):
+        def f(A, B):
+            return np.logical_xor(A, B)
+
+        A = np.random.randn(4, 3).astype(np.float32) > 0
+        B = np.random.randn(4, 3).astype(np.float32) > 0
+        self._run(f, A, B, input_names=["A", "B"])
+
+    def test_ufunc_logical_not(self):
+        def f(X):
+            return np.logical_not(X)
+
+        X = np.random.randn(4, 3).astype(np.float32) > 0
+        self._run(f, X)
+
+    # ------------------------------------------------------------------
+    # expm1
+    # ------------------------------------------------------------------
+
+    def test_expm1(self):
+        def f(X):
+            return np.expm1(X)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X, atol=1e-4)
+
+    # ------------------------------------------------------------------
+    # More reductions
+    # ------------------------------------------------------------------
+
+    def test_prod_axis(self):
+        def f(X):
+            return X.prod(axis=1, keepdims=True)
+
+        X = np.abs(np.random.randn(4, 3).astype(np.float32)) + 0.1
+        self._run(f, X, atol=1e-4)
+
+    def test_prod_all(self):
+        def f(X):
+            return np.prod(X)
+
+        X = np.abs(np.random.randn(4, 3).astype(np.float32)) + 0.1
+        self._run(f, X, atol=1e-4)
+
+    # ------------------------------------------------------------------
+    # More shape operations
+    # ------------------------------------------------------------------
+
+    def test_flatten(self):
+        def f(X):
+            return X.flatten()
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_squeeze_method(self):
+        def f(X):
+            return X.squeeze(axis=0)
+
+        X = np.random.randn(1, 4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_expand_dims_method(self):
+        """NumpyArray.expand_dims adds a size-1 dimension."""
+        from onnx import TensorProto
+        from yobx.xbuilder import GraphBuilder
+        from yobx.xtracing.numpy_array import NumpyArray
+
+        g = GraphBuilder({"": 21, "ai.onnx.ml": 1})
+        g.make_tensor_input("X", TensorProto.FLOAT, ("batch", 3))
+        proxy = NumpyArray("X", g, dtype=np.float32)
+        out = proxy.expand_dims(axis=0)
+        self.assertIsInstance(out, NumpyArray)
+
+    # ------------------------------------------------------------------
+    # Array functions
+    # ------------------------------------------------------------------
+
+    def test_concatenate(self):
+        def f(A, B):
+            return np.concatenate([A, B], axis=0)
+
+        A = np.random.randn(4, 3).astype(np.float32)
+        B = np.random.randn(2, 3).astype(np.float32)
+        self._run(f, A, B, input_names=["A", "B"])
+
+    def test_stack(self):
+        def f(A, B):
+            return np.stack([A, B], axis=0)
+
+        A = np.random.randn(4, 3).astype(np.float32)
+        B = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, A, B, input_names=["A", "B"])
+
+    def test_expand_dims_numpy(self):
+        def f(X):
+            return np.expand_dims(X, axis=0)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_squeeze_numpy(self):
+        def f(X):
+            return np.squeeze(X, axis=0)
+
+        X = np.random.randn(1, 4, 3).astype(np.float32)
+        self._run(f, X)
+
+    def test_dot(self):
+        W = np.random.randn(3, 5).astype(np.float32)
+
+        def f(X):
+            return np.dot(X, W)
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        self._run(f, X)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
