@@ -892,11 +892,14 @@ class DynamoInterpreter:
                 val = example_value
 
         if isinstance(val, tuple):
-            assert len(val) == 1, (
-                f"output not yet implemented for multiple outputs, node={node}"
-                f"{self.builder.get_debug_msg()}"
-            )
-            val = val[0]
+            if len(val) == 1:
+                val = val[0]
+            else:
+                # Multiple outputs: the builder already has type/shape info from
+                # processing the subgraph nodes (e.g. InterpreterModule from
+                # torch.export.unflatten). Fall through to the val-is-None path
+                # which reads each output's type/shape directly from the builder.
+                val = None
 
         if val is None:
             for a, o in outputs:
