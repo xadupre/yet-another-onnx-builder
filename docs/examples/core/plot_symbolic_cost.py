@@ -102,8 +102,8 @@ for node in model.graph.node:
 # FLOPs values are **symbolic arithmetic expressions** (strings such as
 # ``"2*batch*d_head*seq*seq"``).
 #
-# Zero-cost operations (data-movement ops such as ``Transpose``, ``Reshape``,
-# ``Cast``, …) return ``0`` because they perform no arithmetic.
+# ``Transpose`` costs 1 read + 1 write per element (input element count).
+# Truly zero-cost ops (``Reshape``, ``Identity``, ``Cast``, …) return ``0``.
 
 builder_before = BasicShapeBuilder()
 cost_before = builder_before.run_model(model, inference=InferenceMode.COST)

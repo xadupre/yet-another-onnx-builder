@@ -150,7 +150,6 @@ _ZERO_COST_OPS: frozenset = frozenset(
         "Split",
         "Squeeze",
         "Tile",
-        "Transpose",
         "Unsqueeze",
     }
 )
@@ -425,6 +424,15 @@ def _flops_zero_cost(
     return 0
 
 
+def _flops_transpose(
+    node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
+) -> Optional[DIM_TYPE]:
+    """1 read + 1 write per element → input element count."""
+    if not node.input:
+        return None
+    return _literal_size(_resolve_shape(node.input[0], shape_fn, literal_fn))
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher: maps op_type → handler function
 # ---------------------------------------------------------------------------
@@ -459,6 +467,7 @@ _OP_HANDLERS.update(
         "LSTM": _flops_lstm,
         "GRU": _flops_gru,
         "RNN": _flops_rnn,
+        "Transpose": _flops_transpose,
     }
 )
 
