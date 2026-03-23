@@ -72,9 +72,15 @@ This is work in progress.
 Many packages produce SQL queries. It starts by converting a SQL
 query into ONNX.  A lightweight **DataFrame function tracer**
 (:func:`~yobx.sql.dataframe_to_onnx`) records pandas-inspired
-operations on a virtual DataFrame and compiles them to ONNX directly.
+operations on a DataFrame and compiles them to ONNX directly.
 
-* :ref:`l-design-sql`
++-----------------------------+----------------------------------+
+| sql                         | :ref:`l-design-sql`              |
++-----------------------------+----------------------------------+
+| :class:`polars.LazyFrame`   | :ref:`l-design-sql`              |
++-----------------------------+----------------------------------+
+| :class:`pandas.DataFrame`   | :ref:`l-design-sql`              |
++-----------------------------+----------------------------------+
 
 **deep learning**
 
