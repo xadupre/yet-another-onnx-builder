@@ -169,7 +169,7 @@ class TestCustomDataFrameTransformerOnnx(ExtTestCase):
         self.assertEqual(t.n_onnx_outputs_, 1)
 
     def test_get_feature_names_out(self):
-        """get_feature_names_out() must return output column names."""
+        """get_feature_names_out() must return ['total'] for _AddColumnsTransformer."""
         t = _AddColumnsTransformer()
         t.fit()
         self.assertEqual(list(t.get_feature_names_out()), ["total"])
