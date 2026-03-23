@@ -3836,26 +3836,13 @@ class TestGraphPatternOptimization(ExtTestCase):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node(
-                        "Pad",
-                        ["X", "pads"],
-                        ["Xp"],
-                    ),
-                    oh.make_node(
-                        "Conv",
-                        ["Xp", "W"],
-                        ["Y"],
-                        kernel_shape=[3, 3],
-                    ),
+                    oh.make_node("Pad", ["X", "pads"], ["Xp"]),
+                    oh.make_node("Conv", ["Xp", "W"], ["Y"], kernel_shape=[3, 3]),
                 ],
                 "dummy",
                 [_mkv_("X", TFLOAT, [1, 3, 6, 6]), _mkv_("W", TFLOAT, [8, 3, 3, 3])],
                 [_mkv_("Y", TFLOAT, [1, 8, 6, 6])],
-                [
-                    onh.from_array(
-                        np.array([0, 0, 1, 1, 0, 0, 1, 1], dtype=np.int64), name="pads"
-                    )
-                ],
+                [onh.from_array(np.array([0, 0, 1, 1, 0, 0, 1, 1], dtype=np.int64), name="pads")],
             ),
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
@@ -3891,27 +3878,15 @@ class TestGraphPatternOptimization(ExtTestCase):
         model = oh.make_model(
             oh.make_graph(
                 [
+                    oh.make_node("Pad", ["X", "pads"], ["Xp"]),
                     oh.make_node(
-                        "Pad",
-                        ["X", "pads"],
-                        ["Xp"],
-                    ),
-                    oh.make_node(
-                        "Conv",
-                        ["Xp", "W"],
-                        ["Y"],
-                        kernel_shape=[3, 3],
-                        pads=[1, 1, 1, 1],
+                        "Conv", ["Xp", "W"], ["Y"], kernel_shape=[3, 3], pads=[1, 1, 1, 1]
                     ),
                 ],
                 "dummy",
                 [_mkv_("X", TFLOAT, [1, 3, 6, 6]), _mkv_("W", TFLOAT, [8, 3, 3, 3])],
                 [_mkv_("Y", TFLOAT, [1, 8, 8, 8])],
-                [
-                    onh.from_array(
-                        np.array([0, 0, 1, 1, 0, 0, 1, 1], dtype=np.int64), name="pads"
-                    )
-                ],
+                [onh.from_array(np.array([0, 0, 1, 1, 0, 0, 1, 1], dtype=np.int64), name="pads")],
             ),
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
@@ -3953,17 +3928,8 @@ class TestGraphPatternOptimization(ExtTestCase):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node(
-                        "Pad",
-                        ["X", "pads"],
-                        ["Xp"],
-                    ),
-                    oh.make_node(
-                        "Conv",
-                        ["Xp", "W"],
-                        ["Y"],
-                        kernel_shape=[1, 1],
-                    ),
+                    oh.make_node("Pad", ["X", "pads"], ["Xp"]),
+                    oh.make_node("Conv", ["Xp", "W"], ["Y"], kernel_shape=[1, 1]),
                 ],
                 "dummy",
                 [_mkv_("X", TFLOAT, [1, 3, 4, 4]), _mkv_("W", TFLOAT, [3, 3, 1, 1])],

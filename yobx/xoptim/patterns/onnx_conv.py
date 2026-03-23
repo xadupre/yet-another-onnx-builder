@@ -243,7 +243,7 @@ class PadConvPattern(PatternOptimization):
 
         # Spatial pads from Pad node: [h_begin, w_begin, ..., h_end, w_end, ...]
         spatial_pads_begin = pads_values[2:ndim]
-        spatial_pads_end = pads_values[ndim + 2:]
+        spatial_pads_end = pads_values[ndim + 2 :]
 
         # All spatial pads must be non-negative.
         if any(p < 0 for p in spatial_pads_begin + spatial_pads_end):
@@ -252,10 +252,7 @@ class PadConvPattern(PatternOptimization):
         return MatchResult(self, [pad_node, node], self.apply, insert_at=node)
 
     def apply(
-        self,
-        g: "GraphBuilder",  # noqa: F821
-        pad_node: NodeProto,
-        conv_node: NodeProto,
+        self, g: "GraphBuilder", pad_node: NodeProto, conv_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
         # Retrieve the pads from the Pad node.
         pads_cst = g.get_computed_constant(pad_node.input[1])
@@ -276,7 +273,7 @@ class PadConvPattern(PatternOptimization):
             pads_values = full_pads
 
         spatial_pads_begin = list(map(int, pads_values[2:ndim]))
-        spatial_pads_end = list(map(int, pads_values[ndim + 2:]))
+        spatial_pads_end = list(map(int, pads_values[ndim + 2 :]))
 
         # Retrieve existing Conv pads attribute (defaults to all-zeros).
         n_spatial = ndim - 2
@@ -290,15 +287,13 @@ class PadConvPattern(PatternOptimization):
         # Pad existing_pads to the expected length if necessary.
         if len(existing_pads) < 2 * n_spatial:
             existing_pads = existing_pads + [0] * (2 * n_spatial - len(existing_pads))
-        new_pads = [
-            existing_pads[i] + spatial_pads_begin[i] for i in range(n_spatial)
-        ] + [
+        new_pads = [existing_pads[i] + spatial_pads_begin[i] for i in range(n_spatial)] + [
             existing_pads[n_spatial + i] + spatial_pads_end[i] for i in range(n_spatial)
         ]
 
         new_node = g.make_node(
             "Conv",
-            [pad_node.input[0]] + list(conv_node.input[1:]),
+            [pad_node.input[0], *conv_node.input[1:]],
             conv_node.output,
             name=f"{self.__class__.__name__}--{conv_node.name}",
             doc_string=conv_node.doc_string,
