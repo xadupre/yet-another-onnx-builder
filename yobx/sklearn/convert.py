@@ -1,4 +1,5 @@
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
+import numpy as np
 from onnx import ValueInfoProto
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
@@ -81,6 +82,30 @@ def _extract_value_info_proto(vip: ValueInfoProto) -> Tuple[str, int, Optional[T
     else:
         shape = None
     return name, elem_type, shape
+
+
+def _is_arg_tuple_spec(arg: Any) -> bool:
+    """Return True if *arg* is a ``(name, dtype, shape)`` input specification.
+
+    Supported format::
+
+        ('input_name', np.float32, ('N', 4))
+
+    where
+
+    * ``name`` is a :class:`str`
+    * ``dtype`` is a :class:`numpy.dtype` instance, a numpy scalar-type class
+      (e.g. ``np.float32``), or anything accepted by ``np.dtype(...)``
+    * ``shape`` is a :class:`tuple` or :class:`list` whose elements are
+      integers (static dimensions) or strings (symbolic dimensions).
+    """
+    if not (isinstance(arg, tuple) and len(arg) == 3 and isinstance(arg[0], str)):
+        return False
+    if not isinstance(arg[2], (tuple, list)):
+        return False
+    if not all(isinstance(d, (int, str)) for d in arg[2]):
+        return False
+    return True
 
 
 def _default_ai_onnx_ml(main_opset: int) -> int:
@@ -205,12 +230,20 @@ def to_onnx(
     the others are static.
 
     :param estimator: estimator
-    :param args: dummy inputs; each element may be a numpy array **or** an
+    :param args: dummy inputs; each element may be a numpy array, an
         :class:`onnx.ValueInfoProto` that explicitly describes the input
-        tensor's name, element type and shape.  When a
-        :class:`~onnx.ValueInfoProto` is provided no actual data is required,
-        and the ``dynamic_shapes`` parameter is ignored for that input (the
-        shape is taken directly from the proto).
+        tensor's name, element type and shape, **or** a
+        ``(name, dtype, shape)`` tuple.  When a
+        :class:`~onnx.ValueInfoProto` or a ``(name, dtype, shape)`` tuple is
+        provided no actual data is required, and the ``dynamic_shapes``
+        parameter is ignored for that input (the shape is taken directly from
+        the descriptor).  The ``(name, dtype, shape)`` tuple format uses a
+        plain string for the name, a numpy dtype (or scalar-type class such
+        as ``np.float32``) for the element type, and a sequence of ints
+        and/or strings for the shape (strings denote symbolic / dynamic
+        dimensions).  Example::
+
+            to_onnx(estimator, (('x', np.float32, ('N', 4)),))
     :param dynamic_shapes: dynamic shapes, if not specified, the first dimension
         is dynamic, the others are static
     :param target_opset: opset to use; either an integer for the default domain
@@ -335,11 +368,14 @@ def to_onnx(
         if len(input_names) != len(args):
             raise ValueError(f"Length mismatch: {len(args)=} but input_names={input_names!r}")
     else:
-        # Derive default input names; for ValueInfoProto use the embedded name.
+        # Derive default input names; for ValueInfoProto use the embedded name,
+        # for (name, dtype, shape) tuples use the embedded name.
         default_names = []
         for j, arg in enumerate(args):
             if isinstance(arg, ValueInfoProto):
                 default_names.append(arg.name or (f"X{j}" if len(args) > 1 else "X"))
+            elif _is_arg_tuple_spec(arg):
+                default_names.append(arg[0])
             else:
                 default_names.append("X" if len(args) == 1 else f"X{j}")
         input_names = default_names
@@ -348,6 +384,11 @@ def to_onnx(
             # Use name/type/shape directly from the ValueInfoProto.
             _, elem_type, shape = _extract_value_info_proto(arg)
             g.make_tensor_input(name, elem_type, shape, device=-1)
+        elif _is_arg_tuple_spec(arg):
+            # Use name/dtype/shape directly from the (name, dtype, shape) tuple.
+            _, arg_dtype, arg_shape = arg
+            elem_type = np_dtype_to_tensor_dtype(np.dtype(arg_dtype))
+            g.make_tensor_input(name, elem_type, tuple(arg_shape), device=-1)
         else:
             if dynamic_shapes:
                 ds = dynamic_shapes[i]
