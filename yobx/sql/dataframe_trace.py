@@ -51,7 +51,7 @@ Example
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -72,7 +72,7 @@ from .parse import (
     SelectOp,
     _collect_columns,
 )
-from .sql_convert import parsed_query_to_onnx
+from .sql_convert import parsed_queries_to_onnx, parsed_query_to_onnx
 
 # ---------------------------------------------------------------------------
 # Expression conversion helper
@@ -558,7 +558,7 @@ def trace_dataframe(
     input_dtypes: Union[
         Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]
     ],
-) -> ParsedQuery:
+) -> Union[ParsedQuery, List[ParsedQuery]]:
     """Trace *func* and return the equivalent :class:`~yobx.sql.parse.ParsedQuery`.
 
     Constructs one or more :class:`TracedDataFrame` objects whose columns
@@ -567,9 +567,10 @@ def trace_dataframe(
     :class:`~yobx.sql.parse.ParsedQuery`.
 
     :param func: a callable that accepts one or more :class:`TracedDataFrame`
-        objects and returns a :class:`TracedDataFrame`.  The function may apply
-        any combination of ``filter``, ``select``, arithmetic on columns,
-        ``join``, and aggregations.
+        objects and returns a :class:`TracedDataFrame` **or** a tuple / list of
+        :class:`TracedDataFrame` objects for multiple-output functions.  The
+        function may apply any combination of ``filter``, ``select``, arithmetic
+        on columns, ``join``, and aggregations.
     :param input_dtypes: either
 
         * a single ``{column: dtype}`` mapping — *func* is called with one
@@ -580,7 +581,9 @@ def trace_dataframe(
         The dtypes are not used during tracing itself; they are used only when
         the returned query is subsequently compiled to ONNX.
     :return: a :class:`~yobx.sql.parse.ParsedQuery` representing the operations
-        performed by *func*.
+        performed by *func*, or a **list** of
+        :class:`~yobx.sql.parse.ParsedQuery` objects when *func* returns
+        multiple :class:`TracedDataFrame` objects.
 
     Example — single dataframe::
 
@@ -606,6 +609,19 @@ def trace_dataframe(
             return df1.select([(df1["a"] + df2["b"]).alias("total")])
 
         pq = trace_dataframe(transform, [{"a": np.float32}, {"b": np.float32}])
+
+    Example — multiple outputs::
+
+        import numpy as np
+        from yobx.sql.dataframe_trace import trace_dataframe
+
+        def transform(df):
+            pos = df.filter(df["a"] > 0).select([df["a"].alias("a_pos")])
+            neg = df.filter(df["a"] < 0).select([df["a"].alias("a_neg")])
+            return pos, neg
+
+        pqs = trace_dataframe(transform, {"a": np.float32})
+        # pqs is a list of two ParsedQuery objects
     """
     if isinstance(input_dtypes, list):
         dfs = [
@@ -619,6 +635,16 @@ def trace_dataframe(
         columns = {name: TracedSeries(ColumnRef(name)) for name in input_dtypes}
         df = TracedDataFrame(columns, source_columns=list(input_dtypes.keys()))
         result = func(df)
+    if isinstance(result, (list, tuple)):
+        pqs = []
+        for i, r in enumerate(result):
+            if not isinstance(r, TracedDataFrame):
+                raise TypeError(
+                    f"trace_dataframe: function must return TracedDataFrame objects, "
+                    f"got {type(r).__name__!r} at index {i}"
+                )
+            pqs.append(r.to_parsed_query())
+        return pqs
     if not isinstance(result, TracedDataFrame):
         raise TypeError(
             f"trace_dataframe: function must return a TracedDataFrame, "
@@ -644,7 +670,10 @@ def dataframe_to_onnx(
     :func:`~yobx.sql.sql_convert.parsed_query_to_onnx` into a single call.
 
     :param func: a callable that accepts one or more :class:`TracedDataFrame`
-        objects and returns a :class:`TracedDataFrame`.
+        objects and returns a :class:`TracedDataFrame` **or** a tuple / list of
+        :class:`TracedDataFrame` objects.  When the function returns multiple
+        frames, the resulting ONNX model will have a corresponding number of
+        output groups (one per returned frame).
     :param input_dtypes: either
 
         * a single ``{column: dtype}`` mapping — *func* is called with one
@@ -720,23 +749,61 @@ def dataframe_to_onnx(
         dtypes1 = {"cid": np.int64, "a": np.float32}
         dtypes2 = {"id": np.int64, "b": np.float32}
         artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
+
+    Example — multiple output dataframes::
+
+        import numpy as np
+        from yobx.sql.dataframe_trace import dataframe_to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        def transform(df):
+            pos = df.filter(df["a"] > 0).select([df["a"].alias("a_pos")])
+            neg = df.filter(df["a"] < 0).select([df["a"].alias("a_neg")])
+            return pos, neg
+
+        dtypes = {"a": np.float32}
+        artifact = dataframe_to_onnx(transform, dtypes)
+
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        a_pos, a_neg = ref.run(None, {"a": a})
+        # a_pos == array([1., 3.], dtype=float32)
+        # a_neg == array([-2.], dtype=float32)
     """
-    pq = trace_dataframe(func, input_dtypes)
-    if isinstance(input_dtypes, list):
-        has_join = any(isinstance(op, JoinOp) for op in pq.operations)
-        if has_join:
-            left_dtypes: Dict[str, Union[np.dtype, type, str]] = input_dtypes[0]
-            right_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = (
-                input_dtypes[1] if len(input_dtypes) > 1 else None
+    pq_or_pqs = trace_dataframe(func, input_dtypes)
+
+    # Resolve left/right dtype split for list input_dtypes.
+    def _resolve_dtypes(
+        pqs_list: List[ParsedQuery],
+    ) -> Tuple[
+        Dict[str, Union[np.dtype, type, str]],
+        Optional[Dict[str, Union[np.dtype, type, str]]],
+    ]:
+        if isinstance(input_dtypes, list):
+            has_join = any(
+                any(isinstance(op, JoinOp) for op in pq.operations) for pq in pqs_list
             )
+            if has_join:
+                ld: Dict[str, Union[np.dtype, type, str]] = input_dtypes[0]
+                rd: Optional[Dict[str, Union[np.dtype, type, str]]] = (
+                    input_dtypes[1] if len(input_dtypes) > 1 else None
+                )
+            else:
+                ld = {}
+                for d in input_dtypes:
+                    ld.update(d)
+                rd = None
         else:
-            # Merge all dtype dicts — columns come from a flat table.
-            left_dtypes = {}
-            for d in input_dtypes:
-                left_dtypes.update(d)
-            right_dtypes = None
-        return parsed_query_to_onnx(
-            pq,
+            ld = input_dtypes  # type: ignore[assignment]
+            rd = None
+        return ld, rd
+
+    if isinstance(pq_or_pqs, list):
+        # Multiple output DataFrames.
+        pqs = pq_or_pqs
+        left_dtypes, right_dtypes = _resolve_dtypes(pqs)
+        return parsed_queries_to_onnx(
+            pqs,
             left_dtypes,
             right_input_dtypes=right_dtypes,
             target_opset=target_opset,
@@ -745,9 +812,14 @@ def dataframe_to_onnx(
             filename=filename,
             verbose=verbose,
         )
+
+    # Single output DataFrame — original logic.
+    pq = pq_or_pqs
+    left_dtypes, right_dtypes = _resolve_dtypes([pq])
     return parsed_query_to_onnx(
         pq,
-        input_dtypes,
+        left_dtypes,
+        right_input_dtypes=right_dtypes,
         target_opset=target_opset,
         custom_functions=custom_functions,
         builder_cls=builder_cls,

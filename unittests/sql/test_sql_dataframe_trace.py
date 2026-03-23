@@ -915,6 +915,162 @@ class TestMultiDataframe(ExtTestCase):
 
 
 # ---------------------------------------------------------------------------
+# Multiple output DataFrames
+# ---------------------------------------------------------------------------
+
+
+class TestMultipleOutputDataframes(ExtTestCase):
+    """Tests for functions that return multiple :class:`TracedDataFrame` objects."""
+
+    def test_trace_dataframe_tuple_output(self):
+        """trace_dataframe returns a list of ParsedQuery for tuple output."""
+        from yobx.sql.dataframe_trace import trace_dataframe
+        from yobx.sql.parse import ParsedQuery
+
+        def transform(df):
+            pos = df.filter(df["a"] > 0).select([df["a"].alias("a_pos")])
+            neg = df.filter(df["a"] < 0).select([df["a"].alias("a_neg")])
+            return pos, neg
+
+        pqs = trace_dataframe(transform, {"a": np.float32})
+        self.assertIsInstance(pqs, list)
+        self.assertEqual(len(pqs), 2)
+        for pq in pqs:
+            self.assertIsInstance(pq, ParsedQuery)
+
+    def test_trace_dataframe_list_output(self):
+        """trace_dataframe returns a list of ParsedQuery for list output."""
+        from yobx.sql.dataframe_trace import trace_dataframe
+        from yobx.sql.parse import ParsedQuery
+
+        def transform(df):
+            a_col = df.select([df["a"].alias("a_out")])
+            b_col = df.select([df["b"].alias("b_out")])
+            return [a_col, b_col]
+
+        pqs = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+        self.assertIsInstance(pqs, list)
+        self.assertEqual(len(pqs), 2)
+        for pq in pqs:
+            self.assertIsInstance(pq, ParsedQuery)
+
+    def test_two_outputs_no_filter(self):
+        """Function returning two output frames without filtering."""
+
+        def transform(df):
+            out1 = df.select([(df["a"] + df["b"]).alias("total")])
+            out2 = df.select([(df["a"] - df["b"]).alias("diff")])
+            return out1, out2
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        artifact = dataframe_to_onnx(transform, {"a": np.float32, "b": np.float32})
+        ref = ExtendedReferenceEvaluator(artifact)
+        total, diff = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+        np.testing.assert_allclose(diff, a - b)
+
+    def test_two_outputs_with_filter(self):
+        """Function returning two output frames with different filters."""
+
+        def transform(df):
+            pos = df.filter(df["a"] > 0).select([df["a"].alias("a_pos")])
+            neg = df.filter(df["a"] < 0).select([df["a"].alias("a_neg")])
+            return pos, neg
+
+        a = np.array([1.0, -2.0, 3.0, -4.0], dtype=np.float32)
+        artifact = dataframe_to_onnx(transform, {"a": np.float32})
+        ref = ExtendedReferenceEvaluator(artifact)
+        a_pos, a_neg = ref.run(None, {"a": a})
+        np.testing.assert_allclose(a_pos, np.array([1.0, 3.0], dtype=np.float32))
+        np.testing.assert_allclose(a_neg, np.array([-2.0, -4.0], dtype=np.float32))
+
+    def test_three_outputs(self):
+        """Function returning three output frames."""
+
+        def transform(df):
+            out1 = df.select([(df["a"] + df["b"]).alias("sum_ab")])
+            out2 = df.select([(df["a"] * df["b"]).alias("prod_ab")])
+            out3 = df.select([(df["a"] - df["b"]).alias("diff_ab")])
+            return out1, out2, out3
+
+        a = np.array([2.0, 3.0], dtype=np.float32)
+        b = np.array([1.0, 4.0], dtype=np.float32)
+        artifact = dataframe_to_onnx(transform, {"a": np.float32, "b": np.float32})
+        ref = ExtendedReferenceEvaluator(artifact)
+        sum_ab, prod_ab, diff_ab = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(sum_ab, a + b)
+        np.testing.assert_allclose(prod_ab, a * b)
+        np.testing.assert_allclose(diff_ab, a - b)
+
+    def test_multiple_outputs_multi_input_frames(self):
+        """Multiple outputs from a function that takes two input frames."""
+
+        def transform(df1, df2):
+            out1 = df1.select([(df1["a"] + df2["b"]).alias("total")])
+            out2 = df1.select([(df1["a"] - df2["b"]).alias("diff")])
+            return out1, out2
+
+        a = np.array([5.0, 6.0], dtype=np.float32)
+        b = np.array([1.0, 2.0], dtype=np.float32)
+        artifact = dataframe_to_onnx(
+            transform, [{"a": np.float32}, {"b": np.float32}]
+        )
+        ref = ExtendedReferenceEvaluator(artifact)
+        total, diff = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+        np.testing.assert_allclose(diff, a - b)
+
+    def test_to_onnx_multiple_outputs(self):
+        """to_onnx() dispatches callable returning multiple output frames."""
+        from yobx.sql import to_onnx
+
+        def transform(df):
+            out1 = df.select([(df["a"] + df["b"]).alias("total")])
+            out2 = df.select([(df["a"] - df["b"]).alias("diff")])
+            return out1, out2
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        artifact = to_onnx(transform, {"a": np.float32, "b": np.float32})
+        ref = ExtendedReferenceEvaluator(artifact)
+        total, diff = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+        np.testing.assert_allclose(diff, a - b)
+
+    def test_parsed_queries_to_onnx_imported(self):
+        """parsed_queries_to_onnx is exported from yobx.sql."""
+        from yobx.sql import parsed_queries_to_onnx  # noqa: F401
+
+        self.assertTrue(callable(parsed_queries_to_onnx))
+
+    def test_parsed_queries_to_onnx_basic(self):
+        """parsed_queries_to_onnx works with two independent queries."""
+        from yobx.sql import parse_sql, parsed_queries_to_onnx
+
+        pq1 = parse_sql("SELECT a + b AS total FROM t")
+        pq2 = parse_sql("SELECT a - b AS diff FROM t")
+        dtypes = {"a": np.float32, "b": np.float32}
+        artifact = parsed_queries_to_onnx([pq1, pq2], dtypes)
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        total, diff = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+        np.testing.assert_allclose(diff, a - b)
+
+    def test_type_error_non_dataframe_in_tuple(self):
+        """trace_dataframe raises TypeError when tuple contains non-TracedDataFrame."""
+        from yobx.sql.dataframe_trace import trace_dataframe
+
+        def bad_transform(df):
+            return df.select([df["a"].alias("out")]), 42
+
+        with self.assertRaises(TypeError):
+            trace_dataframe(bad_transform, {"a": np.float32})
+
+
+# ---------------------------------------------------------------------------
 # parsed_query_to_onnx
 # ---------------------------------------------------------------------------
 

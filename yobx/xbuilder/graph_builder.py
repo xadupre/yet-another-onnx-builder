@@ -2696,9 +2696,13 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime):
 
         key = self.make_key(value)
         if key and key in self._values:
-            # exception with obvious names
-            if name in {"", "ONES", "ZEROS", "ZERO", "ONE"} or name.startswith("ONES"):
-                assert not parameter_name, (
+            # exception with obvious names or when give_unique_name is set
+            if (
+                name in {"", "ONES", "ZEROS", "ZERO", "ONE"}
+                or name.startswith("ONES")
+                or give_unique_name
+            ):
+                assert not parameter_name or give_unique_name, (
                     f"Empty name cannot be used with parameter_name={parameter_name!r}, "
                     f"key={key!r}"
                 )
