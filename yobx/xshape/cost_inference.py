@@ -428,8 +428,6 @@ def _flops_transpose(
     node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
 ) -> Optional[DIM_TYPE]:
     """1 read + 1 write per element → input element count."""
-    if not node.input:
-        return None
     return _literal_size(_resolve_shape(node.input[0], shape_fn, literal_fn))
 
 
