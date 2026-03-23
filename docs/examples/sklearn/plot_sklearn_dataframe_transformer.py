@@ -135,9 +135,7 @@ class MultiOutTransformer(BaseEstimator, TransformerMixin):
 
 
 def multi_out_func(df):
-    return df.select(
-        [(df["a"] + df["b"]).alias("total"), (df["a"] * 2.0).alias("a_doubled")]
-    )
+    return df.select([(df["a"] + df["b"]).alias("total"), (df["a"] * 2.0).alias("a_doubled")])
 
 
 t_multi = MultiOutTransformer()
@@ -203,4 +201,3 @@ print("Filter + select ✓")
 # ---------------------------
 
 plot_dot(onx_multi)
-

@@ -21,7 +21,6 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
 
-
 # ---------------------------------------------------------------------------
 # Module-level helpers shared by multiple tests
 # ---------------------------------------------------------------------------
@@ -110,10 +109,7 @@ class _MultiOutTransformer(BaseEstimator, TransformerMixin):
         import pandas as pd
 
         return pd.DataFrame(
-            {
-                "total": df["a"].values + df["b"].values,
-                "a_doubled": df["a"].values * 2.0,
-            }
+            {"total": df["a"].values + df["b"].values, "a_doubled": df["a"].values * 2.0}
         )
 
     def get_feature_names_out(self, input_features=None):
@@ -121,12 +117,7 @@ class _MultiOutTransformer(BaseEstimator, TransformerMixin):
 
 
 def _multi_out_tracing_func(df):
-    return df.select(
-        [
-            (df["a"] + df["b"]).alias("total"),
-            (df["a"] * 2.0).alias("a_doubled"),
-        ]
-    )
+    return df.select([(df["a"] + df["b"]).alias("total"), (df["a"] * 2.0).alias("a_doubled")])
 
 
 def _multi_out_converter(g, sts, outputs, estimator, *inputs, name="multi_out"):
@@ -321,9 +312,7 @@ class TestCustomDataFrameTransformerOnnx(ExtTestCase):
             def transform(self, df):
                 import pandas as pd
 
-                return pd.DataFrame(
-                    {"s": df["a"].values + df["b"].values + df["c"].values}
-                )
+                return pd.DataFrame({"s": df["a"].values + df["b"].values + df["c"].values})
 
             def get_feature_names_out(self, input_features=None):
                 return np.array(["s"])
@@ -344,9 +333,7 @@ class TestCustomDataFrameTransformerOnnx(ExtTestCase):
         t = _ThreeColTransformer()
         t.fit()
         args = self._make_args(t.input_dtypes_)
-        onx = to_onnx(
-            t, args, extra_converters={_ThreeColTransformer: _three_col_converter}
-        )
+        onx = to_onnx(t, args, extra_converters={_ThreeColTransformer: _three_col_converter})
 
         input_names = {inp.name for inp in onx.proto.graph.input}
         self.assertIn("a", input_names)
@@ -362,4 +349,3 @@ class TestCustomDataFrameTransformerOnnx(ExtTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
