@@ -108,6 +108,65 @@ def _is_arg_tuple_spec(arg: Any) -> bool:
     return True
 
 
+def _register_inputs(
+    g: Any,
+    args: Tuple[Any, ...],
+    input_names: Optional[Sequence[str]],
+    dynamic_shapes: Optional[Tuple[Dict[int, str]]],
+) -> List[str]:
+    """Resolve *input_names* and register each input with the graph builder *g*.
+
+    :param g: graph builder (any object exposing ``make_tensor_input``)
+    :param args: input descriptors — numpy arrays,
+        :class:`onnx.ValueInfoProto` objects, or ``(name, dtype, shape)`` tuples
+    :param input_names: optional explicit names; overrides names embedded in
+        :class:`~onnx.ValueInfoProto` / tuple descriptors when provided
+    :param dynamic_shapes: per-input axis-to-symbol mapping used only for
+        numpy-array inputs; ``None`` defaults to ``{0: "batch"}``
+    :return: the resolved list of input names (same length as *args*)
+    """
+    if input_names:
+        if len(input_names) != len(args):
+            raise ValueError(f"Length mismatch: {len(args)=} but input_names={input_names!r}")
+        resolved_names: List[str] = list(input_names)
+    else:
+        # Derive default input names; for ValueInfoProto or tuple specs use the
+        # embedded name.
+        default_names = []
+        for j, arg in enumerate(args):
+            if isinstance(arg, ValueInfoProto):
+                default_names.append(arg.name or (f"X{j}" if len(args) > 1 else "X"))
+            elif _is_arg_tuple_spec(arg):
+                default_names.append(arg[0])
+            else:
+                default_names.append("X" if len(args) == 1 else f"X{j}")
+        resolved_names = default_names
+
+    for i, (name, arg) in enumerate(zip(resolved_names, args)):
+        if isinstance(arg, ValueInfoProto):
+            # Use name/type/shape directly from the ValueInfoProto.
+            _, elem_type, shape = _extract_value_info_proto(arg)
+            g.make_tensor_input(name, elem_type, shape, device=-1)
+        elif _is_arg_tuple_spec(arg):
+            # Use name/dtype/shape directly from the (name, dtype, shape) tuple.
+            _, arg_dtype, arg_shape = arg
+            elem_type = np_dtype_to_tensor_dtype(np.dtype(arg_dtype))
+            g.make_tensor_input(name, elem_type, tuple(arg_shape), device=-1)
+        else:
+            if dynamic_shapes:
+                ds = dynamic_shapes[i]
+            else:
+                ds = {0: "batch"}
+            shape = list(arg.shape)  # type: ignore
+            for axis, dim in ds.items():
+                shape[axis] = dim  # type: ignore
+            g.make_tensor_input(  # type: ignore
+                name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1  # type: ignore
+            )  # type: ignore
+
+    return resolved_names
+
+
 def _default_ai_onnx_ml(main_opset: int) -> int:
     if main_opset >= 21:
         return 5
@@ -364,42 +423,7 @@ def to_onnx(
     else:
         fct = get_sklearn_converter(cls)
 
-    if input_names:
-        if len(input_names) != len(args):
-            raise ValueError(f"Length mismatch: {len(args)=} but input_names={input_names!r}")
-    else:
-        # Derive default input names; for ValueInfoProto use the embedded name,
-        # for (name, dtype, shape) tuples use the embedded name.
-        default_names = []
-        for j, arg in enumerate(args):
-            if isinstance(arg, ValueInfoProto):
-                default_names.append(arg.name or (f"X{j}" if len(args) > 1 else "X"))
-            elif _is_arg_tuple_spec(arg):
-                default_names.append(arg[0])
-            else:
-                default_names.append("X" if len(args) == 1 else f"X{j}")
-        input_names = default_names
-    for i, (name, arg) in enumerate(zip(input_names, args)):
-        if isinstance(arg, ValueInfoProto):
-            # Use name/type/shape directly from the ValueInfoProto.
-            _, elem_type, shape = _extract_value_info_proto(arg)
-            g.make_tensor_input(name, elem_type, shape, device=-1)
-        elif _is_arg_tuple_spec(arg):
-            # Use name/dtype/shape directly from the (name, dtype, shape) tuple.
-            _, arg_dtype, arg_shape = arg
-            elem_type = np_dtype_to_tensor_dtype(np.dtype(arg_dtype))
-            g.make_tensor_input(name, elem_type, tuple(arg_shape), device=-1)
-        else:
-            if dynamic_shapes:
-                ds = dynamic_shapes[i]
-            else:
-                ds = {0: "batch"}
-            shape = list(arg.shape)  # type: ignore
-            for axis, dim in ds.items():
-                shape[axis] = dim  # type: ignore
-            g.make_tensor_input(  # type: ignore
-                name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1  # type: ignore
-            )  # type: ignore
+    input_names = _register_inputs(g, args, input_names, dynamic_shapes)
 
     # Build the sts dict (shared state for converters). function_options, if set,
     # is passed explicitly to container converters below.
