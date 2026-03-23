@@ -180,11 +180,16 @@ def to_onnx(
     the others are static.
 
     :param estimator: estimator
-    :param args: dummy inputs; each element may be a numpy array, an
+    :param args: dummy inputs; each element may be a numpy array, a
+        :class:`pandas.DataFrame`, an
         :class:`onnx.ValueInfoProto` that explicitly describes the input
         tensor's name, element type and shape, **or** a
-        ``(name, dtype, shape)`` tuple.  When a
-        :class:`~onnx.ValueInfoProto` or a ``(name, dtype, shape)`` tuple is
+        ``(name, dtype, shape)`` tuple.  A :class:`~pandas.DataFrame` is
+        expanded column-by-column: each column is registered as a separate
+        1-D ONNX graph input named after the column, and an
+        ``Unsqueeze`` + ``Concat`` node sequence assembles them back into a
+        2-D matrix ``(batch, n_cols)`` that is passed to the converter.  When
+        a :class:`~onnx.ValueInfoProto` or a ``(name, dtype, shape)`` tuple is
         provided no actual data is required, and the ``dynamic_shapes``
         parameter is ignored for that input (the shape is taken directly from
         the descriptor).  The ``(name, dtype, shape)`` tuple format uses a
