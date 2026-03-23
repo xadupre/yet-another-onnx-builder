@@ -138,7 +138,10 @@ class TestSklearnColumnTransformer(ExtTestCase):
         )
         df = pd.DataFrame(X, columns=["age", "income", "score", "balance"])
         ct = ColumnTransformer(
-            [("std", StandardScaler(), ["age", "income"]), ("mm", MinMaxScaler(), ["score", "balance"])]
+            [
+                ("std", StandardScaler(), ["age", "income"]),
+                ("mm", MinMaxScaler(), ["score", "balance"]),
+            ]
         )
         ct.fit(df)
 
@@ -175,7 +178,10 @@ class TestSklearnColumnTransformer(ExtTestCase):
         y = np.array([0, 0, 1, 1, 0, 1])
         df = pd.DataFrame(X, columns=["age", "income", "score", "balance"])
         ct = ColumnTransformer(
-            [("std", StandardScaler(), ["age", "income"]), ("mm", MinMaxScaler(), ["score", "balance"])]
+            [
+                ("std", StandardScaler(), ["age", "income"]),
+                ("mm", MinMaxScaler(), ["score", "balance"]),
+            ]
         )
         pipe = Pipeline([("preprocessor", ct), ("clf", LogisticRegression())])
         pipe.fit(df, y)

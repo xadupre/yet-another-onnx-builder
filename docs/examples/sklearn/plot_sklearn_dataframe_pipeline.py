@@ -76,10 +76,7 @@ print("Class distribution:", np.bincount(y))
 # as the final step.
 
 ct = ColumnTransformer(
-    [
-        ("std", StandardScaler(), ["age", "income"]),
-        ("mm", MinMaxScaler(), ["score", "balance"]),
-    ]
+    [("std", StandardScaler(), ["age", "income"]), ("mm", MinMaxScaler(), ["score", "balance"])]
 )
 pipe = Pipeline([("preprocessor", ct), ("clf", LogisticRegression(max_iter=500))])
 # max_iter=500 avoids ConvergenceWarnings on some random seeds.
