@@ -100,11 +100,6 @@ class ShapedBasedReshapePattern(ReshapePattern):
             class ID constNode
     """
 
-    @classmethod
-    def fast_op_type(cls) -> Set[str]:
-        "Starts matching with this node."
-        return {"Reshape"}
-
     def __init__(self, verbose: int = 0, priority: int = 0):
         super().__init__(verbose, priority)
 
