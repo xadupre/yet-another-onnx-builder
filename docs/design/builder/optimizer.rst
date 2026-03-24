@@ -106,6 +106,40 @@ The optimizer considers that any node given to this function is removed
 from the graph, and any node returned by it are added.
 If a received node must be kept, it must be added to the list of returned nodes.
 
+PatternOptimization.fast_op_type
++++++++++++++++++++++++++++++++++
+
+::
+
+    @classmethod
+    def fast_op_type(cls) -> Set[str]:
+
+The base class returns an empty set. Overriding this method is an optional
+performance hint: when the returned set contains **exactly one** ``op_type``
+string, the optimizer builds an op-type → nodes index over the graph once per
+matching step and restricts :meth:`enumerate_matches
+<yobx.xoptim.PatternOptimization.enumerate_matches>` to only the nodes of
+that type. This avoids iterating over the entire graph for patterns whose
+entry point is always a specific operator.
+
+When the method returns an empty set (the default) or a set with more than one
+element, the full node list is used and no pre-filtering takes place.
+
+.. code-block:: python
+
+    from yobx.xoptim import PatternOptimization
+
+    class ReshapePattern(PatternOptimization):
+        """Base class for patterns whose entry node is always a Reshape."""
+
+        @classmethod
+        def fast_op_type(cls):
+            return {"Reshape"}
+
+Subclasses that always start matching from the same inherited entry point do
+**not** need to override ``fast_op_type``; the inherited implementation is
+already correct.
+
 Optimization Algorithm
 ======================
 
@@ -131,9 +165,15 @@ An iteration is:
 
     # Step 1: match
 
+    build op_type → nodes index (fast_nodes)
+
     for all patterns P:
 
-        for all nodes n:
+        nodes_to_visit = fast_nodes[P.fast_op_type()]  # pre-filtered
+                         if len(P.fast_op_type()) == 1
+                         else all nodes
+
+        for all nodes n in nodes_to_visit:
 
             r = p.match(n)
             if r:
