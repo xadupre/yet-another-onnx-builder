@@ -2,7 +2,7 @@ from typing import Callable, List, Optional, Tuple, Union
 from sklearn.base import BaseEstimator
 from ..xbuilder import GraphBuilder
 from ..xbuilder.function_options import FunctionOptions
-from .sklearn_helper import get_output_names
+from .sklearn_helper import get_output_names, TraceableMixin
 
 
 def default_ai_onnx_ml(main_opset: int) -> int:
@@ -144,6 +144,8 @@ def wrap_step(
         return converter(
             g, sts, output_names, estimator, *input_names, name=name, function_options=fopts
         )
+    if isinstance(estimator, TraceableMixin):
+        return converter(g, sts, output_names, estimator, *input_names, name=name)
     # In that case, we need to concatenate input_names if there are multiple.
     if len(input_names) > 1:
         conc = g.op.Concat(*input_names, axis=1, name=f"{name}_concat")
