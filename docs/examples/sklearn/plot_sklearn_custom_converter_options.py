@@ -133,13 +133,13 @@ def convert_clip_transformer(
     high = np.array(estimator.clip_max, dtype=dtype)
 
     # ── Primary output: Clip ──────────────────────────────────────────────────
-    clipped = g.op.Clip(X, low, high, name=name, outputs=outputs[:1])
+    _clipped = g.op.Clip(X, low, high, name=name, outputs=outputs[:1])
 
     # ── Optional extra output: clip mask ─────────────────────────────────────
     if g.convert_options.has("clip_mask", estimator, name):
-        assert len(outputs) > 1, (
-            f"Expected at least 2 outputs when clip_mask is active, got {len(outputs)}"
-        )
+        assert (
+            len(outputs) > 1
+        ), f"Expected at least 2 outputs when clip_mask is active, got {len(outputs)}"
         below = g.op.Less(X, low, name=f"{name}_below")
         above = g.op.Greater(X, high, name=f"{name}_above")
         g.op.Or(below, above, name=f"{name}_mask", outputs=outputs[1:2])
@@ -164,9 +164,7 @@ transformer = ClipTransformer(clip_min=-0.5, clip_max=0.5).fit(X_train)
 # Without any ``convert_options`` the model produces a single output.
 
 onx_plain = to_onnx(
-    transformer,
-    (X_train,),
-    extra_converters={ClipTransformer: convert_clip_transformer},
+    transformer, (X_train,), extra_converters={ClipTransformer: convert_clip_transformer}
 )
 
 print("=== Plain conversion (no clip_mask) ===")

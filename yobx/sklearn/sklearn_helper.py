@@ -1,5 +1,12 @@
 from typing import Optional, Sequence
-from sklearn.base import BaseEstimator, ClusterMixin, OutlierMixin, is_classifier, is_regressor
+from sklearn.base import (
+    BaseEstimator,
+    ClusterMixin,
+    OutlierMixin,
+    TransformerMixin,
+    is_classifier,
+    is_regressor,
+)
 from sklearn.cluster import FeatureAgglomeration
 from sklearn.mixture._base import BaseMixture
 from sklearn.pipeline import Pipeline
@@ -54,6 +61,20 @@ class NoKnownOutputMixin:
     The paired ``extra_converters`` entry is then free to call
     ``g.make_output(...)`` for each output without the framework complaining
     about a mismatched output count.
+    """
+
+
+class TraceableMixin:
+    """
+    Marks an estimator as traceable. Then its method transform will be traced
+    to export it into ONNX.
+    """
+
+
+class TraceableTransformerMixin(TransformerMixin, TraceableMixin):
+    """
+    Marks a transformer as traceable. Then its method transform will be traced
+    to export it into ONNX.
     """
 
 
@@ -120,7 +141,7 @@ def get_output_names(
     name: Optional[str] = None,
 ) -> Optional[Sequence[str]]:
     """Returns output names for every estimator."""
-    if isinstance(estimator, NoKnownOutputMixin):
+    if isinstance(estimator, (NoKnownOutputMixin, TraceableMixin)):
         return None
 
     # Append extra output names requested by convert_options so that converters

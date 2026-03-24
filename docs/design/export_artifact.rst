@@ -57,8 +57,8 @@ during conversion:
       - :class:`~yobx.container.ExtendedModelContainer` | ``None``
       - Set **only** when ``large_model=True``.  The container stores
         large initializers outside the proto (e.g. as separate
-        :mod:`numpy` or :mod:`torch` tensors) so that the in-memory
-        proto remains small.
+        :mod:`numpy`, :mod:`torch`, :epkg:`tensorflow` tensors)
+        so that the in-memory proto remains small.
 
 The helper method :meth:`~yobx.container.ExportArtifact.get_proto`
 abstracts over both cases: it always returns a fully self-contained

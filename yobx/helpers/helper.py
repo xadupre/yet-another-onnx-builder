@@ -627,6 +627,19 @@ def string_type(
     if obj.__class__.__name__.endswith("Type"):
         return f"{obj.__class__.__name__}(...)"
 
+    if obj.__class__.__name__ == "DataFrame":
+        import pandas
+
+        assert isinstance(obj, pandas.DataFrame), f"unexpected type {type(obj)}"
+        s = string_type(
+            dict(zip(obj.columns, [obj[c].values for c in obj.columns])),
+            with_shape=with_shape,
+            with_min_max=with_min_max,
+            with_device=with_device,
+            limit=limit,
+        )
+        return f"DataFrame({s})"
+
     raise TypeError(f"Unsupported type {type(obj).__name__!r} - {type(obj)} ({has_torch=})")
 
 

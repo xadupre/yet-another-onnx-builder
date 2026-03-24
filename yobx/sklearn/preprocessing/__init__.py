@@ -1,3 +1,6 @@
+from .. import traceable_converter
+
+
 def register():
     from . import (
         binarizer,

@@ -160,7 +160,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
         self.assertEqualArray(expected, result, atol=1e-5)
 
         sess = self.check_ort(onx)
-        ort_result = sess.run(None, {col: df[col].to_numpy() for col in df.columns})[0]
+        ort_result = sess.run(None, {col: df[[col]].values for col in df.columns})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-5)
 
     def test_pipeline_with_column_transformer_dataframe(self):
@@ -201,7 +201,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
         self.assertEqualArray(expected_label, label)
 
         sess = self.check_ort(onx)
-        ort_label, _ = sess.run(None, {col: df[col].to_numpy() for col in df.columns})
+        ort_label, _ = sess.run(None, {col: df[[col]].values for col in df.columns})
         self.assertEqualArray(expected_label, ort_label)
 
     def test_pipeline_with_column_transformer(self):

@@ -78,7 +78,7 @@ def _np_dtype_to_onnx(dt: Union[np.dtype, type, str]) -> int:
 def sql_to_onnx_graph(
     g: GraphBuilderExtendedProtocol,
     sts: Optional[Dict],
-    outputs: List[str],
+    outputs: Optional[List[str]],
     query: str,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
@@ -254,7 +254,7 @@ def sql_to_onnx(
 def parsed_query_to_onnx_graph(
     g: GraphBuilderExtendedProtocol,
     sts: Optional[Dict],
-    outputs: List[str],
+    outputs: Optional[List[str]],
     pq: ParsedQuery,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,

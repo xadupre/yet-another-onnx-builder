@@ -6,7 +6,7 @@ from sklearn.preprocessing import FunctionTransformer
 from ...typing import GraphBuilderExtendedProtocol
 from ...xbuilder import FunctionOptions
 from ..register import register_sklearn_converter, get_sklearn_converter
-from ..convert import _wrap_step_as_function
+from ..convert import wrap_step_as_function, wrap_step
 
 
 def _resolve_columns(
@@ -78,7 +78,7 @@ def sklearn_column_transformer(
     sts: Dict,
     outputs: List[str],
     estimator: ColumnTransformer,
-    X: str,
+    *X: str,
     name: str = "column_transformer",
     function_options: Optional[FunctionOptions] = None,
 ) -> str:
@@ -119,7 +119,11 @@ def sklearn_column_transformer(
     assert isinstance(
         estimator, ColumnTransformer
     ), f"Unexpected type {type(estimator)} for estimator."
-    assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
+    assert all(g.has_type(x) for x in X), f"Missing type for {X!r}{g.get_debug_msg()}"
+    assert all(g.has_shape(x) for x in X), f"Missing shape for {X!r}{g.get_debug_msg()}"
+    shapes = [g.get_shape(x) for x in X]
+    unique_shape = set(shapes)
+    is_columns = len(unique_shape) == 1 and next(iter(unique_shape))[1] == 1
 
     n_features = estimator.n_features_in_
     feature_names_in = getattr(estimator, "feature_names_in_", None)
@@ -132,10 +136,19 @@ def sklearn_column_transformer(
         col_indices = _resolve_columns(columns, n_features, feature_names_in)
 
         # Select the subset of features for this transformer.
-        X_sub = g.op.Gather(X, col_indices, axis=1, name=f"{name}__{trans_name}")
+        if len(X) == 1:
+            X_sub = g.op.Gather(*X, col_indices, axis=1, name=f"{name}__{trans_name}")
+            X_subs = [X_sub]
+        elif is_columns and all(isinstance(i, (int, np.int64)) for i in col_indices):
+            X_subs = [X[i] for i in col_indices]
+        else:
+            raise NotImplementedError(
+                f"Unable to grab columns {col_indices} ({[type(i) for i in col_indices]}) "
+                f"from inputs {X}, shapes={shapes}, {is_columns=}{g.get_debug_msg()}"
+            )
 
         if _is_passthrough(transformer):
-            parts.append(X_sub)
+            parts.extend(X_subs)
         else:
             try:
                 fct = get_sklearn_converter(type(transformer))
@@ -150,29 +163,28 @@ def sklearn_column_transformer(
             is_container = isinstance(transformer, (Pipeline, ColumnTransformer, FeatureUnion))
             if function_options and function_options.export_as_function and not is_container:
                 with g.prefix_name_context(step_node_name):
-                    _wrap_step_as_function(
+                    wrap_step_as_function(
                         g,  # type: ignore
                         function_options,
                         transformer,
-                        [X_sub],
+                        X_subs,
                         sub_outputs,
                         fct,
                         step_node_name,
                     )
-            elif is_container:
-                with g.prefix_name_context(step_node_name):
-                    fct(
-                        g,
-                        sts,
-                        sub_outputs,
-                        transformer,
-                        X_sub,
-                        name=step_node_name,
-                        function_options=function_options,
-                    )
             else:
                 with g.prefix_name_context(step_node_name):
-                    fct(g, sts, sub_outputs, transformer, X_sub, name=step_node_name)
+                    wrap_step(
+                        g,
+                        sts,
+                        function_options,
+                        is_container,
+                        transformer,
+                        X_subs,
+                        sub_outputs,
+                        fct,
+                        step_node_name,
+                    )
             parts.append(sub_outputs[0])
 
     if not parts:

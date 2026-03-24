@@ -10,3 +10,7 @@ yobx.sklearn.to\_onnx
 .. autoclass:: yobx.sklearn.NoKnownOutputMixin
     :members:
     :undoc-members:
+
+.. autoclass:: yobx.sklearn.TraceableMixin
+    :members:
+    :undoc-members:

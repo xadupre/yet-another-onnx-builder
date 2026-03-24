@@ -57,6 +57,12 @@ def get_sklearn_converter(cls: type):
     global SKLEARN_CONVERTERS
     if cls in SKLEARN_CONVERTERS:
         return SKLEARN_CONVERTERS[cls]
+    from .sklearn_helper import TraceableMixin
+
+    if issubclass(cls, TraceableMixin):
+        from .traceable_converter import sklearn_traceable_converter
+
+        return sklearn_traceable_converter
     raise ValueError(f"Unable to find a converter for type {cls}.")
 
 

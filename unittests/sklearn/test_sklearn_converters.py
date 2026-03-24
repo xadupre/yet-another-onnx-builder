@@ -449,7 +449,7 @@ class TestSklearnBaseConverters(ExtTestCase):
             low = np.array(estimator.clip_min, dtype=dtype)
             high = np.array(estimator.clip_max, dtype=dtype)
 
-            clipped = g.op.Clip(X, low, high, name=name, outputs=outputs[:1])
+            _clipped = g.op.Clip(X, low, high, name=name, outputs=outputs[:1])
 
             if g.convert_options.has("clip_mask", estimator, name):
                 below = g.op.Less(X, low, name=f"{name}_below")
@@ -474,10 +474,7 @@ class TestSklearnBaseConverters(ExtTestCase):
 
         # With clip_mask=True: two outputs
         onx_mask = to_onnx(
-            transformer,
-            (X,),
-            extra_converters=extra,
-            convert_options=ClipOptions(clip_mask=True),
+            transformer, (X,), extra_converters=extra, convert_options=ClipOptions(clip_mask=True)
         )
         self.assertEqual(2, len(onx_mask.proto.graph.output))
 
@@ -738,7 +735,8 @@ class TestSklearnToOnnxDataFrame(ExtTestCase):
             inp = graph_inputs[col]
             self.assertEqual(inp.type.tensor_type.elem_type, 1)  # FLOAT = 1
             shape = inp.type.tensor_type.shape
-            self.assertEqual(len(shape.dim), 1)  # 1-D column
+            self.assertEqual(len(shape.dim), 2)  # 1-D column
+            self.assertEqual(shape.dim[1].dim_value, 1)
 
         # Numerical output should match sklearn when feeding per-column 1-D arrays.
         ref = ExtendedReferenceEvaluator(onx)
@@ -841,7 +839,6 @@ class TestSklearnConvertersBasicInvocation(ExtTestCase):
             "BernoulliRBM",  # different input semantics
             "KernelCenterer",  # expects square kernel matrix
             "GaussianRandomProjection",  # fails with tiny dataset
-            "FeatureHasher",  # needs dict inputs
             "PatchExtractor",  # needs image input
             "CountVectorizer",  # needs text input
             "TfidfVectorizer",  # needs text input
