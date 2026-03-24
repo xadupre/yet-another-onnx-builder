@@ -600,6 +600,7 @@ def list_op_cost_formulas() -> Dict[str, str]:
         dyn_model, _ = replace_static_dimensions_by_strings(model)
         builder = BasicShapeBuilder()
         cost = builder.run_model(dyn_model, inference=InferenceMode.COST)
+        assert cost is not None, f"no cost was produced by {builder}"
         for ct, flops, _ in cost:
             if ct == op_type and flops is not None:
                 result[op_type] = str(flops)
