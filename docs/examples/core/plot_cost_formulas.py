@@ -129,14 +129,17 @@ print(f"  {'TOTAL':<12s}  {total:>12,}")
 # -----------------------------------------------------------
 #
 # :func:`~yobx.xshape.list_op_cost_formulas` returns a sorted dictionary that
-# maps every registered ``op_type`` to a plain-English description of the FLOPs
-# formula, taken directly from the handler docstrings.
+# maps every registered ``op_type`` to the **symbolic FLOPs expression** obtained
+# by running the cost estimator on a representative ONNX backend test example.
+# All static input dimensions are first replaced by symbolic variables
+# (``DIM<n>``) so that the result shows the general formula rather than a
+# single concrete number.
 
 from yobx.xshape import list_op_cost_formulas  # noqa: E402
 
 formulas = list_op_cost_formulas()
 
-print(f"{'Op type':<35s}  Formula")
+print(f"{'Op type':<35s}  Symbolic FLOPs")
 print("-" * 80)
 for op_type, formula in formulas.items():
     print(f"{op_type:<35s}  {formula}")

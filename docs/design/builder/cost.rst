@@ -144,9 +144,11 @@ Programmatic Formula Listing
 ==============================
 
 The function :func:`~yobx.xshape.list_op_cost_formulas` returns a sorted
-dictionary mapping every registered ``op_type`` to its formula description,
-derived directly from the handler function docstrings.  This makes it easy
-to inspect the full set of supported operators at runtime:
+dictionary mapping every supported ``op_type`` to the **symbolic FLOPs
+expression** that the estimator produces on a representative ONNX backend test
+example.  All static input dimensions of that example are replaced by symbolic
+variables (``DIM<n>``) before running the estimator, so the result shows the
+general formula rather than a single concrete number.
 
 .. code-block:: python
 
@@ -154,6 +156,13 @@ to inspect the full set of supported operators at runtime:
 
     for op_type, formula in list_op_cost_formulas().items():
         print(f"{op_type:<30s}  {formula}")
+
+Example output (selected operators)::
+
+    MatMul   2*DIM3*DIM3*DIM4
+    Relu     DIM3*DIM4*DIM5
+    Gemm     2*DIM3*DIM4*DIM5+DIM3*DIM5
+    Sigmoid  3*DIM3*DIM4*DIM5
 
 See also the gallery example :ref:`l-plot-cost-formulas` which runs this code
 and renders the complete operator table.
