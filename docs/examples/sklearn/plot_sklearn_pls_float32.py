@@ -64,12 +64,12 @@ from yobx.sklearn import to_onnx
 # ``make_regression`` returns ``float64`` arrays by default, which is also
 # what scikit-learn uses internally for all computations.
 
-X, y = make_regression(n_samples=200, n_features=10, n_informative=3, random_state=0)
+X, y = make_regression(n_samples=200, n_features=50, n_informative=10, random_state=0)
 # X and y are float64 here
 print("X dtype :", X.dtype)  # float64
 print("y dtype :", y.dtype)  # float64
 
-pls = PLSRegression(n_components=3)
+pls = PLSRegression(n_components=5)
 pls.fit(X, y)
 print("coef_ dtype   :", pls.coef_.dtype)  # float64
 print("_x_mean dtype :", pls._x_mean.dtype)  # float64
@@ -150,10 +150,10 @@ print("\nConclusion: use float64 inputs when the model was trained with float64 
 # The same precision loss applies to multi-target regression.
 
 X2, Y2 = make_regression(
-    n_samples=200, n_features=10, n_informative=5, n_targets=3, random_state=1
+    n_samples=200, n_features=50, n_informative=10, n_targets=3, random_state=1
 )
 
-pls2 = PLSRegression(n_components=3)
+pls2 = PLSRegression(n_components=5)
 pls2.fit(X2, Y2)
 
 # float32 export
