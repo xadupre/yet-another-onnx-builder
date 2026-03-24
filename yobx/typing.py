@@ -33,6 +33,10 @@ class InferenceSessionLike(Protocol):
 class ConvertOptionsProtocol(Protocol):
     """Protocol for a class giving indications on how to convert a model."""
 
+    def available_options(self) -> Sequence[str]:
+        """Returns the list of options."""
+        ...
+
     def has(self, option_name: str, piece: object) -> bool:
         """Returns true if option `option_name` applies to `piece`"""
         ...
