@@ -65,7 +65,7 @@ class _AddColumnsTransformer(BaseEstimator, TransformerMixin):
         return pd.DataFrame({"total": df["a"].values + df["b"].values})
 
     def get_feature_names_out(self, input_features=None):
-        return np.array(["total"])
+        return ["total"]
 
 
 def _add_columns_tracing_func(df):
@@ -230,7 +230,7 @@ class TestCustomDataFrameTransformerOnnx(ExtTestCase):
                 )
 
             def get_feature_names_out(self, input_features=None):
-                return np.array(["total", "a_doubled"])
+                return ["total", "a_doubled"]
 
         t = _MultiOutTransformer()
         t.fit()
@@ -268,7 +268,7 @@ class TestCustomDataFrameTransformerOnnx(ExtTestCase):
                 return pd.DataFrame({"total": df["a"].values[mask] + df["b"].values[mask]})
 
             def get_feature_names_out(self, input_features=None):
-                return np.array(["total"])
+                return ["total"]
 
         def _filter_func(df):
             df = df.filter(df["a"] > 0)
@@ -315,7 +315,7 @@ class TestCustomDataFrameTransformerOnnx(ExtTestCase):
                 return pd.DataFrame({"s": df["a"].values + df["b"].values + df["c"].values})
 
             def get_feature_names_out(self, input_features=None):
-                return np.array(["s"])
+                return ["s"]
 
         def _three_col_func(df):
             return df.select([(df["a"] + df["b"] + df["c"]).alias("s")])
