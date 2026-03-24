@@ -28,7 +28,7 @@ def _wrap_step_as_function(
     fopts: FunctionOptions,
     estimator: BaseEstimator,
     input_names: List[str],
-    output_names: List[str],
+    output_names: Optional[List[str]],
     converter: Callable,
     name: str,
 ) -> Union[str, Tuple[str, ...]]:
