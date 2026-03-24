@@ -889,5 +889,122 @@ class TestSklearnDecisionTree(ExtTestCase):
         np.testing.assert_array_equal(ort_out[2], expected_leaves)
 
 
+@requires_sklearn("1.4")
+class TestConvertOptionsHas(ExtTestCase):
+    """Tests for ConvertOptions.has() name-based and callable filtering."""
+
+    def setUp(self):
+        from sklearn.tree import DecisionTreeClassifier
+        from sklearn.preprocessing import StandardScaler
+
+        self._dtc = DecisionTreeClassifier(max_depth=2, random_state=0)
+        self._ss = StandardScaler()
+
+    # ------------------------------------------------------------------
+    # Step name (pipeline name) matching
+    # ------------------------------------------------------------------
+
+    def test_has_by_step_name_true(self):
+        opts = ConvertOptions(decision_leaf={"main__clf"})
+        self.assertTrue(opts.has("decision_leaf", self._dtc, name="main__clf"))
+
+    def test_has_by_step_name_false_wrong_name(self):
+        opts = ConvertOptions(decision_leaf={"main__clf"})
+        self.assertFalse(opts.has("decision_leaf", self._dtc, name="main__scaler"))
+
+    def test_has_by_step_name_false_no_name(self):
+        """String in set is ignored when no name is provided."""
+        opts = ConvertOptions(decision_leaf={"main__clf"})
+        self.assertFalse(opts.has("decision_leaf", self._dtc))
+
+    def test_has_by_step_name_false_empty_set(self):
+        opts = ConvertOptions(decision_leaf=set())
+        self.assertFalse(opts.has("decision_leaf", self._dtc, name="main__clf"))
+
+    # ------------------------------------------------------------------
+    # Type (class object) matching — existing behaviour preserved
+    # ------------------------------------------------------------------
+
+    def test_has_by_type_true(self):
+        from sklearn.tree import DecisionTreeClassifier
+
+        opts = ConvertOptions(decision_leaf={DecisionTreeClassifier})
+        self.assertTrue(opts.has("decision_leaf", self._dtc))
+
+    def test_has_by_type_false_other(self):
+        from sklearn.tree import DecisionTreeClassifier
+
+        opts = ConvertOptions(decision_leaf={DecisionTreeClassifier})
+        self.assertFalse(opts.has("decision_leaf", self._ss))
+
+    # ------------------------------------------------------------------
+    # Callable element in the set
+    # ------------------------------------------------------------------
+
+    def test_has_callable_in_set_true(self):
+        opts = ConvertOptions(decision_leaf={lambda est: hasattr(est, "decision_path")})
+        self.assertTrue(opts.has("decision_leaf", self._dtc))
+
+    def test_has_callable_in_set_false(self):
+        opts = ConvertOptions(decision_leaf={lambda est: False})
+        self.assertFalse(opts.has("decision_leaf", self._dtc))
+
+    def test_has_multiple_callables_any_true(self):
+        opts = ConvertOptions(
+            decision_leaf={lambda est: False, lambda est: hasattr(est, "decision_path")}
+        )
+        self.assertTrue(opts.has("decision_leaf", self._dtc))
+
+    # ------------------------------------------------------------------
+    # Boolean True/False — existing behaviour preserved
+    # ------------------------------------------------------------------
+
+    def test_has_true_matches_any_tree(self):
+        opts = ConvertOptions(decision_leaf=True)
+        self.assertTrue(opts.has("decision_leaf", self._dtc))
+
+    def test_has_false_matches_nothing(self):
+        opts = ConvertOptions(decision_leaf=False)
+        self.assertFalse(opts.has("decision_leaf", self._dtc))
+
+    # ------------------------------------------------------------------
+    # End-to-end: step-name set triggers extra output only for matching step
+    # ------------------------------------------------------------------
+
+    def test_decision_leaf_by_step_name_in_pipeline(self):
+        """ConvertOptions with a full node-name set enables the extra output for that step."""
+        X, y = make_classification(n_samples=50, n_features=4, random_state=0)
+        X = X.astype(np.float32)
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.pipeline import Pipeline
+
+        pipe = Pipeline(
+            [("scaler", StandardScaler()), ("clf", DecisionTreeClassifier(max_depth=3))]
+        ).fit(X, y)
+
+        # "main__clf" is the full converter node name for the step named "clf"
+        opts = ConvertOptions(decision_leaf={"main__clf"})
+        onx = to_onnx(pipe, (X,), convert_options=opts)
+        # label + proba + decision_leaf = 3 outputs
+        self.assertEqual(len(onx.graph.output), 3)
+
+    def test_decision_leaf_step_name_not_triggered_for_other_name(self):
+        """decision_leaf is NOT emitted when the node name does not match any step."""
+        X, y = make_classification(n_samples=50, n_features=4, random_state=0)
+        X = X.astype(np.float32)
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.pipeline import Pipeline
+
+        pipe = Pipeline(
+            [("scaler", StandardScaler()), ("clf", DecisionTreeClassifier(max_depth=3))]
+        ).fit(X, y)
+
+        # "other__clf" does not match any step node name in this pipeline
+        opts = ConvertOptions(decision_leaf={"other__clf"})
+        onx = to_onnx(pipe, (X,), convert_options=opts)
+        # label + proba only = 2 outputs (no decision_leaf)
+        self.assertEqual(len(onx.graph.output), 2)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

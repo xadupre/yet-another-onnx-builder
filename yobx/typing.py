@@ -37,7 +37,7 @@ class ConvertOptionsProtocol(Protocol):
         """Returns the list of options."""
         ...
 
-    def has(self, option_name: str, piece: object) -> bool:
+    def has(self, option_name: str, piece: object, name: Optional[str] = None) -> bool:
         """Returns true if option `option_name` applies to `piece`"""
         ...
 
@@ -49,7 +49,7 @@ class DefaultConvertOptions(ConvertOptionsProtocol):
         """Returns the list of options."""
         return []
 
-    def has(self, option_name: str, piece: object) -> bool:
+    def has(self, option_name: str, piece: object, name: Optional[str] = None) -> bool:
         """Returns always False."""
         return False
 
