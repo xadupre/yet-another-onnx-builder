@@ -3,7 +3,7 @@ import os
 import pprint
 import textwrap
 from collections import Counter
-from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
 from onnx import AttributeProto, FunctionProto, ModelProto, NodeProto, TensorProto
 from ..helpers.onnx_helper import make_idn
@@ -116,7 +116,22 @@ class PatternOptimization:
         all patterns whose priority is below one threshold
         are executed, if none of them matches, the priority is increase
     :param min_opset: can be applied if main opset is > min_opset
+
+    Class attribute :attr:`op_types` can be set to a non-empty set of operator-type
+    strings to restrict which nodes :meth:`enumerate_matches` will visit.
+    When it is ``None`` (the default) every node is considered.
+    Declaring it allows the optimizer to skip nodes whose ``op_type`` is not in
+    the set without even calling :meth:`match`, which reduces the cost of the
+    outer loop when the graph contains many node types that the pattern cannot
+    possibly match.
+
+    Example::
+
+        class MyPattern(PatternOptimization):
+            op_types = {"Add", "Sub"}  # only visit Add and Sub nodes
     """
+
+    op_types: Optional[Set[str]] = None
 
     def __init__(self, verbose: int = 0, priority: int = 1, min_opset: int = 1):
         value = os.environ.get("LOG_PATTERN_OPTIMIZE", "0")
@@ -151,6 +166,11 @@ class PatternOptimization:
         :param g: graph optimizer
         :param subset_nodes: subset of nodes to look at or all of them if empty
         :return: Iterator on matching results
+
+        When :attr:`op_types` is not ``None``, nodes whose ``op_type`` is not in
+        that set are skipped before :meth:`match` is even called, which reduces
+        the iteration cost for patterns that only apply to a small subset of
+        operator types.
         """
         if self.verbose >= 10:
             print(
@@ -163,7 +183,11 @@ class PatternOptimization:
             #   too slow to have a secondary iterator
             if subset_nodes is None:
                 subset_nodes = g.builder.nodes
+            op_types = self.op_types
             for node in subset_nodes:
+                if op_types is not None and node.op_type not in op_types:
+                    # Skip early: this node's op_type cannot match the pattern.
+                    continue
                 # This expression seems awkward but it saves 10% just by looking into
                 # the first item of the list and then, if necessary, walking through the
                 # rest of the outputs.
@@ -399,6 +423,41 @@ class EasyPatternOptimization(PatternOptimization):
         pat = self._build_pattern(g, self.apply_pattern)
         self._cache[cache_key] = pat
         return pat
+
+    def enumerate_matches(
+        self,
+        g: GraphBuilderPatternOptimizationProtocol,
+        subset_nodes: Optional[List[NodeProto]] = None,
+    ) -> Iterator[MatchResult]:
+        """
+        Overrides :meth:`PatternOptimization.enumerate_matches` to lazily infer
+        :attr:`op_types` from the match pattern when it is not explicitly declared
+        on the class.
+
+        :meth:`match` anchors its search on the *last* node of the match pattern
+        (``pat.nodes[-1]``) and immediately returns ``None`` when the candidate
+        node's ``op_type`` differs from that anchor.  By building (and caching)
+        the match pattern once, we can extract the anchor ``op_type`` and store
+        it so that :meth:`PatternOptimization.enumerate_matches` can skip
+        non-matching nodes before even calling :meth:`match`.
+        """
+        if self.op_types is None and not hasattr(self, "_easy_op_types_inferred"):
+            # Mark that we have attempted inference so we do not repeat it.
+            self._easy_op_types_inferred = True
+            try:
+                pat = self._get_match_pattern(g)
+                if pat.nodes:
+                    # The anchor is the last node; its op_type is the only type that
+                    # the match() method will accept on the first check.
+                    # NOTE: ``self.op_types = ...`` sets an *instance* attribute that
+                    # shadows the class-level ``None``.  The class attribute is never
+                    # mutated, so other instances of the same class are unaffected.
+                    self.op_types = {pat.nodes[-1].op_type}
+            except Exception:
+                # If the pattern cannot be built yet (e.g. missing opset info),
+                # leave op_types as None so all nodes are visited.
+                pass
+        yield from super().enumerate_matches(g, subset_nodes=subset_nodes)
 
     def display_pattern(self, g, fct) -> str:
         """Shows the pattern to match or to apply."""

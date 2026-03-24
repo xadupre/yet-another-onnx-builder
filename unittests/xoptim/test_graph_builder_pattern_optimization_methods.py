@@ -481,5 +481,128 @@ class TestPatternTableDoc(ExtTestCase):
         self.assertEqual(item["short_name"], item["name"].replace("Pattern", ""))
 
 
+def _make_mixed_gbpo(opset: int = 18):
+    """Creates an optimizer from a graph with Add, Relu and Mul nodes."""
+    from yobx.xbuilder.graph_builder import InferShapesOptions
+
+    model = oh.make_model(
+        oh.make_graph(
+            [
+                oh.make_node("Add", ["X", "Y"], ["add_out"], name="n_add"),
+                oh.make_node("Relu", ["add_out"], ["relu_out"], name="n_relu"),
+                oh.make_node("Mul", ["relu_out", "Y"], ["Z"], name="n_mul"),
+            ],
+            "test",
+            [
+                oh.make_tensor_value_info("X", TFLOAT, [3, 4]),
+                oh.make_tensor_value_info("Y", TFLOAT, [3, 4]),
+            ],
+            [oh.make_tensor_value_info("Z", TFLOAT, [3, 4])],
+        ),
+        opset_imports=[oh.make_opsetid("", opset)],
+        ir_version=9,
+    )
+    gr = GraphBuilder(
+        model,
+        infer_shapes_options=InferShapesOptions.BUILDER,
+        optimization_options=OptimizationOptions(patterns=[]),
+    )
+    gro = GraphBuilderPatternOptimization(gr, patterns=[])
+    gro._build()
+    return gr, gro
+
+
+class TestPatternOpTypesFiltering(ExtTestCase):
+    """Tests for the op_types class attribute and its use in enumerate_matches."""
+
+    # ------------------------------------------------------------------
+    # Default value
+    # ------------------------------------------------------------------
+
+    def test_op_types_default_is_none(self):
+        """PatternOptimization.op_types is None by default."""
+        self.assertIsNone(PatternOptimization.op_types)
+
+    # ------------------------------------------------------------------
+    # PatternOptimization with op_types set – only matching nodes visited
+    # ------------------------------------------------------------------
+
+    def test_enumerate_matches_skips_non_matching_op_types(self):
+        """When op_types is set, enumerate_matches only calls match() for nodes
+        whose op_type is in op_types."""
+        visited = []
+
+        class AddOnlyPattern(PatternOptimization):
+            op_types = {"Add"}
+
+            def match(self, g, node, matched):
+                visited.append(node.op_type)
+                return None  # never actually match
+
+        _, gro = _make_mixed_gbpo()
+        pat = AddOnlyPattern()
+        list(pat.enumerate_matches(gro))
+        # Only Add nodes should have been visited.
+        self.assertEqual(visited, ["Add"])
+
+    def test_enumerate_matches_none_op_types_visits_all(self):
+        """When op_types is None, enumerate_matches visits every node."""
+        visited = []
+
+        class AllPattern(PatternOptimization):
+            op_types = None
+
+            def match(self, g, node, matched):
+                visited.append(node.op_type)
+                return None
+
+        _, gro = _make_mixed_gbpo()
+        pat = AllPattern()
+        list(pat.enumerate_matches(gro))
+        self.assertEqual(sorted(visited), ["Add", "Mul", "Relu"])
+
+    # ------------------------------------------------------------------
+    # EasyPatternOptimization – op_types auto-inferred from the pattern
+    # ------------------------------------------------------------------
+
+    def test_easy_pattern_infers_op_types_from_pattern(self):
+        """EasyPatternOptimization infers op_types from the anchor node of the
+        match pattern so that enumerate_matches can skip irrelevant nodes."""
+
+        class ReluPattern(EasyPatternOptimization):
+            def match_pattern(self, g, x: T):
+                return g.op.Relu(x)
+
+            def apply_pattern(self, g, x: T):
+                return g.op.Relu(x)
+
+        _, gro = _make_mixed_gbpo()
+        pat = ReluPattern()
+        # Exhaust the iterator so that enumerate_matches runs fully.
+        list(pat.enumerate_matches(gro))
+        # After the first enumeration, op_types should have been inferred.
+        self.assertIsNotNone(pat.op_types)
+        self.assertIn("Relu", pat.op_types)
+
+    def test_easy_pattern_explicit_op_types_not_overwritten(self):
+        """When a subclass of EasyPatternOptimization explicitly sets op_types,
+        that value must not be overwritten by the lazy inference."""
+
+        class MulPattern(EasyPatternOptimization):
+            op_types = {"Mul"}  # explicit – should remain unchanged
+
+            def match_pattern(self, g, x: T, y: T):
+                return g.op.Add(x, y)  # anchor is Add, but op_types says Mul
+
+            def apply_pattern(self, g, x: T, y: T):
+                return g.op.Add(x, y)
+
+        _, gro = _make_mixed_gbpo()
+        pat = MulPattern()
+        list(pat.enumerate_matches(gro))
+        # The explicit op_types should be preserved.
+        self.assertEqual(pat.op_types, {"Mul"})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
