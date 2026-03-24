@@ -588,31 +588,25 @@ def list_op_cost_formulas() -> Dict[str, str]:
         model_path = os.path.join(test_dir, "model.onnx")
         if not os.path.exists(model_path):
             continue
-        try:
-            model = onnx.load(model_path)
-        except Exception:
-            continue
+        model = onnx.load(model_path)
         if len(model.graph.node) != 1:
             continue
         op_type = model.graph.node[0].op_type
-        if op_type in result:
-            continue  # keep the first passing test case for each op
-        try:
-            n_in = (
-                1
-                if op_type in _ONE_DATA_INPUT_OPS or op_type.startswith("Reduce")
-                else None
-            )
-            if n_in is not None:
-                model = overwrite_shape_in_model_proto(model, n_in=n_in)
-            dyn_model, _ = replace_static_dimensions_by_strings(model)
-            builder = BasicShapeBuilder()
-            cost = builder.run_model(dyn_model, inference=InferenceMode.COST)
-            for ct, flops, _ in cost:
-                if ct == op_type and flops is not None:
-                    result[op_type] = str(flops)
-                    break
-        except Exception:
-            continue
+        if op_type in result or op_type not in _OP_HANDLERS:
+            continue  # keep the first passing test case; skip unsupported ops
+        n_in = (
+            1
+            if op_type in _ONE_DATA_INPUT_OPS or op_type.startswith("Reduce")
+            else None
+        )
+        if n_in is not None:
+            model = overwrite_shape_in_model_proto(model, n_in=n_in)
+        dyn_model, _ = replace_static_dimensions_by_strings(model)
+        builder = BasicShapeBuilder()
+        cost = builder.run_model(dyn_model, inference=InferenceMode.COST)
+        for ct, flops, _ in cost:
+            if ct == op_type and flops is not None:
+                result[op_type] = str(flops)
+                break
 
     return dict(sorted(result.items()))
