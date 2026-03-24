@@ -624,6 +624,9 @@ def string_type(
         if isinstance(obj, onnx_ir.Value):
             return f"ir.{obj.__class__.__name__}({obj})"
 
+    if obj.__class__.__name__.endswith("Type"):
+        return f"{obj.__class__.__name__}(...)"
+
     raise TypeError(f"Unsupported type {type(obj).__name__!r} - {type(obj)} ({has_torch=})")
 
 

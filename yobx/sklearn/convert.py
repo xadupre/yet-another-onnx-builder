@@ -31,7 +31,7 @@ def _wrap_step_as_function(
     output_names: List[str],
     converter: Callable,
     name: str,
-) -> None:
+) -> Union[str, Tuple[str, ...]]:
     """
     Converts *estimator* to ONNX via *converter* and wraps the result as an
     ONNX local function registered in *g*.
@@ -60,10 +60,16 @@ def _wrap_step_as_function(
 
     # Determine generic sub-builder output names (independent of the main graph).
     function_output_names = list(get_output_names(estimator, g.convert_options))
-    function_output_names = [g.unique_name(n) for n in function_output_names]
+    function_output_names = (
+        [g.unique_name(n) for n in function_output_names] if function_input_names else None
+    )
 
     # Run the converter inside the sub-builder (no function_options propagation).
-    converter(sub_g, {}, function_output_names, estimator, *function_input_names, name=name)
+    out_names = converter(
+        sub_g, {}, function_output_names, estimator, *function_input_names, name=name
+    )
+    if function_input_names is None:
+        function_output_names = out_names
 
     # Register the sub-builder outputs.
     for out_name in function_output_names:
@@ -113,6 +119,7 @@ def _wrap_step_as_function(
                 g.set_rank(out, sub_g.get_rank(func_out))
             if sub_g.has_device(func_out):
                 g.set_device(out, sub_g.get_device(func_out))
+    return function_output_names
 
 
 def to_onnx(
@@ -280,18 +287,18 @@ def to_onnx(
     # Build the sts dict (shared state for converters). function_options, if set,
     # is passed explicitly to container converters below.
     sts: Dict[str, Any] = {}
-    output_names = list(get_output_names(estimator, g.convert_options))
-    output_names = [g.unique_name(n) for n in output_names]
+    output_names = get_output_names(estimator, g.convert_options)
+    output_names = [g.unique_name(n) for n in output_names] if output_names else None
 
     is_container = isinstance(estimator, (Pipeline, ColumnTransformer, FeatureUnion))
 
     if function_options and function_options.export_as_function and not is_container:
         # Wrap the single top-level estimator as a local function.
-        _wrap_step_as_function(
+        out_names = _wrap_step_as_function(
             g, function_options, estimator, list(input_names), output_names, fct, name="main"
         )
     elif is_container:
-        fct(
+        out_names = fct(
             g,
             sts,
             output_names,
@@ -301,8 +308,14 @@ def to_onnx(
             function_options=function_options,
         )
     else:
-        fct(g, sts, output_names, estimator, *input_names, name="main")
+        out_names = fct(g, sts, output_names, estimator, *input_names, name="main")
 
+    assert output_names is None or out_names == output_names, (
+        f"estimator={cls}, {fct=}, output mismatch, expected is {output_names}, got {out_names}"
+        f"{g.get_debug_msg()}"
+    )
+    if output_names is None:
+        output_names = out_names
     for name in output_names:
         g.make_tensor_output(name, indexed=False, allow_untyped_output=True)
     # When local functions are requested we must NOT inline them; pass inline=False

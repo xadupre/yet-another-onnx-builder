@@ -17,7 +17,6 @@ import unittest
 
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
-
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
 
@@ -96,26 +95,6 @@ def _add_columns_converter(g, sts, outputs, estimator, *inputs, name="add_cols")
 # ---------------------------------------------------------------------------
 
 
-class _MultiOutTransformer(BaseEstimator, TransformerMixin):
-    """User-defined transformer: produces two output columns from two inputs."""
-
-    _INPUT_DTYPES = {"a": np.float32, "b": np.float32}
-
-    def fit(self, X=None, y=None):
-        self.input_dtypes_ = {k: np.dtype(v) for k, v in self._INPUT_DTYPES.items()}
-        return self
-
-    def transform(self, df):
-        import pandas as pd
-
-        return pd.DataFrame(
-            {"total": df["a"].values + df["b"].values, "a_doubled": df["a"].values * 2.0}
-        )
-
-    def get_feature_names_out(self, input_features=None):
-        return np.array(["total", "a_doubled"])
-
-
 def _multi_out_tracing_func(df):
     return df.select([(df["a"] + df["b"]).alias("total"), (df["a"] * 2.0).alias("a_doubled")])
 
@@ -126,9 +105,10 @@ def _multi_out_converter(g, sts, outputs, estimator, *inputs, name="multi_out"):
 
     pq = trace_dataframe(_multi_out_tracing_func, estimator.input_dtypes_)
     out_names = parsed_query_to_onnx_graph(
-        g, sts, list(outputs), pq, estimator.input_dtypes_, _finalize=False
+        g, sts, outputs, pq, estimator.input_dtypes_, _finalize=False
     )
-    return out_names[0]
+    assert len(out_names) >= 2, f"issue with {out_names=}{g.get_debug_msg()}"
+    return out_names
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +181,7 @@ class TestCustomDataFrameTransformerOnnx(ExtTestCase):
                 return pd.DataFrame({"x3": df["x"].values * 3.0})
 
             def get_feature_names_out(self, input_features=None):
-                return np.array(["x3"])
+                return ["x3"]
 
         def _scale_func(df):
             return df.select([(df["x"] * 3.0).alias("x3")])
@@ -231,7 +211,26 @@ class TestCustomDataFrameTransformerOnnx(ExtTestCase):
 
     def test_multi_output(self):
         """Multiple output columns exported to ONNX via extra_converters."""
-        from yobx.sklearn import to_onnx
+        from yobx.sklearn import to_onnx, NoKnownOutputMixin
+
+        class _MultiOutTransformer(BaseEstimator, TransformerMixin, NoKnownOutputMixin):
+            """User-defined transformer: produces two output columns from two inputs."""
+
+            _INPUT_DTYPES = {"a": np.float32, "b": np.float32}
+
+            def fit(self, X=None, y=None):
+                self.input_dtypes_ = {k: np.dtype(v) for k, v in self._INPUT_DTYPES.items()}
+                return self
+
+            def transform(self, df):
+                import pandas as pd
+
+                return pd.DataFrame(
+                    {"total": df["a"].values + df["b"].values, "a_doubled": df["a"].values * 2.0}
+                )
+
+            def get_feature_names_out(self, input_features=None):
+                return np.array(["total", "a_doubled"])
 
         t = _MultiOutTransformer()
         t.fit()
@@ -239,6 +238,7 @@ class TestCustomDataFrameTransformerOnnx(ExtTestCase):
 
         args = self._make_args(t.input_dtypes_)
         onx = to_onnx(t, args, extra_converters={_MultiOutTransformer: _multi_out_converter})
+        self.assertEqual(["total", "a_doubled"], onx.output_names)
 
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)

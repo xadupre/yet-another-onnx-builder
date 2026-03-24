@@ -52,13 +52,13 @@ def sklearn_pipeline(
             output_names = outputs
         else:
             output_names = list(get_output_names(step, g.convert_options))
-            output_names = [g.unique_name(n) for n in output_names]
+            output_names = [g.unique_name(n) for n in output_names] if output_names else None
         fct = get_sklearn_converter(type(step))
         step_node_name = f"{name}__{step_name}"
         is_container = isinstance(step, (Pipeline, ColumnTransformer, FeatureUnion))
         if function_options and function_options.export_as_function and not is_container:
             with g.prefix_name_context(step_node_name):
-                _wrap_step_as_function(
+                out_names = _wrap_step_as_function(
                     g,  # type: ignore
                     function_options,
                     step,
@@ -69,7 +69,7 @@ def sklearn_pipeline(
                 )
         elif is_container:
             with g.prefix_name_context(step_node_name):
-                fct(
+                out_names = fct(
                     g,
                     sts,
                     output_names,
@@ -80,6 +80,8 @@ def sklearn_pipeline(
                 )
         else:
             with g.prefix_name_context(step_node_name):
-                fct(g, sts, output_names, step, *current_input, name=step_node_name)
+                out_names = fct(g, sts, output_names, step, *current_input, name=step_node_name)
+        if output_names is None:
+            out_names = out_names
         current_input = output_names
     return current_input[0] if len(current_input) == 1 else tuple(current_input)

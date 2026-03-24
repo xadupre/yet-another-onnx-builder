@@ -651,3 +651,13 @@ class ExportArtifact(ExportArtifactProtocol):
         if self.container and self.container.model_proto_:
             return self.container.model_proto_.ir_version
         raise AttributeError(f"The artifact do not contain any model {self!r}.")
+
+    @property
+    def input_names(self) -> List[str]:
+        """Returns the input names."""
+        return [i.name for i in self.graph.input]
+
+    @property
+    def output_names(self) -> List[str]:
+        """Returns the output names."""
+        return [i.name for i in self.graph.output]

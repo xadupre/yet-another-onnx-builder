@@ -6,3 +6,7 @@ yobx.sklearn.to\_onnx
 .. autoclass:: yobx.sklearn.ConvertOptions
     :members:
     :undoc-members:
+
+.. autoclass:: yobx.sklearn.NoKnownOutputMixin
+    :members:
+    :undoc-members:
