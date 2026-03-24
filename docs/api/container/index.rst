@@ -9,6 +9,13 @@ yobx.container
     export_artifact
     model_container
 
+BuildStats
+++++++++++
+
+.. autoclass:: yobx.container.BuildStats
+    :members:
+    :no-undoc-members:
+
 ExportArtifact
 ++++++++++++++
 

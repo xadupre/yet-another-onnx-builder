@@ -225,7 +225,7 @@ print("kwargs:", string_type(kwargs, with_shape=True))
 #
 # We now export the model.  Both
 # :func:`register_flattening_functions <yobx.torch.flatten.register_flattening_functions>`
-# and :func:`apply_patches_for_model <yobx.torch.patch_model.apply_patches_for_model>`
+# and :func:`apply_patches_for_model <yobx.torch.patch.apply_patches_for_model>`
 # must be active during export so that the exporter can correctly handle
 # the KV-cache type and any PyTorch ops that need patching.
 

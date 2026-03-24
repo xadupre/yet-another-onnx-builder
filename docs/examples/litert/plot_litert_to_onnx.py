@@ -36,7 +36,7 @@ from yobx.litert.litert_helper import (
 # Build a minimal TFLite FlatBuffer
 # -----------------------------------
 #
-# :func:`~yobx.litert.litert_helper._make_sample_tflite_model` returns the
+# ``_make_sample_tflite_model`` returns the
 # bytes of a minimal TFLite model with a single RELU operator
 # (input: float32 [1, 4], output: float32 [1, 4]).  In a real workflow you
 # would pass the path to a ``.tflite`` file produced by the TFLite converter
