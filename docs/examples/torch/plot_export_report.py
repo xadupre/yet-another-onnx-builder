@@ -46,7 +46,6 @@ import torch
 
 from yobx.torch.interpreter import to_onnx
 
-
 # %%
 # 1. Define and export a model
 # ----------------------------

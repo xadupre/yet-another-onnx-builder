@@ -94,7 +94,9 @@ def get_output_names(
             # No get_feature_names_out available (FunctionTransformer for example).
             # Let's assume it is one output.
             return post_process_output_names(last_step, ["Y"], convert_options, effective_name)
-        return post_process_output_names(last_step, list(outnames), convert_options, effective_name)
+        return post_process_output_names(
+            last_step, list(outnames), convert_options, effective_name
+        )
 
     if SelectorMixin is not None and isinstance(last_step, SelectorMixin):
         return post_process_output_names(last_step, ["Y"], convert_options, effective_name)
@@ -105,21 +107,37 @@ def get_output_names(
             )
         return post_process_output_names(last_step, ["label"], convert_options, effective_name)
     if OutlierMixin is not None and isinstance(last_step, OutlierMixin):
-        return post_process_output_names(last_step, ["label", "scores"], convert_options, effective_name)
+        return post_process_output_names(
+            last_step, ["label", "scores"], convert_options, effective_name
+        )
     if isinstance(last_step, BaseMixture):
-        return post_process_output_names(last_step, ["label", "probabilities"], convert_options, effective_name)
+        return post_process_output_names(
+            last_step, ["label", "probabilities"], convert_options, effective_name
+        )
     if isinstance(last_step, OutlierMixin):
-        return post_process_output_names(last_step, ["label", "scores"], convert_options, effective_name)
+        return post_process_output_names(
+            last_step, ["label", "scores"], convert_options, effective_name
+        )
     if is_regressor(last_step):
-        return post_process_output_names(last_step, ["predictions"], convert_options, effective_name)
+        return post_process_output_names(
+            last_step, ["predictions"], convert_options, effective_name
+        )
     if OutlierMixin is not None and isinstance(last_step, OutlierMixin):
-        return post_process_output_names(last_step, ["label", "scores"], convert_options, effective_name)
+        return post_process_output_names(
+            last_step, ["label", "scores"], convert_options, effective_name
+        )
     if isinstance(last_step, ClusterMixin) and not isinstance(last_step, FeatureAgglomeration):
-        return post_process_output_names(last_step, ["label", "distances"], convert_options, effective_name)
+        return post_process_output_names(
+            last_step, ["label", "distances"], convert_options, effective_name
+        )
     if isinstance(last_step, BaseMixture):
-        return post_process_output_names(last_step, ["label", "probabilities"], convert_options, effective_name)
+        return post_process_output_names(
+            last_step, ["label", "probabilities"], convert_options, effective_name
+        )
     if isinstance(last_step, OutlierMixin):
-        return post_process_output_names(last_step, ["label", "scores"], convert_options, effective_name)
+        return post_process_output_names(
+            last_step, ["label", "scores"], convert_options, effective_name
+        )
     return post_process_output_names(last_step, ["Y"], convert_options, effective_name)
 
 
@@ -128,7 +146,6 @@ def _longest_prefix(s1: str, s2: str) -> str:
         if c1 != c2:
             return s1[:i]
     return s1
-
 
 
 def longest_prefix(names: Sequence[str]) -> str:
