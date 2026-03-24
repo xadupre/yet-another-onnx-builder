@@ -250,7 +250,6 @@ class:
 .. code-block:: python
 
     import numpy as np
-    import onnx
     from sklearn.base import BaseEstimator, TransformerMixin
     from yobx.sklearn import to_onnx
     from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
@@ -303,10 +302,6 @@ class:
             below = g.op.Less(X, low, name=f"{name}_below")
             above = g.op.Greater(X, high, name=f"{name}_above")
             mask = g.op.Or(below, above, name=f"{name}_mask", outputs=outputs[1:2])
-            if not sts:
-                g.set_type(mask, onnx.TensorProto.BOOL)
-                if g.has_shape(X):
-                    g.set_shape(mask, g.get_shape(X))
 
         return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
