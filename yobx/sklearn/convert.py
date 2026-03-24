@@ -60,6 +60,7 @@ def _wrap_step_as_function(
 
     # Determine generic sub-builder output names (independent of the main graph).
     function_output_names = list(get_output_names(estimator, g.convert_options))
+    function_output_names = [g.unique_name(n) for n in function_output_names]
 
     # Run the converter inside the sub-builder (no function_options propagation).
     converter(sub_g, {}, function_output_names, estimator, *function_input_names, name=name)

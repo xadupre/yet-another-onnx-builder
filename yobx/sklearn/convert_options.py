@@ -1,4 +1,4 @@
-from typing import Callable, Set, Union
+from typing import Callable, Set, Sequence, Union
 from sklearn.base import BaseEstimator
 from ..typing import ConvertOptionsProtocol
 
@@ -68,6 +68,10 @@ class ConvertOptions(ConvertOptionsProtocol):
     ):
         self.decision_leaf = decision_leaf
         self.decision_path = decision_path
+
+    def available_options(self) -> Sequence[str]:
+        """Returns the list of available options."""
+        return list(self.OPTIONS)
 
     def __repr__(self):
         rows = []

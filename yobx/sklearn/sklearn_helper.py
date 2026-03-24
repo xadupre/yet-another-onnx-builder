@@ -3,7 +3,7 @@ from sklearn.base import BaseEstimator, ClusterMixin, OutlierMixin, is_classifie
 from sklearn.cluster import FeatureAgglomeration
 from sklearn.mixture._base import BaseMixture
 from sklearn.pipeline import Pipeline
-from .convert_options import ConvertOptions
+from ..typing import ConvertOptionsProtocol
 
 try:
     from sklearn.feature_selection._base import SelectorMixin
@@ -52,7 +52,7 @@ def get_n_expected_outputs(estimator: BaseEstimator) -> int:
 def post_process_output_names(
     estimator: BaseEstimator,
     output_names: Sequence[str],
-    convert_options: Optional[ConvertOptions] = None,
+    convert_options: Optional[ConvertOptionsProtocol] = None,
 ) -> Sequence[str]:
     """Makes sures the number of outputs is expected."""
     output_names_0 = output_names
@@ -65,14 +65,15 @@ def post_process_output_names(
             f"and estimator is {type(estimator)}, {output_names_0=}."
         )
     if convert_options:
-        for _extra_opt in ConvertOptions.OPTIONS:
+        output_names = list(output_names)
+        for _extra_opt in convert_options.available_options():
             if convert_options.has(_extra_opt, estimator):
                 output_names.append(_extra_opt)
     return output_names
 
 
 def get_output_names(
-    estimator: BaseEstimator, convert_options: Optional[ConvertOptions] = None
+    estimator: BaseEstimator, convert_options: Optional[ConvertOptionsProtocol] = None
 ) -> Sequence[str]:
     """Returns output names for every estimator."""
 
