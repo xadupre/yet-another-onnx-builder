@@ -3,6 +3,7 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from ..sklearn_helper import extract_step_name
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
@@ -522,11 +523,11 @@ def sklearn_decision_tree_classifier(
 
     # Emit optional extra outputs requested via sts["options"].
     extra_idx = 2
-    if g.convert_options.has("decision_path", estimator):
+    if g.convert_options.has("decision_path", estimator, extract_step_name(name)):
         assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
         _emit_decision_path_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dp")
         extra_idx += 1
-    if g.convert_options.has("decision_leaf", estimator):
+    if g.convert_options.has("decision_leaf", estimator, extract_step_name(name)):
         assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
         _emit_decision_leaf_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dl")
     return outputs[0] if len(outputs) == 1 else tuple(outputs)
@@ -592,11 +593,11 @@ def _sklearn_decision_tree_classifier_v5(
 
     # Emit optional extra outputs requested via sts["options"].
     extra_idx = 2
-    if g.convert_options.has("decision_path", estimator):
+    if g.convert_options.has("decision_path", estimator, extract_step_name(name)):
         assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
         _emit_decision_path_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dp")
         extra_idx += 1
-    if g.convert_options.has("decision_leaf", estimator):
+    if g.convert_options.has("decision_leaf", estimator, extract_step_name(name)):
         assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
         _emit_decision_leaf_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dl")
     return outputs[0] if len(outputs) == 1 else tuple(outputs)
@@ -654,11 +655,11 @@ def sklearn_decision_tree_regressor(
         )
         # Emit optional extra outputs.
         extra_idx = 1
-        if g.convert_options.has("decision_path", estimator):
+        if g.convert_options.has("decision_path", estimator, extract_step_name(name)):
             assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
             _emit_decision_path_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dp")
             extra_idx += 1
-        if g.convert_options.has("decision_leaf", estimator):
+        if g.convert_options.has("decision_leaf", estimator, extract_step_name(name)):
             assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
             _emit_decision_leaf_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dl")
         return outputs[0] if len(outputs) == 1 else tuple(outputs)
@@ -681,11 +682,11 @@ def sklearn_decision_tree_regressor(
     )
     # Emit optional extra outputs.
     extra_idx = 1
-    if g.convert_options.has("decision_path", estimator):
+    if g.convert_options.has("decision_path", estimator, extract_step_name(name)):
         assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
         _emit_decision_path_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dp")
         extra_idx += 1
-    if g.convert_options.has("decision_leaf", estimator):
+    if g.convert_options.has("decision_leaf", estimator, extract_step_name(name)):
         assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
         _emit_decision_leaf_for_tree(g, tree, X, outputs[extra_idx], f"{name}_dl")
     return outputs[0] if len(outputs) == 1 else tuple(outputs)

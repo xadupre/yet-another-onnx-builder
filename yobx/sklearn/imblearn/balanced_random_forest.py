@@ -4,6 +4,7 @@ import numpy as np
 from imblearn.ensemble import BalancedRandomForestClassifier
 
 from ...typing import GraphBuilderExtendedProtocol
+from ..sklearn_helper import extract_step_name
 from ..ensemble.random_forest import (
     _emit_decision_leaf_for_estimators,
     _emit_decision_path_for_estimators,
@@ -99,11 +100,11 @@ def sklearn_balanced_random_forest_classifier(
     )
 
     extra_idx = 2
-    if g.convert_options.has("decision_path", estimator):
+    if g.convert_options.has("decision_path", estimator, extract_step_name(name)):
         assert len(outputs) > extra_idx, f"Missing output for decision_path in {outputs}"
         _emit_decision_path_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dp")
         extra_idx += 1
-    if g.convert_options.has("decision_leaf", estimator):
+    if g.convert_options.has("decision_leaf", estimator, extract_step_name(name)):
         assert len(outputs) > extra_idx, f"Missing output for decision_leaf in {outputs}"
         _emit_decision_leaf_for_estimators(g, estimators, X, outputs[extra_idx], f"{name}_dl")
     return outputs[0] if len(outputs) == 1 else tuple(outputs)

@@ -53,6 +53,7 @@ def post_process_output_names(
     estimator: BaseEstimator,
     output_names: Sequence[str],
     convert_options: Optional[ConvertOptionsProtocol] = None,
+    name: Optional[str] = None,
 ) -> Sequence[str]:
     """Makes sures the number of outputs is expected."""
     output_names_0 = output_names
@@ -67,56 +68,62 @@ def post_process_output_names(
     if convert_options:
         output_names = list(output_names)
         for _extra_opt in convert_options.available_options():
-            if convert_options.has(_extra_opt, estimator):
+            if convert_options.has(_extra_opt, estimator, name):
                 output_names.append(_extra_opt)
     return output_names
 
 
 def get_output_names(
-    estimator: BaseEstimator, convert_options: Optional[ConvertOptionsProtocol] = None
+    estimator: BaseEstimator,
+    convert_options: Optional[ConvertOptionsProtocol] = None,
+    name: Optional[str] = None,
 ) -> Sequence[str]:
     """Returns output names for every estimator."""
 
     # Append extra output names requested by convert_options so that converters
     # can detect them via len(outputs) > extra_idx and emit the extra nodes.
     if isinstance(estimator, Pipeline):
-        last_step = estimator.steps[-1][1]
+        last_step_name_in_pipeline, last_step = estimator.steps[-1]
+        # When no explicit name override is given, use the last step's pipeline
+        # name so that string-based ConvertOptions filtering works by step name.
+        effective_name = name if name is not None else last_step_name_in_pipeline
     else:
         last_step = estimator
+        effective_name = name
     if hasattr(last_step, "get_feature_names_out") and _should_use_feature_names(last_step):
         try:
             outnames = estimator.get_feature_names_out()
         except AttributeError:
             # No get_feature_names_out available (FunctionTransformer for example).
             # Let's assume it is one output.
-            return post_process_output_names(last_step, ["Y"], convert_options)
-        return post_process_output_names(last_step, list(outnames), convert_options)
+            return post_process_output_names(last_step, ["Y"], convert_options, effective_name)
+        return post_process_output_names(last_step, list(outnames), convert_options, effective_name)
 
     if SelectorMixin is not None and isinstance(last_step, SelectorMixin):
-        return post_process_output_names(last_step, ["Y"], convert_options)
+        return post_process_output_names(last_step, ["Y"], convert_options, effective_name)
     if is_classifier(last_step):
         if hasattr(last_step, "predict_proba"):
             return post_process_output_names(
-                last_step, ["label", "probabilities"], convert_options
+                last_step, ["label", "probabilities"], convert_options, effective_name
             )
-        return post_process_output_names(last_step, ["label"], convert_options)
+        return post_process_output_names(last_step, ["label"], convert_options, effective_name)
     if OutlierMixin is not None and isinstance(last_step, OutlierMixin):
-        return post_process_output_names(last_step, ["label", "scores"], convert_options)
+        return post_process_output_names(last_step, ["label", "scores"], convert_options, effective_name)
     if isinstance(last_step, BaseMixture):
-        return post_process_output_names(last_step, ["label", "probabilities"], convert_options)
+        return post_process_output_names(last_step, ["label", "probabilities"], convert_options, effective_name)
     if isinstance(last_step, OutlierMixin):
-        return post_process_output_names(last_step, ["label", "scores"], convert_options)
+        return post_process_output_names(last_step, ["label", "scores"], convert_options, effective_name)
     if is_regressor(last_step):
-        return post_process_output_names(last_step, ["predictions"], convert_options)
+        return post_process_output_names(last_step, ["predictions"], convert_options, effective_name)
     if OutlierMixin is not None and isinstance(last_step, OutlierMixin):
-        return post_process_output_names(last_step, ["label", "scores"], convert_options)
+        return post_process_output_names(last_step, ["label", "scores"], convert_options, effective_name)
     if isinstance(last_step, ClusterMixin) and not isinstance(last_step, FeatureAgglomeration):
-        return post_process_output_names(last_step, ["label", "distances"], convert_options)
+        return post_process_output_names(last_step, ["label", "distances"], convert_options, effective_name)
     if isinstance(last_step, BaseMixture):
-        return post_process_output_names(last_step, ["label", "probabilities"], convert_options)
+        return post_process_output_names(last_step, ["label", "probabilities"], convert_options, effective_name)
     if isinstance(last_step, OutlierMixin):
-        return post_process_output_names(last_step, ["label", "scores"], convert_options)
-    return post_process_output_names(last_step, ["Y"], convert_options)
+        return post_process_output_names(last_step, ["label", "scores"], convert_options, effective_name)
+    return post_process_output_names(last_step, ["Y"], convert_options, effective_name)
 
 
 def _longest_prefix(s1: str, s2: str) -> str:
@@ -124,6 +131,21 @@ def _longest_prefix(s1: str, s2: str) -> str:
         if c1 != c2:
             return s1[:i]
     return s1
+
+
+def extract_step_name(node_name: str) -> Optional[str]:
+    """Return the pipeline step name embedded in a converter node name.
+
+    Converter node names use ``"__"`` as a separator, e.g. ``"main__clf"``
+    for a step named ``"clf"`` inside the top-level pipeline.  This helper
+    returns the last component (``"clf"``), which is the step name used in
+    the :class:`~sklearn.pipeline.Pipeline` constructor.  Returns ``None``
+    when the node name does not contain a separator (i.e. the estimator is
+    not inside a pipeline).
+    """
+    if "__" in node_name:
+        return node_name.rsplit("__", 1)[-1]
+    return None
 
 
 def longest_prefix(names: Sequence[str]) -> str:

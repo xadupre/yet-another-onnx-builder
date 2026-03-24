@@ -901,20 +901,25 @@ class TestConvertOptionsHas(ExtTestCase):
         self._ss = StandardScaler()
 
     # ------------------------------------------------------------------
-    # String (class name) matching
+    # Step name (pipeline name) matching
     # ------------------------------------------------------------------
 
-    def test_has_by_class_name_true(self):
-        opts = ConvertOptions(decision_leaf={"DecisionTreeClassifier"})
-        self.assertTrue(opts.has("decision_leaf", self._dtc))
+    def test_has_by_step_name_true(self):
+        opts = ConvertOptions(decision_leaf={"clf"})
+        self.assertTrue(opts.has("decision_leaf", self._dtc, name="clf"))
 
-    def test_has_by_class_name_false_other(self):
-        opts = ConvertOptions(decision_leaf={"DecisionTreeClassifier"})
-        self.assertFalse(opts.has("decision_leaf", self._ss))
+    def test_has_by_step_name_false_wrong_name(self):
+        opts = ConvertOptions(decision_leaf={"clf"})
+        self.assertFalse(opts.has("decision_leaf", self._dtc, name="scaler"))
 
-    def test_has_by_class_name_false_empty_set(self):
-        opts = ConvertOptions(decision_leaf=set())
+    def test_has_by_step_name_false_no_name(self):
+        """String in set is ignored when no name is provided."""
+        opts = ConvertOptions(decision_leaf={"clf"})
         self.assertFalse(opts.has("decision_leaf", self._dtc))
+
+    def test_has_by_step_name_false_empty_set(self):
+        opts = ConvertOptions(decision_leaf=set())
+        self.assertFalse(opts.has("decision_leaf", self._dtc, name="clf"))
 
     # ------------------------------------------------------------------
     # Type (class object) matching — existing behaviour preserved
@@ -963,19 +968,42 @@ class TestConvertOptionsHas(ExtTestCase):
         self.assertFalse(opts.has("decision_leaf", self._dtc))
 
     # ------------------------------------------------------------------
-    # End-to-end: name-based set triggers extra output only for matching estimator
+    # End-to-end: step-name set triggers extra output only for matching step
     # ------------------------------------------------------------------
 
-    def test_decision_leaf_by_name_end_to_end(self):
-        """ConvertOptions with a class-name set enables the extra output."""
+    def test_decision_leaf_by_step_name_in_pipeline(self):
+        """ConvertOptions with a step-name set enables the extra output for that step."""
         X, y = make_classification(n_samples=50, n_features=4, random_state=0)
         X = X.astype(np.float32)
-        model = DecisionTreeClassifier(max_depth=3, random_state=0).fit(X, y)
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.pipeline import Pipeline
 
-        opts = ConvertOptions(decision_leaf={"DecisionTreeClassifier"})
-        onx = to_onnx(model, (X,), convert_options=opts)
+        pipe = Pipeline(
+            [("scaler", StandardScaler()), ("clf", DecisionTreeClassifier(max_depth=3))]
+        ).fit(X, y)
+
+        # Only enable decision_leaf for the step named "clf"
+        opts = ConvertOptions(decision_leaf={"clf"})
+        onx = to_onnx(pipe, (X,), convert_options=opts)
         # label + proba + decision_leaf = 3 outputs
         self.assertEqual(len(onx.graph.output), 3)
+
+    def test_decision_leaf_step_name_not_triggered_for_other_name(self):
+        """decision_leaf is NOT emitted when the step name does not match."""
+        X, y = make_classification(n_samples=50, n_features=4, random_state=0)
+        X = X.astype(np.float32)
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.pipeline import Pipeline
+
+        pipe = Pipeline(
+            [("scaler", StandardScaler()), ("clf", DecisionTreeClassifier(max_depth=3))]
+        ).fit(X, y)
+
+        # "tree" doesn't match the step name "clf" → no extra output
+        opts = ConvertOptions(decision_leaf={"tree"})
+        onx = to_onnx(pipe, (X,), convert_options=opts)
+        # label + proba only = 2 outputs (no decision_leaf)
+        self.assertEqual(len(onx.graph.output), 2)
 
 
 if __name__ == "__main__":

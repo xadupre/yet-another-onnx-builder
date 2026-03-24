@@ -1,4 +1,4 @@
-from typing import Callable, Set, Sequence, Union
+from typing import Callable, Optional, Set, Sequence, Union
 from sklearn.base import BaseEstimator
 from ..typing import ConvertOptionsProtocol
 
@@ -80,19 +80,21 @@ class ConvertOptions(ConvertOptionsProtocol):
         text = "\n".join(rows)
         return f"{self.__class__.__name__}(\n{text}\n)"
 
-    def has(self, option_name: str, piece: BaseEstimator) -> bool:  # type: ignore[bad-override]
+    def has(self, option_name: str, piece: BaseEstimator, name: Optional[str] = None) -> bool:  # type: ignore[bad-override]
         """Return ``True`` if option *option_name* is active for estimator *piece*.
 
         :param option_name: name of the option to query.  Must be one of the
             strings listed in :attr:`OPTIONS`.  An :exc:`AssertionError` is
             raised when an unknown name is passed.
         :param piece: the fitted :class:`~sklearn.base.BaseEstimator` for which
-            the option is being queried.  When the attribute value is a
-            :class:`set`, the set may contain types, integer object ids,
-            class-name strings, or callables.  A callable element is called
-            with *piece* as its sole argument and the option is considered
-            active if any callable returns ``True``.  A string element is
-            compared against ``type(piece).__name__``.
+            the option is being queried.
+        :param name: optional pipeline step name for the estimator.  When the
+            option attribute is a :class:`set`, string elements in the set are
+            compared against this *name* to enable an option for a specific
+            named step inside a :class:`~sklearn.pipeline.Pipeline`.  If
+            *name* is ``None`` the string elements are ignored.  Non-string
+            elements (types, integer object ids, callable predicates) are
+            always checked regardless of *name*.
         :return: ``True`` when the option is enabled globally (the attribute
             value is ``True``), ``False`` when it is disabled (``False`` or any
             falsy value).
@@ -114,7 +116,7 @@ class ConvertOptions(ConvertOptionsProtocol):
             return (
                 type(piece) in value
                 or id(piece) in value
-                or type(piece).__name__ in value
+                or (name is not None and name in value)
             )
         raise NotImplementedError(
             f"Not implemented with {option_name!r} is not a boolean but {value!r}."
