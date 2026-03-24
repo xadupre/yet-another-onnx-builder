@@ -18,8 +18,42 @@ except ImportError:
 
 class NoKnownOutputMixin:
     """
-    Tells the converter there is no definite number of outputs.
-    The converter will not make any assumption on the number of outputs.
+    Mixin for custom sklearn estimators that produce a variable or non-standard
+    number of ONNX outputs.
+
+    By default the ONNX converter infrastructure infers the expected output
+    names from the estimator type (classifier, regressor, transformer, …) and
+    from ``get_feature_names_out()``.  For estimators whose outputs cannot be
+    determined by those heuristics — for example a transformer that returns
+    multiple named columns — this mixin instructs :func:`get_output_names` to
+    return ``None`` so that the converter is given full control over how many
+    outputs it registers.
+
+    Usage
+    -----
+    Inherit from both ``BaseEstimator`` (or any sklearn base class) and
+    ``NoKnownOutputMixin`` when writing a custom converter that needs to emit
+    an arbitrary set of ONNX outputs:
+
+    .. code-block:: python
+
+        from sklearn.base import BaseEstimator, TransformerMixin
+        from yobx.sklearn import NoKnownOutputMixin
+
+        class MyMultiOutputTransformer(BaseEstimator, TransformerMixin, NoKnownOutputMixin):
+            def fit(self, X=None, y=None):
+                self.input_dtypes_ = {"a": np.dtype("float32"), "b": np.dtype("float32")}
+                return self
+
+            def transform(self, df):
+                return df[["a", "b"]].assign(total=df["a"] + df["b"])
+
+            def get_feature_names_out(self, input_features=None):
+                return ["a", "b", "total"]
+
+    The paired ``extra_converters`` entry is then free to call
+    ``g.make_output(...)`` for each output without the framework complaining
+    about a mismatched output count.
     """
 
 
