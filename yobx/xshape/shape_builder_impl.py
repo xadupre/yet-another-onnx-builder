@@ -58,19 +58,7 @@ class BasicShapeBuilder(
     def __init__(self, verbose: int = 0, opset: Optional[int] = None):
         _ExtraPackages.__init__(self)
         self.verbose = verbose
-        self._input_names = []
-        self._output_names = []
-        self._known_shapes = {}
-        self._known_ranks = {}
-        self._known_devices = {}
-        self._known_types = {}
-        self.constraints_ = {}
-        self.dynamic_dimensions_ = {}
-        self.constants_ = {}
-        #
-        self._known_value_shape = {}
-        self.constants_computed_ = {}
-        self._calls = []
+        self.reset_types_and_shapes()
         # self.dynamic_dimensions_source={}
         # self.dynamic_dimensions_source_flat={}
         # self._dynamic_examples={}
@@ -86,6 +74,22 @@ class BasicShapeBuilder(
         self.main_opset = self.opsets[""]
         self.time_evaluation_constants_ = 0
         self.optimization_options = _OptimizationOptions()
+        self.functions: Dict[Tuple[str, str], onnx.FunctionProto] = {}
+
+    def reset_types_and_shapes(self):
+        self._input_names = []
+        self._output_names = []
+        self._calls = []
+        self._known_shapes = {}
+        self._known_ranks = {}
+        self._known_devices = {}
+        self._known_types = {}
+        self.constraints_ = {}
+        self.dynamic_dimensions_ = {}
+        self.constants_ = {}
+        #
+        self._known_value_shape = {}
+        self.constants_computed_ = {}
 
     @property
     def input_names(self) -> List[str]:
@@ -166,6 +170,11 @@ class BasicShapeBuilder(
             if value is not None:
                 self.constants_computed_[name] = value
                 return value
+            assert not self.is_constant(name), (
+                f"Issue with node {self.pretty_node(possible_value)}, name={name!r}, "
+                f"{computed_value=}{self.get_debug_msg()}"
+            )
+            return None
 
         if isinstance(possible_value, onnx.TensorProto):
             if uses_external_data(possible_value):
@@ -179,9 +188,10 @@ class BasicShapeBuilder(
             self.constants_computed_[name] = v
             return v
 
-        assert isinstance(
-            possible_value, onnx.TensorProto
-        ), f"Unexpected type {type(possible_value)} for a constant{self.get_debug_msg()}"
+        assert isinstance(possible_value, onnx.TensorProto), (
+            f"Unexpected type {type(possible_value)} for constant {name!r}, {computed_value=}"
+            f"{self.get_debug_msg()}"
+        )
         res, _ = self.compute_constant(name, exc=exc)
         if res is None:
             # The constant is too big to be computed.
@@ -528,6 +538,20 @@ class BasicShapeBuilder(
         )
         return self._known_shapes[name]
 
+    def has_local_function(self, name: str, domain: str = "", builder: bool = False) -> bool:
+        """Checks if a local function exists."""
+        return (domain, name) in self.functions
+
+    def get_local_function(
+        self, name: str, domain: str = "", builder: bool = False
+    ) -> Union[onnx.FunctionProto, "BasicShapeBuilder"]:
+        """Returns a local function."""
+        if builder:
+            sh = self.__class__(opset=self.opsets)
+            sh.functions.update(self.functions)
+            return sh
+        return self.functions[domain, name]
+
     def register_dynamic_objects_from_dim(self, dim: str):
         """Registers all the dynamic objects required in a dimension."""
         assert isinstance(dim, str) and " " not in dim and dim.count("(") == dim.count(")"), (
@@ -750,6 +774,8 @@ class BasicShapeBuilder(
                 inference=inference,
             )
         assert isinstance(model, onnx.GraphProto), f"Unexpected type {type(model)} for model"
+        if functions:
+            self.functions.update(functions)
         graph = model
         if inference == InferenceMode.TYPE:
             self._run_model_type_inference(graph, functions=functions, exc=exc)

@@ -2710,7 +2710,16 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
                 if self.has_device(ni):
                     local_function_builder.set_device(i, self.get_device(ni))
                 local_function_builder.set_shape(i, sh)
-            local_function_builder.infer_shapes()
+            if hasattr(local_function_builder, "infer_shapes"):
+                # A GraphBuilder
+                local_function_builder.infer_shapes()
+            else:
+                # A ShapeBuilder
+                for node in proto_local_function.node:
+                    local_function_builder.run_node(node, exc=exc)
+                for o in proto_local_function.output:
+                    local_function_builder._output_names.append(o)
+
         assert len(local_function_builder.output_names) == len(node.output), (
             f"Mismatch between the number of outputs, node has {node.output}, "
             f"function has {local_function_builder.output_names}{self.get_debug_msg()}"
