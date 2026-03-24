@@ -27,6 +27,7 @@ class ConvertOptions(ConvertOptionsProtocol):
     **Class attributes**
 
     .. attribute:: OPTIONS
+        :no-index:
 
         :type: list[str]
 

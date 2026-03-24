@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_pandas, hide_stdout
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
+from yobx.typing import ConvertOptionsProtocol
 
 
 @requires_sklearn("1.4")
@@ -411,6 +412,88 @@ class TestSklearnBaseConverters(ExtTestCase):
         artifact = to_onnx(lr, (X,), large_model=True)
         self.assertIsInstance(artifact, ExportArtifact)
         self.assertIsInstance(artifact.container, ExtendedModelContainer)
+
+    def test_custom_converter_with_convert_options(self):
+        """A custom converter can use g.convert_options.has() to emit optional outputs."""
+        from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
+
+        # ── custom estimator ──────────────────────────────────────────────────
+        class ClipTransformer(TransformerMixin, BaseEstimator):
+            def __init__(self, clip_min=0.0, clip_max=1.0):
+                self.clip_min = clip_min
+                self.clip_max = clip_max
+
+            def fit(self, X, y=None):
+                return self
+
+            def transform(self, X):
+                return np.clip(X, self.clip_min, self.clip_max)
+
+        # ── custom convert-options class ──────────────────────────────────────
+        class ClipOptions(ConvertOptionsProtocol):
+            def __init__(self, clip_mask=False):
+                self.clip_mask = clip_mask
+
+            def available_options(self):
+                return ["clip_mask"]
+
+            def has(self, option_name, piece, name=None):
+                if option_name == "clip_mask":
+                    return bool(self.clip_mask) and hasattr(piece, "clip_min")
+                return False
+
+        # ── converter function ────────────────────────────────────────────────
+        def convert_clip_transformer(g, sts, outputs, estimator, X, name="clip"):
+            itype = g.get_type(X)
+            dtype = tensor_dtype_to_np_dtype(itype)
+            low = np.array(estimator.clip_min, dtype=dtype)
+            high = np.array(estimator.clip_max, dtype=dtype)
+
+            clipped = g.op.Clip(X, low, high, name=name, outputs=outputs[:1])
+
+            if g.convert_options.has("clip_mask", estimator, name):
+                below = g.op.Less(X, low, name=f"{name}_below")
+                above = g.op.Greater(X, high, name=f"{name}_above")
+                g.op.Or(below, above, name=f"{name}_mask", outputs=outputs[1:2])
+
+            return outputs[0] if len(outputs) == 1 else tuple(outputs)
+
+        X = np.array([[-1.0, 0.5], [0.3, 2.0], [-0.8, 1.5]], dtype=np.float32)
+        transformer = ClipTransformer(clip_min=-0.5, clip_max=1.0).fit(X)
+        extra = {ClipTransformer: convert_clip_transformer}
+
+        # Without convert_options: single output
+        onx_plain = to_onnx(transformer, (X,), extra_converters=extra)
+        self.assertEqual(1, len(onx_plain.proto.graph.output))
+
+        ref_plain = ExtendedReferenceEvaluator(onx_plain)
+        (clipped_onnx,) = ref_plain.run(None, {"X": X})
+        self.assertEqualArray(
+            transformer.transform(X).astype(np.float32), clipped_onnx, atol=1e-6
+        )
+
+        # With clip_mask=True: two outputs
+        onx_mask = to_onnx(
+            transformer,
+            (X,),
+            extra_converters=extra,
+            convert_options=ClipOptions(clip_mask=True),
+        )
+        self.assertEqual(2, len(onx_mask.proto.graph.output))
+
+        ref_mask = ExtendedReferenceEvaluator(onx_mask)
+        clipped_onnx2, mask_onnx = ref_mask.run(None, {"X": X})
+        self.assertEqualArray(
+            transformer.transform(X).astype(np.float32), clipped_onnx2, atol=1e-6
+        )
+        expected_mask = (X < transformer.clip_min) | (X > transformer.clip_max)
+        self.assertEqualArray(expected_mask, mask_onnx)
+
+        # The mask ops should appear in the graph
+        op_types = [n.op_type for n in onx_mask.proto.graph.node]
+        self.assertIn("Less", op_types)
+        self.assertIn("Greater", op_types)
+        self.assertIn("Or", op_types)
 
 
 @requires_sklearn("1.4")

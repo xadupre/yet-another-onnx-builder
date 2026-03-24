@@ -76,7 +76,7 @@ from yobx.torch import (
 # speed up export and reduce memory during development.
 #
 # ``--model`` selects the HuggingFace model ID to use (default:
-# ``arnir0/Tiny-LLM``).  Any :epkg:`AutoModelForCausalLM`-compatible model
+# ``arnir0/Tiny-LLM``).  Any :class:`transformers.AutoModelForCausalLM`-compatible model
 # can be passed here.
 
 _DEFAULT_MODEL = "arnir0/Tiny-LLM"
