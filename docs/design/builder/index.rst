@@ -11,6 +11,7 @@ graphs.
    :maxdepth: 1
 
    shape
+   cost
    graph_builder
    optimizer
    optimizer_patterns

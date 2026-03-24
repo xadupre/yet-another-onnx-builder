@@ -523,3 +523,21 @@ def estimate_node_flops(
     if handler is None:
         return None
     return handler(node, shape_fn, literal_fn)
+
+
+def list_op_cost_formulas() -> Dict[str, str]:
+    """
+    Returns a mapping from each supported ONNX ``op_type`` to a human-readable
+    description of the FLOPs formula used by :func:`estimate_node_flops`.
+
+    The descriptions are taken directly from the docstrings of the per-op handler
+    functions registered in :data:`_OP_HANDLERS`.  Operators that share the same
+    handler (e.g. all element-wise unary ops) therefore share the same description.
+
+    :return: ``{op_type: formula_description}`` sorted alphabetically by ``op_type``.
+    """
+    result: Dict[str, str] = {}
+    for op_type, handler in _OP_HANDLERS.items():
+        doc = (handler.__doc__ or "").strip().splitlines()[0].rstrip(".")
+        result[op_type] = doc
+    return dict(sorted(result.items()))
