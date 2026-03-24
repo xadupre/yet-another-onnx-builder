@@ -111,40 +111,33 @@ def register_inputs(
                 default_names.append("X" if len(args) == 1 else f"X{j}")
         resolved_names = default_names
 
+    expanded_names = []
     for i, (name, arg) in enumerate(zip(resolved_names, args)):
         if isinstance(arg, ValueInfoProto):
             # Use name/type/shape directly from the ValueInfoProto.
             _, elem_type, shape = extract_value_info_proto(arg)
             g.make_tensor_input(name, elem_type, shape, device=-1)
+            expanded_names.append(name)
         elif is_arg_tuple_spec(arg):
             # Use name/dtype/shape directly from the (name, dtype, shape) tuple.
             _, arg_dtype, arg_shape = arg
             elem_type = np_dtype_to_tensor_dtype(np.dtype(arg_dtype))
             g.make_tensor_input(name, elem_type, tuple(arg_shape), device=-1)
+            expanded_names.append(name)
         elif _is_dataframe(arg):
             # Each DataFrame column becomes a separate 1-D ONNX graph input.
-            # They are then assembled into a 2-D matrix passed to the converter.
             ds = dynamic_shapes[i] if dynamic_shapes else {0: "batch"}
             batch_dim = ds.get(0, "batch")
-            col_shape = (batch_dim,)
+            col_shape = (batch_dim, 1)
 
             columns = _dataframe_columns(arg)
-            col_tensor_names = []
             for col in columns:
-                col_arr = arg[col].to_numpy()
-                col_elem_type = np_dtype_to_tensor_dtype(col_arr.dtype)
-                g.make_tensor_input(str(col), col_elem_type, col_shape, device=-1)
-                col_tensor_names.append(str(col))
-
-            # Unsqueeze each 1-D column to (batch, 1), then concat to (batch, n_cols).
-            axes = np.array([1], dtype=np.int64)
-            parts_2d = [
-                g.op.Unsqueeze(c, axes, name=f"_df_unsqueeze_{c}") for c in col_tensor_names
-            ]
-            if len(parts_2d) == 1:
-                g.op.Identity(parts_2d[0], outputs=[name], name=f"_df_assembled_{name}")
-            else:
-                g.op.Concat(*parts_2d, axis=1, outputs=[name], name=f"_df_assembled_{name}")
+                col_elem_type = np_dtype_to_tensor_dtype(arg[col].dtype)
+                col_name = (
+                    str(col).replace(" ", "_").replace("(", "").replace(")", "").replace(",", "_")
+                )
+                g.make_tensor_input(col_name, col_elem_type, col_shape, device=-1)
+                expanded_names.append(col_name)
         else:
             if dynamic_shapes:
                 ds = dynamic_shapes[i]
@@ -156,5 +149,5 @@ def register_inputs(
             g.make_tensor_input(  # type: ignore
                 name, np_dtype_to_tensor_dtype(arg.dtype), tuple(shape), device=-1  # type: ignore
             )  # type: ignore
-
-    return resolved_names
+            expanded_names.append(name)
+    return expanded_names

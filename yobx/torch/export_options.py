@@ -114,7 +114,7 @@ class ExportOptions:
         )
         self.fake = fake
         if aten_as_function is None:
-            from yobx.torch.interpreter.onnx_export import get_default_aten_as_function
+            from .interpreter.onnx_export import get_default_aten_as_function
 
             aten_as_function = get_default_aten_as_function()  # type: ignore
         self.aten_as_function = aten_as_function
@@ -319,7 +319,7 @@ class ExportOptions:
             assert not (
                 args and kwargs
             ), "Option with fake tensors is not available if both args and kwargs are specified"
-            from yobx.helpers import string_type as _string_type
+            from ..helpers import string_type as _string_type
             from .fake_tensor_helper import make_fake_with_dynamic_dimensions
 
             dynamic_shapes_str = self.use_str_not_dyn(dynamic_shapes)

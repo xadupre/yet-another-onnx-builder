@@ -2,25 +2,18 @@ from ..pv_version import PvVersion
 from .convert import to_onnx
 from .convert_options import ConvertOptions
 from .skl2onnx_converter import wrap_skl2onnx_converter
-from .sklearn_helper import NoKnownOutputMixin
+from .sklearn_helper import NoKnownOutputMixin, TraceableMixin
 
 __all__ = [
     "ConvertOptions",
     "DataFrameTransformer",
     "NoKnownOutputMixin",
     "NumericalDiscrepancyWarning",
+    "TraceableMixin",
     "register_sklearn_converters",
     "to_onnx",
     "wrap_skl2onnx_converter",
 ]
-
-
-def __getattr__(name: str):
-    if name == "DataFrameTransformer":
-        from .preprocessing._dataframe_transformer import DataFrameTransformer
-
-        return DataFrameTransformer
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def has_sklearn(version: str = ""):

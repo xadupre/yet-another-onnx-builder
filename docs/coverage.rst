@@ -16,16 +16,6 @@ from :epkg:`category_encoders`, :epkg:`imbalanced-learn`,
 :epkg:`xgboost`, showing which ones have a registered converter in
 :mod:`yobx.sklearn`.
 
-PyTorch
--------
-
-:ref:`l-design-torch-supported-aten-functions` enumerates every ATen
-function and its mapping to an ONNX operator.
-
-:ref:`l-torch-converter` also contains an overview of exportability
-(:ref:`l-design-torch-case-coverage`) that runs a broad set of model cases
-through multiple exporters and reports which ones succeed.
-
 TensorFlow / JAX
 -----------------
 
@@ -40,3 +30,13 @@ LiteRT
 
 :ref:`l-design-litert-supported-ops` lists every LiteRT (TFLite) op that
 has a converter to ONNX.
+
+PyTorch
+-------
+
+:ref:`l-design-torch-supported-aten-functions` enumerates every ATen
+function and its mapping to an ONNX operator.
+
+:ref:`l-torch-converter` also contains an overview of exportability
+(:ref:`l-design-torch-case-coverage`) that runs a broad set of model cases
+through multiple exporters and reports which ones succeed.
