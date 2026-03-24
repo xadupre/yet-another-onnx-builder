@@ -585,6 +585,8 @@ def list_op_cost_formulas() -> Dict[str, str]:
 
     result: Dict[str, str] = {}
     for test_dir in sorted(glob.glob(os.path.join(data_dir, "test_*"))):
+        if "expanded" in os.path.basename(test_dir):
+            continue  # skip expanded variants; they tend to be multi-node rewrites
         model_path = os.path.join(test_dir, "model.onnx")
         if not os.path.exists(model_path):
             continue
