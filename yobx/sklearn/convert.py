@@ -202,7 +202,7 @@ def to_onnx(
             input_names,
             output_names,
             fct,
-            "name",
+            "main",
         )
 
     assert isinstance(out_names, str) or (

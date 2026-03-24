@@ -839,7 +839,6 @@ class TestSklearnConvertersBasicInvocation(ExtTestCase):
             "BernoulliRBM",  # different input semantics
             "KernelCenterer",  # expects square kernel matrix
             "GaussianRandomProjection",  # fails with tiny dataset
-            "FeatureHasher",  # needs dict inputs
             "PatchExtractor",  # needs image input
             "CountVectorizer",  # needs text input
             "TfidfVectorizer",  # needs text input

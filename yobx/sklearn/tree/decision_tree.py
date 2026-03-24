@@ -556,6 +556,7 @@ def _sklearn_decision_tree_classifier_v5(
         tensors; uses input element type when ``None``
     :return: tuple ``(label_result_name, proba_result_name)``
     """
+    assert "name" not in name
     attrs = _extract_tree_attributes_v5(tree, n_classes, is_classifier=True, itype=g.get_type(X))
 
     # scores: [N, n_classes] float32 - class probabilities
