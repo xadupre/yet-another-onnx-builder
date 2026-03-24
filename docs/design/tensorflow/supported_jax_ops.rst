@@ -12,7 +12,9 @@ module.  The converter parses that module op-by-op and maps each
 
 The tables below list every ``stablehlo`` op name (after stripping the
 ``stablehlo.`` prefix) that is currently supported, together with the
-corresponding ONNX op or sub-graph it is lowered to.
+corresponding ONNX op or sub-graph it is lowered to.  Each ONNX op name
+links to its entry in the :epkg:`ONNX Operators` specification, and each
+StableHLO op name links to the :epkg:`StableHLO` specification.
 
 Direct mappings
 ---------------
@@ -25,6 +27,15 @@ These ``stablehlo`` ops map to a single ONNX op with the same semantics:
 
     from yobx.tensorflow.ops.jax_ops import _MAPPING_JAX_ONNX
 
+    _ONNX_BASE = "https://onnx.ai/onnx/operators/onnx__{}.html"
+    _STABLEHLO_BASE = "https://openxla.org/stablehlo/spec#{}"
+
+    def _hlo_anchor(jax_op):
+        # compare_EQ/GT/GE/LT/LE/NE are synthetic names for stablehlo.compare
+        if jax_op.startswith("compare_"):
+            return "compare"
+        return jax_op.replace("_", "-")
+
     # Group by ONNX op name for a more readable table
     rows = sorted(_MAPPING_JAX_ONNX.items())  # (jax_op, onnx_op)
     print(".. list-table::")
@@ -34,8 +45,10 @@ These ``stablehlo`` ops map to a single ONNX op with the same semantics:
     print("   * - StableHLO op (``stablehlo.<name>``)")
     print("     - ONNX op")
     for jax_op, onnx_op in rows:
-        print(f"   * - ``{jax_op}``")
-        print(f"     - ``{onnx_op}``")
+        hlo_url = _STABLEHLO_BASE.format(_hlo_anchor(jax_op))
+        onnx_url = _ONNX_BASE.format(onnx_op)
+        print(f"   * - `{jax_op} <{hlo_url}>`_")
+        print(f"     - `{onnx_op} <{onnx_url}>`_")
     print()
 
 Composite mappings
@@ -50,10 +63,22 @@ as small sub-graphs by dedicated factory functions:
 
     from yobx.tensorflow.ops.jax_ops import _COMPOSITE_JAX_OPS
 
+    _ONNX_BASE = "https://onnx.ai/onnx/operators/onnx__{}.html"
+    _STABLEHLO_BASE = "https://openxla.org/stablehlo/spec#{}"
+
+    def _hlo_anchor(jax_op):
+        if jax_op.startswith("compare_"):
+            return "compare"
+        return jax_op.replace("_", "-")
+
+    def _onnx_link(op):
+        return f"`{op} <{_ONNX_BASE.format(op)}>`_"
+
     _descriptions = {
-        "rsqrt": "``Reciprocal(Sqrt(x))``",
-        "log_plus_one": "``Log(Add(x, 1))``",
-        "exponential_minus_one": "``Sub(Exp(x), 1)``",
+        "rsqrt": f"{_onnx_link('Reciprocal')} ( {_onnx_link('Sqrt')} (x) )",
+        "log_plus_one": f"{_onnx_link('Log')} ( {_onnx_link('Add')} (x, 1) )",
+        "exponential_minus_one": f"{_onnx_link('Sub')} ( {_onnx_link('Exp')} (x), 1 )",
+        "compare_NE": f"{_onnx_link('Not')} ( {_onnx_link('Equal')} (a, b) )",
     }
 
     print(".. list-table::")
@@ -63,10 +88,39 @@ as small sub-graphs by dedicated factory functions:
     print("   * - StableHLO op (``stablehlo.<name>``)")
     print("     - ONNX equivalent")
     for jax_op in sorted(_COMPOSITE_JAX_OPS):
+        hlo_url = _STABLEHLO_BASE.format(_hlo_anchor(jax_op))
         desc = _descriptions.get(jax_op, "*(see source)*")
-        print(f"   * - ``{jax_op}``")
+        print(f"   * - `{jax_op} <{hlo_url}>`_")
         print(f"     - {desc}")
     print()
+
+Structural ops
+--------------
+
+The following ``stablehlo`` ops are handled directly by the
+``XlaCallModule`` converter in :mod:`yobx.tensorflow.ops.xla_call_module`
+and do not go through :func:`~yobx.tensorflow.ops.jax_ops.get_jax_cvt`:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - StableHLO op
+     - ONNX equivalent
+   * - `broadcast_in_dim <https://openxla.org/stablehlo/spec#broadcast_in_dim>`_
+     - identity pass-through (ONNX broadcasting is implicit)
+   * - `constant <https://openxla.org/stablehlo/spec#constant>`_
+     - ONNX initializer (weight tensor)
+   * - `convert <https://openxla.org/stablehlo/spec#convert>`_
+     - `Cast <https://onnx.ai/onnx/operators/onnx__Cast.html>`_
+   * - `dot_general <https://openxla.org/stablehlo/spec#dot_general>`_
+     - `MatMul <https://onnx.ai/onnx/operators/onnx__MatMul.html>`_
+   * - `dynamic_broadcast_in_dim <https://openxla.org/stablehlo/spec#dynamic_broadcast_in_dim>`_
+     - identity pass-through (ONNX broadcasting is implicit)
+   * - `reduce_max <https://openxla.org/stablehlo/spec#reduce>`_
+     - `ReduceMax <https://onnx.ai/onnx/operators/onnx__ReduceMax.html>`_
+   * - `reduce_sum <https://openxla.org/stablehlo/spec#reduce>`_
+     - `ReduceSum <https://onnx.ai/onnx/operators/onnx__ReduceSum.html>`_
 
 Adding a new JAX op mapping
 ----------------------------
