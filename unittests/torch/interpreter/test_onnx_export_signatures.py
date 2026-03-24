@@ -456,6 +456,7 @@ class TestOnnxExportSignatures(ExtTestCase):
         self._check_exporter(sname, Neuron(), inputs, sig_tracing)
 
     @skipif_ci_windows("not working on windows")
+    @ignore_warnings(FutureWarning)
     def test_signature_index_d_r(self):
         class Neuron(torch.nn.Module):
             def __init__(self, n_dims: int = 3, n_targets: int = 1):

@@ -1109,10 +1109,7 @@ def to_onnx(
     artifact = onx
 
     if filename:
-        from ...xbuilder.builder_stats_helper import builder_stats_to_dataframe
-
-        df = builder_stats_to_dataframe(all_stats)
-        df.to_excel(f"{os.path.splitext(filename)[0]}.xlsx")
+        artifact.compute_node_stats()
         artifact.save(filename)
 
     if isinstance(validate_onnx, float) or validate_onnx:
