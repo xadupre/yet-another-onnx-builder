@@ -1,18 +1,21 @@
 """
 .. _l-plot-translate-comparison:
 
-Comparing the four ONNX translation APIs
+Comparing the five ONNX translation APIs
 =========================================
 
 :func:`translate <yobx.translate.translate>` converts an
 :class:`onnx.ModelProto` into Python source code that, when executed,
-recreates the same model.  Four output APIs are available:
+recreates the same model.  Five output APIs are available:
 
 * ``"onnx"`` — uses :mod:`onnx.helper` (``oh.make_node``, ``oh.make_graph``, …)
   via :class:`~yobx.translate.inner_emitter.InnerEmitter`.
 * ``"onnx-short"`` — same as ``"onnx"`` but replaces large initializers with
   random values to keep the snippet compact, via
   :class:`~yobx.translate.inner_emitter.InnerEmitterShortInitializer`.
+* ``"onnx-compact"`` — produces a single nested expression instead of assembling
+  separate lists of nodes/inputs/outputs, via
+  :class:`~yobx.translate.inner_emitter.InnerEmitterCompact`.
 * ``"light"`` — fluent ``start(…).vin(…).…`` chain,
   via :class:`~yobx.translate.light_emitter.LightEmitter`.
 * ``"builder"`` — ``GraphBuilder``-based function wrapper,
@@ -87,7 +90,20 @@ print(f"\nFull code length  : {len(code_onnx):>6} characters")
 print(f"Short code length : {len(code_short):>6} characters")
 
 # %%
-# 3. ``"light"`` API — fluent chain
+# 3. ``"onnx-compact"`` API — single nested expression
+# -------------------------------------------------------
+#
+# Instead of building separate lists of nodes, inputs, outputs, and initializers
+# before assembling them, this emitter produces a single nested
+# ``oh.make_model(oh.make_graph([…], …), …)`` expression.
+# This is often more concise than ``"onnx"`` while still being fully readable.
+
+code_compact = translate(model, api="onnx-compact")
+print("=== api='onnx-compact' ===")
+print(code_compact)
+
+# %%
+# 4. ``"light"`` API — fluent chain
 # -----------------------------------
 #
 # The output is a single method-chain expression (``start(…).vin(…).…``).
@@ -97,7 +113,7 @@ print("=== api='light' ===")
 print(code_light)
 
 # %%
-# 4. ``"builder"`` API — GraphBuilder
+# 5. ``"builder"`` API — GraphBuilder
 # -------------------------------------
 #
 # The output uses ``GraphBuilder`` to wrap the graph nodes in a Python function.
@@ -135,15 +151,20 @@ print("\nRound-trip succeeded ✓")
 #
 # The bar chart compares the number of characters produced by each API for the
 # same model.  ``"onnx-short"`` is always ≤ ``"onnx"`` because it compresses
-# large initializers.
+# large initializers.  ``"onnx-compact"`` is typically shorter than ``"onnx"``
+# because it uses a single nested expression instead of building separate lists.
 
 import matplotlib.pyplot as plt  # noqa: E402
 
-api_labels = ["onnx", "onnx-short", "light", "builder"]
-code_sizes = [len(code_onnx), len(code_short), len(code_light), len(code_builder)]
+api_labels = ["onnx", "onnx-short", "onnx-compact", "light", "builder"]
+code_sizes = [len(code_onnx), len(code_short), len(code_compact), len(code_light), len(code_builder)]
 
-fig, ax = plt.subplots(figsize=(7, 4))
-bars = ax.bar(api_labels, code_sizes, color=["#4c72b0", "#dd8452", "#55a868", "#c44e52"])
+fig, ax = plt.subplots(figsize=(8, 4))
+bars = ax.bar(
+    api_labels,
+    code_sizes,
+    color=["#4c72b0", "#dd8452", "#8172b2", "#55a868", "#c44e52"],
+)
 ax.set_ylabel("Generated code size (characters)")
 ax.set_title("ONNX translation: code size by API")
 for bar, size in zip(bars, code_sizes):
