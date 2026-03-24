@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_pandas, hide_stdout
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
+from yobx.typing import ConvertOptionsProtocol
 
 
 @requires_sklearn("1.4")
@@ -429,7 +430,7 @@ class TestSklearnBaseConverters(ExtTestCase):
                 return np.clip(X, self.clip_min, self.clip_max)
 
         # ── custom convert-options class ──────────────────────────────────────
-        class ClipOptions:
+        class ClipOptions(ConvertOptionsProtocol):
             def __init__(self, clip_mask=False):
                 self.clip_mask = clip_mask
 
