@@ -15,7 +15,7 @@ import onnx.numpy_helper as onh
 
 from ..typing import GraphBuilderExtendedProtocol
 from ..xtracing.tracing import trace_numpy_function
-from .parse import AggExpr, BinaryExpr, ColumnRef, Condition, FuncCallExpr, Literal
+from yobx.xtracing.parse import AggExpr, BinaryExpr, ColumnRef, Condition, FuncCallExpr, Literal
 
 
 class _ExprEmitter:

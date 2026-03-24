@@ -49,7 +49,7 @@ def build_traceable_inputs_from_inputs(
 
     # dataframe
     from ..sql import TracedDataFrame, TracedSeries
-    from ..sql.parse import ColumnRef
+    from ..xtracing.parse import ColumnRef
 
     return (TracedDataFrame(dict(zip(inputs, [TracedSeries(ColumnRef(i)) for i in inputs]))),)
 

@@ -68,7 +68,7 @@ from .sql_convert import (
 )
 from .polars_convert import lazyframe_to_onnx
 from .convert import to_onnx
-from .parse import (
+from yobx.xtracing.parse import (
     AggExpr,
     BinaryExpr,
     ColumnRef,

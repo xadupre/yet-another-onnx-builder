@@ -29,7 +29,7 @@ Public API
 * :class:`TracedCondition` — proxy for a boolean predicate
 * :class:`TracedGroupBy` — result of :meth:`TracedDataFrame.groupby`
 * :func:`trace_dataframe` — trace a DataFrame function →
-  :class:`~yobx.sql.parse.ParsedQuery`
+  :class:`~yobx.xtracing.parse.ParsedQuery`
 * :func:`dataframe_to_onnx` — high-level entry point: traced DataFrame
   function → :class:`~yobx.container.ExportArtifact`
 

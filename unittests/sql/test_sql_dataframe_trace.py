@@ -21,7 +21,7 @@ from yobx.sql import (
     trace_dataframe,
 )
 from yobx.xtracing.dataframe_trace import _to_ast
-from yobx.sql.parse import AggExpr, BinaryExpr, ColumnRef, Condition, Literal
+from yobx.xtracing.parse import AggExpr, BinaryExpr, ColumnRef, Condition, Literal
 
 
 def _ort_run(onx, feeds):

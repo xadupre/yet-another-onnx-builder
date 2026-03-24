@@ -60,7 +60,7 @@ import numpy as np
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
 from ..xbuilder import GraphBuilder
-from ..sql.parse import (
+from .parse import (
     AggExpr,
     BinaryExpr,
     ColumnRef,

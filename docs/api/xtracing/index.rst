@@ -11,6 +11,7 @@ See :ref:`l-design-function-transformer-tracing` for a full walkthrough.
     numpy_array
     tracing
     dataframe_trace
+    parse
 
 trace_numpy_function
 ++++++++++++++++++++

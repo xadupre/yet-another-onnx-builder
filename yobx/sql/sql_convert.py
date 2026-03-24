@@ -52,7 +52,7 @@ from ..typing import GraphBuilderExtendedProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
 from .ops import get_sql_op_converter
-from .parse import GroupByOp, JoinOp, ParsedQuery, SelectOp, parse_sql
+from yobx.xtracing.parse import GroupByOp, JoinOp, ParsedQuery, SelectOp, parse_sql
 
 # ---------------------------------------------------------------------------
 # Dtype helper

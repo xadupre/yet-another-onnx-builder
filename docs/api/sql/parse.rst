@@ -1,6 +1,10 @@
 yobx.sql — parse module
 =======================
 
-.. automodule:: yobx.sql.parse
+.. note::
+
+    The ``parse`` module has moved to :mod:`yobx.xtracing.parse`.
+
+.. automodule:: yobx.xtracing.parse
     :members:
     :no-undoc-members:
