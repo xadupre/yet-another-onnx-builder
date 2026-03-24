@@ -905,21 +905,21 @@ class TestConvertOptionsHas(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_has_by_step_name_true(self):
-        opts = ConvertOptions(decision_leaf={"clf"})
-        self.assertTrue(opts.has("decision_leaf", self._dtc, name="clf"))
+        opts = ConvertOptions(decision_leaf={"main__clf"})
+        self.assertTrue(opts.has("decision_leaf", self._dtc, name="main__clf"))
 
     def test_has_by_step_name_false_wrong_name(self):
-        opts = ConvertOptions(decision_leaf={"clf"})
-        self.assertFalse(opts.has("decision_leaf", self._dtc, name="scaler"))
+        opts = ConvertOptions(decision_leaf={"main__clf"})
+        self.assertFalse(opts.has("decision_leaf", self._dtc, name="main__scaler"))
 
     def test_has_by_step_name_false_no_name(self):
         """String in set is ignored when no name is provided."""
-        opts = ConvertOptions(decision_leaf={"clf"})
+        opts = ConvertOptions(decision_leaf={"main__clf"})
         self.assertFalse(opts.has("decision_leaf", self._dtc))
 
     def test_has_by_step_name_false_empty_set(self):
         opts = ConvertOptions(decision_leaf=set())
-        self.assertFalse(opts.has("decision_leaf", self._dtc, name="clf"))
+        self.assertFalse(opts.has("decision_leaf", self._dtc, name="main__clf"))
 
     # ------------------------------------------------------------------
     # Type (class object) matching — existing behaviour preserved
@@ -972,7 +972,7 @@ class TestConvertOptionsHas(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_decision_leaf_by_step_name_in_pipeline(self):
-        """ConvertOptions with a step-name set enables the extra output for that step."""
+        """ConvertOptions with a full node-name set enables the extra output for that step."""
         X, y = make_classification(n_samples=50, n_features=4, random_state=0)
         X = X.astype(np.float32)
         from sklearn.preprocessing import StandardScaler
@@ -982,14 +982,14 @@ class TestConvertOptionsHas(ExtTestCase):
             [("scaler", StandardScaler()), ("clf", DecisionTreeClassifier(max_depth=3))]
         ).fit(X, y)
 
-        # Only enable decision_leaf for the step named "clf"
-        opts = ConvertOptions(decision_leaf={"clf"})
+        # "main__clf" is the full converter node name for the step named "clf"
+        opts = ConvertOptions(decision_leaf={"main__clf"})
         onx = to_onnx(pipe, (X,), convert_options=opts)
         # label + proba + decision_leaf = 3 outputs
         self.assertEqual(len(onx.graph.output), 3)
 
     def test_decision_leaf_step_name_not_triggered_for_other_name(self):
-        """decision_leaf is NOT emitted when the step name does not match."""
+        """decision_leaf is NOT emitted when the node name does not match any step."""
         X, y = make_classification(n_samples=50, n_features=4, random_state=0)
         X = X.astype(np.float32)
         from sklearn.preprocessing import StandardScaler
@@ -999,8 +999,8 @@ class TestConvertOptionsHas(ExtTestCase):
             [("scaler", StandardScaler()), ("clf", DecisionTreeClassifier(max_depth=3))]
         ).fit(X, y)
 
-        # "tree" doesn't match the step name "clf" → no extra output
-        opts = ConvertOptions(decision_leaf={"tree"})
+        # "other__clf" does not match any step node name in this pipeline
+        opts = ConvertOptions(decision_leaf={"other__clf"})
         onx = to_onnx(pipe, (X,), convert_options=opts)
         # label + proba only = 2 outputs (no decision_leaf)
         self.assertEqual(len(onx.graph.output), 2)

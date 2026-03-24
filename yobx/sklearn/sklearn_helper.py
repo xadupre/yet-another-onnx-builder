@@ -83,13 +83,10 @@ def get_output_names(
     # Append extra output names requested by convert_options so that converters
     # can detect them via len(outputs) > extra_idx and emit the extra nodes.
     if isinstance(estimator, Pipeline):
-        last_step_name_in_pipeline, last_step = estimator.steps[-1]
-        # When no explicit name override is given, use the last step's pipeline
-        # name so that string-based ConvertOptions filtering works by step name.
-        effective_name = name if name is not None else last_step_name_in_pipeline
+        last_step = estimator.steps[-1][1]
     else:
         last_step = estimator
-        effective_name = name
+    effective_name = name
     if hasattr(last_step, "get_feature_names_out") and _should_use_feature_names(last_step):
         try:
             outnames = estimator.get_feature_names_out()
@@ -132,20 +129,6 @@ def _longest_prefix(s1: str, s2: str) -> str:
             return s1[:i]
     return s1
 
-
-def extract_step_name(node_name: str) -> Optional[str]:
-    """Return the pipeline step name embedded in a converter node name.
-
-    Converter node names use ``"__"`` as a separator, e.g. ``"main__clf"``
-    for a step named ``"clf"`` inside the top-level pipeline.  This helper
-    returns the last component (``"clf"``), which is the step name used in
-    the :class:`~sklearn.pipeline.Pipeline` constructor.  Returns ``None``
-    when the node name does not contain a separator (i.e. the estimator is
-    not inside a pipeline).
-    """
-    if "__" in node_name:
-        return node_name.rsplit("__", 1)[-1]
-    return None
 
 
 def longest_prefix(names: Sequence[str]) -> str:

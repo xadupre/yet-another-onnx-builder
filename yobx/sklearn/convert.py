@@ -59,7 +59,7 @@ def _wrap_step_as_function(
         sub_g.make_tensor_input(func_inp, itype, ishape)
 
     # Determine generic sub-builder output names (independent of the main graph).
-    function_output_names = list(get_output_names(estimator, g.convert_options))
+    function_output_names = list(get_output_names(estimator, g.convert_options, name))
     function_output_names = [g.unique_name(n) for n in function_output_names]
 
     # Run the converter inside the sub-builder (no function_options propagation).
@@ -280,7 +280,10 @@ def to_onnx(
     # Build the sts dict (shared state for converters). function_options, if set,
     # is passed explicitly to container converters below.
     sts: Dict[str, Any] = {}
-    output_names = list(get_output_names(estimator, g.convert_options))
+    _top_level_node_name = (
+        f"main__{estimator.steps[-1][0]}" if isinstance(estimator, Pipeline) else "main"
+    )
+    output_names = list(get_output_names(estimator, g.convert_options, _top_level_node_name))
     output_names = [g.unique_name(n) for n in output_names]
 
     is_container = isinstance(estimator, (Pipeline, ColumnTransformer, FeatureUnion))
