@@ -5,7 +5,7 @@ ExtendedReferenceEvaluator: running models with contrib operators
 =================================================================
 
 :class:`ExtendedReferenceEvaluator
-<yobx.reference.evaluator.ExtendedReferenceEvaluator>` extends
+<yobx.reference.ExtendedReferenceEvaluator>` extends
 :class:`onnx.reference.ReferenceEvaluator` with additional operator kernels for
 non-standard domains such as ``com.microsoft``.
 

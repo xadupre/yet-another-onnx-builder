@@ -28,12 +28,12 @@ derives the output shape from the input shapes.  When a dimension cannot be
 expressed as a plain integer it is stored as a Python-arithmetic string
 (e.g. ``"seq1+seq2"``, ``"c//2"``).  Before storing, the string is
 normalised by
-:func:`simplify_expression <yobx.xshape.simplify_expressions.simplify_expression>`,
+:func:`simplify_expression <yobx.xexpressions.simplify_expressions.simplify_expression>`,
 which uses Python's :mod:`ast` module to cancel identical sub-expressions
 (``d + f - f`` → ``d``) and fold constants (``2 * seq // 2`` → ``seq``).
 Once the actual input sizes are available at runtime, every symbolic
 dimension can be resolved to an integer by
-:func:`evaluate_expression <yobx.xshape.evaluate_expressions.evaluate_expression>`
+:func:`evaluate_expression <yobx.xexpressions.evaluate_expressions.evaluate_expression>`
 or the higher-level
 :meth:`evaluate_shape <yobx.xshape.ShapeBuilder.evaluate_shape>`.
 
@@ -172,7 +172,7 @@ print("concrete shape of S2:", builder_split.evaluate_shape("S2", context_split)
 # -------------------------------------
 #
 # Before storing a symbolic dimension,
-# :func:`simplify_expression <yobx.xshape.simplify_expressions.simplify_expression>`
+# :func:`simplify_expression <yobx.xexpressions.simplify_expressions.simplify_expression>`
 # reduces the expression to its simplest equivalent form.
 
 

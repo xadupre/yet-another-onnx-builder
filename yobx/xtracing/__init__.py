@@ -35,6 +35,7 @@ Example
     onx = trace_numpy_to_onnx(my_func, X_sample)
 """
 
+from .numpy_array import NumpyArray
 from .tracing import trace_numpy_function, trace_numpy_to_onnx
 
-__all__ = ["trace_numpy_function", "trace_numpy_to_onnx"]
+__all__ = ["NumpyArray", "trace_numpy_function", "trace_numpy_to_onnx"]
