@@ -157,13 +157,17 @@ print("\nRound-trip succeeded ✓")
 import matplotlib.pyplot as plt  # noqa: E402
 
 api_labels = ["onnx", "onnx-short", "onnx-compact", "light", "builder"]
-code_sizes = [len(code_onnx), len(code_short), len(code_compact), len(code_light), len(code_builder)]
+code_sizes = [
+    len(code_onnx),
+    len(code_short),
+    len(code_compact),
+    len(code_light),
+    len(code_builder),
+]
 
 fig, ax = plt.subplots(figsize=(8, 4))
 bars = ax.bar(
-    api_labels,
-    code_sizes,
-    color=["#4c72b0", "#dd8452", "#8172b2", "#55a868", "#c44e52"],
+    api_labels, code_sizes, color=["#4c72b0", "#dd8452", "#8172b2", "#55a868", "#c44e52"]
 )
 ax.set_ylabel("Generated code size (characters)")
 ax.set_title("ONNX translation: code size by API")
