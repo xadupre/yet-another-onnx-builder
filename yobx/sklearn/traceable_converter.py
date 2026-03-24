@@ -61,7 +61,7 @@ def sklearn_traceable_converter(
     estimator: TraceableTransformerMixin,
     *inputs: str,
     name: str = "traceable",
-) -> List[str]:
+) -> Union[str, Tuple[str, ...]]:
     """
     The function assumes the estimator processes dataframe or numpy arrays.
     For dataframe, the function will group in a single dataframes all
@@ -78,7 +78,7 @@ def sklearn_traceable_converter(
         dtypes = dict(zip(inputs, [tensor_dtype_to_np_dtype(g.get_type(i)) for i in inputs]))
         pq = trace_dataframe(estimator.transform, dtypes)  # type: ignore
         out_names = parsed_query_to_onnx_graph(
-            g, sts, list(outputs) if outputs else None, pq, dtypes, _finalize=False
+            g, sts, list(outputs) if outputs else None, pq, dtypes, _finalize=False  # type: ignore
         )
         return out_names[0] if len(out_names) == 1 else tuple(out_names)
 
