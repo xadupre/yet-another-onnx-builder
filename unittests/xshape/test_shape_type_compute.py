@@ -178,9 +178,12 @@ class _LocalFunctionShapeBuilder(BasicShapeBuilder):
 
     def reset_types_and_shapes(self):
         """Clear cached shapes and types so they can be recomputed."""
-        self._known_shapes.clear()
-        self._known_types.clear()
-        self._known_ranks.clear()
+        self._known_shapes = {}
+        self._known_types = {}
+        self._known_ranks = {}
+        self._known_devices = {}
+        self.constants_ = {}
+        self._calls = []
 
     def infer_shapes(self):
         """Re-run shape inference over the stored function nodes."""
