@@ -73,7 +73,7 @@ def _wrap_step_as_function(
     )
     # Reconcile: if outputs were not pre-specified, use the names returned by the converter.
     if function_output_names is None:
-        function_output_names = (out_names,) if isinstance(out_names, str) else tuple(out_names)
+        function_output_names = (out_names,) if isinstance(out_names, str) else tuple(out_names)  # type: ignore
     else:
         function_output_names = tuple(function_output_names)  # type: ignore
 
@@ -133,7 +133,7 @@ def _wrap_step_as_function(
                 g.set_rank(out, sub_g.get_rank(func_out))
             if sub_g.has_device(func_out):
                 g.set_device(out, sub_g.get_device(func_out))
-    return function_output_names if len(function_output_names) > 1 else function_output_names[0]
+    return function_output_names if len(function_output_names) > 1 else function_output_names[0]  # type: ignore
 
 
 def to_onnx(

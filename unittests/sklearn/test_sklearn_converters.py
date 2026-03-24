@@ -845,17 +845,12 @@ class TestSklearnConvertersBasicInvocation(ExtTestCase):
 
                 # Pre-compute output names exactly as to_onnx() does internally.
                 output_names = get_output_names(est, g.convert_options)
-                outputs = (
-                    [g.unique_name(n) for n in output_names] if output_names else None
-                )
+                outputs = [g.unique_name(n) for n in output_names] if output_names else None
 
                 fct = converters[cls]
                 result = fct(g, {}, outputs, est, inp, name="test")
 
-                self.assertIsNotNone(
-                    result,
-                    msg=f"Converter for {cls.__name__} returned None",
-                )
+                self.assertIsNotNone(result, msg=f"Converter for {cls.__name__} returned None")
                 tested += 1
 
         self.assertGreater(tested, 0, "No converters were tested")
