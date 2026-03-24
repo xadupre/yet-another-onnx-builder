@@ -337,6 +337,23 @@ class:
     contract and the built-in :class:`~yobx.sklearn.ConvertOptions`
     reference.
 
+Multi-output converters with ``NoKnownOutputMixin``
+===================================================
+
+By default the framework infers the expected ONNX output names from the
+estimator type (see :ref:`l-design-sklearn-converter`, *Output naming*
+section).  When a custom estimator produces outputs that don't fit those
+heuristics — for example an arbitrary set of named columns — the automatic
+inference gets in the way.
+
+Inheriting from
+:class:`NoKnownOutputMixin <yobx.sklearn.NoKnownOutputMixin>`
+tells :func:`get_output_names <yobx.sklearn.sklearn_helper.get_output_names>`
+to return ``None``, which causes :func:`to_onnx <yobx.sklearn.to_onnx>`
+to skip pre-allocating output tensor names and hand full control to the
+converter.  The converter is then free to call ``g.op.*`` and return as
+many (or as few) output names as it needs.
+
 .. seealso::
 
     :ref:`l-design-sklearn-converter` — overview of the converter

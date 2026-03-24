@@ -97,8 +97,8 @@ print(f"  {'TOTAL':<12s}  {total:>12,}")
 # ====================================  ==========================================
 # Group                                 Formula
 # ====================================  ==========================================
-# Element-wise unary (Relu, Sqrt, …)   1 FLOPs per output element
-# Element-wise binary (Add, Mul, …)    1 FLOPs per output element
+# Element-wise unary (Relu, Sqrt, …)    1 FLOPs per output element
+# Element-wise binary (Add, Mul, …)     1 FLOPs per output element
 # Sigmoid                               3 FLOPs per element (exp+add+div)
 # Softmax / LogSoftmax                  3 FLOPs per element (exp+sum+div)
 # MatMul                                2·batch·M·K·N
@@ -108,12 +108,12 @@ print(f"  {'TOTAL':<12s}  {total:>12,}")
 # GlobalAveragePool / GlobalMaxPool     N·C·spatial_in
 # BatchNormalization                    2 FLOPs per output element
 # LayerNorm / GroupNorm / InstanceNorm  6 FLOPs per output element
-# ReduceSum / ReduceMean / … (9 ops)   Input element count
+# ReduceSum / ReduceMean / … (9 ops)    Input element count
 # LSTM                                  2·seq·batch·(input+hidden)·4·hidden
 # GRU                                   2·seq·batch·(input+hidden)·3·hidden
 # RNN                                   2·seq·batch·(input+hidden)·hidden
-# Data-movement (Cast, Transpose, …)   Output element count
-# Shape-manipulation (Reshape, …)      Rank of output tensor
+# Data-movement (Cast, Transpose, …)    Output element count
+# Shape-manipulation (Reshape, …)       Rank of output tensor
 # Identity                              0 (zero cost)
 # ====================================  ==========================================
 #

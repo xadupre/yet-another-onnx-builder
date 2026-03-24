@@ -137,6 +137,13 @@ determines the list of output tensor names for an estimator:
 * **Classifiers** default to ``["label", "probabilities"]``.
 * **Regressors** default to ``["predictions"]``.
 * Everything else defaults to ``["Y"]``.
+* **Estimators that inherit from**
+  :class:`NoKnownOutputMixin <yobx.sklearn.NoKnownOutputMixin>` cause
+  ``get_output_names()`` to return ``None``, signalling that the converter
+  itself is responsible for registering its outputs.  Use this mixin when
+  the output shape cannot be determined by the heuristics above — for
+  example a transformer that returns an arbitrary number of named columns.
+  See :ref:`l-design-sklearn-custom-converter` for a worked example.
 
 Adding a new converter
 ======================

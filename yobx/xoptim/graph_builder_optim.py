@@ -1342,6 +1342,13 @@ class GraphBuilderPatternOptimization:
         matches = []
         durations = {}
         continue_optimization = True
+
+        unique_node_type = {n.op_type for n in self.nodes if n}
+        fast_nodes = {t: [] for t in unique_node_type}
+        for node in self.nodes:
+            if node:
+                fast_nodes[node.op_type].append(node)
+
         for pattern in patterns_list:
             if not continue_optimization:
                 break
@@ -1362,8 +1369,15 @@ class GraphBuilderPatternOptimization:
             begin = time.perf_counter()
             before = len(matches)
 
+            fast_match = pattern.fast_op_type()
+            subset_nodes = None
+            if len(fast_match) == 1:
+                t = next(iter(fast_match))
+                if t in fast_nodes:
+                    subset_nodes = fast_nodes[t]
+
             # loop over the nodes
-            for match in pattern.enumerate_matches(self):
+            for match in pattern.enumerate_matches(self, subset_nodes=subset_nodes):
                 # bypass this node if the name contains some specific name
                 fail_match = False
                 for n in match.nodes:

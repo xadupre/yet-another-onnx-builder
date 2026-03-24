@@ -19,29 +19,29 @@ def broadcast_shape(
     The function follows NumPy/ONNX broadcasting rules.  Shapes are right-aligned
     and each pair of dimensions ``(a, b)`` is resolved according to the table below:
 
-    +-------------------+-------------------+--------+--------------------------------------+
-    | ``a``             | ``b``             | Result | Side effect                          |
-    +===================+===================+========+======================================+
-    | int (any)         | int (any)         | max    | none                                 |
-    +-------------------+-------------------+--------+--------------------------------------+
-    | int ``n ≠ 0, 1``  | str (symbolic)    | ``n``  | :meth:`register_constraint_dimension\
-                                                         <yobx.xshape.ShapeBuilder.\
-                                                         register_constraint_dimension>`\
-                                                         ``(b, n)`` if *graph_builder*        |
-    +-------------------+-------------------+--------+--------------------------------------+
-    | ``1``             | str (symbolic)    | ``b``  | none                                 |
-    +-------------------+-------------------+--------+--------------------------------------+
-    | str (symbolic)    | int ``n ≠ 0, 1``  | ``n``  | :meth:`register_constraint_dimension\
-                                                         <yobx.xshape.ShapeBuilder.\
-                                                         register_constraint_dimension>`\
-                                                         ``(a, n)`` if *graph_builder*        |
-    +-------------------+-------------------+--------+--------------------------------------+
-    | str (symbolic)    | ``1``             | ``a``  | none                                 |
-    +-------------------+-------------------+--------+--------------------------------------+
-    | str ``a == b``    | str ``a == b``    | ``a``  | none                                 |
-    +-------------------+-------------------+--------+--------------------------------------+
-    | str ``a != b``    | str ``a != b``    | ``a^b``| none (``^`` means ``max``)           |
-    +-------------------+-------------------+--------+--------------------------------------+
+    +-------------------+-------------------+--------+----------------------------------------+
+    | ``a``             | ``b``             | Result | Side effect                            |
+    +===================+===================+========+========================================+
+    | int (any)         | int (any)         | max    | none                                   |
+    +-------------------+-------------------+--------+----------------------------------------+
+    | int ``n ≠ 0, 1``  | str (symbolic)    | ``n``  | :meth:`register_constraint_dimension   |
+    |                   |                   |        | <yobx.xshape.ShapeBuilder.             |
+    |                   |                   |        | register_constraint_dimension>`        |
+    |                   |                   |        | ``(b, n)`` if *graph_builder*          |
+    +-------------------+-------------------+--------+----------------------------------------+
+    | ``1``             | str (symbolic)    | ``b``  | none                                   |
+    +-------------------+-------------------+--------+----------------------------------------+
+    | str (symbolic)    | int ``n ≠ 0, 1``  | ``n``  | :meth:`register_constraint_dimension   |
+    |                   |                   |        | <yobx.xshape.ShapeBuilder.             |
+    |                   |                   |        | register_constraint_dimension>`        |
+    |                   |                   |        | ``(a, n)`` if *graph_builder*          |
+    +-------------------+-------------------+--------+----------------------------------------+
+    | str (symbolic)    | ``1``             | ``a``  | none                                   |
+    +-------------------+-------------------+--------+----------------------------------------+
+    | str ``a == b``    | str ``a == b``    | ``a``  | none                                   |
+    +-------------------+-------------------+--------+----------------------------------------+
+    | str ``a != b``    | str ``a != b``    | ``a^b``| none (``^`` means ``max``)             |
+    +-------------------+-------------------+--------+----------------------------------------+
 
     When a symbolic dimension is paired with a concrete integer ``n ≠ 1``, the concrete
     value is chosen as the output dimension *and* the equality is stored as a constraint
