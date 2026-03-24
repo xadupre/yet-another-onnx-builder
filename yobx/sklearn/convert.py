@@ -70,6 +70,8 @@ def _wrap_step_as_function(
     )
     if function_input_names is None:
         function_output_names = out_names
+    else:
+        function_output_names = tuple(function_output_names)
 
     # Register the sub-builder outputs.
     assert (
@@ -122,7 +124,7 @@ def _wrap_step_as_function(
                 g.set_rank(out, sub_g.get_rank(func_out))
             if sub_g.has_device(func_out):
                 g.set_device(out, sub_g.get_device(func_out))
-    return function_output_names
+    return function_output_names if len(function_output_names) > 1 else function_output_names[0]
 
 
 def to_onnx(
@@ -319,13 +321,15 @@ def to_onnx(
     assert (
         output_names is None
         or (out_names == output_names[0] and len(output_names) == 1)
-        or (out_names == output_names and len(output_names) > 1)
+        or (out_names == tuple(output_names) and len(output_names) > 1)
     ), (
         f"estimator={cls}, {fct=}, output mismatch, expected is {output_names}, got {out_names}"
         f"{g.get_debug_msg()}"
     )
     if output_names is None:
         output_names = out_names
+    else:
+        output_names = tuple(output_names)
     for name in output_names:
         g.make_tensor_output(name, indexed=False, allow_untyped_output=True)
     # When local functions are requested we must NOT inline them; pass inline=False
