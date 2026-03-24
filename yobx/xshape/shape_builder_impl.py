@@ -69,6 +69,7 @@ class BasicShapeBuilder(
         self._debug_shape_missing = int(os.environ.get("ONNXSHAPECOMPUTE", "0"))
         self._debug_value_shape = os.environ.get("ONNXSTOPVALUESHAPE", "")
         self._debug_constant_folding = 0
+        self._debug_quiet = False
         self._debug_msg = {}
         self.opsets = {"": opset} if isinstance(opset, int) else (opset or {"": 18})
         self.main_opset = self.opsets[""]
