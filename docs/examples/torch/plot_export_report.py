@@ -39,7 +39,6 @@ The five sheets are:
 # -------
 
 import os
-import tempfile
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -71,76 +70,75 @@ class SmallMLP(torch.nn.Module):
 model = SmallMLP()
 x = torch.randn(4, 16)
 
-with tempfile.TemporaryDirectory() as tmp:
-    onnx_path = os.path.join(tmp, "small_mlp.onnx")
-    xlsx_path = os.path.splitext(onnx_path)[0] + ".xlsx"
+onnx_path = "plot_export_report.onnx"
+xlsx_path = os.path.splitext(onnx_path)[0] + ".xlsx"
 
-    # ``filename`` triggers both the ONNX save and the Excel report.
-    artifact = to_onnx(model, (x,), filename=onnx_path)
+# ``filename`` triggers both the ONNX save and the Excel report.
+artifact = to_onnx(model, (x,), filename=onnx_path)
 
-    print(f"ONNX saved  : {os.path.basename(onnx_path)}")
-    print(f"Report saved: {os.path.basename(xlsx_path)}")
-    print(f"Nodes in graph: {len(artifact.graph.node)}")
-    print(f"Report repr  : {artifact.report!r}")
+print(f"ONNX saved  : {onnx_path}")
+print(f"Report saved: {xlsx_path}")
+print(f"Nodes in graph: {len(artifact.graph.node)}")
+print(f"Report repr  : {artifact.report!r}")
 
-    # %%
-    # 2. Read every sheet from the workbook
-    # --------------------------------------
-    #
-    # :func:`pandas.read_excel` with ``sheet_name=None`` returns an
-    # ``{sheet_name: DataFrame}`` mapping so we can inspect every page.
+# %%
+# 2. Read every sheet from the workbook
+# --------------------------------------
+#
+# :func:`pandas.read_excel` with ``sheet_name=None`` returns an
+# ``{sheet_name: DataFrame}`` mapping so we can inspect every page.
 
-    sheets: dict[str, pd.DataFrame] = pd.read_excel(xlsx_path, sheet_name=None)
-    print(f"\nSheets in workbook: {list(sheets)}")
-    for name, df in sheets.items():
-        print(f"\n--- {name} ({df.shape[0]} rows × {df.shape[1]} cols) ---")
-        print(df.to_string(index=False))
+sheets: dict[str, pd.DataFrame] = pd.read_excel(xlsx_path, sheet_name=None)
+print(f"\nSheets in workbook: {list(sheets)}")
+for name, df in sheets.items():
+    print(f"\n--- {name} ({df.shape[0]} rows × {df.shape[1]} cols) ---")
+    print(df.to_string(index=False))
 
-    # %%
-    # 3. Plot the sheet content
-    # -------------------------
-    #
-    # We render each sheet as a matplotlib table so sphinx-gallery captures
-    # the output.  Sheets that are absent (e.g. ``build_stats`` for a
-    # standard-size model) are silently skipped.
+# %%
+# 3. Plot the sheet content
+# -------------------------
+#
+# We render each sheet as a matplotlib table so sphinx-gallery captures
+# the output.  Sheets that are absent (e.g. ``build_stats`` for a
+# standard-size model) are silently skipped.
 
-    ordered_sheets = ["extra", "stats", "stats_agg", "node_stats", "build_stats"]
-    present = [s for s in ordered_sheets if s in sheets]
-    n = len(present)
+ordered_sheets = ["extra", "stats", "stats_agg", "node_stats", "build_stats"]
+present = [s for s in ordered_sheets if s in sheets]
+n = len(present)
 
-    fig, axes = plt.subplots(n, 1, figsize=(10, 3 * n))
-    if n == 1:
-        axes = [axes]
+fig, axes = plt.subplots(n, 1, figsize=(10, 3 * n))
+if n == 1:
+    axes = [axes]
 
-    for ax, sheet_name in zip(axes, present):
-        df = sheets[sheet_name]
-        ax.axis("off")
-        ax.set_title(sheet_name, fontsize=11, fontweight="bold", pad=6)
-        if df.empty:
-            ax.text(0.5, 0.5, "(empty)", ha="center", va="center", transform=ax.transAxes)
-            continue
-        # Truncate to at most 10 rows for readability
-        display_df = df.head(10)
-        tbl = ax.table(
-            cellText=display_df.values.tolist(),
-            colLabels=list(display_df.columns),
-            cellLoc="center",
-            loc="center",
+for ax, sheet_name in zip(axes, present):
+    df = sheets[sheet_name]
+    ax.axis("off")
+    ax.set_title(sheet_name, fontsize=11, fontweight="bold", pad=6)
+    if df.empty:
+        ax.text(0.5, 0.5, "(empty)", ha="center", va="center", transform=ax.transAxes)
+        continue
+    # Truncate to at most 10 rows for readability
+    display_df = df.head(10)
+    tbl = ax.table(
+        cellText=display_df.values.tolist(),
+        colLabels=list(display_df.columns),
+        cellLoc="center",
+        loc="center",
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(7)
+    tbl.auto_set_column_width(col=list(range(len(display_df.columns))))
+    if len(df) > 10:
+        ax.text(
+            0.5,
+            0.01,
+            f"… {len(df) - 10} more rows not shown",
+            ha="center",
+            va="bottom",
+            fontsize=7,
+            transform=ax.transAxes,
         )
-        tbl.auto_set_font_size(False)
-        tbl.set_fontsize(7)
-        tbl.auto_set_column_width(col=list(range(len(display_df.columns))))
-        if len(df) > 10:
-            ax.text(
-                0.5,
-                0.01,
-                f"… {len(df) - 10} more rows not shown",
-                ha="center",
-                va="bottom",
-                fontsize=7,
-                transform=ax.transAxes,
-            )
 
-    fig.suptitle("Excel report sheets produced by to_onnx()", fontsize=12)
-    plt.tight_layout()
-    plt.show()
+fig.suptitle("Excel report sheets produced by to_onnx()", fontsize=12)
+plt.tight_layout()
+plt.show()
