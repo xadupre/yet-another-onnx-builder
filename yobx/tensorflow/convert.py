@@ -231,10 +231,8 @@ def _build_input_specs(input_names, args, dynamic_shapes):
             shape = list(arr.shape)
             if dynamic_shapes and i < len(dynamic_shapes):
                 for axis, _ in dynamic_shapes[i].items():
-                    # TODO: make the batch dimension dynamic (copilot?)
                     shape[axis] = None  # type: ignore
             elif shape:
-                # TODO: make the batch dimension dynamic (copilot?)
                 shape[0] = None  # type: ignore
             specs.append(tf.TensorSpec(shape=shape, dtype=tf.as_dtype(arr.dtype), name=name))
     return specs
