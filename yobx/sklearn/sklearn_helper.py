@@ -84,7 +84,7 @@ def get_output_names(
     estimator: BaseEstimator,
     convert_options: Optional[ConvertOptionsProtocol] = None,
     name: Optional[str] = None,
-) -> Sequence[str]:
+) -> Optional[Sequence[str]]:
     """Returns output names for every estimator."""
     if isinstance(estimator, NoKnownOutputMixin):
         return None
