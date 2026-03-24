@@ -680,11 +680,6 @@ def _cmd_render_gallery(argv: List[Any]):
             fh.write(rst)
 
 
-#############
-# main parser
-#############
-
-
 def get_parser_validate() -> ArgumentParser:
     _DEFAULT_PROMPT = "Continue: it rains, what should I do?"
     parser = ArgumentParser(

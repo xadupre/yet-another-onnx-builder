@@ -1,8 +1,9 @@
-from typing import Sequence
+from typing import Optional, Sequence
 from sklearn.base import BaseEstimator, ClusterMixin, OutlierMixin, is_classifier, is_regressor
 from sklearn.cluster import FeatureAgglomeration
 from sklearn.mixture._base import BaseMixture
 from sklearn.pipeline import Pipeline
+from ..typing import ConvertOptionsProtocol
 
 try:
     from sklearn.feature_selection._base import SelectorMixin
@@ -49,63 +50,73 @@ def get_n_expected_outputs(estimator: BaseEstimator) -> int:
 
 
 def post_process_output_names(
-    estimator: BaseEstimator, output_names: Sequence[str]
+    estimator: BaseEstimator,
+    output_names: Sequence[str],
+    convert_options: Optional[ConvertOptionsProtocol] = None,
 ) -> Sequence[str]:
     """Makes sures the number of outputs is expected."""
+    output_names_0 = output_names
     n_outputs = get_n_expected_outputs(estimator)
-    if len(output_names) == n_outputs:
-        return output_names
-    if n_outputs == 1:
-        return [longest_prefix(output_names)]
-    raise NotImplementedError(
-        f"Not implemented with {output_names=}, {n_outputs=} and estimator is {type(estimator)}."
-    )
+    if n_outputs == 1 and len(output_names) != 1:
+        output_names = [longest_prefix(output_names)]
+    if len(output_names) != n_outputs:
+        raise NotImplementedError(
+            f"Not implemented with {output_names=}, {n_outputs=} "
+            f"and estimator is {type(estimator)}, {output_names_0=}."
+        )
+    if convert_options:
+        output_names = list(output_names)
+        for _extra_opt in convert_options.available_options():
+            if convert_options.has(_extra_opt, estimator):
+                output_names.append(_extra_opt)
+    return output_names
 
 
-def get_output_names(estimator: BaseEstimator) -> Sequence[str]:
+def get_output_names(
+    estimator: BaseEstimator, convert_options: Optional[ConvertOptionsProtocol] = None
+) -> Sequence[str]:
     """Returns output names for every estimator."""
-    if hasattr(estimator, "get_feature_names_out"):
-        if isinstance(estimator, Pipeline):
-            last_step = estimator.steps[-1][1]
-            if _should_use_feature_names(last_step):
-                try:
-                    return post_process_output_names(
-                        last_step, list(last_step.get_feature_names_out())
-                    )
-                except AttributeError:
-                    pass
-        elif _should_use_feature_names(estimator):
-            try:
-                return post_process_output_names(
-                    estimator, list(estimator.get_feature_names_out())
-                )
-            except AttributeError:
-                pass
 
-    if SelectorMixin is not None and isinstance(estimator, SelectorMixin):
-        return ["Y"]
-    if is_classifier(estimator):
-        if hasattr(estimator, "predict_proba"):
-            return ["label", "probabilities"]
-        return ["label"]
-    if OutlierMixin is not None and isinstance(estimator, OutlierMixin):
-        return ["label", "scores"]
-    if isinstance(estimator, BaseMixture):
-        return ["label", "probabilities"]
-    if isinstance(estimator, OutlierMixin):
-        return ["label", "scores"]
-    if is_regressor(estimator):
-        return ["predictions"]
-    last = estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
-    if OutlierMixin is not None and isinstance(last, OutlierMixin):
-        return ["label", "scores"]
-    if isinstance(last, ClusterMixin) and not isinstance(last, FeatureAgglomeration):
-        return ["label", "distances"]
-    if isinstance(last, BaseMixture):
-        return ["label", "probabilities"]
-    if isinstance(last, OutlierMixin):
-        return ["label", "scores"]
-    return ["Y"]
+    # Append extra output names requested by convert_options so that converters
+    # can detect them via len(outputs) > extra_idx and emit the extra nodes.
+    if isinstance(estimator, Pipeline):
+        last_step = estimator.steps[-1][1]
+    else:
+        last_step = estimator
+    if hasattr(last_step, "get_feature_names_out") and _should_use_feature_names(last_step):
+        try:
+            outnames = estimator.get_feature_names_out()
+        except AttributeError:
+            # No get_feature_names_out available (FunctionTransformer for example).
+            # Let's assume it is one output.
+            return post_process_output_names(last_step, ["Y"], convert_options)
+        return post_process_output_names(last_step, list(outnames), convert_options)
+
+    if SelectorMixin is not None and isinstance(last_step, SelectorMixin):
+        return post_process_output_names(last_step, ["Y"], convert_options)
+    if is_classifier(last_step):
+        if hasattr(last_step, "predict_proba"):
+            return post_process_output_names(
+                last_step, ["label", "probabilities"], convert_options
+            )
+        return post_process_output_names(last_step, ["label"], convert_options)
+    if OutlierMixin is not None and isinstance(last_step, OutlierMixin):
+        return post_process_output_names(last_step, ["label", "scores"], convert_options)
+    if isinstance(last_step, BaseMixture):
+        return post_process_output_names(last_step, ["label", "probabilities"], convert_options)
+    if isinstance(last_step, OutlierMixin):
+        return post_process_output_names(last_step, ["label", "scores"], convert_options)
+    if is_regressor(last_step):
+        return post_process_output_names(last_step, ["predictions"], convert_options)
+    if OutlierMixin is not None and isinstance(last_step, OutlierMixin):
+        return post_process_output_names(last_step, ["label", "scores"], convert_options)
+    if isinstance(last_step, ClusterMixin) and not isinstance(last_step, FeatureAgglomeration):
+        return post_process_output_names(last_step, ["label", "distances"], convert_options)
+    if isinstance(last_step, BaseMixture):
+        return post_process_output_names(last_step, ["label", "probabilities"], convert_options)
+    if isinstance(last_step, OutlierMixin):
+        return post_process_output_names(last_step, ["label", "scores"], convert_options)
+    return post_process_output_names(last_step, ["Y"], convert_options)
 
 
 def _longest_prefix(s1: str, s2: str) -> str:

@@ -1,5 +1,6 @@
 from ..pv_version import PvVersion
-from .convert import to_onnx, ConvertOptions
+from .convert import to_onnx
+from .convert_options import ConvertOptions
 from .skl2onnx_converter import wrap_skl2onnx_converter
 
 __all__ = [

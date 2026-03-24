@@ -16,6 +16,7 @@ class TestBinarizer(ExtTestCase):
 
         X = np.array([[-1.0, 0.0, 0.5, 1.0, 2.0]], dtype=np.float32)
         binarizer = Binarizer()
+        binarizer.fit(X)
 
         onx = to_onnx(binarizer, (X,))
 
@@ -39,6 +40,7 @@ class TestBinarizer(ExtTestCase):
 
         X = np.array([[0.5, 1.0, 1.5, 2.0, 3.0]], dtype=np.float32)
         binarizer = Binarizer(threshold=1.0)
+        binarizer.fit(X)
 
         onx = to_onnx(binarizer, (X,))
 
@@ -58,6 +60,7 @@ class TestBinarizer(ExtTestCase):
         rng = np.random.default_rng(0)
         X = rng.standard_normal((20, 5)).astype(np.float32)
         binarizer = Binarizer(threshold=0.3)
+        binarizer.fit(X)
 
         onx = to_onnx(binarizer, (X,))
 

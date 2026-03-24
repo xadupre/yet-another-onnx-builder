@@ -1927,7 +1927,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
             raise AssertionError(
                 f"Requested stop, name={name!r}, dtype={dtype}{self.get_debug_msg()}"
             )
-        assert isinstance(name, str), f"Unexpected type {type(name)} for name."
+        assert isinstance(name, str), f"Unexpected type {type(name)} for {name=}"
         if isinstance(dtype, int):
             int_type = dtype
         else:
