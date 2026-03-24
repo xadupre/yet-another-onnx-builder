@@ -17,6 +17,8 @@ node using the shapes already inferred during a
 
 from __future__ import annotations
 
+import glob
+import os
 from typing import Any, Callable, Dict, Optional, Tuple
 
 import numpy as np
@@ -523,3 +525,90 @@ def estimate_node_flops(
     if handler is None:
         return None
     return handler(node, shape_fn, literal_fn)
+
+
+def list_op_cost_formulas() -> Dict[str, str]:
+    """
+    Returns a mapping from each supported ONNX ``op_type`` to the symbolic FLOPs
+    expression produced by :func:`estimate_node_flops` on a representative test
+    case from the ONNX backend test suite.
+
+    For every single-node model found in the ONNX backend test data directory
+    the static input dimensions are replaced by symbolic variables (``DIM<n>``)
+    using
+    :func:`~yobx.helpers.onnx_helper.replace_static_dimensions_by_strings`.
+    :class:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder` is then run with
+    ``inference=InferenceMode.COST`` to obtain the symbolic FLOPs expression.
+
+    Only the first passing test case per ``op_type`` is kept.  Operators with
+    no matching backend test case, or whose cost cannot be inferred
+    symbolically, are omitted.
+
+    :return: ``{op_type: symbolic_flops_expression}`` sorted alphabetically.
+    """
+    # Lazy imports to avoid circular dependencies at module load time.
+    from .shape_builder_impl import BasicShapeBuilder, InferenceMode
+    from ..helpers.onnx_helper import (
+        overwrite_shape_in_model_proto,
+        replace_static_dimensions_by_strings,
+    )
+
+    # These operators use a second input as a *shape specification* rather than
+    # a data tensor.  Replacing it with symbolic values confuses the cost
+    # estimator, so we tell overwrite_shape_in_model_proto to make only the
+    # first input dynamic.
+    _ONE_DATA_INPUT_OPS: frozenset[str] = frozenset(
+        {
+            "ArgMax",
+            "ArgMin",
+            "BlackmanWindow",
+            "CumSum",
+            "DepthToSpace",
+            "Expand",
+            "Flatten",
+            "GlobalAveragePool",
+            "GlobalMaxPool",
+            "HammingWindow",
+            "HannWindow",
+            "Reshape",
+            "SpaceToDepth",
+            "Squeeze",
+            "Unsqueeze",
+        }
+    )
+
+    data_dir = os.path.join(
+        os.path.dirname(onnx.__file__), "backend", "test", "data", "node"
+    )
+    if not os.path.isdir(data_dir):
+        return {}
+
+    result: Dict[str, str] = {}
+    for test_dir in sorted(glob.glob(os.path.join(data_dir, "test_*"))):
+        if "expanded" in os.path.basename(test_dir):
+            continue  # skip expanded variants; they tend to be multi-node rewrites
+        model_path = os.path.join(test_dir, "model.onnx")
+        if not os.path.exists(model_path):
+            continue
+        model = onnx.load(model_path)
+        if len(model.graph.node) != 1:
+            continue
+        op_type = model.graph.node[0].op_type
+        if op_type in result or op_type not in _OP_HANDLERS:
+            continue  # keep the first passing test case; skip unsupported ops
+        n_in = (
+            1
+            if op_type in _ONE_DATA_INPUT_OPS or op_type.startswith("Reduce")
+            else None
+        )
+        if n_in is not None:
+            model = overwrite_shape_in_model_proto(model, n_in=n_in)
+        dyn_model, _ = replace_static_dimensions_by_strings(model)
+        builder = BasicShapeBuilder()
+        cost = builder.run_model(dyn_model, inference=InferenceMode.COST)
+        for ct, flops, _ in cost:
+            if ct == op_type and flops is not None:
+                result[op_type] = str(flops)
+                break
+
+    return dict(sorted(result.items()))

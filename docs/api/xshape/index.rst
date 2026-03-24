@@ -33,3 +33,8 @@ estimate_node_flops
 +++++++++++++++++++
 
 .. autofunction:: yobx.xshape.estimate_node_flops
+
+list_op_cost_formulas
++++++++++++++++++++++
+
+.. autofunction:: yobx.xshape.list_op_cost_formulas

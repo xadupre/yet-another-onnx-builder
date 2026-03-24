@@ -48,13 +48,13 @@ def sklearn_pipeline(
 
     current_input = [X]
     for i, (step_name, step) in enumerate(estimator.steps):
+        step_node_name = f"{name}__{step_name}"
         if i == len(estimator.steps) - 1:
             output_names = outputs
         else:
-            output_names = list(get_output_names(step, g.convert_options))
+            output_names = list(get_output_names(step, g.convert_options, step_node_name))
             output_names = [g.unique_name(n) for n in output_names]
         fct = get_sklearn_converter(type(step))
-        step_node_name = f"{name}__{step_name}"
         is_container = isinstance(step, (Pipeline, ColumnTransformer, FeatureUnion))
         if function_options and function_options.export_as_function and not is_container:
             with g.prefix_name_context(step_node_name):

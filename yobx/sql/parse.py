@@ -210,6 +210,17 @@ class ParsedQuery:
     columns: List[str] = field(default_factory=list)
     subquery: Optional[ParsedQuery] = None
 
+    def __repr__(self) -> str:
+        parts = [f"  from_table={self.from_table!r}"]
+        if self.columns:
+            parts.append(f"  columns={self.columns!r}")
+        if self.subquery is not None:
+            parts.append(f"  subquery={self.subquery!r}")
+        for op in self.operations:
+            parts.append(f"  {op!r}")
+        inner = ",\n".join(parts)
+        return f"ParsedQuery(\n{inner}\n)"
+
 
 # ---------------------------------------------------------------------------
 # Tokenizer helpers
