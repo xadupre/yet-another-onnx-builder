@@ -61,7 +61,7 @@ def _wrap_step_as_function(
     # Determine generic sub-builder output names (independent of the main graph).
     function_output_names = get_output_names(estimator, g.convert_options, name)
     function_output_names = (
-        [g.unique_name(n) for n in function_output_names] if function_input_names else None
+        [sub_g.unique_name(n) for n in function_output_names] if function_input_names else None
     )
 
     # Run the converter inside the sub-builder (no function_options propagation).
@@ -323,8 +323,8 @@ def to_onnx(
         or (out_names == output_names[0] and len(output_names) == 1)
         or (out_names == tuple(output_names) and len(output_names) > 1)
     ), (
-        f"estimator={cls}, {fct=}, output mismatch, expected is {output_names}, got {out_names}"
-        f"{g.get_debug_msg()}"
+        f"estimator={cls}, {fct=}, output mismatch, {input_names=}, {output_names=}, "
+        f"{out_names=}, {is_container=}, {function_options=}, {estimator=}{g.get_debug_msg()}"
     )
     if output_names is None:
         output_names = out_names
