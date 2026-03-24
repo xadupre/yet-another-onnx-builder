@@ -36,15 +36,16 @@ from the live converter registry.
         tflite_op = m.group(1) if m else (builtin_op_name(code) if isinstance(code, int) else code)
         onnx_op = m.group(2).rstrip(".") if m else "?"
         if mod in groups:
-            groups[mod].append((tflite_op, onnx_op))
+            groups[mod].append((tflite_op, onnx_op, fn))
 
     for mod in MODULE_ORDER:
         label = MODULE_LABELS[mod]
-        items = sorted(groups[mod])
+        items = sorted(groups[mod], key=lambda x: x[0])
         if not items:
             continue
         print(f"**{label}**")
         print()
-        for tflite_op, onnx_op in items:
-            print(f"* ``{tflite_op}`` → {onnx_op}")
+        for tflite_op, onnx_op, fn in items:
+            link = f":func:`{fn.__name__} <{fn.__module__}.{fn.__name__}>`"
+            print(f"* ``{tflite_op}`` → {onnx_op} ({link})")
         print()
