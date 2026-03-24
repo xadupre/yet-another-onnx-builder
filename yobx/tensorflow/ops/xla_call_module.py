@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import tensorflow as tf
@@ -21,28 +21,12 @@ from .xla_call_module_parsing import (  # noqa: F401
     parse_mlir,
 )
 
-# ---------------------------------------------------------------------------
-# Structural ops handled directly (not via get_jax_cvt)
-# ---------------------------------------------------------------------------
-# Maps StableHLO op names to a tuple (onnx_op_or_None, description).
-# ``onnx_op`` is the ONNX op name for direct 1-op translations (used to
-# generate a hyperlink), or ``None`` for ops that have no single ONNX
-# counterpart.  ``description`` is a short human-readable label shown in
-# the coverage table.
-_STRUCTURAL_OPS: "dict[str, tuple[str | None, str]]" = {
-    "broadcast_in_dim": (None, "identity pass-through (ONNX broadcasting is implicit)"),
-    "call": (None, "inlined private function (no ONNX op emitted)"),
-    "constant": (None, "ONNX initializer (weight tensor)"),
-    "convert": ("Cast", "type cast"),
-    "dot_general": ("MatMul", "matrix multiply"),
-    "dynamic_broadcast_in_dim": (None, "identity pass-through (ONNX broadcasting is implicit)"),
-    "reduce_max": ("ReduceMax", "reduce along axes keeping dims"),
-    "reduce_sum": ("ReduceSum", "reduce along axes keeping dims"),
-}
-
 
 def _process_constant_layer(
-    layer: dict, local_results: Dict[str, str], g: GraphBuilderExtendedProtocol
+    layer: dict,
+    local_results: Dict[str, str],
+    g: GraphBuilderExtendedProtocol,
+    decoded_module: Optional[str] = None,
 ) -> None:
     """Create an ONNX initializer for a ``constant`` StableHLO layer.
 
@@ -52,6 +36,7 @@ def _process_constant_layer(
     :param layer: layer dict with keys ``id``, ``shape``, and ``dense_content``.
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
+    :param decoded_module: unused; present for a uniform handler signature.
     """
     const_name = layer["id"]
     type_str = layer.get("shape", "")
@@ -82,7 +67,12 @@ def _process_constant_layer(
     local_results[layer["id"]] = const_name
 
 
-def _process_broadcast_layer(layer: dict, local_results: Dict[str, str]) -> None:
+def _process_broadcast_layer(
+    layer: dict,
+    local_results: Dict[str, str],
+    g: Optional[GraphBuilderExtendedProtocol] = None,
+    decoded_module: Optional[str] = None,
+) -> None:
     """Handle a ``broadcast_in_dim`` or ``dynamic_broadcast_in_dim`` layer.
 
     ONNX arithmetic ops support implicit broadcasting, so we simply pass the
@@ -90,6 +80,8 @@ def _process_broadcast_layer(layer: dict, local_results: Dict[str, str]) -> None
 
     :param layer: layer dict with keys ``id`` and ``operands``.
     :param local_results: mutable id→tensor-name mapping for the current scope.
+    :param g: unused; present for a uniform handler signature.
+    :param decoded_module: unused; present for a uniform handler signature.
     """
     operand_id = layer["operands"][0]
     if operand_id in local_results:
@@ -97,13 +89,17 @@ def _process_broadcast_layer(layer: dict, local_results: Dict[str, str]) -> None
 
 
 def _process_dot_general_layer(
-    layer: dict, local_results: Dict[str, str], g: GraphBuilderExtendedProtocol
+    layer: dict,
+    local_results: Dict[str, str],
+    g: GraphBuilderExtendedProtocol,
+    decoded_module: Optional[str] = None,
 ) -> None:
     """Emit a MatMul ONNX op for a ``dot_general`` StableHLO layer.
 
     :param layer: layer dict with keys ``id`` and ``operands`` (lhs, rhs).
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
+    :param decoded_module: unused; present for a uniform handler signature.
     """
     lhs_id, rhs_id = layer["operands"]
     if lhs_id not in local_results or rhs_id not in local_results:
@@ -113,13 +109,17 @@ def _process_dot_general_layer(
 
 
 def _process_reduce_layer(
-    layer: dict, local_results: Dict[str, str], g: GraphBuilderExtendedProtocol
+    layer: dict,
+    local_results: Dict[str, str],
+    g: GraphBuilderExtendedProtocol,
+    decoded_module: Optional[str] = None,
 ) -> None:
     """Emit a ReduceMax or ReduceSum ONNX op for a ``reduce_*`` StableHLO layer.
 
     :param layer: layer dict with keys ``id``, ``op``, ``operands``, and ``axes``.
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
+    :param decoded_module: unused; present for a uniform handler signature.
     """
     inp_id = layer["operands"][0]
     if inp_id not in local_results:
@@ -206,7 +206,10 @@ def _process_call_layer(
 
 
 def _process_convert_layer(
-    layer: dict, local_results: Dict[str, str], g: GraphBuilderExtendedProtocol
+    layer: dict,
+    local_results: Dict[str, str],
+    g: GraphBuilderExtendedProtocol,
+    decoded_module: Optional[str] = None,
 ) -> None:
     """Emit a Cast ONNX op for a ``convert`` StableHLO layer.
 
@@ -217,6 +220,7 @@ def _process_convert_layer(
         (the target tensor-type string, e.g. ``"tensor<f32>"``).
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
+    :param decoded_module: unused; present for a uniform handler signature.
     """
     from ...helpers.onnx_helper import np_dtype_to_tensor_dtype
 
@@ -242,6 +246,61 @@ def _process_convert_layer(
     local_results[layer["id"]] = res if isinstance(res, str) else res[0]
 
 
+# ---------------------------------------------------------------------------
+# Structural ops: registry mapping StableHLO op → (onnx_op, description, handler).
+# ---------------------------------------------------------------------------
+# Each entry registers one of the handler functions defined above.  The dict
+# is consumed both at runtime (to dispatch layers in _process_layers below) and
+# at documentation build time (to generate the Structural ops table in the RST).
+#
+# Fields per entry:
+#   [0] onnx_op   – ONNX op name used for the spec hyperlink, or ``None``.
+#   [1] description – short human-readable label for the coverage table.
+#   [2] handler   – callable(layer, local_results, g, decoded_module) -> None.
+_STRUCTURAL_OPS: "dict[str, tuple[str | None, str, Callable[[dict, Dict[str, str], Optional[GraphBuilderExtendedProtocol], Optional[str]], None]]]" = {
+    "broadcast_in_dim": (
+        None,
+        "identity pass-through (ONNX broadcasting is implicit)",
+        _process_broadcast_layer,
+    ),
+    "call": (
+        None,
+        "inlined private function (no ONNX op emitted)",
+        _process_call_layer,
+    ),
+    "constant": (
+        None,
+        "ONNX initializer (weight tensor)",
+        _process_constant_layer,
+    ),
+    "convert": (
+        "Cast",
+        "type cast",
+        _process_convert_layer,
+    ),
+    "dot_general": (
+        "MatMul",
+        "matrix multiply",
+        _process_dot_general_layer,
+    ),
+    "dynamic_broadcast_in_dim": (
+        None,
+        "identity pass-through (ONNX broadcasting is implicit)",
+        _process_broadcast_layer,
+    ),
+    "reduce_max": (
+        "ReduceMax",
+        "reduce along axes keeping dims",
+        _process_reduce_layer,
+    ),
+    "reduce_sum": (
+        "ReduceSum",
+        "reduce along axes keeping dims",
+        _process_reduce_layer,
+    ),
+}
+
+
 def _process_layers(
     layer_list: List[dict],
     local_results: Dict[str, str],
@@ -252,6 +311,10 @@ def _process_layers(
 
     Updates *local_results* in-place mapping StableHLO result ids to ONNX
     tensor names.  Returns early when a ``return`` layer is encountered.
+
+    Structural ops (those registered in :data:`_STRUCTURAL_OPS`) are
+    dispatched directly to their handler functions.  All other ops are
+    handled via :func:`~yobx.tensorflow.ops.jax_ops.get_jax_cvt`.
 
     :param layer_list: list of layer dicts produced by :func:`parse_mlir`.
     :param local_results: mutable id→tensor-name mapping for the current scope.
@@ -270,28 +333,8 @@ def _process_layers(
         if op_type == "skip":
             continue
 
-        if op_type == "constant":
-            _process_constant_layer(layer, local_results, g)
-            continue
-
-        if op_type in ("broadcast_in_dim", "dynamic_broadcast_in_dim"):
-            _process_broadcast_layer(layer, local_results)
-            continue
-
-        if op_type == "dot_general":
-            _process_dot_general_layer(layer, local_results, g)
-            continue
-
-        if op_type in ("reduce_max", "reduce_sum"):
-            _process_reduce_layer(layer, local_results, g)
-            continue
-
-        if op_type == "call":
-            _process_call_layer(layer, local_results, g, decoded_module)
-            continue
-
-        if op_type == "convert":
-            _process_convert_layer(layer, local_results, g)
+        if op_type in _STRUCTURAL_OPS:
+            _STRUCTURAL_OPS[op_type][2](layer, local_results, g, decoded_module)
             continue
 
         # Generic elementwise op via get_jax_cvt.

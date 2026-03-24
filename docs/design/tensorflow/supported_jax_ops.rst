@@ -124,7 +124,7 @@ and do not go through :func:`~yobx.tensorflow.ops.jax_ops.get_jax_cvt`:
     print()
     print("   * - StableHLO op")
     print("     - ONNX equivalent")
-    for hlo_op, (onnx_op, desc) in sorted(_STRUCTURAL_OPS.items()):
+    for hlo_op, (onnx_op, desc, _handler) in sorted(_STRUCTURAL_OPS.items()):
         hlo_url = _STABLEHLO_BASE.format(_hlo_anchor(hlo_op))
         hlo_cell = f"`{hlo_op} <{hlo_url}>`_"
         if onnx_op is not None:
