@@ -23,7 +23,7 @@ scikit-learn Export to ONNX
 
 A basic :epkg:`scikit-learn` model may look like the following,
 a scaler following by an estimator. Every model can be converter
-with model :func:`~yobx.sklearn.to_onnx`.
+with model :func:`yobx.sklearn.to_onnx`.
 
 .. runpython::
     :rst:

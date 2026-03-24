@@ -91,6 +91,7 @@ class ExtendedModelContainer(ModelContainer):
         return self
 
     def get_raw_data(self, np_tensor: Union[np.ndarray, "torch.Tensor"]) -> bytes:  # noqa: F821
+        """Returns the raw data of a specific tensor whatever it is."""
         if sys.byteorder == "big":
             # Convert endian from little to big
             begin = time.perf_counter()
@@ -144,6 +145,7 @@ class ExtendedModelContainer(ModelContainer):
         return tensor_bytes
 
     def get_prop(self, tensor: onnx.TensorProto) -> onnx.StringStringEntryProto:
+        """Returns the location for a tensor stored in external data."""
         prop: Optional[onnx.StringStringEntryProto] = None
         for ext in tensor.external_data:  # type: ignore[assignment]
             if ext.key == "location":  # type: ignore[attr-defined]

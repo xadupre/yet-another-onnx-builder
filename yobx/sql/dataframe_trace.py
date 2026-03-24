@@ -1,7 +1,7 @@
 """
 DataFrame function tracer — convert a Python function operating on a
 :class:`TracedDataFrame` into an ONNX model via
-:class:`~yobx.sql.parse.ParsedQuery`.
+:class:`yobx.sql.to_onnx`.
 
 The tracer provides a lightweight pandas-inspired API.  When you call
 :func:`dataframe_to_onnx` (or the lower-level :func:`trace_dataframe`), a

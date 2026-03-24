@@ -148,7 +148,7 @@ def sklearn_column_transformer(
             )
 
         if _is_passthrough(transformer):
-            parts.append(X_sub)
+            parts.extend(X_subs)
         else:
             try:
                 fct = get_sklearn_converter(type(transformer))

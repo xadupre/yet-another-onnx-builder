@@ -76,7 +76,7 @@ def sklearn_traceable_converter(
 
     if isinstance(args[0], TracedDataFrame):
         dtypes = dict(zip(inputs, [tensor_dtype_to_np_dtype(g.get_type(i)) for i in inputs]))
-        pq = trace_dataframe(estimator.transform, dtypes)
+        pq = trace_dataframe(estimator.transform, dtypes)  # type: ignore
         out_names = parsed_query_to_onnx_graph(
             g, sts, list(outputs) if outputs else None, pq, dtypes, _finalize=False
         )

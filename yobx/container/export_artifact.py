@@ -252,7 +252,8 @@ class ExportReport:
             :class:`~yobx.helpers.stats_helper.ModelStatistics`.
         :return: ``self``, to allow method chaining.
 
-        Example::
+        .. runpython::
+            :showcode:
 
             import onnx.helper as oh
             import onnx
