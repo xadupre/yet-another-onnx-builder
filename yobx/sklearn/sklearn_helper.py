@@ -16,6 +16,13 @@ except ImportError:
     OutlierMixin = None  # type: ignore
 
 
+class NoKnownOutputMixin:
+    """
+    Tells the converter there is no definite number of outputs.
+    The converter will not make any assumption on the number of outputs.
+    """
+
+
 def _should_use_feature_names(estimator: BaseEstimator) -> bool:
     """Returns True when get_feature_names_out() should drive output naming."""
     return (
@@ -77,8 +84,10 @@ def get_output_names(
     estimator: BaseEstimator,
     convert_options: Optional[ConvertOptionsProtocol] = None,
     name: Optional[str] = None,
-) -> Sequence[str]:
+) -> Optional[Sequence[str]]:
     """Returns output names for every estimator."""
+    if isinstance(estimator, NoKnownOutputMixin):
+        return None
 
     # Append extra output names requested by convert_options so that converters
     # can detect them via len(outputs) > extra_idx and emit the extra nodes.

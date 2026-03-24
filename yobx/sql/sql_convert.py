@@ -258,6 +258,7 @@ def parsed_query_to_onnx_graph(
     pq: ParsedQuery,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
+    _finalize: bool = True,
 ) -> List[str]:
     """
     Build ONNX nodes for an already-parsed :class:`~yobx.sql.parse.ParsedQuery`
@@ -274,6 +275,12 @@ def parsed_query_to_onnx_graph(
     :param pq: the parsed query to convert.
     :param input_dtypes: mapping from left-table column name to numpy dtype.
     :param right_input_dtypes: mapping for right-table columns (JOIN queries).
+    :param _finalize: when ``True`` (default) the SELECT output tensors are
+        registered as ONNX model outputs via
+        :meth:`~yobx.xbuilder.GraphBuilder.make_tensor_output`.  Pass
+        ``False`` when embedding the conversion in an outer graph (e.g.
+        inside an sklearn converter) so that the caller can register the
+        outputs itself.
     :return: list of output tensor names added to *g*.
     """
     custom_functions = (sts or {}).get("custom_functions", {})
@@ -284,6 +291,7 @@ def parsed_query_to_onnx_graph(
         right_input_dtypes=right_input_dtypes,
         custom_functions=custom_functions,
         desired_outputs=outputs or None,
+        _finalize=_finalize,
     )
 
 

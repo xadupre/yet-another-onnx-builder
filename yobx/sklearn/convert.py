@@ -28,10 +28,10 @@ def _wrap_step_as_function(
     fopts: FunctionOptions,
     estimator: BaseEstimator,
     input_names: List[str],
-    output_names: List[str],
+    output_names: Optional[List[str]],
     converter: Callable,
     name: str,
-) -> None:
+) -> Union[str, Tuple[str, ...]]:
     """
     Converts *estimator* to ONNX via *converter* and wraps the result as an
     ONNX local function registered in *g*.
@@ -59,13 +59,24 @@ def _wrap_step_as_function(
         sub_g.make_tensor_input(func_inp, itype, ishape)
 
     # Determine generic sub-builder output names (independent of the main graph).
-    function_output_names = list(get_output_names(estimator, g.convert_options, name))
-    function_output_names = [g.unique_name(n) for n in function_output_names]
+    function_output_names = get_output_names(estimator, g.convert_options, name)
+    function_output_names = (
+        [sub_g.unique_name(n) for n in function_output_names] if function_input_names else None  # type: ignore
+    )
 
     # Run the converter inside the sub-builder (no function_options propagation).
-    converter(sub_g, {}, function_output_names, estimator, *function_input_names, name=name)
+    out_names = converter(
+        sub_g, {}, function_output_names, estimator, *function_input_names, name=name
+    )
+    if function_input_names is None:
+        function_output_names = out_names
+    else:
+        function_output_names = tuple(function_output_names)  # type: ignore
 
     # Register the sub-builder outputs.
+    assert (
+        function_output_names
+    ), f"No output found for convert {converter} applied to {estimator}{g.get_debug_msg()}"
     for out_name in function_output_names:
         sub_g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
 
@@ -85,22 +96,27 @@ def _wrap_step_as_function(
     # we write to a fresh temporary name first and then rename via Identity.
     actual_output_names = []
     renames: List[Tuple[str, str]] = []
-    for out in output_names:
-        if g.has_name(out):
-            tmp = g.unique_name(f"_tmp_{cls_name}_out_")
-            actual_output_names.append(tmp)
-            renames.append((tmp, out))
-        else:
-            actual_output_names.append(out)
+    if output_names:
+        for out in output_names:
+            if g.has_name(out):
+                tmp = g.unique_name(f"_tmp_{cls_name}_out_")
+                actual_output_names.append(tmp)
+                renames.append((tmp, out))
+            else:
+                actual_output_names.append(out)
 
     # Call the local function in the main graph.
     g.make_node(fname, list(input_names), actual_output_names, domain=fdomain, name=name)
 
     # Apply any needed Identity renames.
-    for tmp, final in renames:
-        g.make_node("Identity", [tmp], [final], name=f"{name}_rename")
+    if renames:
+        for tmp, final in renames:
+            g.make_node("Identity", [tmp], [final], name=f"{name}_rename")
+    else:
+        output_names = actual_output_names
 
     # Propagate type/shape metadata from the sub-builder to the main graph.
+    assert output_names is not None, "type checking"
     for func_out, actual, desired in zip(
         function_output_names, actual_output_names, output_names
     ):
@@ -113,6 +129,7 @@ def _wrap_step_as_function(
                 g.set_rank(out, sub_g.get_rank(func_out))
             if sub_g.has_device(func_out):
                 g.set_device(out, sub_g.get_device(func_out))
+    return function_output_names if len(function_output_names) > 1 else function_output_names[0]
 
 
 def to_onnx(
@@ -280,21 +297,21 @@ def to_onnx(
     # Build the sts dict (shared state for converters). function_options, if set,
     # is passed explicitly to container converters below.
     sts: Dict[str, Any] = {}
-    _top_level_node_name = (
+    top_level_node_name = (
         f"main__{estimator.steps[-1][0]}" if isinstance(estimator, Pipeline) else "main"
     )
-    output_names = list(get_output_names(estimator, g.convert_options, _top_level_node_name))
-    output_names = [g.unique_name(n) for n in output_names]
+    output_names = get_output_names(estimator, g.convert_options, top_level_node_name)
+    output_names = [g.unique_name(n) for n in output_names] if output_names else None
 
     is_container = isinstance(estimator, (Pipeline, ColumnTransformer, FeatureUnion))
 
     if function_options and function_options.export_as_function and not is_container:
         # Wrap the single top-level estimator as a local function.
-        _wrap_step_as_function(
+        out_names = _wrap_step_as_function(
             g, function_options, estimator, list(input_names), output_names, fct, name="main"
         )
     elif is_container:
-        fct(
+        out_names = fct(
             g,
             sts,
             output_names,
@@ -304,8 +321,20 @@ def to_onnx(
             function_options=function_options,
         )
     else:
-        fct(g, sts, output_names, estimator, *input_names, name="main")
+        out_names = fct(g, sts, output_names, estimator, *input_names, name="main")
 
+    assert (
+        output_names is None
+        or (out_names == output_names[0] and len(output_names) == 1)
+        or (out_names == tuple(output_names) and len(output_names) > 1)
+    ), (
+        f"estimator={cls}, {fct=}, output mismatch, {input_names=}, {output_names=}, "
+        f"{out_names=}, {is_container=}, {function_options=}, {estimator=}{g.get_debug_msg()}"
+    )
+    if output_names is None:
+        output_names = out_names
+    else:
+        output_names = tuple(output_names)
     for name in output_names:
         g.make_tensor_output(name, indexed=False, allow_untyped_output=True)
     # When local functions are requested we must NOT inline them; pass inline=False

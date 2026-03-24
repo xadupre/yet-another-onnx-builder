@@ -60,12 +60,16 @@ def imblearn_pipeline(
         if i == len(inference_steps) - 1:
             step_outputs = outputs
         else:
-            step_output_names = list(get_output_names(step, g.convert_options, step_node_name))
-            step_outputs = [g.unique_name(n) for n in step_output_names]
+            step_output_names = get_output_names(step, g.convert_options, step_node_name)
+            step_outputs = (
+                [g.unique_name(n) for n in step_output_names] if step_output_names else None
+            )
 
         fct = get_sklearn_converter(type(step))
         with g.prefix_name_context(step_node_name):
-            fct(g, sts, step_outputs, step, *current_input, name=step_node_name)
+            out_names = fct(g, sts, step_outputs, step, *current_input, name=step_node_name)
+        if step_outputs is None:
+            step_outputs = out_names
         current_input = step_outputs
 
     return current_input[0] if len(current_input) == 1 else tuple(current_input)
