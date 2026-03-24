@@ -455,6 +455,7 @@ class _InferenceRuntime:
             return None, None
 
         feeds = {i: self.get_constant(i, exc=exc, computed_value=True) for i in v.input}
+
         for kval, val in feeds.items():
             if not exc and "FakeTensor" in str(type(val)):
                 assert not self._debug_constant_folding, (

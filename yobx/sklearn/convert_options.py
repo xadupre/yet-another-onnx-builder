@@ -114,9 +114,7 @@ class ConvertOptions(ConvertOptionsProtocol):
                 if callable(item) and not isinstance(item, type) and item(piece):
                     return True
             return (
-                type(piece) in value
-                or id(piece) in value
-                or (name is not None and name in value)
+                type(piece) in value or id(piece) in value or (name is not None and name in value)
             )
         raise NotImplementedError(
             f"Not implemented with {option_name!r} is not a boolean but {value!r}."

@@ -96,6 +96,7 @@ class TestDocumentationExamples(ExtTestCase):
                 in {
                     "plot_dot_graph.py",
                     "plot_dump_intermediate_results.py",
+                    "plot_export_report.py",
                     "plot_input_observer_tiny_llm.py",
                     "plot_sklearn_convert_options.py",
                     "plot_jax_to_onnx.py",

@@ -434,7 +434,7 @@ class _BuilderRuntime:
             axis = [int(axis)] if axis.shape == tuple() else axis.tolist()
         if len(axis) == 1:
             if isinstance(x, (np.int64, np.int32)):
-                return np.array([x])
+                return [np.array([x])]
             return (
                 [np.expand_dims(x, int(axis[0]))]
                 if isinstance(x, np.ndarray)

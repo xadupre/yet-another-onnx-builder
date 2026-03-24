@@ -577,9 +577,7 @@ def list_op_cost_formulas() -> Dict[str, str]:
         }
     )
 
-    data_dir = os.path.join(
-        os.path.dirname(onnx.__file__), "backend", "test", "data", "node"
-    )
+    data_dir = os.path.join(os.path.dirname(onnx.__file__), "backend", "test", "data", "node")
     if not os.path.isdir(data_dir):
         return {}
 
@@ -596,16 +594,13 @@ def list_op_cost_formulas() -> Dict[str, str]:
         op_type = model.graph.node[0].op_type
         if op_type in result or op_type not in _OP_HANDLERS:
             continue  # keep the first passing test case; skip unsupported ops
-        n_in = (
-            1
-            if op_type in _ONE_DATA_INPUT_OPS or op_type.startswith("Reduce")
-            else None
-        )
+        n_in = 1 if op_type in _ONE_DATA_INPUT_OPS or op_type.startswith("Reduce") else None
         if n_in is not None:
             model = overwrite_shape_in_model_proto(model, n_in=n_in)
         dyn_model, _ = replace_static_dimensions_by_strings(model)
         builder = BasicShapeBuilder()
         cost = builder.run_model(dyn_model, inference=InferenceMode.COST)
+        assert cost is not None, f"no cost was produced by {builder}"
         for ct, flops, _ in cost:
             if ct == op_type and flops is not None:
                 result[op_type] = str(flops)
