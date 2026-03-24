@@ -150,19 +150,31 @@ example.  All static input dimensions of that example are replaced by symbolic
 variables (``DIM<n>``) before running the estimator, so the result shows the
 general formula rather than a single concrete number.
 
-.. code-block:: python
+The complete table of supported operators and their symbolic FLOPs formulas is
+generated below by calling :func:`~yobx.xshape.list_op_cost_formulas` at
+documentation-build time:
+
+.. runpython::
+    :showcode:
+    :rst:
 
     from yobx.xshape import list_op_cost_formulas
 
-    for op_type, formula in list_op_cost_formulas().items():
-        print(f"{op_type:<30s}  {formula}")
+    formulas = list_op_cost_formulas()
 
-Example output (selected operators)::
+    rows = [
+        ".. list-table::",
+        "   :header-rows: 1",
+        "   :widths: 30 70",
+        "",
+        "   * - Op type",
+        "     - Symbolic FLOPs",
+    ]
+    for op_type, formula in formulas.items():
+        rows.append(f"   * - ``{op_type}``")
+        rows.append(f"     - ``{formula}``")
 
-    MatMul   2*DIM3*DIM3*DIM4
-    Relu     DIM3*DIM4*DIM5
-    Gemm     2*DIM3*DIM4*DIM5+DIM3*DIM5
-    Sigmoid  3*DIM3*DIM4*DIM5
+    print("\n".join(rows))
 
-See also the gallery example :ref:`l-plot-cost-formulas` which runs this code
-and renders the complete operator table.
+See also the gallery example :ref:`l-plot-cost-formulas` for additional
+context and worked examples.
