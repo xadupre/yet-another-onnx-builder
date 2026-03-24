@@ -1369,10 +1369,10 @@ class GraphBuilderPatternOptimization:
             begin = time.perf_counter()
             before = len(matches)
 
-            fast_match = self.fast_op_type()
+            fast_match = pattern.fast_op_type()
             subset_nodes = None
             if len(fast_match) == 1:
-                t = next(fast_match)
+                t = next(iter(fast_match))
                 if t in fast_nodes:
                     subset_nodes = fast_nodes[t]
 
