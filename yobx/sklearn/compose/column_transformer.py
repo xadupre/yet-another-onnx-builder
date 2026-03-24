@@ -6,7 +6,7 @@ from sklearn.preprocessing import FunctionTransformer
 from ...typing import GraphBuilderExtendedProtocol
 from ...xbuilder import FunctionOptions
 from ..register import register_sklearn_converter, get_sklearn_converter
-from ..convert import _wrap_step_as_function
+from ..convert import wrap_step_as_function, wrap_step
 
 
 def _resolve_columns(
@@ -150,7 +150,7 @@ def sklearn_column_transformer(
             is_container = isinstance(transformer, (Pipeline, ColumnTransformer, FeatureUnion))
             if function_options and function_options.export_as_function and not is_container:
                 with g.prefix_name_context(step_node_name):
-                    _wrap_step_as_function(
+                    wrap_step_as_function(
                         g,  # type: ignore
                         function_options,
                         transformer,
@@ -159,20 +159,19 @@ def sklearn_column_transformer(
                         fct,
                         step_node_name,
                     )
-            elif is_container:
-                with g.prefix_name_context(step_node_name):
-                    fct(
-                        g,
-                        sts,
-                        sub_outputs,
-                        transformer,
-                        X_sub,
-                        name=step_node_name,
-                        function_options=function_options,
-                    )
             else:
                 with g.prefix_name_context(step_node_name):
-                    fct(g, sts, sub_outputs, transformer, X_sub, name=step_node_name)
+                    wrap_step(
+                        g,
+                        sts,
+                        function_options,
+                        is_container,
+                        transformer,
+                        [X_sub],
+                        sub_outputs,
+                        fct,
+                        step_node_name,
+                    )
             parts.append(sub_outputs[0])
 
     if not parts:

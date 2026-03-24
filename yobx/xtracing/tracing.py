@@ -31,7 +31,7 @@ def trace_numpy_function(
     inputs: List[str],
     name: str = "trace",
     kw_args: Optional[Dict[str, Any]] = None,
-) -> str:
+) -> Union[str, Tuple[str, ...]]:
     """
     Trace a numpy function by wrapping named tensors in *g* as
     :class:`~yobx.xtracing.numpy_array.NumpyArray` proxies, then recording all
@@ -99,7 +99,9 @@ def trace_numpy_function(
         )
 
     if not outputs:
-        return raw_outputs[0] if len(raw_outputs) == 1 else tuple(raw_outputs)
+        return (
+            raw_outputs[0].name if len(raw_outputs) == 1 else tuple(r.name for r in raw_outputs)
+        )
 
     if len(raw_outputs) != len(outputs):
         raise ValueError(

@@ -6,7 +6,6 @@ from .sklearn_helper import NoKnownOutputMixin, TraceableMixin
 
 __all__ = [
     "ConvertOptions",
-    "DataFrameTransformer",
     "NoKnownOutputMixin",
     "NumericalDiscrepancyWarning",
     "TraceableMixin",

@@ -5,7 +5,7 @@ from ...typing import GraphBuilderExtendedProtocol
 from ...xbuilder import FunctionOptions
 from ..register import register_sklearn_converter, get_sklearn_converter
 from ..sklearn_helper import get_output_names
-from ..convert import _wrap_step_as_function
+from ..convert import wrap_step_as_function, wrap_step
 
 
 @register_sklearn_converter(Pipeline)
@@ -14,7 +14,7 @@ def sklearn_pipeline(
     sts: Dict,
     outputs: List[str],
     estimator: Pipeline,
-    X: str,
+    *X: str,
     name: str = "pipeline",
     function_options: Optional[FunctionOptions] = None,
 ) -> Union[str, Tuple[str, ...]]:
@@ -44,9 +44,9 @@ def sklearn_pipeline(
     :return: name of the output tensor, or a tuple of output tensor names
     """
     assert isinstance(estimator, Pipeline), f"Unexpected type {type(estimator)} for estimator."
-    assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
+    assert all(g.has_type(x) for x in X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
-    current_input = [X]
+    current_input = list(X)
     for i, (step_name, step) in enumerate(estimator.steps):
         assert current_input, f"No input to give to step {step_name!r}: {step}{g.get_debug_msg()}"
         step_node_name = f"{name}__{step_name}"
@@ -59,7 +59,7 @@ def sklearn_pipeline(
         is_container = isinstance(step, (Pipeline, ColumnTransformer, FeatureUnion))
         if function_options and function_options.export_as_function and not is_container:
             with g.prefix_name_context(step_node_name):
-                out_names = _wrap_step_as_function(
+                out_names = wrap_step_as_function(
                     g,  # type: ignore
                     function_options,
                     step,
@@ -68,20 +68,19 @@ def sklearn_pipeline(
                     fct,
                     step_node_name,
                 )
-        elif is_container:
-            with g.prefix_name_context(step_node_name):
-                out_names = fct(
-                    g,
-                    sts,
-                    output_names,
-                    step,
-                    *current_input,
-                    name=step_node_name,
-                    function_options=function_options,
-                )
         else:
             with g.prefix_name_context(step_node_name):
-                out_names = fct(g, sts, output_names, step, *current_input, name=step_node_name)
+                out_names = wrap_step(
+                    g,
+                    sts,
+                    function_options,
+                    is_container,
+                    step,
+                    current_input,
+                    output_names,
+                    fct,
+                    step_node_name,
+                )
         if output_names is None:
             # Converter was called with outputs=None; collect actual output names
             # from its return value so the next step receives valid input names.

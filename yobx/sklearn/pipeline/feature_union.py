@@ -4,7 +4,7 @@ from sklearn.pipeline import Pipeline, FeatureUnion
 from ...typing import GraphBuilderExtendedProtocol
 from ...xbuilder import FunctionOptions
 from ..register import register_sklearn_converter, get_sklearn_converter
-from ..convert import _wrap_step_as_function
+from ..convert import wrap_step_as_function, wrap_step
 
 
 @register_sklearn_converter(FeatureUnion)
@@ -75,7 +75,7 @@ def sklearn_feature_union(
         is_container = isinstance(transformer, (Pipeline, ColumnTransformer, FeatureUnion))
         if function_options and function_options.export_as_function and not is_container:
             with g.prefix_name_context(step_node_name):
-                _wrap_step_as_function(
+                wrap_step_as_function(
                     g,  # type: ignore
                     function_options,
                     transformer,
@@ -84,20 +84,20 @@ def sklearn_feature_union(
                     fct,
                     step_node_name,
                 )
-        elif is_container:
-            with g.prefix_name_context(step_node_name):
-                fct(
-                    g,
-                    sts,
-                    sub_outputs,
-                    transformer,
-                    X,
-                    name=step_node_name,
-                    function_options=function_options,
-                )
         else:
             with g.prefix_name_context(step_node_name):
-                fct(g, sts, sub_outputs, transformer, X, name=step_node_name)
+                wrap_step(
+                    g,
+                    sts,
+                    function_options,
+                    is_container,
+                    transformer,
+                    [X],
+                    sub_outputs,
+                    fct,
+                    step_node_name,
+                )
+
         parts.append(sub_outputs[0])
 
     if not parts:

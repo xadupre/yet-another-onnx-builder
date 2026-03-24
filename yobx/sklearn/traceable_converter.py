@@ -7,7 +7,7 @@ from .sklearn_helper import TraceableTransformerMixin
 
 def build_traceable_inputs_from_inputs(
     g: GraphBuilderExtendedProtocol, estimator: TraceableTransformerMixin, *inputs: str
-) -> Union[Tuple["NumpyArray", ...], Tuple["TracedDataFrame", ...]]:  # noqa: F821
+) -> Union[Tuple["NumpyArray", ...], Tuple["TracedDataFrame", ...]]:  # type: ignore # noqa: F821
     assert all(
         g.has_type(x) for x in inputs
     ), f"Some times are missing in {inputs!r}{g.get_debug_msg()}"
@@ -48,10 +48,10 @@ def build_traceable_inputs_from_inputs(
     ), f"Unexpected second dimension for unique shape={shape}{g.get_debug_msg()}"
 
     # dataframe
-    from ..sql import TracedDataFrame
+    from ..sql import TracedDataFrame, TracedSeries
     from ..sql.parse import ColumnRef
 
-    return (TracedDataFrame(dict(zip(inputs, [ColumnRef(i) for i in inputs]))),)
+    return (TracedDataFrame(dict(zip(inputs, [TracedSeries(ColumnRef(i)) for i in inputs]))),)
 
 
 def sklearn_traceable_converter(
@@ -85,9 +85,8 @@ def sklearn_traceable_converter(
     if isinstance(args[0], NumpyArray):
         from ..xtracing import trace_numpy_function
 
-        res = trace_numpy_function(
+        return trace_numpy_function(
             g, sts, list(outputs) if outputs else None, estimator.transform, inputs, name=name
         )
-        return tuple(n.name for n in res) if isinstance(res, tuple) else res.name
 
     raise NotImplementedError(f"Unable to trace estimator {estimator}{g.get_debug_msg()}")

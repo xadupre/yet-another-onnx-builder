@@ -13,6 +13,7 @@ yobx.sklearn
     :caption: main module
 
     convert
+    convert_helper
     register
     skl2onnx_converter
     sklearn_helper
