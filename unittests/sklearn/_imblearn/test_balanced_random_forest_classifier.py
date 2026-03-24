@@ -10,8 +10,7 @@ from sklearn.preprocessing import StandardScaler
 
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.sklearn import to_onnx
-from yobx.sklearn.convert import ConvertOptions
+from yobx.sklearn import to_onnx, ConvertOptions
 
 
 @requires_sklearn("1.4")

@@ -9,7 +9,7 @@ using :class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilde
 with ``inference=InferenceMode.COST``.
 
 The model used is a single-head **scaled dot-product attention** block, which
-contains two :term:`MatMul` nodes (the core of the attention mechanism) plus
+contains two `MatMul` nodes (the core of the attention mechanism) plus
 auxiliary element-wise operations.
 
 We also show how a simple pattern-based **optimization** can reduce the total
@@ -49,7 +49,7 @@ TFLOAT = onnx.TensorProto.FLOAT
 #     \text{out} = \text{Softmax}(Q \cdot s_Q \cdot (K^T \cdot s_K)) \cdot V
 #
 # where ``scale_q = 1 / sqrt(d_head)`` and ``scale_k = 1.0``.
-# Both inputs to the attention :term:`MatMul` are multiplied by a constant scalar,
+# Both inputs to the attention `MatMul` are multiplied by a constant scalar,
 # which creates an opportunity for the :class:`MulMulMatMulPattern` to fuse them.
 #
 # Input dimensions are **symbolic** (``batch``, ``seq``, ``d_head``) so that the
@@ -147,9 +147,9 @@ print(f"  {'TOTAL':12s}  {total_before:>10,}")
 # -------------------------------------------------
 #
 # The :class:`~yobx.xoptim.patterns.onnx_matmul.MulMulMatMulPattern` detects
-# a :term:`MatMul` whose *both* inputs are the outputs of element-wise ``Mul``
+# a `MatMul` whose *both* inputs are the outputs of element-wise ``Mul``
 # nodes with constant scalars.  It fuses the three nodes into a single
-# :term:`MatMul` followed by one ``Mul`` on the *output* tensor.
+# `MatMul` followed by one ``Mul`` on the *output* tensor.
 #
 # For our attention model this turns:
 #

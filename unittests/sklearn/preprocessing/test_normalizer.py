@@ -16,6 +16,7 @@ class TestNormalizer(ExtTestCase):
 
         X = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
         normalizer = Normalizer()  # default norm='l2'
+        normalizer.fit(X)
 
         onx = to_onnx(normalizer, (X,))
 
@@ -37,6 +38,7 @@ class TestNormalizer(ExtTestCase):
 
         X = np.array([[1.0, -2.0, 3.0], [0.0, 5.0, -1.0]], dtype=np.float32)
         normalizer = Normalizer(norm="l1")
+        normalizer.fit(X)
 
         onx = to_onnx(normalizer, (X,))
 
@@ -58,6 +60,7 @@ class TestNormalizer(ExtTestCase):
 
         X = np.array([[1.0, 2.0, -4.0], [3.0, -1.0, 2.0]], dtype=np.float32)
         normalizer = Normalizer(norm="max")
+        normalizer.fit(X)
 
         onx = to_onnx(normalizer, (X,))
 
@@ -81,6 +84,7 @@ class TestNormalizer(ExtTestCase):
         X = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]], dtype=np.float32)
         for norm in ("l1", "l2", "max"):
             normalizer = Normalizer(norm=norm)
+            normalizer.fit(X)
 
             onx = to_onnx(normalizer, (X,))
 
@@ -100,6 +104,7 @@ class TestNormalizer(ExtTestCase):
         rng = np.random.default_rng(0)
         X = rng.standard_normal((20, 5)).astype(np.float64)
         normalizer = Normalizer(norm="l2")
+        normalizer.fit(X)
 
         onx = to_onnx(normalizer, (X,))
 

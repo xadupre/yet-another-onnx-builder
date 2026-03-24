@@ -4,12 +4,16 @@ Unit tests for yobx.sklearn.tree decision tree converters.
 
 import unittest
 import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.sklearn import to_onnx
+from yobx.sklearn import to_onnx, ConvertOptions
+
+from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
 
 
 @requires_sklearn("1.4")
@@ -849,6 +853,40 @@ class TestSklearnDecisionTree(ExtTestCase):
             sess = self.check_ort(onx)
             ort_results = sess.run(None, {"X": X_test})
             self.assertEqualArray(expected, ort_results[0], atol=1e-5)
+
+    def test_model_decision_tree_classifier_decision_leaf(self):
+        """Check extra decision_leaf output for DecisionTreeClassifier."""
+        X, y = make_classification(n_samples=200, n_features=5, random_state=42)
+        X = X.astype(np.float32)
+        X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
+        model = DecisionTreeClassifier(max_depth=4, random_state=42)
+        model.fit(X_train, y_train)
+        model_onnx = to_onnx(
+            model,
+            (X,),
+            target_opset=TARGET_OPSET,
+            convert_options=ConvertOptions(decision_leaf=True),
+        )
+        self.assertTrue(model_onnx is not None)
+        self.assertEqual(len(model_onnx.graph.output), 3)
+        feeds = {model_onnx.graph.input[0].name: X_test}
+        sess = self.check_ort(model_onnx)
+        ort_out = sess.run(None, feeds)
+        ref_out = ExtendedReferenceEvaluator(model_onnx).run(None, feeds)
+        # Verify labels and probabilities
+        expected_labels = model.predict(X_test)
+        expected_proba = model.predict_proba(X_test).astype(np.float32)
+        np.testing.assert_array_equal(ort_out[0], expected_labels)
+        np.testing.assert_allclose(ort_out[1], expected_proba, rtol=1e-5, atol=1e-5)
+        np.testing.assert_array_equal(ref_out[0], expected_labels)
+        np.testing.assert_allclose(ref_out[1], expected_proba, rtol=1e-5, atol=1e-5)
+        # Verify the extra decision_leaf output matches between ORT and the reference evaluator
+        np.testing.assert_array_equal(ort_out[2], ref_out[2])
+        # decision_leaf contains the leaf node index for each sample, shape (n_samples, 1)
+        self.assertEqual(ort_out[2].ndim, 2)
+        self.assertEqual(ort_out[2].shape[0], X_test.shape[0])
+        expected_leaves = model.apply(X_test).reshape(-1, 1)
+        np.testing.assert_array_equal(ort_out[2], expected_leaves)
 
 
 if __name__ == "__main__":
