@@ -10,9 +10,10 @@ then demonstrates the different output formats produced by the
 
 The same result can be achieved from the terminal with::
 
-    python -m yobx print pretty  model.onnx
-    python -m yobx print printer model.onnx
-    python -m yobx print dot     model.onnx
+    python -m yobx print pretty   model.onnx
+    python -m yobx print printer  model.onnx
+    python -m yobx print dot      model.onnx
+    python -m yobx print mermaid  model.onnx
 """
 
 import os
@@ -83,3 +84,16 @@ _cmd_print(["print", "printer", tmp])
 print("python -m yobx print dot model.onnx")
 print("-" * 40)
 _cmd_print(["print", "dot", tmp])
+
+# %%
+# ``mermaid`` format
+# ------------------
+#
+# Dumps a `Mermaid <https://mermaid.js.org/>`_ ``flowchart TD`` diagram.
+# Paste the output into the Mermaid live editor or any Markdown renderer that
+# supports Mermaid fenced code blocks to get an interactive graph visualisation
+# (see also :class:`yobx.translate.mermaid_emitter.MermaidEmitter`).
+
+print("python -m yobx print mermaid model.onnx")
+print("-" * 40)
+_cmd_print(["print", "mermaid", tmp])
