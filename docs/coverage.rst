@@ -28,6 +28,9 @@ ops that are handled during JAX-to-ONNX conversion.
 LiteRT
 ------
 
+:ref:`l-design-litert-converter` describes the overall LiteRT/TFLite to
+ONNX conversion workflow, including dynamic shapes and custom op converters.
+
 :ref:`l-design-litert-supported-ops` lists every LiteRT (TFLite) op that
 has a converter to ONNX.
 
