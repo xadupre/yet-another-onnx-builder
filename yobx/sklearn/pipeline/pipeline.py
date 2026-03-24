@@ -83,7 +83,9 @@ def sklearn_pipeline(
             with g.prefix_name_context(step_node_name):
                 out_names = fct(g, sts, output_names, step, *current_input, name=step_node_name)
         if output_names is None:
-            out_names = out_names
+            # Converter was called with outputs=None; collect actual output names
+            # from its return value so the next step receives valid input names.
+            output_names = [out_names] if isinstance(out_names, str) else list(out_names)
         current_input = output_names
     assert current_input, f"No output coming from {estimator}{g.get_debug_msg()}"
     return current_input[0] if len(current_input) == 1 else tuple(current_input)
