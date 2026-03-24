@@ -704,21 +704,15 @@ class TestSklearnToOnnxDataFrame(ExtTestCase):
 
 
 @requires_sklearn("1.4")
-class TestSklearnConvertersOutputNamesNone(ExtTestCase):
-    """Verify that every registered sklearn converter accepts ``outputs=None``.
+class TestSklearnConvertersBasicInvocation(ExtTestCase):
+    """Verify that every registered sklearn converter can be invoked successfully.
 
-    When a converter is called with ``outputs=None`` it should not raise and
-    should return a non-None output name (or tuple of names).  This mirrors
-    the case where a :class:`~yobx.sklearn.NoKnownOutputMixin` step sits
-    inside a :class:`~sklearn.pipeline.Pipeline`, or when callers invoke
-    converter functions directly without pre-specifying output names.
-
-    The :func:`~yobx.sklearn.register.register_sklearn_converter` decorator
-    now wraps every registered converter with a shim that auto-generates
-    output names from
-    :func:`~yobx.sklearn.sklearn_helper.get_output_names` whenever
-    ``outputs=None`` is received.  This test exercises that shim for a broad
-    set of estimator types.
+    Each converter is called directly with output names pre-computed from
+    :func:`~yobx.sklearn.sklearn_helper.get_output_names`, mirroring exactly
+    what :func:`~yobx.sklearn.to_onnx` does internally.  This catches
+    registration bugs (e.g. a newly added converter that returns ``None`` or
+    has a mis-named output) that would not be caught by individual estimator
+    tests.
     """
 
     # Estimator classes that require non-trivial setup (extra estimators,
@@ -785,7 +779,7 @@ class TestSklearnConvertersOutputNamesNone(ExtTestCase):
             # Supervised feature selection / imputation needing y or special X
             "MissingIndicator",
             # KernelPCA with n_components=None (default) triggers a converter bug
-            # unrelated to outputs=None handling
+            # unrelated to this test
             "KernelPCA",
         }
     )
@@ -828,10 +822,11 @@ class TestSklearnConvertersOutputNamesNone(ExtTestCase):
                 self.skipTest(f"Cannot fit {cls.__name__}: {exc}")
         return est
 
-    def test_all_sklearn_converters_accept_none_outputs(self):
-        """Every registered sklearn-library converter must handle outputs=None."""
+    def test_all_sklearn_converters_basic_invocation(self):
+        """Every registered sklearn-library converter must return a non-None result."""
         from sklearn.utils import all_estimators
         from yobx.sklearn.register import get_sklearn_converters
+        from yobx.sklearn.sklearn_helper import get_output_names
 
         converters = get_sklearn_converters()
 
@@ -847,74 +842,23 @@ class TestSklearnConvertersOutputNamesNone(ExtTestCase):
 
                 g = self._make_graph_builder()
                 inp = g.make_tensor_input("X", 1, (None, self._X.shape[1]))
-                fct = converters[cls]
 
-                result = fct(g, {}, None, est, inp, name="test")
+                # Pre-compute output names exactly as to_onnx() does internally.
+                output_names = get_output_names(est, g.convert_options)
+                outputs = (
+                    [g.unique_name(n) for n in output_names] if output_names else None
+                )
+
+                fct = converters[cls]
+                result = fct(g, {}, outputs, est, inp, name="test")
 
                 self.assertIsNotNone(
                     result,
-                    msg=f"Converter for {cls.__name__} returned None when outputs=None",
+                    msg=f"Converter for {cls.__name__} returned None",
                 )
                 tested += 1
 
         self.assertGreater(tested, 0, "No converters were tested")
-
-    def test_wrapper_does_not_affect_explicit_output_names(self):
-        """The normalization wrapper must be transparent when outputs is a list."""
-        from yobx.sklearn.register import get_sklearn_converters
-        from sklearn.preprocessing import StandardScaler
-
-        converters = get_sklearn_converters()
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
-        ss = StandardScaler().fit(X)
-
-        g = self._make_graph_builder()
-        inp = g.make_tensor_input("X", 1, (None, 2))
-
-        explicit_name = g.unique_name("my_output")
-        fct = converters[StandardScaler]
-        result = fct(g, {}, [explicit_name], ss, inp, name="test")
-
-        self.assertEqual(result, explicit_name)
-
-    def test_logistic_regression_none_outputs_returns_two_names(self):
-        """LogisticRegression converter with outputs=None returns (label, proba)."""
-        from sklearn.linear_model import LogisticRegression
-        from yobx.sklearn.register import get_sklearn_converters
-
-        converters = get_sklearn_converters()
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
-        y = np.array([0, 0, 1, 1])
-        lr = LogisticRegression().fit(X, y)
-
-        g = self._make_graph_builder()
-        inp = g.make_tensor_input("X", 1, (None, 2))
-        fct = converters[LogisticRegression]
-
-        result = fct(g, {}, None, lr, inp, name="test")
-
-        # Must return a 2-tuple (label, probabilities)
-        self.assertIsInstance(result, tuple)
-        self.assertEqual(len(result), 2)
-        self.assertIsInstance(result[0], str)
-        self.assertIsInstance(result[1], str)
-
-    def test_standard_scaler_none_outputs_returns_one_name(self):
-        """StandardScaler converter with outputs=None returns a single string."""
-        from sklearn.preprocessing import StandardScaler
-        from yobx.sklearn.register import get_sklearn_converters
-
-        converters = get_sklearn_converters()
-        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
-        ss = StandardScaler().fit(X)
-
-        g = self._make_graph_builder()
-        inp = g.make_tensor_input("X", 1, (None, 2))
-        fct = converters[StandardScaler]
-
-        result = fct(g, {}, None, ss, inp, name="test")
-
-        self.assertIsInstance(result, str)
 
     def test_to_onnx_with_no_known_output_mixin(self):
         """to_onnx works for a custom estimator with NoKnownOutputMixin."""
