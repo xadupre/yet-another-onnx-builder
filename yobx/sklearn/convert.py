@@ -59,17 +59,21 @@ def _wrap_step_as_function(
         sub_g.make_tensor_input(func_inp, itype, ishape)
 
     # Determine generic sub-builder output names (independent of the main graph).
-    function_output_names = get_output_names(estimator, g.convert_options, name)
-    function_output_names = (
-        [sub_g.unique_name(n) for n in function_output_names] if function_input_names else None  # type: ignore
-    )
+    raw_output_names = get_output_names(estimator, g.convert_options, name)
+    if not function_input_names or raw_output_names is None:
+        # No inputs, or output count unknown (NoKnownOutputMixin): let the
+        # converter (and its normalization wrapper) decide the output names.
+        function_output_names = None
+    else:
+        function_output_names = [sub_g.unique_name(n) for n in raw_output_names]  # type: ignore
 
     # Run the converter inside the sub-builder (no function_options propagation).
     out_names = converter(
         sub_g, {}, function_output_names, estimator, *function_input_names, name=name
     )
-    if function_input_names is None:
-        function_output_names = out_names
+    # Reconcile: if outputs were not pre-specified, use the names returned by the converter.
+    if function_output_names is None:
+        function_output_names = (out_names,) if isinstance(out_names, str) else tuple(out_names)
     else:
         function_output_names = tuple(function_output_names)  # type: ignore
 
@@ -332,7 +336,8 @@ def to_onnx(
         f"{out_names=}, {is_container=}, {function_options=}, {estimator=}{g.get_debug_msg()}"
     )
     if output_names is None:
-        output_names = out_names
+        # Converter was called with outputs=None; collect returned name(s) into a tuple.
+        output_names = (out_names,) if isinstance(out_names, str) else tuple(out_names)
     else:
         output_names = tuple(output_names)
     for name in output_names:

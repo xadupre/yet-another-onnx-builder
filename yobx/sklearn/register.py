@@ -1,7 +1,35 @@
+from functools import wraps
 from typing import Dict, Callable, Optional, Tuple, Union
 
 SKLEARN_CONVERTERS: Dict[type, Callable] = {}
 VERSION_CONVERTERS: Dict[type, Dict[str, str]] = {}
+
+
+def _normalize_outputs_for_converter(fct: Callable) -> Callable:
+    """
+    Wraps a converter so that ``outputs=None`` is replaced by auto-generated
+    output names derived from the estimator type before the converter is called.
+
+    This ensures every registered converter can be called with ``outputs=None``
+    (e.g., when a :class:`~yobx.sklearn.NoKnownOutputMixin` step appears inside
+    a :class:`~sklearn.pipeline.Pipeline`, or when testing converters directly)
+    without raising a ``TypeError`` from code that indexes into ``outputs``.
+    """
+    # Import once at decoration time, not on every converter call.
+    from .sklearn_helper import get_output_names
+
+    @wraps(fct)
+    def wrapper(g, sts, outputs, estimator, *args, **kwargs):
+        if outputs is None:
+            convert_opts = getattr(g, "convert_options", None)
+            names = get_output_names(estimator, convert_opts)
+            if names is not None:
+                outputs = [g.unique_name(n) for n in names]
+            else:
+                outputs = [g.unique_name("output")]
+        return fct(g, sts, outputs, estimator, *args, **kwargs)
+
+    return wrapper
 
 
 def register_sklearn_converter(
@@ -38,15 +66,16 @@ def register_sklearn_converter(
         """Registers a function to converts a model."""
         if enabled:
             global SKLEARN_CONVERTERS
+            wrapped = _normalize_outputs_for_converter(fct)
             if isinstance(cls, tuple):
                 for c in cls:
                     if c in SKLEARN_CONVERTERS:
                         raise TypeError(f"A converter is already registered for {c}.")
-                    SKLEARN_CONVERTERS[c] = fct
+                    SKLEARN_CONVERTERS[c] = wrapped
             else:
                 if cls in SKLEARN_CONVERTERS:
                     raise TypeError(f"A converter is already registered for {cls}.")
-                SKLEARN_CONVERTERS[cls] = fct
+                SKLEARN_CONVERTERS[cls] = wrapped
         return fct
 
     return decorator

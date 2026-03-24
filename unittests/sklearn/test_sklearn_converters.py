@@ -703,5 +703,250 @@ class TestSklearnToOnnxDataFrame(ExtTestCase):
         self.assertEqualArray(expected, label)
 
 
+@requires_sklearn("1.4")
+class TestSklearnConvertersOutputNamesNone(ExtTestCase):
+    """Verify that every registered sklearn converter accepts ``outputs=None``.
+
+    When a converter is called with ``outputs=None`` it should not raise and
+    should return a non-None output name (or tuple of names).  This mirrors
+    the case where a :class:`~yobx.sklearn.NoKnownOutputMixin` step sits
+    inside a :class:`~sklearn.pipeline.Pipeline`, or when callers invoke
+    converter functions directly without pre-specifying output names.
+
+    The :func:`~yobx.sklearn.register.register_sklearn_converter` decorator
+    now wraps every registered converter with a shim that auto-generates
+    output names from
+    :func:`~yobx.sklearn.sklearn_helper.get_output_names` whenever
+    ``outputs=None`` is received.  This test exercises that shim for a broad
+    set of estimator types.
+    """
+
+    # Estimator classes that require non-trivial setup (extra estimators,
+    # supervised feature selectors, 1-D inputs, etc.) and are intentionally
+    # excluded from this smoke test.
+    _SKIP = frozenset(
+        {
+            # Container meta-estimators
+            "Pipeline",
+            "ColumnTransformer",
+            "FeatureUnion",
+            # Meta-estimators that wrap other estimators
+            "GridSearchCV",
+            "HalvingGridSearchCV",
+            "HalvingRandomSearchCV",
+            "RandomizedSearchCV",
+            "StackingClassifier",
+            "StackingRegressor",
+            "VotingClassifier",
+            "VotingRegressor",
+            "MultiOutputClassifier",
+            "MultiOutputRegressor",
+            "ClassifierChain",
+            "RegressorChain",
+            "OneVsOneClassifier",
+            "OneVsRestClassifier",
+            "OutputCodeClassifier",
+            "CalibratedClassifierCV",
+            "TransformedTargetRegressor",
+            "TunedThresholdClassifierCV",
+            # Feature selectors that need supervised fit(X, y)
+            "SelectFdr",
+            "SelectFpr",
+            "SelectFwe",
+            "SelectKBest",
+            "SelectPercentile",
+            "SelectFromModel",
+            "RFE",
+            "RFECV",
+            # Estimators with special input requirements
+            "RANSACRegressor",
+            "IsotonicRegression",  # 1-D input
+            "BernoulliRBM",  # different input semantics
+            "KernelCenterer",  # expects square kernel matrix
+            "GaussianRandomProjection",  # fails with tiny dataset
+            "FeatureHasher",  # needs dict inputs
+            "PatchExtractor",  # needs image input
+            "CountVectorizer",  # needs text input
+            "TfidfVectorizer",  # needs text input
+            # Estimators needing supervised fit for dimensionality reduction
+            "NeighborhoodComponentsAnalysis",
+            "CCA",
+            "PLSSVD",
+            # Multi-task estimators (require multi-column y)
+            "MultiTaskLasso",
+            "MultiTaskElasticNet",
+            "MultiTaskLassoCV",
+            "MultiTaskElasticNetCV",
+            # NMF default solver not supported
+            "NMF",
+            "MiniBatchNMF",
+            # LocalOutlierFactor needs novelty=True which changes semantics
+            "LocalOutlierFactor",
+            # Supervised feature selection / imputation needing y or special X
+            "MissingIndicator",
+            # KernelPCA with n_components=None (default) triggers a converter bug
+            # unrelated to outputs=None handling
+            "KernelPCA",
+        }
+    )
+
+    def setUp(self):
+        from yobx.sklearn import register_sklearn_converters
+
+        register_sklearn_converters()
+
+        # Small float32 dataset suitable for most estimators.
+        rng = np.random.default_rng(0)
+        self._X = rng.standard_normal((20, 4)).astype(np.float32)
+        self._y_bin = (rng.random(20) > 0.5).astype(np.int64)
+        self._y_reg = rng.standard_normal(20).astype(np.float32)
+
+    def _make_graph_builder(self):
+        from yobx.xbuilder import GraphBuilder
+
+        return GraphBuilder({"": 20, "ai.onnx.ml": 5})
+
+    def _fit_estimator(self, cls):
+        """Return a fitted instance of *cls* or raise ``SkipTest``."""
+        from sklearn.base import ClusterMixin, OutlierMixin, is_classifier, is_regressor
+
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            est = cls()
+            try:
+                if is_classifier(est):
+                    est.fit(self._X, self._y_bin)
+                elif is_regressor(est):
+                    est.fit(self._X, self._y_reg)
+                elif isinstance(est, (ClusterMixin, OutlierMixin)):
+                    est.fit(self._X)
+                else:
+                    est.fit(self._X)
+            except Exception as exc:
+                self.skipTest(f"Cannot fit {cls.__name__}: {exc}")
+        return est
+
+    def test_all_sklearn_converters_accept_none_outputs(self):
+        """Every registered sklearn-library converter must handle outputs=None."""
+        from sklearn.utils import all_estimators
+        from yobx.sklearn.register import get_sklearn_converters
+
+        converters = get_sklearn_converters()
+
+        tested = 0
+        for _name, cls in sorted(all_estimators(), key=lambda x: x[0]):
+            if cls not in converters:
+                continue
+            if cls.__name__ in self._SKIP:
+                continue
+
+            with self.subTest(estimator=cls.__name__):
+                est = self._fit_estimator(cls)
+
+                g = self._make_graph_builder()
+                inp = g.make_tensor_input("X", 1, (None, self._X.shape[1]))
+                fct = converters[cls]
+
+                result = fct(g, {}, None, est, inp, name="test")
+
+                self.assertIsNotNone(
+                    result,
+                    msg=f"Converter for {cls.__name__} returned None when outputs=None",
+                )
+                tested += 1
+
+        self.assertGreater(tested, 0, "No converters were tested")
+
+    def test_wrapper_does_not_affect_explicit_output_names(self):
+        """The normalization wrapper must be transparent when outputs is a list."""
+        from yobx.sklearn.register import get_sklearn_converters
+        from sklearn.preprocessing import StandardScaler
+
+        converters = get_sklearn_converters()
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        ss = StandardScaler().fit(X)
+
+        g = self._make_graph_builder()
+        inp = g.make_tensor_input("X", 1, (None, 2))
+
+        explicit_name = g.unique_name("my_output")
+        fct = converters[StandardScaler]
+        result = fct(g, {}, [explicit_name], ss, inp, name="test")
+
+        self.assertEqual(result, explicit_name)
+
+    def test_logistic_regression_none_outputs_returns_two_names(self):
+        """LogisticRegression converter with outputs=None returns (label, proba)."""
+        from sklearn.linear_model import LogisticRegression
+        from yobx.sklearn.register import get_sklearn_converters
+
+        converters = get_sklearn_converters()
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        y = np.array([0, 0, 1, 1])
+        lr = LogisticRegression().fit(X, y)
+
+        g = self._make_graph_builder()
+        inp = g.make_tensor_input("X", 1, (None, 2))
+        fct = converters[LogisticRegression]
+
+        result = fct(g, {}, None, lr, inp, name="test")
+
+        # Must return a 2-tuple (label, probabilities)
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result[0], str)
+        self.assertIsInstance(result[1], str)
+
+    def test_standard_scaler_none_outputs_returns_one_name(self):
+        """StandardScaler converter with outputs=None returns a single string."""
+        from sklearn.preprocessing import StandardScaler
+        from yobx.sklearn.register import get_sklearn_converters
+
+        converters = get_sklearn_converters()
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        ss = StandardScaler().fit(X)
+
+        g = self._make_graph_builder()
+        inp = g.make_tensor_input("X", 1, (None, 2))
+        fct = converters[StandardScaler]
+
+        result = fct(g, {}, None, ss, inp, name="test")
+
+        self.assertIsInstance(result, str)
+
+    def test_to_onnx_with_no_known_output_mixin(self):
+        """to_onnx works for a custom estimator with NoKnownOutputMixin."""
+        from sklearn.base import TransformerMixin
+        from yobx.sklearn import NoKnownOutputMixin
+        from yobx.sklearn import to_onnx
+
+        class _DoubleTransformer(BaseEstimator, TransformerMixin, NoKnownOutputMixin):
+            def fit(self, X, y=None):
+                return self
+
+            def transform(self, X):
+                return X * 2.0
+
+        def _double_converter(g, sts, outputs, estimator, X, name="double"):
+            import numpy as np
+
+            two = np.array([2.0], dtype=np.float32)
+            res = g.op.Mul(X, two, name=name, outputs=outputs)
+            if not sts:
+                g.set_type(res, g.get_type(X))
+                g.set_shape(res, g.get_shape(X))
+            return res
+
+        X = np.array([[1, 2], [3, 4]], dtype=np.float32)
+        est = _DoubleTransformer().fit(X)
+        onx = to_onnx(est, (X,), extra_converters={_DoubleTransformer: _double_converter})
+
+        ref = ExtendedReferenceEvaluator(onx)
+        result = ref.run(None, {"X": X})[0]
+        self.assertEqualArray(X * 2.0, result, atol=1e-5)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
