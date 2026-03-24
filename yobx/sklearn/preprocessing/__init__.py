@@ -1,6 +1,7 @@
 def register():
     from . import (
         binarizer,
+        dataframe_function_transformer,
         function_transformer,
         kbins_discretizer,
         kernel_centerer,
@@ -16,3 +17,11 @@ def register():
         spline_transformer,
         standard_scaler,
     )
+
+
+def __getattr__(name: str):
+    if name == "DataFrameTransformer":
+        from ._dataframe_transformer import DataFrameTransformer
+
+        return DataFrameTransformer
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
