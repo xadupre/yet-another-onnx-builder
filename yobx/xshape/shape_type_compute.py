@@ -2709,14 +2709,19 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
                     local_function_builder.set_type(i, self.get_type(ni))
                 if self.has_device(ni):
                     local_function_builder.set_device(i, self.get_device(ni))
+                if self.is_constant(ni):
+                    cst = self.get_constant(ni, exc=exc, computed_value=True)
+                    if cst is not None:
+                        local_function_builder.constants_[i] = self.constants_[ni]
+                        local_function_builder.constants_computed_[i] = cst
                 local_function_builder.set_shape(i, sh)
             if hasattr(local_function_builder, "infer_shapes"):
                 # A GraphBuilder
                 local_function_builder.infer_shapes()
             else:
                 # A ShapeBuilder
-                for node in proto_local_function.node:
-                    local_function_builder.run_node(node, exc=exc)
+                for n in proto_local_function.node:
+                    local_function_builder.run_node(n, exc=exc)
                 for o in proto_local_function.output:
                     local_function_builder._output_names.append(o)
 
