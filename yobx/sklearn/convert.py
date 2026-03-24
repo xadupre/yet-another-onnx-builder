@@ -96,22 +96,27 @@ def _wrap_step_as_function(
     # we write to a fresh temporary name first and then rename via Identity.
     actual_output_names = []
     renames: List[Tuple[str, str]] = []
-    for out in output_names:
-        if g.has_name(out):
-            tmp = g.unique_name(f"_tmp_{cls_name}_out_")
-            actual_output_names.append(tmp)
-            renames.append((tmp, out))
-        else:
-            actual_output_names.append(out)
+    if output_names:
+        for out in output_names:
+            if g.has_name(out):
+                tmp = g.unique_name(f"_tmp_{cls_name}_out_")
+                actual_output_names.append(tmp)
+                renames.append((tmp, out))
+            else:
+                actual_output_names.append(out)
 
     # Call the local function in the main graph.
     g.make_node(fname, list(input_names), actual_output_names, domain=fdomain, name=name)
 
     # Apply any needed Identity renames.
-    for tmp, final in renames:
-        g.make_node("Identity", [tmp], [final], name=f"{name}_rename")
+    if renames:
+        for tmp, final in renames:
+            g.make_node("Identity", [tmp], [final], name=f"{name}_rename")
+    else:
+        output_names = actual_output_names
 
     # Propagate type/shape metadata from the sub-builder to the main graph.
+    assert output_names is not None, "type checking"
     for func_out, actual, desired in zip(
         function_output_names, actual_output_names, output_names
     ):
