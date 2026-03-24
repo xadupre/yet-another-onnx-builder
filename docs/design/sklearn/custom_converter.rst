@@ -211,6 +211,66 @@ Once this module is imported the converter is available globally and
     onx = to_onnx(ScaleByConstant(scale=3.0).fit(X), (X,))
     # no extra_converters needed
 
+Multi-output converters with ``NoKnownOutputMixin``
+===================================================
+
+By default the framework infers the expected ONNX output names from the
+estimator type (see :ref:`l-design-sklearn-converter`, *Output naming*
+section).  When a custom estimator produces outputs that don't fit those
+heuristics — for example an arbitrary set of named columns — the automatic
+inference gets in the way.
+
+Inheriting from
+:class:`NoKnownOutputMixin <yobx.sklearn.NoKnownOutputMixin>`
+tells :func:`get_output_names <yobx.sklearn.sklearn_helper.get_output_names>`
+to return ``None``, which causes :func:`to_onnx <yobx.sklearn.to_onnx>`
+to skip pre-allocating output tensor names and hand full control to the
+converter.  The converter is then free to call ``g.op.*`` and return as
+many (or as few) output names as it needs.
+
+.. code-block:: python
+
+    import numpy as np
+    from sklearn.base import BaseEstimator, TransformerMixin
+    from yobx.sklearn import NoKnownOutputMixin, to_onnx
+
+    # ── 1. Estimator ──────────────────────────────────────────────────────
+
+    class SumTransformer(BaseEstimator, TransformerMixin, NoKnownOutputMixin):
+        """Returns the original two columns plus their element-wise sum."""
+
+        def fit(self, X=None, y=None):
+            self.input_dtypes_ = {
+                "a": np.dtype("float32"),
+                "b": np.dtype("float32"),
+            }
+            return self
+
+        def transform(self, df):
+            return df[["a", "b"]].assign(total=df["a"] + df["b"])
+
+        def get_feature_names_out(self, input_features=None):
+            return ["a", "b", "total"]
+
+    # ── 2. Converter ──────────────────────────────────────────────────────
+
+    def convert_sum_transformer(g, sts, outputs, estimator, a, b, name="sum"):
+        total = g.op.Add(a, b, name=name)
+        return a, b, total
+
+    # ── 3. Convert ────────────────────────────────────────────────────────
+
+    import pandas as pd
+
+    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]}, dtype="float32")
+    est = SumTransformer().fit(df)
+
+    onx = to_onnx(
+        est,
+        (df,),
+        extra_converters={SumTransformer: convert_sum_transformer},
+    )
+
 .. seealso::
 
     :ref:`l-design-sklearn-converter` — overview of the converter
