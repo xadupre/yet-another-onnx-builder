@@ -414,7 +414,6 @@ class TestSklearnBaseConverters(ExtTestCase):
 
     def test_custom_converter_with_convert_options(self):
         """A custom converter can use g.convert_options.has() to emit optional outputs."""
-        import onnx
         from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
 
         # ── custom estimator ──────────────────────────────────────────────────
@@ -450,19 +449,11 @@ class TestSklearnBaseConverters(ExtTestCase):
             high = np.array(estimator.clip_max, dtype=dtype)
 
             clipped = g.op.Clip(X, low, high, name=name, outputs=outputs[:1])
-            if not sts:
-                g.set_type_shape_unary_op(clipped, X)
 
             if g.convert_options.has("clip_mask", estimator, name):
                 below = g.op.Less(X, low, name=f"{name}_below")
                 above = g.op.Greater(X, high, name=f"{name}_above")
-                mask = g.op.Or(below, above, name=f"{name}_mask", outputs=outputs[1:2])
-                if not sts:
-                    g.set_type(mask, onnx.TensorProto.BOOL)
-                    if g.has_shape(X):
-                        g.set_shape(mask, g.get_shape(X))
-                    if g.has_device(X):
-                        g.set_device(mask, g.get_device(X))
+                g.op.Or(below, above, name=f"{name}_mask", outputs=outputs[1:2])
 
             return outputs[0] if len(outputs) == 1 else tuple(outputs)
 

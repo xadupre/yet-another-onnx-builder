@@ -295,8 +295,6 @@ class:
         high = np.array(estimator.clip_max, dtype=dtype)
 
         clipped = g.op.Clip(X, low, high, name=name, outputs=outputs[:1])
-        if not sts:
-            g.set_type_shape_unary_op(clipped, X)
 
         if g.convert_options.has("clip_mask", estimator, name):
             below = g.op.Less(X, low, name=f"{name}_below")

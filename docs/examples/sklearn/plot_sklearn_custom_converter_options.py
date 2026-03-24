@@ -27,14 +27,13 @@ tensor** indicating which values were actually clipped.
 """
 
 import numpy as np
-import onnx
 import onnxruntime
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from yobx.doc import plot_dot
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
 from yobx.sklearn import to_onnx
-from yobx.typing import GraphBuilderExtendedProtocol
+from yobx.typing import ConvertOptionsProtocol, GraphBuilderExtendedProtocol
 
 # %%
 # 1. Custom estimator: ``ClipTransformer``
@@ -78,7 +77,7 @@ class ClipTransformer(TransformerMixin, BaseEstimator):
 #   specific named step in a :class:`~sklearn.pipeline.Pipeline`).
 
 
-class ClipOptions:
+class ClipOptions(ConvertOptionsProtocol):
     """Convert options for :class:`ClipTransformer`.
 
     :param clip_mask: when ``True``, adds a second boolean output tensor whose
@@ -135,8 +134,6 @@ def convert_clip_transformer(
 
     # ── Primary output: Clip ──────────────────────────────────────────────────
     clipped = g.op.Clip(X, low, high, name=name, outputs=outputs[:1])
-    if not sts:
-        g.set_type_shape_unary_op(clipped, X)
 
     # ── Optional extra output: clip mask ─────────────────────────────────────
     if g.convert_options.has("clip_mask", estimator, name):
@@ -145,13 +142,7 @@ def convert_clip_transformer(
         )
         below = g.op.Less(X, low, name=f"{name}_below")
         above = g.op.Greater(X, high, name=f"{name}_above")
-        mask = g.op.Or(below, above, name=f"{name}_mask", outputs=outputs[1:2])
-        if not sts:
-            g.set_type(mask, onnx.TensorProto.BOOL)
-            if g.has_shape(X):
-                g.set_shape(mask, g.get_shape(X))
-            if g.has_device(X):
-                g.set_device(mask, g.get_device(X))
+        g.op.Or(below, above, name=f"{name}_mask", outputs=outputs[1:2])
 
     return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
