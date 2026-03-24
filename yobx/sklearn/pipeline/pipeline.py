@@ -48,13 +48,14 @@ def sklearn_pipeline(
 
     current_input = [X]
     for i, (step_name, step) in enumerate(estimator.steps):
+        assert current_input, f"No input to give to step {step_name!r}: {step}{g.get_debug_msg()}"
+        step_node_name = f"{name}__{step_name}"
         if i == len(estimator.steps) - 1:
             output_names = outputs
         else:
-            output_names = list(get_output_names(step, g.convert_options))
+            output_names = get_output_names(step, g.convert_options, step_node_name)
             output_names = [g.unique_name(n) for n in output_names] if output_names else None
         fct = get_sklearn_converter(type(step))
-        step_node_name = f"{name}__{step_name}"
         is_container = isinstance(step, (Pipeline, ColumnTransformer, FeatureUnion))
         if function_options and function_options.export_as_function and not is_container:
             with g.prefix_name_context(step_node_name):
@@ -84,4 +85,5 @@ def sklearn_pipeline(
         if output_names is None:
             out_names = out_names
         current_input = output_names
+    assert current_input, f"No output coming from {estimator}{g.get_debug_msg()}"
     return current_input[0] if len(current_input) == 1 else tuple(current_input)

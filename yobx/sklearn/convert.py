@@ -59,7 +59,7 @@ def _wrap_step_as_function(
         sub_g.make_tensor_input(func_inp, itype, ishape)
 
     # Determine generic sub-builder output names (independent of the main graph).
-    function_output_names = list(get_output_names(estimator, g.convert_options))
+    function_output_names = get_output_names(estimator, g.convert_options, name)
     function_output_names = (
         [g.unique_name(n) for n in function_output_names] if function_input_names else None
     )
@@ -72,6 +72,9 @@ def _wrap_step_as_function(
         function_output_names = out_names
 
     # Register the sub-builder outputs.
+    assert (
+        function_output_names
+    ), f"No output found for convert {converter} applied to {estimator}{g.get_debug_msg()}"
     for out_name in function_output_names:
         sub_g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
 
@@ -287,7 +290,10 @@ def to_onnx(
     # Build the sts dict (shared state for converters). function_options, if set,
     # is passed explicitly to container converters below.
     sts: Dict[str, Any] = {}
-    output_names = get_output_names(estimator, g.convert_options)
+    top_level_node_name = (
+        f"main__{estimator.steps[-1][0]}" if isinstance(estimator, Pipeline) else "main"
+    )
+    output_names = get_output_names(estimator, g.convert_options, top_level_node_name)
     output_names = [g.unique_name(n) for n in output_names] if output_names else None
 
     is_container = isinstance(estimator, (Pipeline, ColumnTransformer, FeatureUnion))
@@ -310,7 +316,11 @@ def to_onnx(
     else:
         out_names = fct(g, sts, output_names, estimator, *input_names, name="main")
 
-    assert output_names is None or out_names == output_names, (
+    assert (
+        output_names is None
+        or (out_names == output_names[0] and len(output_names) == 1)
+        or (out_names == output_names and len(output_names) > 1)
+    ), (
         f"estimator={cls}, {fct=}, output mismatch, expected is {output_names}, got {out_names}"
         f"{g.get_debug_msg()}"
     )

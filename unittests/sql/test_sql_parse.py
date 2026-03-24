@@ -271,5 +271,36 @@ class TestParseSqlSubquery(unittest.TestCase):
         self.assertIsNone(pq.subquery)
 
 
+class TestParsedQueryRepr(unittest.TestCase):
+    """Tests for ParsedQuery.__repr__."""
+
+    def test_repr_starts_with_parsed_query(self):
+        pq = parse_sql("SELECT a FROM t")
+        r = repr(pq)
+        self.assertIn("ParsedQuery", r)
+
+    def test_repr_each_operation_on_own_line(self):
+        pq = parse_sql("SELECT a FROM t WHERE a > 0")
+        r = repr(pq)
+        lines = r.splitlines()
+        # At least one line per operation plus the header and footer
+        self.assertGreater(len(lines), 2)
+
+    def test_repr_contains_from_table(self):
+        pq = parse_sql("SELECT a FROM t")
+        r = repr(pq)
+        self.assertIn("from_table='t'", r)
+
+    def test_repr_contains_columns(self):
+        pq = parse_sql("SELECT a, b FROM t")
+        r = repr(pq)
+        self.assertIn("columns=", r)
+
+    def test_repr_with_subquery_contains_subquery(self):
+        pq = parse_sql("SELECT a FROM (SELECT a FROM t)")
+        r = repr(pq)
+        self.assertIn("subquery=", r)
+
+
 if __name__ == "__main__":
     unittest.main()

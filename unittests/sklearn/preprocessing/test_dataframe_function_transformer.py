@@ -168,7 +168,7 @@ class TestCustomDataFrameTransformerOnnx(ExtTestCase):
         """Scalar multiplication: user-defined single-column transformer."""
         from yobx.sklearn import to_onnx
 
-        class _ScaleTransformer(BaseEstimator, TransformerMixin):
+        class ScaleTransformer(BaseEstimator, TransformerMixin):
             _INPUT_DTYPES = {"x": np.float32}
 
             def fit(self, X=None, y=None):
@@ -196,10 +196,10 @@ class TestCustomDataFrameTransformerOnnx(ExtTestCase):
             )
             return out_names[0]
 
-        t = _ScaleTransformer()
+        t = ScaleTransformer()
         t.fit()
         args = self._make_args(t.input_dtypes_)
-        onx = to_onnx(t, args, extra_converters={_ScaleTransformer: _scale_converter})
+        onx = to_onnx(t, args, extra_converters={ScaleTransformer: _scale_converter})
 
         x = np.array([1.0, 2.0, 4.0], dtype=np.float32)
         (x3,) = _run_onnx(onx, {"x": x})
