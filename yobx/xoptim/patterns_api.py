@@ -3,7 +3,7 @@ import os
 import pprint
 import textwrap
 from collections import Counter
-from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
 from onnx import AttributeProto, FunctionProto, ModelProto, NodeProto, TensorProto
 from ..helpers.onnx_helper import make_idn
@@ -130,6 +130,16 @@ class PatternOptimization:
         if pattern & cls_name:
             self.verbose = max(self.verbose, 10)
 
+    @classmethod
+    def fast_op_type(cls) -> Set[str]:
+        """
+        While looping over nodes to match, this allows the algorithm
+        to shorten the list of patterns to look into for a specific type.
+        It does not add much though because the algorithm loops over patterns
+        then nodes to follow the priorities.
+        """
+        return set()
+
     def __str__(self) -> str:
         return self.__class__.__name__
 
@@ -163,6 +173,7 @@ class PatternOptimization:
             #   too slow to have a secondary iterator
             if subset_nodes is None:
                 subset_nodes = g.builder.nodes
+
             for node in subset_nodes:
                 # This expression seems awkward but it saves 10% just by looking into
                 # the first item of the list and then, if necessary, walking through the
