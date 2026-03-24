@@ -727,6 +727,29 @@ class TestDataframeToOnnx(ExtTestCase):
 
         self.assertTrue(callable(td))
 
+    def test_imported_from_xtracing_package(self):
+        from yobx.xtracing import dataframe_to_onnx as dtonnx  # noqa: F401
+
+        self.assertTrue(callable(dtonnx))
+
+    def test_trace_dataframe_imported_from_xtracing_package(self):
+        from yobx.xtracing import trace_dataframe as td  # noqa: F401
+
+        self.assertTrue(callable(td))
+
+    def test_traced_classes_imported_from_xtracing(self):
+        from yobx.xtracing import (  # noqa: F401
+            TracedCondition,
+            TracedDataFrame,
+            TracedGroupBy,
+            TracedSeries,
+        )
+
+        self.assertTrue(issubclass(TracedDataFrame, object))
+        self.assertTrue(issubclass(TracedSeries, object))
+        self.assertTrue(issubclass(TracedCondition, object))
+        self.assertTrue(issubclass(TracedGroupBy, object))
+
     # ------------------------------------------------------------------
     # pipe — calling other functions that process a dataframe
     # ------------------------------------------------------------------

@@ -20,7 +20,6 @@ import numpy as np
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
 from ..xbuilder import GraphBuilder
-from .dataframe_trace import TracedDataFrame, dataframe_to_onnx
 from .polars_convert import lazyframe_to_onnx
 from .sql_convert import sql_to_onnx, sql_to_onnx_graph  # noqa: F401 – re-exported
 
@@ -173,6 +172,8 @@ def to_onnx(
         larger than 2^53.
     """
     if callable(dataframe_or_query) and not isinstance(dataframe_or_query, str):
+        from ..xtracing.dataframe_trace import dataframe_to_onnx
+
         return dataframe_to_onnx(
             dataframe_or_query,  # type: ignore
             input_dtypes,

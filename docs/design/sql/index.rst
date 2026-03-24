@@ -206,7 +206,7 @@ In addition to accepting SQL strings and :class:`polars.LazyFrame` objects,
 ``yobx.sql`` provides a lightweight pandas-inspired API for tracing Python
 functions that operate on a virtual DataFrame.
 
-The tracer works by passing a :class:`~yobx.sql.dataframe_trace.TracedDataFrame`
+The tracer works by passing a :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame`
 proxy to the user function.  Every operation performed on the proxy —
 column access, arithmetic, filtering, aggregation — is recorded as an AST
 node rather than being executed.  The resulting AST is assembled into a
@@ -226,14 +226,14 @@ existing SQL converter.
 Key classes and functions
 -------------------------
 
-* :class:`~yobx.sql.dataframe_trace.TracedDataFrame` — proxy DataFrame with
+* :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame` — proxy DataFrame with
   ``.filter()``, ``.select()``, ``.assign()``, ``.groupby()`` operations.
-* :class:`~yobx.sql.dataframe_trace.TracedSeries` — proxy for a column or
+* :class:`~yobx.xtracing.dataframe_trace.TracedSeries` — proxy for a column or
   expression; supports arithmetic (``+``, ``-``, ``*``, ``/``),
   comparisons (``>``, ``<``, ``>=``, ``<=``, ``==``, ``!=``),
   aggregations (``.sum()``, ``.mean()``, ``.min()``, ``.max()``, ``.count()``)
   and ``.alias()``.
-* :class:`~yobx.sql.dataframe_trace.TracedCondition` — boolean predicate proxy;
+* :class:`~yobx.xtracing.dataframe_trace.TracedCondition` — boolean predicate proxy;
   supports ``&`` (AND) and ``|`` (OR) combination.
 * :func:`~yobx.sql.trace_dataframe` — traces a function and returns a
   :class:`~yobx.sql.parse.ParsedQuery`.
