@@ -26,7 +26,6 @@ input** tensor.  See :ref:`l-design-sql` for the full design discussion.
     parse
     sql_convert
     polars_convert
-    dataframe_trace
     convert
     _expr
     ops/index

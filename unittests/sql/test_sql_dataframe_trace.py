@@ -20,7 +20,7 @@ from yobx.sql import (
     dataframe_to_onnx,
     trace_dataframe,
 )
-from yobx.sql.dataframe_trace import _to_ast
+from yobx.xtracing.dataframe_trace import _to_ast
 from yobx.sql.parse import AggExpr, BinaryExpr, ColumnRef, Condition, Literal
 
 

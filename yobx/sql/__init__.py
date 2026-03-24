@@ -96,7 +96,7 @@ _DATAFRAME_TRACE_NAMES = frozenset([
 
 def __getattr__(name: str) -> object:
     if name in _DATAFRAME_TRACE_NAMES:
-        from .dataframe_trace import (  # noqa: PLC0415
+        from yobx.xtracing.dataframe_trace import (  # noqa: PLC0415
             TracedCondition,
             TracedDataFrame,
             TracedGroupBy,
